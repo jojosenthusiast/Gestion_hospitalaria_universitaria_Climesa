@@ -1,0 +1,18 @@
+name: Supabase
+on:
+  push:
+    paths: ['supabase/**', 'compose.test.yaml', 'deployment/init-test-db.sh', '.github/workflows/supabase.yml']
+  pull_request:
+    paths: ['supabase/**', 'compose.test.yaml', 'deployment/init-test-db.sh', '.github/workflows/supabase.yml']
+permissions:
+  contents: read
+jobs:
+  postgres-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f compose.test.yaml up --wait db
+      - run: docker compose -f compose.test.yaml exec -T db bash -c 'psql -U postgres -d sghu_test -v ON_ERROR_STOP=1 -f /checks/pruebas/01_invariantes.sql'
+      - run: docker compose -f compose.test.yaml exec -T -e PSQL="psql -U postgres -d sghu_test" db bash /checks/pruebas/02_concurrencia.sh
+      - if: always()
+        run: docker compose -f compose.test.yaml down -v

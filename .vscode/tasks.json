@@ -5,7 +5,7 @@
       "label": "CLIMESA: API Node.js",
       "type": "shell",
       "command": "npm run start:dev",
-      "options": { "cwd": "${workspaceFolder}/backend" },
+      "options": { "cwd": "${workspaceFolder}/api" },
       "isBackground": true,
       "problemMatcher": [],
       "presentation": { "group": "climesa", "reveal": "always", "panel": "dedicated" }
@@ -26,10 +26,10 @@
       "problemMatcher": []
     },
     {
-      "label": "CLIMESA: probar backend",
+      "label": "CLIMESA: probar API",
       "type": "shell",
       "command": "npm test -- --runInBand",
-      "options": { "cwd": "${workspaceFolder}/backend" },
+      "options": { "cwd": "${workspaceFolder}/api" },
       "problemMatcher": []
     },
     {

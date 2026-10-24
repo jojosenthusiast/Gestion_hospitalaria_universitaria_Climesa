@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "api:generate": "openapi-typescript ../backend/openapi.json -o src/lib/generated/openapi.d.ts",
+    "api:generate": "openapi-typescript ../contrato/openapi.json -o src/lib/generated/openapi.d.ts",
     "build:design": "tsc -b && vite build --mode design"
   },
   "dependencies": {

@@ -2,6 +2,35 @@
 
 Sistema hospitalario del proyecto final DAMA. La entrega incluye API, web administrativa y fuentes de Android e iOS. El estado verificable y lo que falta para cerrar la entrega están en [REVISION_SEMANAS_1_Y_2.md](REVISION_SEMANAS_1_Y_2.md).
 
+## Estructura
+
+```text
+sghu-climesa/
+├── api/                  API Node.js 22 + NestJS (src/ y tests/)
+├── web/                  React + TypeScript + Vite
+├── android/              proyecto Gradle (abrir esta carpeta en Android Studio)
+├── ios/                  CLIMESA.xcodeproj (abrir en Xcode)
+├── contrato/openapi.json contrato de la API, lo genera la API
+├── supabase/             migraciones, semilla y pruebas
+├── specs/  tools/        especificaciones y utilidades
+├── .github/workflows/    un workflow por plataforma
+└── README.md             instalación y ejecución
+```
+
+## Estado por componente
+
+Cada componente tiene su propio workflow y solo se ejecuta cuando cambian sus rutas.
+
+| Componente | Carpeta | Estado |
+|---|---|---|
+| API | `api/` | [![API](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/api.yml/badge.svg)](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/api.yml) |
+| Web | `web/` | [![Web](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/web.yml/badge.svg)](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/web.yml) |
+| Android | `android/` | [![Android](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/android.yml/badge.svg)](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/android.yml) |
+| iOS | `ios/` | [![iOS](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/ios.yml/badge.svg)](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/ios.yml) |
+| Base de datos | `supabase/` | [![Supabase](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/supabase.yml/badge.svg)](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/supabase.yml) |
+
+## Stack
+
 | Plataforma | Stack real |
 |---|---|
 | API | Node.js 22, TypeScript 5.7, NestJS 11, Fastify, node-postgres |
@@ -17,16 +46,16 @@ Sistema hospitalario del proyecto final DAMA. La entrega incluye API, web admini
 Instala Node.js 22 y abre `SGHU-CLIMESA.code-workspace` en VS Code. Desde la raíz:
 
 ```sh
-npm ci --prefix backend
+npm ci --prefix api
 npm ci --prefix web
 ```
 
-Copia `backend/.env.example` a `backend/.env` y `web/.env.example` a `web/.env` (PowerShell: `Copy-Item`; macOS/Linux: `cp`). Configura en el servidor `DATABASE_URL` y la clave privada de Supabase para invitaciones. La conexión de PostgreSQL debe pertenecer al proyecto CLIMESA y poder asumir el rol `sghu_api`. Los clientes contienen solo la clave publicable.
+Copia `api/.env.example` a `api/.env` y `web/.env.example` a `web/.env` (PowerShell: `Copy-Item`; macOS/Linux: `cp`). Configura en el servidor `DATABASE_URL` y la clave privada de Supabase para invitaciones. La conexión de PostgreSQL debe pertenecer al proyecto CLIMESA y poder asumir el rol `sghu_api`. Los clientes contienen solo la clave publicable.
 
 Abre dos terminales:
 
 ```sh
-npm run start:dev --prefix backend
+npm run start:dev --prefix api
 ```
 
 ```sh
@@ -67,9 +96,9 @@ xcodebuild -project CLIMESA.xcodeproj -scheme CLIMESA -configuration Debug -sdk 
 ## Validación
 
 ```sh
-npm test --prefix backend
-npm run build --prefix backend
-npm run api:generate --prefix backend
+npm test --prefix api
+npm run build --prefix api
+npm run api:generate --prefix api
 npm run api:generate --prefix web
 npm run build --prefix web
 python tools/generar_docs.py --verificar

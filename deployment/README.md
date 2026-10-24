@@ -6,7 +6,7 @@ La API y la web compilan localmente. La nueva migración `20261024070241_core_se
 
 ## Base del proyecto correcto
 
-La carpeta `supabase/` tiene configuración local, migraciones y semilla. Usa la CLI instalada en `backend/node_modules/.bin` después de `npm ci --prefix backend`. Antes de escribir, verifica en tu cuenta que la referencia coincida con CLIMESA. Las migraciones de `pruebas/` simulan Auth/Realtime y solo se usan en bases de prueba; nunca se aplican al proyecto remoto.
+La carpeta `supabase/` tiene configuración local, migraciones y semilla. Usa la CLI instalada en `api/node_modules/.bin` después de `npm ci --prefix api`. Antes de escribir, verifica en tu cuenta que la referencia coincida con CLIMESA. Las migraciones de `pruebas/` simulan Auth/Realtime y solo se usan en bases de prueba; nunca se aplican al proyecto remoto.
 
 ```sh
 supabase projects list
@@ -27,7 +27,7 @@ Activa el Custom Access Token Hook `acceso.hook_token` en Auth → Hooks del pro
 docker compose up --build -d api
 ```
 
-El contenedor usa `backend/.env`, corre como usuario `node` y expone `127.0.0.1:3000`. Colócalo detrás de HTTPS en el servidor elegido. Configura `WEB_APP_URL` con el origen exacto de la web para CORS y correos. `/api/v1/health` solo comprueba proceso; `/salud` debe dar 200 con la base operativa. Una base no configurada responde 503 sin revelar secretos.
+El contenedor usa `api/.env`, corre como usuario `node` y expone `127.0.0.1:3000`. Colócalo detrás de HTTPS en el servidor elegido. Configura `WEB_APP_URL` con el origen exacto de la web para CORS y correos. `/api/v1/health` solo comprueba proceso; `/salud` debe dar 200 con la base operativa. Una base no configurada responde 503 sin revelar secretos.
 
 ## Web y apps
 
