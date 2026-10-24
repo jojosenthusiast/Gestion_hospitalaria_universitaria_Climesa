@@ -1,0 +1,1549 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/pacientes": {
+      "get": {
+        "operationId": "PatientsController_search",
+        "parameters": [
+          {
+            "name": "query",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 2,
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar por nombre, fonética, DUI o expediente; devuelve campos mínimos",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.buscar"
+      },
+      "post": {
+        "operationId": "PatientsController_create",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientCreateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar después de buscar; expediente y DUI exclusivos",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.registrar"
+      }
+    },
+    "/api/v1/pacientes/busquedas": {
+      "post": {
+        "operationId": "PatientsController_recordSearch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar y obtener constancia de diez minutos, ligada a la cuenta y criterios",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.buscar"
+      }
+    },
+    "/api/v1/pacientes/{id}": {
+      "get": {
+        "operationId": "PatientsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ficha filtrada por rol y relación de atención",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.ver_ficha"
+      },
+      "patch": {
+        "operationId": "PatientsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientUpdateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Corregir ficha con versión, motivo e historial",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.editar_demograficos"
+      }
+    },
+    "/api/v1/pacientes/provisionales": {
+      "post": {
+        "operationId": "PatientsController_provisional",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientCreateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar identidad provisional sin inventar fecha exacta",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.registrar_provisional"
+      }
+    },
+    "/api/v1/pacientes/{id}/estado": {
+      "post": {
+        "operationId": "PatientsController_state",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientStateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Inactivar o reactivar sin eliminar historial",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.editar_demograficos"
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cuenta activa, roles, plataformas y permisos vigentes en la base",
+        "tags": [
+          "auth"
+        ],
+        "x-permiso": "sesion.perfil"
+      }
+    },
+    "/api/v1/usuarios": {
+      "get": {
+        "operationId": "UsersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cuentas, roles, estado y vínculo con personal",
+        "tags": [
+          "users"
+        ],
+        "x-permiso": "usuarios.ver"
+      }
+    },
+    "/api/v1/usuarios/invitaciones": {
+      "post": {
+        "operationId": "UsersController_invite",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitePatientDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invitar paciente o personal con roles autorizados por el administrador",
+        "tags": [
+          "users"
+        ],
+        "x-permiso": "usuarios.invitar"
+      }
+    },
+    "/api/v1/usuarios/{id}/roles": {
+      "patch": {
+        "operationId": "UsersController_roles",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRolesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambiar roles; prohíbe autoasignación y protege el último administrador",
+        "tags": [
+          "users"
+        ],
+        "x-permiso": "usuarios.asignar_roles"
+      }
+    },
+    "/api/v1/usuarios/{id}/estado": {
+      "patch": {
+        "operationId": "UsersController_state",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserStateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desactivar o reactivar; no desactiva al último administrador",
+        "tags": [
+          "users"
+        ],
+        "x-permiso": "usuarios.desactivar"
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "HealthController_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "API disponible"
+          }
+        },
+        "summary": "Comprueba que la API está disponible",
+        "tags": [
+          "health"
+        ],
+        "x-permiso": "publico"
+      }
+    },
+    "/salud": {
+      "get": {
+        "operationId": "HealthController_readiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Readiness: API y conexión PostgreSQL operativas",
+        "tags": [
+          "health"
+        ],
+        "x-permiso": "publico"
+      }
+    },
+    "/api/v1/inicio": {
+      "get": {
+        "operationId": "OperationsController_dashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resumen permitido para la cuenta actual",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "sesion.perfil"
+      }
+    },
+    "/api/v1/personal": {
+      "get": {
+        "operationId": "OperationsController_personnel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Directorio de personal con o sin cuenta",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "personal.ver"
+      },
+      "post": {
+        "operationId": "OperationsController_createStaff",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar personal",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "personal.gestionar"
+      }
+    },
+    "/api/v1/personal/{id}": {
+      "patch": {
+        "operationId": "OperationsController_editStaff",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar o inactivar personal con versión y motivo",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "personal.gestionar"
+      }
+    },
+    "/api/v1/turnos": {
+      "get": {
+        "operationId": "OperationsController_shifts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Consultar la planificación de turnos",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.ver"
+      },
+      "post": {
+        "operationId": "OperationsController_createShift",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Planificar turno con duración, traslapes y descanso",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
+    "/api/v1/turnos/mios": {
+      "get": {
+        "operationId": "OperationsController_myShifts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turnos publicados de la persona vinculada a la cuenta",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.ver"
+      }
+    },
+    "/api/v1/turnos/{id}": {
+      "patch": {
+        "operationId": "OperationsController_editShift",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mover o cancelar turno con versión y motivo",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
+    "/api/v1/espacios": {
+      "get": {
+        "operationId": "OperationsController_spaces",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Árbol, rutas y disponibilidad recursiva por espacio",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "espacios.ver"
+      },
+      "post": {
+        "operationId": "OperationsController_createSpace",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpaceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear espacio respetando árbol y capacidad",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "espacios.configurar"
+      }
+    },
+    "/api/v1/espacios/{id}": {
+      "patch": {
+        "operationId": "OperationsController_editSpace",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpaceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar espacio con versión, capacidad y ocupación",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "espacios.configurar"
+      }
+    },
+    "/api/v1/camas": {
+      "get": {
+        "operationId": "OperationsController_beds",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tablero con ocupante filtrado por permiso y área",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "camas.ver_tablero"
+      }
+    },
+    "/api/v1/auditoria": {
+      "get": {
+        "operationId": "OperationsController_audit",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Metadatos de auditoría; no contiene valores clínicos",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "auditoria.ver"
+      }
+    },
+    "/api/v1/eventos": {
+      "get": {
+        "operationId": "OperationsController_events",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eventos delgados de canales autorizados para recuperar cambios tras reconexión",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "sesion.perfil"
+      }
+    }
+  },
+  "info": {
+    "title": "SGHU-CLIMESA API",
+    "description": "Core S1/S2: autorización, pacientes, personal, espacios y turnos. Cada operación incluye x-permiso. Las escrituras requieren Idempotency-Key.",
+    "version": "0.3.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "PatientSearchDto": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "PatientCreateDto": {
+        "type": "object",
+        "properties": {
+          "givenNames": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 80
+          },
+          "surnames": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 100
+          },
+          "dui": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 10
+          },
+          "birth": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 10
+          },
+          "sex": {
+            "type": "string",
+            "enum": [
+              "femenino",
+              "masculino",
+              "indeterminado",
+              "no_registrado"
+            ]
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 9
+          },
+          "email": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 254
+          },
+          "address": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "provisional": {
+            "type": "boolean"
+          },
+          "estimatedAge": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "searchToken": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "searchQuery": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "givenNames",
+          "surnames",
+          "sex",
+          "searchToken",
+          "searchQuery"
+        ]
+      },
+      "PatientUpdateDto": {
+        "type": "object",
+        "properties": {
+          "givenNames": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 80
+          },
+          "surnames": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 100
+          },
+          "dui": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 10
+          },
+          "birth": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 10
+          },
+          "sex": {
+            "type": "string",
+            "enum": [
+              "femenino",
+              "masculino",
+              "indeterminado",
+              "no_registrado"
+            ]
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 9
+          },
+          "email": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 254
+          },
+          "address": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "provisional": {
+            "type": "boolean"
+          },
+          "estimatedAge": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "givenNames",
+          "surnames",
+          "sex",
+          "version",
+          "reason"
+        ]
+      },
+      "PatientStateDto": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "active",
+          "version",
+          "reason"
+        ]
+      },
+      "InvitePatientDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ADM",
+                "JOP",
+                "REC",
+                "AST",
+                "ENF",
+                "MED",
+                "LAB",
+                "PAR",
+                "DPD",
+                "PAC"
+              ]
+            }
+          },
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "email",
+          "displayName"
+        ]
+      },
+      "UserRolesDto": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ADM",
+                "JOP",
+                "REC",
+                "AST",
+                "ENF",
+                "MED",
+                "LAB",
+                "PAR",
+                "DPD",
+                "PAC"
+              ]
+            }
+          },
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "roles",
+          "version",
+          "reason"
+        ]
+      },
+      "UserStateDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "desactivado"
+            ]
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "state",
+          "version",
+          "reason"
+        ]
+      },
+      "StaffDto": {
+        "type": "object",
+        "properties": {
+          "givenNames": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          },
+          "surnames": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "medico",
+              "enfermero",
+              "asistente",
+              "recepcionista",
+              "laboratorista",
+              "paramedico",
+              "motorista",
+              "limpieza",
+              "administrativo",
+              "otro"
+            ]
+          },
+          "specialty": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 120
+          },
+          "areaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 9
+          },
+          "dui": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 10
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "givenNames",
+          "surnames",
+          "type"
+        ]
+      },
+      "ShiftDto": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "areaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "diurno",
+              "nocturno",
+              "guardia"
+            ]
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "borrador",
+              "cancelado"
+            ]
+          },
+          "version": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "staffId",
+          "areaId",
+          "start",
+          "end",
+          "type"
+        ]
+      },
+      "SpaceDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "hospital",
+              "planta",
+              "area",
+              "habitacion",
+              "cama",
+              "consultorio",
+              "cubiculo",
+              "bodega",
+              "bahia"
+            ]
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "vip",
+              "semiprivada"
+            ]
+          },
+          "capacity": {
+            "type": "number",
+            "minimum": 1
+          },
+          "level": {
+            "type": "number"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "type"
+        ]
+      }
+    }
+  }
+}

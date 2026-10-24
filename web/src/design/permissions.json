@@ -1,0 +1,706 @@
+{
+  "ADM": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "usuarios.ver",
+      "context": "x"
+    },
+    {
+      "code": "usuarios.invitar",
+      "context": "x"
+    },
+    {
+      "code": "usuarios.asignar_roles",
+      "context": "x"
+    },
+    {
+      "code": "usuarios.desactivar",
+      "context": "x"
+    },
+    {
+      "code": "personal.ver",
+      "context": "x"
+    },
+    {
+      "code": "personal.gestionar",
+      "context": "x"
+    },
+    {
+      "code": "turnos.ver",
+      "context": "x"
+    },
+    {
+      "code": "espacios.ver",
+      "context": "x"
+    },
+    {
+      "code": "espacios.configurar",
+      "context": "x"
+    },
+    {
+      "code": "recursos.configurar",
+      "context": "x"
+    },
+    {
+      "code": "catalogo.configurar",
+      "context": "x"
+    },
+    {
+      "code": "privacidad.solicitar_acceso",
+      "context": "x"
+    },
+    {
+      "code": "inventario.configurar",
+      "context": "x"
+    },
+    {
+      "code": "metricas.ver",
+      "context": "x"
+    }
+  ],
+  "JOP": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.buscar",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.ver_ficha",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.gestionar_duplicados",
+      "context": "x"
+    },
+    {
+      "code": "personal.ver",
+      "context": "x"
+    },
+    {
+      "code": "turnos.ver",
+      "context": "x"
+    },
+    {
+      "code": "turnos.planificar",
+      "context": "x"
+    },
+    {
+      "code": "turnos.publicar",
+      "context": "x"
+    },
+    {
+      "code": "espacios.ver",
+      "context": "x"
+    },
+    {
+      "code": "camas.ver_tablero",
+      "context": "x"
+    },
+    {
+      "code": "camas.ver_ocupante",
+      "context": "x"
+    },
+    {
+      "code": "camas.asignar",
+      "context": "x"
+    },
+    {
+      "code": "camas.trasladar",
+      "context": "x"
+    },
+    {
+      "code": "camas.bloquear",
+      "context": "x"
+    },
+    {
+      "code": "camas.verificar_limpieza",
+      "context": "x"
+    },
+    {
+      "code": "recursos.gestionar",
+      "context": "x"
+    },
+    {
+      "code": "fila.ver",
+      "context": "x"
+    },
+    {
+      "code": "citas.ver",
+      "context": "x"
+    },
+    {
+      "code": "admision.crear",
+      "context": "x"
+    },
+    {
+      "code": "admision.autorizar",
+      "context": "x"
+    },
+    {
+      "code": "admision.ver",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.ver_estado",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.despachar",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.recibir_prehospital",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.mantenimiento",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.ver_bitacora",
+      "context": "x"
+    },
+    {
+      "code": "privacidad.solicitar_acceso",
+      "context": "x"
+    },
+    {
+      "code": "inventario.ver",
+      "context": "x"
+    },
+    {
+      "code": "inventario.mover",
+      "context": "x"
+    },
+    {
+      "code": "inventario.configurar",
+      "context": "x"
+    },
+    {
+      "code": "avisos.publicar",
+      "context": "x"
+    },
+    {
+      "code": "metricas.ver",
+      "context": "x"
+    }
+  ],
+  "REC": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "cuentas.verificar",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.buscar",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.registrar",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.registrar_provisional",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.ver_ficha",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.editar_demograficos",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.gestionar_duplicados",
+      "context": "x"
+    },
+    {
+      "code": "turnos.ver",
+      "context": "x"
+    },
+    {
+      "code": "espacios.ver",
+      "context": "x"
+    },
+    {
+      "code": "camas.ver_tablero",
+      "context": "x"
+    },
+    {
+      "code": "camas.ver_ocupante",
+      "context": "x"
+    },
+    {
+      "code": "camas.asignar",
+      "context": "x"
+    },
+    {
+      "code": "camas.trasladar",
+      "context": "x"
+    },
+    {
+      "code": "fila.emitir",
+      "context": "x"
+    },
+    {
+      "code": "fila.ver",
+      "context": "x"
+    },
+    {
+      "code": "fila.gestionar",
+      "context": "x"
+    },
+    {
+      "code": "citas.ver",
+      "context": "x"
+    },
+    {
+      "code": "citas.agendar",
+      "context": "x"
+    },
+    {
+      "code": "citas.cancelar",
+      "context": "x"
+    },
+    {
+      "code": "admision.crear",
+      "context": "x"
+    },
+    {
+      "code": "admision.ver",
+      "context": "x"
+    },
+    {
+      "code": "admision.registrar_salida",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.ver_estado",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.solicitar",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.despachar",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.recibir_prehospital",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.ver_bitacora",
+      "context": "x"
+    }
+  ],
+  "AST": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.buscar",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.ver_ficha",
+      "context": "x"
+    },
+    {
+      "code": "turnos.ver",
+      "context": "x"
+    },
+    {
+      "code": "espacios.ver",
+      "context": "x"
+    },
+    {
+      "code": "fila.ver",
+      "context": "x"
+    },
+    {
+      "code": "fila.llamar",
+      "context": "x"
+    },
+    {
+      "code": "fila.gestionar",
+      "context": "x"
+    },
+    {
+      "code": "citas.ver",
+      "context": "x"
+    },
+    {
+      "code": "signos.registrar",
+      "context": "x"
+    }
+  ],
+  "ENF": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.buscar",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.registrar_provisional",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.ver_ficha",
+      "context": "x"
+    },
+    {
+      "code": "expediente.ver",
+      "context": "relacion"
+    },
+    {
+      "code": "turnos.ver",
+      "context": "x"
+    },
+    {
+      "code": "espacios.ver",
+      "context": "x"
+    },
+    {
+      "code": "camas.ver_tablero",
+      "context": "x"
+    },
+    {
+      "code": "camas.ver_ocupante",
+      "context": "area"
+    },
+    {
+      "code": "camas.registrar_limpieza",
+      "context": "x"
+    },
+    {
+      "code": "camas.verificar_limpieza",
+      "context": "x"
+    },
+    {
+      "code": "signos.registrar",
+      "context": "x"
+    },
+    {
+      "code": "resultados.ver",
+      "context": "relacion"
+    },
+    {
+      "code": "admision.ver",
+      "context": "area"
+    },
+    {
+      "code": "admision.registrar_salida",
+      "context": "x"
+    },
+    {
+      "code": "enfermeria.registrar",
+      "context": "area"
+    },
+    {
+      "code": "ambulancia.recibir_prehospital",
+      "context": "x"
+    },
+    {
+      "code": "inventario.ver",
+      "context": "x"
+    },
+    {
+      "code": "inventario.mover",
+      "context": "consumo"
+    }
+  ],
+  "MED": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.buscar",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.ver_ficha",
+      "context": "relacion"
+    },
+    {
+      "code": "expediente.ver",
+      "context": "relacion"
+    },
+    {
+      "code": "turnos.ver",
+      "context": "x"
+    },
+    {
+      "code": "espacios.ver",
+      "context": "x"
+    },
+    {
+      "code": "camas.ver_tablero",
+      "context": "x"
+    },
+    {
+      "code": "camas.ver_ocupante",
+      "context": "relacion"
+    },
+    {
+      "code": "fila.ver",
+      "context": "x"
+    },
+    {
+      "code": "fila.llamar",
+      "context": "x"
+    },
+    {
+      "code": "fila.gestionar",
+      "context": "x"
+    },
+    {
+      "code": "citas.ver",
+      "context": "propio"
+    },
+    {
+      "code": "consulta.iniciar",
+      "context": "x"
+    },
+    {
+      "code": "consulta.registrar",
+      "context": "relacion"
+    },
+    {
+      "code": "consulta.corregir",
+      "context": "autor"
+    },
+    {
+      "code": "signos.registrar",
+      "context": "x"
+    },
+    {
+      "code": "recetas.emitir",
+      "context": "relacion"
+    },
+    {
+      "code": "laboratorio.ordenar",
+      "context": "relacion"
+    },
+    {
+      "code": "laboratorio.cancelar",
+      "context": "autor"
+    },
+    {
+      "code": "laboratorio.revisar",
+      "context": "relacion"
+    },
+    {
+      "code": "resultados.ver",
+      "context": "relacion"
+    },
+    {
+      "code": "admision.solicitar",
+      "context": "relacion"
+    },
+    {
+      "code": "admision.ver",
+      "context": "relacion"
+    },
+    {
+      "code": "alta.firmar",
+      "context": "relacion"
+    },
+    {
+      "code": "ambulancia.ver_estado",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.recibir_prehospital",
+      "context": "x"
+    },
+    {
+      "code": "privacidad.solicitar_acceso",
+      "context": "x"
+    }
+  ],
+  "LAB": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.buscar",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.ver_ficha",
+      "context": "x"
+    },
+    {
+      "code": "turnos.ver",
+      "context": "x"
+    },
+    {
+      "code": "laboratorio.ver_cola",
+      "context": "x"
+    },
+    {
+      "code": "laboratorio.procesar",
+      "context": "x"
+    },
+    {
+      "code": "laboratorio.validar",
+      "context": "x"
+    },
+    {
+      "code": "laboratorio.cancelar",
+      "context": "x"
+    },
+    {
+      "code": "resultados.ver",
+      "context": "x"
+    },
+    {
+      "code": "inventario.ver",
+      "context": "x"
+    },
+    {
+      "code": "inventario.mover",
+      "context": "reactivos"
+    }
+  ],
+  "PAR": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.buscar",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.registrar_provisional",
+      "context": "x"
+    },
+    {
+      "code": "pacientes.ver_ficha",
+      "context": "relacion"
+    },
+    {
+      "code": "turnos.ver",
+      "context": "x"
+    },
+    {
+      "code": "signos.registrar",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.ver_estado",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.operar",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.reportar_prehospital",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.ver_bitacora",
+      "context": "propio"
+    }
+  ],
+  "DPD": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "usuarios.ver",
+      "context": "x"
+    },
+    {
+      "code": "ambulancia.ver_bitacora",
+      "context": "x"
+    },
+    {
+      "code": "privacidad.aprobar_acceso",
+      "context": "x"
+    },
+    {
+      "code": "auditoria.ver",
+      "context": "x"
+    },
+    {
+      "code": "metricas.ver",
+      "context": "x"
+    }
+  ],
+  "PAC": [
+    {
+      "code": "sesion.perfil",
+      "context": "x"
+    },
+    {
+      "code": "cuenta.vincular",
+      "context": "propio"
+    },
+    {
+      "code": "pacientes.ver_ficha",
+      "context": "propio"
+    },
+    {
+      "code": "expediente.ver",
+      "context": "propio_revisado"
+    },
+    {
+      "code": "camas.ver_ocupante",
+      "context": "propio"
+    },
+    {
+      "code": "fila.ver",
+      "context": "propio"
+    },
+    {
+      "code": "citas.ver",
+      "context": "propio"
+    },
+    {
+      "code": "citas.solicitar",
+      "context": "propio"
+    },
+    {
+      "code": "citas.cancelar",
+      "context": "propio"
+    },
+    {
+      "code": "resultados.ver",
+      "context": "propio_revisado"
+    },
+    {
+      "code": "admision.ver",
+      "context": "propio"
+    },
+    {
+      "code": "ambulancia.solicitar",
+      "context": "propio"
+    },
+    {
+      "code": "auditoria.mis_accesos",
+      "context": "propio"
+    }
+  ]
+}

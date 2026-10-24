@@ -1,0 +1,15 @@
+**/node_modules/
+**/dist/
+**/coverage/
+**/.gradle/
+**/build/
+**/.build/
+**/DerivedData/
+**/xcuserdata/
+**/.env
+**/.env.*
+!**/.env.example
+**/local.properties
+**/*.tsbuildinfo
+*.log
+.DS_Store

@@ -1,0 +1,15 @@
+{
+  "folders": [{ "path": "." }],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/.gradle": true,
+      "**/build": true
+    },
+    "typescript.tsdk": "web/node_modules/typescript/lib"
+  },
+  "extensions": {
+    "recommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "vscjava.vscode-gradle", "fwcd.kotlin"]
+  }
+}

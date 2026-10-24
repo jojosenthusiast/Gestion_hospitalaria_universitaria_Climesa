@@ -1,0 +1,52 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CLIMESA: API Node.js",
+      "type": "shell",
+      "command": "npm run start:dev",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "climesa", "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "CLIMESA: Web",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "climesa", "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "CLIMESA: Web + API",
+      "dependsOn": ["CLIMESA: API Node.js", "CLIMESA: Web"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "CLIMESA: probar backend",
+      "type": "shell",
+      "command": "npm test -- --runInBand",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "CLIMESA: compilar web",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "problemMatcher": []
+    },
+    {
+      "label": "CLIMESA: instalar Android debug",
+      "type": "shell",
+      "windows": { "command": ".\\gradlew.bat installDebug" },
+      "linux": { "command": "./gradlew installDebug" },
+      "osx": { "command": "./gradlew installDebug" },
+      "options": { "cwd": "${workspaceFolder}/android" },
+      "problemMatcher": ["$gradle"]
+    }
+  ]
+}
