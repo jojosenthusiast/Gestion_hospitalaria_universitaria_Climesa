@@ -1,6 +1,6 @@
 # 108. Tareas
 
-- [x] T01 · S2 · R · Migración de hospitalización con exclusión de ocupaciones y vista publicada
+- [x] T01 · S1 · R · Migración de hospitalización con exclusión de ocupaciones y vista publicada
   - Cubre: FR-108-05, FR-108-15
   - Depende de: 104-T01
   - Hecho cuando: dos ocupaciones traslapadas de la misma cama se rechazan en prueba

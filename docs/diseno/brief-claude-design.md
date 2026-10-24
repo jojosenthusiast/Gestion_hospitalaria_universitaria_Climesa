@@ -1,12 +1,14 @@
 # Brief de diseño para Claude Design
 
-> Referencia inicial. La dirección visual implementada el 24 de octubre de 2026 está en [identidad_actual.md](identidad_actual.md): DM Sans, IBM Plex Mono, azul intenso, tinta oscura y superficies planas. Este brief conserva el planteamiento previo y el alcance futuro de las tres plataformas.
+> **Nota (24-oct-2026):** el diseño de alta fidelidad en `claude-design/` es ahora la fuente de verdad visual. Cambió la paleta a azul CLIMESA `#0043B2` (D-070) y agregó la escalera de avisos (D-071). La tipografía y la iconografía de este brief siguen vigentes.
+>
+> Estado implementado en el corte S1/S2 (web y apps): ver [identidad_actual.md](identidad_actual.md); converge con esta fuente de verdad visual en los sprints siguientes.
 
 Insumo para crear el sistema de diseño y los prototipos de web, Android e iOS. El inventario completo de pantallas y flujos está en `inventario-pantallas.md` (o su página publicada). Requisito del curso para el 31 de octubre: prototipo interactivo completo para móvil (iOS y Android) y web, y un sistema de diseño básico con paleta accesible, tipografía y estados de componentes.
 
 ## 1. Personalidad
 
-Un hospital universitario que se toma en serio la seguridad del paciente. **Sereno, legible y preciso**: nada decorativo compite con un dato clínico. El color se reserva para estados (cama, ambulancia, laboratorio, alertas); la marca vive en un verde azulado clínico usado con moderación. La interfaz se lee a un metro de distancia en un mostrador y con prisa en un pasillo.
+Un hospital universitario que se toma en serio la seguridad del paciente. **Sereno, legible y preciso**: nada decorativo compite con un dato clínico. El color se reserva para estados (cama, ambulancia, laboratorio, alertas); la marca vive en el **azul institucional de CLIMESA**, tomado del logotipo, usado con moderación (navegación activa, botón primario, encabezados de marca). La interfaz se lee a un metro de distancia en un mostrador y con prisa en un pasillo.
 
 Tres reglas que no se negocian:
 1. **Ningún estado se comunica solo con color**: siempre texto y, cuando ayuda, un ícono o una forma (por ejemplo, rayado para "bloqueada").
@@ -24,16 +26,23 @@ Contraste medido con la fórmula WCAG 2.1: todos los textos y estados superan 4.
 | `ink` | `#122028` | `#E3ECEF` | Texto principal (16.6:1 / 13.9:1) |
 | `muted` | `#4E616B` | `#9AADB5` | Texto secundario (6.5:1 / 7.1:1) |
 | `border` | `#D3DDE1` | `#28393F` | Bordes y divisores (decorativo, no portador de información) |
-| `primary` | `#0A6C70` | `#5CC3C7` | Marca, acciones principales, enlaces (6.2:1 / 8.0:1) |
-| `primary-strong` | `#07575A` | `#86D6D9` | Hover y presionado |
-| `primary-soft` | `#E3F2F1` | `#123236` | Fondos seleccionados |
+| `primary` | `#0043B2` | `#8FB3F5` | Azul CLIMESA: marca, acciones principales, enlaces, anillo de foco (8.6:1 / 7.9:1) |
+| `primary-strong` | `#00348C` | `#B5CDF9` | Hover y presionado |
+| `primary-soft` | `#E8EEF9` | `#172846` | Fondos seleccionados, navegación activa |
 | `on-primary` | `#FFFFFF` | `#0D161A` | Texto sobre botón primario |
 | `success` / `-soft` | `#1D7444` / `#E4F3EA` | `#6CCB92` / `#13301F` | Libre, disponible, completado |
 | `warning` / `-soft` | `#8F5300` / `#FBEFD9` | `#E8B25E` / `#33260E` | En limpieza, por confirmar, bajo mínimo |
 | `danger` / `-soft` | `#B3261E` / `#FBE7E5` | `#F2918A` / `#3A1A17` | Crítico, en servicio de emergencia, errores |
-| `info` / `-soft` | `#1F55A3` / `#E6EEFA` | `#8CB2F0` / `#16253D` | Ocupada, en proceso, llamado |
+| `info` / `-soft` | `#0A6C70` / `#E3F2F1` | `#5CC3C7` / `#123236` | Ocupada, en proceso, llamado (verde azulado: distinto del azul de marca) |
 | `violet` / `-soft` | `#6A45A6` / `#EFE9F8` | `#BCA3EE` / `#2A2040` | Reservada, acceso excepcional |
 | `slate` / `-soft` | `#4A5865` / `#E9EDF0` | `#AAB7C1` / `#222D33` | Bloqueada, mantenimiento, cancelado, pendiente |
+
+Tokens adicionales:
+
+| Token | Claro | Oscuro | Uso |
+|---|---|---|---|
+| `priority-yellow` / `-soft` | `#8A7300` / `#FBF5D6` | `#E6CF5C` / `#2E2A10` | Prioridad amarilla prehospital (4.6:1 / 10.6:1) |
+| `focus` | `#0043B2` | `#8FB3F5` | Anillo de foco de 2 px con separación de 2 px |
 
 ### Estados de dominio
 
@@ -55,7 +64,7 @@ Contraste medido con la fórmula WCAG 2.1: todos los textos y estados superan 4.
 | Resultado | Normal, alto, bajo | ink, warning, warning | flecha arriba o abajo |
 | | Crítico | danger, fondo `danger-soft` | triángulo de alerta |
 | Fila | En espera, llamado, en atención, atendido, no se presentó | slate, info, primary, success, warning | |
-| Prioridad prehospital | Roja, naranja, amarilla, verde | danger, warning, `#8A7300` sobre claro, success | número de prioridad además del color |
+| Prioridad prehospital | Roja, naranja, amarilla, verde | danger, warning, `priority-yellow`, success | número 1 a 4 y la palabra siempre visibles: en oscuro el amarillo y el naranja se parecen |
 
 ## 3. Tipografía
 
@@ -78,6 +87,8 @@ Escala (en px o sp; en iOS usar estilos de Dynamic Type equivalentes):
 | Dato | Mono 16/400 | Valores, unidades, rangos, horas |
 | Nota | 14/400 | Ayudas, metadatos |
 | Etiqueta | 12/700, mayúsculas, espaciado 0.06em | Encabezados de tabla, insignias |
+
+Interlineado: número de fila 1.0; display 1.15; títulos 1 y 2 1.25; cuerpo 1.5; dato mono 1.4; nota 1.4; etiqueta 1.3. Párrafos de máximo 70 caracteres en web.
 
 ## 4. Iconografía
 
@@ -116,11 +127,35 @@ Equivalencias principales (verificar el nombre exacto en el buscador de cada bib
 | Ajustes | `settings` | `gearshape` |
 | Cerrar sesión | `logout` | `rectangle.portrait.and.arrow.right` |
 
+## 4b. Marca y logotipos
+
+Archivos en `docs/diseno/marca/` (vectorizados desde los PNG del hospital, limpios y recortados):
+
+| Archivo | Uso |
+|---|---|
+| `climesa-completo-color.svg` | Logotipo completo en azul `#0043B2` sobre fondos claros (ingreso, encabezado web, documentos) |
+| `climesa-completo-blanco.svg` | Logotipo completo en blanco sobre fondos oscuros o sobre el azul de marca |
+| `climesa-completo-tinta.svg` | Una sola tinta `#122028` para impresión en blanco y negro y sellos |
+| `climesa-isotipo-color.svg`, `-blanco.svg`, `-tinta.svg` | Solo el símbolo: ícono de app, favicon, barra lateral colapsada, pantalla de carga |
+
+Reglas: no usar el PNG blanco "desgastado" (tiene manchas); no estirar ni recolorear fuera de estas tres tintas; zona libre alrededor igual a la altura de una franja del símbolo; tamaño mínimo 24 px de alto para el isotipo y 120 px de ancho para el completo. En modo oscuro siempre la versión blanca: el azul de marca sobre fondo oscuro no llega a contraste 3:1.
+
+Nota: los dos PNG recibidos usan azules distintos (`#0043B2` en el símbolo y `#002F97` en el logotipo completo). Se adopta `#0043B2` hasta confirmar el manual de marca de CLIMESA.
+
 ## 5. Espaciado, forma y elevación
 
 - Retícula de 4: espacios 4, 8, 12, 16, 24, 32, 48.
 - Radios: 6 en campos y chips, 10 en tarjetas, 16 en hojas inferiores móviles; píldora solo para estados.
-- Elevación casi plana: borde de 1 px `border` en tarjetas; sombra suave solo en menús, diálogos y hojas.
+- Elevación casi plana: borde de 1 px `border` en tarjetas; sombra solo en lo que flota.
+
+| Nivel | Uso | Sombra en claro | En oscuro |
+|---|---|---|---|
+| 0 | Tarjetas, tablas | ninguna (solo borde) | ninguna (solo borde) |
+| 1 | Barra fija al desplazar, chips arrastrables | `0 1px 2px rgba(18,32,40,.08)` | sin sombra; superficie un tono más clara `#1A2830` |
+| 2 | Menús, selectores, tooltips | `0 4px 12px rgba(18,32,40,.12)` | superficie `#1E2E36` y borde `#33474F` |
+| 3 | Diálogos y hojas inferiores | `0 12px 32px rgba(18,32,40,.18)` con velo `rgba(13,22,26,.45)` | superficie `#22343C`, velo `rgba(0,0,0,.6)` |
+
+En Android se usan las elevaciones tonales de Material 3 equivalentes; en iOS, los materiales del sistema para hojas.
 - Objetivos táctiles de 48 × 48 dp en Android y 44 × 44 pt en iOS como mínimo; los botones de la app del paramédico, 64 de alto (se usan con guantes y en movimiento).
 
 ## 6. Componentes del sistema de diseño
@@ -154,7 +189,7 @@ Cada uno con estados normal, hover o presionado, foco, deshabilitado, cargando y
 
 ## 8. Prioridad de prototipos
 
-1. Sistema de diseño (tokens, tipografía, componentes) en claro y oscuro.
+1. Sistema de diseño en claro y oscuro, en este orden: página de tokens y marca; base (botones, campos, insignias de estado, tarjeta de cama, valor de laboratorio); después número de fila, tarjeta de indicador, filas de tabla y lista, línea de tiempo, bandas de conexión y conflicto, estados vacío, error y sin permiso, aviso del 911 y navegación por plataforma.
 2. Flujos de la defensa: F04 consulta y laboratorio, F05 admisión con la última cama, F07 ambulancia, F02 fila del día.
 3. Pantallas del avance: ingreso y registro (todas), tablero web (W03), pacientes (W26, A30), personal (W07, W08), navegación principal de cada rol en Android e iOS.
 4. Resto del inventario.
@@ -163,9 +198,9 @@ Cada uno con estados normal, hover o presionado, foco, deshabilitado, cargando y
 
 > Diseña el sistema de diseño y los prototipos del "Sistema de Gestión Hospitalaria Universitaria (CLIMESA)": un ecosistema con panel web administrativo (React), app Android (Material 3) y app iOS (guías de Apple, SwiftUI) para un hospital universitario de 3 plantas: planta 1 consulta general, emergencia y laboratorio; planta 2 con 6 habitaciones semiprivadas de 2 camas (HAB-201 a HAB-206); planta 3 con 5 habitaciones VIP individuales (VIP-301 a VIP-305); una sola ambulancia. Todo se actualiza en vivo.
 >
-> Personalidad: sereno, legible y preciso; el color se reserva para estados. Tipografía Atkinson Hyperlegible Next para la interfaz y Atkinson Hyperlegible Mono para datos clínicos, números de fila y horas. Íconos Material Symbols Rounded en web y Android, SF Symbols en iOS.
+> Marca: azul institucional CLIMESA #0043B2 tomado del logotipo (adjunto en color, blanco y una tinta). Personalidad: sereno, legible y preciso; el color se reserva para estados. Tipografía Atkinson Hyperlegible Next para la interfaz y Atkinson Hyperlegible Mono para datos clínicos, números de fila y horas. Íconos Material Symbols Rounded en web y Android, SF Symbols en iOS.
 >
-> Tokens claro: bg #F4F7F8, surface #FFFFFF, ink #122028, muted #4E616B, border #D3DDE1, primary #0A6C70 (texto blanco encima), success #1D7444, warning #8F5300, danger #B3261E, info #1F55A3, violet #6A45A6, slate #4A5865, cada estado con su fondo suave (success-soft #E4F3EA, warning-soft #FBEFD9, danger-soft #FBE7E5, info-soft #E6EEFA, violet-soft #EFE9F8, slate-soft #E9EDF0, primary-soft #E3F2F1). Tokens oscuro: bg #0D161A, surface #142026, ink #E3ECEF, muted #9AADB5, border #28393F, primary #5CC3C7 (texto #0D161A encima), success #6CCB92, warning #E8B25E, danger #F2918A, info #8CB2F0, violet #BCA3EE, slate #AAB7C1.
+> Tokens claro: bg #F4F7F8, surface #FFFFFF, ink #122028, muted #4E616B, border #D3DDE1, primary #0043B2 (texto blanco encima), success #1D7444, warning #8F5300, danger #B3261E, info #0A6C70, violet #6A45A6, slate #4A5865, cada estado con su fondo suave (success-soft #E4F3EA, warning-soft #FBEFD9, danger-soft #FBE7E5, info-soft #E3F2F1, violet-soft #EFE9F8, slate-soft #E9EDF0, primary-soft #E8EEF9, prioridad amarilla #8A7300 con fondo #FBF5D6). Tokens oscuro: bg #0D161A, surface #142026, ink #E3ECEF, muted #9AADB5, border #28393F, primary #8FB3F5 (texto #0D161A encima), success #6CCB92, warning #E8B25E, danger #F2918A, info #5CC3C7, violet #BCA3EE, slate #AAB7C1, prioridad amarilla #E6CF5C. Elevación: sombras suaves solo en menús (nivel 2) y diálogos (nivel 3); en oscuro, superficies más claras en lugar de sombra. Logotipo en blanco sobre fondos oscuros.
 >
 > Estados: cama libre (success), ocupada (info, solo iniciales del paciente), reservada (violet), en limpieza (warning), bloqueada (slate con rayado y candado); ambulancia Disponible (success), En Servicio (danger), En Mantenimiento (slate); laboratorio Pendiente (slate), En Proceso (info), Completado (success), Cancelado (slate tachado), Revisado por médico (primary); valor crítico en danger con triángulo. Ningún estado depende solo del color: siempre texto e ícono.
 >

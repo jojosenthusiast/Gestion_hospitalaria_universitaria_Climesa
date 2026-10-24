@@ -10,6 +10,32 @@
 **/.env.*
 !**/.env.example
 **/local.properties
+!**/local.properties.example
+*.xcconfig
+!*.xcconfig.example
 **/*.tsbuildinfo
 *.log
 .DS_Store
+
+# Export de Jira: referencia local, no se versiona
+docs/gestion/jira-export/
+
+# Android
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# iOS
+*.xcuserstate
+
+# Python
+__pycache__/
+*.pyc
+
+# Sistema y editores
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp

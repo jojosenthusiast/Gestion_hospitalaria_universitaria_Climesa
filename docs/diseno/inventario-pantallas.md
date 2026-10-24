@@ -10,9 +10,9 @@ Cada pantalla trae: para quién es, qué muestra, qué se puede hacer, qué camb
 
 | Plataforma | Pantallas | Exigidas (R) | Extra (E) |
 |---|---|---|---|
-| Web | 36 | 33 | 3 |
-| Android | 41 | 35 | 6 |
-| iOS | 19 | 17 | 2 |
+| Web | 54 | 33 | 21 |
+| Android | 42 | 35 | 7 |
+| iOS | 20 | 17 | 3 |
 
 ## Estados que toda pantalla debe diseñar
 
@@ -367,6 +367,174 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **Acciones:** Reintentar
 - **En vivo:** Banda de reconexión
 - **Spec:** 120
+
+### W40 · Caja del turno (F)
+
+- **Para:** Caja (rol F)
+- **Propósito:** Abrir, operar y cerrar la sesión de caja
+- **Muestra:** Efectivo esperado, cobros del turno
+- **Acciones:** Abrir, cerrar caja
+- **En vivo:** Cobros propios entran al instante
+- **Privacidad:** Sin datos clínicos
+- **Spec:** 006
+
+### W41 · Cobrar o recibir depósito (F)
+
+- **Para:** Caja (rol F)
+- **Propósito:** Registrar un pago o depósito y aplicarlo a una cuenta
+- **Muestra:** Cuenta, concepto, medio de pago
+- **Acciones:** Cobrar, recibir depósito
+- **En vivo:** Aviso si otra caja aplica el mismo depósito
+- **Privacidad:** Nunca contenido clínico
+- **Spec:** 006
+
+### W42 · Recibos y devoluciones (F)
+
+- **Para:** Caja; Facturación (rol F)
+- **Propósito:** Seguir recibos y pedir o aprobar devoluciones
+- **Muestra:** Recibos, devoluciones por aprobar
+- **Acciones:** Pedir, aprobar devolución
+- **Privacidad:** Quien pide no aprueba
+- **Spec:** 006
+
+### W43 · Cuentas de pacientes (F)
+
+- **Para:** Facturación (rol F)
+- **Propósito:** Ver las cuentas abiertas y su estado
+- **Muestra:** Cuentas por episodio, pagador, estado
+- **Acciones:** Abrir cuenta
+- **En vivo:** Cargos nuevos suman solos
+- **Privacidad:** Sin diagnósticos
+- **Spec:** 006
+
+### W44 · Cuenta del paciente (F)
+
+- **Para:** Facturación (rol F)
+- **Propósito:** Revisar cargos, cerrar y dividir por pagador
+- **Muestra:** Cargos, división por pagador, pagos
+- **Acciones:** Cerrar, dividir
+- **En vivo:** El alta firmada corta la estancia
+- **Privacidad:** Sin contenido clínico
+- **Spec:** 006
+
+### W45 · Excepciones de cargos (F)
+
+- **Para:** Facturación (rol F)
+- **Propósito:** Atender lo que no se pudo cobrar solo
+- **Muestra:** Cola de excepciones
+- **Acciones:** Resolver
+- **En vivo:** Entran solas
+- **Spec:** 006
+
+### W46 · Documentos fiscales (DTE) (F)
+
+- **Para:** Facturación; Contadora (rol F)
+- **Propósito:** Emitir y seguir facturas electrónicas
+- **Muestra:** DTE y sus estados
+- **Acciones:** Emitir, invalidar
+- **En vivo:** Sello de recepción llega solo
+- **Privacidad:** Receptor opcional en consumidor final
+- **Spec:** 007
+
+### W47 · Aseguradoras y reclamos (F)
+
+- **Para:** Facturación (rol F)
+- **Propósito:** Del crédito hospitalario a la remesa
+- **Muestra:** Garantías, reclamos, glosas
+- **Acciones:** Registrar garantía, enviar reclamo
+- **Privacidad:** La glosa nunca pasa sola al paciente
+- **Spec:** 009
+
+### W48 · Tarifas y catálogo (F)
+
+- **Para:** Facturación; Contadora (rol F)
+- **Propósito:** Precios con versión y vigencia
+- **Muestra:** Tarifas, versiones por aprobar
+- **Acciones:** Nueva versión
+- **Privacidad:** Clasificación fiscal la aprueba la contadora
+- **Spec:** 006
+
+### W49 · Honorarios médicos (F)
+
+- **Para:** Facturación; Contadora (rol F)
+- **Propósito:** Liquidar lo cobrado por cuenta de cada médico
+- **Muestra:** Honorarios, retención 10%, F-958
+- **Acciones:** Liquidar
+- **Privacidad:** Sin diagnóstico
+- **Spec:** 008
+
+### W50 · Mi cartera (F)
+
+- **Para:** Contadora (rol F)
+- **Propósito:** Primera pantalla del día de la contadora
+- **Muestra:** Clientes con alias y vencimientos
+- **Acciones:** Elegir cliente y período
+- **En vivo:** Semáforo al cerrar tareas
+- **Privacidad:** Clientes con alias
+- **Spec:** R22
+
+### W51 · Cierre del mes (F)
+
+- **Para:** Contadora (rol F)
+- **Propósito:** Recorrer el mes de un cliente de los papeles al archivo
+- **Muestra:** Pasos del cierre
+- **Acciones:** Avanzar, cerrar período
+- **Privacidad:** Reapertura auditada
+- **Spec:** R22
+
+### W52 · Bandeja de documentos (F)
+
+- **Para:** Contadora (rol F)
+- **Propósito:** Clasificar lo que llegó
+- **Muestra:** DTE y papel por clasificar
+- **Acciones:** Clasificar, pedir lo que falta
+- **En vivo:** Nuevos DTE entran solos
+- **Spec:** R22
+
+### W53 · Validaciones cruzadas (F)
+
+- **Para:** Contadora (rol F)
+- **Propósito:** Que todo cuadre antes de presentar
+- **Muestra:** Comparaciones libro contra declaración
+- **Acciones:** Revisar
+- **Spec:** R22
+
+### W54 · Declaraciones (F)
+
+- **Para:** Contadora (rol F)
+- **Propósito:** Borradores listos para presentar a mano
+- **Muestra:** F-07, F-14, F-930, F-958
+- **Acciones:** Generar borrador
+- **En vivo:** Vencimiento calculado
+- **Privacidad:** El sistema nunca entra al portal de Hacienda
+- **Spec:** R22
+
+### W55 · Asientos y períodos (F)
+
+- **Para:** Contadora (rol F)
+- **Propósito:** Contabilidad por eventos
+- **Muestra:** Asientos, períodos
+- **Acciones:** Revisar, cerrar
+- **En vivo:** Cada evento genera su asiento
+- **Privacidad:** Reapertura auditada
+- **Spec:** 008
+
+### W56 · Conciliación bancaria (F)
+
+- **Para:** Contadora (rol F)
+- **Propósito:** Cruzar banco contra libros
+- **Muestra:** Movimientos y coincidencias
+- **Acciones:** Conciliar
+- **Privacidad:** Nada ambiguo se aplica solo
+- **Spec:** R22
+
+### W57 · Biblioteca normativa (F)
+
+- **Para:** Contadora (rol F)
+- **Propósito:** Tasas, tablas y plazos con vigencia
+- **Muestra:** Normas con vigencia
+- **Acciones:** Nueva versión
+- **Spec:** R22
 
 ## Android
 
@@ -731,6 +899,16 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **Acciones:** Ninguna
 - **Spec:** 109
 
+### A13 · Mi cuenta (F)
+
+- **Para:** PAC
+- **Propósito:** Saber cuánto y por qué
+- **Muestra:** Cargos, pagos y factura propia
+- **Acciones:** Descargar factura
+- **En vivo:** Se actualiza al cargar
+- **Privacidad:** Solo la cuenta propia; nada económico a clínicos
+- **Spec:** 006
+
 ## iOS
 
 ### I01 · Ingreso (R)
@@ -902,6 +1080,16 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **En vivo:** Cambios en vivo
 - **Spec:** 103
 
+### I13 · Mi cuenta (F)
+
+- **Para:** PAC
+- **Propósito:** Saber cuánto y por qué
+- **Muestra:** Cargos, pagos y factura propia
+- **Acciones:** Descargar factura
+- **En vivo:** Se actualiza al cargar
+- **Privacidad:** Solo la cuenta propia; nada económico a clínicos
+- **Spec:** 006
+
 ## Pantallas por rol
 
 | Rol | Web | Android | iOS |
@@ -915,4 +1103,4 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 | Laboratorista | W01, W04, W20, W21, W22, W23, W35, W36 | A01, A10, A12, A26, A60, A61, A62 | no usa |
 | Paramédico | no usa | A01, A10, A12, A26, A70, A71, A72, A73, A74 | no usa |
 | Delegado de protección de datos | W01, W04, W19, W30, W32, W33, W35, W36 | no usa | no usa |
-| Paciente | no usa | A01, A02, A03, A04, A05, A06, A07, A08, A09, A10, A11, A12 | I01, I02, I03, I04, I05, I06, I07, I08, I09, I10, I11, I12 |
+| Paciente | no usa | A01, A02, A03, A04, A05, A06, A07, A08, A09, A10, A11, A12, A13 | I01, I02, I03, I04, I05, I06, I07, I08, I09, I10, I11, I12, I13 |

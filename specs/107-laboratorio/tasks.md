@@ -1,6 +1,6 @@
 # 107. Tareas
 
-- [x] T01 · S3 · R · Migración de laboratorio, catálogo recursivo y semilla con rangos
+- [x] T01 · S1 · R · Migración de laboratorio, catálogo recursivo y semilla con rangos
   - Cubre: FR-107-01, FR-107-03
   - Depende de: 100-T03
   - Hecho cuando: agregar un ciclo al catálogo se rechaza

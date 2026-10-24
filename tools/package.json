@@ -1,0 +1,6 @@
+{
+  "name": "sghu-tools",
+  "private": true,
+  "description": "Dependencias de tools/documento_backlog.js. Instalar con: cd tools && npm install",
+  "dependencies": { "docx": "9.5.1" }
+}

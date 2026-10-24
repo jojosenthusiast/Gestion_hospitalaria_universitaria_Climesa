@@ -10,7 +10,7 @@
   - Depende de: T01
   - Hecho cuando: registrar en Supabase Auth crea `acceso.usuario` con PAC
   - Verificado: Prueba local 16: alta desde auth.users crea usuario con PAC; invitado sin rol automático
-- [x] T03 · S2 · R · Endpoint `/me` con permisos efectivos y plataformas
+- [ ] T03 · S2 · R · Endpoint `/me` con permisos efectivos y plataformas
   - Cubre: FR-101-03, FR-101-04
   - Depende de: T01, 100-T05
   - Hecho cuando: prueba devuelve permisos correctos para un usuario con dos roles
@@ -18,7 +18,7 @@
   - Cubre: FR-101-14
   - Depende de: T01
   - Hecho cuando: el token de un REC trae `rol:REC` y `ambulancia`; el de PAC trae `usuario:<id>` y `publico`
-- [x] T05 · S2 · R · Invitación de personal, asignación de roles y desactivación
+- [ ] T05 · S2 · R · Invitación de personal, asignación de roles y desactivación
   - Cubre: FR-101-05, FR-101-06, FR-101-07, FR-101-13
   - Depende de: T03
   - Hecho cuando: pruebas de autoasignación (403), último administrador (409) y cuenta desactivada (401)
@@ -30,7 +30,7 @@
   - Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11
   - Depende de: T05, 102-T03
   - Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
-- [ ] T08 · S4 · E · Vigencia de inscripción en el perfil
+- [ ] T08 · S5 · E · Vigencia de inscripción en el perfil
   - Cubre: FR-101-16
   - Depende de: 103-T05
   - Hecho cuando: el perfil del médico muestra la fecha de vencimiento
@@ -38,4 +38,4 @@
 
 ## Verificación del corte 0.3.0 · 24-oct-2026
 
-backend/test/core.integration.spec.ts: perfil multirrol, permisos vigentes, invitación con proveedor simulado, autoasignación, último ADM y cuenta desactivada. Correo/Auth remoto pendiente. Las tareas cuyo criterio necesita nube, dispositivo, simulador, CI remoto o la siguiente sincronización de Figma permanecen abiertas. Las verificaciones del 17-oct son históricas y no se revalidaron en la nube.
+api/tests/core.integration.spec.ts: perfil multirrol, permisos vigentes, invitación con proveedor simulado, autoasignación, último ADM y cuenta desactivada. Correo/Auth remoto pendiente. Las tareas cuyo criterio necesita nube, dispositivo, simulador, CI remoto o la siguiente sincronización de Figma permanecen abiertas. Las verificaciones del 17-oct son históricas y no se revalidaron en la nube.

@@ -1,10 +1,10 @@
 # 120. Tareas
 
-- [ ] T01 · S1 · R · Proyecto React con TypeScript, rutas, ingreso con Supabase y despliegue
+- [ ] T01 · S2 · R · Proyecto React con TypeScript, rutas, ingreso con Supabase y despliegue
   - Cubre: FR-120-01, FR-101-01
   - Depende de: ninguna
   - Hecho cuando: la URL desplegada permite ingresar con un usuario de prueba
-- [x] T02 · S2 · R · Navegación por rol desde `/auth/me`, estados comunes y cliente de API generado
+- [ ] T02 · S2 · R · Navegación por rol desde `/me`, estados comunes y cliente de API generado
   - Cubre: FR-120-02, FR-120-03, FR-120-06, FR-120-07
   - Depende de: T01, 101-T03
   - Hecho cuando: escenario 1 pasa y cada rol web ve su menú

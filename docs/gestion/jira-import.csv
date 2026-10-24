@@ -1,1142 +1,1501 @@
-Issue Id,Parent Id,Issue Type,Summary,Description,Story Points,Priority,Sprint,Labels,Assignee,Status
-1,,Epic,100 Plataforma de la API,Spec: specs/100-plataforma-api/spec.md,,High,,spec-100,,To Do
-2,,Epic,"101 Identidad, cuentas y acceso",Spec: specs/101-identidad-acceso/spec.md,,High,,spec-101,,To Do
-3,,Epic,102 Pacientes,Spec: specs/102-pacientes/spec.md,,High,,spec-102,,To Do
-4,,Epic,103 Personal de salud y turnos,Spec: specs/103-personal-turnos/spec.md,,High,,spec-103,,To Do
-5,,Epic,"104 Edificio, camas y recursos",Spec: specs/104-infraestructura-recursos/spec.md,,High,,spec-104,,To Do
-6,,Epic,105 Fila del día y citas,Spec: specs/105-fila-citas/spec.md,,High,,spec-105,,To Do
-7,,Epic,106 Consulta general,Spec: specs/106-consulta-general/spec.md,,High,,spec-106,,To Do
-8,,Epic,107 Laboratorio,Spec: specs/107-laboratorio/spec.md,,High,,spec-107,,To Do
-9,,Epic,108 Admisión y hospitalización,Spec: specs/108-admision-hospitalizacion/spec.md,,High,,spec-108,,To Do
-10,,Epic,109 Ambulancia,Spec: specs/109-ambulancia/spec.md,,High,,spec-109,,To Do
-11,,Epic,110 Privacidad y auditoría,Spec: specs/110-privacidad-auditoria/spec.md,,High,,spec-110,,To Do
-12,,Epic,111 Inventario de insumos,Spec: specs/111-inventario/spec.md,,High,,spec-111,,To Do
-13,,Epic,112 Información pública y avisos,Spec: specs/112-informacion-publica/spec.md,,High,,spec-112,,To Do
-14,,Epic,113 Métricas y tablero,Spec: specs/113-metricas-tablero/spec.md,,High,,spec-113,,To Do
-15,,Epic,120 Cliente web,Spec: specs/120-cliente-web/spec.md,,High,,spec-120,,To Do
-16,,Epic,121 Cliente Android,Spec: specs/121-cliente-android/spec.md,,High,,spec-121,,To Do
-17,,Epic,122 Cliente iOS,Spec: specs/122-cliente-ios/spec.md,,High,,spec-122,,To Do
-18,,Epic,130 Calidad y pruebas de concurrencia,Spec: specs/130-calidad-concurrencia/spec.md,,High,,spec-130,,To Do
-19,,Epic,131 Documentación y entrega,Spec: specs/131-documentacion-entrega/spec.md,,High,,spec-131,,To Do
-20,1,Story,"HU-100-1 Una API base con seguridad, auditoría e idempotencia","Como equipo de desarrollo, quiero una API base con seguridad, auditoría e idempotencia, para que cada módulo nazca protegido y trazable.
+Issue Id,Parent Id,Issue Type,Summary,Description,Story Points,Priority,Sprint,Labels,Labels,Labels,Labels,Labels,Status
+1,,Epic,100 Plataforma de la API,Spec: specs/100-plataforma-api/spec.md (requisitos EARS y escenarios de aceptación).,,Highest,,spec-100,,,,,To Do
+2,,Epic,"101 Identidad, cuentas y acceso",Spec: specs/101-identidad-acceso/spec.md (requisitos EARS y escenarios de aceptación).,,Highest,,spec-101,,,,,To Do
+3,,Epic,102 Pacientes,Spec: specs/102-pacientes/spec.md (requisitos EARS y escenarios de aceptación).,,Highest,,spec-102,,,,,To Do
+4,,Epic,103 Personal de salud y turnos,Spec: specs/103-personal-turnos/spec.md (requisitos EARS y escenarios de aceptación).,,Highest,,spec-103,,,,,To Do
+5,,Epic,"104 Edificio, camas y recursos",Spec: specs/104-infraestructura-recursos/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-104,,,,,To Do
+6,,Epic,105 Fila del día y citas,Spec: specs/105-fila-citas/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-105,,,,,To Do
+7,,Epic,106 Consulta general,Spec: specs/106-consulta-general/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-106,,,,,To Do
+8,,Epic,107 Laboratorio,Spec: specs/107-laboratorio/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-107,,,,,To Do
+9,,Epic,108 Admisión y hospitalización,Spec: specs/108-admision-hospitalizacion/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-108,,,,,To Do
+10,,Epic,109 Ambulancia,Spec: specs/109-ambulancia/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-109,,,,,To Do
+11,,Epic,110 Privacidad y auditoría,Spec: specs/110-privacidad-auditoria/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-110,,,,,To Do
+12,,Epic,111 Inventario de insumos,Spec: specs/111-inventario/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-111,,,,,To Do
+13,,Epic,112 Información pública y avisos,Spec: specs/112-informacion-publica/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-112,,,,,To Do
+14,,Epic,113 Métricas y tablero,Spec: specs/113-metricas-tablero/spec.md (requisitos EARS y escenarios de aceptación).,,Highest,,spec-113,,,,,To Do
+15,,Epic,114 Avisos y alarmas,Spec: specs/114-avisos-alarmas/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-114,,,,,To Do
+16,,Epic,120 Cliente web,Spec: specs/120-cliente-web/spec.md (requisitos EARS y escenarios de aceptación).,,Highest,,spec-120,,,,,To Do
+17,,Epic,121 Cliente Android,Spec: specs/121-cliente-android/spec.md (requisitos EARS y escenarios de aceptación).,,Highest,,spec-121,,,,,To Do
+18,,Epic,122 Cliente iOS,Spec: specs/122-cliente-ios/spec.md (requisitos EARS y escenarios de aceptación).,,Highest,,spec-122,,,,,To Do
+19,,Epic,130 Calidad y pruebas de concurrencia,Spec: specs/130-calidad-concurrencia/spec.md (requisitos EARS y escenarios de aceptación).,,High,,spec-130,,,,,To Do
+20,,Epic,131 Documentación y entrega,Spec: specs/131-documentacion-entrega/spec.md (requisitos EARS y escenarios de aceptación).,,Highest,,spec-131,,,,,To Do
+21,,Epic,"F-006 Cuenta del paciente, caja y cobros (fuera del curso)","Como facturación, quiero que los cargos entren solos a la cuenta del episodio y se dividan por pagador, para cobrar sin errores.
+Pantallas diseñadas: W40, W41, W42, W43, W44, W45, A13, I13. Flujo: F13. Nivel F: no entra en sprints del curso.",,Lowest,,produccion-climesa,,,,,To Do
+22,,Epic,F-007 Documentos tributarios electrónicos (DTE) (fuera del curso),"Como facturación, quiero emitir facturas y créditos fiscales electrónicos con su sello de Hacienda, para cumplir con el MH.
+Pantallas diseñadas: W46. Flujo: F13. Nivel F: no entra en sprints del curso.",,Lowest,,produccion-climesa,,,,,To Do
+23,,Epic,"F-009 Aseguradoras, reclamos y glosas (fuera del curso)","Como facturación, quiero seguir cada reclamo desde la garantía hasta la remesa, para cobrar lo que corresponde a la aseguradora.
+Pantallas diseñadas: W47, W56. Flujo: F14. Nivel F: no entra en sprints del curso.",,Lowest,,produccion-climesa,,,,,To Do
+24,,Epic,"F-008 Tarifas, honorarios médicos y F-958 (fuera del curso)","Como contadora, quiero liquidar honorarios con su retención y armar el F-958 desde los procedimientos, para no buscar papeles.
+Pantallas diseñadas: W48, W49, W54. Flujo: F16. Nivel F: no entra en sprints del curso.",,Lowest,,produccion-climesa,,,,,To Do
+25,,Epic,F-R22 Contabilidad general de la contadora (fuera del curso),"Como contadora, quiero recorrer el cierre del mes de cada cliente con validaciones cruzadas, para presentar sin errores.
+Pantallas diseñadas: W50, W51, W52, W53, W55, W57. Flujo: F15. Nivel F: no entra en sprints del curso.",,Lowest,,produccion-climesa,,,,,To Do
+26,20,Story,"HU-131-00 Investigar el dominio, levantar los requisitos y documentar la propuesta","Como equipo, quiero investigar el dominio, levantar los requisitos y documentar la propuesta, para construir el sistema sobre una base acordada.
+
+Criterios de aceptación:
+- Investigación de CLIMESA y del sector documentada
+- Requisitos del curso y del cliente levantados como specs SDD
+- Documento de la propuesta entregado
+- Arquitectura y módulos esquematizados",5,Highest,SGHU Sprint 1,spec-131,,,,,Done
+27,1,Story,HU-100-0 El modelo de datos y la base de datos en la nube con sus invariantes,"Como equipo de desarrollo, quiero el modelo de datos y la base de datos en la nube con sus invariantes, para que todos los módulos construyan sobre la misma estructura.
+
+Criterios de aceptación:
+- 13 migraciones aplicadas en Supabase
+- Cama, turnos y citas sin traslape por restricciones de exclusión
+- RLS en todas las tablas
+- 28 invariantes y 6 pruebas concurrentes pasan
+Requisitos: FR-100-08, FR-100-09, FR-101-02, FR-101-12, FR-102-03, FR-102-04, FR-102-12, FR-103-04, FR-104-01, FR-104-02, FR-104-03, FR-105-01, FR-105-07, FR-106-03, FR-106-04, FR-107-01, FR-107-03, FR-108-05, FR-108-15, FR-109-01, FR-109-05, FR-111-01, FR-111-02",8,Highest,SGHU Sprint 1,spec-100,,comp-backend,,,Done
+28,20,Story,HU-131-0 Un tablero de Jira y el diseño de alta fidelidad de todas las pantallas,"Como equipo, quiero un tablero de Jira y el diseño de alta fidelidad de todas las pantallas, para planificar y construir sobre lo mismo.
+
+Criterios de aceptación:
+- Jira con épicas y sprints
+- 116 pantallas diseñadas con estados y modo oscuro
+
+Pantallas: Todas",5,Highest,SGHU Sprint 1,spec-131,,comp-web,comp-android,,Done
+29,1,Story,"HU-100-1 Una API base con autenticación de Supabase, permisos, auditoría e idempotencia","Como equipo de desarrollo, quiero una API base con autenticación de Supabase, permisos, auditoría e idempotencia, para que cada módulo nazca protegido y trazable.
 
 Criterios de aceptación:
 - Token inválido responde 401
-- Sin permiso responde 403 y se audita
-- Doble clic no duplica efectos",19,Highest,Sprint 1,spec-100,,Done
-21,1,Story,HU-100-2 La API publicada en la nube con su contrato OpenAPI,"Como equipo, quiero la API publicada en la nube con su contrato OpenAPI, para que las tres apps la consuman desde el día uno.
+- Sin permiso responde 403 y queda auditado
+- Doble clic no duplica efectos
+
+Pantallas: W36
+Requisitos: FR-100-01, FR-100-02, FR-100-03, FR-100-04, FR-100-05, FR-100-06, FR-100-07, FR-100-10, FR-100-11, FR-100-12, FR-100-15, FR-100-16, FR-100-18",8,Highest,SGHU Sprint 2,spec-100,,comp-backend,,,To Do
+30,1,Story,HU-100-2 La API publicada en la nube con su contrato OpenAPI y la base de datos con tiempo real,"Como equipo de desarrollo, quiero la API publicada en la nube con su contrato OpenAPI y la base de datos con tiempo real, para que las tres apps la consuman desde el avance.
 
 Criterios de aceptación:
 - /salud responde 200 en la URL pública
-- OpenAPI lista cada endpoint con su permiso",5,Highest,Sprint 2,spec-100,,To Do
-22,1,Story,HU-100-3 Recibir avisos aunque la app esté cerrada y que no abusen de las búsquedas,"Como usuario del sistema, quiero recibir avisos aunque la app esté cerrada y que no abusen de las búsquedas, para enterarme a tiempo y proteger los datos.
-
-Criterios de aceptación:
-- Un evento con push llega una sola vez
-- La búsqueda 21 en un minuto devuelve 429",7,Low,Sprint 5,spec-100,,To Do
-23,2,Story,HU-101-1 Iniciar sesión con mi rol en mi plataforma,"Como miembro del personal, quiero iniciar sesión con mi rol en mi plataforma, para ver solo lo que me corresponde.
+- OpenAPI lista cada endpoint con su permiso
+- Base de datos aplicada en Supabase
+Requisitos: FR-100-13, FR-100-14, FR-100-18",3,Highest,SGHU Sprint 2,spec-100,,comp-backend,,,To Do
+31,2,Story,HU-101-1 Iniciar sesión con mi rol en mi plataforma y registrarme si soy paciente,"Como miembro del personal o paciente, quiero iniciar sesión con mi rol en mi plataforma y registrarme si soy paciente, para ver solo lo que me corresponde.
 
 Criterios de aceptación:
 - Cada rol entra en su plataforma
-- Un rol en plataforma ajena ve 'Tu rol no usa esta aplicación'",21,Highest,Sprint 1,spec-101,,To Do
-24,2,Story,"HU-101-2 Invitar personal, asignar roles y desactivar cuentas","Como administrador, quiero invitar personal, asignar roles y desactivar cuentas, para controlar quién entra sin poder darme permisos a mí mismo.
+- Un rol en plataforma ajena ve 'Tu rol no usa esta aplicación'
+- El paciente se registra en Android e iOS
+
+Pantallas: W01, A01, A02, I01, I02
+Requisitos: FR-101-01, FR-101-02, FR-101-03, FR-101-04, FR-101-14, FR-101-15",5,Highest,SGHU Sprint 2,spec-101,,comp-backend,comp-web,comp-android,To Do
+32,16,Story,"HU-120-1 Un panel React con menú por rol, estados comunes y cliente de API","Como usuario web, quiero un panel React con menú por rol, estados comunes y cliente de API, para trabajar en la web desde el avance.
+
+Criterios de aceptación:
+- El laboratorista ve solo su menú
+- La web está desplegada
+
+Pantallas: W01, W03, W35, W36
+Requisitos: FR-101-01, FR-120-01, FR-120-02, FR-120-03, FR-120-06, FR-120-07",5,Highest,SGHU Sprint 2,spec-120,,comp-web,,,To Do
+33,17,Story,"HU-121-1 Una app Kotlin con Compose, ingreso y navegación por rol para los 7 roles","Como usuario Android, quiero una app Kotlin con Compose, ingreso y navegación por rol para los 7 roles, para usar el sistema en el punto de atención desde el avance.
+
+Criterios de aceptación:
+- Navegación de los 7 roles de Android
+- Girar el teléfono no pierde lo escrito
+
+Pantallas: A01 a A74 (navegación)
+Requisitos: FR-101-01, FR-121-01, FR-121-02, FR-121-03, FR-121-07",8,Highest,SGHU Sprint 2,spec-121,,comp-android,,,To Do
+34,18,Story,HU-122-1 Una app SwiftUI con ingreso y pestañas por rol,"Como médico o paciente con iPhone, quiero una app SwiftUI con ingreso y pestañas por rol, para usar el sistema desde iOS en el avance.
+
+Criterios de aceptación:
+- Pestañas correctas para médico y paciente
+- Un rol sin iOS ve el aviso y sale
+
+Pantallas: I01 a I26 (navegación)
+Requisitos: FR-101-01, FR-122-01, FR-122-02, FR-122-03, FR-122-06",5,Highest,SGHU Sprint 2,spec-122,,comp-ios,,,To Do
+35,3,Story,"HU-102-1 Buscar a un paciente antes de registrarlo y registrarlo si no existe, en web y en Android","Como recepcionista, quiero buscar a un paciente antes de registrarlo y registrarlo si no existe, en web y en Android, para no crear expedientes duplicados.
+
+Criterios de aceptación:
+- 'hernandes basquez' encuentra a Hernández Vásquez
+- DUI repetido se rechaza con el expediente existente
+- Corregir deja historial
+
+Pantallas: W26, A30
+Requisitos: FR-102-01, FR-102-02, FR-102-04, FR-102-05, FR-102-06, FR-102-07, FR-102-08, FR-102-11
+
+HISTORIA PIVOTE: referencia de 3 puntos para estimar las demás.",3,Highest,SGHU Sprint 2,spec-102,pivote,comp-backend,comp-web,comp-android,To Do
+36,4,Story,"HU-103-1 Registrar al personal de salud con tipo, especialidad y área","Como administrador, quiero registrar al personal de salud con tipo, especialidad y área, para saber quién puede atender.
+
+Criterios de aceptación:
+- CRUD de personal desde la web
+- Personal sin cuenta (motorista, limpieza) también se registra
+
+Pantallas: W07, W08
+Requisitos: FR-103-01, FR-103-02",3,Highest,SGHU Sprint 2,spec-103,,comp-backend,comp-web,,To Do
+37,14,Story,"HU-113-1 Un tablero inicial con ocupación, personal y pacientes","Como administrador o jefe de operaciones, quiero un tablero inicial con ocupación, personal y pacientes, para ver el día al entrar.
+
+Criterios de aceptación:
+- El tablero se ve en la web desplegada
+- Ninguna tarjeta muestra datos personales
+
+Pantallas: W03
+Requisitos: FR-113-01, FR-113-03, FR-113-06",3,Highest,SGHU Sprint 2,spec-113,,comp-backend,comp-web,,To Do
+38,20,Story,HU-131-1 El diseño completo en Figma con flujos enlazados y revisado en accesibilidad,"Como docente evaluador, quiero el diseño completo en Figma con flujos enlazados y revisado en accesibilidad, para evaluar el 100% del diseño en el avance.
+
+Criterios de aceptación:
+- Figma con las pantallas de iOS, Android y web
+- Flujos F01 a F12 enlazados
+- Sistema de diseño con paleta accesible y estados
+
+Pantallas: Todas
+Requisitos: FR-131-03",3,Highest,SGHU Sprint 2,spec-131,,,,,To Do
+39,20,Story,"HU-131-2 El diagrama entidad-relación, la arquitectura, la matriz RBAC y la política de privacidad","Como docente evaluador, quiero el diagrama entidad-relación, la arquitectura, la matriz RBAC y la política de privacidad, para evaluar la arquitectura en el avance.
+
+Criterios de aceptación:
+- Los cuatro documentos en docs/arquitectura
+- La matriz se genera y verifica desde los catálogos
+Requisitos: FR-110-10, FR-131-02",1,Highest,SGHU Sprint 2,spec-131,,,,,To Do
+40,20,Story,HU-131-3 Un README que explique cómo instalar y correr las tres plataformas,"Como miembro del equipo, quiero un README que explique cómo instalar y correr las tres plataformas, para que cualquiera levante el proyecto.
+
+Criterios de aceptación:
+- Un compañero levanta el entorno siguiendo el README
+Requisitos: FR-131-01",2,Highest,SGHU Sprint 2,spec-131,,,,,To Do
+41,20,Story,"HU-131-4 Plantillas de casos, usuarios de prueba por rol y la lista de pruebas por pantalla","Como equipo de QA, quiero plantillas de casos, usuarios de prueba por rol y la lista de pruebas por pantalla, para probar desde el primer sprint de código.
+
+Criterios de aceptación:
+- Un usuario por rol
+- Lista de pruebas por pantalla y estado
+
+Pantallas: Todas
+Requisitos: FR-130-06",2,Highest,SGHU Sprint 2,spec-131,,,,,To Do
+42,2,Story,"HU-101-2 Invitar personal, asignar roles y desactivar cuentas","Como administrador, quiero invitar personal, asignar roles y desactivar cuentas, para controlar quién entra sin poder darme permisos a mí mismo.
 
 Criterios de aceptación:
 - No puedo asignarme roles
 - No se puede quitar el último administrador
-- Cuenta desactivada recibe 401",8,Highest,Sprint 2,spec-101,,To Do
-25,2,Story,HU-101-3 Crear mi cuenta y vincularla con mi expediente,"Como paciente, quiero crear mi cuenta y vincularla con mi expediente, para ver mis citas, fila y resultados.
+- Cuenta desactivada recibe 401
+
+Pantallas: W02, W05, W06
+Requisitos: FR-101-05, FR-101-06, FR-101-07, FR-101-13",3,High,SGHU Sprint 2,spec-101,,comp-backend,comp-web,,To Do
+43,4,Story,"HU-103-2 Crear y mover turnos sin traslapes ni descansos insuficientes, y publicarlos con revisión de cobertura","Como jefe de operaciones, quiero crear y mover turnos sin traslapes ni descansos insuficientes, y publicarlos con revisión de cobertura, para que los horarios sean posibles y nunca falte personal en emergencia.
 
 Criterios de aceptación:
-- Sin verificar no veo datos privados
-- Al aprobar recepción, mi app cambia sin recargar",9,High,Sprint 3,spec-101,,To Do
-26,3,Story,HU-102-1 Buscar antes de registrar y ver por qué coincide un paciente,"Como recepcionista, quiero buscar antes de registrar y ver por qué coincide un paciente, para no crear expedientes duplicados.
+- Turno traslapado se rechaza aunque dos jefes lo creen a la vez
+- Menos de 8 h de descanso se rechaza
+- Huecos de cobertura se advierten al publicar
+
+Pantallas: W16, W17
+Requisitos: FR-103-04, FR-103-05, FR-103-06, FR-103-08, FR-103-09, FR-103-13, FR-103-14",5,High,SGHU Sprint 2,spec-103,,comp-backend,,,To Do
+44,4,Story,HU-103-5 Registrar la inscripción profesional y que no se programe ni firme quien la tiene vencida,"Como jefe de operaciones, quiero registrar la inscripción profesional y que no se programe ni firme quien la tiene vencida, para cumplir la ley de la JVPM.
 
 Criterios de aceptación:
-- 'hernandes basquez' encuentra a Hernández Vásquez
-- DUI repetido se rechaza con el expediente existente",26,Highest,Sprint 1,spec-102,,To Do
-27,3,Story,HU-102-2 Que cada rol vea de mí solo los datos que necesita,"Como paciente, quiero que cada rol vea de mí solo los datos que necesita, para proteger mi información personal.
+- Médico con inscripción vencida no se programa
+- La firma de consulta y de alta usa esta vigencia
 
-Criterios de aceptación:
-- Laboratorio no ve mi DUI ni mi teléfono
-- Toda lectura queda auditada",3,Highest,Sprint 2,spec-102,,Done
-28,3,Story,HU-102-3 Registrar a un paciente sin identidad,"Como paramédico, quiero registrar a un paciente sin identidad, para atenderlo sin inventar datos.
-
-Criterios de aceptación:
-- Se crea NN con edad estimada y sin fecha exacta",3,High,Sprint 4,spec-102,,To Do
-29,4,Story,"HU-103-1 Registrar al personal de salud con su tipo, especialidad e inscripción","Como administrador, quiero registrar al personal de salud con su tipo, especialidad e inscripción, para saber quién puede atender.
-
-Criterios de aceptación:
-- CRUD de personal desde la web
-- Médico con inscripción vencida no se programa",15,Highest,Sprint 1,spec-103,,To Do
-30,4,Story,HU-103-2 Planificar y publicar turnos sin traslapes y con cobertura,"Como jefe de operaciones, quiero planificar y publicar turnos sin traslapes y con cobertura, para que nunca falte personal en emergencia.
-
-Criterios de aceptación:
-- Turno traslapado se rechaza aun si dos jefes lo crean a la vez
-- Huecos de cobertura se advierten al publicar",22,Highest,Sprint 2,spec-103,,To Do
-31,4,Story,HU-103-3 Ver qué médicos están de turno,"Como visitante, quiero ver qué médicos están de turno, para saber quién atiende hoy.
-
-Criterios de aceptación:
-- Solo nombre, especialidad y área",1,High,Sprint 3,spec-103,,To Do
-32,5,Story,"HU-104-1 Configurar el edificio como un árbol de plantas, habitaciones y camas","Como administrador, quiero configurar el edificio como un árbol de plantas, habitaciones y camas, para que las capacidades sean datos y no código.
+Pantallas: W08, W17
+Requisitos: FR-103-03, FR-103-10",2,High,SGHU Sprint 2,spec-103,,comp-backend,,,To Do
+45,5,Story,"HU-104-1 Configurar el edificio como árbol de plantas, habitaciones y camas","Como administrador, quiero configurar el edificio como árbol de plantas, habitaciones y camas, para que las capacidades sean datos y no código.
 
 Criterios de aceptación:
 - 17 camas: 12 semiprivadas y 5 VIP
-- No se agrega una tercera cama a una semiprivada",17,Highest,Sprint 1,spec-104,,To Do
-33,5,Story,HU-104-2 Ver el estado de cada cama en vivo,"Como recepcionista o jefe de operaciones, quiero ver el estado de cada cama en vivo, para asignar sin llamar a la planta.
+- No se agrega una tercera cama a una semiprivada
+- Conteos por planta con consulta recursiva
+
+Pantallas: W09
+Requisitos: FR-104-04, FR-104-05, FR-104-13",3,High,SGHU Sprint 2,spec-104,,comp-backend,,,To Do
+46,10,Story,HU-109-1 Ver el estado de la única ambulancia en vivo,"Como despacho y tripulación, quiero ver el estado de la única ambulancia en vivo, para saber si se puede despachar.
 
 Criterios de aceptación:
-- El tablero cambia sin recargar
-- Quien limpió no puede verificar su propia limpieza",9,Highest,Sprint 2,spec-104,,To Do
-34,5,Story,HU-104-3 Saber qué equipo médico hay y si funciona,"Como jefe de operaciones, quiero saber qué equipo médico hay y si funciona, para planificar mantenimiento.
+- Sin paramédico de turno no puede estar Disponible
+- El estado cambia en todas las pantallas
+
+Pantallas: W18, A70
+Requisitos: FR-109-01, FR-109-06",2,High,SGHU Sprint 2,spec-109,,comp-backend,,,To Do
+47,16,Story,HU-120-2 Que la web se actualice sola y se recupere al perder la red,"Como usuario web, quiero que la web se actualice sola y se recupere al perder la red, para no recargar nunca.
 
 Criterios de aceptación:
-- Un monitor en mantenimiento se ve en su habitación",4,Medium,Sprint 4,spec-104,,To Do
-35,6,Story,HU-105-1 Recibir mi número de fila y ver en vivo cuándo me llaman,"Como paciente, quiero recibir mi número de fila y ver en vivo cuándo me llaman, para no estar pendiente del mostrador.
+- Tras perder la red, el tablero se corrige solo
+
+Pantallas: W36
+Requisitos: FR-120-04, FR-120-05",3,High,SGHU Sprint 2,spec-120,,comp-web,,,To Do
+48,17,Story,HU-121-2 Que la app se actualice sola con eventos en vivo,"Como usuario Android, quiero que la app se actualice sola con eventos en vivo, para no recargar.
+
+Criterios de aceptación:
+- Un cambio de cama en web aparece en Android sin recargar
+
+Pantallas: A35
+Requisitos: FR-121-04",3,High,SGHU Sprint 2,spec-121,,comp-android,,,To Do
+49,18,Story,HU-122-2 Que la app se actualice sola con eventos en vivo,"Como usuario iOS, quiero que la app se actualice sola con eventos en vivo, para no recargar.
+
+Criterios de aceptación:
+- El número de fila cambia en vivo al ser llamado
+
+Pantallas: I05
+Requisitos: FR-122-04",2,High,SGHU Sprint 2,spec-122,,comp-ios,,,To Do
+50,2,Story,HU-101-3 Vincular mi cuenta con mi expediente y que recepción la verifique,"Como paciente, quiero vincular mi cuenta con mi expediente y que recepción la verifique, para ver mis citas, fila y resultados.
+
+Criterios de aceptación:
+- Sin verificar no veo datos privados
+- Al aprobar, mi app cambia sin recargar
+
+Pantallas: A03, I03, W27, A33
+Requisitos: FR-101-08, FR-101-09, FR-101-10, FR-101-11",5,High,SGHU Sprint 3,spec-101,,comp-backend,comp-web,comp-android,To Do
+51,3,Story,HU-102-2 Que cada rol vea de mí solo los datos que necesita,"Como paciente, quiero que cada rol vea de mí solo los datos que necesita, para proteger mi información personal.
+
+Criterios de aceptación:
+- Laboratorio no ve mi DUI ni mi teléfono
+- Toda lectura queda auditada
+
+Pantallas: W26, A30
+Requisitos: FR-102-10, FR-110-01, FR-110-02, FR-110-03",5,High,SGHU Sprint 3,spec-102,,comp-backend,,,To Do
+52,4,Story,HU-103-3 Ver mis turnos en el teléfono y el planificador semanal en la web,"Como personal de salud, quiero ver mis turnos en el teléfono y el planificador semanal en la web, para saber cuándo me toca sin preguntar.
+
+Criterios de aceptación:
+- Un cambio de turno llega al teléfono sin recargar
+
+Pantallas: W16, A26, I26
+Requisitos: FR-103-11",3,High,SGHU Sprint 3,spec-103,,comp-web,comp-android,comp-ios,To Do
+53,4,Story,HU-103-4 Ver qué médicos están de turno,"Como visitante, quiero ver qué médicos están de turno, para saber quién atiende hoy.
+
+Criterios de aceptación:
+- Solo nombre, especialidad y área
+
+Pantallas: W34, A10, I10
+Requisitos: FR-103-12",1,High,SGHU Sprint 3,spec-103,,comp-backend,,,To Do
+54,5,Story,HU-104-2 Ver el estado de cada cama en vivo por planta,"Como recepcionista o jefe de operaciones, quiero ver el estado de cada cama en vivo por planta, para asignar sin llamar a la planta.
+
+Criterios de aceptación:
+- El plano cambia sin recargar
+- Ocupante en iniciales para quien no tiene permiso
+
+Pantallas: W12, A35
+Requisitos: FR-104-05, FR-104-06, FR-104-08",5,High,SGHU Sprint 3,spec-104,,comp-backend,comp-web,,To Do
+55,6,Story,HU-105-1 Recibir mi número de fila y ver en vivo cuándo me llaman,"Como paciente, quiero recibir mi número de fila y ver en vivo cuándo me llaman, para no estar pendiente del mostrador.
 
 Criterios de aceptación:
 - 50 números simultáneos sin repetidos
-- Mi teléfono vibra al ser llamado",19,High,Sprint 3,spec-105,,To Do
-36,6,Story,HU-105-2 Agendar citas sin traslapes,"Como recepcionista, quiero agendar citas sin traslapes, para ordenar la consulta.
+- Mi teléfono avisa al ser llamado
+
+Pantallas: W29, A31, A40, A05, I05
+Requisitos: FR-105-01, FR-105-02, FR-105-03, FR-105-04, FR-105-06",5,High,SGHU Sprint 3,spec-105,,comp-backend,comp-android,comp-ios,To Do
+56,6,Story,HU-105-2 Agendar citas sin traslapes con la disponibilidad del médico,"Como recepcionista, quiero agendar citas sin traslapes con la disponibilidad del médico, para ordenar la consulta.
 
 Criterios de aceptación:
-- Dos citas del mismo médico a la misma hora: solo una queda",9,High,Sprint 3,spec-105,,To Do
-37,6,Story,HU-105-3 Pedir una cita desde la app,"Como paciente, quiero pedir una cita desde la app, para no tener que ir al hospital a pedirla.
+- Dos citas del mismo médico a la misma hora: solo una queda
+
+Pantallas: W28, A32
+Requisitos: FR-105-07, FR-105-09, FR-105-10, FR-105-12",3,High,SGHU Sprint 3,spec-105,,comp-backend,comp-web,comp-android,To Do
+57,7,Story,"HU-106-1 Registrar signos, diagnóstico CIE-10, receta y órdenes de laboratorio en una consulta","Como médico, quiero registrar signos, diagnóstico CIE-10, receta y órdenes de laboratorio en una consulta, para atender completo desde el móvil.
 
 Criterios de aceptación:
-- Queda solicitada hasta que recepción confirma
-- La confirmación me llega en vivo",8,High,Sprint 4,spec-105,,To Do
-38,7,Story,"HU-106-1 Registrar signos, diagnóstico, receta y exámenes en una consulta","Como médico, quiero registrar signos, diagnóstico, receta y exámenes en una consulta, para atender completo desde el móvil.
+- Diagnóstico con buscador CIE-10
+- La orden aparece en la cola del laboratorio
 
-Criterios de aceptación:
-- Diagnóstico con CIE-10
-- La orden aparece en la cola del laboratorio",22,High,Sprint 3,spec-106,,To Do
-39,7,Story,HU-106-2 Firmar la consulta con mi inscripción vigente y corregir solo con addendum,"Como médico, quiero firmar la consulta con mi inscripción vigente y corregir solo con addendum, para que el expediente sea confiable.
+Pantallas: A20, A21, A41, I20, I21
+Requisitos: FR-106-01, FR-106-02, FR-106-03, FR-106-04, FR-106-05, FR-106-06",8,High,SGHU Sprint 3,spec-106,,comp-backend,comp-android,comp-ios,To Do
+58,7,Story,HU-106-2 Firmar la consulta con mi inscripción vigente,"Como médico, quiero firmar la consulta con mi inscripción vigente, para que el expediente sea confiable.
 
 Criterios de aceptación:
 - Inscripción vencida no firma
-- Lo firmado no se edita",7,High,Sprint 3,spec-106,,To Do
-40,7,Story,HU-106-3 Ver el historial clínico,"Como médico o paciente, quiero ver el historial clínico, para dar continuidad a la atención.
+- Lo firmado no se edita
+
+Pantallas: A21, I21
+Requisitos: FR-106-06, FR-106-07",2,High,SGHU Sprint 3,spec-106,,comp-backend,,,To Do
+59,7,Story,HU-106-3 Ver el historial clínico,"Como médico o paciente, quiero ver el historial clínico, para dar continuidad a la atención.
 
 Criterios de aceptación:
 - El paciente ve sus consultas firmadas
-- Cada lectura queda auditada",11,High,Sprint 3,spec-106,,To Do
-41,8,Story,HU-107-1 Procesar órdenes de Pendiente a En Proceso y Completado con valores y rangos,"Como laboratorista, quiero procesar órdenes de Pendiente a En Proceso y Completado con valores y rangos, para entregar resultados ordenados.
+- Cada lectura queda auditada
+
+Pantallas: A22, I22, A08, I08
+Requisitos: FR-106-09, FR-106-10, FR-106-12",3,High,SGHU Sprint 3,spec-106,,comp-backend,comp-android,comp-ios,To Do
+60,8,Story,HU-107-1 Recibir órdenes con paneles expandidos y procesarlas de Pendiente a En Proceso y Completado con valores y rangos,"Como laboratorista, quiero recibir órdenes con paneles expandidos y procesarlas de Pendiente a En Proceso y Completado con valores y rangos, para entregar resultados ordenados.
 
 Criterios de aceptación:
 - Transición inválida se rechaza
-- Valor fuera de rango se marca alto o bajo",27,High,Sprint 3,spec-107,,To Do
-42,8,Story,HU-107-2 Revisar resultados y recibir aviso de valores críticos,"Como médico, quiero revisar resultados y recibir aviso de valores críticos, para actuar a tiempo.
+- Valor fuera de rango se marca alto o bajo
+- La cola se actualiza sola
+
+Pantallas: W20, W21, A60, A61, A62
+Requisitos: FR-107-02, FR-107-04, FR-107-05, FR-107-06, FR-107-07, FR-107-09, FR-107-13",8,High,SGHU Sprint 3,spec-107,,comp-backend,comp-web,comp-android,To Do
+61,11,Story,HU-110-1 Que mis datos clínicos solo los vea quien me atiende,"Como paciente, quiero que mis datos clínicos solo los vea quien me atiende, para confiar en el hospital.
 
 Criterios de aceptación:
-- Crítico avisa al instante
-- El paciente ve valores solo después de mi revisión",12,High,Sprint 4,spec-107,,To Do
-43,9,Story,HU-108-1 Admitir con origen y recibir camas sugeridas con su motivo,"Como recepcionista, quiero admitir con origen y recibir camas sugeridas con su motivo, para asignar bien aunque otra persona esté asignando a la vez.
+- Médico no tratante recibe 'sin acceso' y queda auditado
+
+Pantallas: A22, I22
+Requisitos: FR-110-01, FR-110-03",3,High,SGHU Sprint 3,spec-110,,comp-backend,,,To Do
+62,11,Story,HU-110-3 Consultar la auditoría y verificar su integridad,"Como delegado de protección de datos, quiero consultar la auditoría y verificar su integridad, para detectar alteraciones.
 
 Criterios de aceptación:
-- Sugerencia prioriza habitación con ocupante compatible
-- La última cama solo la toma una persona",32,Highest,Sprint 2,spec-108,,To Do
-44,9,Story,HU-108-2 Trasladar pacientes respetando la regla VIP,"Como jefe de operaciones, quiero trasladar pacientes respetando la regla VIP, para mover camas sin errores.
+- Un registro alterado se detecta desde la web
+
+Pantallas: W32
+Requisitos: FR-110-07",3,High,SGHU Sprint 3,spec-110,,comp-backend,comp-web,,To Do
+63,12,Story,HU-111-1 Controlar insumos y reactivos por lote con alerta de mínimo,"Como jefe de operaciones, quiero controlar insumos y reactivos por lote con alerta de mínimo, para no quedarme sin material.
 
 Criterios de aceptación:
-- VIP no se traslada
-- La cama anterior queda en limpieza",3,High,Sprint 4,spec-108,,To Do
-45,9,Story,"HU-108-3 Ver a mis hospitalizados, registrar notas y firmar el alta","Como médico o enfermería, quiero ver a mis hospitalizados, registrar notas y firmar el alta, para cerrar la estancia con todo pendiente asignado.
+- Nunca hay existencias negativas, ni con salidas simultáneas
+- La alerta aparece en vivo
 
-Criterios de aceptación:
-- Alta exige responsable por pendiente
-- Salida física deja la cama en limpieza",14,High,Sprint 4,spec-108,,To Do
-46,10,Story,HU-109-1 Ver y despachar la única ambulancia en tiempo real,"Como despacho, quiero ver y despachar la única ambulancia en tiempo real, para que nunca se despache dos veces.
-
-Criterios de aceptación:
-- Dos despachos a la vez: uno gana
-- Sin paramédico de turno no puede estar Disponible",30,High,Sprint 3,spec-109,,To Do
-47,10,Story,HU-109-2 Pedir ambulancia y seguirla en vivo,"Como paciente, quiero pedir ambulancia y seguirla en vivo, para saber cuándo llega.
-
-Criterios de aceptación:
-- Veo confirmada, en camino y llegó sin recargar
-- La app muestra el aviso del 911",4,High,Sprint 4,spec-109,,To Do
-48,10,Story,"HU-109-3 Enviar el reporte del paciente antes de llegar, aunque no tenga señal","Como paramédico, quiero enviar el reporte del paciente antes de llegar, aunque no tenga señal, para que emergencia se prepare.
-
-Criterios de aceptación:
-- En modo avión se encola y se envía una sola vez
-- La ubicación se mueve en el mapa",15,Medium,Sprint 4,spec-109,,To Do
-49,10,Story,HU-109-4 Consultar la bitácora filtrada,"Como jefe de operaciones, quiero consultar la bitácora filtrada, para evaluar el servicio sin ver datos privados.
-
-Criterios de aceptación:
-- Sin relación de atención no veo el nombre del paciente",6,High,Sprint 4,spec-109,,To Do
-50,11,Story,HU-110-1 Que mis datos clínicos solo los vea quien me atiende,"Como paciente, quiero que mis datos clínicos solo los vea quien me atiende, para confiar en el hospital.
-
-Criterios de aceptación:
-- Médico no tratante recibe 'sin acceso'
-- Veo quién consultó mi expediente",17,Highest,Sprint 2,spec-110,,To Do
-51,11,Story,HU-110-2 Aprobar accesos excepcionales y verificar la auditoría,"Como delegado de protección de datos, quiero aprobar accesos excepcionales y verificar la auditoría, para cumplir la política de privacidad.
-
-Criterios de aceptación:
-- El acceso vence solo
-- Detecto un registro de auditoría alterado",19,High,Sprint 4,spec-110,,To Do
-52,12,Story,HU-111-1 Controlar insumos y reactivos por lote con alertas de mínimo,"Como jefe de operaciones, quiero controlar insumos y reactivos por lote con alertas de mínimo, para no quedarme sin material.
-
-Criterios de aceptación:
-- Nunca hay existencias negativas
-- La alerta aparece en vivo",15,High,Sprint 4,spec-111,,To Do
-53,13,Story,"HU-112-1 Ver ocupación general, médicos de turno y avisos en una pantalla pública","Como visitante, quiero ver ocupación general, médicos de turno y avisos en una pantalla pública, para informarme sin pedir datos privados.
+Pantallas: W22, W23
+Requisitos: FR-111-03, FR-111-04, FR-111-05, FR-111-06, FR-111-08",3,High,SGHU Sprint 3,spec-111,,comp-backend,comp-web,,To Do
+64,13,Story,"HU-112-1 Ver ocupación general, médicos de turno y avisos en una pantalla pública y en las apps","Como visitante, quiero ver ocupación general, médicos de turno y avisos en una pantalla pública y en las apps, para informarme sin datos privados.
 
 Criterios de aceptación:
 - Ninguna respuesta pública contiene datos personales
-- El aviso aparece y vence solo",14,High,Sprint 3,spec-112,,To Do
-54,14,Story,HU-113-1 Un tablero en vivo con los indicadores del día,"Como administrador o jefe de operaciones, quiero un tablero en vivo con los indicadores del día, para decidir con datos.
+- El aviso aparece y vence solo
+
+Pantallas: W25, W34, A10, I10
+Requisitos: FR-112-01, FR-112-02, FR-112-03, FR-112-04, FR-120-09",3,High,SGHU Sprint 3,spec-112,,comp-backend,comp-web,comp-android,To Do
+65,15,Story,"HU-114-1 Avisos urgentes en franja y de atención en la campana, y aviso de sesión por vencer","Como usuario de cualquier plataforma, quiero avisos urgentes en franja y de atención en la campana, y aviso de sesión por vencer, para enterarme de lo importante sin ruido.
+
+Criterios de aceptación:
+- La solicitud de ambulancia aparece en franja con Abrir
+- Bajo mínimo suma a la campana sin sonido
+- Cuenta regresiva antes de cerrar sesión
+
+Pantallas: W36 y estados comunes
+Requisitos: FR-114-01, FR-114-05, FR-114-06, FR-114-07, FR-114-08, FR-114-10",5,High,SGHU Sprint 3,spec-114,,comp-web,comp-android,comp-ios,To Do
+66,19,Story,HU-130-1 Pruebas contra PostgreSQL real e integración continua en GitHub,"Como equipo, quiero pruebas contra PostgreSQL real e integración continua en GitHub, para no romper lo que ya funciona.
+
+Criterios de aceptación:
+- Cada PR muestra el estado de compilación y pruebas
+- Una prueba concurrente corre en CI
+Requisitos: FR-130-02, FR-130-03, FR-130-05",3,High,SGHU Sprint 3,spec-130,,comp-backend,comp-web,,To Do
+67,9,Story,HU-108-1 Admitir con origen y recibir camas sugeridas con su motivo,"Como recepcionista, quiero admitir con origen y recibir camas sugeridas con su motivo, para elegir bien la cama.
+
+Criterios de aceptación:
+- Sugerencia prioriza habitación con ocupante compatible
+- Una segunda admisión activa del mismo paciente se rechaza
+
+Pantallas: W13, W14, A34
+Requisitos: FR-108-01, FR-108-02, FR-108-03, FR-108-04",5,High,SGHU Sprint 4,spec-108,,comp-backend,,,To Do
+68,9,Story,HU-108-2 Asignar la cama aunque otra persona esté asignando al mismo tiempo,"Como recepcionista, quiero asignar la cama aunque otra persona esté asignando al mismo tiempo, para que nunca haya doble asignación.
+
+Criterios de aceptación:
+- La última cama solo la toma una persona y la otra ve la siguiente sugerencia
+- El aislamiento bloquea la segunda cama
+
+Pantallas: W14, A34, W12
+Requisitos: FR-108-03, FR-108-05, FR-108-06, FR-108-07, FR-108-08, FR-108-14",8,High,SGHU Sprint 4,spec-108,,comp-backend,comp-web,comp-android,To Do
+69,9,Story,HU-108-3 Trasladar pacientes respetando la regla VIP,"Como jefe de operaciones, quiero trasladar pacientes respetando la regla VIP, para mover camas sin errores.
+
+Criterios de aceptación:
+- VIP no se traslada
+- La cama anterior queda en limpieza
+
+Pantallas: W15
+Requisitos: FR-108-10, FR-108-11",2,High,SGHU Sprint 4,spec-108,,comp-backend,comp-web,,To Do
+70,9,Story,HU-108-4 Ver a mis hospitalizados y firmar el alta,"Como médico o enfermería, quiero ver a mis hospitalizados y firmar el alta, para cerrar la estancia con todo pendiente asignado.
+
+Criterios de aceptación:
+- Alta exige responsable por pendiente
+- Salida física deja la cama en limpieza
+
+Pantallas: A24, I24, A50
+Requisitos: FR-108-12, FR-108-13, FR-108-14",5,High,SGHU Sprint 4,spec-108,,comp-backend,comp-android,comp-ios,To Do
+71,5,Story,HU-104-3 Registrar limpieza y que otra persona la verifique para liberar la cama,"Como enfermería, quiero registrar limpieza y que otra persona la verifique para liberar la cama, para no asignar camas sucias.
+
+Criterios de aceptación:
+- Quien limpió no puede verificar
+- Al verificar, la cama queda libre en todos los tableros
+
+Pantallas: A52
+Requisitos: FR-104-07, FR-104-09, FR-104-10, FR-104-11",3,High,SGHU Sprint 4,spec-104,,comp-backend,comp-android,,To Do
+72,7,Story,HU-106-4 Indicar hospitalización desde la consulta,"Como médico, quiero indicar hospitalización desde la consulta, para que admisión lo reciba sin papel.
+
+Criterios de aceptación:
+- La indicación aparece en admisiones con origen consulta
+
+Pantallas: A24, I24
+Requisitos: FR-106-11",1,High,SGHU Sprint 4,spec-106,,comp-backend,comp-android,comp-ios,To Do
+73,10,Story,HU-109-2 Confirmar solicitudes y despachar la única ambulancia,"Como despacho, quiero confirmar solicitudes y despachar la única ambulancia, para que nunca se despache dos veces.
+
+Criterios de aceptación:
+- Dos despachos a la vez: uno gana
+- La solicitud del paciente queda por confirmar hasta la llamada
+
+Pantallas: W18, A36
+Requisitos: FR-109-02, FR-109-03, FR-109-04, FR-109-05",5,High,SGHU Sprint 4,spec-109,,comp-backend,,,To Do
+74,10,Story,HU-109-3 Registrar los hitos del servicio y terminarlo,"Como tripulación, quiero registrar los hitos del servicio y terminarlo, para que todos sepan dónde va la ambulancia.
+
+Criterios de aceptación:
+- Hitos en orden
+- Al finalizar vuelve a Disponible
+- Mantenimiento solo sin servicio activo
+
+Pantallas: W18, A71
+Requisitos: FR-109-01, FR-109-04, FR-109-07, FR-109-08, FR-109-09, FR-109-12",8,High,SGHU Sprint 4,spec-109,,comp-backend,comp-web,comp-android,To Do
+75,10,Story,HU-109-4 Pedir ambulancia y seguirla en vivo,"Como paciente, quiero pedir ambulancia y seguirla en vivo, para saber cuándo llega.
+
+Criterios de aceptación:
+- Veo confirmada, en camino y llegó sin recargar
+- La app muestra el aviso del 911
+
+Pantallas: A09, I09
+Requisitos: FR-109-16",2,High,SGHU Sprint 4,spec-109,,comp-android,comp-ios,,To Do
+76,10,Story,HU-109-5 Consultar la bitácora filtrada,"Como jefe de operaciones, quiero consultar la bitácora filtrada, para evaluar el servicio sin ver datos privados.
+
+Criterios de aceptación:
+- Sin relación de atención no veo el nombre del paciente
+
+Pantallas: W19, A74
+Requisitos: FR-109-14, FR-109-15",3,High,SGHU Sprint 4,spec-109,,comp-backend,comp-web,comp-android,To Do
+77,10,Story,HU-109-6 Crear la admisión de quien llega en ambulancia,"Como recepcionista, quiero crear la admisión de quien llega en ambulancia, para no repetir datos.
+
+Criterios de aceptación:
+- La admisión guarda el servicio de origen
+
+Pantallas: W14
+Requisitos: FR-109-17",1,High,SGHU Sprint 4,spec-109,,comp-backend,,,To Do
+78,3,Story,HU-102-3 Registrar a un paciente sin identidad,"Como paramédico, quiero registrar a un paciente sin identidad, para atenderlo sin inventar datos.
+
+Criterios de aceptación:
+- Se crea NN con edad estimada y sin fecha exacta
+
+Pantallas: A73
+Requisitos: FR-102-05",2,High,SGHU Sprint 4,spec-102,,comp-backend,comp-android,,To Do
+79,11,Story,HU-110-2 Aprobar accesos excepcionales que vencen solos,"Como delegado de protección de datos, quiero aprobar accesos excepcionales que vencen solos, para que la administración vea lo clínico solo con motivo.
+
+Criterios de aceptación:
+- El acceso vence solo
+- Nadie aprueba su propio acceso
+
+Pantallas: W30, W31
+Requisitos: FR-110-04, FR-110-05, FR-110-06",5,High,SGHU Sprint 4,spec-110,,comp-backend,comp-web,comp-android,To Do
+80,8,Story,HU-107-2 Que el médico revise el resultado antes de que el paciente vea los valores,"Como médico y paciente, quiero que el médico revise el resultado antes de que el paciente vea los valores, para evitar malas interpretaciones.
+
+Criterios de aceptación:
+- El paciente ve el estado siempre y los valores solo tras la revisión
+
+Pantallas: A23, I23, A07, I07
+Requisitos: FR-107-10, FR-107-11",3,High,SGHU Sprint 4,spec-107,,comp-backend,comp-android,comp-ios,To Do
+81,6,Story,HU-105-3 Pedir una cita desde la app,"Como paciente, quiero pedir una cita desde la app, para no tener que ir al hospital a pedirla.
+
+Criterios de aceptación:
+- Queda solicitada hasta que recepción confirma
+- La confirmación me llega en vivo
+
+Pantallas: A06, I06, W28
+Requisitos: FR-105-08",3,High,SGHU Sprint 4,spec-105,,comp-backend,comp-web,comp-android,To Do
+82,14,Story,HU-113-2 Tarjetas en vivo y una bandeja de pendientes por rol,"Como usuario web, quiero tarjetas en vivo y una bandeja de pendientes por rol, para trabajar sin recargar.
 
 Criterios de aceptación:
 - La ocupación cambia sin recargar
-- Ninguna tarjeta muestra datos personales",25,Highest,Sprint 2,spec-113,,To Do
-55,15,Story,"HU-120-1 Un panel con menú por rol, datos en vivo y estados claros","Como usuario web, quiero un panel con menú por rol, datos en vivo y estados claros, para trabajar sin recargar la página.
+- Todas las tarjetas tienen datos reales
+
+Pantallas: W03, W04
+Requisitos: FR-113-01, FR-113-02, FR-113-04",3,High,SGHU Sprint 4,spec-113,,comp-backend,comp-web,,To Do
+83,19,Story,HU-130-2 Ver en vivo que dos personas no pueden tomar la misma cama ni despachar dos veces la ambulancia,"Como docente evaluador, quiero ver en vivo que dos personas no pueden tomar la misma cama ni despachar dos veces la ambulancia, para comprobar la concurrencia.
 
 Criterios de aceptación:
-- El laboratorista ve solo su menú
-- Tras perder la red, el tablero se corrige solo",19,Highest,Sprint 1,spec-120,,To Do
-56,16,Story,"HU-121-1 Una app con navegación por rol, MVVM y datos en vivo","Como usuario Android, quiero una app con navegación por rol, MVVM y datos en vivo, para trabajar en el punto de atención.
+- Las siete pruebas pasan 20 veces seguidas
+- El script de demostración corre contra la API desplegada
+Requisitos: FR-130-01, FR-130-04",5,High,SGHU Sprint 5,spec-130,,comp-backend,,,To Do
+84,16,Story,"HU-120-3 Una web accesible, con cierre por inactividad y pruebas de punta a punta de la defensa","Como evaluador, quiero una web accesible, con cierre por inactividad y pruebas de punta a punta de la defensa, para confiar en la demostración.
 
 Criterios de aceptación:
-- Navegación de los 7 roles de Android
-- Girar el teléfono no pierde lo escrito",24,Highest,Sprint 1,spec-121,,To Do
-57,17,Story,HU-122-1 Una app SwiftUI con pestañas por rol y datos en vivo,"Como médico o paciente con iPhone, quiero una app SwiftUI con pestañas por rol y datos en vivo, para usar el sistema desde iOS.
+- Revisión de contraste sin errores
+- Flujos de la defensa automatizados
+
+Pantallas: W36
+Requisitos: FR-120-08, FR-120-10",3,High,SGHU Sprint 5,spec-120,,comp-web,,,To Do
+85,17,Story,HU-121-3 Pruebas de los ViewModels y de la interfaz de ingreso,"Como evaluador, quiero pruebas de los ViewModels y de la interfaz de ingreso, para ver la calidad del código Android.
 
 Criterios de aceptación:
-- Pestañas correctas para médico y paciente
-- Un rol sin iOS ve el aviso y sale",19,Highest,Sprint 1,spec-122,,To Do
-58,18,Story,"HU-130-1 Pruebas automáticas, integración continua y demostración de concurrencia","Como equipo, quiero pruebas automáticas, integración continua y demostración de concurrencia, para defender la calidad en vivo.
+- ./gradlew test pasa
+Requisitos: FR-121-01, FR-121-02",3,High,SGHU Sprint 5,spec-121,,comp-android,,,To Do
+86,18,Story,HU-122-3 Pruebas de los view models y sesión guardada en Keychain,"Como evaluador, quiero pruebas de los view models y sesión guardada en Keychain, para ver la calidad del código iOS.
 
 Criterios de aceptación:
-- Las siete pruebas de concurrencia pasan 20 veces seguidas
-- Cada PR muestra el estado de las verificaciones",17,Highest,Sprint 1,spec-130,,To Do
-59,19,Story,"HU-131-1 La documentación, el diseño y la defensa completos","Como docente evaluador, quiero la documentación, el diseño y la defensa completos, para evaluar el proyecto con evidencia.
+- Las pruebas pasan en la Mac universitaria
+Requisitos: FR-122-01, FR-122-07",2,High,SGHU Sprint 5,spec-122,,comp-ios,,,To Do
+87,20,Story,"HU-131-5 El documento de arquitectura en PDF, el entorno de demostración restaurable y la defensa ensayada","Como docente evaluador, quiero el documento de arquitectura en PDF, el entorno de demostración restaurable y la defensa ensayada, para evaluar la entrega final.
 
 Criterios de aceptación:
-- Figma 100% el 31 de octubre
-- PDF de arquitectura con diagramas, RBAC y privacidad
-- Defensa ensayada dos veces",64,Highest,Sprint 1,spec-131,,To Do
-60,20,Subtask,100-T01 Crear monorepo y solución backend con proyectos por módulo,"Cubre: FR-100-18
+- PDF con diagramas, RBAC y privacidad
+- Entorno demo en un comando
+- Dos ensayos completos de 15 minutos
+Requisitos: FR-131-02, FR-131-04, FR-131-05, FR-131-06",5,High,SGHU Sprint 5,spec-131,,comp-backend,,,To Do
+88,1,Story,HU-100-3 Recibir avisos con la app cerrada,"Como usuario del sistema, quiero recibir avisos con la app cerrada, para enterarme a tiempo de lo que me toca.
+
+Criterios de aceptación:
+- Un evento con push llega una sola vez a Android y a iPhone
+- El push nunca lleva datos clínicos
+
+Pantallas: A12, I12
+Requisitos: FR-100-19, FR-121-05, FR-122-05",5,Medium,SGHU Sprint 5,spec-100,,comp-backend,comp-android,comp-ios,To Do
+89,8,Story,HU-107-3 Recibir aviso inmediato de un valor crítico,"Como médico, quiero recibir aviso inmediato de un valor crítico, para actuar a tiempo.
+
+Criterios de aceptación:
+- El aviso llega aunque la app esté cerrada
+
+Pantallas: A23, I23
+Requisitos: FR-107-08",3,Medium,SGHU Sprint 5,spec-107,,comp-backend,comp-android,comp-ios,To Do
+90,10,Story,"HU-109-7 Enviar el reporte del paciente antes de llegar, aunque no tenga señal","Como paramédico, quiero enviar el reporte del paciente antes de llegar, aunque no tenga señal, para que emergencia se prepare.
+
+Criterios de aceptación:
+- En modo avión se encola y se envía una sola vez
+- Emergencia lo recibe en vivo
+
+Pantallas: A72, A54, A25, I25
+Requisitos: FR-109-10, FR-109-11, FR-121-06, FR-121-08",5,Medium,SGHU Sprint 5,spec-109,,comp-backend,comp-android,,To Do
+91,15,Story,HU-114-2 Que un aviso crítico ocupe la pantalla y suene hasta que alguien confirme,"Como médico, quiero que un aviso crítico ocupe la pantalla y suene hasta que alguien confirme, para no perder un valor crítico.
+
+Criterios de aceptación:
+- Confirmar pausa 2 minutos
+- Si nadie confirma en 5 minutos, escala
+
+Pantallas: Avisos críticos
+Requisitos: FR-114-02, FR-114-03, FR-114-04, FR-114-09",5,Medium,SGHU Sprint 5,spec-114,,comp-backend,comp-web,comp-android,To Do
+92,1,Story,HU-100-4 Que nadie pueda buscar pacientes de forma masiva,"Como paciente, quiero que nadie pueda buscar pacientes de forma masiva, para proteger mis datos.
+
+Criterios de aceptación:
+- La búsqueda 21 en un minuto devuelve 429 y queda auditada
+Requisitos: FR-100-17",1,Low,,spec-100,,comp-backend,,,To Do
+93,2,Story,HU-101-4 Ver la vigencia de mi inscripción en el perfil,"Como médico, quiero ver la vigencia de mi inscripción en el perfil, para renovarla a tiempo.
+
+Criterios de aceptación:
+- El perfil muestra la fecha de vencimiento
+
+Pantallas: A12, I12
+Requisitos: FR-101-16",1,Low,,spec-101,,comp-backend,comp-android,comp-ios,To Do
+94,3,Story,HU-102-4 Revisar casos de posible duplicado,"Como recepcionista, quiero revisar casos de posible duplicado, para corregir sin fusionar a ciegas.
+
+Criterios de aceptación:
+- Un registro parecido abre caso y no fusiona
+
+Pantallas: W26
+Requisitos: FR-102-09",2,Low,,spec-102,,comp-backend,,,To Do
+95,4,Story,HU-103-6 Un aviso cuando alguien pasa de 44 horas semanales,"Como jefe de operaciones, quiero un aviso cuando alguien pasa de 44 horas semanales, para no agotar al personal.
+
+Criterios de aceptación:
+- Pasar de 44 h pide justificación y se guarda
+
+Pantallas: W17
+Requisitos: FR-103-07",1,Low,,spec-103,,comp-backend,comp-web,,To Do
+96,5,Story,HU-104-4 Saber qué equipo médico hay y si funciona,"Como jefe de operaciones, quiero saber qué equipo médico hay y si funciona, para planificar mantenimiento.
+
+Criterios de aceptación:
+- Un monitor en mantenimiento se ve en su habitación
+
+Pantallas: W24
+Requisitos: FR-104-12",2,Low,,spec-104,,comp-backend,comp-web,,To Do
+97,6,Story,HU-105-4 Ver los números llamados en la pantalla pública,"Como visitante en sala de espera, quiero ver los números llamados en la pantalla pública, para saber cuándo pasar.
+
+Criterios de aceptación:
+- Sin nombres
+- Tres llamados sin presentarse cambian el estado
+
+Pantallas: W34
+Requisitos: FR-105-05, FR-105-11, FR-112-06",2,Low,,spec-105,,comp-backend,comp-web,,To Do
+98,7,Story,HU-106-5 Corregir una consulta firmada con addendum,"Como médico, quiero corregir una consulta firmada con addendum, para no perder el original.
+
+Criterios de aceptación:
+- El historial muestra original y addendum
+
+Pantallas: A21, I21
+Requisitos: FR-106-08",2,Low,,spec-106,,comp-backend,comp-android,comp-ios,To Do
+99,8,Story,HU-107-4 Corregir un valor conservando el anterior,"Como laboratorista, quiero corregir un valor conservando el anterior, para no ocultar errores.
+
+Criterios de aceptación:
+- El valor anterior queda visible para el médico
+
+Pantallas: W21
+Requisitos: FR-107-12",1,Low,,spec-107,,comp-backend,,,To Do
+100,9,Story,HU-108-5 Reservar cama para una admisión programada,"Como recepcionista, quiero reservar cama para una admisión programada, para tener la cama lista.
+
+Criterios de aceptación:
+- La reserva vence sola
+
+Pantallas: W14
+Requisitos: FR-108-09",2,Low,,spec-108,,comp-backend,,,To Do
+101,9,Story,HU-108-6 Registrar notas y signos del hospitalizado,"Como enfermería, quiero registrar notas y signos del hospitalizado, para dejar constancia del cuidado.
+
+Criterios de aceptación:
+- El médico ve lo registrado
+
+Pantallas: A51
+Requisitos: FR-108-16",2,Low,,spec-108,,comp-backend,comp-android,,To Do
+102,10,Story,HU-109-8 Ver la ubicación de la ambulancia en un mapa,"Como despacho, quiero ver la ubicación de la ambulancia en un mapa, para estimar la llegada.
+
+Criterios de aceptación:
+- El punto se mueve en el mapa
+
+Pantallas: W18
+Requisitos: FR-109-13",3,Low,,spec-109,,comp-backend,comp-web,comp-android,To Do
+103,11,Story,HU-110-4 Ver quién consultó mi expediente,"Como paciente, quiero ver quién consultó mi expediente, para ejercer mi derecho a saberlo.
+
+Criterios de aceptación:
+- Veo fecha, rol y motivo
+
+Pantallas: A11, I11
+Requisitos: FR-110-08",2,Low,,spec-110,,comp-backend,comp-android,comp-ios,To Do
+104,11,Story,HU-110-5 Abrir acceso inmediato en una urgencia,"Como médico de emergencia, quiero abrir acceso inmediato en una urgencia, para atender sin esperar aprobación.
+
+Criterios de aceptación:
+- El acceso queda pendiente de revisión del delegado
+
+Pantallas: A22
+Requisitos: FR-110-09",2,Low,,spec-110,,comp-backend,comp-android,comp-ios,To Do
+105,12,Story,HU-111-2 Registrar el consumo de insumos desde el teléfono,"Como enfermería, quiero registrar el consumo de insumos desde el teléfono, para que el inventario sea real.
+
+Criterios de aceptación:
+- El consumo baja la existencia
+
+Pantallas: A53
+Requisitos: FR-111-07",2,Low,,spec-111,,comp-android,,,To Do
+106,13,Story,HU-112-2 Que me advierta si un aviso tiene datos personales,"Como jefe de operaciones, quiero que me advierta si un aviso tiene datos personales, para no publicarlos por error.
+
+Criterios de aceptación:
+- Un aviso con un DUI muestra advertencia
+
+Pantallas: W25
+Requisitos: FR-112-05",1,Low,,spec-112,,comp-web,,,To Do
+107,14,Story,HU-113-3 Indicadores por rango de fechas,"Como administrador, quiero indicadores por rango de fechas, para evaluar tendencias.
+
+Criterios de aceptación:
+- Cinco indicadores con valores esperados
+
+Pantallas: W33
+Requisitos: FR-113-05",3,Low,,spec-113,,comp-backend,comp-web,,To Do
+108,26,Subtask,"GES-10 Investigación de CLIMESA, del sector hospitalario y de sistemas de referencia","Hecho cuando: Hallazgos incorporados a specs, decisiones y reglas de negocio
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-docs,,,Done
+109,26,Subtask,GES-11 Recolección de datos y toma de requisitos del curso y del cliente,"Hecho cuando: Requisitos del curso y respuestas del cliente registrados en docs/curso y docs/decisiones
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-docs,,,Done
+110,26,Subtask,GES-12 Documento estructurado de la propuesta de desarrollo del software,"Hecho cuando: Propuesta entregada al docente
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-docs,,,Done
+111,26,Subtask,"GES-13 Esquematización inicial: arquitectura, módulos, roles y specs SDD","Hecho cuando: Constitución, arquitectura y specs 100 a 131 escritas
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-docs,,,Done
+112,27,Subtask,"100-T03 Migración 0001 de plataforma con roles, RLS y disparador de Realtime","Hecho cuando: `supabase db push` aplica en el proyecto de la nube y la prueba local de reversión no publica eventos
 Depende de: ninguna
-Hecho cuando: `npm run build --prefix backend` (ADR-024) y `tools/generar_docs.py --verificar` pasa en el repositorio
-Revisa: Leonel",3,Highest,Sprint 1,spec-100 area-BE nivel-R,Carlos,Done
-61,20,Subtask,"100-T02 Portar plataforma del legado (Db, CommandRunner, Idempotency, Outbox, Audit, PolicyRegistry, Clock)","Cubre: FR-100-04, FR-100-05, FR-100-06, FR-100-07, FR-100-10, FR-100-16
-Depende de: T01
-Hecho cuando: las pruebas de plataforma portadas pasan contra PostgreSQL local
-Revisa: Leonel",5,Highest,Sprint 1,spec-100 area-BE nivel-R,Carlos,Done
-62,20,Subtask,"100-T03 Migración 0001 de plataforma con roles, RLS y disparador de Realtime","Cubre: FR-100-08, FR-100-09
-Depende de: T01
-Hecho cuando: `supabase db push` aplica en el proyecto de la nube y la prueba local de reversión no publica eventos
-Revisa: Leonel",3,Highest,Sprint 1,spec-100 area-BE nivel-R,Carlos,Done
-63,20,Subtask,100-T04 Validación del JWT de Supabase y construcción del actor,"Cubre: FR-100-01
-Depende de: T02
-Hecho cuando: pruebas de token válido, vencido, firma falsa y emisor ajeno pasan
-Revisa: Leonel",3,Highest,Sprint 1,spec-100 area-BE nivel-R,Carlos,Done
-64,20,Subtask,100-T05 Filtro de permisos por endpoint con auditoría de denegados,"Cubre: FR-100-02, FR-100-03
-Depende de: T04
-Hecho cuando: prueba de paciente contra `POST /turnos` da 403 y deja auditoría
-Revisa: Leonel",3,Highest,Sprint 1,spec-100 area-BE nivel-R,Carlos,Done
-65,20,Subtask,"100-T06 Errores uniformes, conflicto de versión y registro sin datos sensibles","Cubre: FR-100-11, FR-100-12, FR-100-15
-Depende de: T02
-Hecho cuando: prueba de 409 por versión y revisión de registros sin cuerpos de solicitud
-Revisa: Leonel",2,Highest,Sprint 1,spec-100 area-BE nivel-R,Carlos,Done
-66,21,Subtask,100-T07 OpenAPI con permisos y endpoint de salud,"Cubre: FR-100-13, FR-100-14
-Depende de: T05
-Hecho cuando: `/openapi/v1.json` lista cada endpoint con `x-permiso` y `/salud` responde 200
-Revisa: Leonel",2,Highest,Sprint 2,spec-100 area-BE nivel-R,Carlos,Done
-67,21,Subtask,100-T08 Contenedor y despliegue de la API en la nube,"Cubre: FR-100-18
-Depende de: T07
-Hecho cuando: `/salud` responde desde la URL pública con la base de Supabase
-Revisa: Leonel",3,Highest,Sprint 2,spec-100 area-BE nivel-R,Carlos,To Do
-68,22,Subtask,100-T09 Límite de búsquedas por usuario,"Cubre: FR-100-17
-Depende de: T05
-Hecho cuando: la búsqueda 21 en un minuto devuelve 429 y queda auditada
-Revisa: Leonel",2,Low,Sprint 5,spec-100 area-BE nivel-E,Carlos,To Do
-69,22,Subtask,100-T10 Trabajador de push FCM y APNs con registro de dispositivos,"Cubre: FR-100-19
-Depende de: T03
-Hecho cuando: un evento con push llega una sola vez a un Android y a un iPhone con la app cerrada
-Revisa: Leonel",5,Low,Sprint 5,spec-100 area-BE nivel-E,Carlos,To Do
-70,23,Subtask,101-T01 Migración 0002 de acceso y semilla de roles y permisos desde los CSV,"Cubre: FR-101-12
+Cubre: FR-100-08, FR-100-09",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+113,27,Subtask,101-T01 Migración 0002 de acceso y semilla de roles y permisos desde los CSV,"Hecho cuando: la base tiene 10 roles y 75 permisos iguales a `docs/arquitectura/datos/`
 Depende de: 100-T03
-Hecho cuando: la base tiene 10 roles y 75 permisos iguales a `docs/arquitectura/datos/`
-Revisa: Leonel",2,Highest,Sprint 1,spec-101 area-BE nivel-R,Carlos,Done
-71,23,Subtask,101-T02 Disparador de alta de usuario y rol Paciente por defecto,"Cubre: FR-101-02
+Cubre: FR-101-12",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+114,27,Subtask,101-T02 Disparador de alta de usuario y rol Paciente por defecto,"Hecho cuando: registrar en Supabase Auth crea `acceso.usuario` con PAC
 Depende de: T01
-Hecho cuando: registrar en Supabase Auth crea `acceso.usuario` con PAC
-Revisa: Leonel",1,Highest,Sprint 1,spec-101 area-BE nivel-R,Carlos,Done
-72,23,Subtask,101-T03 Endpoint `/me` con permisos efectivos y plataformas,"Cubre: FR-101-03, FR-101-04
-Depende de: T01, 100-T05
-Hecho cuando: prueba devuelve permisos correctos para un usuario con dos roles
-Revisa: Leonel",2,Highest,Sprint 2,spec-101 area-BE nivel-R,Carlos,Done
-73,23,Subtask,101-T04 Gancho de token con canales de Realtime,"Cubre: FR-101-14
-Depende de: T01
-Hecho cuando: el token de un REC trae `rol:REC` y `ambulancia`; el de PAC trae `usuario:<id>` y `publico`
-Revisa: Leonel",2,Highest,Sprint 2,spec-101 area-BE nivel-R,Carlos,To Do
-74,24,Subtask,"101-T05 Invitación de personal, asignación de roles y desactivación","Cubre: FR-101-05, FR-101-06, FR-101-07, FR-101-13
-Depende de: T03
-Hecho cuando: pruebas de autoasignación (403), último administrador (409) y cuenta desactivada (401)
-Revisa: Leonel",5,Highest,Sprint 2,spec-101 area-BE nivel-R,Carlos,Done
-75,23,Subtask,"101-T06-WEB Pantallas de ingreso y registro en web, Android e iOS (Web)","Cubre: FR-101-01, FR-101-02, FR-101-15
-Depende de: T03, 120-T01, 121-T01, 122-T01
-Hecho cuando: se ingresa con un usuario de cada rol en su plataforma y el paciente se registra en Android e iOS
-Revisa: Carlos",3,Highest,Sprint 2,spec-101 area-WEB nivel-R,Leonel,To Do
-76,23,Subtask,"101-T06-AND Pantallas de ingreso y registro en web, Android e iOS (Android)","Cubre: FR-101-01, FR-101-02, FR-101-15
-Depende de: T03, 120-T01, 121-T01, 122-T01
-Hecho cuando: se ingresa con un usuario de cada rol en su plataforma y el paciente se registra en Android e iOS
-Revisa: Leonel",3,Highest,Sprint 2,spec-101 area-AND nivel-R,Fernando,To Do
-77,23,Subtask,"101-T06-IOS Pantallas de ingreso y registro en web, Android e iOS (iOS)","Cubre: FR-101-01, FR-101-02, FR-101-15
-Depende de: T03, 120-T01, 121-T01, 122-T01
-Hecho cuando: se ingresa con un usuario de cada rol en su plataforma y el paciente se registra en Android e iOS
-Revisa: Leonel",3,Highest,Sprint 2,spec-101 area-IOS nivel-R,Milton,To Do
-78,25,Subtask,101-T07-BE Vinculación de cuenta y verificación por recepción (Backend y base de datos),"Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11
-Depende de: T05, 102-T03
-Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
-Revisa: Leonel",3,High,Sprint 3,spec-101 area-BE nivel-R,Carlos,To Do
-79,25,Subtask,101-T07-WEB Vinculación de cuenta y verificación por recepción (Web),"Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11
-Depende de: T05, 102-T03
-Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
-Revisa: Carlos",2,High,Sprint 3,spec-101 area-WEB nivel-R,Leonel,To Do
-80,25,Subtask,101-T07-AND Vinculación de cuenta y verificación por recepción (Android),"Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11
-Depende de: T05, 102-T03
-Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
-Revisa: Leonel",2,High,Sprint 3,spec-101 area-AND nivel-R,Fernando,To Do
-81,25,Subtask,101-T07-IOS Vinculación de cuenta y verificación por recepción (iOS),"Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11
-Depende de: T05, 102-T03
-Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
-Revisa: Leonel",2,High,Sprint 3,spec-101 area-IOS nivel-R,Milton,To Do
-82,24,Subtask,101-T08-BE Vigencia de inscripción en el perfil (Backend y base de datos),"Cubre: FR-101-16
-Depende de: 103-T05
-Hecho cuando: el perfil del médico muestra la fecha de vencimiento
-Revisa: Leonel",1,Medium,Sprint 4,spec-101 area-BE nivel-E,Carlos,To Do
-83,24,Subtask,101-T08-AND Vigencia de inscripción en el perfil (Android),"Cubre: FR-101-16
-Depende de: 103-T05
-Hecho cuando: el perfil del médico muestra la fecha de vencimiento
-Revisa: Leonel",1,Medium,Sprint 4,spec-101 area-AND nivel-E,Fernando,To Do
-84,24,Subtask,101-T08-IOS Vigencia de inscripción en el perfil (iOS),"Cubre: FR-101-16
-Depende de: 103-T05
-Hecho cuando: el perfil del médico muestra la fecha de vencimiento
-Revisa: Leonel",1,Medium,Sprint 4,spec-101 area-IOS nivel-E,Milton,To Do
-85,26,Subtask,102-T01 Migración 0003 de pacientes portada del legado,"Cubre: FR-102-03, FR-102-04, FR-102-12
+Cubre: FR-101-02",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+115,27,Subtask,102-T01 Migración 0003 de pacientes portada del legado,"Hecho cuando: el índice parcial del DUI rechaza duplicados en una prueba concurrente
 Depende de: 100-T03
-Hecho cuando: el índice parcial del DUI rechaza duplicados en una prueba concurrente
-Revisa: Leonel",2,Highest,Sprint 1,spec-102 area-BE nivel-R,Carlos,Done
-86,26,Subtask,"102-T02 Portar dominio: claves fonéticas, DUI, expediente, identidad provisional","Cubre: FR-102-04, FR-102-05
-Depende de: T01
-Hecho cuando: pruebas de dominio del legado pasan en el módulo nuevo
-Revisa: Leonel",5,Highest,Sprint 2,spec-102 area-BE nivel-R,Carlos,Done
-87,26,Subtask,"102-T03 CRUD: buscar, registrar tras buscar, ver, editar con historial, inactivar","Cubre: FR-102-01, FR-102-02, FR-102-06, FR-102-07, FR-102-08, FR-102-11
-Depende de: T02, 100-T05
-Hecho cuando: escenarios 1, 2 y 4 pasan como pruebas de integración
-Revisa: Leonel",5,Highest,Sprint 2,spec-102 area-BE nivel-R,Carlos,Done
-88,27,Subtask,102-T04 Filtrado de campos por permiso y contexto,"Cubre: FR-102-10
-Depende de: T03
-Hecho cuando: la misma ficha devuelve campos distintos para REC, LAB y PAC según `privacidad.md`
-Revisa: Leonel",3,Highest,Sprint 2,spec-102 area-BE nivel-R,Carlos,Done
-89,26,Subtask,102-T05-WEB Pantallas de pacientes en web (W26) y Android (A30) (Web),"Cubre: FR-102-01, FR-102-02
-Depende de: T03, 120-T02, 121-T02
-Hecho cuando: recepción busca, registra y edita desde web y Android
-Revisa: Carlos",3,Highest,Sprint 2,spec-102 area-WEB nivel-R,Leonel,To Do
-90,26,Subtask,102-T05-AND Pantallas de pacientes en web (W26) y Android (A30) (Android),"Cubre: FR-102-01, FR-102-02
-Depende de: T03, 120-T02, 121-T02
-Hecho cuando: recepción busca, registra y edita desde web y Android
-Revisa: Leonel",3,Highest,Sprint 2,spec-102 area-AND nivel-R,Fernando,To Do
-91,28,Subtask,102-T06 Registro provisional desde la app del paramédico (A73),"Cubre: FR-102-05
-Depende de: T03, 109-T04
-Hecho cuando: escenario 3 pasa en Android
-Revisa: Leonel",3,High,Sprint 4,spec-102 area-AND nivel-R,Fernando,To Do
-92,26,Subtask,102-T07 Casos de posible duplicado,"Cubre: FR-102-09
-Depende de: T03
-Hecho cuando: un registro parecido abre caso y no fusiona
-Revisa: Leonel",3,Medium,Sprint 4,spec-102 area-BE nivel-E,Carlos,To Do
-93,29,Subtask,103-T01 Migración 0004 de personal y turnos con exclusión,"Cubre: FR-103-04
+Cubre: FR-102-03, FR-102-04, FR-102-12",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+116,27,Subtask,103-T01 Migración 0004 de personal y turnos con exclusión,"Hecho cuando: prueba de traslape concurrente deja un solo turno
 Depende de: 100-T03, 104-T01
-Hecho cuando: prueba de traslape concurrente deja un solo turno
-Revisa: Carlos",2,Highest,Sprint 1,spec-103 area-BE nivel-R,Leonel,Done
-94,29,Subtask,103-T02 CRUD de personal (con y sin cuenta),"Cubre: FR-103-01, FR-103-02
-Depende de: T01, 100-T05
-Hecho cuando: pruebas de crear, editar con versión e inactivar
-Revisa: Carlos",3,Highest,Sprint 2,spec-103 area-BE nivel-R,Leonel,Done
-95,30,Subtask,103-T03 Crear y mover turnos con duración y descanso por política,"Cubre: FR-103-04, FR-103-05, FR-103-06, FR-103-14
-Depende de: T01
-Hecho cuando: escenarios 1, 2 y 3 pasan
-Revisa: Carlos",5,Highest,Sprint 2,spec-103 area-BE nivel-R,Leonel,Done
-96,29,Subtask,"103-T04 Pantallas de personal en web (W07, W08)","Cubre: FR-103-01
-Depende de: T02, 120-T02
-Hecho cuando: el administrador crea y edita personal desde la web
-Revisa: Carlos",3,Highest,Sprint 2,spec-103 area-WEB nivel-R,Leonel,Done
-97,29,Subtask,103-T05 Inscripciones y bloqueo de roles clínicos sin inscripción,"Cubre: FR-103-03, FR-103-10
-Depende de: T02
-Hecho cuando: programar a un médico vencido se rechaza
-Revisa: Carlos",2,Medium,Sprint 3,spec-103 area-BE nivel-E,Leonel,To Do
-98,30,Subtask,"103-T06 Cobertura, publicación con advertencias y estados automáticos","Cubre: FR-103-08, FR-103-09, FR-103-13
-Depende de: T03
-Hecho cuando: escenario 4 pasa y un turno cambia a ""en curso"" con el reloj de prueba
-Revisa: Carlos",5,High,Sprint 3,spec-103 area-BE nivel-R,Leonel,To Do
-99,30,Subtask,"103-T07-WEB Planificador web (W16, W17) y mis turnos en Android e iOS (A26, I26) (Web)","Cubre: FR-103-11
-Depende de: T06, 121-T02, 122-T02
-Hecho cuando: un cambio de turno aparece en el teléfono de la persona sin recargar
-Revisa: Carlos",5,High,Sprint 3,spec-103 area-WEB nivel-R,Leonel,To Do
-100,30,Subtask,"103-T07-AND Planificador web (W16, W17) y mis turnos en Android e iOS (A26, I26) (Android)","Cubre: FR-103-11
-Depende de: T06, 121-T02, 122-T02
-Hecho cuando: un cambio de turno aparece en el teléfono de la persona sin recargar
-Revisa: Leonel",2,High,Sprint 3,spec-103 area-AND nivel-R,Fernando,To Do
-101,30,Subtask,"103-T07-IOS Planificador web (W16, W17) y mis turnos en Android e iOS (A26, I26) (iOS)","Cubre: FR-103-11
-Depende de: T06, 121-T02, 122-T02
-Hecho cuando: un cambio de turno aparece en el teléfono de la persona sin recargar
-Revisa: Leonel",2,High,Sprint 3,spec-103 area-IOS nivel-R,Milton,To Do
-102,31,Subtask,103-T08 Médicos de turno públicos,"Cubre: FR-103-12
-Depende de: T06
-Hecho cuando: escenario 5 pasa contra `/publico/medicos-de-turno`
-Revisa: Carlos",1,High,Sprint 3,spec-103 area-BE nivel-R,Leonel,To Do
-103,30,Subtask,103-T09-BE Aviso de horas semanales con justificación (Backend y base de datos),"Cubre: FR-103-07
-Depende de: T03
-Hecho cuando: el turno que pasa de 44 h pide justificación y se guarda
-Revisa: Carlos",2,Low,Sprint 5,spec-103 area-BE nivel-E,Leonel,To Do
-104,30,Subtask,103-T09-WEB Aviso de horas semanales con justificación (Web),"Cubre: FR-103-07
-Depende de: T03
-Hecho cuando: el turno que pasa de 44 h pide justificación y se guarda
-Revisa: Carlos",1,Low,Sprint 5,spec-103 area-WEB nivel-E,Leonel,To Do
-105,32,Subtask,104-T01 Migración 0005 del árbol de espacios con capacidad y semilla del curso,"Cubre: FR-104-01, FR-104-02, FR-104-03
+Cubre: FR-103-04",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+117,27,Subtask,104-T01 Migración 0005 del árbol de espacios con capacidad y semilla del curso,"Hecho cuando: la semilla deja 17 camas de hospitalización y el escenario 1 pasa
 Depende de: 100-T03
-Hecho cuando: la semilla deja 17 camas de hospitalización y el escenario 1 pasa
-Revisa: Leonel",2,Highest,Sprint 1,spec-104 area-BE nivel-R,Carlos,Done
-106,32,Subtask,"104-T02 Consultas recursivas de árbol, ruta y disponibilidad","Cubre: FR-104-05, FR-104-13
-Depende de: T01
-Hecho cuando: escenario 2 pasa con datos de ocupación de prueba
-Revisa: Leonel",3,Highest,Sprint 2,spec-104 area-BE nivel-R,Carlos,Done
-107,33,Subtask,104-T03 Tablero de camas con estados y ocupante según permiso,"Cubre: FR-104-06, FR-104-08
-Depende de: T02, 108-T01
-Hecho cuando: REC ve nombres, ENF de otra planta ve iniciales
-Revisa: Leonel",3,Highest,Sprint 2,spec-104 area-BE nivel-R,Carlos,Done
-108,32,Subtask,104-T04 Edición de espacios (ADM) con regla de capacidad bajo ocupación,"Cubre: FR-104-04
-Depende de: T01
-Hecho cuando: reducir capacidad de habitación ocupada responde 409
-Revisa: Leonel",2,Highest,Sprint 2,spec-104 area-BE nivel-R,Carlos,Done
-109,32,Subtask,104-T05 Pantallas W09 (árbol) y W12 (plano por planta) en web,"Cubre: FR-104-05, FR-104-06
-Depende de: T03, 120-T02
-Hecho cuando: se ven las plantas 2 y 3 con sus 17 camas y estados
-Revisa: Carlos",5,Highest,Sprint 2,spec-104 area-WEB nivel-R,Leonel,Done
-110,33,Subtask,"104-T06-BE Bloqueo, limpieza y verificación con eventos en vivo (Backend y base de datos)","Cubre: FR-104-07, FR-104-09, FR-104-10, FR-104-11
-Depende de: T03
-Hecho cuando: escenario 3 pasa en Android con el tablero web abierto
-Revisa: Leonel",3,High,Sprint 4,spec-104 area-BE nivel-R,Carlos,To Do
-111,33,Subtask,"104-T06-AND Bloqueo, limpieza y verificación con eventos en vivo (Android)","Cubre: FR-104-07, FR-104-09, FR-104-10, FR-104-11
-Depende de: T03
-Hecho cuando: escenario 3 pasa en Android con el tablero web abierto
-Revisa: Leonel",3,High,Sprint 4,spec-104 area-AND nivel-R,Fernando,To Do
-112,34,Subtask,104-T07-BE Equipo médico por espacio (Backend y base de datos),"Cubre: FR-104-12
-Depende de: T01
-Hecho cuando: un monitor pasa a mantenimiento y se ve en W24
-Revisa: Leonel",2,Medium,Sprint 4,spec-104 area-BE nivel-E,Carlos,To Do
-113,34,Subtask,104-T07-WEB Equipo médico por espacio (Web),"Cubre: FR-104-12
-Depende de: T01
-Hecho cuando: un monitor pasa a mantenimiento y se ve en W24
-Revisa: Carlos",2,Medium,Sprint 4,spec-104 area-WEB nivel-E,Leonel,To Do
-114,35,Subtask,105-T01 Migración de fila y citas con unicidad y exclusión,"Cubre: FR-105-01, FR-105-07
+Cubre: FR-104-01, FR-104-02, FR-104-03",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+118,27,Subtask,105-T01 Migración de fila y citas con unicidad y exclusión,"Hecho cuando: escenarios 1 y 4 pasan como pruebas concurrentes
 Depende de: 100-T03
-Hecho cuando: escenarios 1 y 4 pasan como pruebas concurrentes
-Revisa: Carlos",2,High,Sprint 3,spec-105 area-BE nivel-R,Leonel,Done
-115,35,Subtask,"105-T02 Emitir, llamar y cambiar estado de números con reinicio diario","Cubre: FR-105-01, FR-105-02, FR-105-03, FR-105-04
-Depende de: T01
-Hecho cuando: pruebas de transiciones válidas e inválidas y de cambio de día
-Revisa: Carlos",3,High,Sprint 3,spec-105 area-BE nivel-R,Leonel,To Do
-116,35,Subtask,105-T03-AND Mi número en la app del paciente y fila del consultorio (Android),"Cubre: FR-105-06
-Depende de: T02, 121-T03, 122-T03
-Hecho cuando: escenario 2 pasa en Android e iOS
-Revisa: Leonel",3,High,Sprint 3,spec-105 area-AND nivel-R,Fernando,To Do
-117,35,Subtask,105-T03-IOS Mi número en la app del paciente y fila del consultorio (iOS),"Cubre: FR-105-06
-Depende de: T02, 121-T03, 122-T03
-Hecho cuando: escenario 2 pasa en Android e iOS
-Revisa: Leonel",3,High,Sprint 3,spec-105 area-IOS nivel-R,Milton,To Do
-118,36,Subtask,"105-T04-BE Agenda, disponibilidad, agendar y cancelar (Backend y base de datos)","Cubre: FR-105-07, FR-105-09, FR-105-10, FR-105-12
-Depende de: T01, 103-T06
-Hecho cuando: recepción agenda desde web y Android; paciente cancela dentro y fuera del plazo
-Revisa: Carlos",3,High,Sprint 3,spec-105 area-BE nivel-R,Leonel,To Do
-119,36,Subtask,"105-T04-WEB Agenda, disponibilidad, agendar y cancelar (Web)","Cubre: FR-105-07, FR-105-09, FR-105-10, FR-105-12
-Depende de: T01, 103-T06
-Hecho cuando: recepción agenda desde web y Android; paciente cancela dentro y fuera del plazo
-Revisa: Carlos",3,High,Sprint 3,spec-105 area-WEB nivel-R,Leonel,To Do
-120,36,Subtask,"105-T04-AND Agenda, disponibilidad, agendar y cancelar (Android)","Cubre: FR-105-07, FR-105-09, FR-105-10, FR-105-12
-Depende de: T01, 103-T06
-Hecho cuando: recepción agenda desde web y Android; paciente cancela dentro y fuera del plazo
-Revisa: Leonel",3,High,Sprint 3,spec-105 area-AND nivel-R,Fernando,To Do
-121,37,Subtask,105-T05-BE Solicitudes de cita del paciente y su confirmación (Backend y base de datos),"Cubre: FR-105-08
-Depende de: T04, 101-T07
-Hecho cuando: escenario 3 pasa
-Revisa: Carlos",2,High,Sprint 4,spec-105 area-BE nivel-R,Leonel,To Do
-122,37,Subtask,105-T05-WEB Solicitudes de cita del paciente y su confirmación (Web),"Cubre: FR-105-08
-Depende de: T04, 101-T07
-Hecho cuando: escenario 3 pasa
-Revisa: Carlos",2,High,Sprint 4,spec-105 area-WEB nivel-R,Leonel,To Do
-123,37,Subtask,105-T05-AND Solicitudes de cita del paciente y su confirmación (Android),"Cubre: FR-105-08
-Depende de: T04, 101-T07
-Hecho cuando: escenario 3 pasa
-Revisa: Leonel",2,High,Sprint 4,spec-105 area-AND nivel-R,Fernando,To Do
-124,37,Subtask,105-T05-IOS Solicitudes de cita del paciente y su confirmación (iOS),"Cubre: FR-105-08
-Depende de: T04, 101-T07
-Hecho cuando: escenario 3 pasa
-Revisa: Leonel",2,High,Sprint 4,spec-105 area-IOS nivel-R,Milton,To Do
-125,35,Subtask,"105-T06-BE Pantalla pública de llamados y ""no se presentó"" automático (Backend y base de datos)","Cubre: FR-105-05, FR-105-11, FR-112-06
-Depende de: T02, 112-T02
-Hecho cuando: tres llamados sin presentarse cambian el estado; la pantalla pública no muestra nombres
-Revisa: Carlos",1,Medium,Sprint 4,spec-105 area-BE nivel-E,Leonel,To Do
-126,35,Subtask,"105-T06-WEB Pantalla pública de llamados y ""no se presentó"" automático (Web)","Cubre: FR-105-05, FR-105-11, FR-112-06
-Depende de: T02, 112-T02
-Hecho cuando: tres llamados sin presentarse cambian el estado; la pantalla pública no muestra nombres
-Revisa: Carlos",2,Medium,Sprint 4,spec-105 area-WEB nivel-E,Leonel,To Do
-127,38,Subtask,"106-T01 Migración de consulta, signos, diagnósticos, recetas y semilla CIE-10","Cubre: FR-106-03, FR-106-04
+Cubre: FR-105-01, FR-105-07",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+119,27,Subtask,"106-T01 Migración de consulta, signos, diagnósticos, recetas y semilla CIE-10","Hecho cuando: la semilla carga el subconjunto CIE-10 y las tablas existen en la nube
 Depende de: 100-T03
-Hecho cuando: la semilla carga el subconjunto CIE-10 y las tablas existen en la nube
-Revisa: Leonel",2,High,Sprint 3,spec-106 area-BE nivel-R,Carlos,Done
-128,38,Subtask,"106-T02 Iniciar consulta, signos, diagnósticos, recetas y órdenes","Cubre: FR-106-01, FR-106-02, FR-106-03, FR-106-04, FR-106-05
-Depende de: T01, 105-T02
-Hecho cuando: pruebas de cada sección y de relación de atención creada
-Revisa: Leonel",5,High,Sprint 3,spec-106 area-BE nivel-R,Carlos,To Do
-129,39,Subtask,106-T03 Firma con inscripción vigente y bloqueo de edición,"Cubre: FR-106-06, FR-106-07
-Depende de: T02, 103-T05
-Hecho cuando: escenarios 2 y 3 pasan
-Revisa: Leonel",3,High,Sprint 3,spec-106 area-BE nivel-R,Carlos,To Do
-130,40,Subtask,106-T04-BE Historial clínico del médico y del paciente con auditoría (Backend y base de datos),"Cubre: FR-106-09, FR-106-10, FR-106-12
-Depende de: T03
-Hecho cuando: el paciente ve su consulta firmada en Android e iOS y la lectura queda auditada
-Revisa: Leonel",3,High,Sprint 3,spec-106 area-BE nivel-R,Carlos,To Do
-131,40,Subtask,106-T04-AND Historial clínico del médico y del paciente con auditoría (Android),"Cubre: FR-106-09, FR-106-10, FR-106-12
-Depende de: T03
-Hecho cuando: el paciente ve su consulta firmada en Android e iOS y la lectura queda auditada
-Revisa: Leonel",2,High,Sprint 3,spec-106 area-AND nivel-R,Fernando,To Do
-132,40,Subtask,106-T04-IOS Historial clínico del médico y del paciente con auditoría (iOS),"Cubre: FR-106-09, FR-106-10, FR-106-12
-Depende de: T03
-Hecho cuando: el paciente ve su consulta firmada en Android e iOS y la lectura queda auditada
-Revisa: Leonel",2,High,Sprint 3,spec-106 area-IOS nivel-R,Milton,To Do
-133,38,Subtask,"106-T05-AND Pantallas de consulta en Android e iOS (A21, I21) y signos (A41) (Android)","Cubre: FR-106-01, FR-106-02, FR-106-03, FR-106-04, FR-106-05, FR-106-06
-Depende de: T02, 121-T03, 122-T03
-Hecho cuando: escenario 1 pasa en ambas plataformas
-Revisa: Leonel",5,High,Sprint 3,spec-106 area-AND nivel-R,Fernando,To Do
-134,38,Subtask,"106-T05-IOS Pantallas de consulta en Android e iOS (A21, I21) y signos (A41) (iOS)","Cubre: FR-106-01, FR-106-02, FR-106-03, FR-106-04, FR-106-05, FR-106-06
-Depende de: T02, 121-T03, 122-T03
-Hecho cuando: escenario 1 pasa en ambas plataformas
-Revisa: Leonel",5,High,Sprint 3,spec-106 area-IOS nivel-R,Milton,To Do
-135,40,Subtask,106-T06-BE Indicar hospitalización desde la consulta (Backend y base de datos),"Cubre: FR-106-11
-Depende de: T03, 108-T02
-Hecho cuando: la indicación aparece en admisiones con origen consulta
-Revisa: Leonel",2,High,Sprint 4,spec-106 area-BE nivel-R,Carlos,To Do
-136,40,Subtask,106-T06-AND Indicar hospitalización desde la consulta (Android),"Cubre: FR-106-11
-Depende de: T03, 108-T02
-Hecho cuando: la indicación aparece en admisiones con origen consulta
-Revisa: Leonel",1,High,Sprint 4,spec-106 area-AND nivel-R,Fernando,To Do
-137,40,Subtask,106-T06-IOS Indicar hospitalización desde la consulta (iOS),"Cubre: FR-106-11
-Depende de: T03, 108-T02
-Hecho cuando: la indicación aparece en admisiones con origen consulta
-Revisa: Leonel",1,High,Sprint 4,spec-106 area-IOS nivel-R,Milton,To Do
-138,39,Subtask,106-T07-BE Addendum con original conservado (Backend y base de datos),"Cubre: FR-106-08
-Depende de: T03
-Hecho cuando: el historial muestra original y addendum
-Revisa: Leonel",2,Medium,Sprint 4,spec-106 area-BE nivel-E,Carlos,To Do
-139,39,Subtask,106-T07-AND Addendum con original conservado (Android),"Cubre: FR-106-08
-Depende de: T03
-Hecho cuando: el historial muestra original y addendum
-Revisa: Leonel",1,Medium,Sprint 4,spec-106 area-AND nivel-E,Fernando,To Do
-140,39,Subtask,106-T07-IOS Addendum con original conservado (iOS),"Cubre: FR-106-08
-Depende de: T03
-Hecho cuando: el historial muestra original y addendum
-Revisa: Leonel",1,Medium,Sprint 4,spec-106 area-IOS nivel-E,Milton,To Do
-141,41,Subtask,"107-T01 Migración de laboratorio, catálogo recursivo y semilla con rangos","Cubre: FR-107-01, FR-107-03
+Cubre: FR-106-03, FR-106-04",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+120,27,Subtask,"107-T01 Migración de laboratorio, catálogo recursivo y semilla con rangos","Hecho cuando: agregar un ciclo al catálogo se rechaza
 Depende de: 100-T03
-Hecho cuando: agregar un ciclo al catálogo se rechaza
-Revisa: Carlos",2,High,Sprint 3,spec-107 area-BE nivel-R,Leonel,Done
-142,41,Subtask,107-T02 Crear orden desde consulta con expansión recursiva,"Cubre: FR-107-02, FR-107-04
-Depende de: T01, 106-T02
-Hecho cuando: escenario 3 pasa
-Revisa: Carlos",3,High,Sprint 3,spec-107 area-BE nivel-R,Leonel,To Do
-143,41,Subtask,"107-T03 Muestra, captura con marcas, completar y cancelar","Cubre: FR-107-05, FR-107-06, FR-107-07, FR-107-09, FR-107-13
-Depende de: T02
-Hecho cuando: escenarios 1 (hasta Completado) y 4 pasan
-Revisa: Carlos",5,High,Sprint 3,spec-107 area-BE nivel-R,Leonel,To Do
-144,41,Subtask,"107-T04-WEB Cola y captura en web (W20, W21) y Android (A60 a A62) (Web)","Cubre: FR-107-04, FR-107-05, FR-107-06, FR-107-07
-Depende de: T03, 120-T03, 121-T03
-Hecho cuando: una orden recorre los tres estados desde web y desde Android con la cola en vivo
-Revisa: Carlos",5,High,Sprint 3,spec-107 area-WEB nivel-R,Leonel,To Do
-145,41,Subtask,"107-T04-AND Cola y captura en web (W20, W21) y Android (A60 a A62) (Android)","Cubre: FR-107-04, FR-107-05, FR-107-06, FR-107-07
-Depende de: T03, 120-T03, 121-T03
-Hecho cuando: una orden recorre los tres estados desde web y desde Android con la cola en vivo
-Revisa: Leonel",5,High,Sprint 3,spec-107 area-AND nivel-R,Fernando,To Do
-146,42,Subtask,107-T05-BE Revisión médica y vista del paciente (Backend y base de datos),"Cubre: FR-107-10, FR-107-11
-Depende de: T03
-Hecho cuando: escenario 1 completo pasa en iOS y Android
-Revisa: Carlos",2,High,Sprint 4,spec-107 area-BE nivel-R,Leonel,To Do
-147,42,Subtask,107-T05-AND Revisión médica y vista del paciente (Android),"Cubre: FR-107-10, FR-107-11
-Depende de: T03
-Hecho cuando: escenario 1 completo pasa en iOS y Android
-Revisa: Leonel",3,High,Sprint 4,spec-107 area-AND nivel-R,Fernando,To Do
-148,42,Subtask,107-T05-IOS Revisión médica y vista del paciente (iOS),"Cubre: FR-107-10, FR-107-11
-Depende de: T03
-Hecho cuando: escenario 1 completo pasa en iOS y Android
-Revisa: Leonel",3,High,Sprint 4,spec-107 area-IOS nivel-R,Milton,To Do
-149,42,Subtask,107-T06-BE Aviso de valor crítico con push (Backend y base de datos),"Cubre: FR-107-08
-Depende de: T03, 100-T10
-Hecho cuando: escenario 2 pasa y el médico recibe push con la app cerrada
-Revisa: Carlos",2,Low,Sprint 5,spec-107 area-BE nivel-E,Leonel,To Do
-150,42,Subtask,107-T06-AND Aviso de valor crítico con push (Android),"Cubre: FR-107-08
-Depende de: T03, 100-T10
-Hecho cuando: escenario 2 pasa y el médico recibe push con la app cerrada
-Revisa: Leonel",1,Low,Sprint 5,spec-107 area-AND nivel-E,Fernando,To Do
-151,42,Subtask,107-T06-IOS Aviso de valor crítico con push (iOS),"Cubre: FR-107-08
-Depende de: T03, 100-T10
-Hecho cuando: escenario 2 pasa y el médico recibe push con la app cerrada
-Revisa: Leonel",1,Low,Sprint 5,spec-107 area-IOS nivel-E,Milton,To Do
-152,41,Subtask,107-T07 Corrección de valores con historial,"Cubre: FR-107-12
-Depende de: T03
-Hecho cuando: el valor anterior queda visible para el médico
-Revisa: Carlos",2,Low,Sprint 5,spec-107 area-BE nivel-E,Leonel,To Do
-153,43,Subtask,108-T01 Migración de hospitalización con exclusión de ocupaciones y vista publicada,"Cubre: FR-108-05, FR-108-15
+Cubre: FR-107-01, FR-107-03",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+121,27,Subtask,108-T01 Migración de hospitalización con exclusión de ocupaciones y vista publicada,"Hecho cuando: dos ocupaciones traslapadas de la misma cama se rechazan en prueba
 Depende de: 104-T01
-Hecho cuando: dos ocupaciones traslapadas de la misma cama se rechazan en prueba
-Revisa: Leonel",2,Highest,Sprint 2,spec-108 area-BE nivel-R,Carlos,Done
-154,43,Subtask,108-T02 Crear admisión con origen y unicidad por paciente,"Cubre: FR-108-01, FR-108-02
-Depende de: T01, 102-T03
-Hecho cuando: segunda admisión activa del mismo paciente responde 409
-Revisa: Leonel",2,High,Sprint 4,spec-108 area-BE nivel-R,Carlos,To Do
-155,43,Subtask,108-T03 Algoritmo de sugerencias en dominio con pruebas unitarias,"Cubre: FR-108-03, FR-108-04
-Depende de: T01
-Hecho cuando: los 10 casos de la tabla de reglas pasan, incluido el escenario 1
-Revisa: Leonel",5,High,Sprint 4,spec-108 area-BE nivel-R,Carlos,To Do
-156,43,Subtask,"108-T04 Asignación con bloqueo de habitación, aislamiento y conflictos","Cubre: FR-108-05, FR-108-06, FR-108-07, FR-108-08
-Depende de: T03
-Hecho cuando: escenarios 2 y 3 y la prueba de sexo opuesto concurrente pasan
-Revisa: Leonel",5,High,Sprint 4,spec-108 area-BE nivel-R,Carlos,To Do
-157,44,Subtask,108-T05 Traslados con regla VIP,"Cubre: FR-108-10, FR-108-11
-Depende de: T04
-Hecho cuando: escenario 4 pasa y un traslado semiprivado deja la cama anterior en limpieza
-Revisa: Leonel",3,High,Sprint 4,spec-108 area-BE nivel-R,Carlos,To Do
-158,45,Subtask,108-T06 Alta y salida física,"Cubre: FR-108-12, FR-108-13
-Depende de: T04, 103-T05
-Hecho cuando: escenario 5 pasa
-Revisa: Leonel",3,High,Sprint 4,spec-108 area-BE nivel-R,Carlos,To Do
-159,43,Subtask,108-T07-WEB Pantallas de admisión en web (W13 a W15) y Android (A34) (Web),"Cubre: FR-108-03, FR-108-06, FR-108-14
-Depende de: T04, 120-T03, 121-T03
-Hecho cuando: el flujo completo funciona en web y Android con conflicto visible
-Revisa: Carlos",5,High,Sprint 4,spec-108 area-WEB nivel-R,Leonel,To Do
-160,43,Subtask,108-T07-AND Pantallas de admisión en web (W13 a W15) y Android (A34) (Android),"Cubre: FR-108-03, FR-108-06, FR-108-14
-Depende de: T04, 120-T03, 121-T03
-Hecho cuando: el flujo completo funciona en web y Android con conflicto visible
-Revisa: Leonel",5,High,Sprint 4,spec-108 area-AND nivel-R,Fernando,To Do
-161,45,Subtask,108-T08-BE Mis hospitalizados del médico y mi planta de enfermería (Backend y base de datos),"Cubre: FR-108-14
-Depende de: T06
-Hecho cuando: el médico ve solo los suyos y enfermería solo su área
-Revisa: Leonel",2,High,Sprint 4,spec-108 area-BE nivel-R,Carlos,To Do
-162,45,Subtask,108-T08-AND Mis hospitalizados del médico y mi planta de enfermería (Android),"Cubre: FR-108-14
-Depende de: T06
-Hecho cuando: el médico ve solo los suyos y enfermería solo su área
-Revisa: Leonel",3,High,Sprint 4,spec-108 area-AND nivel-R,Fernando,To Do
-163,45,Subtask,108-T08-IOS Mis hospitalizados del médico y mi planta de enfermería (iOS),"Cubre: FR-108-14
-Depende de: T06
-Hecho cuando: el médico ve solo los suyos y enfermería solo su área
-Revisa: Leonel",2,High,Sprint 4,spec-108 area-IOS nivel-R,Milton,To Do
-164,43,Subtask,108-T09 Reserva para admisión programada con vencimiento,"Cubre: FR-108-09
-Depende de: T04
-Hecho cuando: una reserva vence con el reloj de prueba y la cama vuelve a libre
-Revisa: Leonel",3,Low,Sprint 5,spec-108 area-BE nivel-E,Carlos,To Do
-165,45,Subtask,108-T10-BE Notas y signos de enfermería del hospitalizado (Backend y base de datos),"Cubre: FR-108-16
-Depende de: T08
-Hecho cuando: enfermería del área registra y el médico lo ve
-Revisa: Leonel",2,Low,Sprint 5,spec-108 area-BE nivel-E,Carlos,To Do
-166,45,Subtask,108-T10-AND Notas y signos de enfermería del hospitalizado (Android),"Cubre: FR-108-16
-Depende de: T08
-Hecho cuando: enfermería del área registra y el médico lo ve
-Revisa: Leonel",2,Low,Sprint 5,spec-108 area-AND nivel-E,Fernando,To Do
-167,46,Subtask,109-T01 Migración de ambulancia con unidad única y servicio activo único,"Cubre: FR-109-01, FR-109-05
+Cubre: FR-108-05, FR-108-15",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+122,27,Subtask,109-T01 Migración de ambulancia con unidad única y servicio activo único,"Hecho cuando: dos servicios activos para la unidad se rechazan en prueba
 Depende de: 100-T03
-Hecho cuando: dos servicios activos para la unidad se rechazan en prueba
-Revisa: Leonel",2,High,Sprint 3,spec-109 area-BE nivel-R,Carlos,Done
-168,46,Subtask,109-T02 Estado de la unidad visible en vivo y regla de paramédico de turno,"Cubre: FR-109-01, FR-109-06
-Depende de: T01, 103-T06
-Hecho cuando: escenario 2 pasa
-Revisa: Leonel",3,High,Sprint 3,spec-109 area-BE nivel-R,Carlos,To Do
-169,46,Subtask,"109-T03 Solicitudes del paciente y por teléfono, confirmación y despacho con bloqueo","Cubre: FR-109-02, FR-109-03, FR-109-04, FR-109-05
-Depende de: T02, 101-T07
-Hecho cuando: escenario 1 pasa como prueba concurrente
-Revisa: Leonel",5,High,Sprint 4,spec-109 area-BE nivel-R,Carlos,To Do
-170,46,Subtask,"109-T04 Hitos, finalización y mantenimiento","Cubre: FR-109-07, FR-109-08, FR-109-09, FR-109-12
-Depende de: T03
-Hecho cuando: un servicio completo vuelve la unidad a Disponible y mantenimiento con servicio activo se rechaza
-Revisa: Leonel",3,High,Sprint 4,spec-109 area-BE nivel-R,Carlos,To Do
-171,46,Subtask,"109-T05-WEB Centro de despacho web (W18) y app de la tripulación (A70, A71, A73) (Web)","Cubre: FR-109-01, FR-109-04, FR-109-07
-Depende de: T04, 120-T03, 121-T03
-Hecho cuando: un servicio se opera de punta a punta entre web y Android en vivo
-Revisa: Carlos",5,High,Sprint 4,spec-109 area-WEB nivel-R,Leonel,To Do
-172,46,Subtask,"109-T05-AND Centro de despacho web (W18) y app de la tripulación (A70, A71, A73) (Android)","Cubre: FR-109-01, FR-109-04, FR-109-07
-Depende de: T04, 120-T03, 121-T03
-Hecho cuando: un servicio se opera de punta a punta entre web y Android en vivo
-Revisa: Leonel",5,High,Sprint 4,spec-109 area-AND nivel-R,Fernando,To Do
-173,47,Subtask,"109-T06-AND Seguimiento del paciente en Android e iOS (A09, I09) (Android)","Cubre: FR-109-16
-Depende de: T03, 122-T03
-Hecho cuando: escenario 4 pasa
-Revisa: Leonel",2,High,Sprint 4,spec-109 area-AND nivel-R,Fernando,To Do
-174,47,Subtask,"109-T06-IOS Seguimiento del paciente en Android e iOS (A09, I09) (iOS)","Cubre: FR-109-16
-Depende de: T03, 122-T03
-Hecho cuando: escenario 4 pasa
-Revisa: Leonel",2,High,Sprint 4,spec-109 area-IOS nivel-R,Milton,To Do
-175,49,Subtask,"109-T07-BE Bitácora con filtros y privacidad (W19, A74) (Backend y base de datos)","Cubre: FR-109-14, FR-109-15
-Depende de: T04
-Hecho cuando: escenario 5 pasa
-Revisa: Leonel",2,High,Sprint 4,spec-109 area-BE nivel-R,Carlos,To Do
-176,49,Subtask,"109-T07-WEB Bitácora con filtros y privacidad (W19, A74) (Web)","Cubre: FR-109-14, FR-109-15
-Depende de: T04
-Hecho cuando: escenario 5 pasa
-Revisa: Carlos",3,High,Sprint 4,spec-109 area-WEB nivel-R,Leonel,To Do
-177,49,Subtask,"109-T07-AND Bitácora con filtros y privacidad (W19, A74) (Android)","Cubre: FR-109-14, FR-109-15
-Depende de: T04
-Hecho cuando: escenario 5 pasa
-Revisa: Leonel",1,High,Sprint 4,spec-109 area-AND nivel-R,Fernando,To Do
-178,46,Subtask,109-T08 Admisión con origen ambulancia,"Cubre: FR-109-17
-Depende de: T04, 108-T02
-Hecho cuando: un servicio ""en hospital"" crea admisión con su referencia
-Revisa: Leonel",2,High,Sprint 4,spec-109 area-BE nivel-R,Carlos,To Do
-179,48,Subtask,109-T09-BE Reporte prehospital con cola sin conexión y recepción en emergencia (Backend y base de datos),"Cubre: FR-109-10, FR-109-11
-Depende de: T04
-Hecho cuando: escenario 3 pasa en modo avión
-Revisa: Leonel",3,Medium,Sprint 4,spec-109 area-BE nivel-E,Carlos,To Do
-180,48,Subtask,109-T09-AND Reporte prehospital con cola sin conexión y recepción en emergencia (Android),"Cubre: FR-109-10, FR-109-11
-Depende de: T04
-Hecho cuando: escenario 3 pasa en modo avión
-Revisa: Leonel",5,Medium,Sprint 4,spec-109 area-AND nivel-E,Fernando,To Do
-181,48,Subtask,109-T10-BE Ubicación en vivo y mapa (Backend y base de datos),"Cubre: FR-109-13
-Depende de: T05
-Hecho cuando: el punto se mueve en el mapa web mientras el teléfono se desplaza
-Revisa: Leonel",2,Low,Sprint 5,spec-109 area-BE nivel-E,Carlos,To Do
-182,48,Subtask,109-T10-WEB Ubicación en vivo y mapa (Web),"Cubre: FR-109-13
-Depende de: T05
-Hecho cuando: el punto se mueve en el mapa web mientras el teléfono se desplaza
-Revisa: Carlos",3,Low,Sprint 5,spec-109 area-WEB nivel-E,Leonel,To Do
-183,48,Subtask,109-T10-AND Ubicación en vivo y mapa (Android),"Cubre: FR-109-13
-Depende de: T05
-Hecho cuando: el punto se mueve en el mapa web mientras el teléfono se desplaza
-Revisa: Leonel",2,Low,Sprint 5,spec-109 area-AND nivel-E,Fernando,To Do
-184,50,Subtask,110-T01 Servicio de contexto de acceso y filtrado de campos de la ficha,"Cubre: FR-110-01, FR-110-02, FR-110-03
-Depende de: 100-T05, 102-T03
-Hecho cuando: escenario 3 pasa y la prueba por rol y campo de la ficha pasa
-Revisa: Leonel",5,Highest,Sprint 2,spec-110 area-BE nivel-R,Carlos,To Do
-185,50,Subtask,110-T02 Contexto clínico: relación de atención y área de turno,"Cubre: FR-110-01, FR-110-03
-Depende de: T01, 106-T02, 103-T06
-Hecho cuando: escenario 1 pasa
-Revisa: Leonel",3,High,Sprint 3,spec-110 area-BE nivel-R,Carlos,To Do
-186,51,Subtask,110-T03 Accesos excepcionales con aprobación del delegado y vencimiento,"Cubre: FR-110-04, FR-110-05, FR-110-06
-Depende de: T02
-Hecho cuando: escenario 2 pasa con el reloj de prueba
-Revisa: Leonel",3,High,Sprint 4,spec-110 area-BE nivel-R,Carlos,To Do
-187,51,Subtask,110-T04-BE Auditoría consultable y verificación de la cadena (W32) (Backend y base de datos),"Cubre: FR-110-07
-Depende de: 100-T02, 120-T03
-Hecho cuando: el delegado detecta un registro alterado desde la web
-Revisa: Leonel",2,High,Sprint 4,spec-110 area-BE nivel-R,Carlos,To Do
-188,51,Subtask,110-T04-WEB Auditoría consultable y verificación de la cadena (W32) (Web),"Cubre: FR-110-07
-Depende de: 100-T02, 120-T03
-Hecho cuando: el delegado detecta un registro alterado desde la web
-Revisa: Carlos",3,High,Sprint 4,spec-110 area-WEB nivel-R,Leonel,To Do
-189,51,Subtask,"110-T05-WEB Pantallas de accesos (W30, W31) y estado ""sin permiso"" con pedir acceso (Web)","Cubre: FR-110-04, FR-110-05
-Depende de: T03
-Hecho cuando: el flujo completo funciona entre web y móvil
-Revisa: Carlos",3,High,Sprint 4,spec-110 area-WEB nivel-R,Leonel,To Do
-190,51,Subtask,"110-T05-AND Pantallas de accesos (W30, W31) y estado ""sin permiso"" con pedir acceso (Android)","Cubre: FR-110-04, FR-110-05
-Depende de: T03
-Hecho cuando: el flujo completo funciona entre web y móvil
-Revisa: Leonel",2,High,Sprint 4,spec-110 area-AND nivel-R,Fernando,To Do
-191,51,Subtask,"110-T05-IOS Pantallas de accesos (W30, W31) y estado ""sin permiso"" con pedir acceso (iOS)","Cubre: FR-110-04, FR-110-05
-Depende de: T03
-Hecho cuando: el flujo completo funciona entre web y móvil
-Revisa: Leonel",2,High,Sprint 4,spec-110 area-IOS nivel-R,Milton,To Do
-192,50,Subtask,110-T06 Matriz RBAC y política de campos generadas y verificadas,"Cubre: FR-110-10
-Depende de: ninguna
-Hecho cuando: `python3 tools/generar_docs.py --verificar` pasa en CI
-Revisa: Leonel",1,Highest,Sprint 2,spec-110 area-DOC nivel-R,Carlos,To Do
-193,50,Subtask,110-T07-BE Quién vio mi expediente (Backend y base de datos),"Cubre: FR-110-08
-Depende de: T02
-Hecho cuando: escenario 4 pasa en Android e iOS
-Revisa: Leonel",1,Low,Sprint 5,spec-110 area-BE nivel-E,Carlos,To Do
-194,50,Subtask,110-T07-AND Quién vio mi expediente (Android),"Cubre: FR-110-08
-Depende de: T02
-Hecho cuando: escenario 4 pasa en Android e iOS
-Revisa: Leonel",1,Low,Sprint 5,spec-110 area-AND nivel-E,Fernando,To Do
-195,50,Subtask,110-T07-IOS Quién vio mi expediente (iOS),"Cubre: FR-110-08
-Depende de: T02
-Hecho cuando: escenario 4 pasa en Android e iOS
-Revisa: Leonel",1,Low,Sprint 5,spec-110 area-IOS nivel-E,Milton,To Do
-196,51,Subtask,110-T08-BE Romper el vidrio en emergencia (Backend y base de datos),"Cubre: FR-110-09
-Depende de: T03
-Hecho cuando: el acceso inmediato queda pendiente de revisión del delegado
-Revisa: Leonel",2,Low,Sprint 5,spec-110 area-BE nivel-E,Carlos,To Do
-197,51,Subtask,110-T08-AND Romper el vidrio en emergencia (Android),"Cubre: FR-110-09
-Depende de: T03
-Hecho cuando: el acceso inmediato queda pendiente de revisión del delegado
-Revisa: Leonel",1,Low,Sprint 5,spec-110 area-AND nivel-E,Fernando,To Do
-198,51,Subtask,110-T08-IOS Romper el vidrio en emergencia (iOS),"Cubre: FR-110-09
-Depende de: T03
-Hecho cuando: el acceso inmediato queda pendiente de revisión del delegado
-Revisa: Leonel",1,Low,Sprint 5,spec-110 area-IOS nivel-E,Milton,To Do
-199,52,Subtask,111-T01 Migración de inventario y semilla,"Cubre: FR-111-01, FR-111-02
+Cubre: FR-109-01, FR-109-05",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+123,27,Subtask,111-T01 Migración de inventario y semilla,"Hecho cuando: la semilla carga artículos con lotes en dos bodegas
 Depende de: 104-T01
-Hecho cuando: la semilla carga artículos con lotes en dos bodegas
-Revisa: Carlos",1,High,Sprint 4,spec-111 area-BE nivel-R,Leonel,Done
-200,52,Subtask,111-T02 Movimientos atómicos sin negativos y sin lotes vencidos,"Cubre: FR-111-03, FR-111-04, FR-111-05, FR-111-08
-Depende de: T01
-Hecho cuando: escenario 1 pasa como prueba concurrente
-Revisa: Carlos",3,High,Sprint 4,spec-111 area-BE nivel-R,Leonel,To Do
-201,52,Subtask,"111-T03-BE Alerta de mínimo en vivo y pantallas W22, W23 (Backend y base de datos)","Cubre: FR-111-06
-Depende de: T02, 120-T03
-Hecho cuando: escenario 2 pasa
-Revisa: Carlos",1,High,Sprint 4,spec-111 area-BE nivel-R,Leonel,To Do
-202,52,Subtask,"111-T03-WEB Alerta de mínimo en vivo y pantallas W22, W23 (Web)","Cubre: FR-111-06
-Depende de: T02, 120-T03
-Hecho cuando: escenario 2 pasa
-Revisa: Carlos",3,High,Sprint 4,spec-111 area-WEB nivel-R,Leonel,To Do
-203,52,Subtask,111-T04 Consumo desde enfermería y laboratorio (A53),"Cubre: FR-111-07
-Depende de: T02, 121-T03
-Hecho cuando: un consumo desde Android baja la existencia y aparece en el historial
-Revisa: Leonel",2,Low,Sprint 5,spec-111 area-AND nivel-E,Fernando,To Do
-204,53,Subtask,112-T01 Vistas públicas y endpoints sin sesión con prueba de ausencia de datos personales,"Cubre: FR-112-01, FR-112-02
-Depende de: 104-T02, 103-T08
-Hecho cuando: escenario 1 pasa
-Revisa: Carlos",2,High,Sprint 3,spec-112 area-BE nivel-R,Leonel,To Do
-205,53,Subtask,"112-T02-BE Avisos con vigencia y pantalla pública en vivo (W25, W34) (Backend y base de datos)","Cubre: FR-112-03, FR-112-04
-Depende de: T01, 120-T03
-Hecho cuando: escenario 2 pasa en la pantalla pública y en las apps (A10, I10)
-Revisa: Carlos",1,High,Sprint 3,spec-112 area-BE nivel-R,Leonel,To Do
-206,53,Subtask,"112-T02-WEB Avisos con vigencia y pantalla pública en vivo (W25, W34) (Web)","Cubre: FR-112-03, FR-112-04
-Depende de: T01, 120-T03
-Hecho cuando: escenario 2 pasa en la pantalla pública y en las apps (A10, I10)
-Revisa: Carlos",3,High,Sprint 3,spec-112 area-WEB nivel-R,Leonel,To Do
-207,53,Subtask,"112-T02-AND Avisos con vigencia y pantalla pública en vivo (W25, W34) (Android)","Cubre: FR-112-03, FR-112-04
-Depende de: T01, 120-T03
-Hecho cuando: escenario 2 pasa en la pantalla pública y en las apps (A10, I10)
-Revisa: Leonel",1,High,Sprint 3,spec-112 area-AND nivel-R,Fernando,To Do
-208,53,Subtask,"112-T02-IOS Avisos con vigencia y pantalla pública en vivo (W25, W34) (iOS)","Cubre: FR-112-03, FR-112-04
-Depende de: T01, 120-T03
-Hecho cuando: escenario 2 pasa en la pantalla pública y en las apps (A10, I10)
-Revisa: Leonel",1,High,Sprint 3,spec-112 area-IOS nivel-R,Milton,To Do
-209,53,Subtask,112-T03 Advertencia de datos personales en avisos,"Cubre: FR-112-05
-Depende de: T02
-Hecho cuando: un aviso con un DUI muestra advertencia
-Revisa: Carlos",1,Low,Sprint 5,spec-112 area-WEB nivel-E,Leonel,To Do
-210,54,Subtask,"113-T01-BE Tablero inicial con tarjetas de camas, turnos y pacientes y marcadores de semana (Backend y base de datos)","Cubre: FR-113-01, FR-113-03, FR-113-06
-Depende de: 104-T02, 103-T03, 120-T02
-Hecho cuando: el tablero se ve en la web desplegada para el avance
-Revisa: Carlos",2,Highest,Sprint 2,spec-113 area-BE nivel-R,Leonel,To Do
-211,54,Subtask,"113-T01-WEB Tablero inicial con tarjetas de camas, turnos y pacientes y marcadores de semana (Web)","Cubre: FR-113-01, FR-113-03, FR-113-06
-Depende de: 104-T02, 103-T03, 120-T02
-Hecho cuando: el tablero se ve en la web desplegada para el avance
-Revisa: Carlos",3,Highest,Sprint 2,spec-113 area-WEB nivel-R,Leonel,To Do
-212,54,Subtask,113-T02-BE Tarjetas en vivo y bandejas por rol (Backend y base de datos),"Cubre: FR-113-02, FR-113-04
-Depende de: T01
-Hecho cuando: escenario 1 pasa
-Revisa: Carlos",2,High,Sprint 3,spec-113 area-BE nivel-R,Leonel,To Do
-213,54,Subtask,113-T02-WEB Tarjetas en vivo y bandejas por rol (Web),"Cubre: FR-113-02, FR-113-04
-Depende de: T01
-Hecho cuando: escenario 1 pasa
-Revisa: Carlos",3,High,Sprint 3,spec-113 area-WEB nivel-R,Leonel,To Do
-214,54,Subtask,"113-T03-BE Completar tarjetas de laboratorio, fila y ambulancia (Backend y base de datos)","Cubre: FR-113-01
-Depende de: T02, 107-T03, 105-T02, 109-T04
-Hecho cuando: todas las tarjetas tienen datos reales y escenario 2 pasa
-Revisa: Carlos",2,High,Sprint 5,spec-113 area-BE nivel-R,Leonel,To Do
-215,54,Subtask,"113-T03-WEB Completar tarjetas de laboratorio, fila y ambulancia (Web)","Cubre: FR-113-01
-Depende de: T02, 107-T03, 105-T02, 109-T04
-Hecho cuando: todas las tarjetas tienen datos reales y escenario 2 pasa
-Revisa: Carlos",2,High,Sprint 5,spec-113 area-WEB nivel-R,Leonel,To Do
-216,54,Subtask,113-T04-BE Indicadores por rango de fechas (W33) (Backend y base de datos),"Cubre: FR-113-05
-Depende de: T03
-Hecho cuando: los cinco indicadores se calculan sobre datos de prueba con valores esperados
-Revisa: Carlos",3,Low,Sprint 5,spec-113 area-BE nivel-E,Leonel,To Do
-217,54,Subtask,113-T04-WEB Indicadores por rango de fechas (W33) (Web),"Cubre: FR-113-05
-Depende de: T03
-Hecho cuando: los cinco indicadores se calculan sobre datos de prueba con valores esperados
-Revisa: Carlos",3,Low,Sprint 5,spec-113 area-WEB nivel-E,Leonel,To Do
-218,55,Subtask,"120-T01 Proyecto React con TypeScript, rutas, ingreso con Supabase y despliegue","Cubre: FR-120-01, FR-101-01
+Cubre: FR-111-01, FR-111-02",,Highest,,spec-100,nivel-R,comp-backend,,,Done
+124,27,Subtask,HU-100-0-QA Casos de prueba y prueba manual de los criterios de HU-100-0 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-100,nivel-R,comp-qa,,,Done
+125,28,Subtask,"GES-01 Proyecto de Jira con épicas, componentes, sprints y campo de story points","Hecho cuando: El tablero refleja este backlog y sus 5 sprints
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-docs,,,Done
+126,28,Subtask,"GES-02 Diseño de alta fidelidad de las 116 pantallas, sistema de diseño claro y oscuro, y 16 flujos en Claude Design","Hecho cuando: docs/diseno/claude-design/ contiene las pantallas con códigos W, A e I
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-diseno,,,Done
+127,28,Subtask,"GES-14 Base de Figma: archivo, estructura de páginas y prototipo inicial","Hecho cuando: Archivo de Figma creado con su estructura
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-diseno,,,Done
+128,28,Subtask,GES-08 Inicio local del proyecto web (sin evidencia en el repositorio),"Hecho cuando: Se sube al repositorio en HU-120-1
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-web,,,Done
+129,28,Subtask,GES-09 Inicio local del proyecto Android (sin evidencia en el repositorio),"Hecho cuando: Se sube al repositorio en HU-121-1
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-android,,,Done
+130,38,Subtask,"GES-03 Llevar el diseño a Figma: páginas por plataforma y rol, componentes con variantes","Hecho cuando: Cada archivo de claude-design/ tiene su página en Figma
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-diseno,,,To Do
+131,38,Subtask,GES-04 Enlazar los flujos F01 a F12 como prototipo interactivo en Figma,"Hecho cuando: Cada flujo navega de punta a punta
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-diseno,,,To Do
+132,38,Subtask,"GES-05 Revisión de accesibilidad del diseño: contraste, tamaños táctiles, estados sin color","Hecho cuando: Lista de verificación firmada
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-qa,,,To Do
+133,38,Subtask,131-T03 Enlace de Figma y sistema de diseño en la documentación,"Hecho cuando: el enlace está en el README y en el documento
 Depende de: ninguna
-Hecho cuando: la URL desplegada permite ingresar con un usuario de prueba
-Revisa: Carlos",3,Highest,Sprint 1,spec-120 area-WEB nivel-R,Leonel,To Do
-219,55,Subtask,"120-T02 Navegación por rol desde `/auth/me`, estados comunes y cliente de API generado","Cubre: FR-120-02, FR-120-03, FR-120-06, FR-120-07
-Depende de: T01, 101-T03
-Hecho cuando: escenario 1 pasa y cada rol web ve su menú
-Revisa: Carlos",5,Highest,Sprint 2,spec-120 area-WEB nivel-R,Leonel,Done
-220,55,Subtask,120-T03 Suscripción a Realtime con invalidación y reconexión,"Cubre: FR-120-04, FR-120-05
-Depende de: T02, 100-T03
-Hecho cuando: escenario 2 pasa
-Revisa: Carlos",3,Highest,Sprint 2,spec-120 area-WEB nivel-R,Leonel,To Do
-221,55,Subtask,120-T04 Pantalla pública en modo televisor,"Cubre: FR-120-09
-Depende de: T03, 112-T01
-Hecho cuando: `/publico` se actualiza sola sin sesión
-Revisa: Carlos",2,High,Sprint 3,spec-120 area-WEB nivel-R,Leonel,To Do
-222,55,Subtask,"120-T05-WEB Accesibilidad, cierre por inactividad y pruebas Playwright de la defensa (Web)","Cubre: FR-120-08, FR-120-10
-Depende de: T03
-Hecho cuando: revisión de contraste sin errores y los flujos Playwright pasan
-Revisa: Carlos",3,High,Sprint 5,spec-120 area-WEB nivel-R,Leonel,To Do
-223,55,Subtask,"120-T05-QA Accesibilidad, cierre por inactividad y pruebas Playwright de la defensa (Calidad)","Cubre: FR-120-08, FR-120-10
-Depende de: T03
-Hecho cuando: revisión de contraste sin errores y los flujos Playwright pasan
-Revisa: Carlos",3,High,Sprint 5,spec-120 area-QA nivel-R,Walter,To Do
-224,56,Subtask,"121-T01 Proyecto Gradle con Compose, Hilt, red y pantalla de ingreso","Cubre: FR-121-01, FR-121-02, FR-101-01
+Cubre: FR-131-03",,Highest,,spec-131,nivel-R,comp-diseno,,,To Do
+134,39,Subtask,"131-T01 Diagrama ER, arquitectura, RBAC y privacidad para el avance","Hecho cuando: `docs/arquitectura` contiene los cuatro documentos revisados
 Depende de: ninguna
-Hecho cuando: el APK de depuración inicia sesión contra Supabase de la nube
-Revisa: Leonel",3,Highest,Sprint 1,spec-121 area-AND nivel-R,Fernando,To Do
-225,56,Subtask,121-T02 Navegación por rol y maquetación de las pantallas principales de cada rol,"Cubre: FR-121-03, FR-121-07
-Depende de: T01, 101-T03
-Hecho cuando: escenario 1 pasa para los 7 roles de Android (criterio del avance)
-Revisa: Leonel",8,Highest,Sprint 2,spec-121 area-AND nivel-R,Fernando,To Do
-226,56,Subtask,121-T03 Repositorio de Realtime e invalidación en ViewModels,"Cubre: FR-121-04
-Depende de: T02, 100-T03
-Hecho cuando: un cambio de cama hecho en web aparece en el tablero Android sin recargar
-Revisa: Leonel",3,High,Sprint 3,spec-121 area-AND nivel-R,Fernando,To Do
-227,56,Subtask,121-T04 Cola sin conexión del paramédico,"Cubre: FR-121-06, FR-121-08
-Depende de: T03, 109-T04
-Hecho cuando: escenario 3 de la spec 109 pasa en modo avión
-Revisa: Leonel",5,Medium,Sprint 4,spec-121 area-AND nivel-E,Fernando,To Do
-228,56,Subtask,121-T05 Push FCM,"Cubre: FR-121-05
-Depende de: T03, 100-T10
-Hecho cuando: el paciente recibe ""te llamaron al C-102"" con la app cerrada
-Revisa: Leonel",2,Low,Sprint 5,spec-121 area-AND nivel-E,Fernando,To Do
-229,56,Subtask,121-T06 Pruebas de ViewModels y de UI de ingreso,"Cubre: FR-121-01, FR-121-02
-Depende de: T03
-Hecho cuando: `./gradlew test connectedCheck` pasa
-Revisa: Leonel",3,High,Sprint 5,spec-121 area-AND nivel-R,Fernando,To Do
-230,57,Subtask,"122-T01 Proyecto Xcode con SwiftUI, paquetes y pantalla de ingreso","Cubre: FR-122-01, FR-122-02, FR-101-01
+Cubre: FR-131-02",,Highest,,spec-131,nivel-R,comp-docs,,,To Do
+135,39,Subtask,110-T06 Matriz RBAC y política de campos generadas y verificadas,"Hecho cuando: `python3 tools/generar_docs.py --verificar` pasa en CI
 Depende de: ninguna
-Hecho cuando: el simulador inicia sesión contra Supabase de la nube
-Revisa: Leonel",3,Highest,Sprint 1,spec-122 area-IOS nivel-R,Milton,To Do
-231,57,Subtask,122-T02 Pestañas por rol y maquetación de las pantallas de Médico y Paciente,"Cubre: FR-122-03, FR-122-06
-Depende de: T01, 101-T03
-Hecho cuando: escenarios 1 y 2 pasan (criterio del avance)
-Revisa: Leonel",8,Highest,Sprint 2,spec-122 area-IOS nivel-R,Milton,To Do
-232,57,Subtask,122-T03 Servicio de Realtime e invalidación en view models,"Cubre: FR-122-04
-Depende de: T02, 100-T03
-Hecho cuando: el número de fila del paciente cambia en vivo al ser llamado
-Revisa: Leonel",3,High,Sprint 3,spec-122 area-IOS nivel-R,Milton,To Do
-233,57,Subtask,122-T04 Notificaciones APNs,"Cubre: FR-122-05
-Depende de: T03, 100-T10
-Hecho cuando: el médico recibe aviso de valor crítico con la app cerrada en un dispositivo
-Revisa: Leonel",2,Low,Sprint 5,spec-122 area-IOS nivel-E,Milton,To Do
-234,57,Subtask,122-T05 Pruebas de view models y sesión en Keychain,"Cubre: FR-122-01, FR-122-07
-Depende de: T03
-Hecho cuando: las pruebas pasan en la Mac universitaria
-Revisa: Leonel",3,High,Sprint 5,spec-122 area-IOS nivel-R,Milton,To Do
-235,58,Subtask,130-T01 Proyecto de pruebas con PostgreSQL real y ayudante de concurrencia,"Cubre: FR-130-02
-Depende de: 100-T01
-Hecho cuando: una prueba concurrente de ejemplo corre en local y en CI
-Revisa: Leonel",2,Highest,Sprint 1,spec-130 area-BE nivel-R,Carlos,To Do
-236,58,Subtask,130-T02 Integración continua en GitHub,"Cubre: FR-130-03
-Depende de: T01, 120-T01, 121-T01
-Hecho cuando: un PR muestra el estado de todas las verificaciones
-Revisa: Carlos",3,Highest,Sprint 2,spec-130 area-WEB nivel-R,Leonel,To Do
-237,58,Subtask,130-T03 Pruebas de arquitectura de módulos,"Cubre: FR-130-05
-Depende de: 100-T02
-Hecho cuando: referenciar el interior de otro módulo rompe la compilación de pruebas
-Revisa: Leonel",2,Highest,Sprint 2,spec-130 area-BE nivel-R,Carlos,Done
-238,58,Subtask,130-T04 Las siete pruebas de concurrencia de ADR-0007,"Cubre: FR-130-01
-Depende de: 108-T04, 109-T03, 103-T03, 105-T01, 111-T02
-Hecho cuando: las siete pasan 20 veces seguidas sin fallos intermitentes
-Revisa: Leonel",5,High,Sprint 5,spec-130 area-BE nivel-R,Carlos,To Do
-239,58,Subtask,130-T05 Script de demostración de concurrencia,"Cubre: FR-130-04
-Depende de: T04
-Hecho cuando: escenario 1 pasa contra la API desplegada
-Revisa: Leonel",2,High,Sprint 5,spec-130 area-BE nivel-R,Carlos,To Do
-240,58,Subtask,130-T06 Lista de pruebas manuales por pantalla,"Cubre: FR-130-06
-Depende de: ninguna
-Hecho cuando: el equipo de pruebas tiene la lista generada
-Revisa: Carlos",3,High,Sprint 3,spec-130 area-QA nivel-R,Ángel,To Do
-241,59,Subtask,"131-T01 Diagrama ER, arquitectura, RBAC y privacidad para el avance","Cubre: FR-131-02
-Depende de: ninguna
-Hecho cuando: `docs/arquitectura` contiene los cuatro documentos revisados
-Revisa: Leonel",2,Highest,Sprint 1,spec-131 area-DOC nivel-R,Carlos,Done
-242,59,Subtask,131-T02-WEB README raíz con instalación de las tres plataformas (Web),"Cubre: FR-131-01
+Cubre: FR-110-10",,Highest,,spec-131,nivel-R,comp-docs,,,To Do
+136,40,Subtask,131-T02 README raíz con instalación de las tres plataformas,"Hecho cuando: escenario 1 pasa con un compañero
 Depende de: 120-T01, 121-T01, 122-T01, 100-T08
-Hecho cuando: escenario 1 pasa con un compañero
-Revisa: Carlos",2,Highest,Sprint 2,spec-131 area-WEB nivel-R,Leonel,To Do
-243,59,Subtask,131-T02-AND README raíz con instalación de las tres plataformas (Android),"Cubre: FR-131-01
-Depende de: 120-T01, 121-T01, 122-T01, 100-T08
-Hecho cuando: escenario 1 pasa con un compañero
-Revisa: Leonel",1,Highest,Sprint 2,spec-131 area-AND nivel-R,Fernando,To Do
-244,59,Subtask,131-T02-IOS README raíz con instalación de las tres plataformas (iOS),"Cubre: FR-131-01
-Depende de: 120-T01, 121-T01, 122-T01, 100-T08
-Hecho cuando: escenario 1 pasa con un compañero
-Revisa: Leonel",1,Highest,Sprint 2,spec-131 area-IOS nivel-R,Milton,To Do
-245,59,Subtask,131-T03 Enlace de Figma y sistema de diseño en la documentación,"Cubre: FR-131-03
+Cubre: FR-131-01",,Highest,,spec-131,nivel-R,comp-docs,,,To Do
+137,41,Subtask,GES-06 Plantilla de casos de prueba y de reporte de defectos en Jira,"Hecho cuando: Plantilla aprobada y usada en el primer caso
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-qa,,,To Do
+138,41,Subtask,GES-07 Usuarios de prueba por rol y pacientes ficticios en el entorno de nube,"Hecho cuando: Un usuario por cada uno de los 10 roles puede ingresar
+Depende de: ninguna",,Highest,,spec-131,nivel-R,comp-qa,,,To Do
+139,41,Subtask,130-T06 Lista de pruebas manuales por pantalla,"Hecho cuando: el equipo de pruebas tiene la lista generada
 Depende de: ninguna
-Hecho cuando: el enlace está en el README y en el documento
-Revisa: Leonel",1,Highest,Sprint 2,spec-131 area-DIS nivel-R,Walter,To Do
-246,59,Subtask,131-T04 Script de restauración del entorno demo,"Cubre: FR-131-05
+Cubre: FR-130-06",,Highest,,spec-131,nivel-R,comp-qa,,,To Do
+140,87,Subtask,131-T04 Script de restauración del entorno demo,"Hecho cuando: el entorno se reconstruye en un comando y la demo funciona
 Depende de: 130-T04
-Hecho cuando: el entorno se reconstruye en un comando y la demo funciona
-Revisa: Leonel",2,High,Sprint 5,spec-131 area-BE nivel-R,Carlos,To Do
-247,59,Subtask,131-T05 Documento de arquitectura en PDF,"Cubre: FR-131-02, FR-131-06
+Cubre: FR-131-05",,High,,spec-131,nivel-R,comp-backend,,,To Do
+141,87,Subtask,131-T05-QA Documento de arquitectura en PDF (QA),"Hecho cuando: el PDF incluye todo lo de FR-131-02 con diagramas legibles
 Depende de: T01
-Hecho cuando: el PDF incluye todo lo de FR-131-02 con diagramas legibles
-Revisa: Carlos",3,High,Sprint 5,spec-131 area-QA nivel-R,Ángel,To Do
-248,59,Subtask,131-T06-DOC Guion y ensayo de la defensa (Documentación),"Cubre: FR-131-04
+Cubre: FR-131-02, FR-131-06",,High,,spec-131,nivel-R,comp-qa,,,To Do
+142,87,Subtask,131-T05-DOC Documento de arquitectura en PDF (Documentación),"Hecho cuando: el PDF incluye todo lo de FR-131-02 con diagramas legibles
+Depende de: T01
+Cubre: FR-131-02, FR-131-06",,High,,spec-131,nivel-R,comp-docs,,,To Do
+143,87,Subtask,131-T06-DOC Guion y ensayo de la defensa (Documentación),"Hecho cuando: dos ensayos completos sin fallos en 15 minutos
 Depende de: T04
-Hecho cuando: dos ensayos completos sin fallos en 15 minutos
-Revisa: Leonel",3,High,Sprint 5,spec-131 area-DOC nivel-R,Carlos,To Do
-249,59,Subtask,131-T06-QA Guion y ensayo de la defensa (Calidad),"Cubre: FR-131-04
+Cubre: FR-131-04",,High,,spec-131,nivel-R,comp-docs,,,To Do
+144,87,Subtask,131-T06-QA Guion y ensayo de la defensa (QA),"Hecho cuando: dos ensayos completos sin fallos en 15 minutos
 Depende de: T04
-Hecho cuando: dos ensayos completos sin fallos en 15 minutos
-Revisa: Carlos",2,High,Sprint 5,spec-131 area-QA nivel-R,Ángel,To Do
-250,59,Subtask,"DIS-01 Base del sistema de diseño en Claude Design (tokens, tipografía, componentes)","Cubre: FR-131-03
+Cubre: FR-131-04",,High,,spec-131,nivel-R,comp-qa,,,To Do
+145,29,Subtask,100-T01 Crear monorepo y solución backend con proyectos por módulo,"Hecho cuando: `npm run build --prefix api` sin errores y `tools/generar_docs.py --verificar` pasa en el repositorio
 Depende de: ninguna
-Hecho cuando: Tokens claro y oscuro, escala tipográfica y componentes de docs/diseno/brief-claude-design.md exportados a Figma
-Revisa: Leonel",3,Highest,Sprint 1,spec-131 area-DIS nivel-R,Carlos,To Do
-251,59,Subtask,DIS-02 Biblioteca de componentes en Figma con todos sus estados,"Cubre: FR-131-03
+Cubre: FR-100-18",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+146,29,Subtask,"100-T02 Portar plataforma del legado (Db, CommandRunner, Idempotency, Outbox, Audit, PolicyRegistry, Clock)","Hecho cuando: las pruebas de plataforma portadas pasan contra PostgreSQL local
+Depende de: T01
+Cubre: FR-100-04, FR-100-05, FR-100-06, FR-100-07, FR-100-10, FR-100-16",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+147,29,Subtask,100-T04 Validación del JWT de Supabase y construcción del actor,"Hecho cuando: pruebas de token válido, vencido, firma falsa y emisor ajeno pasan
+Depende de: T02
+Cubre: FR-100-01",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+148,29,Subtask,100-T05 Filtro de permisos por endpoint con auditoría de denegados,"Hecho cuando: prueba de paciente contra `POST /turnos` da 403 y deja auditoría
+Depende de: T04
+Cubre: FR-100-02, FR-100-03",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+149,29,Subtask,"100-T06 Errores uniformes, conflicto de versión y registro sin datos sensibles","Hecho cuando: prueba de 409 por versión y revisión de registros sin cuerpos de solicitud
+Depende de: T02
+Cubre: FR-100-11, FR-100-12, FR-100-15",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+150,29,Subtask,HU-100-1-QA Casos de prueba y prueba manual de los criterios de HU-100-1 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-100,nivel-R,comp-qa,,,To Do
+151,30,Subtask,"GES-15 Configurar Supabase para la API: contraseña del rol sghu_api, gancho de token acceso.hook_token, primer Administrador, limpiar la fila de humo del outbox","Hecho cuando: La API se conecta como sghu_api, el token trae roles y canales, existe un usuario ADM (pasos en supabase/README.md)
+Depende de: ninguna",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+152,30,Subtask,100-T07 OpenAPI con permisos y endpoint de salud,"Hecho cuando: `/openapi/v1.json` lista cada endpoint con `x-permiso` y `/salud` responde 200
+Depende de: T05
+Cubre: FR-100-13, FR-100-14",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+153,30,Subtask,100-T08 Contenedor y despliegue de la API en la nube,"Hecho cuando: `/salud` responde desde la URL pública con la base de Supabase
+Depende de: T07
+Cubre: FR-100-18",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+154,30,Subtask,HU-100-2-QA Casos de prueba y prueba manual de los criterios de HU-100-2 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-100,nivel-R,comp-qa,,,To Do
+155,88,Subtask,100-T10 Trabajador de push FCM y APNs con registro de dispositivos,"Hecho cuando: un evento con push llega una sola vez a un Android y a un iPhone con la app cerrada
+Depende de: T03
+Cubre: FR-100-19",,Medium,,spec-100,nivel-E,comp-backend,,,To Do
+156,88,Subtask,121-T05 Push FCM,"Hecho cuando: el paciente recibe ""te llamaron al C-102"" con la app cerrada
+Depende de: T03, 100-T10
+Cubre: FR-121-05",,Medium,,spec-100,nivel-E,comp-android,,,To Do
+157,88,Subtask,122-T04 Notificaciones APNs,"Hecho cuando: el médico recibe aviso de valor crítico con la app cerrada en un dispositivo
+Depende de: T03, 100-T10
+Cubre: FR-122-05",,Medium,,spec-100,nivel-E,comp-ios,,,To Do
+158,88,Subtask,"HU-100-3-QA Casos de prueba y prueba manual de los criterios de HU-100-3 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Medium,,spec-100,nivel-R,comp-qa,,,To Do
+159,92,Subtask,100-T09 Límite de búsquedas por usuario,"Hecho cuando: la búsqueda 21 en un minuto devuelve 429 y queda auditada
+Depende de: T05
+Cubre: FR-100-17",,Low,,spec-100,nivel-E,comp-backend,,,To Do
+160,92,Subtask,HU-100-4-QA Casos de prueba y prueba manual de los criterios de HU-100-4 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-100,nivel-R,comp-qa,,,To Do
+161,31,Subtask,101-T03 Endpoint `/me` con permisos efectivos y plataformas,"Hecho cuando: prueba devuelve permisos correctos para un usuario con dos roles
+Depende de: T01, 100-T05
+Cubre: FR-101-03, FR-101-04",,Highest,,spec-101,nivel-R,comp-backend,,,To Do
+162,31,Subtask,101-T04 Gancho de token con canales de Realtime,"Hecho cuando: el token de un REC trae `rol:REC` y `ambulancia`; el de PAC trae `usuario:<id>` y `publico`
+Depende de: T01
+Cubre: FR-101-14",,Highest,,spec-101,nivel-R,comp-backend,,,To Do
+163,31,Subtask,"101-T06-WEB Pantallas de ingreso y registro en web, Android e iOS (Web)","Hecho cuando: se ingresa con un usuario de cada rol en su plataforma y el paciente se registra en Android e iOS
+Depende de: T03, 120-T01, 121-T01, 122-T01
+Cubre: FR-101-01, FR-101-02, FR-101-15",,Highest,,spec-101,nivel-R,comp-web,,,To Do
+164,31,Subtask,"101-T06-AND Pantallas de ingreso y registro en web, Android e iOS (Android)","Hecho cuando: se ingresa con un usuario de cada rol en su plataforma y el paciente se registra en Android e iOS
+Depende de: T03, 120-T01, 121-T01, 122-T01
+Cubre: FR-101-01, FR-101-02, FR-101-15",,Highest,,spec-101,nivel-R,comp-android,,,To Do
+165,31,Subtask,"101-T06-IOS Pantallas de ingreso y registro en web, Android e iOS (iOS)","Hecho cuando: se ingresa con un usuario de cada rol en su plataforma y el paciente se registra en Android e iOS
+Depende de: T03, 120-T01, 121-T01, 122-T01
+Cubre: FR-101-01, FR-101-02, FR-101-15",,Highest,,spec-101,nivel-R,comp-ios,,,To Do
+166,31,Subtask,"HU-101-1-QA Casos de prueba y prueba manual de los criterios de HU-101-1 en Web, Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-101,nivel-R,comp-qa,,,To Do
+167,42,Subtask,"101-T05-BE Invitación de personal, asignación de roles y desactivación (Backend)","Hecho cuando: pruebas de autoasignación (403), último administrador (409) y cuenta desactivada (401)
+Depende de: T03
+Cubre: FR-101-05, FR-101-06, FR-101-07, FR-101-13",,High,,spec-101,nivel-R,comp-backend,,,To Do
+168,42,Subtask,"101-T05-WEB Invitación de personal, asignación de roles y desactivación (Web)","Hecho cuando: pruebas de autoasignación (403), último administrador (409) y cuenta desactivada (401)
+Depende de: T03
+Cubre: FR-101-05, FR-101-06, FR-101-07, FR-101-13",,High,,spec-101,nivel-R,comp-web,,,To Do
+169,42,Subtask,HU-101-2-QA Casos de prueba y prueba manual de los criterios de HU-101-2 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-101,nivel-R,comp-qa,,,To Do
+170,50,Subtask,101-T07-BE Vinculación de cuenta y verificación por recepción (Backend),"Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
+Depende de: T05, 102-T03
+Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11",,High,,spec-101,nivel-R,comp-backend,,,To Do
+171,50,Subtask,101-T07-WEB Vinculación de cuenta y verificación por recepción (Web),"Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
+Depende de: T05, 102-T03
+Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11",,High,,spec-101,nivel-R,comp-web,,,To Do
+172,50,Subtask,101-T07-AND Vinculación de cuenta y verificación por recepción (Android),"Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
+Depende de: T05, 102-T03
+Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11",,High,,spec-101,nivel-R,comp-android,,,To Do
+173,50,Subtask,101-T07-IOS Vinculación de cuenta y verificación por recepción (iOS),"Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
+Depende de: T05, 102-T03
+Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11",,High,,spec-101,nivel-R,comp-ios,,,To Do
+174,50,Subtask,"HU-101-3-QA Casos de prueba y prueba manual de los criterios de HU-101-3 en Web, Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-101,nivel-R,comp-qa,,,To Do
+175,93,Subtask,101-T08-BE Vigencia de inscripción en el perfil (Backend),"Hecho cuando: el perfil del médico muestra la fecha de vencimiento
+Depende de: 103-T05
+Cubre: FR-101-16",,Low,,spec-101,nivel-E,comp-backend,,,To Do
+176,93,Subtask,101-T08-AND Vigencia de inscripción en el perfil (Android),"Hecho cuando: el perfil del médico muestra la fecha de vencimiento
+Depende de: 103-T05
+Cubre: FR-101-16",,Low,,spec-101,nivel-E,comp-android,,,To Do
+177,93,Subtask,101-T08-IOS Vigencia de inscripción en el perfil (iOS),"Hecho cuando: el perfil del médico muestra la fecha de vencimiento
+Depende de: 103-T05
+Cubre: FR-101-16",,Low,,spec-101,nivel-E,comp-ios,,,To Do
+178,93,Subtask,"HU-101-4-QA Casos de prueba y prueba manual de los criterios de HU-101-4 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-101,nivel-R,comp-qa,,,To Do
+179,35,Subtask,"102-T02 Portar dominio: claves fonéticas, DUI, expediente, identidad provisional","Hecho cuando: pruebas de dominio del legado pasan en el módulo nuevo
+Depende de: T01
+Cubre: FR-102-04, FR-102-05",,Highest,,spec-102,nivel-R,comp-backend,,,To Do
+180,35,Subtask,"102-T03 CRUD: buscar, registrar tras buscar, ver, editar con historial, inactivar","Hecho cuando: escenarios 1, 2 y 4 pasan como pruebas de integración
+Depende de: T02, 100-T05
+Cubre: FR-102-01, FR-102-02, FR-102-06, FR-102-07, FR-102-08, FR-102-11",,Highest,,spec-102,nivel-R,comp-backend,,,To Do
+181,35,Subtask,102-T05-WEB Pantallas de pacientes en web (W26) y Android (A30) (Web),"Hecho cuando: recepción busca, registra y edita desde web y Android
+Depende de: T03, 120-T02, 121-T02
+Cubre: FR-102-01, FR-102-02",,Highest,,spec-102,nivel-R,comp-web,,,To Do
+182,35,Subtask,102-T05-AND Pantallas de pacientes en web (W26) y Android (A30) (Android),"Hecho cuando: recepción busca, registra y edita desde web y Android
+Depende de: T03, 120-T02, 121-T02
+Cubre: FR-102-01, FR-102-02",,Highest,,spec-102,nivel-R,comp-android,,,To Do
+183,35,Subtask,"HU-102-1-QA Casos de prueba y prueba manual de los criterios de HU-102-1 en Web, Android","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-102,nivel-R,comp-qa,,,To Do
+184,51,Subtask,102-T04 Filtrado de campos por permiso y contexto,"Hecho cuando: la misma ficha devuelve campos distintos para REC, LAB y PAC según `privacidad.md`
+Depende de: T03
+Cubre: FR-102-10",,High,,spec-102,nivel-R,comp-backend,,,To Do
+185,51,Subtask,110-T01 Servicio de contexto de acceso y filtrado de campos de la ficha,"Hecho cuando: escenario 3 pasa y la prueba por rol y campo de la ficha pasa
+Depende de: 100-T05, 102-T03
+Cubre: FR-110-01, FR-110-02, FR-110-03",,High,,spec-102,nivel-R,comp-backend,,,To Do
+186,51,Subtask,HU-102-2-QA Casos de prueba y prueba manual de los criterios de HU-102-2 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-102,nivel-R,comp-qa,,,To Do
+187,78,Subtask,102-T06-BE Registro provisional desde la app del paramédico (A73) (Backend),"Hecho cuando: escenario 3 pasa en Android
+Depende de: T03, 109-T04
+Cubre: FR-102-05",,High,,spec-102,nivel-R,comp-backend,,,To Do
+188,78,Subtask,102-T06-AND Registro provisional desde la app del paramédico (A73) (Android),"Hecho cuando: escenario 3 pasa en Android
+Depende de: T03, 109-T04
+Cubre: FR-102-05",,High,,spec-102,nivel-R,comp-android,,,To Do
+189,78,Subtask,HU-102-3-QA Casos de prueba y prueba manual de los criterios de HU-102-3 en Android,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-102,nivel-R,comp-qa,,,To Do
+190,94,Subtask,102-T07 Casos de posible duplicado,"Hecho cuando: un registro parecido abre caso y no fusiona
+Depende de: T03
+Cubre: FR-102-09",,Low,,spec-102,nivel-E,comp-backend,,,To Do
+191,94,Subtask,HU-102-4-QA Casos de prueba y prueba manual de los criterios de HU-102-4 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-102,nivel-R,comp-qa,,,To Do
+192,36,Subtask,103-T02 CRUD de personal (con y sin cuenta),"Hecho cuando: pruebas de crear, editar con versión e inactivar
+Depende de: T01, 100-T05
+Cubre: FR-103-01, FR-103-02",,Highest,,spec-103,nivel-R,comp-backend,,,To Do
+193,36,Subtask,"103-T04 Pantallas de personal en web (W07, W08)","Hecho cuando: el administrador crea y edita personal desde la web
+Depende de: T02, 120-T02
+Cubre: FR-103-01",,Highest,,spec-103,nivel-R,comp-web,,,To Do
+194,36,Subtask,HU-103-1-QA Casos de prueba y prueba manual de los criterios de HU-103-1 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-103,nivel-R,comp-qa,,,To Do
+195,43,Subtask,103-T03 Crear y mover turnos con duración y descanso por política,"Hecho cuando: escenarios 1, 2 y 3 pasan
+Depende de: T01
+Cubre: FR-103-04, FR-103-05, FR-103-06, FR-103-14",,High,,spec-103,nivel-R,comp-backend,,,To Do
+196,43,Subtask,"103-T06 Cobertura, publicación con advertencias y estados automáticos","Hecho cuando: escenario 4 pasa y un turno cambia a ""en curso"" con el reloj de prueba
+Depende de: T03
+Cubre: FR-103-08, FR-103-09, FR-103-13",,High,,spec-103,nivel-R,comp-backend,,,To Do
+197,43,Subtask,HU-103-2-QA Casos de prueba y prueba manual de los criterios de HU-103-2 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-103,nivel-R,comp-qa,,,To Do
+198,52,Subtask,"103-T07-WEB Planificador web (W16, W17) y mis turnos en Android e iOS (A26, I26) (Web)","Hecho cuando: un cambio de turno aparece en el teléfono de la persona sin recargar
+Depende de: T06, 121-T02, 122-T02
+Cubre: FR-103-11",,High,,spec-103,nivel-R,comp-web,,,To Do
+199,52,Subtask,"103-T07-AND Planificador web (W16, W17) y mis turnos en Android e iOS (A26, I26) (Android)","Hecho cuando: un cambio de turno aparece en el teléfono de la persona sin recargar
+Depende de: T06, 121-T02, 122-T02
+Cubre: FR-103-11",,High,,spec-103,nivel-R,comp-android,,,To Do
+200,52,Subtask,"103-T07-IOS Planificador web (W16, W17) y mis turnos en Android e iOS (A26, I26) (iOS)","Hecho cuando: un cambio de turno aparece en el teléfono de la persona sin recargar
+Depende de: T06, 121-T02, 122-T02
+Cubre: FR-103-11",,High,,spec-103,nivel-R,comp-ios,,,To Do
+201,52,Subtask,"HU-103-3-QA Casos de prueba y prueba manual de los criterios de HU-103-3 en Web, Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-103,nivel-R,comp-qa,,,To Do
+202,53,Subtask,103-T08 Médicos de turno públicos,"Hecho cuando: escenario 5 pasa contra `/publico/medicos-de-turno`
+Depende de: T06
+Cubre: FR-103-12",,High,,spec-103,nivel-R,comp-backend,,,To Do
+203,53,Subtask,HU-103-4-QA Casos de prueba y prueba manual de los criterios de HU-103-4 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-103,nivel-R,comp-qa,,,To Do
+204,44,Subtask,103-T05 Inscripciones y bloqueo de roles clínicos sin inscripción,"Hecho cuando: programar a un médico vencido se rechaza
+Depende de: T02
+Cubre: FR-103-03, FR-103-10",,High,,spec-103,nivel-E,comp-backend,,,To Do
+205,44,Subtask,HU-103-5-QA Casos de prueba y prueba manual de los criterios de HU-103-5 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-103,nivel-R,comp-qa,,,To Do
+206,95,Subtask,103-T09-BE Aviso de horas semanales con justificación (Backend),"Hecho cuando: el turno que pasa de 44 h pide justificación y se guarda
+Depende de: T03
+Cubre: FR-103-07",,Low,,spec-103,nivel-E,comp-backend,,,To Do
+207,95,Subtask,103-T09-WEB Aviso de horas semanales con justificación (Web),"Hecho cuando: el turno que pasa de 44 h pide justificación y se guarda
+Depende de: T03
+Cubre: FR-103-07",,Low,,spec-103,nivel-E,comp-web,,,To Do
+208,95,Subtask,HU-103-6-QA Casos de prueba y prueba manual de los criterios de HU-103-6 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-103,nivel-R,comp-qa,,,To Do
+209,45,Subtask,"104-T02 Consultas recursivas de árbol, ruta y disponibilidad","Hecho cuando: escenario 2 pasa con datos de ocupación de prueba
+Depende de: T01
+Cubre: FR-104-05, FR-104-13",,High,,spec-104,nivel-R,comp-backend,,,To Do
+210,45,Subtask,104-T04 Edición de espacios (ADM) con regla de capacidad bajo ocupación,"Hecho cuando: reducir capacidad de habitación ocupada responde 409
+Depende de: T01
+Cubre: FR-104-04",,High,,spec-104,nivel-R,comp-backend,,,To Do
+211,45,Subtask,HU-104-1-QA Casos de prueba y prueba manual de los criterios de HU-104-1 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-104,nivel-R,comp-qa,,,To Do
+212,54,Subtask,104-T03 Tablero de camas con estados y ocupante según permiso,"Hecho cuando: REC ve nombres, ENF de otra planta ve iniciales
+Depende de: T02, 108-T01
+Cubre: FR-104-06, FR-104-08",,High,,spec-104,nivel-R,comp-backend,,,To Do
+213,54,Subtask,104-T05 Pantallas W09 (árbol) y W12 (plano por planta) en web,"Hecho cuando: se ven las plantas 2 y 3 con sus 17 camas y estados
+Depende de: T03, 120-T02
+Cubre: FR-104-05, FR-104-06",,High,,spec-104,nivel-R,comp-web,,,To Do
+214,54,Subtask,HU-104-2-QA Casos de prueba y prueba manual de los criterios de HU-104-2 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-104,nivel-R,comp-qa,,,To Do
+215,71,Subtask,"104-T06-BE Bloqueo, limpieza y verificación con eventos en vivo (Backend)","Hecho cuando: escenario 3 pasa en Android con el tablero web abierto
+Depende de: T03
+Cubre: FR-104-07, FR-104-09, FR-104-10, FR-104-11",,High,,spec-104,nivel-R,comp-backend,,,To Do
+216,71,Subtask,"104-T06-AND Bloqueo, limpieza y verificación con eventos en vivo (Android)","Hecho cuando: escenario 3 pasa en Android con el tablero web abierto
+Depende de: T03
+Cubre: FR-104-07, FR-104-09, FR-104-10, FR-104-11",,High,,spec-104,nivel-R,comp-android,,,To Do
+217,71,Subtask,HU-104-3-QA Casos de prueba y prueba manual de los criterios de HU-104-3 en Android,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-104,nivel-R,comp-qa,,,To Do
+218,96,Subtask,104-T07-BE Equipo médico por espacio (Backend),"Hecho cuando: un monitor pasa a mantenimiento y se ve en W24
+Depende de: T01
+Cubre: FR-104-12",,Low,,spec-104,nivel-E,comp-backend,,,To Do
+219,96,Subtask,104-T07-WEB Equipo médico por espacio (Web),"Hecho cuando: un monitor pasa a mantenimiento y se ve en W24
+Depende de: T01
+Cubre: FR-104-12",,Low,,spec-104,nivel-E,comp-web,,,To Do
+220,96,Subtask,HU-104-4-QA Casos de prueba y prueba manual de los criterios de HU-104-4 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-104,nivel-R,comp-qa,,,To Do
+221,55,Subtask,"105-T02 Emitir, llamar y cambiar estado de números con reinicio diario","Hecho cuando: pruebas de transiciones válidas e inválidas y de cambio de día
+Depende de: T01
+Cubre: FR-105-01, FR-105-02, FR-105-03, FR-105-04",,High,,spec-105,nivel-R,comp-backend,,,To Do
+222,55,Subtask,105-T03-AND Mi número en la app del paciente y fila del consultorio (Android),"Hecho cuando: escenario 2 pasa en Android e iOS
+Depende de: T02, 121-T03, 122-T03
+Cubre: FR-105-06",,High,,spec-105,nivel-R,comp-android,,,To Do
+223,55,Subtask,105-T03-IOS Mi número en la app del paciente y fila del consultorio (iOS),"Hecho cuando: escenario 2 pasa en Android e iOS
+Depende de: T02, 121-T03, 122-T03
+Cubre: FR-105-06",,High,,spec-105,nivel-R,comp-ios,,,To Do
+224,55,Subtask,"HU-105-1-QA Casos de prueba y prueba manual de los criterios de HU-105-1 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-105,nivel-R,comp-qa,,,To Do
+225,56,Subtask,"105-T04-BE Agenda, disponibilidad, agendar y cancelar (Backend)","Hecho cuando: recepción agenda desde web y Android; paciente cancela dentro y fuera del plazo
+Depende de: T01, 103-T06
+Cubre: FR-105-07, FR-105-09, FR-105-10, FR-105-12",,High,,spec-105,nivel-R,comp-backend,,,To Do
+226,56,Subtask,"105-T04-WEB Agenda, disponibilidad, agendar y cancelar (Web)","Hecho cuando: recepción agenda desde web y Android; paciente cancela dentro y fuera del plazo
+Depende de: T01, 103-T06
+Cubre: FR-105-07, FR-105-09, FR-105-10, FR-105-12",,High,,spec-105,nivel-R,comp-web,,,To Do
+227,56,Subtask,"105-T04-AND Agenda, disponibilidad, agendar y cancelar (Android)","Hecho cuando: recepción agenda desde web y Android; paciente cancela dentro y fuera del plazo
+Depende de: T01, 103-T06
+Cubre: FR-105-07, FR-105-09, FR-105-10, FR-105-12",,High,,spec-105,nivel-R,comp-android,,,To Do
+228,56,Subtask,"HU-105-2-QA Casos de prueba y prueba manual de los criterios de HU-105-2 en Web, Android","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-105,nivel-R,comp-qa,,,To Do
+229,81,Subtask,105-T05-BE Solicitudes de cita del paciente y su confirmación (Backend),"Hecho cuando: escenario 3 pasa
+Depende de: T04, 101-T07
+Cubre: FR-105-08",,High,,spec-105,nivel-R,comp-backend,,,To Do
+230,81,Subtask,105-T05-WEB Solicitudes de cita del paciente y su confirmación (Web),"Hecho cuando: escenario 3 pasa
+Depende de: T04, 101-T07
+Cubre: FR-105-08",,High,,spec-105,nivel-R,comp-web,,,To Do
+231,81,Subtask,105-T05-AND Solicitudes de cita del paciente y su confirmación (Android),"Hecho cuando: escenario 3 pasa
+Depende de: T04, 101-T07
+Cubre: FR-105-08",,High,,spec-105,nivel-R,comp-android,,,To Do
+232,81,Subtask,105-T05-IOS Solicitudes de cita del paciente y su confirmación (iOS),"Hecho cuando: escenario 3 pasa
+Depende de: T04, 101-T07
+Cubre: FR-105-08",,High,,spec-105,nivel-R,comp-ios,,,To Do
+233,81,Subtask,"HU-105-3-QA Casos de prueba y prueba manual de los criterios de HU-105-3 en Web, Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-105,nivel-R,comp-qa,,,To Do
+234,97,Subtask,"105-T06-BE Pantalla pública de llamados y ""no se presentó"" automático (Backend)","Hecho cuando: tres llamados sin presentarse cambian el estado; la pantalla pública no muestra nombres
+Depende de: T02, 112-T02
+Cubre: FR-105-05, FR-105-11, FR-112-06",,Low,,spec-105,nivel-E,comp-backend,,,To Do
+235,97,Subtask,"105-T06-WEB Pantalla pública de llamados y ""no se presentó"" automático (Web)","Hecho cuando: tres llamados sin presentarse cambian el estado; la pantalla pública no muestra nombres
+Depende de: T02, 112-T02
+Cubre: FR-105-05, FR-105-11, FR-112-06",,Low,,spec-105,nivel-E,comp-web,,,To Do
+236,97,Subtask,HU-105-4-QA Casos de prueba y prueba manual de los criterios de HU-105-4 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-105,nivel-R,comp-qa,,,To Do
+237,57,Subtask,"106-T02 Iniciar consulta, signos, diagnósticos, recetas y órdenes","Hecho cuando: pruebas de cada sección y de relación de atención creada
+Depende de: T01, 105-T02
+Cubre: FR-106-01, FR-106-02, FR-106-03, FR-106-04, FR-106-05",,High,,spec-106,nivel-R,comp-backend,,,To Do
+238,57,Subtask,"106-T05-AND Pantallas de consulta en Android e iOS (A21, I21) y signos (A41) (Android)","Hecho cuando: escenario 1 pasa en ambas plataformas
+Depende de: T02, 121-T03, 122-T03
+Cubre: FR-106-01, FR-106-02, FR-106-03, FR-106-04, FR-106-05, FR-106-06",,High,,spec-106,nivel-R,comp-android,,,To Do
+239,57,Subtask,"106-T05-IOS Pantallas de consulta en Android e iOS (A21, I21) y signos (A41) (iOS)","Hecho cuando: escenario 1 pasa en ambas plataformas
+Depende de: T02, 121-T03, 122-T03
+Cubre: FR-106-01, FR-106-02, FR-106-03, FR-106-04, FR-106-05, FR-106-06",,High,,spec-106,nivel-R,comp-ios,,,To Do
+240,57,Subtask,"HU-106-1-QA Casos de prueba y prueba manual de los criterios de HU-106-1 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-106,nivel-R,comp-qa,,,To Do
+241,58,Subtask,106-T03 Firma con inscripción vigente y bloqueo de edición,"Hecho cuando: escenarios 2 y 3 pasan
+Depende de: T02, 103-T05
+Cubre: FR-106-06, FR-106-07",,High,,spec-106,nivel-R,comp-backend,,,To Do
+242,58,Subtask,HU-106-2-QA Casos de prueba y prueba manual de los criterios de HU-106-2 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-106,nivel-R,comp-qa,,,To Do
+243,59,Subtask,106-T04-BE Historial clínico del médico y del paciente con auditoría (Backend),"Hecho cuando: el paciente ve su consulta firmada en Android e iOS y la lectura queda auditada
+Depende de: T03
+Cubre: FR-106-09, FR-106-10, FR-106-12",,High,,spec-106,nivel-R,comp-backend,,,To Do
+244,59,Subtask,106-T04-AND Historial clínico del médico y del paciente con auditoría (Android),"Hecho cuando: el paciente ve su consulta firmada en Android e iOS y la lectura queda auditada
+Depende de: T03
+Cubre: FR-106-09, FR-106-10, FR-106-12",,High,,spec-106,nivel-R,comp-android,,,To Do
+245,59,Subtask,106-T04-IOS Historial clínico del médico y del paciente con auditoría (iOS),"Hecho cuando: el paciente ve su consulta firmada en Android e iOS y la lectura queda auditada
+Depende de: T03
+Cubre: FR-106-09, FR-106-10, FR-106-12",,High,,spec-106,nivel-R,comp-ios,,,To Do
+246,59,Subtask,"HU-106-3-QA Casos de prueba y prueba manual de los criterios de HU-106-3 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-106,nivel-R,comp-qa,,,To Do
+247,72,Subtask,106-T06-BE Indicar hospitalización desde la consulta (Backend),"Hecho cuando: la indicación aparece en admisiones con origen consulta
+Depende de: T03, 108-T02
+Cubre: FR-106-11",,High,,spec-106,nivel-R,comp-backend,,,To Do
+248,72,Subtask,106-T06-AND Indicar hospitalización desde la consulta (Android),"Hecho cuando: la indicación aparece en admisiones con origen consulta
+Depende de: T03, 108-T02
+Cubre: FR-106-11",,High,,spec-106,nivel-R,comp-android,,,To Do
+249,72,Subtask,106-T06-IOS Indicar hospitalización desde la consulta (iOS),"Hecho cuando: la indicación aparece en admisiones con origen consulta
+Depende de: T03, 108-T02
+Cubre: FR-106-11",,High,,spec-106,nivel-R,comp-ios,,,To Do
+250,72,Subtask,"HU-106-4-QA Casos de prueba y prueba manual de los criterios de HU-106-4 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-106,nivel-R,comp-qa,,,To Do
+251,98,Subtask,106-T07-BE Addendum con original conservado (Backend),"Hecho cuando: el historial muestra original y addendum
+Depende de: T03
+Cubre: FR-106-08",,Low,,spec-106,nivel-E,comp-backend,,,To Do
+252,98,Subtask,106-T07-AND Addendum con original conservado (Android),"Hecho cuando: el historial muestra original y addendum
+Depende de: T03
+Cubre: FR-106-08",,Low,,spec-106,nivel-E,comp-android,,,To Do
+253,98,Subtask,106-T07-IOS Addendum con original conservado (iOS),"Hecho cuando: el historial muestra original y addendum
+Depende de: T03
+Cubre: FR-106-08",,Low,,spec-106,nivel-E,comp-ios,,,To Do
+254,98,Subtask,"HU-106-5-QA Casos de prueba y prueba manual de los criterios de HU-106-5 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-106,nivel-R,comp-qa,,,To Do
+255,60,Subtask,107-T02 Crear orden desde consulta con expansión recursiva,"Hecho cuando: escenario 3 pasa
+Depende de: T01, 106-T02
+Cubre: FR-107-02, FR-107-04",,High,,spec-107,nivel-R,comp-backend,,,To Do
+256,60,Subtask,"107-T03 Muestra, captura con marcas, completar y cancelar","Hecho cuando: escenarios 1 (hasta Completado) y 4 pasan
+Depende de: T02
+Cubre: FR-107-05, FR-107-06, FR-107-07, FR-107-09, FR-107-13",,High,,spec-107,nivel-R,comp-backend,,,To Do
+257,60,Subtask,"107-T04-WEB Cola y captura en web (W20, W21) y Android (A60 a A62) (Web)","Hecho cuando: una orden recorre los tres estados desde web y desde Android con la cola en vivo
+Depende de: T03, 120-T03, 121-T03
+Cubre: FR-107-04, FR-107-05, FR-107-06, FR-107-07",,High,,spec-107,nivel-R,comp-web,,,To Do
+258,60,Subtask,"107-T04-AND Cola y captura en web (W20, W21) y Android (A60 a A62) (Android)","Hecho cuando: una orden recorre los tres estados desde web y desde Android con la cola en vivo
+Depende de: T03, 120-T03, 121-T03
+Cubre: FR-107-04, FR-107-05, FR-107-06, FR-107-07",,High,,spec-107,nivel-R,comp-android,,,To Do
+259,60,Subtask,"HU-107-1-QA Casos de prueba y prueba manual de los criterios de HU-107-1 en Web, Android","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-107,nivel-R,comp-qa,,,To Do
+260,80,Subtask,107-T05-BE Revisión médica y vista del paciente (Backend),"Hecho cuando: escenario 1 completo pasa en iOS y Android
+Depende de: T03
+Cubre: FR-107-10, FR-107-11",,High,,spec-107,nivel-R,comp-backend,,,To Do
+261,80,Subtask,107-T05-AND Revisión médica y vista del paciente (Android),"Hecho cuando: escenario 1 completo pasa en iOS y Android
+Depende de: T03
+Cubre: FR-107-10, FR-107-11",,High,,spec-107,nivel-R,comp-android,,,To Do
+262,80,Subtask,107-T05-IOS Revisión médica y vista del paciente (iOS),"Hecho cuando: escenario 1 completo pasa en iOS y Android
+Depende de: T03
+Cubre: FR-107-10, FR-107-11",,High,,spec-107,nivel-R,comp-ios,,,To Do
+263,80,Subtask,"HU-107-2-QA Casos de prueba y prueba manual de los criterios de HU-107-2 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-107,nivel-R,comp-qa,,,To Do
+264,89,Subtask,107-T06-BE Aviso de valor crítico con push (Backend),"Hecho cuando: escenario 2 pasa y el médico recibe push con la app cerrada
+Depende de: T03, 100-T10
+Cubre: FR-107-08",,Medium,,spec-107,nivel-E,comp-backend,,,To Do
+265,89,Subtask,107-T06-AND Aviso de valor crítico con push (Android),"Hecho cuando: escenario 2 pasa y el médico recibe push con la app cerrada
+Depende de: T03, 100-T10
+Cubre: FR-107-08",,Medium,,spec-107,nivel-E,comp-android,,,To Do
+266,89,Subtask,107-T06-IOS Aviso de valor crítico con push (iOS),"Hecho cuando: escenario 2 pasa y el médico recibe push con la app cerrada
+Depende de: T03, 100-T10
+Cubre: FR-107-08",,Medium,,spec-107,nivel-E,comp-ios,,,To Do
+267,89,Subtask,"HU-107-3-QA Casos de prueba y prueba manual de los criterios de HU-107-3 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Medium,,spec-107,nivel-R,comp-qa,,,To Do
+268,99,Subtask,107-T07 Corrección de valores con historial,"Hecho cuando: el valor anterior queda visible para el médico
+Depende de: T03
+Cubre: FR-107-12",,Low,,spec-107,nivel-E,comp-backend,,,To Do
+269,99,Subtask,HU-107-4-QA Casos de prueba y prueba manual de los criterios de HU-107-4 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-107,nivel-R,comp-qa,,,To Do
+270,67,Subtask,108-T02 Crear admisión con origen y unicidad por paciente,"Hecho cuando: segunda admisión activa del mismo paciente responde 409
+Depende de: T01, 102-T03
+Cubre: FR-108-01, FR-108-02",,High,,spec-108,nivel-R,comp-backend,,,To Do
+271,67,Subtask,108-T03 Algoritmo de sugerencias en dominio con pruebas unitarias,"Hecho cuando: los 10 casos de la tabla de reglas pasan, incluido el escenario 1
+Depende de: T01
+Cubre: FR-108-03, FR-108-04",,High,,spec-108,nivel-R,comp-backend,,,To Do
+272,67,Subtask,HU-108-1-QA Casos de prueba y prueba manual de los criterios de HU-108-1 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-108,nivel-R,comp-qa,,,To Do
+273,68,Subtask,"108-T04 Asignación con bloqueo de habitación, aislamiento y conflictos","Hecho cuando: escenarios 2 y 3 y la prueba de sexo opuesto concurrente pasan
+Depende de: T03
+Cubre: FR-108-05, FR-108-06, FR-108-07, FR-108-08",,High,,spec-108,nivel-R,comp-backend,,,To Do
+274,68,Subtask,108-T07-WEB Pantallas de admisión en web (W13 a W15) y Android (A34) (Web),"Hecho cuando: el flujo completo funciona en web y Android con conflicto visible
+Depende de: T04, 120-T03, 121-T03
+Cubre: FR-108-03, FR-108-06, FR-108-14",,High,,spec-108,nivel-R,comp-web,,,To Do
+275,68,Subtask,108-T07-AND Pantallas de admisión en web (W13 a W15) y Android (A34) (Android),"Hecho cuando: el flujo completo funciona en web y Android con conflicto visible
+Depende de: T04, 120-T03, 121-T03
+Cubre: FR-108-03, FR-108-06, FR-108-14",,High,,spec-108,nivel-R,comp-android,,,To Do
+276,68,Subtask,"HU-108-2-QA Casos de prueba y prueba manual de los criterios de HU-108-2 en Web, Android","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-108,nivel-R,comp-qa,,,To Do
+277,69,Subtask,108-T05-BE Traslados con regla VIP (Backend),"Hecho cuando: escenario 4 pasa y un traslado semiprivado deja la cama anterior en limpieza
+Depende de: T04
+Cubre: FR-108-10, FR-108-11",,High,,spec-108,nivel-R,comp-backend,,,To Do
+278,69,Subtask,108-T05-WEB Traslados con regla VIP (Web),"Hecho cuando: escenario 4 pasa y un traslado semiprivado deja la cama anterior en limpieza
+Depende de: T04
+Cubre: FR-108-10, FR-108-11",,High,,spec-108,nivel-R,comp-web,,,To Do
+279,69,Subtask,HU-108-3-QA Casos de prueba y prueba manual de los criterios de HU-108-3 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-108,nivel-R,comp-qa,,,To Do
+280,70,Subtask,108-T06 Alta y salida física,"Hecho cuando: escenario 5 pasa
+Depende de: T04, 103-T05
+Cubre: FR-108-12, FR-108-13",,High,,spec-108,nivel-R,comp-backend,,,To Do
+281,70,Subtask,108-T08-BE Mis hospitalizados del médico y mi planta de enfermería (Backend),"Hecho cuando: el médico ve solo los suyos y enfermería solo su área
+Depende de: T06
+Cubre: FR-108-14",,High,,spec-108,nivel-R,comp-backend,,,To Do
+282,70,Subtask,108-T08-AND Mis hospitalizados del médico y mi planta de enfermería (Android),"Hecho cuando: el médico ve solo los suyos y enfermería solo su área
+Depende de: T06
+Cubre: FR-108-14",,High,,spec-108,nivel-R,comp-android,,,To Do
+283,70,Subtask,108-T08-IOS Mis hospitalizados del médico y mi planta de enfermería (iOS),"Hecho cuando: el médico ve solo los suyos y enfermería solo su área
+Depende de: T06
+Cubre: FR-108-14",,High,,spec-108,nivel-R,comp-ios,,,To Do
+284,70,Subtask,"HU-108-4-QA Casos de prueba y prueba manual de los criterios de HU-108-4 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-108,nivel-R,comp-qa,,,To Do
+285,100,Subtask,108-T09 Reserva para admisión programada con vencimiento,"Hecho cuando: una reserva vence con el reloj de prueba y la cama vuelve a libre
+Depende de: T04
+Cubre: FR-108-09",,Low,,spec-108,nivel-E,comp-backend,,,To Do
+286,100,Subtask,HU-108-5-QA Casos de prueba y prueba manual de los criterios de HU-108-5 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-108,nivel-R,comp-qa,,,To Do
+287,101,Subtask,108-T10-BE Notas y signos de enfermería del hospitalizado (Backend),"Hecho cuando: enfermería del área registra y el médico lo ve
+Depende de: T08
+Cubre: FR-108-16",,Low,,spec-108,nivel-E,comp-backend,,,To Do
+288,101,Subtask,108-T10-AND Notas y signos de enfermería del hospitalizado (Android),"Hecho cuando: enfermería del área registra y el médico lo ve
+Depende de: T08
+Cubre: FR-108-16",,Low,,spec-108,nivel-E,comp-android,,,To Do
+289,101,Subtask,HU-108-6-QA Casos de prueba y prueba manual de los criterios de HU-108-6 en Android,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-108,nivel-R,comp-qa,,,To Do
+290,46,Subtask,109-T02 Estado de la unidad visible en vivo y regla de paramédico de turno,"Hecho cuando: escenario 2 pasa
+Depende de: T01, 103-T06
+Cubre: FR-109-01, FR-109-06",,High,,spec-109,nivel-R,comp-backend,,,To Do
+291,46,Subtask,HU-109-1-QA Casos de prueba y prueba manual de los criterios de HU-109-1 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-109,nivel-R,comp-qa,,,To Do
+292,73,Subtask,"109-T03 Solicitudes del paciente y por teléfono, confirmación y despacho con bloqueo","Hecho cuando: escenario 1 pasa como prueba concurrente
+Depende de: T02, 101-T07
+Cubre: FR-109-02, FR-109-03, FR-109-04, FR-109-05",,High,,spec-109,nivel-R,comp-backend,,,To Do
+293,73,Subtask,HU-109-2-QA Casos de prueba y prueba manual de los criterios de HU-109-2 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-109,nivel-R,comp-qa,,,To Do
+294,74,Subtask,"109-T04 Hitos, finalización y mantenimiento","Hecho cuando: un servicio completo vuelve la unidad a Disponible y mantenimiento con servicio activo se rechaza
+Depende de: T03
+Cubre: FR-109-07, FR-109-08, FR-109-09, FR-109-12",,High,,spec-109,nivel-R,comp-backend,,,To Do
+295,74,Subtask,"109-T05-WEB Centro de despacho web (W18) y app de la tripulación (A70, A71, A73) (Web)","Hecho cuando: un servicio se opera de punta a punta entre web y Android en vivo
+Depende de: T04, 120-T03, 121-T03
+Cubre: FR-109-01, FR-109-04, FR-109-07",,High,,spec-109,nivel-R,comp-web,,,To Do
+296,74,Subtask,"109-T05-AND Centro de despacho web (W18) y app de la tripulación (A70, A71, A73) (Android)","Hecho cuando: un servicio se opera de punta a punta entre web y Android en vivo
+Depende de: T04, 120-T03, 121-T03
+Cubre: FR-109-01, FR-109-04, FR-109-07",,High,,spec-109,nivel-R,comp-android,,,To Do
+297,74,Subtask,"HU-109-3-QA Casos de prueba y prueba manual de los criterios de HU-109-3 en Web, Android","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-109,nivel-R,comp-qa,,,To Do
+298,75,Subtask,"109-T06-AND Seguimiento del paciente en Android e iOS (A09, I09) (Android)","Hecho cuando: escenario 4 pasa
+Depende de: T03, 122-T03
+Cubre: FR-109-16",,High,,spec-109,nivel-R,comp-android,,,To Do
+299,75,Subtask,"109-T06-IOS Seguimiento del paciente en Android e iOS (A09, I09) (iOS)","Hecho cuando: escenario 4 pasa
+Depende de: T03, 122-T03
+Cubre: FR-109-16",,High,,spec-109,nivel-R,comp-ios,,,To Do
+300,75,Subtask,"HU-109-4-QA Casos de prueba y prueba manual de los criterios de HU-109-4 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-109,nivel-R,comp-qa,,,To Do
+301,76,Subtask,"109-T07-BE Bitácora con filtros y privacidad (W19, A74) (Backend)","Hecho cuando: escenario 5 pasa
+Depende de: T04
+Cubre: FR-109-14, FR-109-15",,High,,spec-109,nivel-R,comp-backend,,,To Do
+302,76,Subtask,"109-T07-WEB Bitácora con filtros y privacidad (W19, A74) (Web)","Hecho cuando: escenario 5 pasa
+Depende de: T04
+Cubre: FR-109-14, FR-109-15",,High,,spec-109,nivel-R,comp-web,,,To Do
+303,76,Subtask,"109-T07-AND Bitácora con filtros y privacidad (W19, A74) (Android)","Hecho cuando: escenario 5 pasa
+Depende de: T04
+Cubre: FR-109-14, FR-109-15",,High,,spec-109,nivel-R,comp-android,,,To Do
+304,76,Subtask,"HU-109-5-QA Casos de prueba y prueba manual de los criterios de HU-109-5 en Web, Android","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-109,nivel-R,comp-qa,,,To Do
+305,77,Subtask,109-T08 Admisión con origen ambulancia,"Hecho cuando: un servicio ""en hospital"" crea admisión con su referencia
+Depende de: T04, 108-T02
+Cubre: FR-109-17",,High,,spec-109,nivel-R,comp-backend,,,To Do
+306,77,Subtask,HU-109-6-QA Casos de prueba y prueba manual de los criterios de HU-109-6 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-109,nivel-R,comp-qa,,,To Do
+307,90,Subtask,109-T09-BE Reporte prehospital con cola sin conexión y recepción en emergencia (Backend),"Hecho cuando: escenario 3 pasa en modo avión
+Depende de: T04
+Cubre: FR-109-10, FR-109-11",,Medium,,spec-109,nivel-E,comp-backend,,,To Do
+308,90,Subtask,109-T09-AND Reporte prehospital con cola sin conexión y recepción en emergencia (Android),"Hecho cuando: escenario 3 pasa en modo avión
+Depende de: T04
+Cubre: FR-109-10, FR-109-11",,Medium,,spec-109,nivel-E,comp-android,,,To Do
+309,90,Subtask,121-T04 Cola sin conexión del paramédico,"Hecho cuando: escenario 3 de la spec 109 pasa en modo avión
+Depende de: T03, 109-T04
+Cubre: FR-121-06, FR-121-08",,Medium,,spec-109,nivel-E,comp-android,,,To Do
+310,90,Subtask,HU-109-7-QA Casos de prueba y prueba manual de los criterios de HU-109-7 en Android,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Medium,,spec-109,nivel-R,comp-qa,,,To Do
+311,102,Subtask,109-T10-BE Ubicación en vivo y mapa (Backend),"Hecho cuando: el punto se mueve en el mapa web mientras el teléfono se desplaza
+Depende de: T05
+Cubre: FR-109-13",,Low,,spec-109,nivel-E,comp-backend,,,To Do
+312,102,Subtask,109-T10-WEB Ubicación en vivo y mapa (Web),"Hecho cuando: el punto se mueve en el mapa web mientras el teléfono se desplaza
+Depende de: T05
+Cubre: FR-109-13",,Low,,spec-109,nivel-E,comp-web,,,To Do
+313,102,Subtask,109-T10-AND Ubicación en vivo y mapa (Android),"Hecho cuando: el punto se mueve en el mapa web mientras el teléfono se desplaza
+Depende de: T05
+Cubre: FR-109-13",,Low,,spec-109,nivel-E,comp-android,,,To Do
+314,102,Subtask,"HU-109-8-QA Casos de prueba y prueba manual de los criterios de HU-109-8 en Web, Android","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-109,nivel-R,comp-qa,,,To Do
+315,61,Subtask,110-T02 Contexto clínico: relación de atención y área de turno,"Hecho cuando: escenario 1 pasa
+Depende de: T01, 106-T02, 103-T06
+Cubre: FR-110-01, FR-110-03",,High,,spec-110,nivel-R,comp-backend,,,To Do
+316,61,Subtask,HU-110-1-QA Casos de prueba y prueba manual de los criterios de HU-110-1 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-110,nivel-R,comp-qa,,,To Do
+317,79,Subtask,110-T03 Accesos excepcionales con aprobación del delegado y vencimiento,"Hecho cuando: escenario 2 pasa con el reloj de prueba
+Depende de: T02
+Cubre: FR-110-04, FR-110-05, FR-110-06",,High,,spec-110,nivel-R,comp-backend,,,To Do
+318,79,Subtask,"110-T05-WEB Pantallas de accesos (W30, W31) y estado ""sin permiso"" con pedir acceso (Web)","Hecho cuando: el flujo completo funciona entre web y móvil
+Depende de: T03
+Cubre: FR-110-04, FR-110-05",,High,,spec-110,nivel-R,comp-web,,,To Do
+319,79,Subtask,"110-T05-AND Pantallas de accesos (W30, W31) y estado ""sin permiso"" con pedir acceso (Android)","Hecho cuando: el flujo completo funciona entre web y móvil
+Depende de: T03
+Cubre: FR-110-04, FR-110-05",,High,,spec-110,nivel-R,comp-android,,,To Do
+320,79,Subtask,"110-T05-IOS Pantallas de accesos (W30, W31) y estado ""sin permiso"" con pedir acceso (iOS)","Hecho cuando: el flujo completo funciona entre web y móvil
+Depende de: T03
+Cubre: FR-110-04, FR-110-05",,High,,spec-110,nivel-R,comp-ios,,,To Do
+321,79,Subtask,"HU-110-2-QA Casos de prueba y prueba manual de los criterios de HU-110-2 en Web, Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-110,nivel-R,comp-qa,,,To Do
+322,62,Subtask,110-T04-BE Auditoría consultable y verificación de la cadena (W32) (Backend),"Hecho cuando: el delegado detecta un registro alterado desde la web
+Depende de: 100-T02, 120-T03
+Cubre: FR-110-07",,High,,spec-110,nivel-R,comp-backend,,,To Do
+323,62,Subtask,110-T04-WEB Auditoría consultable y verificación de la cadena (W32) (Web),"Hecho cuando: el delegado detecta un registro alterado desde la web
+Depende de: 100-T02, 120-T03
+Cubre: FR-110-07",,High,,spec-110,nivel-R,comp-web,,,To Do
+324,62,Subtask,HU-110-3-QA Casos de prueba y prueba manual de los criterios de HU-110-3 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-110,nivel-R,comp-qa,,,To Do
+325,103,Subtask,110-T07-BE Quién vio mi expediente (Backend),"Hecho cuando: escenario 4 pasa en Android e iOS
+Depende de: T02
+Cubre: FR-110-08",,Low,,spec-110,nivel-E,comp-backend,,,To Do
+326,103,Subtask,110-T07-AND Quién vio mi expediente (Android),"Hecho cuando: escenario 4 pasa en Android e iOS
+Depende de: T02
+Cubre: FR-110-08",,Low,,spec-110,nivel-E,comp-android,,,To Do
+327,103,Subtask,110-T07-IOS Quién vio mi expediente (iOS),"Hecho cuando: escenario 4 pasa en Android e iOS
+Depende de: T02
+Cubre: FR-110-08",,Low,,spec-110,nivel-E,comp-ios,,,To Do
+328,103,Subtask,"HU-110-4-QA Casos de prueba y prueba manual de los criterios de HU-110-4 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-110,nivel-R,comp-qa,,,To Do
+329,104,Subtask,110-T08-BE Romper el vidrio en emergencia (Backend),"Hecho cuando: el acceso inmediato queda pendiente de revisión del delegado
+Depende de: T03
+Cubre: FR-110-09",,Low,,spec-110,nivel-E,comp-backend,,,To Do
+330,104,Subtask,110-T08-AND Romper el vidrio en emergencia (Android),"Hecho cuando: el acceso inmediato queda pendiente de revisión del delegado
+Depende de: T03
+Cubre: FR-110-09",,Low,,spec-110,nivel-E,comp-android,,,To Do
+331,104,Subtask,110-T08-IOS Romper el vidrio en emergencia (iOS),"Hecho cuando: el acceso inmediato queda pendiente de revisión del delegado
+Depende de: T03
+Cubre: FR-110-09",,Low,,spec-110,nivel-E,comp-ios,,,To Do
+332,104,Subtask,"HU-110-5-QA Casos de prueba y prueba manual de los criterios de HU-110-5 en Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-110,nivel-R,comp-qa,,,To Do
+333,63,Subtask,111-T02 Movimientos atómicos sin negativos y sin lotes vencidos,"Hecho cuando: escenario 1 pasa como prueba concurrente
+Depende de: T01
+Cubre: FR-111-03, FR-111-04, FR-111-05, FR-111-08",,High,,spec-111,nivel-R,comp-backend,,,To Do
+334,63,Subtask,"111-T03-BE Alerta de mínimo en vivo y pantallas W22, W23 (Backend)","Hecho cuando: escenario 2 pasa
+Depende de: T02, 120-T03
+Cubre: FR-111-06",,High,,spec-111,nivel-R,comp-backend,,,To Do
+335,63,Subtask,"111-T03-WEB Alerta de mínimo en vivo y pantallas W22, W23 (Web)","Hecho cuando: escenario 2 pasa
+Depende de: T02, 120-T03
+Cubre: FR-111-06",,High,,spec-111,nivel-R,comp-web,,,To Do
+336,63,Subtask,HU-111-1-QA Casos de prueba y prueba manual de los criterios de HU-111-1 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-111,nivel-R,comp-qa,,,To Do
+337,105,Subtask,111-T04 Consumo desde enfermería y laboratorio (A53),"Hecho cuando: un consumo desde Android baja la existencia y aparece en el historial
+Depende de: T02, 121-T03
+Cubre: FR-111-07",,Low,,spec-111,nivel-E,comp-android,,,To Do
+338,105,Subtask,HU-111-2-QA Casos de prueba y prueba manual de los criterios de HU-111-2 en Android,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-111,nivel-R,comp-qa,,,To Do
+339,64,Subtask,112-T01 Vistas públicas y endpoints sin sesión con prueba de ausencia de datos personales,"Hecho cuando: escenario 1 pasa
+Depende de: 104-T02, 103-T08
+Cubre: FR-112-01, FR-112-02",,High,,spec-112,nivel-R,comp-backend,,,To Do
+340,64,Subtask,"112-T02-BE Avisos con vigencia y pantalla pública en vivo (W25, W34) (Backend)","Hecho cuando: escenario 2 pasa en la pantalla pública y en las apps (A10, I10)
+Depende de: T01, 120-T03
+Cubre: FR-112-03, FR-112-04",,High,,spec-112,nivel-R,comp-backend,,,To Do
+341,64,Subtask,"112-T02-WEB Avisos con vigencia y pantalla pública en vivo (W25, W34) (Web)","Hecho cuando: escenario 2 pasa en la pantalla pública y en las apps (A10, I10)
+Depende de: T01, 120-T03
+Cubre: FR-112-03, FR-112-04",,High,,spec-112,nivel-R,comp-web,,,To Do
+342,64,Subtask,"112-T02-AND Avisos con vigencia y pantalla pública en vivo (W25, W34) (Android)","Hecho cuando: escenario 2 pasa en la pantalla pública y en las apps (A10, I10)
+Depende de: T01, 120-T03
+Cubre: FR-112-03, FR-112-04",,High,,spec-112,nivel-R,comp-android,,,To Do
+343,64,Subtask,"112-T02-IOS Avisos con vigencia y pantalla pública en vivo (W25, W34) (iOS)","Hecho cuando: escenario 2 pasa en la pantalla pública y en las apps (A10, I10)
+Depende de: T01, 120-T03
+Cubre: FR-112-03, FR-112-04",,High,,spec-112,nivel-R,comp-ios,,,To Do
+344,64,Subtask,120-T04 Pantalla pública en modo televisor,"Hecho cuando: `/publico` se actualiza sola sin sesión
+Depende de: T03, 112-T01
+Cubre: FR-120-09",,High,,spec-112,nivel-R,comp-web,,,To Do
+345,64,Subtask,"HU-112-1-QA Casos de prueba y prueba manual de los criterios de HU-112-1 en Web, Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-112,nivel-R,comp-qa,,,To Do
+346,106,Subtask,112-T03 Advertencia de datos personales en avisos,"Hecho cuando: un aviso con un DUI muestra advertencia
+Depende de: T02
+Cubre: FR-112-05",,Low,,spec-112,nivel-E,comp-web,,,To Do
+347,106,Subtask,HU-112-2-QA Casos de prueba y prueba manual de los criterios de HU-112-2 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-112,nivel-R,comp-qa,,,To Do
+348,37,Subtask,"113-T01-BE Tablero inicial con tarjetas de camas, turnos y pacientes y marcadores de semana (Backend)","Hecho cuando: el tablero se ve en la web desplegada para el avance, con conteos directos de camas, personal y pacientes (las vistas en vivo llegan en T02)
+Depende de: 102-T03, 103-T02, 120-T02
+Cubre: FR-113-01, FR-113-03, FR-113-06",,Highest,,spec-113,nivel-R,comp-backend,,,To Do
+349,37,Subtask,"113-T01-WEB Tablero inicial con tarjetas de camas, turnos y pacientes y marcadores de semana (Web)","Hecho cuando: el tablero se ve en la web desplegada para el avance, con conteos directos de camas, personal y pacientes (las vistas en vivo llegan en T02)
+Depende de: 102-T03, 103-T02, 120-T02
+Cubre: FR-113-01, FR-113-03, FR-113-06",,Highest,,spec-113,nivel-R,comp-web,,,To Do
+350,37,Subtask,HU-113-1-QA Casos de prueba y prueba manual de los criterios de HU-113-1 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-113,nivel-R,comp-qa,,,To Do
+351,82,Subtask,113-T02-BE Tarjetas en vivo y bandejas por rol (Backend),"Hecho cuando: escenario 1 pasa
+Depende de: T01
+Cubre: FR-113-02, FR-113-04",,High,,spec-113,nivel-R,comp-backend,,,To Do
+352,82,Subtask,113-T02-WEB Tarjetas en vivo y bandejas por rol (Web),"Hecho cuando: escenario 1 pasa
+Depende de: T01
+Cubre: FR-113-02, FR-113-04",,High,,spec-113,nivel-R,comp-web,,,To Do
+353,82,Subtask,"113-T03-BE Completar tarjetas de laboratorio, fila y ambulancia (Backend)","Hecho cuando: todas las tarjetas tienen datos reales y escenario 2 pasa
+Depende de: T02, 107-T03, 105-T02, 109-T04
+Cubre: FR-113-01",,High,,spec-113,nivel-R,comp-backend,,,To Do
+354,82,Subtask,"113-T03-WEB Completar tarjetas de laboratorio, fila y ambulancia (Web)","Hecho cuando: todas las tarjetas tienen datos reales y escenario 2 pasa
+Depende de: T02, 107-T03, 105-T02, 109-T04
+Cubre: FR-113-01",,High,,spec-113,nivel-R,comp-web,,,To Do
+355,82,Subtask,HU-113-2-QA Casos de prueba y prueba manual de los criterios de HU-113-2 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-113,nivel-R,comp-qa,,,To Do
+356,107,Subtask,113-T04-BE Indicadores por rango de fechas (W33) (Backend),"Hecho cuando: los cinco indicadores se calculan sobre datos de prueba con valores esperados
+Depende de: T03
+Cubre: FR-113-05",,Low,,spec-113,nivel-E,comp-backend,,,To Do
+357,107,Subtask,113-T04-WEB Indicadores por rango de fechas (W33) (Web),"Hecho cuando: los cinco indicadores se calculan sobre datos de prueba con valores esperados
+Depende de: T03
+Cubre: FR-113-05",,Low,,spec-113,nivel-E,comp-web,,,To Do
+358,107,Subtask,HU-113-3-QA Casos de prueba y prueba manual de los criterios de HU-113-3 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Low,,spec-113,nivel-R,comp-qa,,,To Do
+359,65,Subtask,"114-T01-WEB Catálogo de niveles, franja urgente y campana en web, Android e iOS (Web)","Hecho cuando: escenarios 2 y 3 pasan en las tres plataformas
+Depende de: 120-T03, 121-T03, 122-T03
+Cubre: FR-114-01, FR-114-05, FR-114-06, FR-114-07, FR-114-10",,High,,spec-114,nivel-R,comp-web,,,To Do
+360,65,Subtask,"114-T01-AND Catálogo de niveles, franja urgente y campana en web, Android e iOS (Android)","Hecho cuando: escenarios 2 y 3 pasan en las tres plataformas
+Depende de: 120-T03, 121-T03, 122-T03
+Cubre: FR-114-01, FR-114-05, FR-114-06, FR-114-07, FR-114-10",,High,,spec-114,nivel-R,comp-android,,,To Do
+361,65,Subtask,"114-T01-IOS Catálogo de niveles, franja urgente y campana en web, Android e iOS (iOS)","Hecho cuando: escenarios 2 y 3 pasan en las tres plataformas
+Depende de: 120-T03, 121-T03, 122-T03
+Cubre: FR-114-01, FR-114-05, FR-114-06, FR-114-07, FR-114-10",,High,,spec-114,nivel-R,comp-ios,,,To Do
+362,65,Subtask,114-T02-WEB Sesión por vencer con cuenta regresiva (Web),"Hecho cuando: a los 14 minutos de inactividad en web aparece la cuenta regresiva y continuar mantiene la sesión
+Depende de: 120-T02, 121-T02, 122-T02
+Cubre: FR-114-08",,High,,spec-114,nivel-R,comp-web,,,To Do
+363,65,Subtask,114-T02-AND Sesión por vencer con cuenta regresiva (Android),"Hecho cuando: a los 14 minutos de inactividad en web aparece la cuenta regresiva y continuar mantiene la sesión
+Depende de: 120-T02, 121-T02, 122-T02
+Cubre: FR-114-08",,High,,spec-114,nivel-R,comp-android,,,To Do
+364,65,Subtask,114-T02-IOS Sesión por vencer con cuenta regresiva (iOS),"Hecho cuando: a los 14 minutos de inactividad en web aparece la cuenta regresiva y continuar mantiene la sesión
+Depende de: 120-T02, 121-T02, 122-T02
+Cubre: FR-114-08",,High,,spec-114,nivel-R,comp-ios,,,To Do
+365,65,Subtask,"HU-114-1-QA Casos de prueba y prueba manual de los criterios de HU-114-1 en Web, Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-114,nivel-R,comp-qa,,,To Do
+366,91,Subtask,"114-T03-BE Aviso crítico a pantalla completa con confirmación, pausa y escalamiento (Backend)","Hecho cuando: escenario 1 pasa y un crítico sin confirmar escala a los 5 minutos con el reloj de prueba
+Depende de: T01, 107-T06
+Cubre: FR-114-02, FR-114-03, FR-114-04, FR-114-09",,Medium,,spec-114,nivel-E,comp-backend,,,To Do
+367,91,Subtask,"114-T03-WEB Aviso crítico a pantalla completa con confirmación, pausa y escalamiento (Web)","Hecho cuando: escenario 1 pasa y un crítico sin confirmar escala a los 5 minutos con el reloj de prueba
+Depende de: T01, 107-T06
+Cubre: FR-114-02, FR-114-03, FR-114-04, FR-114-09",,Medium,,spec-114,nivel-E,comp-web,,,To Do
+368,91,Subtask,"114-T03-AND Aviso crítico a pantalla completa con confirmación, pausa y escalamiento (Android)","Hecho cuando: escenario 1 pasa y un crítico sin confirmar escala a los 5 minutos con el reloj de prueba
+Depende de: T01, 107-T06
+Cubre: FR-114-02, FR-114-03, FR-114-04, FR-114-09",,Medium,,spec-114,nivel-E,comp-android,,,To Do
+369,91,Subtask,"114-T03-IOS Aviso crítico a pantalla completa con confirmación, pausa y escalamiento (iOS)","Hecho cuando: escenario 1 pasa y un crítico sin confirmar escala a los 5 minutos con el reloj de prueba
+Depende de: T01, 107-T06
+Cubre: FR-114-02, FR-114-03, FR-114-04, FR-114-09",,Medium,,spec-114,nivel-E,comp-ios,,,To Do
+370,91,Subtask,"HU-114-2-QA Casos de prueba y prueba manual de los criterios de HU-114-2 en Web, Android, iOS","Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Medium,,spec-114,nivel-R,comp-qa,,,To Do
+371,32,Subtask,"120-T01 Proyecto React con TypeScript, rutas, ingreso con Supabase y despliegue","Hecho cuando: la URL desplegada permite ingresar con un usuario de prueba
 Depende de: ninguna
-Hecho cuando: Cada componente de la sección 6 del brief tiene normal, foco, deshabilitado, cargando y error
-Revisa: Leonel",3,Highest,Sprint 1,spec-131 area-DIS nivel-R,Walter,To Do
-252,59,Subtask,"DIS-03 Prototipo web: ingreso, tablero, usuarios, personal, edificio, catálogo (W01 a W12)","Cubre: FR-131-03
+Cubre: FR-120-01, FR-101-01",,Highest,,spec-120,nivel-R,comp-web,,,To Do
+372,32,Subtask,"120-T02 Navegación por rol desde `/me`, estados comunes y cliente de API generado","Hecho cuando: escenario 1 pasa y cada rol web ve su menú
+Depende de: T01, 101-T03
+Cubre: FR-120-02, FR-120-03, FR-120-06, FR-120-07",,Highest,,spec-120,nivel-R,comp-web,,,To Do
+373,32,Subtask,HU-120-1-QA Casos de prueba y prueba manual de los criterios de HU-120-1 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-120,nivel-R,comp-qa,,,To Do
+374,47,Subtask,120-T03 Suscripción a Realtime con invalidación y reconexión,"Hecho cuando: escenario 2 pasa
+Depende de: T02, 100-T03
+Cubre: FR-120-04, FR-120-05",,High,,spec-120,nivel-R,comp-web,,,To Do
+375,47,Subtask,HU-120-2-QA Casos de prueba y prueba manual de los criterios de HU-120-2 en Web,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-120,nivel-R,comp-qa,,,To Do
+376,84,Subtask,"120-T05-WEB Accesibilidad, cierre por inactividad y pruebas Playwright de la defensa (Web)","Hecho cuando: revisión de contraste sin errores y los flujos Playwright pasan
+Depende de: T03
+Cubre: FR-120-08, FR-120-10",,High,,spec-120,nivel-R,comp-web,,,To Do
+377,84,Subtask,"120-T05-QA Accesibilidad, cierre por inactividad y pruebas Playwright de la defensa (QA)","Hecho cuando: revisión de contraste sin errores y los flujos Playwright pasan
+Depende de: T03
+Cubre: FR-120-08, FR-120-10",,High,,spec-120,nivel-R,comp-qa,,,To Do
+378,33,Subtask,"121-T01 Proyecto Gradle con Compose, Hilt, red y pantalla de ingreso","Hecho cuando: el APK de depuración inicia sesión contra Supabase de la nube
 Depende de: ninguna
-Hecho cuando: Pantallas en Figma con estados comunes, revisadas por Leonel
-Revisa: Leonel",5,Highest,Sprint 1,spec-131 area-DIS nivel-R,Walter,To Do
-253,59,Subtask,"DIS-04 Prototipo web: admisiones, camas, turnos, ambulancia, laboratorio, inventario, avisos (W13 a W25)","Cubre: FR-131-03
+Cubre: FR-121-01, FR-121-02, FR-101-01",,Highest,,spec-121,nivel-R,comp-android,,,To Do
+379,33,Subtask,121-T02 Navegación por rol y maquetación de las pantallas principales de cada rol,"Hecho cuando: escenario 1 pasa para los 7 roles de Android (criterio del avance)
+Depende de: T01, 101-T03
+Cubre: FR-121-03, FR-121-07",,Highest,,spec-121,nivel-R,comp-android,,,To Do
+380,33,Subtask,HU-121-1-QA Casos de prueba y prueba manual de los criterios de HU-121-1 en Android,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-121,nivel-R,comp-qa,,,To Do
+381,48,Subtask,121-T03 Repositorio de Realtime e invalidación en ViewModels,"Hecho cuando: un cambio de cama hecho en web aparece en el tablero Android sin recargar
+Depende de: T02, 100-T03
+Cubre: FR-121-04",,High,,spec-121,nivel-R,comp-android,,,To Do
+382,48,Subtask,HU-121-2-QA Casos de prueba y prueba manual de los criterios de HU-121-2 en Android,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-121,nivel-R,comp-qa,,,To Do
+383,85,Subtask,121-T06 Pruebas de ViewModels y de UI de ingreso,"Hecho cuando: `./gradlew test connectedCheck` pasa
+Depende de: T03
+Cubre: FR-121-01, FR-121-02",,High,,spec-121,nivel-R,comp-android,,,To Do
+384,85,Subtask,HU-121-3-QA Casos de prueba y prueba manual de los criterios de HU-121-3 en Android,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-121,nivel-R,comp-qa,,,To Do
+385,34,Subtask,"122-T01 Proyecto Xcode con SwiftUI, paquetes y pantalla de ingreso","Hecho cuando: el simulador inicia sesión contra Supabase de la nube
 Depende de: ninguna
-Hecho cuando: Pantallas en Figma revisadas por Leonel
-Revisa: Leonel",5,Highest,Sprint 2,spec-131 area-DIS nivel-R,Walter,To Do
-254,59,Subtask,"DIS-05 Prototipo web: recepción, delegado, métricas, pantalla pública (W26 a W36)","Cubre: FR-131-03
-Depende de: ninguna
-Hecho cuando: Pantallas en Figma revisadas por Leonel
-Revisa: Leonel",3,Highest,Sprint 2,spec-131 area-DIS nivel-R,Walter,To Do
-255,59,Subtask,"DIS-06 Prototipo Android: ingreso, registro y app del paciente (A01 a A12)","Cubre: FR-131-03
-Depende de: ninguna
-Hecho cuando: Pantallas en Figma en Material 3 revisadas por Fernando
-Revisa: Leonel",3,Highest,Sprint 1,spec-131 area-DIS nivel-R,Ángel,To Do
-256,59,Subtask,DIS-07 Prototipo Android: médico (A20 a A26),"Cubre: FR-131-03
-Depende de: ninguna
-Hecho cuando: Revisadas por Fernando
-Revisa: Leonel",3,Highest,Sprint 1,spec-131 area-DIS nivel-R,Ángel,To Do
-257,59,Subtask,DIS-08 Prototipo Android: recepción y asistente (A30 a A41),"Cubre: FR-131-03
-Depende de: ninguna
-Hecho cuando: Revisadas por Fernando
-Revisa: Leonel",3,Highest,Sprint 2,spec-131 area-DIS nivel-R,Ángel,To Do
-258,59,Subtask,"DIS-09 Prototipo Android: enfermería, laboratorio y paramédico (A50 a A74)","Cubre: FR-131-03
-Depende de: ninguna
-Hecho cuando: Revisadas por Fernando
-Revisa: Leonel",3,Highest,Sprint 2,spec-131 area-DIS nivel-R,Ángel,To Do
-259,59,Subtask,DIS-10 Prototipo iOS: paciente y médico (I01 a I26),"Cubre: FR-131-03
-Depende de: ninguna
-Hecho cuando: Pantallas según guías de Apple revisadas por Milton
-Revisa: Leonel",5,Highest,Sprint 2,spec-131 area-DIS nivel-R,Walter,To Do
-260,59,Subtask,DIS-11 Flujos F01 a F12 enlazados como prototipo interactivo,"Cubre: FR-131-03
-Depende de: ninguna
-Hecho cuando: Cada flujo del inventario navega de punta a punta en Figma
-Revisa: Leonel",3,Highest,Sprint 2,spec-131 area-DIS nivel-R,Ángel,To Do
-261,59,Subtask,"DIS-12 Revisión de accesibilidad del diseño (contraste, tamaños, estados sin color)","Cubre: FR-130-06
-Depende de: ninguna
-Hecho cuando: Lista de verificación firmada; ningún estado depende solo del color
-Revisa: Carlos",2,Highest,Sprint 2,spec-131 area-QA nivel-R,Walter,To Do
-262,59,Subtask,"GES-01 Configurar Jira: épicas, historias, tablero y sprints desde el backlog","Cubre: FR-130-06
-Depende de: ninguna
-Hecho cuando: El tablero tiene los 5 sprints con las historias de este documento
-Revisa: Leonel",2,Highest,Sprint 1,spec-131 area-DOC nivel-R,Carlos,To Do
-263,59,Subtask,GES-02 Plantilla de casos de prueba y de reporte de defectos,"Cubre: FR-130-06
-Depende de: ninguna
-Hecho cuando: Plantilla aprobada por Carlos y usada en el primer caso
-Revisa: Carlos",2,Highest,Sprint 1,spec-131 area-QA nivel-R,Ángel,To Do
-264,59,Subtask,"GES-03 Datos ficticios de prueba por rol (usuarios, pacientes, escenarios)","Cubre: FR-130-06
-Depende de: ninguna
-Hecho cuando: Hoja con un usuario por rol y 10 pacientes ficticios cargados en el entorno de pruebas
-Revisa: Carlos",2,Highest,Sprint 1,spec-131 area-QA nivel-R,Walter,To Do
-265,23,Subtask,"QA-101-casos Casos de prueba de Identidad, cuentas y acceso","Cubre: spec 101
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,Highest,Sprint 2,spec-101 area-QA nivel-R,Ángel,To Do
-266,23,Subtask,"QA-101-manual Prueba manual de Identidad, cuentas y acceso en las plataformas","Cubre: spec 101
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 3,spec-101 area-QA nivel-R,Ángel,To Do
-267,26,Subtask,QA-102-casos Casos de prueba de Pacientes,"Cubre: spec 102
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,Highest,Sprint 2,spec-102 area-QA nivel-R,Walter,To Do
-268,26,Subtask,QA-102-manual Prueba manual de Pacientes en las plataformas,"Cubre: spec 102
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 4,spec-102 area-QA nivel-R,Walter,To Do
-269,29,Subtask,QA-103-casos Casos de prueba de Personal de salud y turnos,"Cubre: spec 103
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,Highest,Sprint 2,spec-103 area-QA nivel-R,Ángel,To Do
-270,29,Subtask,QA-103-manual Prueba manual de Personal de salud y turnos en las plataformas,"Cubre: spec 103
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 3,spec-103 area-QA nivel-R,Ángel,To Do
-271,32,Subtask,"QA-104-casos Casos de prueba de Edificio, camas y recursos","Cubre: spec 104
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,Highest,Sprint 2,spec-104 area-QA nivel-R,Walter,To Do
-272,32,Subtask,"QA-104-manual Prueba manual de Edificio, camas y recursos en las plataformas","Cubre: spec 104
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 4,spec-104 area-QA nivel-R,Walter,To Do
-273,35,Subtask,QA-105-casos Casos de prueba de Fila del día y citas,"Cubre: spec 105
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,High,Sprint 3,spec-105 area-QA nivel-R,Ángel,To Do
-274,35,Subtask,QA-105-manual Prueba manual de Fila del día y citas en las plataformas,"Cubre: spec 105
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 4,spec-105 area-QA nivel-R,Ángel,To Do
-275,38,Subtask,QA-106-casos Casos de prueba de Consulta general,"Cubre: spec 106
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,High,Sprint 3,spec-106 area-QA nivel-R,Walter,To Do
-276,38,Subtask,QA-106-manual Prueba manual de Consulta general en las plataformas,"Cubre: spec 106
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 4,spec-106 area-QA nivel-R,Walter,To Do
-277,41,Subtask,QA-107-casos Casos de prueba de Laboratorio,"Cubre: spec 107
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,High,Sprint 3,spec-107 area-QA nivel-R,Ángel,To Do
-278,41,Subtask,QA-107-manual Prueba manual de Laboratorio en las plataformas,"Cubre: spec 107
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 4,spec-107 area-QA nivel-R,Ángel,To Do
-279,43,Subtask,QA-108-casos Casos de prueba de Admisión y hospitalización,"Cubre: spec 108
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,Highest,Sprint 2,spec-108 area-QA nivel-R,Walter,To Do
-280,43,Subtask,QA-108-manual Prueba manual de Admisión y hospitalización en las plataformas,"Cubre: spec 108
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 4,spec-108 area-QA nivel-R,Walter,To Do
-281,46,Subtask,QA-109-casos Casos de prueba de Ambulancia,"Cubre: spec 109
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,High,Sprint 3,spec-109 area-QA nivel-R,Ángel,To Do
-282,46,Subtask,QA-109-manual Prueba manual de Ambulancia en las plataformas,"Cubre: spec 109
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 4,spec-109 area-QA nivel-R,Ángel,To Do
-283,50,Subtask,QA-110-casos Casos de prueba de Privacidad y auditoría,"Cubre: spec 110
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,Highest,Sprint 2,spec-110 area-QA nivel-R,Walter,To Do
-284,50,Subtask,QA-110-manual Prueba manual de Privacidad y auditoría en las plataformas,"Cubre: spec 110
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 4,spec-110 area-QA nivel-R,Walter,To Do
-285,52,Subtask,QA-111-casos Casos de prueba de Inventario de insumos,"Cubre: spec 111
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,High,Sprint 4,spec-111 area-QA nivel-R,Ángel,To Do
-286,52,Subtask,QA-111-manual Prueba manual de Inventario de insumos en las plataformas,"Cubre: spec 111
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 4,spec-111 area-QA nivel-R,Ángel,To Do
-287,53,Subtask,QA-112-casos Casos de prueba de Información pública y avisos,"Cubre: spec 112
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,High,Sprint 3,spec-112 area-QA nivel-R,Walter,To Do
-288,53,Subtask,QA-112-manual Prueba manual de Información pública y avisos en las plataformas,"Cubre: spec 112
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 3,spec-112 area-QA nivel-R,Walter,To Do
-289,54,Subtask,QA-113-casos Casos de prueba de Métricas y tablero,"Cubre: spec 113
-Depende de: ninguna
-Hecho cuando: Un caso por escenario de aceptación de la spec, con datos ficticios y resultado esperado
-Revisa: Carlos",2,Highest,Sprint 2,spec-113 area-QA nivel-R,Ángel,To Do
-290,54,Subtask,QA-113-manual Prueba manual de Métricas y tablero en las plataformas,"Cubre: spec 113
-Depende de: ninguna
-Hecho cuando: Casos ejecutados en web, Android e iOS según corresponda; defectos reportados en Jira
-Revisa: Carlos",3,High,Sprint 5,spec-113 area-QA nivel-R,Ángel,To Do
+Cubre: FR-122-01, FR-122-02, FR-101-01",,Highest,,spec-122,nivel-R,comp-ios,,,To Do
+386,34,Subtask,122-T02 Pestañas por rol y maquetación de las pantallas de Médico y Paciente,"Hecho cuando: escenarios 1 y 2 pasan (criterio del avance)
+Depende de: T01, 101-T03
+Cubre: FR-122-03, FR-122-06",,Highest,,spec-122,nivel-R,comp-ios,,,To Do
+387,34,Subtask,HU-122-1-QA Casos de prueba y prueba manual de los criterios de HU-122-1 en iOS,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,Highest,,spec-122,nivel-R,comp-qa,,,To Do
+388,49,Subtask,122-T03 Servicio de Realtime e invalidación en view models,"Hecho cuando: el número de fila del paciente cambia en vivo al ser llamado
+Depende de: T02, 100-T03
+Cubre: FR-122-04",,High,,spec-122,nivel-R,comp-ios,,,To Do
+389,49,Subtask,HU-122-2-QA Casos de prueba y prueba manual de los criterios de HU-122-2 en iOS,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-122,nivel-R,comp-qa,,,To Do
+390,86,Subtask,122-T05 Pruebas de view models y sesión en Keychain,"Hecho cuando: las pruebas pasan en la Mac universitaria
+Depende de: T03
+Cubre: FR-122-01, FR-122-07",,High,,spec-122,nivel-R,comp-ios,,,To Do
+391,86,Subtask,HU-122-3-QA Casos de prueba y prueba manual de los criterios de HU-122-3 en iOS,"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
+Depende de: las demás subtareas
+Cubre: criterios de la historia",,High,,spec-122,nivel-R,comp-qa,,,To Do
+392,66,Subtask,130-T01 Proyecto de pruebas con PostgreSQL real y ayudante de concurrencia,"Hecho cuando: una prueba concurrente de ejemplo corre en local y en CI
+Depende de: 100-T01
+Cubre: FR-130-02",,High,,spec-130,nivel-R,comp-backend,,,To Do
+393,66,Subtask,130-T02 Integración continua en GitHub,"Hecho cuando: un PR muestra el estado de todas las verificaciones
+Depende de: T01, 120-T01, 121-T01
+Cubre: FR-130-03",,High,,spec-130,nivel-R,comp-web,,,To Do
+394,66,Subtask,130-T03 Pruebas de arquitectura de módulos,"Hecho cuando: referenciar el interior de otro módulo rompe la compilación de pruebas
+Depende de: 100-T02
+Cubre: FR-130-05",,High,,spec-130,nivel-R,comp-backend,,,To Do
+395,83,Subtask,130-T04 Las siete pruebas de concurrencia de ADR-0007,"Hecho cuando: las siete pasan 20 veces seguidas sin fallos intermitentes
+Depende de: 108-T04, 109-T03, 103-T03, 105-T01, 111-T02
+Cubre: FR-130-01",,High,,spec-130,nivel-R,comp-backend,,,To Do
+396,83,Subtask,130-T05 Script de demostración de concurrencia,"Hecho cuando: escenario 1 pasa contra la API desplegada
+Depende de: T04
+Cubre: FR-130-04",,High,,spec-130,nivel-R,comp-backend,,,To Do

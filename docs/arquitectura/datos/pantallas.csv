@@ -95,3 +95,23 @@ A71,Android,PAR,Servicio en curso,Hitos con botones grandes,"Salida, en escena, 
 A72,Android,PAR,Reporte prehospital,Avisar antes de llegar,"Motivo, signos, prioridad, hora estimada; indicador de enviado o en cola",Enviar (se guarda si no hay señal),,,E,109
 A73,Android,PAR,Paciente sin identidad,Registrar NN,"Sexo, edad estimada, señas",Crear provisional,,No inventa datos,R,102
 A74,Android,PAR,Mi bitácora,Servicios propios,Servicios con tiempos,Ninguna,,,R,109
+W40,Web,Caja (rol F),Caja del turno,"Abrir, operar y cerrar la sesión de caja","Efectivo esperado, cobros del turno","Abrir, cerrar caja",Cobros propios entran al instante,Sin datos clínicos,F,006
+W41,Web,Caja (rol F),Cobrar o recibir depósito,Registrar un pago o depósito y aplicarlo a una cuenta,"Cuenta, concepto, medio de pago","Cobrar, recibir depósito",Aviso si otra caja aplica el mismo depósito,Nunca contenido clínico,F,006
+W42,Web,Caja; Facturación (rol F),Recibos y devoluciones,Seguir recibos y pedir o aprobar devoluciones,"Recibos, devoluciones por aprobar","Pedir, aprobar devolución",,Quien pide no aprueba,F,006
+W43,Web,Facturación (rol F),Cuentas de pacientes,Ver las cuentas abiertas y su estado,"Cuentas por episodio, pagador, estado",Abrir cuenta,Cargos nuevos suman solos,Sin diagnósticos,F,006
+W44,Web,Facturación (rol F),Cuenta del paciente,"Revisar cargos, cerrar y dividir por pagador","Cargos, división por pagador, pagos","Cerrar, dividir",El alta firmada corta la estancia,Sin contenido clínico,F,006
+W45,Web,Facturación (rol F),Excepciones de cargos,Atender lo que no se pudo cobrar solo,Cola de excepciones,Resolver,Entran solas,,F,006
+W46,Web,Facturación; Contadora (rol F),Documentos fiscales (DTE),Emitir y seguir facturas electrónicas,DTE y sus estados,"Emitir, invalidar",Sello de recepción llega solo,Receptor opcional en consumidor final,F,007
+W47,Web,Facturación (rol F),Aseguradoras y reclamos,Del crédito hospitalario a la remesa,"Garantías, reclamos, glosas","Registrar garantía, enviar reclamo",,La glosa nunca pasa sola al paciente,F,009
+W48,Web,Facturación; Contadora (rol F),Tarifas y catálogo,Precios con versión y vigencia,"Tarifas, versiones por aprobar",Nueva versión,,Clasificación fiscal la aprueba la contadora,F,006
+W49,Web,Facturación; Contadora (rol F),Honorarios médicos,Liquidar lo cobrado por cuenta de cada médico,"Honorarios, retención 10%, F-958",Liquidar,,Sin diagnóstico,F,008
+W50,Web,Contadora (rol F),Mi cartera,Primera pantalla del día de la contadora,Clientes con alias y vencimientos,Elegir cliente y período,Semáforo al cerrar tareas,Clientes con alias,F,R22
+W51,Web,Contadora (rol F),Cierre del mes,Recorrer el mes de un cliente de los papeles al archivo,Pasos del cierre,"Avanzar, cerrar período",,Reapertura auditada,F,R22
+W52,Web,Contadora (rol F),Bandeja de documentos,Clasificar lo que llegó,DTE y papel por clasificar,"Clasificar, pedir lo que falta",Nuevos DTE entran solos,,F,R22
+W53,Web,Contadora (rol F),Validaciones cruzadas,Que todo cuadre antes de presentar,Comparaciones libro contra declaración,Revisar,,,F,R22
+W54,Web,Contadora (rol F),Declaraciones,Borradores listos para presentar a mano,"F-07, F-14, F-930, F-958",Generar borrador,Vencimiento calculado,El sistema nunca entra al portal de Hacienda,F,R22
+W55,Web,Contadora (rol F),Asientos y períodos,Contabilidad por eventos,"Asientos, períodos","Revisar, cerrar",Cada evento genera su asiento,Reapertura auditada,F,008
+W56,Web,Contadora (rol F),Conciliación bancaria,Cruzar banco contra libros,Movimientos y coincidencias,Conciliar,,Nada ambiguo se aplica solo,F,R22
+W57,Web,Contadora (rol F),Biblioteca normativa,"Tasas, tablas y plazos con vigencia",Normas con vigencia,Nueva versión,,,F,R22
+A13,Android,PAC,Mi cuenta,Saber cuánto y por qué,"Cargos, pagos y factura propia",Descargar factura,Se actualiza al cargar,Solo la cuenta propia; nada económico a clínicos,F,006
+I13,iOS,PAC,Mi cuenta,Saber cuánto y por qué,"Cargos, pagos y factura propia",Descargar factura,Se actualiza al cargar,Solo la cuenta propia; nada económico a clínicos,F,006

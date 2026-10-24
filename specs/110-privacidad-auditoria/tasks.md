@@ -1,6 +1,6 @@
 # 110. Tareas
 
-- [ ] T01 · S2 · R · Servicio de contexto de acceso y filtrado de campos de la ficha
+- [ ] T01 · S3 · R · Servicio de contexto de acceso y filtrado de campos de la ficha
   - Cubre: FR-110-01, FR-110-02, FR-110-03
   - Depende de: 100-T05, 102-T03
   - Hecho cuando: escenario 3 pasa y la prueba por rol y campo de la ficha pasa
@@ -12,7 +12,7 @@
   - Cubre: FR-110-04, FR-110-05, FR-110-06
   - Depende de: T02
   - Hecho cuando: escenario 2 pasa con el reloj de prueba
-- [ ] T04 · S4 · R · Auditoría consultable y verificación de la cadena (W32)
+- [ ] T04 · S3 · R · Auditoría consultable y verificación de la cadena (W32)
   - Cubre: FR-110-07
   - Depende de: 100-T02, 120-T03
   - Hecho cuando: el delegado detecta un registro alterado desde la web

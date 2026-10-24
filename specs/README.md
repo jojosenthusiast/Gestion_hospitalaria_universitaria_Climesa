@@ -63,6 +63,7 @@ Formato EARS en español: "Cuando…, el sistema debe…", "Mientras…", "Si…
 | [111](./111-inventario/spec.md) | Inventario de insumos | 104 |
 | [112](./112-informacion-publica/spec.md) | Información pública y avisos | 103, 104, 105 |
 | [113](./113-metricas-tablero/spec.md) | Métricas y tablero | todas las anteriores |
+| [114](./114-avisos-alarmas/spec.md) | Avisos y alarmas | 100, 120 a 122 |
 | [120](./120-cliente-web/spec.md) | Cliente web | 100, 101 |
 | [121](./121-cliente-android/spec.md) | Cliente Android | 100, 101 |
 | [122](./122-cliente-ios/spec.md) | Cliente iOS | 100, 101 |
