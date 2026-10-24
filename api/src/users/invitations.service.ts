@@ -17,11 +17,22 @@ export class InvitationsService {
     if(roles.some(r=>['REC','AST','ENF','MED','LAB','PAR'].includes(r))&&!staffId)throw new BadRequestException('Vincula la cuenta a una persona del directorio para asignar un rol de trabajo.');
     if(staffId&&!(await c.query('SELECT id FROM personal.persona WHERE id=$1 AND activo',[staffId])).rowCount)throw new BadRequestException('La persona vinculada debe estar activa.');
   }
+  /** Jerarquía administrativa: solo el administrador principal puede crear otros ADM. Si aún no hay principal, el único ADM activo lo es. */
+  private async assertAdminAuthority(c:PoolClient,actor:Actor,roles:string[]){
+    if(!roles.includes('ADM'))return;
+    let principal=(await c.query('SELECT usuario_id FROM acceso.administrador_principal WHERE id')).rows[0]?.usuario_id as string|undefined;
+    if(!principal){
+      const admins=(await c.query("SELECT a.usuario_id FROM acceso.asignacion_rol a JOIN acceso.usuario u ON u.id=a.usuario_id AND u.estado='activo' WHERE a.rol_codigo='ADM' ORDER BY a.asignado_en LIMIT 2")).rows;
+      if(admins.length===1&&admins[0].usuario_id===actor.id){await c.query('INSERT INTO acceso.administrador_principal(usuario_id) VALUES($1) ON CONFLICT DO NOTHING',[actor.id]);principal=actor.id;}
+    }
+    if(principal!==actor.id)throw new ForbiddenException('Solo el administrador principal puede asignar el rol de administrador.');
+  }
   async invitePatient(dto:InvitePatientDto,actor:Actor,key?:string):Promise<InvitationResult>{
     const email=dto.email.trim().toLowerCase(),roles=dto.roles??['PAC'];
     if(email===actor.email.toLowerCase())throw new ForbiddenException('No puedes invitarte ni cambiar tus roles con una invitación.');
     return this.commands.run(actor,'usuarios.invitar',key,dto,async c=>{
       await this.validateRoles(c,roles,dto.staffId);
+      await this.assertAdminAuthority(c,actor,roles);
       if((await c.query('SELECT id FROM acceso.usuario WHERE lower(correo)=$1',[email])).rowCount)throw new ConflictException('Esa cuenta ya existe. Utiliza la gestión de usuarios.');
       if(dto.staffId&&(await c.query('SELECT id FROM acceso.usuario WHERE persona_personal_id=$1',[dto.staffId])).rowCount)throw new ConflictException('Esa persona ya tiene una cuenta vinculada.');
       const url=this.config.get<string>('WEB_APP_URL','http://localhost:5173').replace(/\/$/,'');
@@ -31,6 +42,7 @@ export class InvitationsService {
       await c.query('INSERT INTO acceso.usuario(id,correo,nombre_mostrar,persona_personal_id) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET nombre_mostrar=excluded.nombre_mostrar,persona_personal_id=excluded.persona_personal_id',[id,email,dto.displayName.trim(),dto.staffId??null]);
       await c.query('DELETE FROM acceso.asignacion_rol WHERE usuario_id=$1 AND NOT(rol_codigo=ANY($2::text[]))',[id,roles]);
       for(const role of roles)await c.query('INSERT INTO acceso.asignacion_rol(usuario_id,rol_codigo,asignado_por) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[id,role,actor.id]);
+      for(const role of roles)await c.query("INSERT INTO acceso.invitacion(usuario_id,correo,nombre_mostrar,rol_codigo,invitado_por) VALUES($1,$2,$3,$4,$5)",[id,email,dto.displayName.trim(),role,actor.id]);
       await this.commands.audit(c,actor,{action:'usuarios.invitar',entity:'usuario',entityId:id,permission:'usuarios.invitar',detail:{roles}});
       await this.commands.event(c,'usuario.actualizado','usuario',id,1,['rol:ADM',`usuario:${id}`]);
       return {userId:id,email,roles,role:roles[0],status:'sent'};
@@ -45,6 +57,7 @@ export class InvitationsService {
       if(old.version!==dto.version)throw new VersionConflictException(old.version,'La cuenta cambió; vuelve a abrirla.');
       const staffId=dto.staffId??old.persona_personal_id;
       await this.validateRoles(c,dto.roles,staffId);
+      if(!(await c.query("SELECT 1 FROM acceso.asignacion_rol WHERE usuario_id=$1 AND rol_codigo='ADM'",[id])).rowCount)await this.assertAdminAuthority(c,actor,dto.roles);
       await c.query('DELETE FROM acceso.asignacion_rol WHERE usuario_id=$1 AND NOT(rol_codigo=ANY($2::text[]))',[id,dto.roles]);
       for(const role of dto.roles)await c.query('INSERT INTO acceso.asignacion_rol(usuario_id,rol_codigo,asignado_por) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[id,role,actor.id]);
       await c.query('UPDATE acceso.usuario SET persona_personal_id=$2,version=version+1 WHERE id=$1',[id,staffId]);
