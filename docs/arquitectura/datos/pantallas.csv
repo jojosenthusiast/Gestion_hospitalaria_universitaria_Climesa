@@ -1,0 +1,97 @@
+id,plataforma,roles,nombre,proposito,muestra,acciones,tiempo_real,privacidad,nivel,spec
+W01,Web,Todos los roles web,Ingreso,Entrar con correo y contraseña,"Logo, campos, enlace a recuperar",Ingresar; recuperar contraseña,,Mensaje de error genérico (no revela si el correo existe),R,101
+W02,Web,Personal invitado,Activar cuenta,Definir contraseña desde la invitación,"Nombre, rol asignado",Crear contraseña,,,R,101
+W03,Web,ADM; JOP,Tablero inicial,Vista del día al entrar (dashboard del avance),"Ocupación por planta (barras 2.ª y 3.ª), camas en limpieza, estado de la ambulancia, números en fila, órdenes de laboratorio por estado, huecos de cobertura de turnos",Ir al detalle de cada tarjeta,Todas las tarjetas se actualizan solas,"Solo agregados, sin nombres",R,113
+W04,Web,REC; LAB; DPD,Inicio de trabajo,Bandeja de lo que toca hacer,"REC: vinculaciones, solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: accesos por aprobar",Abrir cada pendiente,Contadores en vivo,,R,113
+W05,Web,ADM,Usuarios,Gestionar cuentas,"Tabla: nombre, correo, roles, estado, último ingreso; filtros","Invitar, editar roles, desactivar",,No puede editar sus propios roles,R,101
+W06,Web,ADM,Invitar y editar roles,Alta de cuenta de personal,"Formulario: persona del personal, correo, roles (casillas)",Guardar; enviar invitación,,,R,101
+W07,Web,ADM; JOP,Personal de salud,CRUD de personal (avance),"Tabla: nombre, tipo (médico, enfermero, alergista...), especialidad, área, inscripción y vigencia, tiene cuenta","Crear, editar, inactivar",,Teléfono y DUI del personal solo ADM,R,103
+W08,Web,ADM,Ficha de personal,Detalle y credenciales,"Datos, inscripciones con vencimiento, turnos próximos",Editar; agregar inscripción,,,R,103
+W09,Web,ADM; JOP; REC,Edificio,Árbol recursivo del hospital,"Árbol: Hospital > Planta > Área > Habitación > Cama, con conteo disponible en cada nodo; panel de detalle","ADM: crear, editar, cambiar capacidad. Otros: solo ver",Conteos en vivo,,R,104
+W10,Web,ADM,Catálogo de laboratorio,Exámenes y paneles,"Árbol de paneles (recursivo), unidad, rango por sexo y edad, valores críticos, vigencia","Crear, editar con nueva versión",,,R,107
+W11,Web,ADM,Políticas,Reglas configurables con vigencia,"Reglas de turnos, cobertura mínima, tiempos de limpieza, umbrales",Nueva versión de política,,Cambios auditados,E,100
+W12,Web,JOP; REC,Tablero de camas,Ver y operar camas por planta,"Plano por planta: 2.ª con 6 habitaciones x 2 camas, 3.ª con 5 VIP; estado por color y texto (libre, ocupada, reservada, limpieza, bloqueada); filtro por estado","Abrir cama: asignar, bloquear, ver ocupante si tiene permiso",Cambia color al instante cuando otra persona asigna,Ocupante enmascarado (iniciales) salvo permiso camas.ver_ocupante,R,104
+W13,Web,REC; JOP,Admisiones,Admisiones activas y pendientes,"Lista: paciente, origen, tipo pedido, estado, cama, médico tratante, días",Nueva admisión; asignar cama; trasladar; registrar salida,Nuevas admisiones aparecen solas,,R,108
+W14,Web,REC; JOP,Nueva admisión y asignación,Admitir y elegir cama,"Paso 1 buscar paciente; paso 2 origen, tipo (VIP o semiprivada), aislamiento; paso 3 camas sugeridas con motivo (mismo sexo, cama libre limpia, consolida habitación)",Confirmar cama; elegir otra sugerencia,"Si otra persona toma la cama, la sugerencia se marca y se ofrece la siguiente",,R,108
+W15,Web,REC; JOP,Traslado,Mover a otra cama,"Cama actual, motivo, camas destino válidas",Confirmar traslado,,VIP no muestra la acción (D-037),R,108
+W16,Web,JOP,Planificador de turnos,Semana por área,"Calendario semanal: filas por persona, bloques por turno, franja de cobertura con huecos en rojo","Crear, mover, cancelar, publicar",Cambios de otro jefe aparecen en vivo,,R,103
+W17,Web,JOP,Editar turno,Crear o cambiar un turno,"Persona, área, inicio, fin, tipo; avisos de descanso y horas semanales",Guardar; ver conflicto de traslape,,,R,103
+W18,Web,REC; JOP,Centro de despacho de ambulancia,Operar el recurso único,"Estado grande (Disponible, En Servicio, En Mantenimiento), solicitudes por confirmar, servicio activo con hitos y tiempos, reporte prehospital, mapa con ubicación (extra)",Confirmar y despachar; descartar; JOP: mantenimiento,Todo en vivo; sonido al entrar solicitud,Datos clínicos del prehospital solo a quien recibe al paciente,R,109
+W19,Web,JOP; REC; DPD,Bitácora de ambulancia,Historial filtrable,"Tabla: fecha, tipo, prioridad, origen, destino, tripulación, tiempos, estado final; filtros D-056",Exportar CSV (extra),,Paciente oculto sin relación de atención,R,109
+W20,Web,LAB,Cola de laboratorio,Órdenes por estado,"Columnas Pendiente, En Proceso, Completado; prioridad; médico; tiempo de espera",Tomar muestra; capturar; completar,Órdenes nuevas entran solas,,R,107
+W21,Web,LAB,Captura de resultados,Valores con rangos,"Exámenes de la orden, unidad, rango, marca alto, bajo y crítico",Guardar; completar,,,R,107
+W22,Web,JOP; LAB,Inventario,Existencias y alertas,"Tabla por bodega: artículo, lote, vencimiento, existencia, mínimo; alertas",Registrar movimiento; editar mínimo,Alerta de mínimo en vivo,,R,111
+W23,Web,JOP; LAB,Movimiento de inventario,"Entrada, salida, ajuste o traslado","Artículo, lote, cantidad, motivo",Guardar,,,R,111
+W24,Web,JOP,Equipo médico,Equipo por espacio,"Equipo, espacio, estado operativo o mantenimiento",Cambiar estado,,,E,104
+W25,Web,JOP,Avisos generales,Publicar avisos públicos,Lista con vigencia,"Crear, retirar",,Son públicos: no poner datos personales,R,112
+W26,Web,REC,Pacientes,Buscar y registrar,"Buscador (nombre, DUI, expediente) con motivo de coincidencia; ficha",Registrar solo tras buscar; editar con motivo,,Búsqueda auditada,R,102
+W27,Web,REC,Vinculaciones por verificar,Validar cuentas de pacientes,"Cuenta, datos que dio, candidato de expediente",Aprobar; rechazar con motivo,Nuevas entran solas,,R,101
+W28,Web,REC,Citas y solicitudes,Agenda y bandeja,Agenda por médico y día; solicitudes de pacientes,"Agendar, confirmar, rechazar, cancelar",En vivo,,R,105
+W29,Web,REC,Fila del día,Emitir y seguir números,"Por servicio: números, estado, consultorio",Emitir número; marcar no se presentó,En vivo,Solo número e iniciales,R,105
+W30,Web,DPD,Accesos excepcionales,Aprobar o negar,"Solicitud: quién, paciente, motivo, duración",Aprobar; negar,Nuevas solicitudes en vivo,,R,110
+W31,Web,ADM; JOP,Solicitar acceso excepcional,Pedir ver datos clínicos,"Paciente, motivo, duración",Enviar,Aviso cuando se aprueba,,R,110
+W32,Web,DPD,Auditoría,Buscar y verificar,"Filtros por persona, paciente, acción, fecha; resultado de verificación de cadena",Verificar integridad,,,R,110
+W33,Web,ADM; JOP; DPD,Métricas,Indicadores detallados,"Ocupación por día, estancia promedio, tiempos de laboratorio, tiempos de ambulancia, cobertura",Cambiar rango,,Agregados,E,113
+W34,Web,Público (sin ingreso),Pantalla pública,Televisor de sala de espera y página pública,"Ocupación general por planta, médicos de turno, avisos, números llamados por consultorio",Ninguna,En vivo,Nunca nombres de pacientes,R,112
+W35,Web,Todos,Perfil,Datos propios y sesión,"Nombre, roles, cambiar contraseña",Cerrar sesión,,,R,101
+W36,Web,Todos,Estados comunes,"Sin permiso, sin conexión, error, vacío",Mensajes claros en español,Reintentar,Banda de reconexión,,R,120
+A01,Android,Todos los roles móviles,Ingreso,Entrar,"Correo, contraseña; enlace Crear cuenta de paciente",Ingresar; crear cuenta,,,R,101
+A02,Android,PAC,Crear cuenta de paciente,Registro (avance),"Correo, contraseña, nombre",Crear,,,R,101
+A03,Android,PAC,Vincular expediente,Unir cuenta y expediente,"DUI, fecha de nacimiento; estado: en verificación, aprobada, rechazada",Enviar,Cambia sola al aprobarse,Sin aprobar no se ve nada privado,R,101
+A04,Android,PAC,Inicio del paciente,Resumen,"Mi número de fila (si hay), próxima cita, exámenes, avisos",Ir a cada sección,En vivo,,R,120
+A05,Android,PAC,Mi turno en fila,Seguir mi número,"Número grande, cuántos faltan, consultorio al ser llamado",Ninguna,Vibra y avisa al ser llamado,,R,105
+A06,Android,PAC,Mis citas,"Ver, pedir y cancelar","Próximas y pasadas; pedir: médico o especialidad, fecha, horarios libres",Pedir; cancelar,Confirmación llega en vivo,,R,105
+A07,Android,PAC,Mis exámenes,Estado y resultados,"Lista con estado Pendiente, En Proceso, Completado; detalle con valores y rangos solo si el médico revisó",Abrir detalle,Estado cambia en vivo,Valores ocultos hasta revisión (D-040),R,107
+A08,Android,PAC,Mi historial,Consultas pasadas,"Fecha, médico, diagnósticos, recetas",Abrir consulta,,Solo lo revisado y propio,R,106
+A09,Android,PAC,Pedir ambulancia,Solicitud y seguimiento,"Aviso 911 si hay riesgo de vida; ubicación, motivo, teléfono; luego estado: por confirmar, confirmada, en camino, llegó",Enviar; cancelar antes de confirmar,Estado en vivo,,R,109
+A10,Android,PAC; todos,Información del hospital,Datos públicos,"Ocupación general, médicos de turno, avisos",Ninguna,En vivo,Solo público,R,112
+A11,Android,PAC,Quién vio mi expediente,Transparencia,"Fecha, rol, motivo de cada acceso",Ninguna,,,E,110
+A12,Android,Todos,Perfil y notificaciones,Sesión y preferencias,"Datos, permisos de notificación",Cerrar sesión,,,R,101
+A20,Android,MED,Mi día,Agenda y fila de mi consultorio,"Citas del día, números asignados, resultados por revisar, hospitalizados",Llamar siguiente; abrir paciente,En vivo,,R,106
+A21,Android,MED,Consulta,Atender,"Signos (de asistente), motivo, examen, diagnósticos con buscador CIE-10, receta, órdenes de laboratorio (catálogo en árbol)",Guardar; firmar,,Firma exige inscripción vigente,R,106
+A22,Android,MED,Expediente,Historial del paciente,"Consultas, diagnósticos, recetas, resultados, hospitalizaciones",Pedir acceso excepcional si no es tratante,,Acceso auditado,R,106
+A23,Android,MED,Resultados por revisar,Revisar y liberar,Lista; críticos arriba en rojo; detalle con rangos,Marcar revisado,Crítico avisa con push,,R,107
+A24,Android,MED,Mis hospitalizados,Seguimiento y alta,"Pacientes, cama, días; alta con pendientes y responsables",Indicar hospitalización; firmar alta,,,R,108
+A25,Android,MED,Llegada de ambulancia,Reporte prehospital,"Hora estimada, motivo, signos, prioridad",Marcar recibido,Llega en vivo y por push,,E,109
+A26,Android,MED; todos los de personal,Mis turnos,Horario propio,Calendario de mis turnos publicados,Ninguna,Cambios en vivo,,R,103
+I01,iOS,Todos los roles móviles,Ingreso,Entrar,"Correo, contraseña; enlace Crear cuenta de paciente",Ingresar; crear cuenta,,,R,101
+I02,iOS,PAC,Crear cuenta de paciente,Registro (avance),"Correo, contraseña, nombre",Crear,,,R,101
+I03,iOS,PAC,Vincular expediente,Unir cuenta y expediente,"DUI, fecha de nacimiento; estado: en verificación, aprobada, rechazada",Enviar,Cambia sola al aprobarse,Sin aprobar no se ve nada privado,R,101
+I04,iOS,PAC,Inicio del paciente,Resumen,"Mi número de fila (si hay), próxima cita, exámenes, avisos",Ir a cada sección,En vivo,,R,120
+I05,iOS,PAC,Mi turno en fila,Seguir mi número,"Número grande, cuántos faltan, consultorio al ser llamado",Ninguna,Vibra y avisa al ser llamado,,R,105
+I06,iOS,PAC,Mis citas,"Ver, pedir y cancelar","Próximas y pasadas; pedir: médico o especialidad, fecha, horarios libres",Pedir; cancelar,Confirmación llega en vivo,,R,105
+I07,iOS,PAC,Mis exámenes,Estado y resultados,"Lista con estado Pendiente, En Proceso, Completado; detalle con valores y rangos solo si el médico revisó",Abrir detalle,Estado cambia en vivo,Valores ocultos hasta revisión (D-040),R,107
+I08,iOS,PAC,Mi historial,Consultas pasadas,"Fecha, médico, diagnósticos, recetas",Abrir consulta,,Solo lo revisado y propio,R,106
+I09,iOS,PAC,Pedir ambulancia,Solicitud y seguimiento,"Aviso 911 si hay riesgo de vida; ubicación, motivo, teléfono; luego estado: por confirmar, confirmada, en camino, llegó",Enviar; cancelar antes de confirmar,Estado en vivo,,R,109
+I10,iOS,PAC; todos,Información del hospital,Datos públicos,"Ocupación general, médicos de turno, avisos",Ninguna,En vivo,Solo público,R,112
+I11,iOS,PAC,Quién vio mi expediente,Transparencia,"Fecha, rol, motivo de cada acceso",Ninguna,,,E,110
+I12,iOS,Todos,Perfil y notificaciones,Sesión y preferencias,"Datos, permisos de notificación",Cerrar sesión,,,R,101
+I20,iOS,MED,Mi día,Agenda y fila de mi consultorio,"Citas del día, números asignados, resultados por revisar, hospitalizados",Llamar siguiente; abrir paciente,En vivo,,R,106
+I21,iOS,MED,Consulta,Atender,"Signos (de asistente), motivo, examen, diagnósticos con buscador CIE-10, receta, órdenes de laboratorio (catálogo en árbol)",Guardar; firmar,,Firma exige inscripción vigente,R,106
+I22,iOS,MED,Expediente,Historial del paciente,"Consultas, diagnósticos, recetas, resultados, hospitalizaciones",Pedir acceso excepcional si no es tratante,,Acceso auditado,R,106
+I23,iOS,MED,Resultados por revisar,Revisar y liberar,Lista; críticos arriba en rojo; detalle con rangos,Marcar revisado,Crítico avisa con push,,R,107
+I24,iOS,MED,Mis hospitalizados,Seguimiento y alta,"Pacientes, cama, días; alta con pendientes y responsables",Indicar hospitalización; firmar alta,,,R,108
+I25,iOS,MED,Llegada de ambulancia,Reporte prehospital,"Hora estimada, motivo, signos, prioridad",Marcar recibido,Llega en vivo y por push,,E,109
+I26,iOS,MED; todos los de personal,Mis turnos,Horario propio,Calendario de mis turnos publicados,Ninguna,Cambios en vivo,,R,103
+A30,Android,REC,Buscar o registrar paciente,Buscar antes de crear,Buscador con motivo de coincidencia; formulario de registro,Registrar; abrir ficha,,Búsqueda auditada,R,102
+A31,Android,REC,Emitir número de fila,Turno del día,"Servicio, paciente (opcional), número emitido grande",Emitir; reimprimir,,,R,105
+A32,Android,REC,Citas,Agenda y solicitudes,Agenda del día por médico; solicitudes,"Agendar, confirmar, rechazar",En vivo,,R,105
+A33,Android,REC,Verificar vinculaciones,Aprobar cuentas,Datos de la cuenta y candidato,Aprobar; rechazar,En vivo,,R,101
+A34,Android,REC,Admisión y cama,Admitir y asignar,Mismo flujo de W14 en móvil,Confirmar cama,En vivo,,R,108
+A35,Android,REC,Tablero de camas,Ver camas,"Por planta, colores y texto",Abrir cama,En vivo,Ocupante enmascarado salvo permiso,R,104
+A36,Android,REC,Despacho de ambulancia,Despachar desde el mostrador,"Estado, solicitudes, servicio activo",Confirmar y despachar,En vivo,,R,109
+A40,Android,AST,Mi consultorio,Mover la fila,Números asignados al consultorio y estado,Llamar siguiente; no se presentó,En vivo,Solo número e iniciales,R,105
+A41,Android,AST; ENF,Signos vitales,Tomar signos,"PA, FC, FR, temperatura, SatO2, peso, talla; fuera de rango resaltado",Guardar,,,R,106
+A50,Android,ENF,Mi planta,Pacientes del área,"Camas ocupadas del área, alertas (signos pendientes, resultados críticos)",Abrir paciente,En vivo,,R,108
+A51,Android,ENF,Paciente hospitalizado,Cuidado,"Signos, notas de enfermería, indicaciones",Registrar signos y notas,,,E,108
+A52,Android,ENF,Limpieza de camas,Liberar camas,Camas en limpieza; lista de verificación,Registrar limpieza; verificar la de otra persona,En vivo,,R,104
+A53,Android,ENF,Consumo de insumos,Registrar uso,"Artículo, cantidad, paciente opcional",Guardar,,,E,111
+A54,Android,ENF,Recepción de ambulancia,Prepararse para la llegada,"Reporte prehospital, hora estimada",Marcar recibido; pasar a admisión,En vivo,,E,109
+A60,Android,LAB,Cola de laboratorio,Trabajo del día,Órdenes por estado,Tomar muestra; capturar; completar,En vivo,,R,107
+A61,Android,LAB,Toma de muestra,Identificar paciente y registrar,"Paciente, exámenes, confirmación de identidad (dos datos)",Confirmar muestra,,,R,107
+A62,Android,LAB,Captura de resultados,Valores,Igual a W21,Guardar; completar,,,R,107
+A70,Android,PAR,Unidad,Estado de la ambulancia,Estado grande y servicio asignado,Aceptar servicio,En vivo con sonido,,R,109
+A71,Android,PAR,Servicio en curso,Hitos con botones grandes,"Salida, en escena, trasladando, en hospital, finalizado; dirección; tiempo transcurrido",Avanzar hito; abrir mapa,Ubicación enviada en vivo (extra),,R,109
+A72,Android,PAR,Reporte prehospital,Avisar antes de llegar,"Motivo, signos, prioridad, hora estimada; indicador de enviado o en cola",Enviar (se guarda si no hay señal),,,E,109
+A73,Android,PAR,Paciente sin identidad,Registrar NN,"Sexo, edad estimada, señas",Crear provisional,,No inventa datos,R,102
+A74,Android,PAR,Mi bitácora,Servicios propios,Servicios con tiempos,Ninguna,,,R,109

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="../Climesa.Platform/Climesa.Platform.csproj" />
+    <ProjectReference Include="../Modules/Identity/Climesa.Identity/Climesa.Identity.csproj" />
+    <ProjectReference Include="../Modules/Care/Climesa.Care/Climesa.Care.csproj" />
+    <ProjectReference Include="../Modules/Migration/Climesa.Migration/Climesa.Migration.csproj" />
+  </ItemGroup>
+</Project>

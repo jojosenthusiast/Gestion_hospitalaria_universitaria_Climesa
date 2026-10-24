@@ -1,0 +1,142 @@
+[
+  {
+    "id": "G801",
+    "title": "MTPS jornada arts.161–162",
+    "url": "https://www.mtps.gob.sv/2020/10/26/cuantas-horas-debo-trabajar-al-dia/",
+    "reading_status": "Página oficial consultada; explicación 2020, no lectura consolidada íntegra del Código.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G802",
+    "title": "MTPS Código de Trabajo y LGPRLT",
+    "url": "https://www.mtps.gob.sv/descargas/",
+    "reading_status": "Índice oficial localizado; textos íntegros/reglamentos/reformas laborales pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G803",
+    "title": "CSSP JVPM",
+    "url": "https://cssp.gob.sv/junta-de-vigilancia-de-la-profesion-medica/",
+    "reading_status": "Página oficial consultada: autorizaciones permanentes/provisionales/temporales; no verificación individual.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G804",
+    "title": "CSSP establecimientos/RTA",
+    "url": "https://cssp.gob.sv/establecimientos-y-servicios-de-salud/",
+    "reading_status": "Ficha oficial consultada/indexada; RTA específico/modalidad pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G805",
+    "title": "CSSP consulta profesionales",
+    "url": "https://www.cssp.gob.sv/profesionales/faces/consulta/buscar.xhtml",
+    "reading_status": "Portal localizado; no se consultó ni atribuyó registro a persona concreta.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G806",
+    "title": "MTPS organización SSO",
+    "url": "https://www.mtps.gob.sv/servicios/organizacion-de-sso/",
+    "reading_status": "Página oficial consultada, arts.8/12; texto legal íntegro y tamaño institucional pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G807",
+    "title": "OMS/OIT Caring for those who care 2022",
+    "url": "https://www.who.int/publications/i/item/9789240040779",
+    "reading_status": "Ficha oficial consultada; guía completa pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G808",
+    "title": "Norma calidad SNIS 2024",
+    "url": "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2024/12/107137.PDF",
+    "reading_status": "PDF oficial 14 páginas recuperado; artículos seleccionados revisados. Acuerdo1099 emitido30/10/2024 publicado18/12/2024.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G809",
+    "title": "OMS incident reporting 2020",
+    "url": "https://www.who.int/publications/i/item/9789240010338",
+    "reading_status": "Ficha oficial consultada; informe completo pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G810",
+    "title": "Norma atención segura 2023",
+    "url": "https://asp.salud.gob.sv/regulacion/normas.asp",
+    "reading_status": "Índice oficial localizado 18/09/2023; texto íntegro no revisado en esta entrega.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G811",
+    "title": "IAAS medición puntual 2026 e IAAS2021/reforma2022",
+    "url": "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/lineamientostecnicosparalamedicionpuntualdeinfeccionesasociadasalaatencionensaludenloshospitalesdelsnis-AE-708-09022026_v1.pdf",
+    "reading_status": "Documento2026 indexado localizado; IAAS2021 y reforma369/2022 en índices oficiales. Textos completos pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G812",
+    "title": "Ley derechos/deberes pacientes",
+    "url": "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2010-2019/2016/04/B7B3F.PDF",
+    "reading_status": "PDF oficial20p recuperado; arts.20/21/23/29 seleccionados revisados; reglamento íntegro pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G813",
+    "title": "Norma expediente clínico consolidada",
+    "url": "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2024/08/103F2E.PDF",
+    "reading_status": "PDF25p recuperado, incluye notas de reforma2026 pese a ruta2024. Artículos seleccionados revisados.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G814",
+    "title": "Reforma expediente Acuerdo698/2026",
+    "url": "https://www.jurisprudencia.gob.sv/DocumentosBoveda/R/2/2020-2029/2024/08/112741.HTML?embedded=true",
+    "reading_status": "Texto oficial consultado; emitido09/02/2026 publicadoDO55/T450 19/03/2026.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G815",
+    "title": "Ley protección datos consolidada",
+    "url": "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2024/11/10660E.PDF",
+    "reading_status": "PDF25p oficial recuperado; arts.2/15/16/18/47 y nota reforma659/2026 seleccionados. No dictamen integral.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G816",
+    "title": "Aiken et al. RN4CAST2014",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/24581683/",
+    "reading_status": "Registro/resumen indexado consultado; estudio retrospectivo observacional europeo; texto completo pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G817",
+    "title": "Landrigan et al. horas internos2004",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/15509817/",
+    "reading_status": "Resumen indexado consultado; intervención prospectiva aleatorizada en internos/UCI; texto íntegro pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G818",
+    "title": "MINSAL IAAS2021",
+    "url": "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/lineamientostecnicosparalaprevencionycontroldelasinfeccionesasociadasalaatencionensaludIAAS-Acuerdo-2933.pdf",
+    "reading_status": "Título/indexación oficial; reforma369 del12/01/2022 localizada. Texto consolidado pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G819",
+    "title": "Asamblea reforma protección datos659/2026",
+    "url": "https://www.asamblea.gob.sv/leyes-y-decretos/view/7022",
+    "reading_status": "Ficha oficial indexada confirma emisión17/09/2026; publicación18/09/2026 en notas G815. Decreto separado no recuperado.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "G820",
+    "title": "Políticas actuación datos2025",
+    "url": "https://www.jurisprudencia.gob.sv/busqueda/showFile.php?bd=2&cesta=0&data=DocumentosBoveda%2FD%2F2%2F2020-2029%2F2025%2F09%2F10D3DB.PDF&fecha=03%2F09%2F2025&number=1102811&numero=POLITICAS%3DDE%3DACTUACION%3DY%3DMANEJO%3DDE%3DDATOS%3DPERSONALES%3DDE%3DLA%3DLEY%3DPARA%3DLA%3DPROTECCI%C3%93N%3DDE%3DDATOS%3DPERSONALES&singlePage=false",
+    "reading_status": "Ficha oficial localizada; texto/ámbito/efecto de reforma2026 pendientes.",
+    "consulted": "2026-10-12"
+  }
+]

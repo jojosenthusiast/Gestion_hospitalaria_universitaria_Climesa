@@ -1,0 +1,45 @@
+﻿id,flujo,situacion,accion,resultado_esperado,task,estado
+AC401,INV01,Unidad logística,Recibir en cajas y consumir en unidad,Conversión versionada; no confundir dosis,T401,NO_EJECUTADO
+AC402,INV01,Concentración,Cambiar presentación similar,Revisión explícita; no equivalencia por nombre,T401,NO_EJECUTADO
+AC403,INV01,Propiedad,Recibir consignación,Saldo físico con dueño externo; no compra propia,T401,NO_EJECUTADO
+AC404,INV01,Lote contradictorio,Mismo lote con expiración/fabricante diferente,Conflicto visible sin sobrescritura,T401,NO_EJECUTADO
+AC405,CP01,Reorden,Stock alto pero todo bloqueado,Demanda usa cantidad utilizable/reservas/tránsito,T402,NO_EJECUTADO
+AC406,CP02,Enmienda orden,Cambiar precio/cantidad ya aprobados,Nueva versión/revisión según política,T402,NO_EJECUTADO
+AC407,CP03,Recepción parcial,Recibir parte de línea,Pendiente permanece con vínculos por lote,T403,NO_EJECUTADO
+AC408,CP03,Rechazo parcial,Aceptar parte y rechazar otra,Cantidad y calidad separadas,T403,NO_EJECUTADO
+AC409,CP03,Recepción repetida,Reenviar mismo origen,Un solo incremento de stock,T403,NO_EJECUTADO
+AC410,CP03,Lote oculto,Compra refiere lote desactivado,No reutilización silenciosa; revisión,T403,NO_EJECUTADO
+AC411,CP04,Calidad pendiente,Intentar dispensar cuarentena,Bloqueado sin falsear saldo físico,T403,NO_EJECUTADO
+AC412,CP05,Factura duplicada,Repetir documento emisor/tipo/ID,No segunda CxP,T404,NO_EJECUTADO
+AC413,CP05,Factura sin entrega,Cotejar cantidad no recibida,Excepción/aprobación o disputa; no inventar recepción,T404,NO_EJECUTADO
+AC414,CP05,Stock ya recibido,Contabilizar factura ligada a recepción,No segunda entrada física,T404,NO_EJECUTADO
+AC415,CP07,Proveedor inactivo,Consultar deuda histórica,Visible autorizado; compras nuevas restringidas,T404,NO_EJECUTADO
+AC416,INV03,Transferencia parcial,Enviar lote y recibir parcialmente,Tránsito y diferencia con custodio,T405,NO_EJECUTADO
+AC417,INV01,Reserva concurrente,Dos sesiones reservan mismo saldo,No sobre-reserva; conflicto controlado,T405,NO_EJECUTADO
+AC418,INV03,Stock de piso,Reponer y luego administrar,Una transferencia y un consumo coherentes,T405,NO_EJECUTADO
+AC419,INV06,Conteo concurrente,Salida durante corte/conteo,Movimiento posterior reconciliado; no borrado,T405,NO_EJECUTADO
+AC420,VAL01,Factura con diferencia,Costo definitivo distinto al provisional,Ajuste trazable; consumos/periodo revisados,T406,NO_EJECUTADO
+AC421,VAL01,Inventario inicial,Saldo sin costo comprobado,Pendiente explícito; no precio de venta como costo,T406,NO_EJECUTADO
+AC422,VAL01,Rotación vs valoración,FEFO y método contable distintos,Rotación y costo no se confunden,T406,NO_EJECUTADO
+AC423,MED02,Orden incompleta,Sin vía/unidad/pauta ejecutable,No activar para ejecución rutinaria,T407,NO_EJECUTADO
+AC424,MED02,Orden modificada,Cambiar pauta firmada,Nueva versión; historial y consumidores notificados,T407,NO_EJECUTADO
+AC425,MED02,Autoría,Usuario declara otro prescriptor,Delegación/autoridad explícita o rechazo,T407,NO_EJECUTADO
+AC426,MED03,Validación obsoleta,Cambio después de validar,Reevaluación relevante visible,T408,NO_EJECUTADO
+AC427,MED03,Sustitución,Producto alternativo por falta stock,Autorización/equivalencia documentadas,T408,NO_EJECUTADO
+AC428,MED04,Parcial,Dispensar en dos entregas,Solicitado/entregado/pendiente reconciliados,T409,NO_EJECUTADO
+AC429,INV04,Preparación,Usar varios lotes/insumos,Genealogía a preparación/dosis/residuo,T409,NO_EJECUTADO
+AC430,MED04,Recall tras reserva,Retiro antes de entrega,Entrega bloqueada; reserva revisada,T409,NO_EJECUTADO
+AC431,MED06,Dosis omitida,Registrar rechazo del paciente,No administración; motivo/aviso; no stock automático,T410,NO_EJECUTADO
+AC432,MED06,Infusión,Pausa/cambio/terminación,Eventos/tiempos y entrega turno conservados,T410,NO_EJECUTADO
+AC433,MED06,Registro tardío,Capturar después de ocurrir,Instante efectivo y captura distintos,T410,NO_EJECUTADO
+AC434,MED05,Cambio de turno,Pendiente sin aceptación,No desaparece; dueño/escalamiento,T410,NO_EJECUTADO
+AC435,MED08,Retorno físico,Devolver dosis no usada,Cuarentena/evaluación antes de disponible,T411,NO_EJECUTADO
+AC436,MED08,Ya administrado,Intentar retorno reutilizable,Rechazo y revisión; no reposición ficticia,T411,NO_EJECUTADO
+AC437,MED08,Corrección clínica,Marcar administración errónea,Adenda/evento; físico/cargo se revisan aparte,T411,NO_EJECUTADO
+AC438,MED10,Controlados,Residuo/descargo,Evidencia/custodia y norma local validada antes de producción,T412,NO_EJECUTADO
+AC439,INV05,Retiro insumo,Recall lote usado en preparación,Localiza preparaciones/custodios/pacientes expuestos,T412,NO_EJECUTADO
+AC440,MED10,Reacción,Registrar sospecha,Caso/dueño/seguimiento; reporte externo según norma,T412,NO_EJECUTADO
+AC441,E01,Evento repetido,Reenviar consumo/cargo,Un efecto económico por origen/hito,T413,NO_EJECUTADO
+AC442,E01,Omisión y factura,Dosis no dada con cargo previo,Revisión según contrato; no cobro/abono automático,T413,NO_EJECUTADO
+AC443,MED10,Caída y recuperación,Digitalizar registros contingencia,Deduplicación/autor/tiempo/custodia y pendientes,T414,NO_EJECUTADO
+AC444,MIG,Legacy libre,Migrar Reference/Dosage en texto,No activar órdenes ni fabricar enlaces paciente/producto,T414,NO_EJECUTADO

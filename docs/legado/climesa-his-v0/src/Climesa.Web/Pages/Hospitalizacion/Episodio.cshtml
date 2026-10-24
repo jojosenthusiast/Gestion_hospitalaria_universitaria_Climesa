@@ -1,0 +1,93 @@
+@page "{id:guid}"
+@model Climesa.Web.Pages.Hospitalizacion.EpisodioModel
+@{
+    ViewData["Title"] = "Episodio";
+    var e = Model.Episode;
+}
+@if (!string.IsNullOrEmpty(Model.Flash)) { <div class="alert ok">@Model.Flash</div> }
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+@if (e is not null)
+{
+    <h1>@Model.Patient?.DisplayName <span class="mono muted">@Model.Patient?.Mrn</span></h1>
+    <div class="grid">
+        <section class="card">
+            <h2>Hitos</h2>
+            <table>
+                <tr><th>Estado</th><td>@Labels.Es(e.Status)</td></tr>
+                <tr><th>Cama</th><td>@e.CurrentLocation</td></tr>
+                <tr><th>Servicio</th><td>@e.Service</td></tr>
+                <tr><th>Responsable</th><td>@e.Responsible</td></tr>
+                <tr><th>Ingreso</th><td>@LocalTime.Format(e.AdmittedAt)</td></tr>
+                <tr><th>Alta médica firmada</th><td>@LocalTime.Format(e.DischargeAt) @Labels.Es(e.DischargeType) @e.DischargeSignedBy</td></tr>
+                <tr><th>Salida física</th><td>@LocalTime.Format(e.ExitAt)</td></tr>
+            </table>
+            <p class="muted">La estancia se cobra hasta la firma del alta, no hasta la salida física (LDDPPSS Art. 29). Por eso son dos hitos distintos.</p>
+        </section>
+        @if (e.Status == "active" && Model.Can("care.discharge.sign"))
+        {
+            <section class="card">
+                <h2>Firmar alta médica</h2>
+                <form method="post" asp-page-handler="Discharge">
+                    <div class="row">
+                        <label>Tipo de egreso
+                            <select name="Type"><option value="medical">Alta médica</option><option value="voluntary">Alta voluntaria</option><option value="referred">Referido a otra institución</option><option value="death">Fallecimiento</option><option value="abandonment">Abandono</option></select>
+                        </label>
+                    </div>
+                    <details><summary>Datos para alta voluntaria, referencia o fallecimiento</summary>
+                        <div class="row">
+                            <label>Riesgos explicados <input name="RisksExplained" /></label>
+                            <label>Formulario firmado (referencia) <input name="VoluntaryForm" /></label>
+                            <label>Testigo 1 <input name="Witness1" /></label>
+                            <label>Testigo 2 <input name="Witness2" /></label>
+                        </div>
+                        <div class="row">
+                            <label>Institución de destino <input name="Destination" /></label>
+                            <label>Nombre de quien acepta <input name="Receiver" /></label>
+                            <label>Médico que certifica la defunción <input name="DeathCertifier" /></label>
+                        </div>
+                    </details>
+                    <h3>Pendientes al alta (resultados, citas, tareas)</h3>
+                    <div class="row"><label>Pendiente <input name="Pending1" placeholder="cultivo de orina en proceso" /></label><label>Responsable <input name="Owner1" /></label></div>
+                    <div class="row"><label>Pendiente <input name="Pending2" /></label><label>Responsable <input name="Owner2" /></label></div>
+                    <p class="muted">Se verifica en el momento de firmar que su inscripción en la junta de vigilancia esté vigente.</p>
+                    <button>Firmar alta</button>
+                </form>
+            </section>
+        }
+        @if (e.Status == "medical_discharge_signed")
+        {
+            <section class="card">
+                <h2>Después de la firma</h2>
+                @if (Model.Can("care.exit.record"))
+                {
+                    <form method="post" asp-page-handler="Exit"><button>Registrar salida física</button></form>
+                    <p class="muted">La cama pasará a "pendiente de limpieza", no a disponible.</p>
+                }
+                @if (Model.Can("care.discharge.sign"))
+                {
+                    <form method="post" asp-page-handler="Revoke" style="margin-top:12px" class="row">
+                        <label>Motivo de revocación <input name="Reason" placeholder="paciente presenta fiebre antes de salir" /></label>
+                        <div><button class="danger small">Revocar alta</button></div>
+                    </form>
+                }
+            </section>
+        }
+    </div>
+    @if (e.Continuity.Count > 0)
+    {
+        <section class="card">
+            <h2>Pendientes con responsable</h2>
+            <table>@foreach (var p in e.Continuity) { <tr><td>@p.Description</td><td>@p.Owner</td></tr> }</table>
+        </section>
+    }
+    <section class="card">
+        <h2>Bitácora del episodio</h2>
+        <table>
+            <tr><th>#</th><th>Evento</th><th>Hora del acto</th><th>Usuario</th><th>Detalle</th></tr>
+            @foreach (var ev in e.Events)
+            {
+                <tr><td>@ev.Id</td><td>@Labels.Es(ev.Kind) @if (ev.Cancels is not null) { <span class="tag warn">anula #@ev.Cancels</span> }</td><td>@LocalTime.Format(ev.ActAt)</td><td>@ev.Actor</td><td class="mono">@ev.Reason @ev.Payload</td></tr>
+            }
+        </table>
+    </section>
+}

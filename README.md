@@ -12,7 +12,9 @@ sghu-climesa/
 ├── ios/                  CLIMESA.xcodeproj (abrir en Xcode)
 ├── contrato/openapi.json contrato de la API, lo genera la API
 ├── supabase/             migraciones, semilla y pruebas
-├── specs/  tools/        especificaciones y utilidades
+├── docs/                 arquitectura, decisiones, investigación, diseño y gestión
+├── specs/                SDD por módulo (spec, plan y tasks)
+├── tools/                utilidades que generan y verifican la documentación
 ├── .github/workflows/    un workflow por plataforma
 └── README.md             instalación y ejecución
 ```
@@ -28,6 +30,7 @@ Cada componente tiene su propio workflow y solo se ejecuta cuando cambian sus ru
 | Android | `android/` | [![Android](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/android.yml/badge.svg)](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/android.yml) |
 | iOS | `ios/` | [![iOS](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/ios.yml/badge.svg)](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/ios.yml) |
 | Base de datos | `supabase/` | [![Supabase](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/supabase.yml/badge.svg)](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/supabase.yml) |
+| Documentación | `docs/`, `specs/` | [![Docs](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/docs.yml/badge.svg)](https://github.com/jojosenthusiast/Gestion_hospitalaria_universitaria_Climesa/actions/workflows/docs.yml) |
 
 ## Stack
 

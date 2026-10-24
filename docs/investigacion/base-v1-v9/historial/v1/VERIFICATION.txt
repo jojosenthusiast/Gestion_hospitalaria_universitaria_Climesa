@@ -1,0 +1,6 @@
+Research package validated on 2026-10-12.
+60 distinct catalogued source URLs; access level and limitations included.
+All explicit Sxx identifiers in Markdown exist in the catalogue.
+7 research Markdown documents, 2 source catalogues, this verification file.
+Static review only; no dotnet executable found; no application build/test/runtime or database migration.
+Original archive SHA-256: 3148aa3e0d4ed3598815d6e16cb6e22990db2e4a73fa88f46317725a759ad6f8

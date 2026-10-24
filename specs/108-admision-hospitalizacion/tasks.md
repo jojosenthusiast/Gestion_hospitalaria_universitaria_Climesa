@@ -1,0 +1,43 @@
+# 108. Tareas
+
+- [x] T01 · S2 · R · Migración de hospitalización con exclusión de ocupaciones y vista publicada
+  - Cubre: FR-108-05, FR-108-15
+  - Depende de: 104-T01
+  - Hecho cuando: dos ocupaciones traslapadas de la misma cama se rechazan en prueba
+  - Verificado: Aplicada en Supabase; prueba 1 (23P01) y 02_concurrencia.sh caso 2: 1 ocupación de 2 simultáneas
+- [ ] T02 · S4 · R · Crear admisión con origen y unicidad por paciente
+  - Cubre: FR-108-01, FR-108-02
+  - Depende de: T01, 102-T03
+  - Hecho cuando: segunda admisión activa del mismo paciente responde 409
+- [ ] T03 · S4 · R · Algoritmo de sugerencias en dominio con pruebas unitarias
+  - Cubre: FR-108-03, FR-108-04
+  - Depende de: T01
+  - Hecho cuando: los 10 casos de la tabla de reglas pasan, incluido el escenario 1
+- [ ] T04 · S4 · R · Asignación con bloqueo de habitación, aislamiento y conflictos
+  - Cubre: FR-108-05 a FR-108-08
+  - Depende de: T03
+  - Hecho cuando: escenarios 2 y 3 y la prueba de sexo opuesto concurrente pasan
+- [ ] T05 · S4 · R · Traslados con regla VIP
+  - Cubre: FR-108-10, FR-108-11
+  - Depende de: T04
+  - Hecho cuando: escenario 4 pasa y un traslado semiprivado deja la cama anterior en limpieza
+- [ ] T06 · S4 · R · Alta y salida física
+  - Cubre: FR-108-12, FR-108-13
+  - Depende de: T04, 103-T05
+  - Hecho cuando: escenario 5 pasa
+- [ ] T07 · S4 · R · Pantallas de admisión en web (W13 a W15) y Android (A34)
+  - Cubre: FR-108-03, FR-108-06, FR-108-14
+  - Depende de: T04, 120-T03, 121-T03
+  - Hecho cuando: el flujo completo funciona en web y Android con conflicto visible
+- [ ] T08 · S4 · R · Mis hospitalizados del médico y mi planta de enfermería
+  - Cubre: FR-108-14
+  - Depende de: T06
+  - Hecho cuando: el médico ve solo los suyos y enfermería solo su área
+- [ ] T09 · S5 · E · Reserva para admisión programada con vencimiento
+  - Cubre: FR-108-09
+  - Depende de: T04
+  - Hecho cuando: una reserva vence con el reloj de prueba y la cama vuelve a libre
+- [ ] T10 · S5 · E · Notas y signos de enfermería del hospitalizado
+  - Cubre: FR-108-16
+  - Depende de: T08
+  - Hecho cuando: enfermería del área registra y el médico lo ve

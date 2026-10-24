@@ -1,0 +1,82 @@
+{
+  "version": "0.3.0",
+  "date": "2026-10-24",
+  "backend": {
+    "suites": 7,
+    "testsPassed": 36,
+    "sqlInvariantChecks": 28,
+    "migrationsLoaded": 14,
+    "roles": 10,
+    "permissions": 75,
+    "openapiOperations": 28,
+    "runtime": "PGlite PostgreSQL WASM",
+    "authProvider": "simulated in tests only",
+    "invitationProvider": "simulated in tests only",
+    "build": "passed",
+    "cacheControl": "no-store"
+  },
+  "web": {
+    "productionBuild": "passed; index only; no fixtures",
+    "designBuild": "passed",
+    "rolesObserved": [
+      "ADM",
+      "JOP",
+      "REC",
+      "LAB",
+      "DPD"
+    ],
+    "pagesObserved": [
+      "pacientes",
+      "personal",
+      "usuarios",
+      "espacios",
+      "turnos",
+      "camas",
+      "auditoria",
+      "inicio"
+    ],
+    "widthsChecked": [
+      320,
+      390,
+      768,
+      1348
+    ],
+    "horizontalBodyOverflow": false,
+    "patientRegistrationWithoutDuiAndBirth": "passed with explicit fixtures",
+    "staffRegistrationWithMinimumFields": "passed with explicit fixtures",
+    "mobileDialog": {
+      "viewport": "320x844",
+      "width": 285,
+      "height": 820,
+      "scrollHeight": 1097
+    }
+  },
+  "android": {
+    "domainCompiler": "Kotlin 2.1.20 / JDK 17",
+    "domainTestsPassed": 16,
+    "fullGradleBuild": "not run; Android SDK unavailable",
+    "newApk": "not produced"
+  },
+  "ios": {
+    "swiftFilesSyntaxChecked": 8,
+    "xcodeProjectAndPlists": "parsed",
+    "xcodebuildAndSwiftTest": "not run; Xcode and Swift toolchain unavailable"
+  },
+  "remote": {
+    "supabaseTarget": "gvmvmrusscsfbndnbvbr",
+    "projectAccessibleViaConnections": false,
+    "newMigrationApplied": false,
+    "backendDeploymentVerified": false,
+    "liveMultiClientTest": "pending",
+    "nativePostgresRaceTest": "pending; Docker unavailable",
+    "ciRemote": "prepared; not run"
+  },
+  "figma": {
+    "modifiedInThisCut": false,
+    "reason": "User requested implementation and frontend first, synchronization later"
+  },
+  "notes": [
+    "Only code and local evidence are marked complete. External acceptance criteria remain open.",
+    "Previous Figma screenshots are archived and do not represent the new modules."
+  ]
+}

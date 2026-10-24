@@ -1,0 +1,12 @@
+{
+  "criteria": 72,
+  "tasks": 24,
+  "references": 24,
+  "code_hashes_unchanged": 58,
+  "history_byte_identical": true,
+  "markdown_fences_balanced": true,
+  "utf8": true,
+  "build": "NOT_RUN",
+  "sql": "NOT_RUN",
+  "clinical_acceptance": "NOT_RUN"
+}

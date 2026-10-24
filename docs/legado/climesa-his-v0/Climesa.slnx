@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Climesa.Platform/Climesa.Platform.csproj" />
+    <Project Path="src/Climesa.Web/Climesa.Web.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Care/">
+    <Project Path="src/Modules/Care/Climesa.Care.Contracts/Climesa.Care.Contracts.csproj" />
+    <Project Path="src/Modules/Care/Climesa.Care/Climesa.Care.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Climesa.Identity.Contracts/Climesa.Identity.Contracts.csproj" />
+    <Project Path="src/Modules/Identity/Climesa.Identity/Climesa.Identity.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Migration/">
+    <Project Path="src/Modules/Migration/Climesa.Migration/Climesa.Migration.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Climesa.Tests/Climesa.Tests.csproj" />
+  </Folder>
+</Solution>

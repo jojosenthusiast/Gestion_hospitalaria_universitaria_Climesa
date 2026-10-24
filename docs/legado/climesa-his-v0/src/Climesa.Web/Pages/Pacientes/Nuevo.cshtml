@@ -1,0 +1,52 @@
+@page
+@model Climesa.Web.Pages.Pacientes.NuevoModel
+@{
+    ViewData["Title"] = "Registrar paciente";
+}
+<h1>Registrar paciente</h1>
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+<form method="post" class="card">
+    <input type="hidden" name="Token" value="@Model.Token" />
+    <input type="hidden" name="Key" value="@Model.Key" />
+    <h2>Nombre (Ley del Nombre de la Persona Natural)</h2>
+    <div class="row">
+        <label>Nombres <input name="GivenNames" value="@Model.GivenNames" /></label>
+        <label>Primer apellido <input name="FirstSurname" value="@Model.FirstSurname" /></label>
+        <label>Segundo apellido <input name="SecondSurname" value="@Model.SecondSurname" /></label>
+        <label>Apellido de casada (opcional) <input name="MarriedSurname" value="@Model.MarriedSurname" /></label>
+    </div>
+    <h2 style="margin-top:14px">Nacimiento y sexo</h2>
+    <div class="row">
+        <label>Precisión
+            <select name="BirthPrecision">
+                <option value="exact">Fecha exacta</option>
+                <option value="year_month">Mes y año</option>
+                <option value="year">Solo año</option>
+                <option value="estimated">Edad estimada</option>
+                <option value="unknown">Desconocida</option>
+            </select>
+        </label>
+        <label>Fecha <input name="BirthDate" type="date" value="@Model.BirthDate?.ToString("yyyy-MM-dd")" /></label>
+        <label>Edad estimada (años) <input name="EstimatedAge" type="number" value="@Model.EstimatedAge" /></label>
+        <label>Sexo (documento)
+            <select name="Sex"><option value="female">Femenino</option><option value="male">Masculino</option><option value="not_recorded">No registrado</option><option value="unknown">Desconocido</option></select>
+        </label>
+    </div>
+    <h2 style="margin-top:14px">Documentos</h2>
+    <div class="row">
+        <label>DUI <input name="Dui" value="@Model.Dui" placeholder="00000000-0" /></label>
+        <label>Otro documento
+            <select name="OtherType"><option value="">(ninguno)</option><option value="pasaporte">Pasaporte</option><option value="nui">NUI</option><option value="partida_nacimiento">Partida de nacimiento</option><option value="carne_minoridad">Carné de minoridad</option><option value="carne_residente">Carné de residente</option></select>
+        </label>
+        <label>Número <input name="OtherValue" value="@Model.OtherValue" /></label>
+        <label>Emisor (país, municipio) <input name="OtherIssuer" value="@Model.OtherIssuer" /></label>
+    </div>
+    <h2 style="margin-top:14px">Contacto y origen del dato</h2>
+    <div class="row">
+        <label>Municipio <input name="Municipality" value="@Model.Municipality" /></label>
+        <label>Dirección <input name="AddressText" value="@Model.AddressText" /></label>
+        <label>Teléfono <input name="Phone" value="@Model.Phone" /></label>
+        <label>Quién dio los datos <input name="Informant" value="@Model.Informant" placeholder="el paciente, hija Ana López..." /></label>
+    </div>
+    <div style="margin-top:16px"><button>Registrar</button> <a class="btn secondary" href="/Pacientes">Volver a buscar</a></div>
+</form>

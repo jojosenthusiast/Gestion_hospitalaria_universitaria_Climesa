@@ -1,0 +1,33 @@
+@page "{id:guid}"
+@model Climesa.Web.Pages.Migracion.LoteModel
+@{
+    ViewData["Title"] = "Lote de migración";
+    var b = Model.Batch;
+}
+@if (!string.IsNullOrEmpty(Model.Flash)) { <div class="alert ok">@Model.Flash</div> }
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+@if (b is not null)
+{
+    <h1>Lote @b.SourceName</h1>
+    <section class="card">
+        <table>
+            <tr><th>Huella SHA-256 del archivo</th><td class="mono">@b.Fingerprint</td></tr>
+            <tr><th>Versión de transformación</th><td class="mono">@b.TransformVersion</td></tr>
+            <tr><th>Operador</th><td>@b.Operator</td></tr>
+            <tr><th>Conciliación</th><td>@b.Read leídas = @b.Created creadas + @b.Matched encontradas + @b.Rejected rechazadas + @b.Pending pendientes · <span class="tag @(b.Status == "completed" ? "ok" : "bad")">@Labels.Es(b.Status)</span></td></tr>
+            <tr><th>Muestra de caracteres</th><td class="mono">@b.CharacterSample</td></tr>
+        </table>
+    </section>
+    <section class="card">
+        <h2>Filas</h2>
+        <table>
+            <tr><th>Línea</th><th>Expediente en papel</th><th>Resultado</th><th>Regla</th><th>Detalle</th><th></th></tr>
+            @foreach (var i in Model.Items)
+            {
+                var css = i.Outcome switch { "created" => "ok", "matched" => "", "rejected" => "bad", _ => "warn" };
+                <tr><td>@i.LineNo</td><td class="mono">@i.LegacyNumber</td><td><span class="tag @css">@Labels.Es(i.Outcome)</span></td><td class="mono">@i.Rule</td><td>@i.Detail</td>
+                    <td>@if (i.PersonId is not null && Model.Can("identity.view")) { <a href="/Pacientes/Detalle/@i.PersonId">paciente</a> }</td></tr>
+            }
+        </table>
+    </section>
+}

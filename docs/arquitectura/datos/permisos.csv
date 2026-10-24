@@ -1,0 +1,76 @@
+permiso,descripcion,ADM,JOP,REC,AST,ENF,MED,LAB,PAR,DPD,PAC
+sesion.perfil,Ver su propio perfil y permisos,x,x,x,x,x,x,x,x,x,x
+cuenta.vincular,Pedir la vinculación de su cuenta con su expediente,,,,,,,,,,propio
+cuentas.verificar,Aprobar o rechazar vinculaciones de pacientes,,,x,,,,,,,
+usuarios.ver,Ver usuarios del sistema,x,,,,,,,,x,
+usuarios.invitar,Invitar personal y crear su cuenta,x,,,,,,,,,
+usuarios.asignar_roles,Asignar o quitar roles (nunca a sí mismo),x,,,,,,,,,
+usuarios.desactivar,Desactivar una cuenta,x,,,,,,,,,
+pacientes.buscar,Buscar pacientes (datos mínimos),,x,x,x,x,x,x,x,,
+pacientes.registrar,Registrar paciente tras buscar,,,x,,,,,,,
+pacientes.registrar_provisional,Registrar paciente sin identidad confirmada,,,x,,x,,,x,,
+pacientes.ver_ficha,Ver datos personales del paciente,,x,x,x,x,relacion,x,relacion,,propio
+pacientes.editar_demograficos,Corregir datos personales con historial,,,x,,,,,,,
+pacientes.gestionar_duplicados,Revisar casos de posible duplicado,,x,x,,,,,,,
+expediente.ver,Ver historial clínico,,,,,relacion,relacion,,,,propio_revisado
+personal.ver,Ver personal de salud,x,x,,,,,,,,
+personal.gestionar,Crear y editar personal e inscripciones,x,,,,,,,,,
+turnos.ver,Ver horarios del personal,x,x,x,x,x,x,x,x,,
+turnos.planificar,Crear y editar turnos,,x,,,,,,,,
+turnos.publicar,Publicar una planificación,,x,,,,,,,,
+espacios.ver,Ver el árbol del edificio,x,x,x,x,x,x,,,,
+espacios.configurar,Crear y editar espacios y capacidades,x,,,,,,,,,
+camas.ver_tablero,Ver tablero de camas sin ocupantes,,x,x,,x,x,,,,
+camas.ver_ocupante,Ver qué paciente ocupa una cama,,x,x,,area,relacion,,,,propio
+camas.asignar,Asignar cama a una admisión,,x,x,,,,,,,
+camas.trasladar,Trasladar a otra cama,,x,x,,,,,,,
+camas.bloquear,Bloquear o desbloquear una cama,,x,,,,,,,,
+camas.registrar_limpieza,Registrar limpieza de cama,,,,,x,,,,,
+camas.verificar_limpieza,Verificar limpieza (otra persona),,x,,,x,,,,,
+recursos.gestionar,Equipo médico por espacio y su estado,,x,,,,,,,,
+recursos.configurar,Tipos de equipo y catálogos de recursos,x,,,,,,,,,
+fila.emitir,Emitir número de fila,,,x,,,,,,,
+fila.ver,Ver la fila del día,,x,x,x,,x,,,,propio
+fila.llamar,Llamar un número,,,,x,,x,,,,
+fila.gestionar,Cambiar estado de un número,,,x,x,,x,,,,
+citas.ver,Ver citas,,x,x,x,,propio,,,,propio
+citas.agendar,Agendar y confirmar citas,,,x,,,,,,,
+citas.solicitar,Pedir una cita,,,,,,,,,,propio
+citas.cancelar,Cancelar una cita,,,x,,,,,,,propio
+consulta.iniciar,Iniciar consulta desde número o cita,,,,,,x,,,,
+consulta.registrar,"Registrar motivo, examen, diagnóstico y plan",,,,,,relacion,,,,
+consulta.corregir,Corregir una consulta firmada con addendum,,,,,,autor,,,,
+signos.registrar,Registrar signos vitales,,,,x,x,x,,x,,
+recetas.emitir,Emitir receta,,,,,,relacion,,,,
+laboratorio.ordenar,Emitir orden de laboratorio,,,,,,relacion,,,,
+laboratorio.ver_cola,Ver cola de órdenes,,,,,,,x,,,
+laboratorio.procesar,Tomar muestra y capturar resultados,,,,,,,x,,,
+laboratorio.validar,Completar una orden validada,,,,,,,x,,,
+laboratorio.cancelar,Cancelar una orden,,,,,,autor,x,,,
+laboratorio.revisar,Revisar resultado y liberarlo al paciente,,,,,,relacion,,,,
+resultados.ver,Ver valores de resultados,,,,,relacion,relacion,x,,,propio_revisado
+catalogo.configurar,"Exámenes, paneles y rangos de referencia",x,,,,,,,,,
+admision.solicitar,Indicar hospitalización,,,,,,relacion,,,,
+admision.crear,Crear admisión con su origen,,x,x,,,,,,,
+admision.autorizar,Autorizar excepciones de admisión,,x,,,,,,,,
+admision.ver,Ver admisiones activas,,x,x,,area,relacion,,,,propio
+admision.registrar_salida,Registrar salida física,,,x,,x,,,,,
+alta.firmar,Firmar alta médica,,,,,,relacion,,,,
+enfermeria.registrar,Notas de enfermería,,,,,area,,,,,
+ambulancia.ver_estado,Ver estado de la ambulancia,,x,x,,,x,,x,,
+ambulancia.solicitar,Pedir ambulancia,,,x,,,,,,,propio
+ambulancia.despachar,Confirmar solicitudes y despachar,,x,x,,,,,,,
+ambulancia.operar,Hitos del servicio y ubicación,,,,,,,,x,,
+ambulancia.reportar_prehospital,Enviar datos del paciente antes de llegar,,,,,,,,x,,
+ambulancia.recibir_prehospital,Ver el reporte prehospital,,x,x,,x,x,,,,
+ambulancia.mantenimiento,Poner y quitar mantenimiento,,x,,,,,,,,
+ambulancia.ver_bitacora,Ver bitácora filtrable,,x,x,,,,,propio,x,
+privacidad.solicitar_acceso,Pedir acceso excepcional a datos clínicos,x,x,,,,x,,,,
+privacidad.aprobar_acceso,Aprobar o negar accesos excepcionales,,,,,,,,,x,
+auditoria.ver,Consultar y verificar auditoría,,,,,,,,,x,
+auditoria.mis_accesos,Ver quién consultó mi expediente,,,,,,,,,,propio
+inventario.ver,Ver existencias,,x,,,x,,x,,,
+inventario.mover,"Registrar entradas, salidas, ajustes y traslados",,x,,,consumo,,reactivos,,,
+inventario.configurar,"Artículos, bodegas y mínimos",x,x,,,,,,,,
+avisos.publicar,Publicar avisos generales,,x,,,,,,,,
+metricas.ver,Ver métricas y tablero,x,x,,,,,,,x,

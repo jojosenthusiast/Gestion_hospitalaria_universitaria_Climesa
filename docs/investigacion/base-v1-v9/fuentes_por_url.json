@@ -1,0 +1,604 @@
+{
+  "https://www.bahmni.org/billing-and-accounting": [
+    "V1:S01"
+  ],
+  "https://bahmni.atlassian.net/wiki/spaces/BAH/pages/2392073/Implementer%2Bs%2BGuide": [
+    "V1:S02"
+  ],
+  "https://www.bahmni.org/implementations": [
+    "V1:S03"
+  ],
+  "https://github.com/Bahmni/bahmni-docker": [
+    "V1:S04"
+  ],
+  "https://openmrs.org/product/": [
+    "V1:S05"
+  ],
+  "https://github.com/openmrs/openmrs-core": [
+    "V1:S06"
+  ],
+  "https://www.open-emr.org/wiki/index.php/OpenEMR_Features": [
+    "V1:S07"
+  ],
+  "https://github.com/openemr/openemr": [
+    "V1:S08"
+  ],
+  "https://docs.gnuhealth.org/his/features.html": [
+    "V1:S09"
+  ],
+  "https://docs.gnuhealth.org/his/userguide/": [
+    "V1:S10"
+  ],
+  "https://healthcare.frappe.io/docs/v13/user/manual/en/healthcare/introduction": [
+    "V1:S11"
+  ],
+  "https://github.com/frappe/healthcare": [
+    "V1:S12"
+  ],
+  "https://www.open-hospital.org/documentation/": [
+    "V1:S13"
+  ],
+  "https://www.open-hospital.org/wp-content/OH_manuals/user/UserManual.html": [
+    "V1:S14"
+  ],
+  "https://hospitalrun.io/": [
+    "V1:S15"
+  ],
+  "https://openelis-global.org/": [
+    "V1:S16"
+  ],
+  "https://www.orthanc-server.com/static.php?page=documentation": [
+    "V1:S17"
+  ],
+  "https://github.com/OHIF/Viewers": [
+    "V1:S18"
+  ],
+  "https://www.epic.com/software/access-and-revenue-cycle/": [
+    "V1:S19"
+  ],
+  "https://www.oracle.com/europe/health/clinical-financial-operations/": [
+    "V1:S20"
+  ],
+  "https://ehr.meditech.com/ehr-solutions/meditechs-revenue-cycle": [
+    "V1:S21"
+  ],
+  "https://ehr.meditech.com/ehr-solutions/meditech-expanse-acute-care": [
+    "V1:S22"
+  ],
+  "https://www.intersystems.com/es/productos/trakcare/": [
+    "V1:S23"
+  ],
+  "https://bionexo.com/tasy/": [
+    "V1:S24"
+  ],
+  "https://www.gov.br/hubrasil/pt-br/governanca/plataformas-e-tecnologias/aghu": [
+    "V1:S25"
+  ],
+  "https://docs.dhis2.org/es_419/implement/tracker-implementation/introduction.html": [
+    "V1:S26"
+  ],
+  "https://guides.ohie.org/arch-spec/5.0-es/openhie-component-specifications-1/client-registry": [
+    "V1:S27"
+  ],
+  "https://guides.ohie.org/arch-spec/main-1/openhie-component-specifications-1/openhie-shared-health-record-shr": [
+    "V1:S28"
+  ],
+  "https://github.com/openhie/openhim-core": [
+    "V1:S29"
+  ],
+  "https://hl7.org/fhir/workflow.html": [
+    "V1:S30"
+  ],
+  "https://hl7.org/fhir/security.html": [
+    "V1:S31"
+  ],
+  "https://hl7.org/fhir/auditevent.html": [
+    "V1:S32"
+  ],
+  "https://profiles.ihe.net/ITI/": [
+    "V1:S33"
+  ],
+  "https://www.dicomstandard.org/current": [
+    "V1:S34"
+  ],
+  "https://specifications.openehr.org/": [
+    "V1:S35"
+  ],
+  "https://loinc.org/kb/users-guide": [
+    "V1:S36"
+  ],
+  "https://www.snomed.org/licensing": [
+    "V1:S37"
+  ],
+  "https://www.who.int/es/publications/i/item/9789240010567": [
+    "V1:S38"
+  ],
+  "https://www.who.int/publications/m/item/who-digital-accelerator-kits": [
+    "V1:S39"
+  ],
+  "https://smart.who.int/ig-starter-kit/l2_templates.html": [
+    "V1:S40"
+  ],
+  "https://www.paho.org/es/documentos/conjunto-recomendaciones-basicas-modelo-madurez-sistemas-informacion-para-salud": [
+    "V1:S41"
+  ],
+  "https://healthit.gov/clinical-quality-and-safety/safer-guides": [
+    "V1:S42"
+  ],
+  "https://www.nist.gov/cyberframework": [
+    "V1:S43"
+  ],
+  "https://owasp.org/projects/asvs?tab=main": [
+    "V1:S44"
+  ],
+  "https://www.gs1.org/industries/healthcare/standards": [
+    "V1:S45"
+  ],
+  "https://www.who.int/publications/i/item/9789241598590": [
+    "V1:S46"
+  ],
+  "https://www.who.int/es/publications/i/item/9789241548274": [
+    "V1:S47"
+  ],
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC5874496/": [
+    "V1:S48"
+  ],
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC7657707/": [
+    "V1:S49"
+  ],
+  "https://dotnet.microsoft.com/en-us/platform/support/policy": [
+    "V1:S50"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/15905487/": [
+    "V1:S51"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/20445181/": [
+    "V1:S52",
+    "V4:S412"
+  ],
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC3120130/": [
+    "V1:S53"
+  ],
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC10593710/": [
+    "V1:S54"
+  ],
+  "https://asp.salud.gob.sv/regulacion/pdf/norma/normatecnicadelexpedienteclinico-Acuerdo-Ejecutivo-1616-30052024_v1-reforma1.pdf": [
+    "V1:S55",
+    "V3:S316"
+  ],
+  "https://www.asamblea.gob.sv/leyes-y-decretos/decretos-por-anios/2024/0": [
+    "V1:S56"
+  ],
+  "https://www.asamblea.gob.sv/leyes-y-decretos/view/7022": [
+    "V1:S57",
+    "V2:V2-03",
+    "V8:G819"
+  ],
+  "https://www.asamblea.gob.sv/node/14116": [
+    "V1:S58"
+  ],
+  "https://transparencia.mh.gob.sv/downloads/pdf/700-DGII-MN-2023-002.pdf": [
+    "V1:S59"
+  ],
+  "https://factura.gob.sv/wp-content/uploads/2021/11/FESVDGIIMH_GuiaIntegracionFacturaElectronicasSV.pdf": [
+    "V1:S60"
+  ],
+  "https://www.facebook.com/Hospitalclimesaoficial/posts/hospital-climesa-santa-ananuestros-servicios-consulta-m%C3%A9dica-laboratorio-cl%C3%ADnico/1198571117253088/": [
+    "V2:V2-01"
+  ],
+  "https://www.jurisprudencia.gob.sv/DocumentosBoveda/R/2/2020-2029/2024/08/112741.HTML?embedded=true": [
+    "V2:V2-02",
+    "V8:G814"
+  ],
+  "https://cssp.gob.sv/download/rta-hospital-general-jvpm-ex-cd-r-32-3/": [
+    "V2:V2-04"
+  ],
+  "https://cssp.gob.sv/documents/rta-hospital-general-jvplc-ex-cd-r-32-3/": [
+    "V2:V2-05"
+  ],
+  "https://factura.gob.sv/informacion-tecnica-y-funcional/": [
+    "V2:V2-06"
+  ],
+  "https://hl7.org/fhir/R4/financial-module.html": [
+    "V2:V2-07"
+  ],
+  "https://hl7.org/fhir/R4/chargeitem.html": [
+    "V2:V2-08"
+  ],
+  "https://docs.frappe.io/erpnext/immutable-ledger-in-erpnext": [
+    "V2:V2-09"
+  ],
+  "https://bahmni.atlassian.net/wiki/spaces/BAH/pages/32604217/Patient%2BBilling%2Band%2BAccounting": [
+    "V2:V2-10"
+  ],
+  "https://bahmni.atlassian.net/wiki/spaces/BAH/pages/899973149/Odoo%2Bmodules": [
+    "V2:V2-11"
+  ],
+  "https://www.who.int/publications-detail-redirect/9789241548274": [
+    "V2:V2-12",
+    "V5:L508"
+  ],
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC3329208/": [
+    "V2:V2-13"
+  ],
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC9351241/": [
+    "V2:V2-14"
+  ],
+  "https://arxiv.org/abs/2005.14248": [
+    "V2:V2-15"
+  ],
+  "https://www.who.int/publications/i/item/9789240010567": [
+    "V2:V2-16"
+  ],
+  "https://www.odoo.com/documentation/19.0/applications/finance/accounting.html": [
+    "V2:V2-17"
+  ],
+  "https://github.com/frappe/erpnext/blob/develop/erpnext/accounts/README.md": [
+    "V2:V2-18"
+  ],
+  "https://hl7.org/fhir/R4/patient.html": [
+    "V3:S301"
+  ],
+  "https://hl7.org/fhir/R4/encounter.html": [
+    "V3:S302"
+  ],
+  "https://hl7.org/fhir/R4/episodeofcare.html": [
+    "V3:S303"
+  ],
+  "https://profiles.ihe.net/ITI/PMIR/volume-1.html": [
+    "V3:S304"
+  ],
+  "https://www.jointcommission.org/en-us/knowledge-library/support-center/standards-interpretation/standards-faqs/000001463": [
+    "V3:S305"
+  ],
+  "https://docs.openmrs.org/doc/org/openmrs/api/PatientService.html": [
+    "V3:S306"
+  ],
+  "https://docs.gnuhealth.org/his/userguide/patientmanagement/patientmanagement.html": [
+    "V3:S307"
+  ],
+  "https://docs.gnuhealth.org/his/userguide/modules/pediatrics.html": [
+    "V3:S308"
+  ],
+  "https://hl7.org/fhir/R4/chargeitemdefinition.html": [
+    "V3:S309"
+  ],
+  "https://docs.frappe.io/erpnext/payment-reconciliation": [
+    "V3:S310"
+  ],
+  "https://docs.frappe.io/erpnext/payment-entry": [
+    "V3:S311"
+  ],
+  "https://www.odoo.com/documentation/19.0/applications/finance/accounting/reporting/year_end.html": [
+    "V3:S312"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/23304405/": [
+    "V3:S313"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/29076957/": [
+    "V3:S314"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/27134610/": [
+    "V3:S315"
+  ],
+  "https://factura.gob.sv/download/3-manual-funcional-del-sistema-de-transmision-amplia-la-aplicacion-de-las-estructuras-de-los-dte-y-los-eventos-asi-como-contiene-las-pruebas-minimas-requeridas/": [
+    "V3:S317"
+  ],
+  "https://factura.gob.sv/normativa/": [
+    "V3:S318"
+  ],
+  "https://sitio.aduana.gob.sv/download/ley-de-impuesto-a-la-transferencia-de-bienes-muebles-y-a-la-prestacion-de-servicios-actualizada-con-d-o-no-193-t-425-15-de-octubre-de-2019/": [
+    "V3:S319"
+  ],
+  "https://docs.frappe.io/erpnext/purchase-receipt": [
+    "V4:S401"
+  ],
+  "https://docs.frappe.io/erpnext/stock-received-but-not-billed": [
+    "V4:S402"
+  ],
+  "https://docs.frappe.io/erpnext/fifo-and-moving-average": [
+    "V4:S403"
+  ],
+  "https://docs.frappe.io/erpnext/purchase-invoice": [
+    "V4:S404"
+  ],
+  "https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/purchase/manage_deals/manage.html": [
+    "V4:S405"
+  ],
+  "https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/shipping_receiving/daily_operations/owned_stock.html": [
+    "V4:S406"
+  ],
+  "https://www.who.int/publications/m/item/trs-1025-annex-7": [
+    "V4:S407"
+  ],
+  "https://www.hl7.org/fhir/R4/medicationrequest.html": [
+    "V4:S408"
+  ],
+  "https://www.hl7.org/fhir/R4/medicationdispense.html": [
+    "V4:S409"
+  ],
+  "https://hl7.org/fhir/R4/medicationadministration.html": [
+    "V4:S410"
+  ],
+  "https://www.who.int/publications/i/item/WHO-UHC-SDS-2019.9": [
+    "V4:S411"
+  ],
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC2442264/": [
+    "V4:S413"
+  ],
+  "https://pmc.ncbi.nlm.nih.gov/articles/PMC7646849/": [
+    "V4:S414"
+  ],
+  "https://docs.gnuhealth.org/his/userguide/basics/coremodule/prescriptions.html": [
+    "V4:S415"
+  ],
+  "https://docs.gnuhealth.org/his/userguide/healthcenter/products.html": [
+    "V4:S416"
+  ],
+  "https://bahmni.atlassian.net/wiki/spaces/BAH/pages/3719561222/Medication%2BAdministration%2BAnd%2BNon%2BMedication%2BTasks": [
+    "V4:S417"
+  ],
+  "https://www.srs.gob.sv/?wpdmpro=lineamiento-para-el-manejo-de-medicamentos-controlados-en-establecimientos-de-salud": [
+    "V4:S418"
+  ],
+  "https://www.srs.gob.sv/wp-content/uploads/2025/10/Guia-para-la-Evaluacion-de-Buenas-Practicas-de-Almacenamiento-y-Transporte-Aplicadas-a-Droguerias-y-Centros-de-Almacenamiento.pdf": [
+    "V4:S419"
+  ],
+  "https://www.srs.gob.sv/?wpdmcategory=herramientas-ctft": [
+    "V4:S420"
+  ],
+  "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/lineamientostecnicosparaladisposicionfinaldemedicamentosvacunasinsumosyquimicospeligrososydeterioradosyvencidos-Acuerdo-Ejecutivo-1439-06052024_v2.pdf": [
+    "V4:S421"
+  ],
+  "https://www.who.int/publications/m/item/trs-1044-annex-8-shelf-life-medical-products-delivery": [
+    "V4:S422"
+  ],
+  "https://hl7.org/fhir/R4/servicerequest.html": [
+    "V5:L501"
+  ],
+  "https://hl7.org/fhir/R4/specimen.html": [
+    "V5:L502"
+  ],
+  "https://hl7.org/fhir/R4/diagnosticreport.html": [
+    "V5:L503"
+  ],
+  "https://hl7.org/fhir/R4/observation.html": [
+    "V5:L504"
+  ],
+  "https://loinc.org/kb/users-guide/major-parts-of-a-loinc-term": [
+    "V5:L505"
+  ],
+  "https://ucum.org/ucum": [
+    "V5:L506"
+  ],
+  "https://profiles.ihe.net/PaLM/index.html": [
+    "V5:L507"
+  ],
+  "https://profiles.ihe.net/RAD/": [
+    "V5:L509"
+  ],
+  "https://dicom.nema.org/medical/dicom/current/output/chtml/part04/chapter_K.html": [
+    "V5:L510"
+  ],
+  "https://dicom.nema.org/medical/dicom/current/output/chtml/part04/chapter_J.html": [
+    "V5:L511"
+  ],
+  "https://orthanc.uclouvain.be/book/dicom-guide.html": [
+    "V5:L512"
+  ],
+  "https://orthanc.uclouvain.be/book/faq/security.html": [
+    "V5:L513"
+  ],
+  "https://openelis-global.org/features-and-functionality/": [
+    "V5:L514"
+  ],
+  "https://scholars.duke.edu/publication/1111710": [
+    "V5:L515"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/24154834/": [
+    "V5:L516"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/22278302/": [
+    "V5:L517"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/26374896/": [
+    "V5:L518"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/10579608/": [
+    "V5:L519"
+  ],
+  "https://uwdigi.atlassian.net/wiki/spaces/OG/pages/1648361491": [
+    "V5:L520"
+  ],
+  "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2023/09/FBDBC.PDF": [
+    "V5:L521"
+  ],
+  "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2025/11/10E9FA.PDF": [
+    "V5:L522"
+  ],
+  "https://docs.bvsalud.org/biblioref/2023/07/1438494/manualdeprocesosyprocedimientosparaanalisisclinicosdemuestrasb_iTh9M40.pdf": [
+    "V5:L523"
+  ],
+  "https://www.salud.gob.sv/direccion-de-proteccion-radiologica/": [
+    "V5:L524"
+  ],
+  "https://asp.salud.gob.sv/regulacion/normas.asp": [
+    "V5:L525",
+    "V8:G810"
+  ],
+  "https://www.who.int/tools/triage": [
+    "V6:E601"
+  ],
+  "https://www.who.int/publications/i/item/basic-emergency-care-approach-to-the-acutely-ill-and-injured": [
+    "V6:E602"
+  ],
+  "https://asp.salud.gob.sv/regulacion/pdf/otrosdoc/procedimientopararealizareltriageenelprimerniveldeatencion-Acuerdo-Ejecutivo-2456-BIS-29092025_v1.pdf": [
+    "V6:E603"
+  ],
+  "https://cdn.who.int/media/docs/default-source/patient-safety/9789241598590-eng.pdf": [
+    "V6:E604"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/19144931/": [
+    "V6:E605"
+  ],
+  "https://www.ices.on.ca/publications/journal-articles/introduction-of-surgical-safety-checklists-in-ontario-canada/": [
+    "V6:E606"
+  ],
+  "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2025/11/10FA00.PDF": [
+    "V6:E607"
+  ],
+  "https://asp.salud.gob.sv/regulacion/lineamientos.asp": [
+    "V6:E608",
+    "V7:H723"
+  ],
+  "https://www.cdc.gov/infection-control/hcp/disinfection-sterilization/summary-recommendations.html": [
+    "V6:E609"
+  ],
+  "https://docs.bvsalud.org/biblioref/2023/09/1510000/manualdeprocesosyprocedimientosparalagestiondelasangreinmunohe_DcZKGz5.pdf": [
+    "V6:E610"
+  ],
+  "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/lineamientostecnicosparalaatencionapersonasquerechazanlaterapiacontransfusiondehemocomponentes-Acuerdo1039.pdf": [
+    "V6:E611"
+  ],
+  "https://www.isbtweb.org/resource/tb-004-isbt-128-and-traceability-v1-1-0-pdf.html": [
+    "V6:E612"
+  ],
+  "https://www.who.int/publications/i/item/9789241549844": [
+    "V6:E613"
+  ],
+  "https://www.isbtweb.org/resource/isbt-working-party-on-information-technology-guideline-on-external-electronic-communication-of-transfusion-traceability-information.html": [
+    "V6:E614"
+  ],
+  "https://www.who.int/publications/i/item/9789241549851": [
+    "V6:E615"
+  ],
+  "https://www.who.int/teams/integrated-health-services/patient-safety/research/safe-surgery/tool-and-resources": [
+    "V6:E616"
+  ],
+  "https://www.who.int/tools/clinical-checklists": [
+    "V6:E617"
+  ],
+  "https://www.who.int/teams/health-product-policy-and-standards/standards-and-specifications/blood-and-products-of-human-origin/haemovigilance": [
+    "V6:E618"
+  ],
+  "https://asp.salud.gob.sv/regulacion/pdf/manual/manualdeprocesosyprocedimientosdeatenciondesaludintegralenhospitalizacion-Acuerdo-660_v1.pdf": [
+    "V7:H701"
+  ],
+  "https://asp.salud.gob.sv/regulacion/manuales.asp?offset=40": [
+    "V7:H702"
+  ],
+  "https://asp.salud.gob.sv/regulacion/lineamientos.asp?btnbuscar=Buscar&offset=120": [
+    "V7:H703"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/25372088/": [
+    "V7:H704"
+  ],
+  "https://www.rcp.ac.uk/resources/national-early-warning-score-news-2/": [
+    "V7:H705"
+  ],
+  "https://www.sccm.org/clinical-resources/iculiberation-home/abcdef-bundles": [
+    "V7:H706"
+  ],
+  "https://sccm.org/clinical-resources/guidelines/guidelines/focused-update-padis-guideline": [
+    "V7:H707"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/30339549/": [
+    "V7:H708"
+  ],
+  "https://2022.espen.org/files/ESPEN-Guidelines/ESPEN_guideline_on_hospital_nutrition.pdf": [
+    "V7:H709"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/31030981/": [
+    "V7:H710"
+  ],
+  "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/Lineamientos_tecnicos_para_la_prescripcion_de_dietas_hospitalarias_RIISS.pdf": [
+    "V7:H711"
+  ],
+  "https://www.who.int/docs/default-source/patient-safety/who-uhc-sds-2019-9-eng.pdf": [
+    "V7:H712"
+  ],
+  "https://www.ahrq.gov/patient-safety/settings/hospital/red/toolkit/redtool3.html": [
+    "V7:H713"
+  ],
+  "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/lineamientostecnicosdelimpiezaydesinfeccionenestablecimientosdelsistemanacionalintegradodesalud-Acuerdo-Ejecutivo-941-09102024_v1.pdf": [
+    "V7:H714"
+  ],
+  "https://www.cdc.gov/healthcare-associated-infections/hcp/cleaning-global/procedures.html": [
+    "V7:H715"
+  ],
+  "https://www.cdc.gov/healthcare-associated-infections/hcp/cleaning-global/appendix-d.html": [
+    "V7:H716"
+  ],
+  "https://osartec.gob.sv/?wpdmdl=2878": [
+    "V7:H717"
+  ],
+  "https://osartec.gob.sv/servicios/derogaciones/": [
+    "V7:H718"
+  ],
+  "https://disam.salud.gob.sv/servicios/requisitos-para-tramites-y-servicios/visto-bueno-de-plan-de-manejo-de-desechos-bioinfecciosos/": [
+    "V7:H719"
+  ],
+  "https://www.who.int/publications/i/item/9789241501538": [
+    "V7:H720"
+  ],
+  "https://www.salud.gob.sv/direccion-de-tecnologias-sanitarias-dirtecs/": [
+    "V7:H721"
+  ],
+  "https://asp.salud.gob.sv/regulacion/lineamientos.asp?offset=0": [
+    "V7:H722"
+  ],
+  "https://www.ahrq.gov/patient-safety/settings/hospital/resource/pressureulcer/tool/index.html": [
+    "V7:H724"
+  ],
+  "https://www.mtps.gob.sv/2020/10/26/cuantas-horas-debo-trabajar-al-dia/": [
+    "V8:G801"
+  ],
+  "https://www.mtps.gob.sv/descargas/": [
+    "V8:G802"
+  ],
+  "https://cssp.gob.sv/junta-de-vigilancia-de-la-profesion-medica/": [
+    "V8:G803"
+  ],
+  "https://cssp.gob.sv/establecimientos-y-servicios-de-salud/": [
+    "V8:G804"
+  ],
+  "https://www.cssp.gob.sv/profesionales/faces/consulta/buscar.xhtml": [
+    "V8:G805"
+  ],
+  "https://www.mtps.gob.sv/servicios/organizacion-de-sso/": [
+    "V8:G806"
+  ],
+  "https://www.who.int/publications/i/item/9789240040779": [
+    "V8:G807"
+  ],
+  "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2024/12/107137.PDF": [
+    "V8:G808"
+  ],
+  "https://www.who.int/publications/i/item/9789240010338": [
+    "V8:G809"
+  ],
+  "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/lineamientostecnicosparalamedicionpuntualdeinfeccionesasociadasalaatencionensaludenloshospitalesdelsnis-AE-708-09022026_v1.pdf": [
+    "V8:G811"
+  ],
+  "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2010-2019/2016/04/B7B3F.PDF": [
+    "V8:G812"
+  ],
+  "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2024/08/103F2E.PDF": [
+    "V8:G813"
+  ],
+  "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2024/11/10660E.PDF": [
+    "V8:G815"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/24581683/": [
+    "V8:G816"
+  ],
+  "https://pubmed.ncbi.nlm.nih.gov/15509817/": [
+    "V8:G817"
+  ],
+  "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/lineamientostecnicosparalaprevencionycontroldelasinfeccionesasociadasalaatencionensaludIAAS-Acuerdo-2933.pdf": [
+    "V8:G818"
+  ],
+  "https://www.jurisprudencia.gob.sv/busqueda/showFile.php?bd=2&cesta=0&data=DocumentosBoveda%2FD%2F2%2F2020-2029%2F2025%2F09%2F10D3DB.PDF&fecha=03%2F09%2F2025&number=1102811&numero=POLITICAS%3DDE%3DACTUACION%3DY%3DMANEJO%3DDE%3DDATOS%3DPERSONALES%3DDE%3DLA%3DLEY%3DPARA%3DLA%3DPROTECCI%C3%93N%3DDE%3DDATOS%3DPERSONALES&singlePage=false": [
+    "V8:G820"
+  ]
+}

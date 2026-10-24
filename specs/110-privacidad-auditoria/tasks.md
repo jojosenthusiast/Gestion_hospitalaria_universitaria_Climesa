@@ -1,0 +1,34 @@
+# 110. Tareas
+
+- [ ] T01 · S2 · R · Servicio de contexto de acceso y filtrado de campos de la ficha
+  - Cubre: FR-110-01, FR-110-02, FR-110-03
+  - Depende de: 100-T05, 102-T03
+  - Hecho cuando: escenario 3 pasa y la prueba por rol y campo de la ficha pasa
+- [ ] T02 · S3 · R · Contexto clínico: relación de atención y área de turno
+  - Cubre: FR-110-01, FR-110-03
+  - Depende de: T01, 106-T02, 103-T06
+  - Hecho cuando: escenario 1 pasa
+- [ ] T03 · S4 · R · Accesos excepcionales con aprobación del delegado y vencimiento
+  - Cubre: FR-110-04, FR-110-05, FR-110-06
+  - Depende de: T02
+  - Hecho cuando: escenario 2 pasa con el reloj de prueba
+- [ ] T04 · S4 · R · Auditoría consultable y verificación de la cadena (W32)
+  - Cubre: FR-110-07
+  - Depende de: 100-T02, 120-T03
+  - Hecho cuando: el delegado detecta un registro alterado desde la web
+- [ ] T05 · S4 · R · Pantallas de accesos (W30, W31) y estado "sin permiso" con pedir acceso
+  - Cubre: FR-110-04, FR-110-05
+  - Depende de: T03
+  - Hecho cuando: el flujo completo funciona entre web y móvil
+- [ ] T06 · S2 · R · Matriz RBAC y política de campos generadas y verificadas
+  - Cubre: FR-110-10
+  - Depende de: ninguna
+  - Hecho cuando: `python3 tools/generar_docs.py --verificar` pasa en CI
+- [ ] T07 · S5 · E · Quién vio mi expediente
+  - Cubre: FR-110-08
+  - Depende de: T02
+  - Hecho cuando: escenario 4 pasa en Android e iOS
+- [ ] T08 · S5 · E · Romper el vidrio en emergencia
+  - Cubre: FR-110-09
+  - Depende de: T03
+  - Hecho cuando: el acceso inmediato queda pendiente de revisión del delegado

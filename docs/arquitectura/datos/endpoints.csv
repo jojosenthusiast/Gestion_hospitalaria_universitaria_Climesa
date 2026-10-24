@@ -1,0 +1,109 @@
+spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
+101,GET,/api/v1/me,sesion.perfil,,R,2,"Perfil, roles, permisos y canales de tiempo real del usuario"
+101,PUT,/api/v1/me/dispositivos,sesion.perfil,,E,5,Registrar token de push FCM o APNs
+101,POST,/api/v1/cuentas/vinculacion,cuenta.vincular,Solo su cuenta,R,2,Paciente pide vincular su cuenta con DUI y fecha de nacimiento
+101,GET,/api/v1/cuentas/vinculaciones,cuentas.verificar,,R,3,Vinculaciones pendientes
+101,POST,/api/v1/cuentas/vinculaciones/{id}/aprobar,cuentas.verificar,,R,3,Aprobar vinculación tras verificar identidad
+101,POST,/api/v1/cuentas/vinculaciones/{id}/rechazar,cuentas.verificar,Motivo obligatorio,R,3,Rechazar vinculación
+101,GET,/api/v1/usuarios,usuarios.ver,,R,2,Listado de usuarios con roles y estado
+101,POST,/api/v1/usuarios/invitaciones,usuarios.invitar,,R,2,Crear cuenta de personal e invitarla
+101,PUT,/api/v1/usuarios/{id}/roles,usuarios.asignar_roles,Nunca a sí mismo,R,2,Asignar roles
+101,POST,/api/v1/usuarios/{id}/desactivar,usuarios.desactivar,Nunca a sí mismo,R,2,Desactivar cuenta
+102,GET,/api/v1/pacientes,pacientes.buscar,Devuelve datos mínimos y motivo de coincidencia,R,2,"Búsqueda fonética por nombre, DUI o expediente"
+102,POST,/api/v1/pacientes,pacientes.registrar,Exige búsqueda previa reciente,R,2,Registrar paciente
+102,POST,/api/v1/pacientes/provisional,pacientes.registrar_provisional,,R,4,Paciente sin identidad confirmada (NN)
+102,GET,/api/v1/pacientes/{id},pacientes.ver_ficha,Relación de atención para MED y PAR; propio para PAC,R,2,Ficha personal
+102,PUT,/api/v1/pacientes/{id},pacientes.editar_demograficos,Versión optimista; historial,R,2,Corregir datos personales
+102,POST,/api/v1/pacientes/{id}/desactivar,pacientes.editar_demograficos,Nunca borra,R,2,Inactivar registro conservando historial
+102,GET,/api/v1/pacientes/casos-duplicado,pacientes.gestionar_duplicados,,E,4,Casos de posible duplicado
+102,GET,/api/v1/me/paciente,pacientes.ver_ficha,Propio,R,2,Ficha del paciente autenticado
+103,GET,/api/v1/personal,personal.ver,,R,2,Listado de personal de salud
+103,POST,/api/v1/personal,personal.gestionar,,R,2,Crear personal
+103,PUT,/api/v1/personal/{id},personal.gestionar,Versión optimista,R,2,Editar personal
+103,POST,/api/v1/personal/{id}/inscripciones,personal.gestionar,,E,4,Registrar inscripción profesional con vigencia
+103,GET,/api/v1/turnos,turnos.ver,"PAR, AST, ENF ven los suyos y los de su área",R,2,"Turnos por rango, área y persona"
+103,POST,/api/v1/turnos,turnos.planificar,Sin traslape; reglas D-054,R,2,Crear turno
+103,PUT,/api/v1/turnos/{id},turnos.planificar,Versión optimista,R,3,Editar turno
+103,POST,/api/v1/turnos/publicar,turnos.publicar,Advierte huecos de cobertura,R,4,Publicar planificación de un rango
+103,GET,/api/v1/turnos/cobertura,turnos.ver,,E,4,Huecos de cobertura por área y hora
+103,GET,/api/v1/me/turnos,turnos.ver,Propio,R,3,Mis turnos
+104,GET,/api/v1/espacios/arbol,espacios.ver,,R,2,Árbol del edificio con disponibilidad agregada (CTE recursiva)
+104,POST,/api/v1/espacios,espacios.configurar,,R,2,Crear espacio
+104,PUT,/api/v1/espacios/{id},espacios.configurar,No reduce capacidad bajo ocupación,R,2,Editar espacio
+104,GET,/api/v1/camas/tablero,camas.ver_tablero,Ocupante solo con camas.ver_ocupante,R,2,Estado de cada cama
+104,POST,/api/v1/camas/{id}/bloquear,camas.bloquear,Motivo obligatorio,R,4,Bloquear cama
+104,POST,/api/v1/camas/{id}/desbloquear,camas.bloquear,,R,4,Desbloquear cama
+104,POST,/api/v1/camas/{id}/limpieza,camas.registrar_limpieza,,R,4,Registrar limpieza con lista de verificación
+104,POST,/api/v1/camas/{id}/limpieza/verificar,camas.verificar_limpieza,Distinta persona que limpió,R,4,Verificar limpieza y liberar cama
+104,GET,/api/v1/recursos/equipos,recursos.gestionar,,E,4,Equipo médico por espacio
+104,POST,/api/v1/recursos/equipos/{id}/estado,recursos.gestionar,,E,4,Operativo o en mantenimiento
+105,POST,/api/v1/fila/tickets,fila.emitir,Número único por servicio y día,R,3,Emitir número de fila
+105,GET,/api/v1/fila/hoy,fila.ver,,R,3,Fila del día por servicio
+104,PUT,/api/v1/recursos/tipos/{id},recursos.configurar,,E,4,Tipos de equipo médico
+105,POST,/api/v1/fila/tickets/{id}/llamar,fila.llamar,,R,3,Llamar un número a un consultorio
+105,POST,/api/v1/fila/tickets/{id}/estado,fila.gestionar,Transiciones válidas,R,3,"En atención, atendido, no se presentó"
+105,GET,/api/v1/me/fila,fila.ver,Propio,R,3,Mi número y cuántos faltan
+105,GET,/api/v1/citas,citas.ver,MED y PAC solo propias,R,3,"Citas por fecha, médico o paciente"
+105,GET,/api/v1/citas/disponibilidad,citas.ver,PAC también,R,3,Horarios libres por médico y fecha
+105,POST,/api/v1/citas,citas.agendar,Sin traslape por médico,R,3,Agendar cita
+105,POST,/api/v1/citas/solicitudes,citas.solicitar,Cuenta verificada,R,4,Paciente pide cita
+105,POST,/api/v1/citas/solicitudes/{id}/confirmar,citas.agendar,,R,4,Confirmar solicitud con horario
+105,POST,/api/v1/citas/solicitudes/{id}/rechazar,citas.agendar,Motivo,R,4,Rechazar solicitud
+105,POST,/api/v1/citas/{id}/cancelar,citas.cancelar,PAC solo propias,R,3,Cancelar cita
+106,POST,/api/v1/consultas,consulta.iniciar,Desde número llamado o cita,R,3,Iniciar consulta; crea relación de atención
+106,PUT,/api/v1/consultas/{id},consulta.registrar,Autor; antes de firmar,R,3,"Motivo, examen físico, plan"
+106,POST,/api/v1/consultas/{id}/signos,signos.registrar,,R,3,Signos vitales
+106,POST,/api/v1/consultas/{id}/diagnosticos,consulta.registrar,CIE-10,R,3,Agregar diagnóstico
+106,POST,/api/v1/consultas/{id}/recetas,recetas.emitir,Inscripción vigente,R,3,Emitir receta
+106,POST,/api/v1/consultas/{id}/ordenes-laboratorio,laboratorio.ordenar,,R,3,Ordenar exámenes o paneles
+106,POST,/api/v1/consultas/{id}/firmar,consulta.registrar,Inscripción vigente en el acto,R,3,Firmar y cerrar consulta
+106,POST,/api/v1/consultas/{id}/addendum,consulta.corregir,Solo el autor; conserva original,E,4,Corregir consulta firmada
+106,GET,/api/v1/pacientes/{id}/historial,expediente.ver,"Relación, acceso excepcional o propio revisado",R,3,Historial clínico
+107,GET,/api/v1/laboratorio/ordenes,laboratorio.ver_cola,,R,3,Cola por estado
+107,GET,/api/v1/laboratorio/ordenes/{id},resultados.ver,Ver contexto,R,3,Detalle de orden y resultados
+107,POST,/api/v1/laboratorio/ordenes/{id}/muestra,laboratorio.procesar,Pendiente a En Proceso,R,3,Registrar toma de muestra
+107,PUT,/api/v1/laboratorio/ordenes/{id}/resultados,laboratorio.procesar,Valida unidades y rangos,R,3,Capturar valores
+107,POST,/api/v1/laboratorio/ordenes/{id}/completar,laboratorio.validar,Todos los exámenes con valor,R,3,En Proceso a Completado
+107,POST,/api/v1/laboratorio/ordenes/{id}/cancelar,laboratorio.cancelar,Motivo,R,4,Cancelar orden
+107,POST,/api/v1/laboratorio/ordenes/{id}/revisar,laboratorio.revisar,Solo Completado,R,4,Médico revisa y libera al paciente
+107,GET,/api/v1/me/laboratorio,resultados.ver,Estado siempre; valores solo revisados,R,3,Mis exámenes
+107,GET,/api/v1/catalogo/examenes,laboratorio.ordenar,LAB y ADM también,R,3,Catálogo con paneles (recursivo)
+107,PUT,/api/v1/catalogo/examenes/{id},catalogo.configurar,Versión con vigencia,R,3,"Editar examen, unidades y rangos"
+108,POST,/api/v1/admisiones,admision.crear,"Origen: consulta, emergencia, ambulancia, programada",R,4,Crear admisión
+108,GET,/api/v1/admisiones,admision.ver,,R,4,Admisiones activas
+108,GET,/api/v1/admisiones/{id}/sugerencias-cama,camas.asignar,Algoritmo D-036,R,4,Camas sugeridas con motivo
+108,POST,/api/v1/admisiones/{id}/cama,camas.asignar,Exclusión en base de datos,R,4,Asignar cama
+108,POST,/api/v1/admisiones/{id}/autorizar,admision.autorizar,Motivo,E,4,Autorizar excepción de admisión
+108,POST,/api/v1/ocupaciones/{id}/traslado,camas.trasladar,VIP no se traslada (D-037),R,4,Trasladar a otra cama
+108,POST,/api/v1/admisiones/{id}/notas-enfermeria,enfermeria.registrar,,E,4,Nota de enfermería
+108,POST,/api/v1/admisiones/{id}/alta,alta.firmar,Pendientes con responsable; inscripción vigente,R,4,Firmar alta
+108,POST,/api/v1/admisiones/{id}/salida,admision.registrar_salida,Cama pasa a limpieza,R,4,Registrar salida física
+108,POST,/api/v1/admisiones/indicaciones,admision.solicitar,,R,4,Médico indica hospitalización
+109,GET,/api/v1/ambulancia,ambulancia.ver_estado,,R,3,Estado actual y servicio activo
+109,POST,/api/v1/ambulancia/solicitudes,ambulancia.solicitar,PAC: cuenta verificada; queda por confirmar,R,4,Solicitar ambulancia
+109,POST,/api/v1/ambulancia/solicitudes/{id}/descartar,ambulancia.despachar,Motivo,R,4,Descartar solicitud
+109,POST,/api/v1/ambulancia/servicios,ambulancia.despachar,Solo si Disponible; bloqueo de fila,R,4,Despachar: pasa a En Servicio
+109,POST,/api/v1/ambulancia/servicios/{id}/hitos,ambulancia.operar,Orden de hitos,R,4,"Salida, en escena, trasladando, en hospital, finalizado"
+109,POST,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.reportar_prehospital,Funciona sin conexión con reintento,E,4,Reporte prehospital y hora estimada
+109,GET,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.recibir_prehospital,,E,4,Ver reporte prehospital
+109,POST,/api/v1/ambulancia/ubicacion,ambulancia.operar,Solo con servicio activo,E,5,Ubicación en vivo
+109,POST,/api/v1/ambulancia/mantenimiento,ambulancia.mantenimiento,Solo sin servicio activo,R,4,Entrar o salir de mantenimiento
+109,GET,/api/v1/ambulancia/bitacora,ambulancia.ver_bitacora,Datos del paciente ocultos sin relación,R,4,Bitácora filtrable (D-056)
+110,POST,/api/v1/accesos-excepcionales,privacidad.solicitar_acceso,Motivo y duración,R,4,Pedir acceso excepcional
+110,POST,/api/v1/accesos-excepcionales/{id}/aprobar,privacidad.aprobar_acceso,Nunca el propio,R,4,Aprobar
+110,POST,/api/v1/accesos-excepcionales/{id}/negar,privacidad.aprobar_acceso,,R,4,Negar
+110,GET,/api/v1/accesos-excepcionales,privacidad.aprobar_acceso,Solicitante ve los suyos,R,4,Listado
+110,GET,/api/v1/auditoria,auditoria.ver,,R,4,Consultar auditoría
+110,POST,/api/v1/auditoria/verificacion,auditoria.ver,,R,4,Verificar cadena de hash
+110,GET,/api/v1/me/accesos,auditoria.mis_accesos,Propio,E,5,Quién vio mi expediente
+111,GET,/api/v1/inventario/existencias,inventario.ver,,R,4,"Existencias por bodega, lote y vencimiento"
+111,POST,/api/v1/inventario/movimientos,inventario.mover,Sin existencia negativa,R,4,"Entrada, salida, ajuste o traslado"
+111,PUT,/api/v1/inventario/articulos/{id},inventario.configurar,,R,4,Artículo y mínimo
+112,GET,/api/v1/publico/ocupacion,(público),Solo agregados,R,3,Ocupación por planta y tipo
+112,GET,/api/v1/publico/medicos-de-turno,(público),"Nombre, especialidad, área",R,3,Médicos de turno
+112,GET,/api/v1/publico/avisos,(público),,R,3,Avisos vigentes
+112,GET,/api/v1/publico/fila/{servicio},(público),Sin nombres,E,4,Números llamados
+112,POST,/api/v1/avisos,avisos.publicar,Vigencia,R,3,Publicar aviso
+113,GET,/api/v1/metricas/tablero,metricas.ver,Agregados sin datos personales,R,2,Tablero inicial
+113,GET,/api/v1/metricas/{indicador},metricas.ver,,E,5,Serie de un indicador
+111,POST,/api/v1/inventario/articulos,inventario.configurar,,R,4,Crear artículo

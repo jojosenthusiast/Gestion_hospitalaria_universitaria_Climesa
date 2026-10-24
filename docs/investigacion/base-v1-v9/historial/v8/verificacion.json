@@ -1,0 +1,10 @@
+{
+  "criteria": 60,
+  "tasks": 20,
+  "references": 20,
+  "csharp_unchanged": 58,
+  "history_byte_identical": true,
+  "build": "NOT_RUN",
+  "sql": "NOT_RUN",
+  "operational_acceptance": "NOT_RUN"
+}

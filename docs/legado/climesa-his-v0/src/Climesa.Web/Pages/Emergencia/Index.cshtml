@@ -1,0 +1,56 @@
+@page
+@model Climesa.Web.Pages.Emergencia.IndexModel
+@{
+    ViewData["Title"] = "Emergencia";
+}
+@if (!string.IsNullOrEmpty(Model.Flash)) { <div class="alert ok">@Model.Flash</div> }
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+<h1>Emergencia</h1>
+@if (Model.Can("care.emergency.register"))
+{
+    <section class="card">
+        <h2>Registrar llegada</h2>
+        <p class="muted">Solo se exige la hora y el medio de llegada. Sin cita, cama, pagador ni depósito (LDDPPSS Art. 11 y 42 b). Si no hay expediente, se crea una identidad provisional.</p>
+        <form method="post" asp-page-handler="Arrival">
+            <input type="hidden" name="Key" value="@Model.Key" />
+            <div class="row">
+                <label>Expediente (si se conoce) <input name="Mrn" placeholder="0000001-X" /></label>
+                <label>Medio de llegada <select name="ArrivalMode"><option>Por sus propios medios</option><option>Ambulancia</option><option>Traído por familiar</option><option>Policía o Cruz Roja</option><option>Referido de otro establecimiento</option></select></label>
+                <label>Descripción si es desconocido <input name="Description" placeholder="hombre adulto, camisa azul" /></label>
+                <label style="max-width:150px">Edad estimada <input name="EstimatedAge" type="number" /></label>
+                <label style="max-width:160px">Sexo aparente <select name="Sex"><option value="unknown">Desconocido</option><option value="female">Femenino</option><option value="male">Masculino</option></select></label>
+                <div><button>Registrar llegada</button></div>
+            </div>
+        </form>
+    </section>
+}
+<section class="card">
+    <h2>Pacientes en emergencia (@Model.Board.Count)</h2>
+    <table>
+        <tr><th>Nivel</th><th>Código</th><th>Expediente</th><th>Espera</th><th>Último triaje</th><th>Alertas</th><th></th></tr>
+        @foreach (var r in Model.Board)
+        {
+            <tr>
+                <td>@if (r.Level is not null) { <span class="level" style="background:@r.Color" title="@r.LevelName">@r.Level</span> } else { <span class="tag warn">sin triaje</span> }</td>
+                <td class="mono">@r.Code</td>
+                <td class="mono">@r.Mrn</td>
+                <td>@r.WaitedMinutes min</td>
+                <td>@LocalTime.Format(r.LastTriageAt)</td>
+                <td>
+                    @if (r.ReassessmentOverdue) { <span class="tag bad">reevaluación vencida</span> }
+                    @if (r.PhysicianTargetExceeded) { <span class="tag bad">supera tiempo a médico</span> }
+                    @if (r.SeenByPhysician) { <span class="tag ok">visto por médico</span> }
+                </td>
+                <td style="white-space:nowrap">
+                    @if (Model.Can("emergency.triage")) { <a class="btn small" href="/Emergencia/Triaje/@r.EncounterId">Triaje</a> }
+                    @if (Model.Can("care.encounter.physician") && !r.SeenByPhysician)
+                    {
+                        <form method="post" asp-page-handler="Physician" class="inline"><input type="hidden" name="EncounterId" value="@r.EncounterId" /><button class="small secondary">Primer contacto</button></form>
+                    }
+                    @if (Model.Can("care.admission.accept")) { <a class="btn small secondary" href="/Hospitalizacion/Ingresar?encounterId=@r.EncounterId&personId=@r.PersonId">Ingresar</a> }
+                </td>
+            </tr>
+        }
+    </table>
+    <p class="muted">El tablero muestra un código, no el nombre (spec 002 FR-007). Protocolo de triaje de demostración: CLIMESA elige su escala (R04).</p>
+</section>

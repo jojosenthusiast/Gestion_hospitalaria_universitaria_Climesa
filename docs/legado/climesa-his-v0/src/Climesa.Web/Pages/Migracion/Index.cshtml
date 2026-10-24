@@ -1,0 +1,31 @@
+@page
+@model Climesa.Web.Pages.Migracion.IndexModel
+@{
+    ViewData["Title"] = "Migración";
+}
+@if (!string.IsNullOrEmpty(Model.Flash)) { <div class="alert ok">@Model.Flash</div> }
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+<h1>Migración del archivo en papel</h1>
+<p class="muted">Capa 1 de la estrategia (R02): el índice del archivo entra por las mismas reglas que un registro en admisión. Cada fila termina creada, encontrada, rechazada o pendiente de revisión; nada se pierde en silencio (spec 004 FR-004).</p>
+@if (Model.Can("migration.batch.run"))
+{
+    <section class="card">
+        <h2>Cargar índice (CSV UTF-8)</h2>
+        <form method="post" enctype="multipart/form-data" class="row">
+            <label>Archivo <input type="file" name="File" accept=".csv" /></label>
+            <div><button>Cargar</button></div>
+        </form>
+        <p class="muted">Columnas: <span class="mono">numero_expediente, nombres, primer_apellido, segundo_apellido, apellido_casada, nombre_completo, fecha_nacimiento, precision, sexo, dui, municipio, direccion</span>. Hay un archivo de ejemplo en <span class="mono">docs/demo/indice_archivo_muestra.csv</span>.</p>
+    </section>
+}
+<section class="card">
+    <h2>Lotes</h2>
+    <table>
+        <tr><th>Inicio</th><th>Fuente</th><th>Leídas</th><th>Creadas</th><th>Encontradas</th><th>Rechazadas</th><th>Pendientes</th><th>Estado</th><th></th></tr>
+        @foreach (var b in Model.Batches)
+        {
+            <tr><td>@LocalTime.Format(b.StartedAt)</td><td>@b.SourceName</td><td>@b.Read</td><td>@b.Created</td><td>@b.Matched</td><td>@b.Rejected</td><td>@b.Pending</td>
+                <td><span class="tag @(b.Status == "completed" ? "ok" : "bad")">@Labels.Es(b.Status)</span></td><td><a class="btn small" href="/Migracion/Lote/@b.Id">Detalle</a></td></tr>
+        }
+    </table>
+</section>

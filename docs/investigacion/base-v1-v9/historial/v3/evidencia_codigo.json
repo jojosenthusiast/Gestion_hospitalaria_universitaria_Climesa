@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-12",
+  "review": "static",
+  "changes_to_application": false,
+  "files": [
+    {
+      "file": "src/AldaraHospital.Web/Models/Patients/Patient.cs",
+      "sha256": "f6297dc280c2e19f8028d1c814bccb338bc91750a24f742e7c319c880d6de51d",
+      "lines": 41
+    },
+    {
+      "file": "src/AldaraHospital.Web/Models/Clinical/ClinicalEntities.cs",
+      "sha256": "1115b6a2bc2859784e1bcb809c68cb803e1ed20211553560602bc36550249ef8",
+      "lines": 197
+    },
+    {
+      "file": "src/AldaraHospital.Web/Services/PatientService.cs",
+      "sha256": "227dd2960d9b4106a5bcdc0c9a139d7eb997a81fee160ba74c7578327c9112b4",
+      "lines": 250
+    },
+    {
+      "file": "src/AldaraHospital.Web/Services/FinanceService.cs",
+      "sha256": "096a50809e3bcfebd3c303b656604f2304e88fde4c6eab4bdd686841716a40fe",
+      "lines": 251
+    },
+    {
+      "file": "src/AldaraHospital.Web/Data/ApplicationDbContext.cs",
+      "sha256": "b6625f85a751d49c93b1dfac26113c0f2a8fc8452f85abbef5834694eee5e3e1",
+      "lines": 346
+    }
+  ]
+}

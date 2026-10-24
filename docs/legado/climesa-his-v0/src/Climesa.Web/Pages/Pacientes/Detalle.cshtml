@@ -1,0 +1,108 @@
+@page "{id:guid}"
+@model Climesa.Web.Pages.Pacientes.DetalleModel
+@{
+    ViewData["Title"] = "Paciente";
+    var d = Model.Detail;
+}
+@if (!string.IsNullOrEmpty(Model.Flash)) { <div class="alert ok">@Model.Flash</div> }
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+@if (d is not null)
+{
+    <h1>@d.Summary.DisplayName <span class="tag @(d.Summary.Status == "provisional" ? "warn" : "ok")">@Labels.Es(d.Summary.Status)</span></h1>
+    <div class="grid">
+        <section class="card">
+            <h2>Identificación</h2>
+            <table>
+                <tr><th>Expediente</th><td class="mono">@d.Summary.Mrn</td></tr>
+                <tr><th>Nacimiento</th><td>@d.Summary.BirthDisplay</td></tr>
+                <tr><th>Sexo</th><td>@d.Summary.Sex</td></tr>
+                <tr><th>Municipio</th><td>@d.Municipality</td></tr>
+                <tr><th>Dirección</th><td>@d.AddressText</td></tr>
+                <tr><th>Teléfono</th><td>@d.Phone</td></tr>
+                <tr><th>Datos dados por</th><td>@d.Informant</td></tr>
+                <tr><th>Versión</th><td>@d.Version</td></tr>
+            </table>
+        </section>
+        <section class="card">
+            <h2>Documentos</h2>
+            <table>
+                <tr><th>Tipo</th><th>Valor</th><th>Emisor</th><th>Estado</th></tr>
+                @foreach (var i in d.Identifiers)
+                {
+                    <tr><td>@i.TypeName</td><td class="mono">@i.Value</td><td>@i.Issuer</td><td>@Labels.Es(i.Status)</td></tr>
+                }
+            </table>
+            @if (Model.Can("identity.update"))
+            {
+                <details style="margin-top:10px"><summary>Agregar documento</summary>
+                    <form method="post" asp-page-handler="Identifier">
+                        <div class="row">
+                            <label>Tipo <select name="IdType"><option value="dui">DUI</option><option value="pasaporte">Pasaporte</option><option value="nui">NUI</option><option value="partida_nacimiento">Partida</option><option value="isss_afiliacion">Afiliación ISSS</option></select></label>
+                            <label>Número <input name="IdValue" /></label>
+                            <label>Motivo <input name="Reason" placeholder="presentó documento" /></label>
+                            <div><button class="small">Agregar</button></div>
+                        </div>
+                    </form>
+                </details>
+            }
+        </section>
+    </div>
+    <section class="card">
+        <h2>Nombres registrados</h2>
+        <table>
+            <tr><th>Tipo</th><th>Nombre</th><th>Fuente</th><th>Desde</th></tr>
+            @foreach (var n in d.Names) { <tr><td>@Labels.Es(n.Type)</td><td>@n.Display</td><td>@n.Source</td><td>@LocalTime.Format(n.ValidFrom)</td></tr> }
+        </table>
+        @if (d.Relationships.Count > 0)
+        {
+            <h3>Relaciones</h3>
+            <table>
+                @foreach (var r in d.Relationships) { <tr><td>@Labels.Es(r.Type)</td><td>@r.RelatedName</td><td>@(r.BirthOrder is null ? "" : $"orden de nacimiento {r.BirthOrder}")</td></tr> }
+            </table>
+        }
+    </section>
+    @if (Model.Can("identity.update"))
+    {
+        <section class="card">
+            <h2>Actualizar contacto</h2>
+            <form method="post" asp-page-handler="Contact">
+                <input type="hidden" name="ExpectedVersion" value="@d.Version" />
+                <div class="row">
+                    <label>Municipio <input name="Municipality" value="@d.Municipality" /></label>
+                    <label>Dirección <input name="AddressText" value="@d.AddressText" /></label>
+                    <label>Teléfono <input name="Phone" value="@d.Phone" /></label>
+                    <label>Motivo del cambio <input name="Reason" /></label>
+                    <div><button class="small">Guardar</button></div>
+                </div>
+            </form>
+        </section>
+    }
+    @if (Model.Can("identity.create") && d.Summary.Sex == "F")
+    {
+        <section class="card">
+            <h2>Registrar recién nacido(s)</h2>
+            <form method="post" asp-page-handler="Newborns" class="row">
+                <label>Sexos en orden de nacimiento <input name="Sexes" placeholder="F o F,M para gemelos" /></label>
+                <div><button class="small">Registrar</button></div>
+            </form>
+        </section>
+    }
+    @if (d.Cases.Count > 0)
+    {
+        <section class="card">
+            <h2>Casos de identidad</h2>
+            <table>
+                @foreach (var c in d.Cases) { <tr><td>@Labels.Es(c.Type)</td><td><span class="tag warn">@Labels.Es(c.Status)</span></td><td>@c.Reason</td><td>@LocalTime.Format(c.OpenedAt)</td><td>@foreach (var p in c.PersonIds.Where(p => p != d.Summary.PersonId)) { <a href="/Pacientes/Detalle/@p">otro registro</a> }</td></tr> }
+            </table>
+            <p class="muted">El sistema nunca fusiona solo: un caso queda abierto para revisión supervisada (spec 001 FR-027).</p>
+        </section>
+    }
+    <section class="card">
+        <h2>Historial de cambios</h2>
+        <p class="muted">Cada versión guarda quién, cuándo, por qué y qué cambió. No se puede borrar (Norma del expediente, Art. 42 reformado).</p>
+        <table>
+            <tr><th>Versión</th><th>Fecha</th><th>Usuario</th><th>Motivo</th><th>Cambio</th></tr>
+            @foreach (var h in d.History) { <tr><td>@h.Version</td><td>@LocalTime.Format(h.ChangedAt)</td><td>@h.Actor</td><td>@h.Reason</td><td class="mono">@h.Diff</td></tr> }
+        </table>
+    </section>
+}

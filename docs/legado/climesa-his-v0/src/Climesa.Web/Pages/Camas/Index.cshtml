@@ -1,0 +1,79 @@
+@page
+@model Climesa.Web.Pages.Camas.IndexModel
+@using Climesa.Care.Application
+@{
+    ViewData["Title"] = "Camas";
+    var c = Model.Census;
+}
+@if (!string.IsNullOrEmpty(Model.Flash)) { <div class="alert ok">@Model.Flash</div> }
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+<h1>Censo de camas</h1>
+@if (c is not null)
+{
+    <div class="grid">
+        <section class="card"><div class="muted">Camas habilitadas (CSSP)</div><div class="stat">@c.Authorized</div></section>
+        <section class="card"><div class="muted">Camas operativas</div><div class="stat">@c.Operational</div></section>
+        <section class="card"><div class="muted">Ocupadas</div><div class="stat">@c.Occupied</div><div class="muted">@(c.Operational == 0 ? "" : $"{100.0 * c.Occupied / c.Operational:0}% de operativas · {100.0 * c.Occupied / Math.Max(1, c.Authorized):0}% de habilitadas")</div></section>
+    </div>
+    <p class="muted">La ocupación se muestra con los dos denominadores por separado (spec 002 FR-029).</p>
+    @foreach (var unit in c.Locations.GroupBy(l => l.UnitName))
+    {
+        <section class="card">
+            <h2>@unit.Key</h2>
+            <div class="beds">
+                @foreach (var l in unit)
+                {
+                    <div class="bed @l.Status">
+                        <div class="code">@l.Code</div>
+                        <div class="muted">@CareService.StatusEs(l.Status)</div>
+                        @if (l.PatientCode is not null) { <div class="mono"><a href="/Hospitalizacion/Episodio/@l.EpisodeId">@l.PatientCode</a></div><div class="muted">desde @LocalTime.Format(l.Since)</div> }
+                        @if (l.Status == "pending_cleaning" && Model.Can("care.cleaning.register"))
+                        {
+                            <details><summary>Registrar limpieza</summary>
+                                <form method="post" asp-page-handler="Clean">
+                                    <input type="hidden" name="LocationId" value="@l.LocationId" />
+                                    @for (var i = 0; i < CareService.ChecklistItems.Length; i++)
+                                    {
+                                        <label style="display:flex;gap:6px;font-size:12px;margin:4px 0"><input type="checkbox" name="Items" value="@i" /> @CareService.ChecklistItems[i]</label>
+                                    }
+                                    <label class="field">Inicio <input type="datetime-local" name="Started" /></label>
+                                    <label class="field">Fin <input type="datetime-local" name="Ended" /></label>
+                                    <button class="small">Guardar</button>
+                                </form>
+                            </details>
+                        }
+                        @if (l.Status == "available" && Model.Can("care.location.admin"))
+                        {
+                            <details><summary>Bloquear</summary><form method="post" asp-page-handler="Block"><input type="hidden" name="LocationId" value="@l.LocationId" /><input name="Reason" placeholder="motivo" style="width:100%;margin:4px 0" /><button class="small secondary">Bloquear</button></form></details>
+                        }
+                        @if (l.Status == "blocked" && Model.Can("care.location.admin"))
+                        {
+                            <form method="post" asp-page-handler="Unblock"><input type="hidden" name="LocationId" value="@l.LocationId" /><button class="small secondary">Desbloquear</button></form>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    }
+}
+@if (Model.Pending.Count > 0)
+{
+    <section class="card">
+        <h2>Limpiezas pendientes de firma</h2>
+        <p class="muted">Solo la jefatura de área libera la cama, y no puede ser la misma persona que limpió (Acuerdo 941, V.8.2).</p>
+        <table>
+            <tr><th>Cama</th><th>Limpió</th><th>Inicio</th><th>Fin</th><th>Lista</th><th></th></tr>
+            @foreach (var p in Model.Pending)
+            {
+                <tr><td>@p.LocationCode</td><td>@p.Cleaner</td><td>@LocalTime.Format(p.StartedAt)</td><td>@LocalTime.Format(p.EndedAt)</td><td>@{
+                        using var doc = System.Text.Json.JsonDocument.Parse(p.Items);
+                        var all = doc.RootElement.EnumerateArray().ToList();
+                        var missing = all.Where(x => !x.GetProperty("done").GetBoolean()).Select(x => x.GetProperty("item").GetString()).ToList();
+                    }
+                    <span class="tag @(missing.Count == 0 ? "ok" : "bad")">@(all.Count - missing.Count) de @all.Count puntos</span>
+                    @foreach (var m in missing) { <div class="muted">falta: @m</div> }</td>
+                    <td>@if (Model.Can("care.cleaning.sign")) { <form method="post" asp-page-handler="Sign"><input type="hidden" name="CleaningId" value="@p.Id" /><button class="small">Firmar y liberar</button></form> }</td></tr>
+            }
+        </table>
+    </section>
+}

@@ -1,0 +1,4 @@
+# Verificación
+12/10/2026. Consolidación ejecutada por script:316 IDs únicos,104 tasks únicas,102 tasks con criterios individualesCSV y2 con aceptación narrativa;206 registros fuentes/198 URL exactas. Resultado/estado original conservados ycada referencia resuelta apunta a catálogo.142 criterios sin referencia individualexplícita; no equivale aausencia de referencias en capítulo. Todos 316 pendientes de cláusula/aplicabilidad yownerinstitucional.
+Ocho criterios nuevos AC901–908/T901–908 son gobierno, no clínicos; NO_EJECUTADO. Historial v1–v8 copiado byte a byte sin anidar; lectura UTF-8/cercasMarkdown yZIP CRC/rutas verificados.
+No pruebas.NET/SQL/migraciones/operación/CLIMESA. No cambios al prototipo ni cierre legal/aceptación institucional. Declaración de lectura heredada no es nueva verificación de todas las fuentes.

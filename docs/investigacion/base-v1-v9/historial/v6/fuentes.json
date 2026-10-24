@@ -1,0 +1,128 @@
+[
+  {
+    "id": "E601",
+    "title": "OMS IITT",
+    "url": "https://www.who.int/tools/triage",
+    "reading_status": "Página oficial consultada; tarjetas/algoritmos completos pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E602",
+    "title": "OMS-ICRC Basic Emergency Care",
+    "url": "https://www.who.int/publications/i/item/basic-emergency-care-approach-to-the-acutely-ill-and-injured",
+    "reading_status": "Ficha oficial consultada; manual completo pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E603",
+    "title": "MINSAL triaje primer nivel 2025",
+    "url": "https://asp.salud.gob.sv/regulacion/pdf/otrosdoc/procedimientopararealizareltriageenelprimerniveldeatencion-Acuerdo-Ejecutivo-2456-BIS-29092025_v1.pdf",
+    "reading_status": "Registro indexado localizado; ámbito primer nivel, contenido íntegro pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E604",
+    "title": "OMS lista quirúrgica, manual 2009",
+    "url": "https://cdn.who.int/media/docs/default-source/patient-safety/9789241598590-eng.pdf",
+    "reading_status": "PDF recuperado; secciones de operación revisadas.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E605",
+    "title": "Haynes et al. NEJM 2009",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/19144931/",
+    "reading_status": "Resumen consultado; DOI 10.1056/NEJMsa0810119. No revisión íntegra.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E606",
+    "title": "Urbach et al. NEJM 2014, ICES",
+    "url": "https://www.ices.on.ca/publications/journal-articles/introduction-of-surgical-safety-checklists-in-ontario-canada/",
+    "reading_status": "Resumen institucional indexado consultado y contrastado con registro/editor; DOI 10.1056/NEJMsa1308261. No revisión íntegra.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E607",
+    "title": "Norma técnica anestesiología 2025, Acuerdo 1895",
+    "url": "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2025/11/10FA00.PDF",
+    "reading_status": "PDF oficial 27 páginas recuperado; artículos seleccionados revisados.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E608",
+    "title": "Índice MINSAL: CEYE SNIS 16/07/2026",
+    "url": "https://asp.salud.gob.sv/regulacion/lineamientos.asp",
+    "reading_status": "Registro oficial indexado; documento íntegro no recuperado. No atribuirle artículos ni parámetros.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E609",
+    "title": "CDC recomendaciones esterilización/desinfección",
+    "url": "https://www.cdc.gov/infection-control/hcp/disinfection-sterilization/summary-recommendations.html",
+    "reading_status": "Página oficial consultada; referencia técnica estadounidense, no ley salvadoreña.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E610",
+    "title": "MINSAL manual sangre/inmunohematología/hemoterapia 2023",
+    "url": "https://docs.bvsalud.org/biblioref/2023/09/1510000/manualdeprocesosyprocedimientosparalagestiondelasangreinmunohe_DcZKGz5.pdf",
+    "reading_status": "PDF 70 páginas recuperado; ámbito y despacho seleccionados revisados. Acuerdo 2019 del 04/09/2023.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E611",
+    "title": "MINSAL rechazo de transfusión 2020",
+    "url": "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/lineamientostecnicosparalaatencionapersonasquerechazanlaterapiacontransfusiondehemocomponentes-Acuerdo1039.pdf",
+    "reading_status": "Título/registro indexados; recuperación falló. Interpretación legal y revisión íntegra pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E612",
+    "title": "ISBT ISBT128 y trazabilidad",
+    "url": "https://www.isbtweb.org/resource/tb-004-isbt-128-and-traceability-v1-1-0-pdf.html",
+    "reading_status": "Ficha oficial consultada; boletín y edición técnica a validar antes de implementación.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E613",
+    "title": "OMS guía hemovigilancia 2016",
+    "url": "https://www.who.int/publications/i/item/9789241549844",
+    "reading_status": "Ficha oficial consultada; guía completa pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E614",
+    "title": "ISBT comunicación electrónica transfusional 2026",
+    "url": "https://www.isbtweb.org/resource/isbt-working-party-on-information-technology-guideline-on-external-electronic-communication-of-transfusion-traceability-information.html",
+    "reading_status": "Ficha oficial de 11/06/2026 consultada; paper DOI 10.1111/vox.70296. Perfil y ejemplos completos pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E615",
+    "title": "OMS reprocesamiento 2016",
+    "url": "https://www.who.int/publications/i/item/9789241549851",
+    "reading_status": "Ficha oficial consultada; manual completo pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E616",
+    "title": "OMS recursos de adaptación lista quirúrgica",
+    "url": "https://www.who.int/teams/integrated-health-services/patient-safety/research/safe-surgery/tool-and-resources",
+    "reading_status": "Página oficial consultada; condiciones de adaptación/atribución.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E617",
+    "title": "OMS checklists clínicos y transferencia",
+    "url": "https://www.who.int/tools/clinical-checklists",
+    "reading_status": "Página oficial consultada; formularios completos pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "E618",
+    "title": "OMS hemovigilancia",
+    "url": "https://www.who.int/teams/health-product-policy-and-standards/standards-and-specifications/blood-and-products-of-human-origin/haemovigilance",
+    "reading_status": "Página oficial consultada; cadena y acciones correctivas.",
+    "consulted": "2026-10-12"
+  }
+]

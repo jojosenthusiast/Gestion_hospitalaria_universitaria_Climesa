@@ -1,0 +1,12 @@
+numero_expediente,nombres,primer_apellido,segundo_apellido,apellido_casada,nombre_completo,fecha_nacimiento,precision,sexo,dui,municipio,direccion
+P-000101,María Elena,Muñoz,Peña,,,1958-03-14,exact,F,04567812-3,Santa Ana Centro,"Col. El Palmar, pasaje 3"
+P-000102,José Ángel,Hernández,Vásquez,,,1971,year,M,,Santa Ana Norte,Barrio San Rafael
+P-000103,Ana Gabriela,López,Quiñónez,Pérez,,1990-07-02,exact,F,01234567-8,Santa Ana Centro,"Res. Los Ángeles #12"
+P-000104,,,,,ROSA AMINTA GUEVARA DE MOLINA,1949,year,F,,Chalchuapa,
+P-000105,Jorge,Rivas,Ortiz,,,1985-11-30,exact,M,03344556-1,Metapán,
+P-000106,Jose Angel,Hernandes,Basquez,,,1971,year,M,,Santa Ana Norte,"Barrio San Rafael, misma dirección"
+P-000107,Carmen,Ayala,,,,13/05/1966,exact,F,,Santa Ana Oeste,
+,Luis,Martínez,Cruz,,,1979,year,M,,Coatepeque,
+P-000101,Pedro Antonio,Zelaya,Ramos,,,1990,year,M,,Santa Ana Este,
+P-000110,Raúl,O'Connor,Melara,,,1982-02-28,exact,M,,Santa Ana Centro,
+P-000111,Sofía,Castillo,,,,1982-02-30,exact,F,,Santa Ana Centro,

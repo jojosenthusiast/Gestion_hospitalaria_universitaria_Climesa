@@ -1,0 +1,27 @@
+@page "{id:guid}"
+@model Climesa.Web.Pages.Emergencia.TriajeModel
+@{
+    ViewData["Title"] = "Triaje";
+}
+<h1>Triaje</h1>
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+<form method="post" class="card">
+    <p class="muted">Cada triaje es un registro nuevo con autor y hora; cambiar el nivel es una reevaluación, no una edición (spec 002 FR-004).</p>
+    <div class="row">
+        <label>Nivel asignado
+            <select name="Level">
+                <option value="1">1 · Inmediato</option><option value="2">2 · Muy urgente</option><option value="3" selected>3 · Urgente</option><option value="4">4 · Menos urgente</option><option value="5">5 · No urgente</option>
+            </select>
+        </label>
+        <label>Criterio o discriminador <input name="Discriminator" placeholder="dolor torácico típico, SpO2 92%" /></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+        <label>Presión arterial <input name="BloodPressure" placeholder="120/80" /></label>
+        <label>FC <input name="HeartRate" type="number" /></label>
+        <label>FR <input name="RespiratoryRate" type="number" /></label>
+        <label>Temperatura <input name="Temperature" type="number" step="0.1" /></label>
+        <label>SpO2 % <input name="SpO2" type="number" /></label>
+        <label>Dolor 0-10 <input name="Pain" type="number" /></label>
+    </div>
+    <div style="margin-top:14px"><button>Guardar triaje</button> <a class="btn secondary" href="/Emergencia">Volver</a></div>
+</form>

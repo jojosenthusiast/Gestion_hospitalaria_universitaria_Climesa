@@ -1,0 +1,16 @@
+# Standards/literature notes
+- Poon EG et al. NEJM 2010;362:1698-1707 doi:10.1056/NEJMsa0907115 bar-code eMAR (numbers from knowledge: non-timing errors -41.4%, potential ADEs -50.8%, timing errors -27.3%, transcription errors eliminated). https://psnet.ahrq.gov/issue/effect-bar-code-technology-safety-medication-administration
+- Bates DW et al. JAMA 1998;280(15):1311-6 CPOE: non-intercepted serious medication errors -55%. https://psnet.ahrq.gov/issue/effect-computerized-physician-order-entry-and-team-intervention-prevention-serious-medication
+- HIMSS EMRAM criteria 2022. https://himss.org/sites/hde/files/2022-01/emram-criteria.pdf
+- Kaplan & Porter HBR 2011 TDABC. https://maaw.info/ArticleSummaries/ArtSumKaplanPorter2011.htm
+- IHE BALP audit / FHIR AuditEvent. https://build.fhir.org/ig/IHE/ITI.BasicAudit/
+- CHCF 2010 Chart Abstraction EHR Deployment Techniques. https://collections.nlm.nih.gov/master/borndig/101530131/ChartAbstractionEHRDeploymentTechniques.pdf
+- JCI IPSG 6 goals. https://www.fvhospital.com/en/safety-goals/
+- FHIR R6 ballot, publication expected late 2026; R4 most adopted. https://www.health-samurai.io/articles/getting-ready-for-fhir-r6-what-you-need-to-know
+- openEHR/FHIR/CDA coexistence. https://www.noze.it/en/insights/openehr-fhir-cda-comparison/
+- SNOMED: Costa Rica member 2026. https://www.snomed.org/news/costa-rica-joins-snomed-international,-advancing-digital-health-strategy ; Argentina 31st member.
+- ICD-11 transition guide WHO ES. https://ICD.who.int/es/docs/192190_ICD-11_Implementation_or_Transition_Guide_edited_ES.pdf ; PAHO https://www.paho.org/es/registro-civil-estadisticas-vitales-rcev/cie-11-rcev
+- Downtime: Lyon et al. Appl Clin Inform 2023;14(3):513-520 doi:10.1055/s-0043-1768995.
+- MAPFRE SV preautorización/reclamos forms. https://www.mapfre.com.sv/media/formulariounicodepreautorizacion.pdf ; https://mapfre.com.sv/media/Guia-de-reclamos-gastos-medicos.pdf
+- Haynes AB et al NEJM 2009;360:491-9 WHO surgical safety checklist (mortality 1.5->0.8%, complications 11.0->7.0%) [knowledge]
+- NEWS2 Royal College of Physicians 2017 [knowledge]

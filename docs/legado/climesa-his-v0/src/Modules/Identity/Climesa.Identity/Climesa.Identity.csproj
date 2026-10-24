@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../Climesa.Platform/Climesa.Platform.csproj" />
+    <ProjectReference Include="../Climesa.Identity.Contracts/Climesa.Identity.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Sql\*.sql" />
+  </ItemGroup>
+</Project>

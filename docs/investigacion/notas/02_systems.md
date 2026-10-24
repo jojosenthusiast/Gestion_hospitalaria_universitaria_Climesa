@@ -1,0 +1,17 @@
+# Systems notes
+- KLAS Best in KLAS 2025 Acute EHR LatAm: MV SOUL 80.3 (winner), Tasy 73.4, Oracle i.s.h.med 64.5; TrakCare 80.4 unranked; Pixeon 74.5. https://klasresearch.com/best-in-klas-ranking/acute-care-ehr-global-latin-america/2025/237-41
+- KLAS global 2026 report (jul 2026): low purchasing; Oracle losses (VGR Sweden); InterSystems wins Chile/Colombia. https://www.healthcareitnews.com/news/klas-epic-grows-global-ehr-market-share-oracle-sees-both-gains-and-losses-abroad
+- Tasy sold by Philips to Bionexo (Brazil), €161M, dic 2025. https://finder.techleap.nl/news/feed/bionexo-acquires-philips-tasy-healthcare-platform-for-161m
+- Ozone HIS: OpenMRS3 + SENAITE LIMS + Odoo + Superset, SSO. https://openmrs.atlassian.net/wiki/spaces/docs/pages/25477009/Ozone+-+Health+Information+System
+- GNU Health 5.0: Tryton 7.0 LTS, Python 3.13, FHIR, ICD-10/11, ICPM, ICF, Orthanc DICOM worklist, allergy checks, DHIS2, federation, DPG. https://www.gnuhealth.org/downloads/media/new_features_gnuhealth_50.pdf
+- Open-source HIS comparison (OpenMRS MPL2, OpenEMR GPL, Bahmni AGPL, GNU Health GPL3, HospitalRun, OpenClinic GA); TCO 3 años $93K-$392K 100-200 camas. https://synodus.com/blog/healthcare/free-hospital-information-system-open-source/
+- ERPNext Healthcare / Marley: patient->customer, encounter, ADT, service units, lab, insurance claims, accounting integration; gaps discharge summaries, allergy alerts custom. https://clefincode.com/blog/global-digital-vibes/en/erpnext-healthcare-and-marley-comprehensive-analysis ; https://github.com/frappe/healthcare
+- Medplum headless FHIR. https://vintasoftware.com/blog/building-ehr-introducing-medplum ; https://medplum.com
+- OpenMRS O3 billing module, medications prescribing/dispensing. https://openmrs.atlassian.net/wiki/spaces/projects/pages/26938835/Billing ; https://openmrs.atlassian.net/wiki/spaces/projects/pages/26938549/O3+Medications+Prescribing+Dispensing+etc
+- Bahmni: OpenMRS + Odoo + OpenELIS + dcm4chee. https://bahmni.atlassian.net/wiki/spaces/BAH/pages/2392073
+- HIBA Hospital Italiano BA: in-house, 750 camas, EMRAM 7, CDA 48.5M docs, SNOMED terminology server, CPOE 2011, CLMA barcode 95%, pharmacy validation 98%, CDS, 169 monitors, DIS 189 staff. https://na.eventscloud.com/file_uploads/8f95280b0af93ca29f0921bb29f1851e_HospitalItalianodeBuenosAires.pdf
+- EDUS Costa Rica: in-house Java, Ley 9162 (2013), modules SIES SIAC ARCA SIFF SILC SIFA SIUR MISE SIVE; 125 staff; paper history NOT migrated; cyberattack mayo 2022 ~2 months; CGR 2022 access roles. https://publications.iadb.org/publications/spanish/document/Expediente-digital-unico-en-salud-EDUS-de-Costa-Rica-buenas-practicas-historia-e-implementacion.pdf
+- Uruguay HCEN: federated, CDA, IHE XDS, SNOMED CT ext, OIDs, laws 18.211, 18.331, 19.355, 19.670, Decree 242/017. https://www.fmed.edu.uy/sites/default/files/pag/03-2025/Implementacion%20de%20la%20Historia%20Clinica%20Electronica%20Nacional%20de%20Uruguay.pdf
+- VGR Sweden Millennium: bought 2018, live Nov 2024, pulled after 3 days, ~€500M, KPMG org not prepared. https://heise.de/-10323142
+- NPfIT six reasons. https://www.computerweekly.com/opinion/Six-reasons-why-the-NHS-National-Programme-for-IT-failed ; Anderson case history https://www.cl.cam.ac.uk/~rja14/Papers/npfit-mpp-2014-case-history.pdf
+- El Salvador SIS MINSAL: 28 hospitals 2022, ambulances, $25.1M. https://dplnews.com/?p=159955

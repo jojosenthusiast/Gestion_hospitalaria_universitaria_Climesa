@@ -1,0 +1,31 @@
+# 106. Tareas
+
+- [x] T01 · S3 · R · Migración de consulta, signos, diagnósticos, recetas y semilla CIE-10
+  - Cubre: FR-106-03, FR-106-04
+  - Depende de: 100-T03
+  - Hecho cuando: la semilla carga el subconjunto CIE-10 y las tablas existen en la nube
+  - Verificado: Aplicada en Supabase; semilla con 30 códigos CIE-10 de consulta general
+- [ ] T02 · S3 · R · Iniciar consulta, signos, diagnósticos, recetas y órdenes
+  - Cubre: FR-106-01 a FR-106-05
+  - Depende de: T01, 105-T02
+  - Hecho cuando: pruebas de cada sección y de relación de atención creada
+- [ ] T03 · S3 · R · Firma con inscripción vigente y bloqueo de edición
+  - Cubre: FR-106-06, FR-106-07
+  - Depende de: T02, 103-T05
+  - Hecho cuando: escenarios 2 y 3 pasan
+- [ ] T04 · S3 · R · Historial clínico del médico y del paciente con auditoría
+  - Cubre: FR-106-09, FR-106-10, FR-106-12
+  - Depende de: T03
+  - Hecho cuando: el paciente ve su consulta firmada en Android e iOS y la lectura queda auditada
+- [ ] T05 · S3 · R · Pantallas de consulta en Android e iOS (A21, I21) y signos (A41)
+  - Cubre: FR-106-01 a FR-106-06
+  - Depende de: T02, 121-T03, 122-T03
+  - Hecho cuando: escenario 1 pasa en ambas plataformas
+- [ ] T06 · S4 · R · Indicar hospitalización desde la consulta
+  - Cubre: FR-106-11
+  - Depende de: T03, 108-T02
+  - Hecho cuando: la indicación aparece en admisiones con origen consulta
+- [ ] T07 · S4 · E · Addendum con original conservado
+  - Cubre: FR-106-08
+  - Depende de: T03
+  - Hecho cuando: el historial muestra original y addendum

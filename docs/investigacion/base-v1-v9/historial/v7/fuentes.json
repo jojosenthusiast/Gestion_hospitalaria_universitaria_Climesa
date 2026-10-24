@@ -1,0 +1,170 @@
+[
+  {
+    "id": "H701",
+    "title": "MINSAL manual hospitalización 2022",
+    "url": "https://asp.salud.gob.sv/regulacion/pdf/manual/manualdeprocesosyprocedimientosdeatenciondesaludintegralenhospitalizacion-Acuerdo-660_v1.pdf",
+    "reading_status": "Registro oficial indexado confirmado; PDF no recuperado. Acuerdo 660, 03/03/2022; alcance/contenido íntegros pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H702",
+    "title": "MINSAL manual procedimientos básicos enfermería 2024",
+    "url": "https://asp.salud.gob.sv/regulacion/manuales.asp?offset=40",
+    "reading_status": "Índice oficial confirma título y 15/07/2024; texto íntegro no recuperado.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H703",
+    "title": "MINSAL PAE continuo cuidado 2019",
+    "url": "https://asp.salud.gob.sv/regulacion/lineamientos.asp?btnbuscar=Buscar&offset=120",
+    "reading_status": "Índice oficial consultado; documento de 19/12/2019 pendiente de lectura y vigencia.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H704",
+    "title": "Starmer et al. I-PASS 2014",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/25372088/",
+    "reading_status": "Resumen consultado/indexado; DOI 10.1056/NEJMsa1405556. No texto íntegro.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H705",
+    "title": "RCP NEWS2",
+    "url": "https://www.rcp.ac.uk/resources/national-early-warning-score-news-2/",
+    "reading_status": "Página oficial consultada; informe completo/tablas/guía de implementación pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H706",
+    "title": "SCCM ICU Liberation ABCDEF",
+    "url": "https://www.sccm.org/clinical-resources/iculiberation-home/abcdef-bundles",
+    "reading_status": "Página oficial consultada; referencia de estructura, no protocolo local.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H707",
+    "title": "SCCM PADIS actualización focal 2025",
+    "url": "https://sccm.org/clinical-resources/guidelines/guidelines/focused-update-padis-guideline",
+    "reading_status": "Página oficial consultada; recomendaciones condicionales y alcance adultos. Paper completo pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H708",
+    "title": "Pun et al. ABCDEF 2019",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/30339549/",
+    "reading_status": "Resumen indexado consultado; cohorte prospectiva, DOI 10.1097/CCM.0000000000003482; texto íntegro bloqueado.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H709",
+    "title": "ESPEN nutrición hospitalaria 2021",
+    "url": "https://2022.espen.org/files/ESPEN-Guidelines/ESPEN_guideline_on_hospital_nutrition.pdf",
+    "reading_status": "PDF 26 páginas recuperado; metodología, alcance y recomendaciones 55–56 seleccionadas revisadas. DOI 10.1016/j.clnu.2021.09.039.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H710",
+    "title": "Schuetz et al. EFFORT 2019",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/31030981/",
+    "reading_status": "Resumen indexado consultado; ensayo aleatorizado abierto en pacientes médicos con riesgo nutricional; texto íntegro pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H711",
+    "title": "MINSAL dietas RIISS 2014",
+    "url": "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/Lineamientos_tecnicos_para_la_prescripcion_de_dietas_hospitalarias_RIISS.pdf",
+    "reading_status": "Título y 21/03/2014 en índice oficial; PDF no recuperado, contenido/vigencia/aplicabilidad pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H712",
+    "title": "OMS seguridad de medicamentos en transiciones 2019",
+    "url": "https://www.who.int/docs/default-source/patient-safety/who-uhc-sds-2019-9-eng.pdf",
+    "reading_status": "PDF 52 páginas recuperado; conceptos/conciliación seleccionados revisados. No revisión integral de bibliografía.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H713",
+    "title": "AHRQ RED Tool 3",
+    "url": "https://www.ahrq.gov/patient-safety/settings/hospital/red/toolkit/redtool3.html",
+    "reading_status": "Página oficial consultada; preparación/educación de alta, no ley local ni garantía de readmisión.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H714",
+    "title": "MINSAL limpieza/desinfección SNIS 2024",
+    "url": "https://asp.salud.gob.sv/regulacion/pdf/lineamientos/lineamientostecnicosdelimpiezaydesinfeccionenestablecimientosdelsistemanacionalintegradodesalud-Acuerdo-Ejecutivo-941-09102024_v1.pdf",
+    "reading_status": "Índice oficial confirma 09/10/2024; PDF no recuperado, revisión íntegra pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H715",
+    "title": "CDC limpieza ambiental en recursos limitados",
+    "url": "https://www.cdc.gov/healthcare-associated-infections/hcp/cleaning-global/procedures.html",
+    "reading_status": "Página oficial consultada; secciones de riesgo, responsables y limpieza terminal revisadas.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H716",
+    "title": "CDC textiles/lavandería",
+    "url": "https://www.cdc.gov/healthcare-associated-infections/hcp/cleaning-global/appendix-d.html",
+    "reading_status": "Página oficial consultada; referencia internacional.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H717",
+    "title": "RTS 13.03.01:14 bioinfecciosos, OSARTEC",
+    "url": "https://osartec.gob.sv/?wpdmdl=2878",
+    "reading_status": "PDF oficial recuperado 46 páginas; ámbito, 5.3–5.4 y anexo 3 seleccionados revisados. Paginación Diario Oficial diferente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H718",
+    "title": "OSARTEC tabla derogaciones",
+    "url": "https://osartec.gob.sv/servicios/derogaciones/",
+    "reading_status": "Tabla oficial consultada: fila 27 muestra NSO 2008 sustituida por RTS 2015, no RTS derogado.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H719",
+    "title": "DISAM visto bueno plan bioinfecciosos",
+    "url": "https://disam.salud.gob.sv/servicios/requisitos-para-tramites-y-servicios/visto-bueno-de-plan-de-manejo-de-desechos-bioinfecciosos/",
+    "reading_status": "Ficha oficial indexada; requisitos administrativos actuales completos pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H720",
+    "title": "OMS mantenimiento equipo médico 2011",
+    "url": "https://www.who.int/publications/i/item/9789241501538",
+    "reading_status": "Ficha oficial consultada; inspecciones y mantenimiento. Manual íntegro pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H721",
+    "title": "MINSAL DIRTECS",
+    "url": "https://www.salud.gob.sv/direccion-de-tecnologias-sanitarias-dirtecs/",
+    "reading_status": "Página oficial indexada; funciones organizativas MINSAL, no obligaciones universales del privado.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H722",
+    "title": "MINSAL enlace hospitalario 2026",
+    "url": "https://asp.salud.gob.sv/regulacion/lineamientos.asp?offset=0",
+    "reading_status": "Índice oficial localizado: 06/05/2026; texto íntegro/alcance no revisados.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H723",
+    "title": "MINSAL cuidados paliativos SNIS 2026",
+    "url": "https://asp.salud.gob.sv/regulacion/lineamientos.asp",
+    "reading_status": "Índice oficial localizado: 22/05/2026; texto íntegro/alcance no revisados.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "H724",
+    "title": "AHRQ prevención lesiones de presión",
+    "url": "https://www.ahrq.gov/patient-safety/settings/hospital/resource/pressureulcer/tool/index.html",
+    "reading_status": "Página general consultada; toolkit completo y herramientas/licencias pendientes.",
+    "consulted": "2026-10-12"
+  }
+]

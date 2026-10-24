@@ -1,0 +1,13 @@
+@page
+@model ErrorModel
+@{
+    ViewData["Title"] = "Error";
+}
+<section class="card">
+    <h1>Ocurrió un error inesperado</h1>
+    <p>La operación no se completó. Si se repite, comunique este identificador a TI.</p>
+    @if (Model.ShowRequestId)
+    {
+        <p><strong>Identificador:</strong> <code>@Model.RequestId</code></p>
+    }
+</section>

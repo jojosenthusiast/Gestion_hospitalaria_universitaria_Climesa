@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="sv.edu.catolica.climesa.domain.PatientRulesTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-20T07:31:12" hostname="d6707bcecd6d" time="0.101">
+  <properties/>
+  <testcase name="searchesWithoutAccentsOrWordOrder" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.073"/>
+  <testcase name="recordNumbersAreDistinct" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.004"/>
+  <testcase name="rejectsInvalidDates" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.002"/>
+  <testcase name="requiresReasonAndValidNames" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.002"/>
+  <testcase name="rejectsDuplicateDuiEvenWhenInactive" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.013"/>
+  <testcase name="rejectsStaleUpdates" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.002"/>
+  <testcase name="editsPreserveIdentityAndHistory" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.001"/>
+  <testcase name="unknownFieldsRemainAbsent" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.0"/>
+  <testcase name="checksDuiVerifier" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.001"/>
+  <testcase name="changingStatusNeverDeletes" classname="sv.edu.catolica.climesa.domain.PatientRulesTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

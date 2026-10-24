@@ -1,0 +1,20 @@
+@page
+@model Climesa.Web.Pages.Hospitalizacion.IndexModel
+@{
+    ViewData["Title"] = "Hospitalización";
+}
+<h1>Episodios hospitalarios activos</h1>
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+<section class="card">
+    <table>
+        <tr><th>Paciente</th><th>Expediente</th><th>Cama</th><th>Ingreso</th><th>Estado</th><th></th></tr>
+        @foreach (var e in Model.Rows)
+        {
+            <tr>
+                <td>@e.Name</td><td class="mono">@e.Mrn</td><td>@e.Location</td><td>@LocalTime.Format(e.AdmittedAt)</td>
+                <td>@if (e.Status == "medical_discharge_signed") { <span class="tag warn">alta firmada, pendiente de salida</span> } else { <span class="tag ok">activo</span> }</td>
+                <td><a class="btn small" href="/Hospitalizacion/Episodio/@e.EpisodeId">Abrir</a></td>
+            </tr>
+        }
+    </table>
+</section>

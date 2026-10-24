@@ -1,0 +1,18 @@
+[
+  {
+    "document": "dte_normativa_publica.pdf",
+    "sha256": "89b275140f8090d9641925ad3c66951e91318d357cda6d42a7451529ab840abf",
+    "bytes": 6229219,
+    "source": "Ministerio de Hacienda portal factura.gob.sv",
+    "retrieved": "2026-10-12",
+    "redistributed": false
+  },
+  {
+    "document": "dte_manual_funcional_publico.pdf",
+    "sha256": "9b8e29f28ea6ba98be051654568f54ec65997868b0cc5036c9611e7a29bb51ec",
+    "bytes": 1443194,
+    "source": "Ministerio de Hacienda portal factura.gob.sv",
+    "retrieved": "2026-10-12",
+    "redistributed": false
+  }
+]

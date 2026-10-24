@@ -1,0 +1,200 @@
+CATÁLOGO DE REFERENCIA
+Data Annotations en .NET
+Atributos de validación, presentación y esquema para modelos de C#
+Incluye el espacio de nombres, la descripción de cada atributo y un ejemplo de uso listo para copiar en tus modelos ASP.NET Core / Entity Framework Core.
+
+1
+
+Atributos de Validación
+
+2
+
+Atributos de Presentación (Display)
+
+3
+
+Atributos de Esquema / Base de Datos
+
+16 atributos 6 atributos 7 atributos
+
+using System.ComponentModel.DataAnnotations; using System.ComponentModel.DataAnnotations.Schema;
+
+1 · Atributos de Validación
+Estos atributos controlan si el valor asignado a una propiedad es aceptable. Se evalúan automáticamente mediante ModelState.IsValid en ASP.NET Core, tanto en el servidor como (con los scripts de validación) en el navegador.
+[Required]
+System.ComponentModel.DataAnnotations
+Indica que la propiedad es obligatoria. No permite valores nulos (ni cadenas vacías, salvo que AllowEmptyStrings = true).
+EJEMPLO DE USO
+[Required(ErrorMessage = "El nombre es obligatorio")] public string Nombre { get; set; }
+[StringLength]
+System.ComponentModel.DataAnnotations
+Establece la longitud máxima (y opcionalmente mínima) permitida para una cadena de texto.
+EJEMPLO DE USO
+[StringLength(100, MinimumLength = 3, ErrorMessage = "Debe tener entre 3 y 100 caracteres")] public string Nombre { get; set; }
+[MinLength] / [MaxLength]
+System.ComponentModel.DataAnnotations
+Definen por separado la longitud mínima y máxima de una cadena o el número mínimo/máximo de elementos de una colección.
+EJEMPLO DE USO
+[MinLength(3, ErrorMessage = "Mínimo 3 caracteres")] [MaxLength(50, ErrorMessage = "Máximo 50 caracteres")] public string Usuario { get; set; }
+[Length] (.NET 8+)
+System.ComponentModel.DataAnnotations
+Combina MinLength y MaxLength en un solo atributo para cadenas o colecciones. Disponible desde .NET 8.
+EJEMPLO DE USO
+[Length(3, 50, ErrorMessage = "Debe medir entre 3 y 50")] public string Codigo { get; set; }
+
+[Range]
+System.ComponentModel.DataAnnotations
+Restringe un valor numérico (o fecha) a un rango mínimo y máximo.
+EJEMPLO DE USO
+[Range(0.01, 999999, ErrorMessage = "El precio debe ser mayor que 0")] public decimal Precio { get; set; }
+[RegularExpression]
+System.ComponentModel.DataAnnotations
+Valida que el valor cumpla con un patrón de expresión regular específico. Útil para formatos personalizados (teléfonos, códigos, etc.).
+EJEMPLO DE USO
+[RegularExpression(@"^[0-9]{8}$", ErrorMessage = "Debe contener 8 dígitos")] public string Telefono { get; set; }
+[EmailAddress]
+System.ComponentModel.DataAnnotations
+Valida que el valor tenga el formato de una dirección de correo electrónico válida.
+EJEMPLO DE USO
+[Required] [EmailAddress(ErrorMessage = "Correo no válido")] public string Correo { get; set; }
+[Phone]
+System.ComponentModel.DataAnnotations
+Valida que el valor tenga un formato de número telefónico reconocible.
+EJEMPLO DE USO
+[Phone(ErrorMessage = "Número de teléfono no válido")] public string Telefono { get; set; }
+[Url]
+System.ComponentModel.DataAnnotations
+Valida que el valor tenga el formato de una URL (http, https, ftp).
+EJEMPLO DE USO
+[Url(ErrorMessage = "Ingrese una URL válida")] public string SitioWeb { get; set; }
+
+[CreditCard]
+System.ComponentModel.DataAnnotations
+Valida que el valor tenga un formato de número de tarjeta de crédito válido (algoritmo de Luhn).
+EJEMPLO DE USO
+[CreditCard(ErrorMessage = "Número de tarjeta inválido")] public string NumeroTarjeta { get; set; }
+[Compare]
+System.ComponentModel.DataAnnotations
+Compara el valor de la propiedad con el de otra propiedad del mismo modelo. Muy utilizado para confirmar contraseñas o correos.
+EJEMPLO DE USO
+[Required] [DataType(DataType.Password)] public string Password { get; set; }
+[Required] [Compare("Password")] [DataType(DataType.Password)] public string ConfirmarPassword { get; set; }
+[FileExtensions]
+System.ComponentModel.DataAnnotations
+Valida que el nombre del archivo tenga una de las extensiones permitidas.
+EJEMPLO DE USO
+[FileExtensions(Extensions = "jpg,jpeg,png", ErrorMessage = "Solo se permiten imágenes JPG o PNG")] public string Imagen { get; set; }
+[Base64String] (.NET 8+)
+System.ComponentModel.DataAnnotations
+Valida que la cadena contenga un valor Base64 válido.
+EJEMPLO DE USO
+[Base64String] public string ArchivoCodificado { get; set; }
+
+[AllowedValues] / [DeniedValues] (.NET 8+)
+System.ComponentModel.DataAnnotations
+AllowedValues restringe el valor a una lista específica de opciones permitidas; DeniedValues rechaza una lista de valores prohibidos.
+EJEMPLO DE USO
+[AllowedValues("Pendiente", "Aprobado", "Rechazado")] public string Estado { get; set; }
+[DeniedValues("admin", "root")] public string NombreUsuario { get; set; }
+[EnumDataType]
+System.ComponentModel.DataAnnotations
+Valida que el valor corresponda a uno de los miembros definidos en un tipo enum específico.
+EJEMPLO DE USO
+public enum EstadoPedido { Pendiente, Enviado, Entregado }
+[EnumDataType(typeof(EstadoPedido))] public string Estado { get; set; }
+[CustomValidation]
+System.ComponentModel.DataAnnotations
+Ejecuta un método estático propio para validar la propiedad, cuando las reglas incorporadas no son suficientes.
+EJEMPLO DE USO
+[CustomValidation(typeof(ProductoValidator), "ValidarPrecio")] public decimal Precio { get; set; }
+public static class ProductoValidator { public static ValidationResult ValidarPrecio( decimal precio, ValidationContext contexto) { if (precio <= 0) return new ValidationResult("El precio debe ser mayor a 0"); return ValidationResult.Success; } }
+
+[ValidateNever]
+Microsoft.AspNetCore.Mvc.ModelBinding.Validation
+Indica al motor de validación de ASP.NET Core que NO valide esta propiedad, aunque tenga otras Data Annotations.
+EJEMPLO DE USO
+[ValidateNever] public Categoria Categoria { get; set; }
+
+2 · Atributos de Presentación (Display)
+Estos atributos no validan datos: controlan cómo se ven las propiedades en los formularios generados automáticamente (Tag Helpers, scaffolding) -- etiquetas, formato y visibilidad.
+[Display]
+System.ComponentModel.DataAnnotations
+Define el nombre visible, la descripción y el orden de una propiedad al generarse formularios o etiquetas automáticamente.
+EJEMPLO DE USO
+[Display(Name = "Nombre completo", Description = "Ingrese su nombre y apellido")] public string NombreCompleto { get; set; }
+[DisplayName]
+System.ComponentModel
+Alternativa más simple a [Display]; solo define el texto que se mostrará como etiqueta de la propiedad.
+EJEMPLO DE USO
+[DisplayName("Correo electrónico")] public string Email { get; set; }
+[DataType]
+System.ComponentModel.DataAnnotations
+Especifica el tipo semántico del dato (fecha, contraseña, moneda, texto largo, etc.) para que la vista genere el control HTML adecuado.
+EJEMPLO DE USO
+[DataType(DataType.Date)] public DateTime FechaNacimiento { get; set; }
+[DataType(DataType.MultilineText)] public string Comentarios { get; set; }
+
+[DisplayFormat]
+System.ComponentModel.DataAnnotations
+Controla el formato de presentación y edición de un valor, por ejemplo el formato de una fecha o el texto para valores nulos.
+EJEMPLO DE USO
+[DisplayFormat(DataFormatString = "{0:dd/MM/yyyy}", ApplyFormatInEditMode = true)] public DateTime FechaRegistro { get; set; }
+[ScaffoldColumn]
+System.ComponentModel.DataAnnotations
+Indica si una propiedad debe mostrarse u ocultarse al generar vistas automáticamente con scaffolding.
+EJEMPLO DE USO
+[ScaffoldColumn(false)] public string ClaveInterna { get; set; }
+[UIHint]
+System.ComponentModel.DataAnnotations
+Sugiere qué plantilla o control de UI personalizado debe usarse para representar la propiedad.
+EJEMPLO DE USO
+[UIHint("MiSelectorDeColor")] public string Color { get; set; }
+
+3 · Atributos de Esquema / Base de Datos
+Estos atributos pertenecen principalmente a Entity Framework Core: definen cómo se traduce la entidad de C# a tablas, columnas y relaciones dentro de la base de datos.
+[Key]
+System.ComponentModel.DataAnnotations
+Marca una propiedad como la clave primaria de la entidad cuando el nombre no sigue la convención Id / EntidadId.
+EJEMPLO DE USO
+public class Producto { [Key] public int CodigoProducto { get; set; } }
+[Table]
+System.ComponentModel.DataAnnotations.Schema
+Especifica el nombre (y opcionalmente el esquema) de la tabla a la que se mapea la entidad en la base de datos.
+EJEMPLO DE USO
+[Table("Productos", Schema = "inventario")] public class Producto { public int Id { get; set; } }
+[Column]
+System.ComponentModel.DataAnnotations.Schema
+Especifica el nombre, tipo y orden de la columna a la que se mapea una propiedad.
+EJEMPLO DE USO
+[Column("nombre_producto", TypeName = "varchar(150)", Order = 1)] public string Nombre { get; set; }
+
+[ForeignKey]
+System.ComponentModel.DataAnnotations.Schema
+Indica explícitamente qué propiedad actúa como llave foránea de una relación, cuando el nombre no sigue la convención.
+EJEMPLO DE USO
+public int IdCategoria { get; set; }
+[ForeignKey("IdCategoria")] public Categoria Categoria { get; set; }
+[NotMapped]
+System.ComponentModel.DataAnnotations.Schema
+Excluye una propiedad para que Entity Framework Core NO la incluya como columna de la base de datos.
+EJEMPLO DE USO
+[NotMapped] public string NombreCompleto => $"{Nombre} {Apellido}";
+[DatabaseGenerated]
+System.ComponentModel.DataAnnotations.Schema
+Define cómo se genera el valor de una propiedad en la base de datos: Identity (autoincremental), Computed o None.
+EJEMPLO DE USO
+[DatabaseGenerated(DatabaseGeneratedOption.Identity)] public int Id { get; set; }
+[ConcurrencyCheck]
+System.ComponentModel.DataAnnotations
+Marca una propiedad para que se incluya en la verificación de concurrencia optimista al actualizar un registro.
+EJEMPLO DE USO
+[ConcurrencyCheck] public int Version { get; set; }
+
+[Timestamp]
+System.ComponentModel.DataAnnotations
+Marca una propiedad byte[] como token de concurrencia (rowversion), gestionado automáticamente por la base de datos.
+EJEMPLO DE USO
+[Timestamp] public byte[] RowVersion { get; set; }
+Nota: los atributos de validación (Sección 1) se aplican tanto en modelos de dominio como en ViewModels de ASP.NET Core MVC. Los atributos de esquema (Sección 3) solo tienen efecto si el proyecto usa Entity Framework Core y no ha sido sobreescrito por configuración Fluent API en OnModelCreating.
+
+

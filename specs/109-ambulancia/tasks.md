@@ -1,0 +1,43 @@
+# 109. Tareas
+
+- [x] T01 · S3 · R · Migración de ambulancia con unidad única y servicio activo único
+  - Cubre: FR-109-01, FR-109-05
+  - Depende de: 100-T03
+  - Hecho cuando: dos servicios activos para la unidad se rechazan en prueba
+  - Verificado: Aplicada en Supabase; prueba 12 y 02_concurrencia.sh caso 3: 1 servicio activo de 2 despachos
+- [ ] T02 · S3 · R · Estado de la unidad visible en vivo y regla de paramédico de turno
+  - Cubre: FR-109-01, FR-109-06
+  - Depende de: T01, 103-T06
+  - Hecho cuando: escenario 2 pasa
+- [ ] T03 · S4 · R · Solicitudes del paciente y por teléfono, confirmación y despacho con bloqueo
+  - Cubre: FR-109-02, FR-109-03, FR-109-04, FR-109-05
+  - Depende de: T02, 101-T07
+  - Hecho cuando: escenario 1 pasa como prueba concurrente
+- [ ] T04 · S4 · R · Hitos, finalización y mantenimiento
+  - Cubre: FR-109-07, FR-109-08, FR-109-09, FR-109-12
+  - Depende de: T03
+  - Hecho cuando: un servicio completo vuelve la unidad a Disponible y mantenimiento con servicio activo se rechaza
+- [ ] T05 · S4 · R · Centro de despacho web (W18) y app de la tripulación (A70, A71, A73)
+  - Cubre: FR-109-01, FR-109-04, FR-109-07
+  - Depende de: T04, 120-T03, 121-T03
+  - Hecho cuando: un servicio se opera de punta a punta entre web y Android en vivo
+- [ ] T06 · S4 · R · Seguimiento del paciente en Android e iOS (A09, I09)
+  - Cubre: FR-109-16
+  - Depende de: T03, 122-T03
+  - Hecho cuando: escenario 4 pasa
+- [ ] T07 · S4 · R · Bitácora con filtros y privacidad (W19, A74)
+  - Cubre: FR-109-14, FR-109-15
+  - Depende de: T04
+  - Hecho cuando: escenario 5 pasa
+- [ ] T08 · S4 · R · Admisión con origen ambulancia
+  - Cubre: FR-109-17
+  - Depende de: T04, 108-T02
+  - Hecho cuando: un servicio "en hospital" crea admisión con su referencia
+- [ ] T09 · S4 · E · Reporte prehospital con cola sin conexión y recepción en emergencia
+  - Cubre: FR-109-10, FR-109-11
+  - Depende de: T04
+  - Hecho cuando: escenario 3 pasa en modo avión
+- [ ] T10 · S5 · E · Ubicación en vivo y mapa
+  - Cubre: FR-109-13
+  - Depende de: T05
+  - Hecho cuando: el punto se mueve en el mapa web mientras el teléfono se desplaza

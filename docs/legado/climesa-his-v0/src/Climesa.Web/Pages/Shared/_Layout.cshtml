@@ -1,0 +1,43 @@
+@inject ActorAccessor Actors
+@{
+    var actor = await Actors.Current();
+    bool Can(string p) => actor?.Has(p) ?? false;
+    var path = Context.Request.Path.Value ?? "/";
+    string Active(string prefix) => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] · CLIMESA HIS</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="/">CLIMESA <span>HIS</span></a>
+        @if (actor is not null)
+        {
+            <nav>
+                @if (Can("identity.search")) { <a class="@Active("/Pacientes")" href="/Pacientes">Pacientes</a> }
+                @if (Can("care.view.emergency")) { <a class="@Active("/Emergencia")" href="/Emergencia">Emergencia</a> }
+                @if (Can("care.view.episode")) { <a class="@Active("/Hospitalizacion")" href="/Hospitalizacion">Hospitalización</a> }
+                @if (Can("care.view.beds")) { <a class="@Active("/Camas")" href="/Camas">Camas</a> }
+                @if (Can("migration.view")) { <a class="@Active("/Migracion")" href="/Migracion">Migración</a> }
+                @if (Can("audit.view")) { <a class="@Active("/Auditoria")" href="/Auditoria">Auditoría</a> }
+            </nav>
+            <div class="who">
+                <span>@actor.DisplayName</span>
+                <form method="post" action="/Cuenta/Salir"><button class="link">Salir</button></form>
+            </div>
+        }
+    </header>
+    <div class="demo-banner">Demostración con datos ficticios. No usar con pacientes reales.</div>
+    <main>
+        @RenderBody()
+    </main>
+    <footer>
+        Especificaciones 000, 001, 002 y 004 (parcial) · Hora local @LocalTime.Format(DateTimeOffset.UtcNow)
+    </footer>
+</body>
+</html>

@@ -1,0 +1,177 @@
+[
+  {
+    "id": "L501",
+    "title": "FHIR R4 ServiceRequest",
+    "url": "https://hl7.org/fhir/R4/servicerequest.html",
+    "reading_status": "Página oficial consultada; solicitud no equivale a ejecución.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L502",
+    "title": "FHIR R4 Specimen",
+    "url": "https://hl7.org/fhir/R4/specimen.html",
+    "reading_status": "Página oficial consultada.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L503",
+    "title": "FHIR R4 DiagnosticReport",
+    "url": "https://hl7.org/fhir/R4/diagnosticreport.html",
+    "reading_status": "Página oficial consultada; informe y observaciones vinculadas.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L504",
+    "title": "FHIR R4 Observation",
+    "url": "https://hl7.org/fhir/R4/observation.html",
+    "reading_status": "Lectura completa pendiente; no fundamenta reglas detalladas en esta versión.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L505",
+    "title": "LOINC partes del término",
+    "url": "https://loinc.org/kb/users-guide/major-parts-of-a-loinc-term",
+    "reading_status": "Página oficial consultada; mapear componente, propiedad, tiempo, sistema, escala y método.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L506",
+    "title": "UCUM",
+    "url": "https://ucum.org/ucum",
+    "reading_status": "Especificación oficial consultada; congelar versión implementada.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L507",
+    "title": "IHE PaLM",
+    "url": "https://profiles.ihe.net/PaLM/index.html",
+    "reading_status": "Índice oficial Rev. 11.0; distinguir Final Text de Trial Implementation. Transacciones completas pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L508",
+    "title": "WHO Laboratory quality management system handbook",
+    "url": "https://www.who.int/publications-detail-redirect/9789241548274",
+    "reading_status": "Ficha oficial de 2011; no lectura integral ni acreditación demostrada.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L509",
+    "title": "IHE Radiology",
+    "url": "https://profiles.ihe.net/RAD/",
+    "reading_status": "Índice oficial Rev. 23.0, 2025; perfiles completos pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L510",
+    "title": "DICOM Basic Worklist Management",
+    "url": "https://dicom.nema.org/medical/dicom/current/output/chtml/part04/chapter_K.html",
+    "reading_status": "Capítulo oficial consultado; verificar conformance y transacciones con proveedor.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L511",
+    "title": "DICOM Storage Commitment",
+    "url": "https://dicom.nema.org/medical/dicom/current/output/chtml/part04/chapter_J.html",
+    "reading_status": "Capítulo oficial PS3.4 2026d consultado.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L512",
+    "title": "Orthanc DICOM guide",
+    "url": "https://orthanc.uclouvain.be/book/dicom-guide.html",
+    "reading_status": "Guía oficial consultada; ID Orthanc y UID DICOM no son equivalentes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L513",
+    "title": "Orthanc security",
+    "url": "https://orthanc.uclouvain.be/book/faq/security.html",
+    "reading_status": "Guía oficial consultada; evaluar permisos y configuración de versión concreta.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L514",
+    "title": "OpenELIS funcionalidades",
+    "url": "https://openelis-global.org/features-and-functionality/",
+    "reading_status": "Página del proyecto consultada; capacidades anunciadas, integración no probada.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L515",
+    "title": "Roy et al. 2005: resultados pendientes al alta",
+    "url": "https://scholars.duke.edu/publication/1111710",
+    "reading_status": "Resumen en institución autora consultado; DOI 10.7326/0003-4819-143-2-200507190-00011.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L516",
+    "title": "Ensayo de avisos postalta",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/24154834/",
+    "reading_status": "Registro indexado consultado; texto íntegro pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L517",
+    "title": "Seguimiento microbiológico postalta",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/22278302/",
+    "reading_status": "Registro indexado; texto íntegro pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L518",
+    "title": "Comunicación radiológica de circuito cerrado",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/26374896/",
+    "reading_status": "Registro indexado; texto íntegro pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L519",
+    "title": "Ensayo de avisos de laboratorio críticos",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/10579608/",
+    "reading_status": "Registro indexado; texto íntegro pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L520",
+    "title": "OpenELIS configuración de analizadores",
+    "url": "https://uwdigi.atlassian.net/wiki/spaces/OG/pages/1648361491",
+    "reading_status": "Documentación oficial indexada; lectura completa y configuración de versión pendientes.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L521",
+    "title": "Norma técnica laboratorios SNIS 2023, Acuerdo 1855",
+    "url": "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2023/09/FBDBC.PDF",
+    "reading_status": "PDF oficial recuperado; artículos seleccionados revisados, no dictamen legal integral.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L522",
+    "title": "Norma radiológica 2025, Acuerdo 2580",
+    "url": "https://www.jurisprudencia.gob.sv/DocumentosBoveda/D/2/2020-2029/2025/11/10E9FA.PDF",
+    "reading_status": "PDF oficial recuperado; ámbito y artículos iniciales revisados.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L523",
+    "title": "Manual MINSAL análisis clínicos 2022",
+    "url": "https://docs.bvsalud.org/biblioref/2023/07/1438494/manualdeprocesosyprocedimientosparaanalisisclinicosdemuestrasb_iTh9M40.pdf",
+    "reading_status": "Documento MINSAL alojado BVS; alcance y procedimiento de validación seleccionados revisados.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L524",
+    "title": "Dirección de Protección Radiológica MINSAL",
+    "url": "https://www.salud.gob.sv/direccion-de-proteccion-radiologica/",
+    "reading_status": "Ficha indexada; recuperación completa bloqueada.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "L525",
+    "title": "Índice MINSAL de normas",
+    "url": "https://asp.salud.gob.sv/regulacion/normas.asp",
+    "reading_status": "Índice localizado: control de calidad radiológico 23/10/2025; texto íntegro pendiente.",
+    "consulted": "2026-10-12"
+  }
+]

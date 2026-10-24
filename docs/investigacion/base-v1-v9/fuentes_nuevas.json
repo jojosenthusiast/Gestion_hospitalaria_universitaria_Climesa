@@ -1,0 +1,65 @@
+[
+  {
+    "id": "N901",
+    "title": "CSSP RTAHospitalGeneral revisión1",
+    "url": "https://www.cssp.gob.sv/wp-content/uploads/2016/06/EX-CD-N-32-1-RTA-HOSPITAL-GENERAL-JVPM-JVPE-JVPLC.pdf",
+    "reading_status": "PDF33p recuperado; seleccionado oferta/recursos. Versión anterior al catálogo, no regla vigente definitiva.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "N902",
+    "title": "CSSP catálogoRTA",
+    "url": "https://cssp.gob.sv/rta/",
+    "reading_status": "Página oficial consultada, listadoEX-CD-N-32-3; instrumento íntegrorevisión3 pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "N903",
+    "title": "CSSP fichaHospitalGeneral JVPMrevisión3",
+    "url": "https://cssp.gob.sv/download/rta-hospital-general-jvpm-ex-cd-r-32-3/",
+    "reading_status": "Ficha oficial consultada; enlace de documento no recuperado.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "N904",
+    "title": "CSSP fichaHospitalGeneral JVPLCrevisión3",
+    "url": "https://cssp.gob.sv/documents/rta-hospital-general-jvplc-ex-cd-r-32-3/",
+    "reading_status": "Ficha oficial consultada; instrumento no recuperado.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "N905",
+    "title": "OIT ediciónCódigoTrabajo",
+    "url": "https://natlex.ilo.org/dyn/natlex2/natlex2/files/download/115180/Cod_Trab_SLV.pdf",
+    "reading_status": "PDF141p recuperado; arts161–166 ynotaeditorial revisados. Edición antigua, no consolidación2026.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "N906",
+    "title": "MTPS FAQjornada",
+    "url": "https://www.mtps.gob.sv/2020/10/26/cuantas-horas-debo-trabajar-al-dia/",
+    "reading_status": "Página oficial consultada eniteraciónprevia; contraste ordinario, Códigoactual pendiente.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "N907",
+    "title": "Web atribuidaCLIMESA",
+    "url": "https://hospitalclimesasv.com/",
+    "reading_status": "Página recuperada/listadoindexado con contenido plantilla; no prueba de oferta/equipos/habilitación.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "N908",
+    "title": "MH información técnica/funcionalDTE",
+    "url": "https://factura.gob.sv/informacion-tecnica-y-funcional/",
+    "reading_status": "Índice oficial actual recuperado; fechas2026 confirmadas, archivos actualizados aún por comparar.",
+    "consulted": "2026-10-12"
+  },
+  {
+    "id": "N909",
+    "title": "MINSAL índiceCEYE2026",
+    "url": "https://asp.salud.gob.sv/regulacion/lineamientos.asp",
+    "reading_status": "Registro oficial indexado16/07/2026; texto íntegro no recuperado.",
+    "consulted": "2026-10-12"
+  }
+]

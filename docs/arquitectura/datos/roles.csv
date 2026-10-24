@@ -1,0 +1,11 @@
+codigo,nombre,plataformas,origen,descripcion
+ADM,Administrador,Web,CUR REQ-ROL-01,"Configura y asegura el sistema: usuarios y roles, edificio, catálogos, políticas. No opera pacientes ni ve contenido clínico (D-050)."
+JOP,Jefe de Operaciones,Web,CUR (panel web); D-050,"Opera el día: tablero de camas, autorizaciones de admisión y traslado, turnos, mantenimiento de ambulancia, inventario, avisos, métricas."
+REC,Recepcionista,Android; Web,CUR REQ-ROL-03; base pedida,"Registro y verificación de pacientes, fila del día, citas, admisión, asignación de cama, despacho de ambulancia."
+AST,Asistente,Android,CUR REQ-ROL-03; base pedida,"Apoya la consulta: prepara al paciente, toma signos vitales, llama y mueve la fila del consultorio."
+ENF,Enfermero/a,Android,CUR (Android); base pedida,"Cuidado del hospitalizado: signos, notas de enfermería, limpieza de cama, consumo de insumos."
+MED,Médico,iOS; Android,CUR REQ-ROL-02,"Consulta general, diagnósticos, recetas, órdenes y revisión de laboratorio, indicación de hospitalización, alta. Especialidad (alergista, emergenciólogo) es atributo."
+LAB,Laboratorista,Web; Android,D-043; R07,"Procesa órdenes de laboratorio: muestra, resultados con rangos, completar; reactivos de inventario."
+PAR,Paramédico,Android,D-042; R04,"Tripulación de la única ambulancia: estados del servicio, reporte prehospital, ubicación en vivo. Solo móvil."
+DPD,Delegado de protección de datos,Web,D-031; LPDP Art. 15-17,"Aprueba accesos excepcionales a datos clínicos, revisa auditoría y verifica su integridad."
+PAC,Paciente,Android; iOS,CUR REQ-ROL-04; D-032 a D-034,"Ve su fila, citas, estado de laboratorio, resultados revisados e historial; pide citas y ambulancia."

@@ -1,0 +1,14 @@
+{
+  "criteria_original": 316,
+  "tasks_original": 104,
+  "source_records_original": 206,
+  "new_governance_criteria": 8,
+  "new_tasks": 8,
+  "source_keys_valid": true,
+  "original_execution_preserved": true,
+  "csharp_hashes_unchanged": 58,
+  "history_byte_identical": true,
+  "build": "NOT_RUN",
+  "sql": "NOT_RUN",
+  "institutional_acceptance": "NOT_RUN"
+}

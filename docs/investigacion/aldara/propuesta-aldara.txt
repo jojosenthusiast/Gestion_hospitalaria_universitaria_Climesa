@@ -1,0 +1,81 @@
+UNIVERSIDAD CATÓLICA DE EL SALVADOR FACULTAD DE INGENIERÍA Y ARQUITECTURA
+
+ASIGNATURA: "Desarrollo Multiplataforma de Aplicaciones Web"
+DOCENTE: "Ing. Luis Enrique Vásquez Áquila"
+
+PRESENTAN:
+1.- Murgas Juárez, Carlos Gabriel 2.- Munguía Noyola, Leonel Alexander
+
+CARNET
+2023-MJ-602 2022-MN-650
+
+Santa Ana, 3 de septiembre de 2026
+
+Sistema Integral de Gestión Hospitalaria
+Tecnologías base
+· Lenguaje y framework: C# sobre ASP.NET Core. · Arquitectura: Aplicación web monolítica con separación en capas (presentación, servicios, dominio
+y persistencia). · Interfaz de usuario: Razor Pages con Bootstrap, sin necesidad de un frontend independiente. · Base de datos: SQL Server. · Acceso a datos: Entity Framework Core con enfoque Code-First y migraciones. · Seguridad: ASP.NET Core Identity con autenticación por cookies y autorización basada en roles y
+políticas. · Organización del código: Pages, Models, Services, Data y repositorios, para mantener
+responsabilidades claras y evitar el acceso directo a datos desde la interfaz. · Validaciones: Data Annotations y reglas de negocio aplicadas desde la capa de servicios.
+1. Objetivos
+1.1 Objetivo general
+Diseñar y desarrollar un prototipo web de gestión hospitalaria sobre ASP.NET Core con Razor Pages, que centralice los procesos clínicos y administrativos esenciales --pacientes, citas, historial clínico, inventario, farmacia, facturación, control financiero y reportes-- y que, a su vez, esté estructurado para facilitar futuras ampliaciones.
+1.2 Objetivos específicos
+1. Implementar el registro, consulta, actualización e inactivación de pacientes, conservando siempre el historial asociado.
+2. Establecer un control de acceso diferenciado por roles: Administrador, Recepción/Admisiones, Médico, Enfermería, Farmacia/Bodega, Caja/Facturación, Contabilidad y Dirección, definiendo operaciones específicas para cada perfil.
+3. Desarrollar la gestión de citas y admisiones, controlando su programación, atención, cancelación y vinculación con el paciente.
+4. Construir un expediente clínico que integre consultas, diagnósticos, observaciones y prescripciones por paciente.
+5. Implementar el inventario de medicamentos e insumos mediante entradas, salidas, ajustes, control de existencias mínimas y trazabilidad de movimientos.
+6. Integrar farmacia, compras y proveedores con el inventario para registrar el abastecimiento y la dispensación de productos.
+7. Incorporar facturación, pagos, ingresos, egresos y caja como base del control financiero operativo. 8. Proveer reportes básicos de atención, inventario y movimientos financieros para apoyar la toma de
+decisiones administrativas.
+2. Descripción del proyecto
+Este proyecto consiste en el desarrollo de un Sistema Integral de Gestión Hospitalaria, una aplicación web diseñada para concentrar en una sola plataforma los principales procesos clínicos y administrativos de un hospital. Se concibe como un prototipo funcional que sirve tanto como demostración para una institución real como para un proyecto académico de alcance controlado. La solución busca superar la fragmentación de la información que suele darse entre expedientes físicos, hojas de cálculo y sistemas aislados. Para ello, articula el registro del paciente con citas, consultas, historial clínico, prescripciones, inventario, cobros y reportes, garantizando trazabilidad entre todos los procesos. El acceso se organiza por funciones: Recepción administra pacientes y citas; el personal médico registra información clínica; Enfermería apoya el seguimiento del paciente; Farmacia/Bodega controla
+
+medicamentos e insumos; Caja y Contabilidad gestionan las operaciones financieras; Dirección consulta indicadores; y el Administrador configura usuarios, roles y parámetros generales. En la versión académica se implementarán los flujos esenciales, dejando la arquitectura preparada para una mayor profundidad funcional. Técnicamente, la aplicación emplea C#, ASP.NET Core y Razor Pages. Entity Framework Core gestiona la persistencia sobre SQL Server, mientras que ASP.NET Core Identity se encarga de la autenticación y los permisos. La separación por capas mantiene el código organizado y facilita futuras extensiones.
+2.1 Usuarios y roles
+· Administrador: Gestiona usuarios, roles, parámetros y configuración general; su acceso a información clínica queda restringido a los permisos explícitamente asignados.
+· Recepción/Admisiones: Registra pacientes, programa y modifica citas, gestiona admisiones y consulta la información administrativa necesaria para la atención.
+· Médico: Consulta pacientes asignados y registra consultas, diagnósticos, indicaciones y prescripciones en el expediente clínico.
+· Enfermería: Registra signos vitales, observaciones y seguimiento básico de pacientes, especialmente durante la hospitalización.
+· Farmacia/Bodega: Administra medicamentos e insumos, lotes, existencias, entradas, salidas y dispensaciones vinculadas a prescripciones.
+· Caja/Facturación: Registra cargos, pagos, formas de pago y movimientos de caja relacionados con los servicios prestados.
+· Contabilidad: Consulta y registra ingresos, egresos y gastos operativos, y genera reportes financieros básicos.
+· Dirección: Consulta indicadores y reportes generales para el seguimiento administrativo, clínico y financiero, principalmente en modo de lectura.
+El paciente se considera una entidad gestionada por el sistema y no un usuario con acceso propio en el alcance inicial; no obstante, un portal de pacientes podría añadirse en el futuro.
+2.2 Alcance del prototipo
+La versión académica implementará como núcleo funcional: seguridad por roles, gestión de pacientes, citas, historial clínico, inventario, facturación/control financiero básico y reportes. Módulos como hospitalización, compras y farmacia por lotes se abordarán de forma simplificada. La solución se presentará como prototipo con datos ficticios o anonimizados; no se concibe como un sistema clínico en producción ni como herramienta de diagnóstico.
+3. Alcance funcional
+3.1 Gestión de pacientes
+Registro y mantenimiento de datos personales, contacto, identificación y estado del paciente. Los registros pueden inactivarse sin perder la información histórica.
+3.2 Seguridad y control de acceso
+Autenticación mediante ASP.NET Core Identity y autorización por roles y políticas. Cada usuario accede únicamente a las páginas y operaciones correspondientes a su función; el acceso a información clínica queda limitado al personal autorizado, y las operaciones críticas registran trazabilidad de usuario, fecha y acción.
+3.3 Citas y admisiones
+Programación y control de citas por paciente, médico, fecha, hora y estado. Permite registrar atención, cancelación y admisión básica.
+3.4 Expediente e historial clínico
+Concentra las consultas realizadas al paciente, incluyendo motivo, signos vitales u observaciones, diagnóstico, indicaciones y prescripciones. Cada registro conserva profesional, fecha y hora; las correcciones mantienen trazabilidad sin eliminar el historial previo.
+
+3.5 Hospitalización y camas
+Registro básico de ingresos hospitalarios, asignación de cama, médico responsable, estado y alta. En la versión académica se manejará de forma simplificada.
+3.6 Farmacia e inventario
+Administración de medicamentos e insumos mediante productos, categorías, lotes, vencimientos, existencias y movimientos. Las entradas aumentan el stock; las dispensaciones o consumos generan salidas, impidiendo cantidades superiores a la existencia disponible y permitiendo alertas por stock mínimo o vencimiento próximo.
+3.7 Compras y proveedores
+Registro de proveedores y compras de productos. La recepción de una compra puede generar automáticamente los movimientos de entrada correspondientes en el inventario.
+3.8 Facturación y caja
+Registro de cargos por servicios, medicamentos u otros conceptos, junto con pagos y formas de pago. Permite controlar ingresos y movimientos básicos de caja.
+3.9 Contabilidad operativa
+Control básico de ingresos, egresos y gastos asociados a la operación. El alcance inicial no contempla contabilidad fiscal completa ni reemplaza un sistema contable especializado.
+3.10 Reportes y analítica
+Reportes de pacientes atendidos, citas, existencias, productos con stock bajo, movimientos de inventario, ingresos y egresos. Dirección puede consultar indicadores generales del sistema.
+3.11 Interfaz de usuario por rol
+Las Razor Pages se organizan según las funciones de cada rol, mostrando menús, vistas, acciones y paneles distintos para Administración, Recepción/Admisiones, área clínica, Farmacia/Bodega, Caja/Facturación, Contabilidad y Dirección.
+4. Posibles integraciones futuras
+La arquitectura permitirá incorporar nuevas funcionalidades sin alterar el propósito base del sistema: · Notificaciones en tiempo real: avisos de citas, cambios de estado, stock bajo o solicitudes internas
+mediante SignalR. · Procesamiento en segundo plano: recordatorios, cierres programados y tareas automáticas con
+Hangfire u otra herramienta similar. · API y aplicación móvil: exposición de servicios para integrar aplicaciones móviles o sistemas
+externos. · Integración clínica: laboratorio, radiología, expediente interoperable y otros servicios hospitalarios
+especializados. · Integración administrativa: sistemas contables, seguros, facturación electrónica y otros servicios
+externos. · Identificación y trazabilidad: uso de códigos QR o códigos de barras para pacientes, medicamentos,
+lotes e inventario.
+
+

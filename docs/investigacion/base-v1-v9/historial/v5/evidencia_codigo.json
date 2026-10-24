@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-12",
+  "mode": "static",
+  "files": [
+    {
+      "path": "Data/ApplicationDbContext.cs",
+      "sha256": "b6625f85a751d49c93b1dfac26113c0f2a8fc8452f85abbef5834694eee5e3e1"
+    },
+    {
+      "path": "Models/Clinical/ClinicalEntities.cs",
+      "sha256": "1115b6a2bc2859784e1bcb809c68cb803e1ed20211553560602bc36550249ef8"
+    },
+    {
+      "path": "Security/HospitalRoles.cs",
+      "sha256": "2d9bfe8093e3a2a4967ca06ef4850299b71187c352041125c8c335776cf6e687"
+    },
+    {
+      "path": "Security/HospitalAuthorizationOptions.cs",
+      "sha256": "90c573d11fcc30decf3894eec5ff4c991c532b6c44262b56593ff37d87d1e3a1"
+    },
+    {
+      "path": "Services/ClinicalRecordService.cs",
+      "sha256": "8bd43f1f0f6217cf12297aadefa952763fb7bb96df6e9e54164ebfab17871d9c"
+    },
+    {
+      "path": "Services/AdmissionService.cs",
+      "sha256": "6ff9b7f9e2a3c7685492840612a28280bd31e41cedab23ade76847287e43a37e"
+    }
+  ],
+  "search_scope": [
+    "Models/**/*.cs",
+    "Services/**/*.cs",
+    "Controllers/**/*.cs"
+  ],
+  "term_hits": {
+    "Specimen": [],
+    "DiagnosticReport": [],
+    "LaboratoryOrder": [],
+    "ResultNotification": [],
+    "Accession": [],
+    "DICOM": [],
+    "PACS": [],
+    "HL7": [],
+    "FHIR": [],
+    "Radiology": []
+  },
+  "controller_names": [
+    "AccountingController",
+    "AdmissionsController",
+    "AppointmentsController",
+    "BillingController",
+    "ClinicalRecordsController",
+    "HomeController",
+    "InventoryController",
+    "PatientsController",
+    "PharmacyController",
+    "PurchasesController",
+    "ReportsController"
+  ],
+  "changes": false,
+  "absence_limit": "No matches is evidence only for the searched scope, not all external systems."
+}

@@ -1,0 +1,27 @@
+@page
+@model Climesa.Web.Pages.Hospitalizacion.IngresarModel
+@{
+    ViewData["Title"] = "Ingreso hospitalario";
+}
+<h1>Ingreso hospitalario</h1>
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+@if (Model.Patient is not null)
+{
+    <p>Paciente: <strong>@Model.Patient.DisplayName</strong> · <span class="mono">@Model.Patient.Mrn</span></p>
+}
+<form method="post" class="card">
+    <input type="hidden" name="EncounterId" value="@Model.EncounterId" />
+    <input type="hidden" name="PersonId" value="@Model.PersonId" />
+    <input type="hidden" name="Key" value="@Model.Key" />
+    <div class="row">
+        <label>Cama disponible
+            <select name="LocationId">
+                @foreach (var b in Model.Beds) { <option value="@b.Id">@b.Code · @b.Unit</option> }
+            </select>
+        </label>
+        <label>Servicio <input name="Service" value="Medicina interna" /></label>
+        <label>Médico responsable <input name="Responsible" value="@Model.ResponsibleDefault" /></label>
+    </div>
+    <p class="muted">Solo se ofrecen camas "disponibles": una cama recién desocupada queda pendiente de limpieza. Si dos personas asignan la misma cama a la vez, la base de datos acepta una sola (restricción de exclusión, spec 002 FR-017).</p>
+    <div><button>Ingresar</button> <a class="btn secondary" href="/Emergencia">Cancelar</a></div>
+</form>

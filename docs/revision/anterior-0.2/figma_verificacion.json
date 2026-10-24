@@ -1,0 +1,1029 @@
+{
+  "date": "2026-10-24",
+  "figma": "https://www.figma.com/design/bHJjbgi64I0p0Bnw8nho8e",
+  "palette": {
+    "primary": "#2E49E6",
+    "navy": "#171B2D",
+    "background": "#F6F5F1",
+    "accent": "#DCED83"
+  },
+  "fonts": [
+    "DM Sans",
+    "IBM Plex Mono"
+  ],
+  "totalScreens": 47,
+  "pages": [
+    {
+      "pageId": "3:2",
+      "screenCount": 14,
+      "screens": [
+        {
+          "key": "login",
+          "id": "3:3",
+          "width": 1440,
+          "height": 1004,
+          "descendants": 49,
+          "typeCounts": {
+            "FRAME": 19,
+            "INSTANCE": 4,
+            "VECTOR": 5,
+            "TEXT": 18,
+            "RECTANGLE": 3
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "login-error",
+          "id": "3:4",
+          "width": 1440,
+          "height": 1004,
+          "descendants": 55,
+          "typeCounts": {
+            "FRAME": 21,
+            "INSTANCE": 4,
+            "VECTOR": 7,
+            "TEXT": 19,
+            "RECTANGLE": 4
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "login-success",
+          "id": "3:5",
+          "width": 1440,
+          "height": 1004,
+          "descendants": 54,
+          "typeCounts": {
+            "FRAME": 21,
+            "INSTANCE": 4,
+            "VECTOR": 6,
+            "TEXT": 19,
+            "RECTANGLE": 4
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "admin",
+          "id": "3:6",
+          "width": 1440,
+          "height": 1133,
+          "descendants": 122,
+          "typeCounts": {
+            "FRAME": 56,
+            "INSTANCE": 5,
+            "VECTOR": 11,
+            "TEXT": 41,
+            "RECTANGLE": 9
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 4
+        },
+        {
+          "key": "invite-success",
+          "id": "3:7",
+          "width": 1440,
+          "height": 1211,
+          "descendants": 128,
+          "typeCounts": {
+            "FRAME": 59,
+            "INSTANCE": 5,
+            "VECTOR": 12,
+            "TEXT": 42,
+            "RECTANGLE": 10
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 3
+        },
+        {
+          "key": "invite-error",
+          "id": "3:8",
+          "width": 1440,
+          "height": 1211,
+          "descendants": 129,
+          "typeCounts": {
+            "FRAME": 59,
+            "INSTANCE": 5,
+            "VECTOR": 13,
+            "TEXT": 42,
+            "RECTANGLE": 10
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 4
+        },
+        {
+          "key": "activation",
+          "id": "3:9",
+          "width": 1440,
+          "height": 1004,
+          "descendants": 67,
+          "typeCounts": {
+            "FRAME": 28,
+            "INSTANCE": 4,
+            "VECTOR": 12,
+            "TEXT": 21,
+            "RECTANGLE": 2
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "activation-error",
+          "id": "3:10",
+          "width": 1440,
+          "height": 1004,
+          "descendants": 36,
+          "typeCounts": {
+            "FRAME": 15,
+            "INSTANCE": 2,
+            "VECTOR": 5,
+            "TEXT": 13,
+            "RECTANGLE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "password-error",
+          "id": "3:11",
+          "width": 1440,
+          "height": 1104,
+          "descendants": 73,
+          "typeCounts": {
+            "FRAME": 30,
+            "INSTANCE": 4,
+            "VECTOR": 14,
+            "TEXT": 22,
+            "RECTANGLE": 3
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "welcome",
+          "id": "3:12",
+          "width": 1440,
+          "height": 1100,
+          "descendants": 62,
+          "typeCounts": {
+            "FRAME": 29,
+            "INSTANCE": 2,
+            "VECTOR": 9,
+            "TEXT": 19,
+            "RECTANGLE": 3
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 2
+        },
+        {
+          "key": "loading",
+          "id": "3:13",
+          "width": 1440,
+          "height": 1000,
+          "descendants": 20,
+          "typeCounts": {
+            "FRAME": 9,
+            "INSTANCE": 1,
+            "VECTOR": 3,
+            "TEXT": 7
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 0
+        },
+        {
+          "key": "access-error",
+          "id": "3:14",
+          "width": 1440,
+          "height": 1000,
+          "descendants": 23,
+          "typeCounts": {
+            "FRAME": 9,
+            "INSTANCE": 2,
+            "VECTOR": 3,
+            "TEXT": 9
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "admin-filled",
+          "id": "10:160",
+          "width": 1440,
+          "height": 1133,
+          "descendants": 122,
+          "typeCounts": {
+            "FRAME": 56,
+            "INSTANCE": 5,
+            "VECTOR": 11,
+            "TEXT": 41,
+            "RECTANGLE": 9
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 4
+        },
+        {
+          "key": "account-menu",
+          "id": "22:206",
+          "width": 1440,
+          "height": 1133,
+          "descendants": 129,
+          "typeCounts": {
+            "FRAME": 59,
+            "INSTANCE": 5,
+            "VECTOR": 12,
+            "TEXT": 44,
+            "RECTANGLE": 9
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 5
+        }
+      ]
+    },
+    {
+      "pageId": "5:3419",
+      "screenCount": 14,
+      "screens": [
+        {
+          "key": "login",
+          "id": "5:3420",
+          "width": 390,
+          "height": 854,
+          "descendants": 48,
+          "typeCounts": {
+            "FRAME": 19,
+            "INSTANCE": 4,
+            "VECTOR": 5,
+            "TEXT": 17,
+            "RECTANGLE": 3
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "login-error",
+          "id": "5:3421",
+          "width": 390,
+          "height": 953,
+          "descendants": 54,
+          "typeCounts": {
+            "FRAME": 21,
+            "INSTANCE": 4,
+            "VECTOR": 7,
+            "TEXT": 18,
+            "RECTANGLE": 4
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "login-success",
+          "id": "5:3422",
+          "width": 390,
+          "height": 953,
+          "descendants": 53,
+          "typeCounts": {
+            "FRAME": 21,
+            "INSTANCE": 4,
+            "VECTOR": 6,
+            "TEXT": 18,
+            "RECTANGLE": 4
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "admin",
+          "id": "5:3423",
+          "width": 390,
+          "height": 1446,
+          "descendants": 114,
+          "typeCounts": {
+            "FRAME": 54,
+            "INSTANCE": 5,
+            "VECTOR": 11,
+            "TEXT": 35,
+            "RECTANGLE": 9
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 3
+        },
+        {
+          "key": "invite-success",
+          "id": "5:3424",
+          "width": 390,
+          "height": 1543,
+          "descendants": 120,
+          "typeCounts": {
+            "FRAME": 57,
+            "INSTANCE": 5,
+            "VECTOR": 12,
+            "TEXT": 36,
+            "RECTANGLE": 10
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 2
+        },
+        {
+          "key": "invite-error",
+          "id": "5:3425",
+          "width": 390,
+          "height": 1543,
+          "descendants": 121,
+          "typeCounts": {
+            "FRAME": 57,
+            "INSTANCE": 5,
+            "VECTOR": 13,
+            "TEXT": 36,
+            "RECTANGLE": 10
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 3
+        },
+        {
+          "key": "activation",
+          "id": "5:3426",
+          "width": 390,
+          "height": 1040,
+          "descendants": 66,
+          "typeCounts": {
+            "FRAME": 28,
+            "INSTANCE": 4,
+            "VECTOR": 12,
+            "TEXT": 20,
+            "RECTANGLE": 2
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "activation-error",
+          "id": "5:3427",
+          "width": 390,
+          "height": 844,
+          "descendants": 35,
+          "typeCounts": {
+            "FRAME": 15,
+            "INSTANCE": 2,
+            "VECTOR": 5,
+            "TEXT": 12,
+            "RECTANGLE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "password-error",
+          "id": "5:3428",
+          "width": 390,
+          "height": 1040,
+          "descendants": 72,
+          "typeCounts": {
+            "FRAME": 30,
+            "INSTANCE": 4,
+            "VECTOR": 14,
+            "TEXT": 21,
+            "RECTANGLE": 3
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "welcome",
+          "id": "5:3429",
+          "width": 390,
+          "height": 844,
+          "descendants": 58,
+          "typeCounts": {
+            "FRAME": 29,
+            "INSTANCE": 2,
+            "VECTOR": 9,
+            "TEXT": 15,
+            "RECTANGLE": 3
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "loading",
+          "id": "5:3430",
+          "width": 390,
+          "height": 844,
+          "descendants": 18,
+          "typeCounts": {
+            "FRAME": 8,
+            "INSTANCE": 1,
+            "VECTOR": 3,
+            "TEXT": 6
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 0
+        },
+        {
+          "key": "access-error",
+          "id": "5:3431",
+          "width": 390,
+          "height": 844,
+          "descendants": 21,
+          "typeCounts": {
+            "FRAME": 8,
+            "INSTANCE": 2,
+            "VECTOR": 3,
+            "TEXT": 8
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "admin-filled",
+          "id": "10:299",
+          "width": 390,
+          "height": 1446,
+          "descendants": 114,
+          "typeCounts": {
+            "FRAME": 54,
+            "INSTANCE": 5,
+            "VECTOR": 11,
+            "TEXT": 35,
+            "RECTANGLE": 9
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 3
+        },
+        {
+          "key": "account-menu",
+          "id": "22:381",
+          "width": 390,
+          "height": 1446,
+          "descendants": 121,
+          "typeCounts": {
+            "FRAME": 57,
+            "INSTANCE": 5,
+            "VECTOR": 12,
+            "TEXT": 38,
+            "RECTANGLE": 9
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 4
+        }
+      ]
+    },
+    {
+      "pageId": "8:2",
+      "screenCount": 19,
+      "patientRowComponent": "32:104",
+      "screens": [
+        {
+          "key": "a-login",
+          "id": "8:3",
+          "width": 390,
+          "height": 844,
+          "descendants": 37,
+          "typeCounts": {
+            "FRAME": 11,
+            "TEXT": 16,
+            "INSTANCE": 4,
+            "VECTOR": 3,
+            "RECTANGLE": 3
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "a-login-error",
+          "id": "8:4",
+          "width": 390,
+          "height": 901,
+          "descendants": 43,
+          "typeCounts": {
+            "FRAME": 13,
+            "TEXT": 17,
+            "INSTANCE": 4,
+            "VECTOR": 5,
+            "RECTANGLE": 4
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "a-session",
+          "id": "8:5",
+          "width": 390,
+          "height": 844,
+          "descendants": 16,
+          "typeCounts": {
+            "FRAME": 7,
+            "TEXT": 5,
+            "INSTANCE": 1,
+            "VECTOR": 3
+          },
+          "fonts": [
+            "DM Sans"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 1
+        },
+        {
+          "key": "a-home",
+          "id": "8:6",
+          "width": 390,
+          "height": 988,
+          "descendants": 84,
+          "typeCounts": {
+            "FRAME": 35,
+            "TEXT": 32,
+            "VECTOR": 9,
+            "RECTANGLE": 4,
+            "INSTANCE": 4
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 8
+        },
+        {
+          "key": "a-patients",
+          "id": "8:7",
+          "width": 390,
+          "height": 963,
+          "descendants": 93,
+          "typeCounts": {
+            "FRAME": 38,
+            "TEXT": 36,
+            "VECTOR": 9,
+            "INSTANCE": 6,
+            "RECTANGLE": 4
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 10
+        },
+        {
+          "key": "a-results",
+          "id": "8:8",
+          "width": 390,
+          "height": 844,
+          "descendants": 67,
+          "typeCounts": {
+            "FRAME": 29,
+            "TEXT": 25,
+            "VECTOR": 9,
+            "INSTANCE": 3,
+            "RECTANGLE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 6
+        },
+        {
+          "key": "a-empty",
+          "id": "8:9",
+          "width": 390,
+          "height": 844,
+          "descendants": 58,
+          "typeCounts": {
+            "FRAME": 25,
+            "TEXT": 22,
+            "VECTOR": 9,
+            "INSTANCE": 2
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 8
+        },
+        {
+          "key": "a-detail",
+          "id": "8:10",
+          "width": 390,
+          "height": 1020,
+          "descendants": 47,
+          "typeCounts": {
+            "FRAME": 14,
+            "TEXT": 22,
+            "VECTOR": 5,
+            "RECTANGLE": 4,
+            "INSTANCE": 2
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 4
+        },
+        {
+          "key": "a-inactive",
+          "id": "8:11",
+          "width": 390,
+          "height": 1020,
+          "descendants": 47,
+          "typeCounts": {
+            "FRAME": 14,
+            "TEXT": 22,
+            "VECTOR": 5,
+            "RECTANGLE": 4,
+            "INSTANCE": 2
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 4
+        },
+        {
+          "key": "a-new",
+          "id": "8:12",
+          "width": 390,
+          "height": 1066,
+          "descendants": 57,
+          "typeCounts": {
+            "FRAME": 27,
+            "TEXT": 24,
+            "VECTOR": 5,
+            "INSTANCE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 3
+        },
+        {
+          "key": "a-edit",
+          "id": "8:13",
+          "width": 390,
+          "height": 1186,
+          "descendants": 62,
+          "typeCounts": {
+            "FRAME": 29,
+            "TEXT": 27,
+            "VECTOR": 5,
+            "INSTANCE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 3
+        },
+        {
+          "key": "a-validation",
+          "id": "8:14",
+          "width": 390,
+          "height": 1101,
+          "descendants": 58,
+          "typeCounts": {
+            "FRAME": 27,
+            "TEXT": 25,
+            "VECTOR": 5,
+            "INSTANCE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 3
+        },
+        {
+          "key": "a-discard",
+          "id": "8:15",
+          "width": 390,
+          "height": 1186,
+          "descendants": 73,
+          "typeCounts": {
+            "FRAME": 31,
+            "TEXT": 33,
+            "VECTOR": 5,
+            "INSTANCE": 3,
+            "RECTANGLE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 4
+        },
+        {
+          "key": "a-deactivate",
+          "id": "8:16",
+          "width": 390,
+          "height": 1020,
+          "descendants": 63,
+          "typeCounts": {
+            "FRAME": 18,
+            "TEXT": 31,
+            "VECTOR": 5,
+            "RECTANGLE": 5,
+            "INSTANCE": 4
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 4
+        },
+        {
+          "key": "a-reactivate",
+          "id": "8:17",
+          "width": 390,
+          "height": 1020,
+          "descendants": 63,
+          "typeCounts": {
+            "FRAME": 18,
+            "TEXT": 31,
+            "VECTOR": 5,
+            "RECTANGLE": 5,
+            "INSTANCE": 4
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 4
+        },
+        {
+          "key": "a-profile",
+          "id": "8:18",
+          "width": 390,
+          "height": 889,
+          "descendants": 56,
+          "typeCounts": {
+            "FRAME": 24,
+            "TEXT": 21,
+            "VECTOR": 9,
+            "RECTANGLE": 1,
+            "INSTANCE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 5
+        },
+        {
+          "key": "a-dark",
+          "id": "8:19",
+          "width": 390,
+          "height": 889,
+          "descendants": 56,
+          "typeCounts": {
+            "FRAME": 24,
+            "TEXT": 21,
+            "VECTOR": 9,
+            "RECTANGLE": 1,
+            "INSTANCE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 6
+        },
+        {
+          "key": "a-loading",
+          "id": "8:20",
+          "width": 390,
+          "height": 844,
+          "descendants": 39,
+          "typeCounts": {
+            "FRAME": 19,
+            "TEXT": 9,
+            "VECTOR": 11
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 5
+        },
+        {
+          "key": "a-error",
+          "id": "8:21",
+          "width": 390,
+          "height": 844,
+          "descendants": 44,
+          "typeCounts": {
+            "FRAME": 20,
+            "TEXT": 11,
+            "VECTOR": 11,
+            "RECTANGLE": 1,
+            "INSTANCE": 1
+          },
+          "fonts": [
+            "DM Sans",
+            "IBM Plex Mono"
+          ],
+          "images": [],
+          "shadowCount": 0,
+          "linkedNodes": 5
+        }
+      ]
+    }
+  ],
+  "webQA": {
+    "widths": [
+      320,
+      390,
+      1280
+    ],
+    "screenStatesPerWidth": 14,
+    "horizontalOverflow": false,
+    "build": "passed",
+    "invitationFixture": "disabled when empty; local success with fictitious data; no mail sent",
+    "passwordToggle": "accessible state and input type changed",
+    "logoutFixture": "direct full canvas returns to login"
+  },
+  "androidQA": {
+    "apkCompiled": false,
+    "reason": "Android SDK unavailable"
+  },
+  "reusablePatientRowComponent": "32:104"
+}

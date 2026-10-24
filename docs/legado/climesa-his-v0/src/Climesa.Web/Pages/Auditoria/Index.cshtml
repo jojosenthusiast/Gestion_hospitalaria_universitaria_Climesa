@@ -1,0 +1,28 @@
+@page
+@model Climesa.Web.Pages.Auditoria.IndexModel
+@{
+    ViewData["Title"] = "Auditoría";
+}
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+<h1>Bitácora de auditoría</h1>
+<p class="muted">Cada acceso y cambio queda en una bitácora de solo inserción, encadenada por SHA-256: si alguien altera un registro, la verificación lo señala (spec 000 FR-019, FR-020). Esta consulta también queda registrada.</p>
+@if (Model.Can("audit.verify"))
+{
+    <form method="post" class="card row">
+        <div><button>Verificar integridad de la cadena</button></div>
+        @if (Model.Check is not null)
+        {
+            <div class="alert @(Model.Check.Ok ? "ok" : "error")" style="margin:0">@Model.Check.Message</div>
+        }
+    </form>
+}
+<section class="card">
+    <table>
+        <tr><th>#</th><th>Hora</th><th>Usuario</th><th>Acción</th><th>Objeto</th><th>Paciente</th><th>Resultado</th><th>Detalle</th><th>Hash</th></tr>
+        @foreach (var r in Model.Rows)
+        {
+            <tr><td>@r.Seq</td><td>@LocalTime.Format(r.RecordedAt)</td><td>@r.Username</td><td>@r.Action</td><td>@r.EntityType</td><td class="mono">@(r.PatientId?.ToString()[..8])</td>
+                <td><span class="tag @(r.Outcome == "success" ? "ok" : "bad")">@Labels.Es(r.Outcome)</span></td><td class="mono" style="font-size:11px">@r.Permission @r.Detail</td><td class="mono">@r.HashPrefix</td></tr>
+        }
+    </table>
+</section>

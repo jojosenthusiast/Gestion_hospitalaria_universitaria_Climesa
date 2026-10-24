@@ -1,0 +1,33 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Inicio";
+}
+<h1>Bienvenido, @Model.Name</h1>
+<p class="muted">Esta demostración implementa la base del sistema: identidad de pacientes sin duplicados, emergencia sin barreras económicas, camas con limpieza firmada, alta médica separada de la salida, carga del índice de archivo en papel y bitácora de auditoría encadenada.</p>
+<div class="grid">
+    @if (Model.Can("identity.search"))
+    {
+        <section class="card"><h2>Pacientes</h2><p>Buscar antes de registrar, DUI validado, expediente con dígito verificador, historial de cambios.</p><a class="btn" href="/Pacientes">Abrir</a></section>
+    }
+    @if (Model.Can("care.view.emergency"))
+    {
+        <section class="card"><h2>Emergencia</h2><p>Llegada en un paso, identidad provisional, triaje con alertas de reevaluación.</p><a class="btn" href="/Emergencia">Abrir</a></section>
+    }
+    @if (Model.Can("care.view.episode"))
+    {
+        <section class="card"><h2>Hospitalización</h2><p>Ingreso, alta médica firmada con inscripción vigente, salida física y pendientes con responsable.</p><a class="btn" href="/Hospitalizacion">Abrir</a></section>
+    }
+    @if (Model.Can("care.view.beds"))
+    {
+        <section class="card"><h2>Camas</h2><p>Censo, limpieza terminal con lista de verificación y firma de jefatura.</p><a class="btn" href="/Camas">Abrir</a></section>
+    }
+    @if (Model.Can("migration.view"))
+    {
+        <section class="card"><h2>Migración del papel</h2><p>Carga del índice del archivo con conciliación de conteos y casos de duplicado.</p><a class="btn" href="/Migracion">Abrir</a></section>
+    }
+    @if (Model.Can("audit.view"))
+    {
+        <section class="card"><h2>Auditoría</h2><p>Quién vio y cambió qué, y verificación de que nadie alteró la bitácora.</p><a class="btn" href="/Auditoria">Abrir</a></section>
+    }
+</div>

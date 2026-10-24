@@ -1,0 +1,27 @@
+# 105. Tareas
+
+- [x] T01 · S3 · R · Migración de fila y citas con unicidad y exclusión
+  - Cubre: FR-105-01, FR-105-07
+  - Depende de: 100-T03
+  - Hecho cuando: escenarios 1 y 4 pasan como pruebas concurrentes
+  - Verificado: Aplicada en Supabase; 02_concurrencia.sh casos 1 (50 números distintos) y 6 (1 cita de 2 simultáneas)
+- [ ] T02 · S3 · R · Emitir, llamar y cambiar estado de números con reinicio diario
+  - Cubre: FR-105-01 a FR-105-04
+  - Depende de: T01
+  - Hecho cuando: pruebas de transiciones válidas e inválidas y de cambio de día
+- [ ] T03 · S3 · R · Mi número en la app del paciente y fila del consultorio
+  - Cubre: FR-105-06
+  - Depende de: T02, 121-T03, 122-T03
+  - Hecho cuando: escenario 2 pasa en Android e iOS
+- [ ] T04 · S3 · R · Agenda, disponibilidad, agendar y cancelar
+  - Cubre: FR-105-07, FR-105-09, FR-105-10, FR-105-12
+  - Depende de: T01, 103-T06
+  - Hecho cuando: recepción agenda desde web y Android; paciente cancela dentro y fuera del plazo
+- [ ] T05 · S4 · R · Solicitudes de cita del paciente y su confirmación
+  - Cubre: FR-105-08
+  - Depende de: T04, 101-T07
+  - Hecho cuando: escenario 3 pasa
+- [ ] T06 · S4 · E · Pantalla pública de llamados y "no se presentó" automático
+  - Cubre: FR-105-05, FR-105-11, FR-112-06
+  - Depende de: T02, 112-T02
+  - Hecho cuando: tres llamados sin presentarse cambian el estado; la pantalla pública no muestra nombres

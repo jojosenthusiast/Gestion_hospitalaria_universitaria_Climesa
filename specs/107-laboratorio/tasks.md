@@ -1,0 +1,31 @@
+# 107. Tareas
+
+- [x] T01 · S3 · R · Migración de laboratorio, catálogo recursivo y semilla con rangos
+  - Cubre: FR-107-01, FR-107-03
+  - Depende de: 100-T03
+  - Hecho cuando: agregar un ciclo al catálogo se rechaza
+  - Verificado: Aplicada en Supabase; prueba 11: ciclo_en_catalogo y 7 hojas del perfil prenatal
+- [ ] T02 · S3 · R · Crear orden desde consulta con expansión recursiva
+  - Cubre: FR-107-02, FR-107-04
+  - Depende de: T01, 106-T02
+  - Hecho cuando: escenario 3 pasa
+- [ ] T03 · S3 · R · Muestra, captura con marcas, completar y cancelar
+  - Cubre: FR-107-05, FR-107-06, FR-107-07, FR-107-09, FR-107-13
+  - Depende de: T02
+  - Hecho cuando: escenarios 1 (hasta Completado) y 4 pasan
+- [ ] T04 · S3 · R · Cola y captura en web (W20, W21) y Android (A60 a A62)
+  - Cubre: FR-107-04 a FR-107-07
+  - Depende de: T03, 120-T03, 121-T03
+  - Hecho cuando: una orden recorre los tres estados desde web y desde Android con la cola en vivo
+- [ ] T05 · S4 · R · Revisión médica y vista del paciente
+  - Cubre: FR-107-10, FR-107-11
+  - Depende de: T03
+  - Hecho cuando: escenario 1 completo pasa en iOS y Android
+- [ ] T06 · S5 · E · Aviso de valor crítico con push
+  - Cubre: FR-107-08
+  - Depende de: T03, 100-T10
+  - Hecho cuando: escenario 2 pasa y el médico recibe push con la app cerrada
+- [ ] T07 · S5 · E · Corrección de valores con historial
+  - Cubre: FR-107-12
+  - Depende de: T03
+  - Hecho cuando: el valor anterior queda visible para el médico

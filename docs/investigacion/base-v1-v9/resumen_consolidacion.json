@@ -1,0 +1,22 @@
+{
+  "criteria": 316,
+  "tasks": 104,
+  "tasks_with_individual_csv_criteria": 102,
+  "tasks_without_individual_csv_criteria": [
+    "T309",
+    "T310"
+  ],
+  "source_records": 206,
+  "distinct_exact_urls": 198,
+  "criteria_without_explicit_source": 142,
+  "criteria_without_clause_mapping": 316,
+  "criteria_without_institutional_owner": 316,
+  "criteria_by_version": {
+    "3": 32,
+    "4": 44,
+    "5": 48,
+    "6": 60,
+    "7": 72,
+    "8": 60
+  }
+}

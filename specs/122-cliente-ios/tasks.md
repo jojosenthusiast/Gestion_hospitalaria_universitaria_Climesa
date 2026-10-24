@@ -1,0 +1,22 @@
+# 122. Tareas
+
+- [ ] T01 · S1 · R · Proyecto Xcode con SwiftUI, paquetes y pantalla de ingreso
+  - Cubre: FR-122-01, FR-122-02, FR-101-01
+  - Depende de: ninguna
+  - Hecho cuando: el simulador inicia sesión contra Supabase de la nube
+- [ ] T02 · S2 · R · Pestañas por rol y maquetación de las pantallas de Médico y Paciente
+  - Cubre: FR-122-03, FR-122-06
+  - Depende de: T01, 101-T03
+  - Hecho cuando: escenarios 1 y 2 pasan (criterio del avance)
+- [ ] T03 · S3 · R · Servicio de Realtime e invalidación en view models
+  - Cubre: FR-122-04
+  - Depende de: T02, 100-T03
+  - Hecho cuando: el número de fila del paciente cambia en vivo al ser llamado
+- [ ] T04 · S5 · E · Notificaciones APNs
+  - Cubre: FR-122-05
+  - Depende de: T03, 100-T10
+  - Hecho cuando: el médico recibe aviso de valor crítico con la app cerrada en un dispositivo
+- [ ] T05 · S5 · R · Pruebas de view models y sesión en Keychain
+  - Cubre: FR-122-01, FR-122-07
+  - Depende de: T03
+  - Hecho cuando: las pruebas pasan en la Mac universitaria

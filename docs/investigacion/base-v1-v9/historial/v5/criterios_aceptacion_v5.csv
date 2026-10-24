@@ -1,0 +1,49 @@
+id,task,criterio,evidencia_requerida,estado
+AC501,T501,Catálogo conserva versión vigente en cada orden,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC502,T501,Panel distingue pruebas y materiales requeridos,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC503,T501,"Unidad, método y rangos se aprueban antes de uso",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC504,T502,"Orden vincula paciente, episodio, solicitante y prioridad",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC505,T502,Cancelación preserva actos ya ejecutados y responsables,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC506,T502,Derivación conserva origen y estado de aceptación,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC507,T503,Etiqueta se vincula a identidad verificada junto al paciente,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC508,T503,Reimpresión queda auditada y controla duplicados,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC509,T503,Identidad provisional permite reconciliación trazable,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC510,T504,"Cada transferencia registra emisor, receptor y tiempo",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC511,T504,Rechazo guarda motivo y comunica necesidad de nueva toma,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC512,T504,Nueva muestra no sobrescribe la rechazada,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC513,T505,Alícuota conserva vínculo y custodia de muestra madre,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC514,T505,QC no conforme retiene liberación según protocolo,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC515,T505,"Corrida conserva equipo, lote y método",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC516,T506,Código desconocido queda retenido sin asignación automática,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC517,T506,Mensaje duplicado no duplica resultados ni cargos,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC518,T506,Resultado conserva payload y correlación de origen,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC519,T507,Validación exige privilegio profesional y evidencia,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC520,T507,Corrección crea versión y preserva informe anterior,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC521,T507,Preliminar y final se distinguen al entregar,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC522,T508,Cultivo conserva resultados parciales y finalización,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC523,T508,Reflex registra protocolo y autorización aplicable,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC524,T508,"POCT y terceros conservan operador, equipo y procedencia",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC525,T509,Protocolo registra decisión clínica y responsable,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC526,T509,Agenda comprueba recursos y preparación aplicable,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC527,T509,Excepción urgente deja motivo y responsable,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC528,T510,Worklist conserva identificadores y emisor,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC529,T510,Discrepancia de identidad retiene asociación insegura,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC530,T510,Reconciliación de identidad mantiene estudios y auditoría,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC531,T511,UID y contenido conflictivo no se sobrescriben,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC532,T511,Completitud contrasta instancias esperadas y recibidas,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC533,T511,"Custodia documenta compromiso, retención y recuperación",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC534,T512,Firma de informe requiere privilegio vigente,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC535,T512,Corrección conserva versiones y redistribución,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC536,T512,"Visor verifica paciente, estudio y acceso autorizado",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC537,T513,Crítico genera destinatario responsable y reloj auditable,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC538,T513,Sin acuse escala según política y cobertura,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC539,T513,"Entrega, acuse, revisión y acción son eventos separados",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC540,T514,Alta mantiene pendientes con responsable y plazo,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC541,T514,Cambio de responsable requiere aceptación trazable,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC542,T514,"Portal controla identidad, representación y versión",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC543,T515,Cargo se origina en prestación verificable sin duplicación,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC544,T515,Indicadores usan denominador y datos trazables,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC545,T515,Acceso y exportación dejan evidencia auditable,Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC546,T516,"Caída permite cola, reconciliación y recuperación sin pérdida",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC547,T516,"Restauración prueba resultados, imágenes y obligaciones",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO
+AC548,T516,"Migración concilia vínculos, versiones y pendientes",Caso documentado; estado antes/después; auditoría; aceptación del responsable,NO_EJECUTADO

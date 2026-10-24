@@ -1,0 +1,247 @@
+{
+  "zip_sha256": "3148aa3e0d4ed3598815d6e16cb6e22990db2e4a73fa88f46317725a759ad6f8",
+  "csharp_files": 58,
+  "controllers": 11,
+  "projects": [
+    "src/AldaraHospital.Web/AldaraHospital.Web.csproj"
+  ],
+  "tools": {
+    "codex_cli": "not found on PATH",
+    "dotnet_sdk": "not found on PATH"
+  },
+  "execution": "static only; no database queries, migrations, build or runtime tests",
+  "files": [
+    {
+      "path": "src/AldaraHospital.Web/Areas/Identity/Pages/Account/Login.cshtml.cs",
+      "sha256": "f10976cefd3a5eb823aabada152a6db55f7d7e79df8ec89a18f74f56343edb55"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/AccountingController.cs",
+      "sha256": "b4fe8dad5683a1a72fdc8e7a09840bd53b560a376a313a1df8455545fbad2260"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/AdmissionsController.cs",
+      "sha256": "12db47a6727cc75dab3a00dd116b437bd39055224a9a2afeef71bf46f9a03a25"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/AppointmentsController.cs",
+      "sha256": "e77f642b535bcc33ad3805d95499f927ffb71422885fbb9285b0673d151ef23a"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/BillingController.cs",
+      "sha256": "7c758fa3cf58604d243153c33336d67b07af984a348224aaa5e050f6d18fa1a5"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/ClinicalRecordsController.cs",
+      "sha256": "0243bdda681f2df44c7e2ab345727684af256ee8fd32bf77c9477b7bfba4040d"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/HomeController.cs",
+      "sha256": "6193fa4dde106f1517dc99f04aa149c0d0aec785b167f69527a7cfcb525642ff"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/InventoryController.cs",
+      "sha256": "3d653a812daa47f1211cd8d197961e759f8402ac752a3569cfdfcc5fca65d49b"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/PatientsController.cs",
+      "sha256": "128e7afabd734f6045e8e8741b75493c88d3fbc2061b4193c012024325f3fba6"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/PharmacyController.cs",
+      "sha256": "7b4a4341e5fb672fe5ed2622c00af6d1dcf85bb04c7caf34d511f00c0eeec92d"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/PurchasesController.cs",
+      "sha256": "c16c4e08217be762ed1db503ca7e58b59c71bed2d0993f47b79da07823d1fa9e"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/ReportsController.cs",
+      "sha256": "822747f6940c1d2ea30c0bc045d85825d63fb9a416c5f6e330d61590eae7074f"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/ApplicationDbContext.cs",
+      "sha256": "b6625f85a751d49c93b1dfac26113c0f2a8fc8452f85abbef5834694eee5e3e1"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Migrations/00000000000000_CreateIdentitySchema.Designer.cs",
+      "sha256": "92d41b2c4b32f49c4a8b23c970aa805ebe3d33989e7fffd048728296df04a5c0"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Migrations/00000000000000_CreateIdentitySchema.cs",
+      "sha256": "3f373f07e920873c64d246b9c83daa208a62fb434bfa287d31d9f5fc8c5ca08d"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Migrations/20260929001312_AddHospitalDomainSchema.Designer.cs",
+      "sha256": "00fec0db9ad6b73a85df4fe596c2e8c2915e16858a39a0f0b8cd3751cf795f90"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Migrations/20260929001312_AddHospitalDomainSchema.cs",
+      "sha256": "ff067c91d07a23463d05d3c1d9b344263f902df6d0e67141ac0351dd1f968dc7"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Migrations/20260929001349_AlignDomainQueryFilters.Designer.cs",
+      "sha256": "fa968a05c8128acbc7773110c41c94b30304e98827358bd29eacad51390cbd68"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Migrations/20260929001349_AlignDomainQueryFilters.cs",
+      "sha256": "bebe4f5f6d36e92342a609fd8ab49255887822ba1cc1e7675b9803936237a8ef"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Migrations/20260929004945_AddAuditSoftDeleteToMasterRecords.Designer.cs",
+      "sha256": "e957c548777511569c590854b2448ca006a5261f03fe1fc9d5337771dd4aa2e2"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Migrations/20260929004945_AddAuditSoftDeleteToMasterRecords.cs",
+      "sha256": "9566c2a56ee03632beaa330868b3240f9d3e7e15ee486325a313879004d9315e"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Migrations/ApplicationDbContextModelSnapshot.cs",
+      "sha256": "6b3aabc01609e92abd30f9a7b159e84463c67b962f67e1ce547c420b077963f8"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Data/Seeders/DevelopmentIdentitySeeder.cs",
+      "sha256": "bf52b9c86ab099b784c161a096c5c85d432ce969e6fac789af572c88c1bc055a"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/Clinical/ClinicalEntities.cs",
+      "sha256": "1115b6a2bc2859784e1bcb809c68cb803e1ed20211553560602bc36550249ef8"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/Common/AuditableEntity.cs",
+      "sha256": "0e2f953d22adfc5d040459275a11cd92ae0ad99df0a9314231e6bd2424f731eb"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/ErrorViewModel.cs",
+      "sha256": "6d62de4d0cf6469841fb6d3c4f3c63d7fb00d93424a6bb676a48523773928ec3"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/Finance/FinanceEntities.cs",
+      "sha256": "7441b26a8c1bc39bffe7e29a44b3f079959b2c425f843bf3e3d1a64c64479c32"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/Inventory/InventoryEntities.cs",
+      "sha256": "b7ad6b3e79da48623209787293cc9e826adcf53ae95a8e79f1c1f2d93a1cdcfd"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/Patients/EmergencyContact.cs",
+      "sha256": "38bcbd481c59b93447dfc586f137d63da472f0f65bf9971192ddbdfd14c9bb92"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/Patients/Patient.cs",
+      "sha256": "f6297dc280c2e19f8028d1c814bccb338bc91750a24f742e7c319c880d6de51d"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/Staff/MedicalSpecialty.cs",
+      "sha256": "885a1e3ef462e8142625d7f6f06f7cc04d9665265e3abb21ec7921f4907de4e2"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/Staff/StaffProfile.cs",
+      "sha256": "0ca7f82f2e240e9900cf3ceb26b997285895c3049d0f1f6285dd72fa96d486b7"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Program.cs",
+      "sha256": "c7c35d7de358322e106cb07f04b07de719bd2b4b206d7e36eeee98de6f01ccf3"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Security/HospitalAuthorizationOptions.cs",
+      "sha256": "90c573d11fcc30decf3894eec5ff4c991c532b6c44262b56593ff37d87d1e3a1"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Security/HospitalPolicies.cs",
+      "sha256": "0701e6aa8dc7b25ccc47767041c068b10963a7ddbcf097e31a79178e7bc2e7f7"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Security/HospitalRoles.cs",
+      "sha256": "2d9bfe8093e3a2a4967ca06ef4850299b71187c352041125c8c335776cf6e687"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/AdmissionService.cs",
+      "sha256": "6ff9b7f9e2a3c7685492840612a28280bd31e41cedab23ade76847287e43a37e"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/AppointmentService.cs",
+      "sha256": "4fa59693ca700f1c937e740d86834f2523ccae433258d936d84b0ed782c5267f"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/ClinicalOperationResult.cs",
+      "sha256": "a5f8ff983923cbbe1f53f6a029f6d6b3c809b0be16a6fc6ae5353de4a60de42c"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/ClinicalRecordService.cs",
+      "sha256": "8bd43f1f0f6217cf12297aadefa952763fb7bb96df6e9e54164ebfab17871d9c"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/FinanceService.cs",
+      "sha256": "096a50809e3bcfebd3c303b656604f2304e88fde4c6eab4bdd686841716a40fe"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/IAdmissionService.cs",
+      "sha256": "013615600e877ed41f7a770629001e7ef51f7d40d95bc1fd50f5d8b99a4e2392"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/IAppointmentService.cs",
+      "sha256": "51709d34b7fc5773bb0de098a5ccd91459c7e0faedf9def6ab4b6db9a5a1aa15"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/IClinicalRecordService.cs",
+      "sha256": "f90bc0fa0a987886ebcab209a3307c61bfbed8d47ce73ef93d0f60fba9e23b0d"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/IPatientService.cs",
+      "sha256": "b6ae439a1078f52586aafe95f61c128ef68e0149be5084df3b523c494499ac83"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/InventoryService.cs",
+      "sha256": "061e4579f76440d553a4b451e5ff6c007945438c6d4e682e9b0ac58f8e221142"
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/PatientService.cs",
+      "sha256": "227dd2960d9b4106a5bcdc0c9a139d7eb997a81fee160ba74c7578327c9112b4"
+    },
+    {
+      "path": "src/AldaraHospital.Web/ViewModels/Admissions/AdmissionViewModels.cs",
+      "sha256": "a02e9487774f3bb3fa1ad1d181db7d71167932e3230594959dfd384ec7c4175f"
+    },
+    {
+      "path": "src/AldaraHospital.Web/ViewModels/Appointments/AppointmentViewModels.cs",
+      "sha256": "53f38aaa24048c426b4cb324b90210f95d301b841392348ac05936dc2ef4597e"
+    },
+    {
+      "path": "src/AldaraHospital.Web/ViewModels/ClinicalRecords/ClinicalRecordViewModels.cs",
+      "sha256": "7a015ff23ead12f12525c013d64af62491fffa682f8dbf4723252f085404634b"
+    },
+    {
+      "path": "src/AldaraHospital.Web/ViewModels/Finance/FinanceViewModels.cs",
+      "sha256": "91d1b318c52bfb55027f76b1a32f4642d5659dd8ebd03c4c82c262072ac8c66f"
+    },
+    {
+      "path": "src/AldaraHospital.Web/ViewModels/Inventory/InventoryViewModels.cs",
+      "sha256": "b05f75e5e56bf8eb88dcdddc6adb621c403a4feedbb540adc3998af97628a252"
+    },
+    {
+      "path": "src/AldaraHospital.Web/ViewModels/Patients/PatientViewModels.cs",
+      "sha256": "e5166f38fde287e7cc594110a81aa9b53546e8723a128fd72741cc51f78cb05b"
+    },
+    {
+      "path": "src/AldaraHospital.Web/obj/Debug/net8.0/.NETCoreApp,Version=v8.0.AssemblyAttributes.cs",
+      "sha256": "f7a5d9789c863625e139ff99e1113a503830f6b85a88f6129916df83ac76b49e"
+    },
+    {
+      "path": "src/AldaraHospital.Web/obj/Debug/net8.0/AldaraHospital.Web.AssemblyInfo.cs",
+      "sha256": "27a982108be6c9cdbdabe5bf7319e456b0906bf4a277dc92be3a829699fb2688"
+    },
+    {
+      "path": "src/AldaraHospital.Web/obj/Debug/net8.0/AldaraHospital.Web.GlobalUsings.g.cs",
+      "sha256": "dcdf55702e02f3cc88efc9a8ec2b6881891f8821df27db90157ba496ae9813a1"
+    },
+    {
+      "path": "src/AldaraHospital.Web/obj/Debug/net8.0/AldaraHospital.Web.MvcApplicationPartsAssemblyInfo.cs",
+      "sha256": "6fd00e8941aa74042a3d895812cc15c310d64233746fe24bfd4724d4674c0036"
+    },
+    {
+      "path": "src/AldaraHospital.Web/obj/Debug/net8.0/AldaraHospital.Web.RazorAssemblyInfo.cs",
+      "sha256": "1dec7660fd203d95e2380bd5c4f52aed530592ae9968e54ad5c80e6f738ee79f"
+    }
+  ]
+}

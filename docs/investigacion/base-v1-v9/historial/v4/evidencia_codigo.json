@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-12",
+  "mode": "static",
+  "application_changes": false,
+  "records": [
+    {
+      "path": "src/AldaraHospital.Web/Models/Inventory/InventoryEntities.cs",
+      "sha256": "b7ad6b3e79da48623209787293cc9e826adcf53ae95a8e79f1c1f2d93a1cdcfd",
+      "lines": 136
+    },
+    {
+      "path": "src/AldaraHospital.Web/Models/Clinical/ClinicalEntities.cs",
+      "sha256": "1115b6a2bc2859784e1bcb809c68cb803e1ed20211553560602bc36550249ef8",
+      "lines": 197
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/InventoryService.cs",
+      "sha256": "061e4579f76440d553a4b451e5ff6c007945438c6d4e682e9b0ac58f8e221142",
+      "lines": 362
+    },
+    {
+      "path": "src/AldaraHospital.Web/Services/ClinicalRecordService.cs",
+      "sha256": "8bd43f1f0f6217cf12297aadefa952763fb7bb96df6e9e54164ebfab17871d9c",
+      "lines": 249
+    },
+    {
+      "path": "src/AldaraHospital.Web/Controllers/PharmacyController.cs",
+      "sha256": "7b4a4341e5fb672fe5ed2622c00af6d1dcf85bb04c7caf34d511f00c0eeec92d",
+      "lines": 43
+    },
+    {
+      "path": "src/AldaraHospital.Web/ViewModels/Inventory/InventoryViewModels.cs",
+      "sha256": "b05f75e5e56bf8eb88dcdddc6adb621c403a4feedbb540adc3998af97628a252",
+      "lines": 315
+    }
+  ]
+}

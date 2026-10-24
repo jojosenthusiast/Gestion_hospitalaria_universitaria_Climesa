@@ -1,0 +1,33 @@
+﻿id,flujo,situacion,accion,resultado_esperado,task,estado
+AC301,ID01,Datos desconocidos,Registrar sin documento/nacimiento exacto,Identidad provisional sin valores ficticios,T301,NO_EJECUTADO
+AC302,ID01,Documento con emisores diferentes,Buscar mismo valor en dos dominios,No asumir que son la misma persona,T301,NO_EJECUTADO
+AC303,ID01,Creación simultánea,Dos sesiones crean mismo identificador exclusivo,Unicidad durable y conflicto revisable,T301,NO_EJECUTADO
+AC304,ID01,Homónimos,Buscar nombre/fecha compartidos,Candidatos distinguibles; no auto-fusión,T301,NO_EJECUTADO
+AC305,ID01,ID estable,Corregir documento identificado,Mismo ID interno y versión anterior conservada,T301,NO_EJECUTADO
+AC306,ID04,Merge supervisado,Aprobar y aplicar duplicado confirmado,Manifest y referencias previas conservados,T302,NO_EJECUTADO
+AC307,ID04,Merge repetido,Reenviar misma operación,Un solo efecto y resultado consistente,T302,NO_EJECUTADO
+AC308,ID04,Consumidor caído,Aplicar local y fallar LIS,Estado pendiente; no completado global,T302,NO_EJECUTADO
+AC309,ID04,Overlay,Detectar dos personas en un registro,Ruta de separación supervisada; no merge,T302,NO_EJECUTADO
+AC310,ID04,Deshacer merge,Corregir fusión con datos posteriores ambiguos,Datos ambiguos no se redistribuyen automáticamente,T302,NO_EJECUTADO
+AC311,ID05,Contacto sin representación,Contacto solicita exportación,Denegación salvo autoridad verificada,T303,NO_EJECUTADO
+AC312,ID05,Representación vencida,Acción después de vencimiento,No concede permiso y conserva historial,T303,NO_EJECUTADO
+AC313,ID06,Corrección clínica,Cambiar nota firmada,Adenda/versionado y autor autorizado,T303,NO_EJECUTADO
+AC314,ID06,Exportación,Entregar contenido autorizado,Alcance/hash/receptor/canal/constancia verificables,T303,NO_EJECUTADO
+AC315,AT01,Urgencia sin cita,Crear atención no programada,No exige cita o cama,T304,NO_EJECUTADO
+AC316,AT02,Traslado,Destino rechaza traslado,Responsable actual y ubicación ejecutada se conservan,T304,NO_EJECUTADO
+AC317,AT03,Resultado postalta,Llega resultado después de finalizar,Pendiente con dueño y comunicación; no se pierde,T304,NO_EJECUTADO
+AC318,AT04,Retorno real,Paciente vuelve tras alta,Nueva atención relacionada; no sobrescritura,T304,NO_EJECUTADO
+AC319,E01,Evento repetido,Reenviar evidencia de prestación,Un solo cargo efectivo por origen,T305,NO_EJECUTADO
+AC320,E01,Tarifa histórica,Cambiar tarifa después de facturar,Snapshot histórico intacto,T305,NO_EJECUTADO
+AC321,E01,Tarifa conflictiva,Dos reglas igualmente aplicables,Cola de revisión con dueño; no precio arbitrario,T305,NO_EJECUTADO
+AC322,CT01,Glosa seguro,Seguro niega una línea,No traslado automático al paciente,T305,NO_EJECUTADO
+AC323,E02,Saldo anticipo,Aplicar dos veces simultáneamente,Suma aplicada no excede disponible,T306,NO_EJECUTADO
+AC324,E03,Saldo deuda,Dos cobros/aplicaciones simultáneos,No sobreaplicación; exceso sigue política de anticipo,T306,NO_EJECUTADO
+AC325,E03,Idempotencia conflictiva,Misma clave con diferente importe,Conflicto explícito sin segundo efecto,T306,NO_EJECUTADO
+AC326,E02,Reverso aplicación,Desaplicar pago ya cobrado,Restaurar vínculo/saldos sin nuevo ingreso bancario,T306,NO_EJECUTADO
+AC327,E10,Asiento duplicado,Reenviar evento económico,Un asiento efectivo por origen,T307,NO_EJECUTADO
+AC328,E10,Cierre,Intentar postear en periodo bloqueado,Rechazo o ruta autorizada; nunca edición silenciosa,T307,NO_EJECUTADO
+AC329,E10,Balance,Enviar asiento descuadrado,No contabiliza,T307,NO_EJECUTADO
+AC330,E12,DTE timeout,MH acepta pero respuesta se pierde,Estado desconocido/reconciliación; no nuevo DTE automático,T308,NO_EJECUTADO
+AC331,E12,Archivo DTE,Comparar entrega y documento firmado,Componentes oficiales íntegros y representación coherente,T308,NO_EJECUTADO
+AC332,E12,Entrega y recuperación,Caída de canal/servicio de entrega,"Reintento controlado, acceso autorizado y evidencia durable",T308,NO_EJECUTADO

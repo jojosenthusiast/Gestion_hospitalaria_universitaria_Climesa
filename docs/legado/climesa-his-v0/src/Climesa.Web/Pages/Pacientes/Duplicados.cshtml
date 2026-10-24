@@ -1,0 +1,17 @@
+@page
+@model Climesa.Web.Pages.Pacientes.DuplicadosModel
+@{
+    ViewData["Title"] = "Posibles duplicados";
+}
+<h1>Casos de posible duplicado</h1>
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+<p class="muted">La revisión, aprobación por un segundo usuario, fusión con manifiesto y reversión están especificadas (spec 001 FR-026 a FR-034) y no forman parte de esta demostración.</p>
+<section class="card">
+    <table>
+        <tr><th>Abierto</th><th>Motivo</th><th>Registros</th><th>Estado</th></tr>
+        @foreach (var c in Model.Cases)
+        {
+            <tr><td>@LocalTime.Format(c.OpenedAt)</td><td>@c.Reason</td><td>@foreach (var p in c.PersonIds) { <a class="btn small secondary" href="/Pacientes/Detalle/@p">ver</a> }</td><td><span class="tag warn">@Labels.Es(c.Status)</span></td></tr>
+        }
+    </table>
+</section>

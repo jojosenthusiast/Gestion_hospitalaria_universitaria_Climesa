@@ -1,0 +1,30 @@
+@page
+@model Climesa.Web.Pages.Cuenta.LoginModel
+@{
+    ViewData["Title"] = "Ingresar";
+}
+<section class="card" style="max-width:520px;margin:30px auto">
+    <h1>Ingresar</h1>
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert error">@Model.Error</div>
+    }
+    <form method="post">
+        <div class="row"><label>Usuario <input name="Username" value="@Model.Username" autocomplete="username" autofocus /></label></div>
+        <div class="row" style="margin-top:10px"><label>Contraseña <input name="Password" type="password" autocomplete="current-password" /></label></div>
+        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+        <div style="margin-top:14px"><button>Ingresar</button></div>
+    </form>
+    <h3>Usuarios de demostración</h3>
+    <p class="muted">Contraseña para todos: <span class="mono">@DemoSeeder.DemoPassword</span></p>
+    <table>
+        <tr><td class="mono">admision1</td><td>Admisión: buscar y registrar pacientes, llegadas</td></tr>
+        <tr><td class="mono">triage1</td><td>Enfermería: triaje, salida física</td></tr>
+        <tr><td class="mono">medico1</td><td>Médico con inscripción vigente: ingreso y alta</td></tr>
+        <tr><td class="mono">medico2</td><td>Médico con inscripción vencida (el alta se rechaza)</td></tr>
+        <tr><td class="mono">limpieza1</td><td>Limpieza terminal</td></tr>
+        <tr><td class="mono">jefe1</td><td>Jefa de área: firma la liberación de camas</td></tr>
+        <tr><td class="mono">archivo1</td><td>Archivo: carga del índice en papel, duplicados</td></tr>
+        <tr><td class="mono">auditor1</td><td>Auditoría: bitácora y verificación de integridad</td></tr>
+    </table>
+</section>

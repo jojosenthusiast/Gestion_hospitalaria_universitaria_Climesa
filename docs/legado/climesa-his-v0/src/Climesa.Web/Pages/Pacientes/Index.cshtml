@@ -1,0 +1,51 @@
+@page
+@model Climesa.Web.Pages.Pacientes.IndexModel
+@{
+    ViewData["Title"] = "Pacientes";
+}
+<h1>Buscar paciente</h1>
+<p class="muted">Siempre se busca antes de registrar (spec 001 FR-001). La búsqueda compara DUI, número de expediente y nombres por sonido (b/v, s/z, ll/y, h muda, tildes).</p>
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+<section class="card">
+    <form method="get">
+        <div class="row">
+            <label>Nombres y apellidos <input name="Text" value="@Model.Text" placeholder="ej. hernandes basquez ana" /></label>
+            <label style="max-width:180px">DUI <input name="Dui" value="@Model.Dui" placeholder="00000000-0" /></label>
+            <label style="max-width:170px">Expediente <input name="Mrn" value="@Model.Mrn" placeholder="0000001-X" /></label>
+            <label style="max-width:130px">Año de nacimiento <input name="Year" value="@Model.Year" /></label>
+            <div><button>Buscar</button></div>
+        </div>
+    </form>
+</section>
+@if (Model.Result is not null)
+{
+    <section class="card">
+        <h2>@Model.Result.Candidates.Count candidato(s)</h2>
+        @if (Model.Result.Candidates.Count > 0)
+        {
+            <table>
+                <tr><th>Paciente</th><th>Expediente</th><th>Nacimiento</th><th>DUI</th><th>Municipio</th><th>Por qué aparece</th><th></th></tr>
+                @foreach (var c in Model.Result.Candidates)
+                {
+                    <tr>
+                        <td>@c.DisplayName @if (c.Status == "provisional") { <span class="tag warn">provisional</span> }</td>
+                        <td class="mono">@c.Mrn</td>
+                        <td>@c.BirthDisplay</td>
+                        <td class="mono">@c.MaskedDui</td>
+                        <td>@c.Municipality</td>
+                        <td>@foreach (var r in c.Reasons) { <span class="tag">@r</span> }</td>
+                        <td>@if (Model.Can("identity.view")) { <a class="btn small" href="/Pacientes/Detalle/@c.PersonId">Abrir</a> }</td>
+                    </tr>
+                }
+            </table>
+        }
+        @if (Model.Can("identity.create"))
+        {
+            <p style="margin-top:12px">¿No es ninguno? <a class="btn secondary" href="/Pacientes/Nuevo?token=@Model.Result.Token">Registrar paciente nuevo</a></p>
+        }
+    </section>
+}
+@if (Model.Can("identity.duplicate.review"))
+{
+    <p><a href="/Pacientes/Duplicados">Ver casos de posible duplicado</a></p>
+}
