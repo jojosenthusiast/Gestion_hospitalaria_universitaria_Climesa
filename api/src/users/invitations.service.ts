@@ -2,6 +2,7 @@ import { BadGatewayException, BadRequestException, ConflictException, ForbiddenE
 import { ConfigService } from '@nestjs/config';
 import { PoolClient } from 'pg';
 import { SupabaseService } from '../supabase/supabase.service';
+import { VersionConflictException } from '../platform/problem';
 import { Actor } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
@@ -41,7 +42,7 @@ export class InvitationsService {
       await c.query('SELECT pg_advisory_xact_lock(671001)');
       const old=(await c.query('SELECT version,persona_personal_id FROM acceso.usuario WHERE id=$1 FOR UPDATE',[id])).rows[0];
       if(!old)throw new NotFoundException('No se encontró la cuenta.');
-      if(old.version!==dto.version)throw new ConflictException('La cuenta cambió; vuelve a abrirla.');
+      if(old.version!==dto.version)throw new VersionConflictException(old.version,'La cuenta cambió; vuelve a abrirla.');
       const staffId=dto.staffId??old.persona_personal_id;
       await this.validateRoles(c,dto.roles,staffId);
       await c.query('DELETE FROM acceso.asignacion_rol WHERE usuario_id=$1 AND NOT(rol_codigo=ANY($2::text[]))',[id,dto.roles]);
@@ -57,7 +58,7 @@ export class InvitationsService {
       await c.query('SELECT pg_advisory_xact_lock(671001)');
       const old=(await c.query('SELECT version FROM acceso.usuario WHERE id=$1 FOR UPDATE',[id])).rows[0];
       if(!old)throw new NotFoundException('No se encontró la cuenta.');
-      if(old.version!==dto.version)throw new ConflictException('La cuenta cambió; vuelve a abrirla.');
+      if(old.version!==dto.version)throw new VersionConflictException(old.version,'La cuenta cambió; vuelve a abrirla.');
       await c.query('UPDATE acceso.usuario SET estado=$2,version=version+1 WHERE id=$1',[id,dto.state]);
       await this.commands.audit(c,actor,{action:'usuarios.estado',entity:'usuario',entityId:id,permission:'usuarios.desactivar',reason:dto.reason});
       await this.commands.event(c,'usuario.actualizado','usuario',id,old.version+1,['rol:ADM',`usuario:${id}`]);

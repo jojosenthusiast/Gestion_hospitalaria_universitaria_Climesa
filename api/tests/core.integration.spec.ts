@@ -107,7 +107,7 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
  });
  test('edita con historial y rechaza una versión antigua',async()=>{
   const first=await call('REC','PATCH',`/pacientes/${patientId}`,{...patient,surnames:'Ejemplo Hernández Gómez',version:1,reason:'Corrección del segundo apellido'});expect(first.status).toBe(200);
-  expect((await call('REC','PATCH',`/pacientes/${patientId}`,{...patient,version:1,reason:'Otra corrección simultánea'})).status).toBe(409);
+  const stale=await call('REC','PATCH',`/pacientes/${patientId}`,{...patient,version:1,reason:'Otra corrección simultánea'});expect(stale.status).toBe(409);expect(stale.body.codigo).toBe('version_conflicto');expect(stale.body.versionActual).toBe(2);
   const detail=(await call('REC','GET',`/pacientes/${patientId}`)).body;expect(detail.history[0].changes.primer_apellido.before).toBe('Ejemplo Hernández');expect(detail.version).toBe(2);
  });
  test('filtra campos para laboratorio y rechaza al médico sin relación y paciente ajeno',async()=>{

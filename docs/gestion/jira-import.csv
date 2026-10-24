@@ -59,7 +59,7 @@ Criterios de aceptación:
 - Doble clic no duplica efectos
 
 Pantallas: W36
-Requisitos: FR-100-01, FR-100-02, FR-100-03, FR-100-04, FR-100-05, FR-100-06, FR-100-07, FR-100-10, FR-100-11, FR-100-12, FR-100-15, FR-100-16, FR-100-18",8,Highest,SGHU Sprint 2,spec-100,,comp-backend,,,To Do
+Requisitos: FR-100-01, FR-100-02, FR-100-03, FR-100-04, FR-100-05, FR-100-06, FR-100-07, FR-100-10, FR-100-11, FR-100-12, FR-100-15, FR-100-16, FR-100-18",8,Highest,SGHU Sprint 2,spec-100,,comp-backend,,,Done
 30,1,Story,HU-100-2 La API publicada en la nube con su contrato OpenAPI y la base de datos con tiempo real,"Como equipo de desarrollo, quiero la API publicada en la nube con su contrato OpenAPI y la base de datos con tiempo real, para que las tres apps la consuman desde el avance.
 
 Criterios de aceptación:
@@ -746,22 +746,22 @@ Depende de: T04
 Cubre: FR-131-04",,High,,spec-131,nivel-R,comp-qa,,,To Do
 145,29,Subtask,100-T01 Crear monorepo y solución backend con proyectos por módulo,"Hecho cuando: `npm run build --prefix api` sin errores y `tools/generar_docs.py --verificar` pasa en el repositorio
 Depende de: ninguna
-Cubre: FR-100-18",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+Cubre: FR-100-18",,Highest,,spec-100,nivel-R,comp-backend,,,Done
 146,29,Subtask,"100-T02 Portar plataforma del legado (Db, CommandRunner, Idempotency, Outbox, Audit, PolicyRegistry, Clock)","Hecho cuando: las pruebas de plataforma portadas pasan contra PostgreSQL local
 Depende de: T01
-Cubre: FR-100-04, FR-100-05, FR-100-06, FR-100-07, FR-100-10, FR-100-16",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+Cubre: FR-100-04, FR-100-05, FR-100-06, FR-100-07, FR-100-10, FR-100-16",,Highest,,spec-100,nivel-R,comp-backend,,,Done
 147,29,Subtask,100-T04 Validación del JWT de Supabase y construcción del actor,"Hecho cuando: pruebas de token válido, vencido, firma falsa y emisor ajeno pasan
 Depende de: T02
-Cubre: FR-100-01",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+Cubre: FR-100-01",,Highest,,spec-100,nivel-R,comp-backend,,,Done
 148,29,Subtask,100-T05 Filtro de permisos por endpoint con auditoría de denegados,"Hecho cuando: prueba de paciente contra `POST /turnos` da 403 y deja auditoría
 Depende de: T04
-Cubre: FR-100-02, FR-100-03",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+Cubre: FR-100-02, FR-100-03",,Highest,,spec-100,nivel-R,comp-backend,,,Done
 149,29,Subtask,"100-T06 Errores uniformes, conflicto de versión y registro sin datos sensibles","Hecho cuando: prueba de 409 por versión y revisión de registros sin cuerpos de solicitud
 Depende de: T02
-Cubre: FR-100-11, FR-100-12, FR-100-15",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+Cubre: FR-100-11, FR-100-12, FR-100-15",,Highest,,spec-100,nivel-R,comp-backend,,,Done
 150,29,Subtask,HU-100-1-QA Casos de prueba y prueba manual de los criterios de HU-100-1 en API (Postman o Swagger),"Hecho cuando: Cada criterio de aceptación tiene un caso ejecutado con datos ficticios; defectos reportados en Jira
 Depende de: las demás subtareas
-Cubre: criterios de la historia",,Highest,,spec-100,nivel-R,comp-qa,,,To Do
+Cubre: criterios de la historia",,Highest,,spec-100,nivel-R,comp-qa,,,Done
 151,30,Subtask,"GES-15 Configurar Supabase para la API: contraseña del rol sghu_api, gancho de token acceso.hook_token, primer Administrador, limpiar la fila de humo del outbox","Hecho cuando: La API se conecta como sghu_api, el token trae roles y canales, existe un usuario ADM (pasos en supabase/README.md)
 Depende de: ninguna",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
 152,30,Subtask,100-T07 OpenAPI con permisos y endpoint de salud,"Hecho cuando: `/openapi/v1.json` lista cada endpoint con `x-permiso` y `/salud` responde 200

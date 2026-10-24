@@ -2,13 +2,13 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 12 de 131 (9%) · **Requisitos:** 221 · **Specs:** 20
+**Tareas:** 17 de 131 (12%) · **Requisitos:** 221 · **Specs:** 20
 
 ## Por spec
 
 | Spec | Estado | Requisitos R/E/F | Tareas | Avance |
 |---|---|---|---|---|
-| [100 Plataforma de la API](./100-plataforma-api/spec.md) | En revisión | 17/2/0 | 1/10 | █░░░░░░░░░ |
+| [100 Plataforma de la API](./100-plataforma-api/spec.md) | En revisión | 17/2/0 | 6/10 | ██████░░░░ |
 | [101 Identidad, cuentas y acceso](./101-identidad-acceso/spec.md) | En revisión | 15/1/0 | 2/8 | ██░░░░░░░░ |
 | [102 Pacientes](./102-pacientes/spec.md) | En revisión | 11/1/0 | 1/7 | █░░░░░░░░░ |
 | [103 Personal de salud y turnos](./103-personal-turnos/spec.md) | En revisión | 11/3/0 | 1/9 | █░░░░░░░░░ |
@@ -34,19 +34,19 @@
 | Semana | Fechas | R hechas | E hechas | Total |
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
-| S2 | 24 a 30 oct | 0/36 | 0/1 | ░░░░░░░░░░ |
+| S2 | 24 a 30 oct | 5/36 | 0/1 | █░░░░░░░░░ |
 | S3 | 31 oct a 6 nov | 0/29 | 0/0 | ░░░░░░░░░░ |
 | S4 | 7 a 13 nov | 0/22 | 0/0 | ░░░░░░░░░░ |
 | S5 | 14 a 20 nov | 0/8 | 0/23 | ░░░░░░░░░░ |
 
 ## Para el avance del 31 de octubre (tareas R de S1 y S2)
 
-- [ ] 100-T01 · Crear monorepo y solución backend con proyectos por módulo
-- [ ] 100-T02 · Portar plataforma del legado (Db, CommandRunner, Idempotency, Outbox, Audit, PolicyRegistry, Clock)
+- [x] 100-T01 · Crear monorepo y solución backend con proyectos por módulo
+- [x] 100-T02 · Portar plataforma del legado (Db, CommandRunner, Idempotency, Outbox, Audit, PolicyRegistry, Clock)
 - [x] 100-T03 · Migración 0001 de plataforma con roles, RLS y disparador de Realtime
-- [ ] 100-T04 · Validación del JWT de Supabase y construcción del actor
-- [ ] 100-T05 · Filtro de permisos por endpoint con auditoría de denegados
-- [ ] 100-T06 · Errores uniformes, conflicto de versión y registro sin datos sensibles
+- [x] 100-T04 · Validación del JWT de Supabase y construcción del actor
+- [x] 100-T05 · Filtro de permisos por endpoint con auditoría de denegados
+- [x] 100-T06 · Errores uniformes, conflicto de versión y registro sin datos sensibles
 - [ ] 100-T07 · OpenAPI con permisos y endpoint de salud
 - [ ] 100-T08 · Contenedor y despliegue de la API en la nube
 - [x] 101-T01 · Migración 0002 de acceso y semilla de roles y permisos desde los CSV
