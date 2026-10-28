@@ -37,3 +37,10 @@ Mitigación sin costo:
 2. `/salud` ejecuta `SELECT 1`, así que también mantiene activa la base de Supabase.
 
 Límites: el ping reduce el riesgo pero no lo elimina (un reinicio de Render sigue costando ~1 minuto). Para uso real con ambulancias, cambiar `plan: free` a `plan: starter` en `render.yaml` (instancia de pago, siempre encendida).
+
+## SSL hacia Supabase (`SELF_SIGNED_CERT_IN_CHAIN`)
+
+El pooler de Supabase firma con su propia CA, que Node no conoce, así que `?sslmode=require` falla. Dos salidas:
+
+1. **Rápida, menos segura:** terminar `DATABASE_URL` en `?uselibpqcompat=true&sslmode=require`. Cifra, pero no verifica la identidad del servidor.
+2. **Correcta:** en Supabase, Database → Settings → SSL Configuration, descarga el certificado y pega su contenido PEM completo en la variable `DB_SSL_CA` de Render. Quita `sslmode` de `DATABASE_URL`: la API lo hace sola cuando hay CA y verifica el servidor.

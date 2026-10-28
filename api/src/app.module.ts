@@ -24,6 +24,7 @@ import { OperationsModule } from './operations/operations.module';
         SUPABASE_SECRET_KEY: Joi.string().allow('').default(''),
         SUPABASE_SERVICE_ROLE_KEY: Joi.string().allow('').default(''),
         DATABASE_URL: Joi.string().allow('').default(''),
+        DB_SSL_CA: Joi.string().allow('').default(''),
       }),
     }),
     SupabaseModule,
