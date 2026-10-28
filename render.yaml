@@ -1,8 +1,8 @@
-# Render Blueprint for SGHU: API (Docker) + web (static SPA).
-# Service names fix the public URLs, so each service can reference the other
-# without waiting for the first deploy. If Render reports a name as taken it
-# appends a suffix: then update WEB_APP_URL and VITE_API_BASE_URL together.
-# Secrets are never stored here: every `sync: false` variable is entered by hand.
+# Blueprint de Render para SGHU: API (Docker) + web (sitio estático).
+# Los nombres de servicio fijan las URL públicas, así que cada servicio puede referenciar al otro
+# sin esperar al primer despliegue. Si Render avisa que un nombre ya está tomado y le añade un
+# sufijo, actualiza juntos WEB_APP_URL y VITE_API_BASE_URL.
+# Los secretos nunca se guardan aquí: cada variable con `sync: false` se escribe a mano en el panel.
 services:
   - type: web
     name: sghu-api
