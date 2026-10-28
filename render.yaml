@@ -1,0 +1,27 @@
+﻿# Render Blueprint for the SGHU API. Secrets are never stored here: every
+# `sync: false` variable is entered by hand in the Render dashboard.
+services:
+  - type: web
+    name: sghu-api
+    runtime: docker
+    rootDir: api
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /salud
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: api/v1
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: WEB_APP_URL
+        sync: false
