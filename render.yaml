@@ -1,0 +1,49 @@
+﻿# Render Blueprint for SGHU: API (Docker) + web (static SPA).
+# Service names fix the public URLs, so each service can reference the other
+# without waiting for the first deploy. If Render reports a name as taken it
+# appends a suffix: then update WEB_APP_URL and VITE_API_BASE_URL together.
+# Secrets are never stored here: every `sync: false` variable is entered by hand.
+services:
+  - type: web
+    name: sghu-api
+    runtime: docker
+    rootDir: api
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /salud
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: api/v1
+      - key: WEB_APP_URL
+        value: https://sghu-web.onrender.com
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+
+  - type: web
+    name: sghu-web
+    runtime: static
+    rootDir: web
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeploy: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://sghu-api.onrender.com/api/v1
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
