@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Pool, PoolClient, PoolConfig, QueryResultRow } from 'pg';
 
 /**
- * With a CA the server is verified against it. `sslmode` is removed from the URL because pg
- * lets URL parameters override the `ssl` option and would drop the CA.
+ * Con una CA se verifica el servidor contra ella. Se quita `sslmode` de la URL porque pg deja
+ * que los parámetros de la URL pisen la opción `ssl` y se perdería la CA.
  */
 export function poolConfig(connectionString: string, ca?: string): PoolConfig {
   const base = { max: 10, connectionTimeoutMillis: 10000, idleTimeoutMillis: 30000 };
