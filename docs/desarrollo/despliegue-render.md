@@ -1,6 +1,6 @@
 ﻿# Despliegue de la API en Render (100-T08)
 
-Qué hace `render.yaml`: construye `api/Dockerfile` y publica el servicio `sghu-api`. Render usa `/salud` como health check (responde 503 si la base no conecta, y el despliegue se marca fallido) y inyecta `PORT`; la API ya escucha en `0.0.0.0`.
+Qué hace `render.yaml` (en la raíz, donde Render lo busca): publica `sghu-api` (Docker, `api/`) y `sghu-web` (sitio estático, `web/`). Render usa `/salud` como health check (responde 503 si la base no conecta, y el despliegue se marca fallido) y inyecta `PORT`; la API ya escucha en `0.0.0.0`.
 
 ## Variables (se escriben a mano en el panel de Render)
 
@@ -10,7 +10,13 @@ Qué hace `render.yaml`: construye `api/Dockerfile` y publica el servicio `sghu-
 | `SUPABASE_PUBLISHABLE_KEY` | clave `sb_publishable_…` | pública |
 | `SUPABASE_SECRET_KEY` | clave secreta del proyecto | **solo servidor**, nunca en `VITE_` ni en las apps |
 | `DATABASE_URL` | cadena del **pooler** de Supabase | ver abajo |
-| `WEB_APP_URL` | URL pública de la web | CORS admite un solo origen |
+| `WEB_APP_URL` | ya fijada: `https://sghu-web.onrender.com` | CORS admite un solo origen |
+
+## Web (servicio `sghu-web`)
+
+Se compila con `npm ci && npm run build` y las variables `VITE_*` quedan **dentro del bundle**: solo valores públicos. `VITE_API_BASE_URL` ya apunta a `https://sghu-api.onrender.com/api/v1`. A mano: `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`. La regla de rewrite `/* → /index.html` hace que las rutas del SPA no den 404.
+
+**Por qué no hay dependencia circular:** los nombres fijan las URLs públicas, así que cada servicio ya conoce la del otro. Si Render dice que un nombre está tomado y le añade sufijo, cambia `WEB_APP_URL` y `VITE_API_BASE_URL` juntos y vuelve a desplegar ambos.
 
 ## Dos puntos que suelen romper el despliegue
 
@@ -20,4 +26,5 @@ Qué hace `render.yaml`: construye `api/Dockerfile` y publica el servicio `sghu-
 ## Verificación (criterio de T08)
 
 `GET https://<servicio>.onrender.com/salud` → 200 con la base de Supabase conectada. El plan `free` duerme tras 15 minutos sin tráfico; la primera llamada tarda ~1 minuto.
+
 
