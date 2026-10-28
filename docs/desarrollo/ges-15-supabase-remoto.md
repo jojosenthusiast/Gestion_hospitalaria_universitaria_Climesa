@@ -2,7 +2,21 @@
 
 Proyecto: "Gestion hospitalaria universitaria (Climesa)", ref `gvmvmrusscsfbndnbvbr`.
 
+## Pendientes al cierre del 28-oct-2026
+
+Hecho ese día: `core_semanas_1_2` aplicada; `/salud` responde 200 con `database: ok`; la API corre como `postgres` con `SET` concedido sobre `sghu_api`; existen 10 cuentas de demostración, una por rol (`<rol>@climesa`).
+
+- [ ] **Gancho de token (el que falta para que cada rol vea lo suyo).** Supabase → Authentication → Hooks → *Customize Access Token (JWT) Claims* → Postgres → esquema `acceso`, función `hook_token`.
+- [ ] **URL de Auth.** Supabase → Authentication → URL Configuration: Site URL `https://sghu-web.onrender.com` y Redirect URL `https://sghu-web.onrender.com/**`.
+- [ ] **Antes de usar datos reales:** dar clave a `sghu_api` (paso 2 de abajo) y cambiar `DATABASE_URL` en Render a `sghu_api.<ref>` (paso 5); borrar las cuentas de demostración, porque `adm@climesa` es administrador y la web es pública.
+- [ ] Limpieza opcional: `delete from plataforma.outbox where entidad_id = 'humo-1';`
+- [ ] Opcional: activar *Leaked Password Protection* en Authentication (único aviso del asesor de seguridad).
+
+Al terminar el gancho de token, comprobar que un inicio de sesión devuelve un token con roles y canales.
+
 ## Estado verificado el 28-oct-2026 (consulta de solo lectura)
+
+> La fila de `core_semanas_1_2` de esta tabla ya se resolvió (aplicada el 28-oct). Las demás siguen como se describe.
 
 | Elemento | Remoto | Falta |
 |---|---|---|
