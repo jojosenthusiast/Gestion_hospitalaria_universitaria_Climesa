@@ -2,6 +2,8 @@
 
 > Revisión 24-oct, corte 0.3.0: ahora hay 14 migraciones. La migración nueva se validó localmente y no fue aplicada remotamente porque las conexiones disponibles no exponen el proyecto CLIMESA. Los estados de nube del 17-oct que figuran debajo son evidencia histórica del archivo original; no se revalidaron en este corte. Usa `../deployment/README.md` para completar conexión y despliegue.
 
+> Fusión V11: se incorporaron 20261024000100_invitaciones_jerarquia.sql (tablas cceso.administrador_principal y cceso.invitacion; según la transferencia v11 ya estaba aplicada en el proyecto remoto, sin reverificar) y 20261024000110_invitaciones_rls.sql (RLS y política pi_sghu para esas tablas, ADR-0004; no proviene de V11). Ahora hay 16 archivos de migración y ninguno fue aplicado remotamente en este corte.
+
 Estado: las 13 migraciones y la semilla están **aplicadas** en el proyecto Supabase "Gestion hospitalaria universitaria (Climesa)" (ref `gvmvmrusscsfbndnbvbr`, PostgreSQL 17) desde el 17-oct-2026. El asesor de seguridad de Supabase no reporta hallazgos.
 
 ## Contenido
@@ -18,7 +20,7 @@ Estado: las 13 migraciones y la semilla están **aplicadas** en el proyecto Supa
 
 - Email y contraseña están habilitados con confirmación de correo.
 - SMTP personalizado de Gmail fue comprobado mediante un correo de invitación.
-- La cuenta inicial `tradleomun@gmail.com` está confirmada, activa y tiene únicamente el rol `ADM`.
+- La cuenta inicial del administrador principal está confirmada, activa y tiene únicamente el rol `ADM`.
 - La asignación automática `PAC` producida al crear la cuenta fue retirada porque esta cuenta se destina a administración.
 
 ## Pasos pendientes

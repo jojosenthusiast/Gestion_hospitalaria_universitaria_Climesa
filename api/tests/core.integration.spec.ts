@@ -176,4 +176,14 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   let previous=Buffer.alloc(32);for(const row of rows){expect(Buffer.from(row.hash_previo)).toEqual(previous);const hash=createHash('sha256').update(previous).update(row.detalle.canonicalEvent).digest();expect(Buffer.from(row.hash)).toEqual(hash);previous=hash;}
   const searches=(await fixture.pg.query<{huella_criterios:string}>('SELECT huella_criterios FROM pacientes.busqueda_registro')).rows;expect(searches.every(r=>/^[a-f0-9]{64}$/.test(r.huella_criterios))).toBe(true);
  });
+ test('jerarquía: solo el administrador principal invita a otro ADM y se registra la invitación',async()=>{
+  const adm=(email:string)=>({email,displayName:'Administrador ficticio',roles:['ADM']});
+  expect((await call('ADM','GET','/auth/me')).body.canInviteAdmin).toBe(true);
+  expect((await call('ADM','POST','/usuarios/invitaciones',adm('admin2@example.test'))).status).toBe(201);
+  expect((await fixture.pg.query<{n:number}>("SELECT count(*)::int AS n FROM acceso.invitacion WHERE correo='admin2@example.test' AND rol_codigo='ADM'")).rows[0].n).toBe(1);
+  await fixture.pg.query('INSERT INTO acceso.asignacion_rol(usuario_id,rol_codigo) VALUES($1,$2)',[userId('JOP'),'ADM']);
+  expect((await call('JOP','GET','/auth/me')).body.canInviteAdmin).toBe(false);
+  expect((await call('JOP','POST','/usuarios/invitaciones',adm('admin3@example.test'))).status).toBe(403);
+  await fixture.pg.query("DELETE FROM acceso.asignacion_rol WHERE rol_codigo='ADM' AND usuario_id<>$1",[userId('ADM')]);
+ });
 });

@@ -66,7 +66,7 @@ Criterios de aceptación:
 - /salud responde 200 en la URL pública
 - OpenAPI lista cada endpoint con su permiso
 - Base de datos aplicada en Supabase
-Requisitos: FR-100-13, FR-100-14, FR-100-18",3,Highest,SGHU Sprint 2,spec-100,,comp-backend,,,To Do
+Requisitos: FR-100-13, FR-100-14, FR-100-18",3,Highest,SGHU Sprint 2,spec-100,,comp-backend,,,In Progress
 31,2,Story,HU-101-1 Iniciar sesión con mi rol en mi plataforma y registrarme si soy paciente,"Como miembro del personal o paciente, quiero iniciar sesión con mi rol en mi plataforma y registrarme si soy paciente, para ver solo lo que me corresponde.
 
 Criterios de aceptación:
@@ -766,7 +766,7 @@ Cubre: criterios de la historia",,Highest,,spec-100,nivel-R,comp-qa,,,Done
 Depende de: ninguna",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
 152,30,Subtask,100-T07 OpenAPI con permisos y endpoint de salud,"Hecho cuando: `/openapi/v1.json` lista cada endpoint con `x-permiso` y `/salud` responde 200
 Depende de: T05
-Cubre: FR-100-13, FR-100-14",,Highest,,spec-100,nivel-R,comp-backend,,,To Do
+Cubre: FR-100-13, FR-100-14",,Highest,,spec-100,nivel-R,comp-backend,,,Done
 153,30,Subtask,100-T08 Contenedor y despliegue de la API en la nube,"Hecho cuando: `/salud` responde desde la URL pública con la base de Supabase
 Depende de: T07
 Cubre: FR-100-18",,Highest,,spec-100,nivel-R,comp-backend,,,To Do

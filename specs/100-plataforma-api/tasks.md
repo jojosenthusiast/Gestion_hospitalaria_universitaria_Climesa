@@ -31,10 +31,11 @@
   - Hecho cuando: prueba de 409 por versión y revisión de registros sin cuerpos de solicitud
   - Verificado: tests/errors.filter.spec.ts (problem+json, versionActual, registros sin cuerpo/token/campos clínicos) y tests/core.integration.spec.ts (PATCH con versión antigua → 409 ersion_conflicto con ersionActual=2); los 7 puntos de conflicto de versión usan VersionConflictException; 
 pm test -- --ci en api: 9 suites, 52 pruebas OK
-- [ ] T07 · S2 · R · OpenAPI con permisos y endpoint de salud
+- [x] T07 · S2 · R · OpenAPI con permisos y endpoint de salud
   - Cubre: FR-100-13, FR-100-14
   - Depende de: T05
   - Hecho cuando: `/openapi/v1.json` lista cada endpoint con `x-permiso` y `/salud` responde 200
+  - Verificado: `npm test -- --ci` en api: 9 suites, 52 pruebas OK. `tests/core.integration.spec.ts` comprueba que `GET /salud` responde 200 sin sesión con `cache-control: no-store` y que cada operación de `/openapi/v1.json` (28 de 28 en `contrato/openapi.json`) trae `x-permiso`; `POST /api/v1/pacientes` declara `pacientes.registrar`. Alcance: solo el contrato local; la URL pública pertenece a T08.
 - [ ] T08 · S2 · R · Contenedor y despliegue de la API en la nube
   - Cubre: FR-100-18
   - Depende de: T07

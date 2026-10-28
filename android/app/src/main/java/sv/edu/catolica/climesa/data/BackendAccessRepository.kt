@@ -15,7 +15,7 @@ class BackendAccessRepository(private val apiBaseUrl:String) {
         try {
             val status=c.responseCode
             val body=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}.orEmpty()
-            if(status !in 200..299)throw AuthRequestException(runCatching{JSONObject(body).optJSONObject("error")?.optString("message")}.getOrNull()?:"No se pudo verificar el acceso.",status)
+            if(status !in 200..299)throw AuthRequestException(apiErrorMessage(body)?:"No se pudo verificar el acceso.",status)
             val json=JSONObject(body)
             fun strings(key:String)=json.optJSONArray(key)?.let{a->(0 until a.length()).map(a::getString)}?:emptyList()
             val permissions=json.optJSONArray("permissions")?.let{a->(0 until a.length()).map{a.getJSONObject(it).getString("code")}}?:emptyList()

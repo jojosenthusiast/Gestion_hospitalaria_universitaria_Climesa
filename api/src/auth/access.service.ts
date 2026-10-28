@@ -5,6 +5,14 @@ import { Actor } from '../platform/actor';
 @Injectable()
 export class AccessService {
   constructor(private readonly db: DatabaseService) {}
+  /** Solo el administrador principal (o el único ADM activo, antes de fijarlo) puede crear otros administradores. */
+  async canInviteAdmin(actor: Actor): Promise<boolean> {
+    if (!actor.roles.includes('ADM')) return false;
+    const principal = await this.db.query('SELECT usuario_id FROM acceso.administrador_principal WHERE id');
+    if (principal.length) return principal[0].usuario_id === actor.id;
+    const admins = await this.db.query("SELECT a.usuario_id FROM acceso.asignacion_rol a JOIN acceso.usuario u ON u.id=a.usuario_id AND u.estado='activo' WHERE a.rol_codigo='ADM' LIMIT 2");
+    return admins.length === 1 && admins[0].usuario_id === actor.id;
+  }
   async actor(id: string, email = ''): Promise<Actor> {
     const users = await this.db.query('SELECT id,correo,nombre_mostrar,persona_personal_id,paciente_id,estado FROM acceso.usuario WHERE id=$1', [id]);
     const user = users[0];
