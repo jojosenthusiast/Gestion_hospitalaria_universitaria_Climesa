@@ -48,7 +48,7 @@
 - [x] 100-T05 · Filtro de permisos por endpoint con auditoría de denegados
 - [x] 100-T06 · Errores uniformes, conflicto de versión y registro sin datos sensibles
 - [x] 100-T07 · OpenAPI con permisos y endpoint de salud
-- [ ] 100-T08 · Contenedor y despliegue de la API en la nube
+- [x] 100-T08 · Contenedor y despliegue de la API en la nube
 - [x] 101-T01 · Migración 0002 de acceso y semilla de roles y permisos desde los CSV
 - [x] 101-T02 · Disparador de alta de usuario y rol Paciente por defecto
 - [x] 101-T03 · Endpoint `/auth/me` con permisos efectivos y plataformas

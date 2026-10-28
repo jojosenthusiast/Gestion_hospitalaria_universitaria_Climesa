@@ -36,10 +36,11 @@ pm test -- --ci en api: 9 suites, 52 pruebas OK
   - Depende de: T05
   - Hecho cuando: `/openapi/v1.json` lista cada endpoint con `x-permiso` y `/salud` responde 200
   - Verificado: `npm test -- --ci` en api: 9 suites, 52 pruebas OK. `tests/core.integration.spec.ts` comprueba que `GET /salud` responde 200 sin sesión con `cache-control: no-store` y que cada operación de `/openapi/v1.json` (28 de 28 en `contrato/openapi.json`) trae `x-permiso`; `POST /api/v1/pacientes` declara `pacientes.registrar`. Alcance: solo el contrato local; la URL pública pertenece a T08.
-- [ ] T08 · S2 · R · Contenedor y despliegue de la API en la nube
+- [x] T08 · S2 · R · Contenedor y despliegue de la API en la nube
   - Cubre: FR-100-18
   - Depende de: T07
   - Hecho cuando: `/salud` responde desde la URL pública con la base de Supabase
+  - Verificado: 28-oct-2026 en Render (servicio `sghu-api`, imagen de `api/Dockerfile`, plan free, Virginia): `GET https://sghu-api.onrender.com/salud` responde 200 con `{"status":"ok","database":"ok"}` y `GET /openapi/v1.json` responde 200 con 28 de 28 operaciones con `x-permiso`. La base es el proyecto Supabase `gvmvmrusscsfbndnbvbr` por el Session pooler. Alcance: la API corre con el rol `postgres` (se le concedió `SET` sobre `sghu_api`); pasar a conectar como `sghu_api` y aplicar `core_semanas_1_2` siguen pendientes en GES-15 (`docs/desarrollo/ges-15-supabase-remoto.md`).
 - [ ] T09 · S5 · E · Límite de búsquedas por usuario
   - Cubre: FR-100-17
   - Depende de: T05
