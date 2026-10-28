@@ -1,15 +1,15 @@
-﻿# Render Blueprint for SGHU: API (Docker) + web (static SPA).
+# Render Blueprint for SGHU: API (Docker) + web (static SPA).
 # Service names fix the public URLs, so each service can reference the other
 # without waiting for the first deploy. If Render reports a name as taken it
 # appends a suffix: then update WEB_APP_URL and VITE_API_BASE_URL together.
-# Secrets are never stored here: every `sync: false` variable is entered by hand.
+# The API runs on starter (always on): the free plan sleeps after 15 min idle and\n# takes ~1 min to wake, which is unacceptable for the ambulance flow.\n# Secrets are never stored here: every `sync: false` variable is entered by hand.
 services:
   - type: web
     name: sghu-api
     runtime: docker
     rootDir: api
     dockerfilePath: ./Dockerfile
-    plan: free
+    plan: starter
     region: oregon
     healthCheckPath: /salud
     autoDeploy: false

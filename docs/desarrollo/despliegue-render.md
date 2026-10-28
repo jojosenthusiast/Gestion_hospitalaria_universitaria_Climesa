@@ -1,4 +1,4 @@
-﻿# Despliegue de la API en Render (100-T08)
+# Despliegue de la API en Render (100-T08)
 
 Qué hace `render.yaml` (en la raíz, donde Render lo busca): publica `sghu-api` (Docker, `api/`) y `sghu-web` (sitio estático, `web/`). Render usa `/salud` como health check (responde 503 si la base no conecta, y el despliegue se marca fallido) y inyecta `PORT`; la API ya escucha en `0.0.0.0`.
 
@@ -25,6 +25,6 @@ Se compila con `npm ci && npm run build` y las variables `VITE_*` quedan **dentr
 
 ## Verificación (criterio de T08)
 
-`GET https://<servicio>.onrender.com/salud` → 200 con la base de Supabase conectada. El plan `free` duerme tras 15 minutos sin tráfico; la primera llamada tarda ~1 minuto.
+`GET https://<servicio>.onrender.com/salud` → 200 con la base de Supabase conectada. La API usa el plan `starter` (siempre encendido) porque el plan `free` duerme tras 15 minutos sin tráfico y tarda ~1 minuto en despertar, inaceptable para ambulancia. Para solo probar, puede bajarse a `free` en `render.yaml`.
 
 
