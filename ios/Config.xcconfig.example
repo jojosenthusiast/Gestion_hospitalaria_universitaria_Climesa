@@ -1,0 +1,4 @@
+// Copiar a ios/Config.xcconfig (no se sube). En xcconfig, "//" inicia comentario: escribir https:/$()/ en las URLs.
+API_URL = http:/$()/localhost:5080
+SUPABASE_URL = https:/$()/<ref>.supabase.co
+SUPABASE_ANON_KEY = <llave anon o publishable; nunca service_role>

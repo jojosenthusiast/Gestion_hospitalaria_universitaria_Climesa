@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
+import { VersionConflictException } from '../platform/problem';
 import { Actor } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
@@ -25,7 +26,7 @@ export class PersonnelService {
       if(id){
         const old=(await c.query('SELECT * FROM personal.persona WHERE id=$1 FOR UPDATE',[id])).rows[0];
         if(!old)throw new NotFoundException('No se encontró la persona.');
-        if(old.version!==dto.version)throw new ConflictException('La ficha cambió; vuelve a abrirla.');
+        if(old.version!==dto.version)throw new VersionConflictException(old.version,'La ficha cambió; vuelve a abrirla.');
         if(!dto.reason||dto.reason.trim().length<10)throw new BadRequestException('Indica el motivo de la modificación.');
         if(dto.active===false&&(await c.query("SELECT id FROM personal.turno WHERE persona_id=$1 AND estado<>'cancelado' AND upper(periodo)>$2 LIMIT 1",[id,this.clock.now()])).rowCount)throw new ConflictException('Reasigna o cancela sus turnos pendientes antes de inactivar.');
         row=(await c.query('UPDATE personal.persona SET nombres=$2,apellidos=$3,tipo=$4,especialidad=$5,area_id=$6,telefono=$7,dui=$8,activo=$9,version=version+1 WHERE id=$1 RETURNING id,version',[id,dto.givenNames.trim(),dto.surnames.trim(),dto.type,dto.specialty||null,dto.areaId||null,dto.phone||null,dto.dui?.replace('-','')||null,dto.active??true])).rows[0];
@@ -67,7 +68,7 @@ export class PersonnelService {
       if(id){
         const old=(await c.query('SELECT version FROM personal.turno WHERE id=$1 FOR UPDATE',[id])).rows[0];
         if(!old)throw new NotFoundException('No se encontró el turno.');
-        if(old.version!==dto.version)throw new ConflictException('El turno cambió; actualiza la planificación.');
+        if(old.version!==dto.version)throw new VersionConflictException(old.version,'El turno cambió; actualiza la planificación.');
         if(!dto.reason||dto.reason.trim().length<10)throw new BadRequestException('Indica el motivo del cambio.');
         row=(await c.query("UPDATE personal.turno SET persona_id=$2,area_id=$3,periodo=tstzrange($4,$5,'[)'),tipo=$6,justificacion=$7,estado=coalesce($8,estado),version=version+1 WHERE id=$1 RETURNING id,version",[id,dto.staffId,dto.areaId,start,end,dto.type,dto.justification||null,dto.state||null])).rows[0];
       }else row=(await c.query("INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,justificacion,creado_por) VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7) RETURNING id,version",[dto.staffId,dto.areaId,start,end,dto.type,dto.justification||null,actor.id])).rows[0];

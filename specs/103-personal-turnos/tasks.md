@@ -5,23 +5,23 @@
   - Depende de: 100-T03, 104-T01
   - Hecho cuando: prueba de traslape concurrente deja un solo turno
   - Verificado: Aplicada en Supabase; 02_concurrencia.sh caso 4: 1 turno guardado de 2 simultáneos
-- [x] T02 · S2 · R · CRUD de personal (con y sin cuenta)
+- [ ] T02 · S2 · R · CRUD de personal (con y sin cuenta)
   - Cubre: FR-103-01, FR-103-02
   - Depende de: T01, 100-T05
   - Hecho cuando: pruebas de crear, editar con versión e inactivar
-- [x] T03 · S2 · R · Crear y mover turnos con duración y descanso por política
+- [ ] T03 · S2 · R · Crear y mover turnos con duración y descanso por política
   - Cubre: FR-103-04, FR-103-05, FR-103-06, FR-103-14
   - Depende de: T01
   - Hecho cuando: escenarios 1, 2 y 3 pasan
-- [x] T04 · S2 · R · Pantallas de personal en web (W07, W08)
+- [ ] T04 · S2 · R · Pantallas de personal en web (W07, W08)
   - Cubre: FR-103-01
   - Depende de: T02, 120-T02
   - Hecho cuando: el administrador crea y edita personal desde la web
-- [ ] T05 · S3 · E · Inscripciones y bloqueo de roles clínicos sin inscripción
+- [ ] T05 · S2 · E · Inscripciones y bloqueo de roles clínicos sin inscripción
   - Cubre: FR-103-03, FR-103-10
   - Depende de: T02
   - Hecho cuando: programar a un médico vencido se rechaza
-- [ ] T06 · S3 · R · Cobertura, publicación con advertencias y estados automáticos
+- [ ] T06 · S2 · R · Cobertura, publicación con advertencias y estados automáticos
   - Cubre: FR-103-08, FR-103-09, FR-103-13
   - Depende de: T03
   - Hecho cuando: escenario 4 pasa y un turno cambia a "en curso" con el reloj de prueba

@@ -24,7 +24,7 @@ export class HttpApi implements Api {
   let response:Response;
   try{response=await fetch(base+path,{...init,cache:'no-store',headers:{Accept:'application/json',Authorization:`Bearer ${await this.token()}`,...(init.body?{'Content-Type':'application/json'}:{}),...init.headers}});}catch(e){if(e instanceof DOMException&&e.name==='AbortError')throw e;throw new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.');}
   const body=await response.json().catch(()=>({}));
-  if(!response.ok){if(response.status===401)this.unauthorized?.();throw new ApiError(body.error?.message??body.message??'No se pudo completar la operación.',response.status);}
+  if(!response.ok){if(response.status===401)this.unauthorized?.();throw new ApiError(body.detail??body.error?.message??body.message??'No se pudo completar la operación.',response.status);}
   return body as T;
  }
  async write<T>(path:string,body:unknown,method='POST'):Promise<T>{

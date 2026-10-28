@@ -1,6 +1,6 @@
 # 106. Tareas
 
-- [x] T01 · S3 · R · Migración de consulta, signos, diagnósticos, recetas y semilla CIE-10
+- [x] T01 · S1 · R · Migración de consulta, signos, diagnósticos, recetas y semilla CIE-10
   - Cubre: FR-106-03, FR-106-04
   - Depende de: 100-T03
   - Hecho cuando: la semilla carga el subconjunto CIE-10 y las tablas existen en la nube
@@ -25,7 +25,7 @@
   - Cubre: FR-106-11
   - Depende de: T03, 108-T02
   - Hecho cuando: la indicación aparece en admisiones con origen consulta
-- [ ] T07 · S4 · E · Addendum con original conservado
+- [ ] T07 · S5 · E · Addendum con original conservado
   - Cubre: FR-106-08
   - Depende de: T03
   - Hecho cuando: el historial muestra original y addendum

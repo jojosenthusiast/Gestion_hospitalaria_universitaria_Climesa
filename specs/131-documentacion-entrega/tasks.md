@@ -1,6 +1,6 @@
 # 131. Tareas
 
-- [x] T01 · S1 · R · Diagrama ER, arquitectura, RBAC y privacidad para el avance
+- [ ] T01 · S2 · R · Diagrama ER, arquitectura, RBAC y privacidad para el avance
   - Cubre: FR-131-02
   - Depende de: ninguna
   - Hecho cuando: `docs/arquitectura` contiene los cuatro documentos revisados

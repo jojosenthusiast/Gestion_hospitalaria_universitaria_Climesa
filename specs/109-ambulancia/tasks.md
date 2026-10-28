@@ -1,11 +1,11 @@
 # 109. Tareas
 
-- [x] T01 · S3 · R · Migración de ambulancia con unidad única y servicio activo único
+- [x] T01 · S1 · R · Migración de ambulancia con unidad única y servicio activo único
   - Cubre: FR-109-01, FR-109-05
   - Depende de: 100-T03
   - Hecho cuando: dos servicios activos para la unidad se rechazan en prueba
   - Verificado: Aplicada en Supabase; prueba 12 y 02_concurrencia.sh caso 3: 1 servicio activo de 2 despachos
-- [ ] T02 · S3 · R · Estado de la unidad visible en vivo y regla de paramédico de turno
+- [ ] T02 · S2 · R · Estado de la unidad visible en vivo y regla de paramédico de turno
   - Cubre: FR-109-01, FR-109-06
   - Depende de: T01, 103-T06
   - Hecho cuando: escenario 2 pasa
@@ -33,7 +33,7 @@
   - Cubre: FR-109-17
   - Depende de: T04, 108-T02
   - Hecho cuando: un servicio "en hospital" crea admisión con su referencia
-- [ ] T09 · S4 · E · Reporte prehospital con cola sin conexión y recepción en emergencia
+- [ ] T09 · S5 · E · Reporte prehospital con cola sin conexión y recepción en emergencia
   - Cubre: FR-109-10, FR-109-11
   - Depende de: T04
   - Hecho cuando: escenario 3 pasa en modo avión

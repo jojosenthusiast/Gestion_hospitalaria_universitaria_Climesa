@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
+import { VersionConflictException } from '../platform/problem';
 import { Actor, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
@@ -99,7 +100,7 @@ export class PatientsService {
     return this.commands.run(actor,`pacientes.editar_demograficos:${id}`,key,dto,async c=>{
       const old=(await c.query('SELECT * FROM pacientes.paciente WHERE id=$1 FOR UPDATE',[id])).rows[0];
       if(!old)throw new NotFoundException('No se encontró el paciente.');
-      if(old.version!==dto.version)throw new ConflictException('La ficha cambió. Vuelve a abrirla antes de guardar.');
+      if(old.version!==dto.version)throw new VersionConflictException(old.version,'La ficha cambió. Vuelve a abrirla antes de guardar.');
       await this.duplicate(c,data.dui,id);
       const row=(await c.query(`UPDATE pacientes.paciente SET nombres=$2,primer_apellido=$3,segundo_apellido=NULL,sexo=$4,nacimiento=$5,precision_nacimiento=$6,telefono=$7,correo=$8,direccion=$9,busqueda_normalizada=$10,fon_apellido=$11,fon_nombres=$12,version=version+1 WHERE id=$1 RETURNING *`,[id,data.givenNames,data.surnames,data.sex,data.birth,data.birth?'exacta':'desconocida',data.phone,data.email||null,data.address||null,normalize(`${data.givenNames} ${data.surnames} ${data.dui??''} ${data.birth??''}`),phonetic(data.surnames),phonetic(data.givenNames)])).rows[0];
       const previous=(await c.query("SELECT valor_original FROM pacientes.identificador WHERE paciente_id=$1 AND tipo='dui' AND estado IN ('sin_verificar','verificado')",[id])).rows[0]?.valor_original??null;
@@ -117,7 +118,7 @@ export class PatientsService {
     return this.commands.run(actor,`pacientes.editar_demograficos:${id}:estado`,key,dto,async c=>{
       const old=(await c.query('SELECT estado,version FROM pacientes.paciente WHERE id=$1 FOR UPDATE',[id])).rows[0];
       if(!old)throw new NotFoundException('No se encontró el paciente.');
-      if(old.version!==dto.version)throw new ConflictException('La ficha cambió. Vuelve a abrirla.');
+      if(old.version!==dto.version)throw new VersionConflictException(old.version,'La ficha cambió. Vuelve a abrirla.');
       const state=dto.active?'activo':'inactivo';
       await c.query('UPDATE pacientes.paciente SET estado=$2,version=version+1 WHERE id=$1',[id,state]);
       await c.query('INSERT INTO pacientes.historial_demografico(paciente_id,version,actor_id,motivo,cambios) VALUES($1,$2,$3,$4,$5)',[id,old.version+1,actor.id,dto.reason,{estado:{before:old.estado,after:state}}]);

@@ -1,6 +1,6 @@
 # 121. Tareas
 
-- [ ] T01 · S1 · R · Proyecto Gradle con Compose, Hilt, red y pantalla de ingreso
+- [ ] T01 · S2 · R · Proyecto Gradle con Compose, Hilt, red y pantalla de ingreso
   - Cubre: FR-121-01, FR-121-02, FR-101-01
   - Depende de: ninguna
   - Hecho cuando: el APK de depuración inicia sesión contra Supabase de la nube
@@ -8,11 +8,11 @@
   - Cubre: FR-121-03, FR-121-07
   - Depende de: T01, 101-T03
   - Hecho cuando: escenario 1 pasa para los 7 roles de Android (criterio del avance)
-- [ ] T03 · S3 · R · Repositorio de Realtime e invalidación en ViewModels
+- [ ] T03 · S2 · R · Repositorio de Realtime e invalidación en ViewModels
   - Cubre: FR-121-04
   - Depende de: T02, 100-T03
   - Hecho cuando: un cambio de cama hecho en web aparece en el tablero Android sin recargar
-- [ ] T04 · S4 · E · Cola sin conexión del paramédico
+- [ ] T04 · S5 · E · Cola sin conexión del paramédico
   - Cubre: FR-121-06, FR-121-08
   - Depende de: T03, 109-T04
   - Hecho cuando: escenario 3 de la spec 109 pasa en modo avión

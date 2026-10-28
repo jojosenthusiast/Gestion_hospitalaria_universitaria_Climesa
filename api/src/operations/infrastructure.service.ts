@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { VersionConflictException } from '../platform/problem';
 import { Actor, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
@@ -41,7 +42,7 @@ export class InfrastructureService {
       if(id){
         const old=(await c.query('SELECT * FROM infra.espacio WHERE id=$1 FOR UPDATE',[id])).rows[0];
         if(!old)throw new NotFoundException('No se encontró el espacio.');
-        if(old.version!==dto.version)throw new ConflictException('El espacio cambió; vuelve a abrirlo.');
+        if(old.version!==dto.version)throw new VersionConflictException(old.version,'El espacio cambió; vuelve a abrirlo.');
         if(!dto.reason||dto.reason.trim().length<10)throw new BadRequestException('Indica el motivo del cambio.');
         if(old.tipo==='cama'&&(dto.parentId!==old.padre_id||dto.active===false||dto.type!=='cama')){
           const state=(await c.query('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1',[id])).rows[0]?.estado;

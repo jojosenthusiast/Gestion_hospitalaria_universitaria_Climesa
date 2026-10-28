@@ -1,6 +1,6 @@
 # 105. Tareas
 
-- [x] T01 · S3 · R · Migración de fila y citas con unicidad y exclusión
+- [x] T01 · S1 · R · Migración de fila y citas con unicidad y exclusión
   - Cubre: FR-105-01, FR-105-07
   - Depende de: 100-T03
   - Hecho cuando: escenarios 1 y 4 pasan como pruebas concurrentes
@@ -21,7 +21,7 @@
   - Cubre: FR-105-08
   - Depende de: T04, 101-T07
   - Hecho cuando: escenario 3 pasa
-- [ ] T06 · S4 · E · Pantalla pública de llamados y "no se presentó" automático
+- [ ] T06 · S5 · E · Pantalla pública de llamados y "no se presentó" automático
   - Cubre: FR-105-05, FR-105-11, FR-112-06
   - Depende de: T02, 112-T02
   - Hecho cuando: tres llamados sin presentarse cambian el estado; la pantalla pública no muestra nombres

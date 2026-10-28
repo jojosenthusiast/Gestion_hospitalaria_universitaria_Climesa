@@ -75,3 +75,78 @@ Solo el servidor recibe `DATABASE_URL` y la clave privada necesaria para invitac
 Las pruebas locales cubren HTTP, roles, migraciones, RLS, comandos y reglas de negocio con PGlite. PGlite usa un motor PostgreSQL con una sola conexión y no demuestra carreras multisesión; `compose.test.yaml` y el workflow `postgres-native` cubren ese entorno cuando se ejecuten con Docker. No hay Docker ni SDK móviles en este entorno. La cuenta conectada de Supabase no expone el proyecto CLIMESA: la migración nueva no fue aplicada en la nube y no hay una URL de API desplegada verificada.
 
 FCM, APNs, Storage clínico y operaciones clínicas de S3–S5 siguen fuera del corte construido. Figma se sincronizará después de cerrar la implementación, según el orden solicitado.
+
+---
+
+# Diseño objetivo del conjunto (planificación, ADR-0001 a ADR-0008)
+
+Las secciones siguientes describen el diseño completo del sistema, incluidos los módulos de semanas posteriores. Aplican a la API actual en Node.js + NestJS (ADR-024); CommandRunner en los textos de diseño corresponde a CommandService y las pruebas de arquitectura viven en pi/tests/architecture.spec.ts.
+
+## Diseño objetivo 1. Clientes con MVVM
+
+```mermaid
+flowchart LR
+  V[Vista<br/>Compose / SwiftUI / React] -- intenciones --> VM[ViewModel<br/>StateFlow / @Observable / hook]
+  VM -- estado inmutable --> V
+  VM --> R[Repositorio]
+  R -- async --> API2[Cliente HTTP de la API]
+  R -- suscripción --> RT2[Cliente Realtime de Supabase]
+  RT2 -- evento delgado --> R
+  R -- invalida y vuelve a pedir --> API2
+```
+
+- Android: corrutinas y `Flow`; Hilt para inyección; Room solo para la cola sin conexión del paramédico.
+- iOS: `async/await`, `@MainActor @Observable` en view models; protocolos para simular repositorios en pruebas.
+- Web: TanStack Query como caché; el evento de Realtime invalida la consulta correspondiente.
+
+## Diseño objetivo 2. Flujos clave de la defensa
+
+### Asignación concurrente de la última cama
+
+```mermaid
+sequenceDiagram
+  participant R1 as Recepción Android
+  participant R2 as Jefe Op. Web
+  participant API
+  participant DB
+  R1->>API: POST /admisiones/A/cama {cama: HAB-203-B}
+  R2->>API: POST /admisiones/B/cama {cama: HAB-203-B}
+  API->>DB: INSERT ocupación A (EXCLUDE)
+  API->>DB: INSERT ocupación B (EXCLUDE)
+  DB-->>API: A confirma
+  DB-->>API: B falla: conflicto de exclusión
+  API-->>R1: 200 asignada
+  API-->>R2: 409 "otra persona tomó esta cama" + siguiente sugerencia
+  DB-->>R2: Realtime cama.estado_cambiado (el tablero ya la muestra ocupada)
+```
+
+### Despacho de la única ambulancia con aviso previo a la llegada
+
+```mermaid
+sequenceDiagram
+  participant P as Paciente iOS
+  participant D as Despacho Web
+  participant A as Paramédico Android
+  participant E as Emergencia Android
+  participant API
+  P->>API: POST /ambulancia/solicitudes (por confirmar)
+  API-->>D: Realtime + sonido
+  D->>API: POST /ambulancia/servicios (bloqueo de la unidad)
+  API-->>A: push "servicio asignado"; estado En Servicio
+  A->>API: hitos: salida, en escena, trasladando
+  A->>API: POST prehospital (si no hay señal, se encola y se reenvía con la misma clave)
+  API-->>E: Realtime + push "llega en 8 min"
+  A->>API: hito en hospital, finalizado
+  API-->>D: Disponible
+  API-->>P: "la ambulancia llegó"
+```
+
+## Diseño objetivo 3. Seguridad en capas
+
+| Capa | Control |
+|---|---|
+| Transporte | HTTPS en todo; JWT de corta duración con renovación |
+| API | Permiso por endpoint, contexto de atención, filtrado de campos, idempotencia, límite de intentos de búsqueda |
+| Base de datos | RLS que niega acceso directo a `anon` y `authenticated`; rol de la API con mínimos privilegios; auditoría solo inserción |
+| Realtime | Canales privados autorizados por políticas sobre `realtime.messages`; mensajes sin datos personales |
+| Clientes | Sin llaves de servicio; sesión con cierre por inactividad; sin datos clínicos en disco salvo la cola cifrada del paramédico |

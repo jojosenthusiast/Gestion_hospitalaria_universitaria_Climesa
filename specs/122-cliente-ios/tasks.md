@@ -1,6 +1,6 @@
 # 122. Tareas
 
-- [ ] T01 · S1 · R · Proyecto Xcode con SwiftUI, paquetes y pantalla de ingreso
+- [ ] T01 · S2 · R · Proyecto Xcode con SwiftUI, paquetes y pantalla de ingreso
   - Cubre: FR-122-01, FR-122-02, FR-101-01
   - Depende de: ninguna
   - Hecho cuando: el simulador inicia sesión contra Supabase de la nube
@@ -8,7 +8,7 @@
   - Cubre: FR-122-03, FR-122-06
   - Depende de: T01, 101-T03
   - Hecho cuando: escenarios 1 y 2 pasan (criterio del avance)
-- [ ] T03 · S3 · R · Servicio de Realtime e invalidación en view models
+- [ ] T03 · S2 · R · Servicio de Realtime e invalidación en view models
   - Cubre: FR-122-04
   - Depende de: T02, 100-T03
   - Hecho cuando: el número de fila del paciente cambia en vivo al ser llamado

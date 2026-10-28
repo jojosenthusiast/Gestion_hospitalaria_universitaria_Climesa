@@ -1,14 +1,14 @@
 # 130. Tareas
 
-- [ ] T01 · S1 · R · Proyecto de pruebas con PostgreSQL real y ayudante de concurrencia
+- [ ] T01 · S3 · R · Proyecto de pruebas con PostgreSQL real y ayudante de concurrencia
   - Cubre: FR-130-02
   - Depende de: 100-T01
   - Hecho cuando: una prueba concurrente de ejemplo corre en local y en CI
-- [ ] T02 · S2 · R · Integración continua en GitHub
+- [ ] T02 · S3 · R · Integración continua en GitHub
   - Cubre: FR-130-03
   - Depende de: T01, 120-T01, 121-T01
   - Hecho cuando: un PR muestra el estado de todas las verificaciones
-- [x] T03 · S2 · R · Pruebas de arquitectura de módulos
+- [ ] T03 · S3 · R · Pruebas de arquitectura de módulos
   - Cubre: FR-130-05
   - Depende de: 100-T02
   - Hecho cuando: referenciar el interior de otro módulo rompe la compilación de pruebas
@@ -20,7 +20,7 @@
   - Cubre: FR-130-04
   - Depende de: T04
   - Hecho cuando: escenario 1 pasa contra la API desplegada
-- [ ] T06 · S3 · R · Lista de pruebas manuales por pantalla
+- [ ] T06 · S2 · R · Lista de pruebas manuales por pantalla
   - Cubre: FR-130-06
   - Depende de: ninguna
   - Hecho cuando: el equipo de pruebas tiene la lista generada

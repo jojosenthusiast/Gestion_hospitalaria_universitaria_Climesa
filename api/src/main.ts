@@ -6,6 +6,8 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { AppModule } from './app.module';
 import { ApiErrorsFilter } from './platform/errors.filter';
 import { CommandService } from './platform/command.service';
+/** FR-100-15: el registro de solicitudes solo lleva método, ruta sin consulta e id; nunca cuerpos, encabezados ni cookies. */
+export const requestLogging={serializers:{req:(r:{method:string;url:string;id:string})=>({method:r.method,url:r.url.split('?')[0],id:r.id})},redact:['req.headers.authorization','req.headers.cookie']};
 export function configureApplication(app:NestFastifyApplication) {
   const config=app.get(ConfigService);
   if(config.get('NODE_ENV')==='production'&&!config.get<string>('SUPABASE_URL')?.startsWith('https://'))throw new Error('Supabase requiere HTTPS en producción.');
@@ -22,7 +24,7 @@ export function configureApplication(app:NestFastifyApplication) {
   return document;
 }
 export async function createApplication() {
-  const app=await NestFactory.create<NestFastifyApplication>(AppModule,new FastifyAdapter({ logger:process.env.NODE_ENV==='production'?{serializers:{req:(r:{method:string;url:string;id:string})=>({method:r.method,url:r.url.split('?')[0],id:r.id})},redact:['req.headers.authorization','req.headers.cookie']}:false }));
+  const app=await NestFactory.create<NestFastifyApplication>(AppModule,new FastifyAdapter({ logger:process.env.NODE_ENV==='production'?requestLogging:false }));
   const document=configureApplication(app);
   return {app,document};
 }
