@@ -26,6 +26,7 @@
   - Cubre: FR-101-01, FR-101-02, FR-101-15
   - Depende de: T03, 120-T01, 121-T01, 122-T01
   - Hecho cuando: se ingresa con un usuario de cada rol en su plataforma y el paciente se registra en Android e iOS
+  - Avance 28-oct-2026 (solo web): `web/src/__tests__/acceso.test.tsx` (10 pruebas) verifica que MED y PAC ven "Tu rol no usa esta aplicación", que ADM entra al portal, el error de credenciales incorrectas, el error de red, y el registro (contraseña débil y contraseñas distintas no llaman a `signUp`; una válida lo llama una vez). Se comprobó por mutación que invertir la regla de plataforma rompe 3 pruebas. Existen 10 cuentas de demostración (una por rol, en la nube) para la prueba manual en `https://sghu-web.onrender.com`. **Sigue abierta**: faltan Android e iOS y el ingreso comprobado a mano con cada rol.
 - [ ] T07 · S3 · R · Vinculación de cuenta y verificación por recepción
   - Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11
   - Depende de: T05, 102-T03
