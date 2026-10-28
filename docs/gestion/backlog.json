@@ -428,7 +428,7 @@
     "FR-100-14",
     "FR-100-18"
    ],
-   "estado": "Por hacer",
+   "estado": "En curso",
    "pivote": false,
    "jira": "SCRUM-37",
    "orden": 5
@@ -3201,7 +3201,7 @@
    "componente": "BE",
    "resumen": "OpenAPI con permisos y endpoint de salud",
    "hecho_cuando": "`/openapi/v1.json` lista cada endpoint con `x-permiso` y `/salud` responde 200",
-   "estado": "Por hacer",
+   "estado": "Hecho",
    "cubre": "FR-100-13, FR-100-14",
    "depende": "T05",
    "nivel": "R",
