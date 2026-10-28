@@ -7,6 +7,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+/** Mensaje de error del API: `detail` de application/problem+json, con respaldo al formato anterior `error.message`. */
+internal fun apiErrorMessage(body:String):String?=runCatching {
+    val json=JSONObject(body)
+    json.optString("detail").takeIf{it.isNotBlank()}?:json.optJSONObject("error")?.optString("message")?.takeIf{it.isNotBlank()}
+}.getOrNull()
 class ApiClient(private val baseUrl:String,private val auth:SupabaseAuthRepository) {
     private val attempts=ConcurrentHashMap<String,String>()
     suspend fun request(path:String,method:String="GET",body:JSONObject?=null):Any=withContext(Dispatchers.IO) {
@@ -24,7 +29,7 @@ class ApiClient(private val baseUrl:String,private val auth:SupabaseAuthReposito
             body?.let { payload -> c.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) } }
             val status=c.responseCode
             val text=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}.orEmpty()
-            if(status !in 200..299){val message=runCatching{JSONObject(text).optJSONObject("error")?.optString("message")}.getOrNull();throw AuthRequestException(message?.takeIf{it.isNotBlank()}?:"No se pudo completar la operación (HTTP $status).",status)}
+            if(status !in 200..299){val message=apiErrorMessage(text);throw AuthRequestException(message?.takeIf{it.isNotBlank()}?:"No se pudo completar la operación (HTTP $status).",status)}
             attempts.remove(signature)
             if(text.isBlank())JSONObject()else JSONTokener(text).nextValue()
         } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("Sin conexión. Conservamos el formulario; vuelve a intentar.")} finally {c.disconnect()}

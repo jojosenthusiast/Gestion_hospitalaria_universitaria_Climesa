@@ -7,13 +7,13 @@ Abre `SGHU-CLIMESA.code-workspace`. Requiere Node.js 22; para Android, JDK 17 y 
 Desde la raíz:
 
 ```powershell
-Copy-Item backend/.env.example backend/.env
+Copy-Item api/.env.example api/.env
 Copy-Item web/.env.example web/.env
-npm ci --prefix backend
+npm ci --prefix api
 npm ci --prefix web
 ```
 
-Completa `backend/.env`: `DATABASE_URL` con acceso al rol `sghu_api` del proyecto CLIMESA y `SUPABASE_SECRET_KEY` o `SUPABASE_SERVICE_ROLE_KEY` para invitaciones. Usa TLS con verificación del certificado en la nube. No distribuyas esas variables a web o apps. `WEB_APP_URL=http://localhost:5173` configura CORS y la redirección de invitaciones.
+Completa `api/.env`: `DATABASE_URL` con acceso al rol `sghu_api` del proyecto CLIMESA y `SUPABASE_SECRET_KEY` o `SUPABASE_SERVICE_ROLE_KEY` para invitaciones. Usa TLS con verificación del certificado en la nube. No distribuyas esas variables a web o apps. `WEB_APP_URL=http://localhost:5173` configura CORS y la redirección de invitaciones.
 
 Para una base nueva aplica las migraciones y semilla mediante la CLI del proyecto correcto; consulta [deployment/README.md](deployment/README.md). La migración del 24 de octubre aún no se aplicó remotamente en esta revisión.
 
@@ -24,7 +24,7 @@ En Supabase Auth configura Site URL `http://localhost:5173` y la redirección `h
 Terminal → Run Task → **CLIMESA: Web + API**. También puedes usar dos terminales:
 
 ```powershell
-npm run start:dev --prefix backend
+npm run start:dev --prefix api
 ```
 
 ```powershell
@@ -40,8 +40,8 @@ npm run dev --prefix web
 ## Comprobar
 
 ```powershell
-npm test --prefix backend
-npm run build --prefix backend
+npm test --prefix api
+npm run build --prefix api
 npm run build --prefix web
 ```
 

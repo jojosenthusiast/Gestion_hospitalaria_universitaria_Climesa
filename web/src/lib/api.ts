@@ -1,5 +1,5 @@
 import type { components } from './generated/openapi';
-export type AccessProfile={id:string;user:{id:string;email?:string};email:string;name:string;roles:string[];platforms:string[];permissions:{code:string;context:string}[];channels:string[];patientId:string|null;staffId:string|null};
+export type AccessProfile={canInviteAdmin?:boolean;id:string;user:{id:string;email?:string};email:string;name:string;roles:string[];platforms:string[];permissions:{code:string;context:string}[];channels:string[];patientId:string|null;staffId:string|null};
 export type Patient={id:string;record:string;fullName:string;givenNames:string;surnames:string;state:string;active:boolean;sex:string;birth?:string|null;birthPrecision?:string;phone?:string|null;dui?:string|null;email?:string|null;address?:string|null;version:number;matchReason?:string;history?:{version:number;at:string;reason:string;changes:Record<string,{before:unknown;after:unknown}>}[]};
 export type Staff={id:string;givenNames:string;surnames:string;type:string;specialty?:string;areaId?:string;area?:string;phone?:string;dui?:string;active:boolean;version:number};
 export type Space={id:string;parentId:string|null;type:string;code:string;name:string;category?:string;capacity?:number;level?:number;active:boolean;version:number;path:string;totalBeds:number;freeBeds:number};

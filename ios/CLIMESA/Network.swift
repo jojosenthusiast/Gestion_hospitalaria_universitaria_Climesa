@@ -62,7 +62,8 @@ actor AuthService {
     }
     func signOut() async { revision+=1; refreshTask?.cancel(); refreshTask=nil; let saved=try? KeychainStore.load(); KeychainStore.clear(); if let saved { _ = try? await send("/auth/v1/logout?scope=local",[:],token:saved.access_token) } }
 }
-private struct APIErrorEnvelope:Decodable { struct Detail:Decodable { let message:String }; let error:Detail }
+/// application/problem+json (`detail`) con respaldo al formato anterior `error.message`.
+private struct APIErrorEnvelope:Decodable { struct Detail:Decodable { let message:String? }; let detail:String?; let error:Detail?; var text:String? { detail ?? error?.message } }
 actor APIClient {
     private let transport=URLSession(configuration:.ephemeral)
     private let config: AppConfiguration; private let auth: AuthService
@@ -75,7 +76,7 @@ actor APIClient {
         guard let http=response as? HTTPURLResponse else { throw ClientError.message("El servidor no respondió.") }
         guard (200..<300).contains(http.statusCode) else {
             if http.statusCode==401 { await auth.signOut(); throw ClientError.message("Tu sesión no está activa. Vuelve a ingresar.") }
-            let message=(try? JSONDecoder().decode(APIErrorEnvelope.self,from:data))?.error.message
+            let message=(try? JSONDecoder().decode(APIErrorEnvelope.self,from:data))?.text
             throw ClientError.message(message ?? "No se pudo consultar la información. Vuelve a intentar.")
         }
         return try JSONDecoder().decode(T.self,from:data)
