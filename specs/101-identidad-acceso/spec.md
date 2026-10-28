@@ -7,7 +7,7 @@
 Login y registro con roles en las tres plataformas (criterio del avance), con el personal creado por invitación y el paciente creando su propia cuenta que solo ve datos privados después de ser verificado.
 
 ## Alcance
-- Dentro: inicio de sesión con Supabase Auth, perfil y permisos (`/me`), invitación del personal, roles y su asignación, desactivación, registro del paciente, vinculación con expediente y su verificación, catálogo de roles y permisos como datos, canales de Realtime permitidos en el token.
+- Dentro: inicio de sesión con Supabase Auth, perfil y permisos (`/auth/me`), invitación del personal, roles y su asignación, desactivación, registro del paciente, vinculación con expediente y su verificación, catálogo de roles y permisos como datos, canales de Realtime permitidos en el token.
 - Fuera: doble factor (F), inicio de sesión con proveedores externos (F).
 
 ## Requisitos
@@ -16,7 +16,7 @@ Login y registro con roles en las tres plataformas (criterio del avance), con el
 |---|---|---|---|
 | FR-101-01 | El sistema debe permitir iniciar sesión con correo y contraseña en web, Android e iOS mediante Supabase Auth. | R | REQ-PLT-01 a 03; avance |
 | FR-101-02 | Cuando una persona crea una cuenta desde la app móvil, el sistema debe darle el rol Paciente sin acceso a datos personales ni clínicos. | R | D-032; avance "Register" |
-| FR-101-03 | Cuando un usuario autenticado consulta `/me`, el sistema debe devolver su nombre, roles, permisos efectivos, plataformas permitidas y canales de tiempo real. | R | ADR-0004 |
+| FR-101-03 | Cuando un usuario autenticado consulta `/auth/me`, el sistema debe devolver su nombre, roles, permisos efectivos, plataformas permitidas y canales de tiempo real. | R | ADR-0004 |
 | FR-101-04 | Si un usuario inicia sesión en una plataforma que su rol no usa, entonces el cliente debe mostrar "Tu rol no usa esta aplicación" y cerrar la sesión. | R | D-052 |
 | FR-101-05 | Cuando el Administrador invita a una persona del personal, el sistema debe crear su cuenta, enlazarla con su registro de personal y enviarle el enlace para definir contraseña. | R | D-050, D-053 |
 | FR-101-06 | El sistema debe impedir que un usuario se asigne roles a sí mismo o se quite el último Administrador. | R | RN-38 |
