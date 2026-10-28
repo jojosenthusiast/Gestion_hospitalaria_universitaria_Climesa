@@ -1,4 +1,4 @@
-﻿# Despliegue de la API en Render (100-T08)
+# Despliegue de la API en Render (100-T08)
 
 Qué hace `render.yaml` (en la raíz, donde Render lo busca): publica `sghu-api` (Docker, `api/`) y `sghu-web` (sitio estático, `web/`). Render usa `/salud` como health check (responde 503 si la base no conecta, y el despliegue se marca fallido) y inyecta `PORT`; la API ya escucha en `0.0.0.0`.
 
@@ -27,4 +27,13 @@ Se compila con `npm ci && npm run build` y las variables `VITE_*` quedan **dentr
 
 `GET https://<servicio>.onrender.com/salud` → 200 con la base de Supabase conectada. El plan `free` duerme tras 15 minutos sin tráfico; la primera llamada tarda ~1 minuto.
 
+## Mantener la API despierta (plan free)
 
+El plan `free` duerme la API tras 15 minutos sin tráfico y la primera llamada tarda ~1 minuto. Para ambulancia eso es un riesgo: el paramédico puede ser quien llame cuando nadie más tiene la web abierta (la web consulta `/eventos` cada 5 s mientras hay una sesión abierta, pero sin sesiones no hay tráfico).
+
+Mitigación sin costo:
+
+1. Crea un monitor externo gratuito (UptimeRobot, cron-job.org u otro) con `GET https://sghu-api.onrender.com/salud` cada 5 minutos.
+2. `/salud` ejecuta `SELECT 1`, así que también mantiene activa la base de Supabase.
+
+Límites: el ping reduce el riesgo pero no lo elimina (un reinicio de Render sigue costando ~1 minuto). Para uso real con ambulancias, cambiar `plan: free` a `plan: starter` en `render.yaml` (instancia de pago, siempre encendida).
