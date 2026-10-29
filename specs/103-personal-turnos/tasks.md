@@ -38,10 +38,11 @@
   - Cubre: FR-103-12
   - Depende de: T06
   - Hecho cuando: escenario 5 pasa contra `/publico/medicos-de-turno`
-- [ ] T09 · S5 · E · Aviso de horas semanales con justificación
+- [x] T09 · S5 · E · Aviso de horas semanales con justificación
   - Cubre: FR-103-07
   - Depende de: T03
   - Hecho cuando: el turno que pasa de 44 h pide justificación y se guarda
+  - Verificado: 29-oct-2026 npm test -- --ci en api/: personal-turnos.spec.ts (9 pruebas, 3 de horas semanales): el turno que lleva la semana a 48 h diurnas da 409 horas_semanales_excedidas sin justificación de 10 caracteres y con ella se guarda con advertencias, justificación y auditoría; 44 h exactas, turnos nocturnos y otra semana no piden nada; mover a una semana saturada también la exige; 197 pruebas pasadas, 0 fallidas
 
 
 ## Verificación del corte 0.3.0 · 24-oct-2026

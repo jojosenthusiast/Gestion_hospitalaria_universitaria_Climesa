@@ -151,6 +151,19 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
         const nextRest=dto.type==='guardia'&&hours>=24?rest.tras_guardia_24h:rest.min_horas;
         if(a>=end.valueOf()&&(a-end.valueOf())/3600000<nextRest)throw new ConflictException(`Necesita al menos ${nextRest} horas de descanso antes del siguiente turno.`);
       }
+      // FR-103-07 / RN-14: aviso, no bloqueo, de más de 44 h diurnas por semana (lunes a domingo, 06:00-22:00 local); excederlas exige justificación.
+      const warnings:{codigo:string;horasSemana:number;limite:number}[]=[];
+      if(dto.state!=='cancelado'){
+        const limit=(await this.policies.value<{aviso_diurnas:number}>(c,'turnos.horas_semanales',start)).aviso_diurnas;
+        const first=weekStart(start).valueOf(),last=weekStart(new Date(end.valueOf()-1)).valueOf()+7*DAY;
+        const others=(await c.query("SELECT lower(periodo) AS start,upper(periodo) AS \"end\" FROM personal.turno WHERE persona_id=$1 AND estado<>'cancelado' AND ($2::uuid IS NULL OR id<>$2) AND periodo && tstzrange($3::timestamptz,$4::timestamptz)",[dto.staffId,id,new Date(first),new Date(last)])).rows.map(o=>[new Date(o.start).valueOf(),new Date(o.end).valueOf()]);
+        for(let week=first;week<last;week+=7*DAY){
+          const within=(a:number,b:number)=>daytimeHours(Math.max(a,week),Math.min(b,week+7*DAY));
+          const own=within(start.valueOf(),end.valueOf()),total=Math.round((own+others.reduce((sum,[a,b])=>sum+within(a,b),0))*100)/100;
+          if(own>0&&total>limit)warnings.push({codigo:'horas_semanales_excedidas',horasSemana:total,limite:limit});
+        }
+        if(warnings.length&&(dto.justification?.trim().length??0)<10)throw new ProblemException('horas_semanales_excedidas',409,`La persona suma ${warnings[0].horasSemana} horas diurnas en la semana, más de las ${limit} permitidas sin aviso; indica una justificación de al menos 10 caracteres.`,'justification',{horasSemana:warnings[0].horasSemana,limite:limit});
+      }
       let row;
       if(id){
         const old=(await c.query('SELECT version FROM personal.turno WHERE id=$1 FOR UPDATE',[id])).rows[0];
@@ -159,10 +172,10 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
         if(!dto.reason||dto.reason.trim().length<10)throw new BadRequestException('Indica el motivo del cambio.');
         row=(await c.query("UPDATE personal.turno SET persona_id=$2,area_id=$3,periodo=tstzrange($4,$5,'[)'),tipo=$6,justificacion=$7,estado=coalesce($8,estado),version=version+1 WHERE id=$1 RETURNING id,version",[id,dto.staffId,dto.areaId,start,end,dto.type,dto.justification||null,dto.state||null])).rows[0];
       }else row=(await c.query("INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,justificacion,creado_por) VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7) RETURNING id,version",[dto.staffId,dto.areaId,start,end,dto.type,dto.justification||null,actor.id])).rows[0];
-      await this.commands.audit(c,actor,{action:id?'turnos.mover':'turnos.crear',entity:'turno',entityId:row.id,permission:'turnos.planificar',reason:dto.reason});
+      await this.commands.audit(c,actor,{action:id?'turnos.mover':'turnos.crear',entity:'turno',entityId:row.id,permission:'turnos.planificar',reason:dto.reason,...(warnings.length?{detail:{horasSemana:warnings[0].horasSemana,limite:warnings[0].limite,justificacion:dto.justification!.trim()}}:{})});
       const accounts=(await c.query('SELECT id FROM acceso.usuario WHERE persona_personal_id=$1',[dto.staffId])).rows;
       await this.commands.event(c,'turno.actualizado','turno',row.id,row.version,['rol:JOP','rol:ADM',...accounts.map(a=>`usuario:${a.id}`)]);
-      return row;
+      return {...row,advertencias:warnings};
     });
   }
 }

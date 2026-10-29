@@ -136,4 +136,45 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   current=new Date('2026-10-24T12:00:00Z');
   expect((await fixture.pg.query<any>("SELECT estado FROM personal.turno WHERE id=$1",[draft.id])).rows[0].estado).toBe('borrador');
  });
+
+ // FR-103-07 / RN-14: más de 44 h diurnas (06:00-22:00) en la semana de lunes a domingo.
+ const weekdays=['2026-11-23','2026-11-24','2026-11-25','2026-11-26','2026-11-27'];
+ const fillWeek=async(staffId:string)=>{for(const day of weekdays)expect((await shift(staffId,local(day,'07:00'),local(day,'15:00'),{areaId})).status).toBe(201);};
+
+ test('el turno que pasa de 44 h diurnas exige justificación y, con ella, se guarda y queda en auditoría',async()=>{
+  const p=await person('asistente');await fillWeek(p.id);
+  const body=(over:Record<string,unknown>={})=>({staffId:p.id,areaId,type:'diurno',start:local('2026-11-28','07:00'),end:local('2026-11-28','15:00'),...over});
+  const missing=await call('JOP','POST','/turnos',body());
+  expect(missing.status).toBe(409);expect(missing.body.codigo).toBe('horas_semanales_excedidas');
+  expect(missing.body.horasSemana).toBe(48);expect(missing.body.limite).toBe(44);
+  expect((await call('JOP','POST','/turnos',body({justification:'corta'}))).status).toBe(409);
+  const ok=await call('JOP','POST','/turnos',body({justification:'Cobertura por incapacidad de una compañera'}));
+  expect(ok.status).toBe(201);expect(ok.body.advertencias).toEqual([{codigo:'horas_semanales_excedidas',horasSemana:48,limite:44}]);
+  const saved=(await fixture.pg.query<any>("SELECT justificacion FROM personal.turno WHERE id=$1",[ok.body.id])).rows[0];
+  expect(saved.justificacion).toBe('Cobertura por incapacidad de una compañera');
+  const audit=(await fixture.pg.query<any>("SELECT detalle FROM plataforma.auditoria WHERE accion='turnos.crear' AND entidad_id=$1",[ok.body.id])).rows[0];
+  expect(audit.detalle).toMatchObject({horasSemana:48,limite:44,justificacion:'Cobertura por incapacidad de una compañera'});
+ });
+
+ test('exactamente 44 h, las horas nocturnas y otra semana no piden justificación',async()=>{
+  const p=await person('asistente');await fillWeek(p.id);
+  // 18:00-02:00 aporta 4 h diurnas: 40 + 4 = 44, no excede.
+  expect((await shift(p.id,local('2026-11-28','18:00'),local('2026-11-29','02:00'),{areaId,type:'nocturno'})).status).toBe(201);
+  const night=await person('asistente');await fillWeek(night.id);
+  // Turno nocturno 22:00-06:00: cero horas diurnas.
+  const n=await shift(night.id,local('2026-11-28','22:00'),local('2026-11-29','06:00'),{areaId,type:'nocturno'});
+  expect(n.status).toBe(201);expect(n.body.advertencias).toEqual([]);
+  // Lunes siguiente pertenece a otra semana.
+  expect((await shift(p.id,local('2026-11-30','07:00'),local('2026-11-30','15:00'),{areaId})).status).toBe(201);
+ });
+
+ test('mover un turno a una semana saturada también exige justificación; cancelar no',async()=>{
+  const p=await person('asistente');await fillWeek(p.id);
+  const extra=(await shift(p.id,local('2026-12-05','07:00'),local('2026-12-05','15:00'),{areaId})).body;
+  const move=(over:Record<string,unknown>)=>call('JOP','PATCH',`/turnos/${extra.id}`,{staffId:p.id,areaId,type:'diurno',start:local('2026-11-28','07:00'),end:local('2026-11-28','15:00'),version:1,reason:'Reprogramación de turno de prueba',...over});
+  const refused=await move({});expect(refused.status).toBe(409);expect(refused.body.codigo).toBe('horas_semanales_excedidas');
+  expect((await move({justification:'Refuerzo autorizado por la jefatura'})).status).toBe(200);
+  const cancel=await call('JOP','PATCH',`/turnos/${extra.id}`,{staffId:p.id,areaId,type:'diurno',start:local('2026-11-28','07:00'),end:local('2026-11-28','15:00'),version:2,state:'cancelado',reason:'Cancelación del refuerzo de prueba'});
+  expect(cancel.status).toBe(200);
+ });
 });
