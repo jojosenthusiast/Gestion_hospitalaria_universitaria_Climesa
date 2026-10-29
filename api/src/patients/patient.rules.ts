@@ -25,3 +25,25 @@ export function validateDemographics(data: Demographics, today: Date): Demograph
   if (data.provisional && (!Number.isInteger(data.estimatedAge) || data.estimatedAge!<0 || data.estimatedAge!>120 || (data.description?.trim().length ?? 0)<10)) throw new BadRequestException('Una identidad provisional necesita edad estimada y señas de al menos diez caracteres.');
   return {...data, givenNames: data.givenNames?.trim() ?? '', surnames: data.surnames?.trim() ?? '', dui: data.dui ? data.dui.replace(/-/g,'') : null, birth: data.birth || null, phone: data.phone?.replace(/-/g,'') || null};
 }
+
+export type MatchEvidence = { query: string; fullName: string; record: string; dui?: string | null; birth?: string | null };
+/** FR-102-01: motivos reales por los que un paciente aparece en la búsqueda, en el orden documento, expediente, fecha, nombre o fonética. */
+export function matchReasons(e: MatchEvidence): string[] {
+  const query = e.query.trim();
+  if (!query) return ['Listado sin criterio de búsqueda'];
+  const reasons: string[] = [];
+  const digits = query.replace(/\D/g,'');
+  if (digits.length>=4 && (e.dui??'').replace(/\D/g,'').includes(digits)) reasons.push('Coincidencia de documento');
+  if (e.record.toLowerCase().includes(query.toLowerCase())) reasons.push('Coincidencia de expediente');
+  if (e.birth && e.birth===query) reasons.push('Coincidencia de fecha de nacimiento');
+  const words = normalize(query).split(' ').filter(Boolean);
+  const name = normalize(e.fullName);
+  if (words.length && words.every(w=>name.includes(w))) reasons.push('Coincidencia de nombre');
+  else if (words.length && words.every(w=>phonetic(e.fullName).includes(phonetic(w)))) reasons.push('Coincidencia fonética');
+  return reasons.length ? reasons : ['Coincidencia de datos'];
+}
+/** FR-102-05: al editar, una fecha estimada (o aproximada) no se vuelve exacta si quien edita no la cambia. */
+export function birthPrecision(previous: { birth: string | null; precision: string }, birth: string | null): string {
+  if (!birth) return previous.precision==='estimada' ? 'estimada' : 'desconocida';
+  return birth===previous.birth && ['estimada','anio','anio_mes'].includes(previous.precision) ? previous.precision : 'exacta';
+}
