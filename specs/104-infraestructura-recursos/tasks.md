@@ -25,6 +25,7 @@
   - Cubre: FR-104-07, FR-104-09, FR-104-10, FR-104-11
   - Depende de: T03
   - Hecho cuando: escenario 3 pasa en Android con el tablero web abierto
+  - Avance 29-oct-2026 (API y web): `POST /camas/:id/bloquear`, `desbloquear`, `limpieza`, `limpieza/completar` y `limpieza/verificar` con versión, motivo, auditoría y evento `cama.estado_cambiado`; `api/tests/core.integration.spec.ts` cubre las transiciones y `web/src/__tests__/spaces.test.tsx` las acciones del tablero. **Sigue abierta**: falta el escenario 3 en Android con el tablero web abierto.
 - [ ] T07 · S5 · E · Equipo médico por espacio
   - Cubre: FR-104-12
   - Depende de: T01
