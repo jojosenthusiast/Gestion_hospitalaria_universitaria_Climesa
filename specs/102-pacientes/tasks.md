@@ -10,7 +10,7 @@
   - Depende de: T01
   - Hecho cuando: pruebas de dominio del legado pasan en el módulo nuevo
   - Verificado: 28-oct-2026 `api/tests/patients.service.spec.ts` y `api/tests/patients-dominio.spec.ts`: claves fonéticas y acentos, DUI válido e inválido (sin guion al guardar), expediente ISO 7064 MOD 11-2 para varias secuencias y tres vectores públicos, reglas de nombre, teléfono y correo, identidad provisional con caso positivo y límites de edad. 151 de 151 pruebas pasan en `api/`. No hay un conjunto "del legado" en el repositorio contra el cual compararlas; el criterio se cumple con estas pruebas del dominio.
-- [ ] T03 · S2 · R · CRUD: buscar, registrar tras buscar, ver, editar con historial, inactivar
+- [x] T03 · S2 · R · CRUD: buscar, registrar tras buscar, ver, editar con historial, inactivar
   - Cubre: FR-102-01, FR-102-02, FR-102-06, FR-102-07, FR-102-08, FR-102-11
   - Depende de: T02, 100-T05
   - Hecho cuando: escenarios 1, 2 y 4 pasan como pruebas de integración
