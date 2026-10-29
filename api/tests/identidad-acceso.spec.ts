@@ -97,7 +97,7 @@ describe('Spec 101 — identidad, canales y ciclo de vida de cuentas',()=>{
   const before=(await denied()).length;
   const response=await call('ADM','PATCH',`/usuarios/${userId('ADM')}/roles`,{roles:['ADM','PAC'],version:await version('ADM'),reason:'Prueba de autoasignación'});
   expect(response.status).toBe(403);
-  const rows=await denied();expect(rows.length).toBeGreaterThan(before);expect(rows.at(-1)?.resultado).toBe('denegado');
+  const rows=await denied();expect(rows.length-before).toBe(1);expect(rows.at(-1)?.resultado).toBe('denegado');
   expect((await fixture.pg.query<{n:number}>("SELECT count(*)::int AS n FROM acceso.asignacion_rol WHERE usuario_id=$1 AND rol_codigo='PAC'",[userId('ADM')])).rows[0].n).toBe(0);
  });
 });
