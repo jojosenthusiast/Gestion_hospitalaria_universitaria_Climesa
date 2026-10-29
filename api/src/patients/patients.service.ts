@@ -6,7 +6,7 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
 import { Clock } from '../platform/clock';
 import { PatientCreateDto, PatientUpdateDto, PatientStateDto } from './patient-write.dto';
-import { birthPrecision, matchReasons, normalize, phonetic, recordNumber, validateDemographics } from './patient.rules';
+import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateDemographics } from './patient.rules';
 type Row = Record<string, any>;
 @Injectable()
 export class PatientsService {
@@ -92,7 +92,28 @@ export class PatientsService {
       if(data.dui)await c.query("INSERT INTO pacientes.identificador(paciente_id,tipo,emisor,valor_original,valor_normalizado,exclusivo) VALUES($1,'dui','RNPN',$2,$3,true)",[row.id,`${data.dui.slice(0,8)}-${data.dui[8]}`,data.dui]);
       await this.commands.audit(c,actor,{action:'pacientes.registrar',entity:'paciente',entityId:row.id,patientId:row.id,permission});
       await this.commands.event(c,'paciente.creado','paciente',row.id,1,['rol:REC','rol:JOP']);
+      await this.openDuplicateCases(c,actor,{id:row.id,fonApellido:phonetic(data.surnames),fonNombres:phonetic(data.givenNames),nacimiento:data.birth});
       return {id:row.id,record:recordNumber(seq),version:1};
+    });
+  }
+  /** FR-102-09: un registro parecido abre caso para revisión; nunca fusiona ni impide el registro. */
+  private async openDuplicateCases(c:PoolClient,actor:Actor,created:DuplicateKey) {
+    if(!created.nacimiento)return;
+    const similar=(await c.query('SELECT id,fon_apellido AS "fonApellido",fon_nombres AS "fonNombres",nacimiento::text AS nacimiento FROM pacientes.paciente WHERE id<>$1 AND fon_apellido=$2 AND fon_nombres=$3 AND nacimiento=$4 ORDER BY id',[created.id,created.fonApellido,created.fonNombres,created.nacimiento])).rows as DuplicateKey[];
+    for(const other of similar.filter(o=>isPossibleDuplicate(created,o))){
+      const opened=(await c.query("INSERT INTO pacientes.caso_duplicado(pacientes_ids,motivo,abierto_por,abierto_en) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING id",[canonicalPair(created.id,other.id),'Mismo apellido y nombres fonéticos y misma fecha de nacimiento.',actor.id,this.clock.now()])).rows[0];
+      if(!opened)continue;
+      await this.commands.audit(c,actor,{action:'pacientes.caso_duplicado.abrir',entity:'caso_duplicado',entityId:opened.id,permission:'pacientes.registrar'});
+      await this.commands.event(c,'caso_duplicado.abierto','caso_duplicado',opened.id,1,['rol:REC']);
+    }
+  }
+  async duplicateCases(actor:Actor,limit=50) {
+    return this.db.transaction(async c=>{
+      const rows=(await c.query(`SELECT d.id,d.estado,d.motivo,d.abierto_en,
+        (SELECT json_agg(json_build_object('id',p.id,'record',p.expediente,'fullName',coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional)) ORDER BY p.id) FROM pacientes.paciente p WHERE p.id=ANY(d.pacientes_ids)) AS patients
+        FROM pacientes.caso_duplicado d WHERE d.estado IN ('sospechado','en_revision') ORDER BY d.abierto_en DESC,d.id LIMIT $1`,[limit])).rows;
+      await this.commands.audit(c,actor,{action:'pacientes.casos_duplicado',entity:'caso_duplicado',permission:'pacientes.gestionar_duplicados',detail:{count:rows.length}});
+      return rows.map(r=>({id:r.id,state:r.estado,reason:r.motivo,openedAt:r.abierto_en,patients:r.patients}));
     });
   }
   async update(actor:Actor,id:string,dto:PatientUpdateDto,key?:string) {

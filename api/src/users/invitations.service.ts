@@ -49,7 +49,7 @@ export class InvitationsService {
     });
   }
   async changeRoles(actor:Actor,id:string,dto:UserRolesDto,key?:string){
-    if(id===actor.id){await this.commands.denied(actor,'usuarios.asignar_roles','PATCH',`usuarios/${id}/roles`);throw new ForbiddenException('No puedes asignarte o quitarte roles a ti mismo.');}
+    if(id===actor.id){throw new ForbiddenException('No puedes asignarte o quitarte roles a ti mismo.');}
     return this.commands.run(actor,`usuarios.asignar_roles:${id}`,key,dto,async c=>{
       await c.query('SELECT pg_advisory_xact_lock(671001)');
       const old=(await c.query('SELECT version,persona_personal_id FROM acceso.usuario WHERE id=$1 FOR UPDATE',[id])).rows[0];

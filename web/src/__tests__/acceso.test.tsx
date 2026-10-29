@@ -25,12 +25,13 @@ function perfil(roles: string[], platforms: string[]): AccessProfile {
   };
 }
 
-// La API real se alcanza con fetch: devolvemos el perfil para /auth/me y vacío para el resto.
+// La API real se alcanza con fetch: devolvemos el perfil para /auth/me. Las demás consultas
+// (el tablero del portal) quedan pendientes: responderles `{}` hacía que el tablero llamara a
+// formatDateTime(undefined) y la prueba fallara de forma intermitente según el momento del render.
 function responderPerfil(profile: AccessProfile) {
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(
-    JSON.stringify(String(url).endsWith('/auth/me') ? profile : {}),
-    { status: 200, headers: { 'Content-Type': 'application/json' } },
-  )));
+  vi.stubGlobal('fetch', vi.fn((url: string) => String(url).endsWith('/auth/me')
+    ? Promise.resolve(new Response(JSON.stringify(profile), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    : new Promise<Response>(() => {})));
 }
 
 function irA(path: string) { window.history.pushState({}, '', path); }

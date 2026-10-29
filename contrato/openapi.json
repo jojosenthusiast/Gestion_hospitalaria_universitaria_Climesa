@@ -120,6 +120,46 @@
         "x-permiso": "pacientes.buscar"
       }
     },
+    "/api/v1/pacientes/casos-duplicado": {
+      "get": {
+        "operationId": "PatientsController_duplicateCases",
+        "parameters": [
+          {
+            "name": "query",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 2,
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Casos abiertos de posible duplicado con los dos pacientes mínimos",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.gestionar_duplicados"
+      }
+    },
     "/api/v1/pacientes/{id}": {
       "get": {
         "operationId": "PatientsController_get",
