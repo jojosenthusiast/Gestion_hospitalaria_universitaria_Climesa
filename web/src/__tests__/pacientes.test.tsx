@@ -132,7 +132,7 @@ describe('edición y estado', () => {
   });
 
   it('un conflicto de versión pide recargar la ficha en vez de un error genérico', async () => {
-    montar({ escritura: async () => { throw new ApiError('La ficha cambió. Vuelve a abrirla antes de guardar.', 409); } });
+    montar({ escritura: async () => { throw new ApiError('La ficha cambió. Vuelve a abrirla antes de guardar.', 409, 'version_conflicto', 4); } });
     const dialogo = await abrirEdicion();
     await userEvent.type(within(dialogo).getByLabelText(/Motivo de la corrección/), 'motivo suficiente');
     await userEvent.click(within(dialogo).getByRole('button', { name: /Guardar corrección/ }));

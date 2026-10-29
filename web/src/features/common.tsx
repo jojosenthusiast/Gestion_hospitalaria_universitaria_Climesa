@@ -20,7 +20,7 @@ export function RemoteState<T>({state,children}:{state:Remote<T>;children:(data:
  return <>{state.loading&&<p className="refresh-hint" role="status">Actualizando…</p>}{children(state.data)}</>;
 }
 export function Empty({title,description}:{title:string;description:string}){return <div className="empty-state"><Icon name="search" size={26}/><h2>{title}</h2><p>{description}</p></div>;}
-export function WriteError({error}:{error:ApiError|null}){return error?<Notice kind="error">{error.status===409?`${error.message} Conservamos lo que escribiste; cierra y vuelve a abrir el registro para cargar su estado actual.`:error.message}</Notice>:null;}
+export function WriteError({error}:{error:ApiError|null}){return error?<Notice kind="error">{isVersionConflict(error)?`${error.message} Conservamos lo que escribiste; cierra y vuelve a abrir el registro para cargar su estado actual.`:error.message}</Notice>:null;}
 export function Dialog({title,onClose,busy=false,children}:{title:string;onClose:()=>void;busy?:boolean;children:ReactNode}){
  const ref=useRef<HTMLDialogElement>(null);
  useEffect(()=>{const node=ref.current;node?.showModal();return()=>{node?.close();};},[]);
@@ -31,6 +31,6 @@ export const formatDateTime=(s:string)=>new Intl.DateTimeFormat('es-SV',{dateSty
 const statusNames:Record<string,string>={activo:'Activo',inactivo:'Inactivo',provisional:'Provisional',libre:'Libre',ocupada:'Ocupada',reservada:'Reservada',limpieza:'En limpieza',bloqueada:'Bloqueada',borrador:'Borrador',publicado:'Publicado',en_curso:'En curso',completado:'Completado',cancelado:'Cancelado',desactivado:'Desactivado',exito:'Correcto',denegado:'Denegado',fallido:'Fallido'};
 export function Tag({value}:{value:string}){return <span className={`status-tag status-${value}`}>{statusNames[value]??value}</span>;}
 export function Select({label,value,onChange,children,required=false,disabled=false}:{label:string;value:string;onChange:(v:string)=>void;children:ReactNode;required?:boolean;disabled?:boolean}){return <label className="select-field"><span>{label}</span><select value={value} onChange={e=>onChange(e.target.value)} required={required} disabled={disabled}>{children}</select></label>;}
-/** FR-102-07: la API responde 409 `version_conflicto` con la leyenda "La ficha cambió…"; ApiError aún no expone el código, así que se reconoce por el mensaje. */
-export const isVersionConflict=(e:ApiError|null)=>e?.status===409&&/^La ficha cambió/.test(e.message);
+/** FR-102-07: la API responde 409 con `codigo` `version_conflicto` y `versionActual`; se reconoce por esos datos, no por el texto. */
+export const isVersionConflict=(e:ApiError|null)=>e?.status===409&&(e.code==='version_conflicto'||e.currentVersion!==undefined);
 export function SaveButton({busy,label='Guardar cambios',disabled=false}:{busy:boolean;label?:string;disabled?:boolean}){return <button className="primary-button" disabled={busy||disabled} type="submit"><span>{busy?'Guardando…':label}</span>{busy?<span className="spinner"/>:<Icon name="arrow" size={18}/>}</button>;}
