@@ -29,10 +29,11 @@
   - Cubre: FR-102-05
   - Depende de: T03, 109-T04
   - Hecho cuando: escenario 3 pasa en Android
-- [ ] T07 · S5 · E · Casos de posible duplicado
+- [x] T07 · S5 · E · Casos de posible duplicado
   - Cubre: FR-102-09
   - Depende de: T03
   - Hecho cuando: un registro parecido abre caso y no fusiona
+  - Verificado: 28-oct-2026 `api/tests/patients-duplicados.spec.ts` (24 pruebas): al registrar un paciente con la misma clave fonética de apellido y nombres y la misma fecha de nacimiento que otro, se abre exactamente un caso `sospechado` en `pacientes.caso_duplicado`, ambos pacientes siguen activos y la respuesta de registro no cambia; una fecha o fonética distinta no abre caso; un DUI repetido sigue dando 409 sin caso; el reintento con la misma clave de idempotencia no duplica el caso; el par se guarda ordenado, por lo que el índice único impide repetirlo. `GET /api/v1/pacientes/casos-duplicado` lista los casos abiertos solo para JOP y REC (los demás roles reciben 403) y audita cada lectura. Sin migración nueva: usa la tabla existente. 175 de 175 pruebas pasan. Alcance: no hay pantalla para revisar los casos ni cambio de estado (descartar o confirmar); quedan para una historia posterior.
 
 
 ## Verificación del corte 0.3.0 · 24-oct-2026
