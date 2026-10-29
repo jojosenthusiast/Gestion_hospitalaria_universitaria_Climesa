@@ -6,7 +6,7 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
 import { Clock } from '../platform/clock';
 import { PatientCreateDto, PatientUpdateDto, PatientStateDto } from './patient-write.dto';
-import { normalize, phonetic, recordNumber, validateDemographics } from './patient.rules';
+import { birthPrecision, matchReasons, normalize, phonetic, recordNumber, validateDemographics } from './patient.rules';
 type Row = Record<string, any>;
 @Injectable()
 export class PatientsService {
@@ -19,7 +19,7 @@ export class PatientsService {
       WHERE ($1::text[]='{}' OR p.busqueda_normalizada LIKE ALL($1) OR (p.fon_apellido||' '||p.fon_nombres) LIKE ALL($2)
         OR p.expediente ILIKE $3 OR regexp_replace(coalesce(i.valor_original,''),'[^0-9]','','g') LIKE $4 OR p.nacimiento::text=$5)
       AND ($6::text IS NULL OR p.estado=$6) ORDER BY p.nombres,p.primer_apellido,p.id LIMIT $7`,[words,sounds,`%${query.trim()}%`,query.replace(/\D/g,'').length>=4?`%${query.replace(/\D/g,'')}%`:'!no-document!',query,state??null,limit])).rows;
-    return rows.map(p=>({ id:p.id, record:p.expediente, fullName:this.name(p), givenNames:p.nombres??p.alias_provisional??'', surnames:[p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' '), state:p.estado, active:p.estado!=='inactivo', sex:p.sexo, birth:p.nacimiento, version:p.version, matchReason:words.every(t=>p.busqueda_normalizada.includes(t.slice(1,-1)))?'Coincidencia de datos':'Coincidencia fonética o identificador' }));
+    return rows.map(p=>({ id:p.id, record:p.expediente, fullName:this.name(p), givenNames:p.nombres??p.alias_provisional??'', surnames:[p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' '), state:p.estado, active:p.estado!=='inactivo', sex:p.sexo, birth:p.nacimiento, version:p.version, matchReason:matchReasons({query,fullName:this.name(p),record:p.expediente,dui:p.dui,birth:p.nacimiento}).join(', ') }));
   }
   private name(p:Row) { return [p.nombres,p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' ')||p.alias_provisional; }
   async search(actor:Actor, query:string|undefined, limit=50, state?:string) {
@@ -98,11 +98,11 @@ export class PatientsService {
   async update(actor:Actor,id:string,dto:PatientUpdateDto,key?:string) {
     const data=validateDemographics(dto,this.clock.now());
     return this.commands.run(actor,`pacientes.editar_demograficos:${id}`,key,dto,async c=>{
-      const old=(await c.query('SELECT * FROM pacientes.paciente WHERE id=$1 FOR UPDATE',[id])).rows[0];
+      const old=(await c.query('SELECT *,nacimiento::text AS nacimiento_texto FROM pacientes.paciente WHERE id=$1 FOR UPDATE',[id])).rows[0];
       if(!old)throw new NotFoundException('No se encontró el paciente.');
       if(old.version!==dto.version)throw new VersionConflictException(old.version,'La ficha cambió. Vuelve a abrirla antes de guardar.');
       await this.duplicate(c,data.dui,id);
-      const row=(await c.query(`UPDATE pacientes.paciente SET nombres=$2,primer_apellido=$3,segundo_apellido=NULL,sexo=$4,nacimiento=$5,precision_nacimiento=$6,telefono=$7,correo=$8,direccion=$9,busqueda_normalizada=$10,fon_apellido=$11,fon_nombres=$12,version=version+1 WHERE id=$1 RETURNING *`,[id,data.givenNames,data.surnames,data.sex,data.birth,data.birth?'exacta':'desconocida',data.phone,data.email||null,data.address||null,normalize(`${data.givenNames} ${data.surnames} ${data.dui??''} ${data.birth??''}`),phonetic(data.surnames),phonetic(data.givenNames)])).rows[0];
+      const row=(await c.query(`UPDATE pacientes.paciente SET nombres=$2,primer_apellido=$3,segundo_apellido=NULL,sexo=$4,nacimiento=$5,precision_nacimiento=$6,telefono=$7,correo=$8,direccion=$9,busqueda_normalizada=$10,fon_apellido=$11,fon_nombres=$12,version=version+1 WHERE id=$1 RETURNING *`,[id,data.givenNames,data.surnames,data.sex,data.birth,birthPrecision({birth:old.nacimiento_texto,precision:old.precision_nacimiento},data.birth??null),data.phone,data.email||null,data.address||null,normalize(`${data.givenNames} ${data.surnames} ${data.dui??''} ${data.birth??''}`),phonetic(data.surnames),phonetic(data.givenNames)])).rows[0];
       const previous=(await c.query("SELECT valor_original FROM pacientes.identificador WHERE paciente_id=$1 AND tipo='dui' AND estado IN ('sin_verificar','verificado')",[id])).rows[0]?.valor_original??null;
       await c.query("UPDATE pacientes.identificador SET estado='retirado' WHERE paciente_id=$1 AND tipo='dui' AND estado IN ('sin_verificar','verificado')",[id]);
       if(data.dui)await c.query("INSERT INTO pacientes.identificador(paciente_id,tipo,emisor,valor_original,valor_normalizado,exclusivo) VALUES($1,'dui','RNPN',$2,$3,true)",[id,`${data.dui.slice(0,8)}-${data.dui[8]}`,data.dui]);
