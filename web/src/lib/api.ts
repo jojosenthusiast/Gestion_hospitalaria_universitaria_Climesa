@@ -3,7 +3,7 @@ export type AccessProfile={canInviteAdmin?:boolean;id:string;user:{id:string;ema
 export type Patient={id:string;record:string;fullName:string;givenNames:string;surnames:string;state:string;active:boolean;sex:string;birth?:string|null;birthPrecision?:string;phone?:string|null;dui?:string|null;email?:string|null;address?:string|null;version:number;matchReason?:string;history?:{version:number;at:string;reason:string;changes:Record<string,{before:unknown;after:unknown}>}[]};
 export type Staff={id:string;givenNames:string;surnames:string;type:string;specialty?:string;areaId?:string;area?:string;phone?:string;dui?:string;active:boolean;version:number};
 export type Space={id:string;parentId:string|null;type:string;code:string;name:string;category?:string;capacity?:number;level?:number;active:boolean;version:number;path:string;totalBeds:number;freeBeds:number};
-export type Bed={id:string;code:string;roomId:string;room:string;category:string;level:number;state:string;path:string;occupant?:string;occupantRestricted?:boolean;patientId?:string};
+export type Bed={id:string;code:string;roomId:string;room:string;category:string;level:number;state:string;version:number;cleaningPending:boolean;cleaningCompleted:boolean;cleanedByCurrentUser:boolean;path:string;occupant?:string;occupantRestricted?:boolean;patientId?:string};
 export type Shift={id:string;staffId:string;person:string;areaId:string;area:string;start:string;end:string;type:string;state:string;justification?:string;version:number};
 export type UserAccount={id:string;email:string;name:string;roles:string[];state:string;staffId?:string;version:number};
 export type AuditRow={seq:string;at:string;role:string;actor:string;action:string;entity:string;entityId:string;result:string;reason?:string};
@@ -13,6 +13,8 @@ export type PatientInput=Omit<components['schemas']['PatientCreateDto'],'searchT
 export type StaffInput=components['schemas']['StaffDto'];
 export type ShiftInput=components['schemas']['ShiftDto'];
 export type SpaceInput=components['schemas']['SpaceDto'];
+export type BedBlockInput=components['schemas']['BedBlockDto'];
+export type BedTransitionInput=components['schemas']['BedTransitionDto'];
 export type InvitationResult={userId:string;email:string;roles:string[];role:string;status:'sent'};
 export interface Api {request<T>(path:string,init?:RequestInit):Promise<T>;write<T>(path:string,body:unknown,method?:string):Promise<T>;}
 export class ApiError extends Error {constructor(message:string,public status=0){super(message);}}

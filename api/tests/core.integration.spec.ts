@@ -166,11 +166,14 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   expect((await call('REC','GET','/camas')).body.find((item:any)=>item.id===bed.id).state).toBe('libre');
   const requested=await call('ENF','POST',`/camas/${bed.id}/limpieza`,{version:initial+2,reason:'Salida física registrada'});
   expect(requested.status).toBe(201);
-  expect((await call('REC','GET','/camas')).body.find((item:any)=>item.id===bed.id).state).toBe('limpieza');
+  const pending=(await call('REC','GET','/camas')).body.find((item:any)=>item.id===bed.id);
+  expect(pending).toMatchObject({state:'limpieza',cleaningPending:true,cleaningCompleted:false});
   expect((await call('ENF','POST',`/camas/${bed.id}/limpieza/completar`,{version:initial+3,reason:'Limpieza completada'})).status).toBe(201);
+  expect((await call('ENF','GET','/camas')).body.find((item:any)=>item.id===bed.id)).toMatchObject({cleaningPending:true,cleaningCompleted:true,cleanedByCurrentUser:true});
+  expect((await call('JOP','GET','/camas')).body.find((item:any)=>item.id===bed.id).cleanedByCurrentUser).toBe(false);
   expect((await call('ENF','POST',`/camas/${bed.id}/limpieza/verificar`,{version:initial+4,reason:'Verificación por la misma persona'})).status).toBe(409);
   expect((await call('JOP','POST',`/camas/${bed.id}/limpieza/verificar`,{version:initial+4,reason:'Verificación independiente'})).status).toBe(201);
-  expect((await call('REC','GET','/camas')).body.find((item:any)=>item.id===bed.id).state).toBe('libre');
+  expect((await call('REC','GET','/camas')).body.find((item:any)=>item.id===bed.id)).toMatchObject({state:'libre',cleaningPending:false,cleaningCompleted:false,cleanedByCurrentUser:false});
   expect((await fixture.pg.query<{version:number}>('SELECT version FROM infra.espacio WHERE id=$1',[bed.id])).rows[0].version).toBe(initial+5);
   await fixture.pg.query("UPDATE hospitalizacion.admision SET estado='egresado' WHERE id=$1",[admission.id]);
  });
