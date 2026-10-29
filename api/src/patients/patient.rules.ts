@@ -42,6 +42,16 @@ export function matchReasons(e: MatchEvidence): string[] {
   else if (words.length && words.every(w=>phonetic(e.fullName).includes(phonetic(w)))) reasons.push('Coincidencia fonética');
   return reasons.length ? reasons : ['Coincidencia de datos'];
 }
+export type DuplicateKey = { id: string; fonApellido?: string | null; fonNombres?: string | null; nacimiento?: string | null };
+/** FR-102-09: dos fichas distintas con mismo apellido y nombres fonéticos y misma fecha de nacimiento exacta son un posible duplicado. Sin fecha o sin claves fonéticas no hay semejanza. */
+export function isPossibleDuplicate(a: DuplicateKey, b: DuplicateKey): boolean {
+  if (a.id === b.id || !a.nacimiento || !a.fonApellido || !a.fonNombres) return false;
+  return a.fonApellido === b.fonApellido && a.fonNombres === b.fonNombres && a.nacimiento === b.nacimiento;
+}
+/** Par ordenado: el índice único del caso abierto no distingue (a,b) de (b,a), así que siempre se guarda en el mismo orden. */
+export function canonicalPair(a: string, b: string): [string, string] {
+  return a < b ? [a, b] : [b, a];
+}
 /** FR-102-05: al editar, una fecha estimada (o aproximada) no se vuelve exacta si quien edita no la cambia. */
 export function birthPrecision(previous: { birth: string | null; precision: string }, birth: string | null): string {
   if (!birth) return previous.precision==='estimada' ? 'estimada' : 'desconocida';

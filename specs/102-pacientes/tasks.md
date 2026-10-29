@@ -10,7 +10,7 @@
   - Depende de: T01
   - Hecho cuando: pruebas de dominio del legado pasan en el módulo nuevo
   - Verificado: 28-oct-2026 `api/tests/patients.service.spec.ts` y `api/tests/patients-dominio.spec.ts`: claves fonéticas y acentos, DUI válido e inválido (sin guion al guardar), expediente ISO 7064 MOD 11-2 para varias secuencias y tres vectores públicos, reglas de nombre, teléfono y correo, identidad provisional con caso positivo y límites de edad. 151 de 151 pruebas pasan en `api/`. No hay un conjunto "del legado" en el repositorio contra el cual compararlas; el criterio se cumple con estas pruebas del dominio.
-- [ ] T03 · S2 · R · CRUD: buscar, registrar tras buscar, ver, editar con historial, inactivar
+- [x] T03 · S2 · R · CRUD: buscar, registrar tras buscar, ver, editar con historial, inactivar
   - Cubre: FR-102-01, FR-102-02, FR-102-06, FR-102-07, FR-102-08, FR-102-11
   - Depende de: T02, 100-T05
   - Hecho cuando: escenarios 1, 2 y 4 pasan como pruebas de integración
@@ -29,10 +29,11 @@
   - Cubre: FR-102-05
   - Depende de: T03, 109-T04
   - Hecho cuando: escenario 3 pasa en Android
-- [ ] T07 · S5 · E · Casos de posible duplicado
+- [x] T07 · S5 · E · Casos de posible duplicado
   - Cubre: FR-102-09
   - Depende de: T03
   - Hecho cuando: un registro parecido abre caso y no fusiona
+  - Verificado: 28-oct-2026 `api/tests/patients-duplicados.spec.ts` (24 pruebas): al registrar un paciente con la misma clave fonética de apellido y nombres y la misma fecha de nacimiento que otro, se abre exactamente un caso `sospechado` en `pacientes.caso_duplicado`, ambos pacientes siguen activos y la respuesta de registro no cambia; una fecha o fonética distinta no abre caso; un DUI repetido sigue dando 409 sin caso; el reintento con la misma clave de idempotencia no duplica el caso; el par se guarda ordenado, por lo que el índice único impide repetirlo. `GET /api/v1/pacientes/casos-duplicado` lista los casos abiertos solo para JOP y REC (los demás roles reciben 403) y audita cada lectura. Sin migración nueva: usa la tabla existente. 175 de 175 pruebas pasan. Alcance: no hay pantalla para revisar los casos ni cambio de estado (descartar o confirmar); quedan para una historia posterior.
 
 
 ## Verificación del corte 0.3.0 · 24-oct-2026

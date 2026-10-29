@@ -17,6 +17,8 @@ export class PatientsController {
   search(@Req() req:ActorRequest,@Query() q:PatientSearchQueryDto) { return this.patients.search(req.actor,q.query,q.limit); }
   @Post('busquedas') @RequirePermission('pacientes.buscar') @ApiOperation({summary:'Buscar y obtener constancia de diez minutos, ligada a la cuenta y criterios'})
   recordSearch(@Req() req:ActorRequest,@Body() dto:PatientSearchDto) { return this.patients.recordSearch(req.actor,dto.query); }
+  @Get('casos-duplicado') @RequirePermission('pacientes.gestionar_duplicados') @ApiOperation({summary:'Casos abiertos de posible duplicado con los dos pacientes mínimos'})
+  duplicateCases(@Req() req:ActorRequest,@Query() q:PatientSearchQueryDto) { return this.patients.duplicateCases(req.actor,q.limit); }
   @Get(':id') @RequirePermission('pacientes.ver_ficha') @ApiOperation({summary:'Ficha filtrada por rol y relación de atención'})
   get(@Req() req:ActorRequest,@Param('id',ParseUUIDPipe) id:string) { return this.patients.get(req.actor,id); }
   @Post() @RequirePermission('pacientes.registrar') @ApiOperation({summary:'Registrar después de buscar; expediente y DUI exclusivos'})
