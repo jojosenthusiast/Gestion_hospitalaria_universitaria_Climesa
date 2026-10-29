@@ -890,6 +890,100 @@
         "x-permiso": "turnos.ver"
       }
     },
+    "/api/v1/turnos/cobertura": {
+      "get": {
+        "operationId": "OperationsController_coverage",
+        "parameters": [
+          {
+            "name": "areaId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Último día local, yyyy-MM-dd",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Primer día local, yyyy-MM-dd",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Huecos de cobertura por área y hora frente al mínimo vigente",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.ver"
+      }
+    },
+    "/api/v1/turnos/publicar": {
+      "post": {
+        "operationId": "OperationsController_publishShifts",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.publicar"
+      }
+    },
     "/api/v1/turnos/{id}": {
       "patch": {
         "operationId": "OperationsController_editShift",
@@ -1858,6 +1952,29 @@
           "validTo",
           "version",
           "reason"
+        ]
+      },
+      "PublishDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-10"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-16"
+          },
+          "areaId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "from",
+          "to"
         ]
       },
       "ShiftDto": {

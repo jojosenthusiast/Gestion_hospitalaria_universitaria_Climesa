@@ -331,6 +331,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/turnos/cobertura": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Huecos de cobertura por área y hora frente al mínimo vigente */
+        get: operations["OperationsController_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/turnos/publicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó */
+        post: operations["OperationsController_publishShifts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/turnos/{id}": {
         parameters: {
             query?: never;
@@ -616,6 +650,20 @@ export interface components {
             validTo: string;
             version: number;
             reason: string;
+        };
+        PublishDto: {
+            /**
+             * Format: date
+             * @example 2026-11-10
+             */
+            from: string;
+            /**
+             * Format: date
+             * @example 2026-11-16
+             */
+            to: string;
+            /** Format: uuid */
+            areaId?: string;
         };
         ShiftDto: {
             /** Format: uuid */
@@ -1152,6 +1200,53 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperationsController_coverage: {
+        parameters: {
+            query: {
+                areaId?: string;
+                /** @description Último día local, yyyy-MM-dd */
+                to: unknown;
+                /** @description Primer día local, yyyy-MM-dd */
+                from: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperationsController_publishShifts: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

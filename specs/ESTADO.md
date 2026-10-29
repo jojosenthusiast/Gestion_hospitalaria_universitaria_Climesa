@@ -2,7 +2,7 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 27 de 131 (20%) · **Requisitos:** 221 · **Specs:** 20
+**Tareas:** 28 de 131 (21%) · **Requisitos:** 221 · **Specs:** 20
 
 ## Por spec
 
@@ -11,7 +11,7 @@
 | [100 Plataforma de la API](./100-plataforma-api/spec.md) | En revisión | 17/2/0 | 8/10 | ████████░░ |
 | [101 Identidad, cuentas y acceso](./101-identidad-acceso/spec.md) | En revisión | 15/1/0 | 4/8 | █████░░░░░ |
 | [102 Pacientes](./102-pacientes/spec.md) | En revisión | 11/1/0 | 4/7 | ██████░░░░ |
-| [103 Personal de salud y turnos](./103-personal-turnos/spec.md) | En revisión | 11/3/0 | 4/9 | ████░░░░░░ |
+| [103 Personal de salud y turnos](./103-personal-turnos/spec.md) | En revisión | 11/3/0 | 5/9 | ██████░░░░ |
 | [104 Edificio, camas y recursos](./104-infraestructura-recursos/spec.md) | En revisión | 12/1/0 | 1/7 | █░░░░░░░░░ |
 | [105 Fila del día y citas](./105-fila-citas/spec.md) | En revisión | 10/2/0 | 1/6 | ██░░░░░░░░ |
 | [106 Consulta general](./106-consulta-general/spec.md) | En revisión | 11/1/0 | 1/7 | █░░░░░░░░░ |
@@ -34,7 +34,7 @@
 | Semana | Fechas | R hechas | E hechas | Total |
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
-| S2 | 24 a 30 oct | 13/36 | 1/1 | ████░░░░░░ |
+| S2 | 24 a 30 oct | 14/36 | 1/1 | ████░░░░░░ |
 | S3 | 31 oct a 6 nov | 0/29 | 0/0 | ░░░░░░░░░░ |
 | S4 | 7 a 13 nov | 0/22 | 0/0 | ░░░░░░░░░░ |
 | S5 | 14 a 20 nov | 0/8 | 1/23 | ░░░░░░░░░░ |
@@ -63,7 +63,7 @@
 - [x] 103-T02 · CRUD de personal (con y sin cuenta)
 - [x] 103-T03 · Crear y mover turnos con duración y descanso por política
 - [ ] 103-T04 · Pantallas de personal en web (W07, W08)
-- [ ] 103-T06 · Cobertura, publicación con advertencias y estados automáticos
+- [x] 103-T06 · Cobertura, publicación con advertencias y estados automáticos
 - [x] 104-T01 · Migración 0005 del árbol de espacios con capacidad y semilla del curso
 - [ ] 104-T02 · Consultas recursivas de árbol, ruta y disponibilidad
 - [ ] 104-T04 · Edición de espacios (ADM) con regla de capacidad bajo ocupación
