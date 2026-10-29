@@ -21,6 +21,7 @@
   - Cubre: FR-102-01, FR-102-02
   - Depende de: T03, 120-T02, 121-T02
   - Hecho cuando: recepción busca, registra y edita desde web y Android
+  - Avance 28-oct-2026 (solo web, W26): `web/src/__tests__/pacientes.test.tsx` (9 pruebas): la búsqueda muestra candidatos con su motivo de coincidencia, "Registrar paciente" se bloquea sin búsqueda vigente o con el recibo vencido, el registro envía `searchToken` y `searchQuery`, un DUI duplicado muestra el expediente, un conflicto de versión pide recargar, la corrección exige un motivo de al menos 10 caracteres, e inactivar y reactivar envían `active`, versión y motivo. 19 de 19 pruebas web pasan. **Sigue abierta**: falta A30 en Android y comprobar a mano con la cuenta `rec@climesa`.
 - [ ] T06 · S4 · R · Registro provisional desde la app del paramédico (A73)
   - Cubre: FR-102-05
   - Depende de: T03, 109-T04
