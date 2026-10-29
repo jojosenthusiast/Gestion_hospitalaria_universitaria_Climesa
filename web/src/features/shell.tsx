@@ -37,7 +37,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  else if(route==='personal')content=<PersonnelPage api={api} profile={profile} version={version}/>;
  else if(route==='turnos')content=<ShiftsPage api={api} profile={profile} version={version}/>;
  else if(route==='espacios')content=<SpacesPage api={api} profile={profile} version={version}/>;
- else if(route==='camas')content=<BedsPage api={api} version={version}/>;
+ else if(route==='camas')content=<BedsPage api={api} profile={profile} version={version}/>;
  else if(route==='usuarios')content=<UsersPage api={api} profile={profile} version={version}/>;
  else if(route==='auditoria')content=<AuditPage api={api} version={version}/>;
  else if(route==='perfil')content=<ProfilePage profile={profile} onLogout={onLogout}/>;

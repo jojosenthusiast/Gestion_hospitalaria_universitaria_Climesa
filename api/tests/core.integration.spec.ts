@@ -142,6 +142,52 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   const room=tree.find((n:any)=>n.code==='HAB-201');expect((await call('ADM','POST','/espacios',{type:'cama',code:'HAB-201-C',name:'Cama C',parentId:room.id})).status).toBe(409);
   expect((await call('ADM','PATCH',`/espacios/${room.id}`,{code:room.code,name:room.name,type:room.type,parentId:room.parentId,category:room.category,capacity:1,level:2,version:1,reason:'Reducción de capacidad de prueba'})).status).toBe(409);
  });
+ test('bloqueo y limpieza son transiciones atómicas, versionadas e idempotentes',async()=>{
+  const beds=(await call('REC','GET','/camas')).body;
+  const bed=beds.find((item:any)=>item.state==='libre'&&item.code!=='HAB-201-A');
+  expect(bed).toBeTruthy();
+  const initial=(await fixture.pg.query<{version:number}>('SELECT version FROM infra.espacio WHERE id=$1',[bed.id])).rows[0].version;
+  const blockBody={version:initial,motivo:'Mantenimiento preventivo'};
+  const blocked=await call('JOP','POST',`/camas/${bed.id}/bloquear`,blockBody,'bed-block-key-0001');
+  expect(blocked.status).toBe(201);
+  expect((await call('JOP','POST',`/camas/${bed.id}/bloquear`,blockBody,'bed-block-key-0001')).body).toEqual(blocked.body);
+  expect((await call('REC','GET','/camas')).body.find((item:any)=>item.id===bed.id).state).toBe('bloqueada');
+  expect((await call('JOP','POST',`/camas/${bed.id}/desbloquear`,{version:initial,reason:'Intento con versión obsoleta'})).status).toBe(409);
+  const unblocked=await call('JOP','POST',`/camas/${bed.id}/desbloquear`,{version:initial+1,reason:'Fin del mantenimiento preventivo'});
+  expect(unblocked.status).toBe(201);
+
+  const doctorId=(await call('MED','GET','/auth/me')).body.staffId;
+  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado') RETURNING id",[patientId,randomUUID(),doctorId])).rows[0];
+  await fixture.pg.query("INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo) VALUES($1,$2,$3,'semiprivada',tstzrange(now()-interval '1 hour',NULL,'[)'))",[admission.id,bed.id,bed.roomId]);
+  expect((await call('JOP','POST',`/camas/${bed.id}/bloquear`,{version:initial+2,motivo:'Bloqueo inválido'},'bed-block-occupied')).status).toBe(409);
+  expect((await call('ENF','POST',`/camas/${bed.id}/limpieza/completar`,{version:initial+2,reason:'Limpieza no solicitada'})).status).toBe(409);
+  expect((await call('ENF','POST',`/camas/${bed.id}/limpieza/verificar`,{version:initial+2,reason:'Limpieza aún no completada'})).status).toBe(409);
+  await fixture.pg.query("UPDATE hospitalizacion.ocupacion_cama SET periodo=tstzrange(lower(periodo),now(),'[)') WHERE cama_id=$1 AND upper_inf(periodo)",[bed.id]);
+  expect((await call('REC','GET','/camas')).body.find((item:any)=>item.id===bed.id).state).toBe('libre');
+  const requested=await call('ENF','POST',`/camas/${bed.id}/limpieza`,{version:initial+2,reason:'Salida física registrada'});
+  expect(requested.status).toBe(201);
+  const pending=(await call('REC','GET','/camas')).body.find((item:any)=>item.id===bed.id);
+  expect(pending).toMatchObject({state:'limpieza',cleaningPending:true,cleaningCompleted:false});
+  expect((await call('ENF','POST',`/camas/${bed.id}/limpieza/completar`,{version:initial+3,reason:'Limpieza completada'})).status).toBe(201);
+  expect((await call('ENF','GET','/camas')).body.find((item:any)=>item.id===bed.id)).toMatchObject({cleaningPending:true,cleaningCompleted:true,cleanedByCurrentUser:true});
+  expect((await call('JOP','GET','/camas')).body.find((item:any)=>item.id===bed.id).cleanedByCurrentUser).toBe(false);
+  expect((await call('ENF','POST',`/camas/${bed.id}/limpieza/verificar`,{version:initial+4,reason:'Verificación por la misma persona'})).status).toBe(409);
+  expect((await call('JOP','POST',`/camas/${bed.id}/limpieza/verificar`,{version:initial+4,reason:'Verificación independiente'})).status).toBe(201);
+  expect((await call('REC','GET','/camas')).body.find((item:any)=>item.id===bed.id)).toMatchObject({state:'libre',cleaningPending:false,cleaningCompleted:false,cleanedByCurrentUser:false});
+  expect((await fixture.pg.query<{version:number}>('SELECT version FROM infra.espacio WHERE id=$1',[bed.id])).rows[0].version).toBe(initial+5);
+  await fixture.pg.query("UPDATE hospitalizacion.admision SET estado='egresado' WHERE id=$1",[admission.id]);
+ });
+ test.each([
+  ['/camas/00000000-0000-4000-8000-000000000001/bloquear',{version:1,reason:'Motivo de prueba',motivo:'Motivo de prueba'}],
+  ['/camas/00000000-0000-4000-8000-000000000001/desbloquear',{version:1,reason:'Motivo de prueba'}],
+  ['/camas/00000000-0000-4000-8000-000000000001/limpieza',{version:1,reason:'Motivo de prueba'}],
+  ['/camas/00000000-0000-4000-8000-000000000001/limpieza/completar',{version:1,reason:'Motivo de prueba'}],
+  ['/camas/00000000-0000-4000-8000-000000000001/limpieza/verificar',{version:1,reason:'Motivo de prueba'}],
+ ])('cada transición de cama deniega permiso a REC: %s',async(path,body)=>{
+  const result=await call('REC','POST',path,body,randomUUID());
+  expect(result.status).toBe(403);
+  expect(result.body.codigo).toBe('sin_permiso');
+ });
  test('la cama ocupada muestra iniciales fuera del área y nombre al médico tratante',async()=>{
   const med=(await call('MED','GET','/auth/me')).body,enf=(await call('ENF','GET','/auth/me')).body;
   const bed=(await call('REC','GET','/camas')).body.find((b:any)=>b.code==='HAB-201-A');

@@ -167,11 +167,12 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/espacios/arbol` | `espacios.ver` |  | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/espacios` | `espacios.configurar` |  | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | PUT | `/api/v1/espacios/{id}` | `espacios.configurar` | No reduce capacidad bajo ocupación | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
-| GET | `/api/v1/camas/tablero` | `camas.ver_tablero` | Ocupante solo con camas.ver_ocupante | R | 2 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
-| POST | `/api/v1/camas/{id}/bloquear` | `camas.bloquear` | Motivo obligatorio | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
-| POST | `/api/v1/camas/{id}/desbloquear` | `camas.bloquear` |  | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
-| POST | `/api/v1/camas/{id}/limpieza` | `camas.registrar_limpieza` |  | R | 4 | · | · | · | · | ✔ | · | · | · | · | · |
-| POST | `/api/v1/camas/{id}/limpieza/verificar` | `camas.verificar_limpieza` | Distinta persona que limpió | R | 4 | · | ✔ | · | · | ✔ | · | · | · | · | · |
+| GET | `/api/v1/camas` | `camas.ver_tablero` | Ocupante solo con camas.ver_ocupante | R | 2 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
+| POST | `/api/v1/camas/{id}/bloquear` | `camas.bloquear` | Motivo y versión obligatorios | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/camas/{id}/desbloquear` | `camas.bloquear` | Versión y motivo obligatorios | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/camas/{id}/limpieza` | `camas.registrar_limpieza` | Versión y motivo obligatorios | R | 4 | · | · | · | · | ✔ | · | · | · | · | · |
+| POST | `/api/v1/camas/{id}/limpieza/completar` | `camas.registrar_limpieza` | Versión y motivo obligatorios | R | 4 | · | · | · | · | ✔ | · | · | · | · | · |
+| POST | `/api/v1/camas/{id}/limpieza/verificar` | `camas.verificar_limpieza` | Distinta persona; versión y motivo obligatorios | R | 4 | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | GET | `/api/v1/recursos/equipos` | `recursos.gestionar` |  | E | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/recursos/equipos/{id}/estado` | `recursos.gestionar` |  | E | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | PUT | `/api/v1/recursos/tipos/{id}` | `recursos.configurar` |  | E | 4 | ✔ | · | · | · | · | · | · | · | · | · |
