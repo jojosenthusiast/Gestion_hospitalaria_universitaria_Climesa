@@ -38,3 +38,11 @@ export class SpaceDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) version?:number;
   @Text(10,500,true) reason?:string;
 }
+export class BedBlockDto {
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+  @Text(5,500) motivo!:string;
+}
+export class BedTransitionDto {
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+  @Text(10,500) reason!:string;
+}
