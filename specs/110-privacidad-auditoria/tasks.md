@@ -20,10 +20,11 @@
   - Cubre: FR-110-04, FR-110-05
   - Depende de: T03
   - Hecho cuando: el flujo completo funciona entre web y móvil
-- [ ] T06 · S2 · R · Matriz RBAC y política de campos generadas y verificadas
+- [x] T06 · S2 · R · Matriz RBAC y política de campos generadas y verificadas
   - Cubre: FR-110-10
   - Depende de: ninguna
   - Hecho cuando: `python3 tools/generar_docs.py --verificar` pasa en CI
+  - Verificado: 29-oct-2026 `python tools/generar_docs.py --verificar` sale con código 0 (matriz RBAC y SQL de semilla generados desde los CSV, ya en docs.yml; ahora también valida la tabla de campos de privacidad.md §2 y la regla D-031 contra permisos.csv); api/tests/matriz-rbac.spec.ts (6 pruebas) cruza permisos.csv y roles.csv contra la base sembrada y el x-permiso del OpenAPI contra endpoints.csv. La política de campos publicada es la tabla de privacidad.md (fuente única, verificada); el filtrado por rol del código sigue caracterizado en patients-fichas.spec.ts con diferencias pendientes de decisión
 - [ ] T07 · S5 · E · Quién vio mi expediente
   - Cubre: FR-110-08
   - Depende de: T02
