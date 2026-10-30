@@ -7,7 +7,7 @@ import { ActorRequest } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
-import { BedBlockDto, BedTransitionDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
+import { BedBlockDto, BedTransitionDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
 export class OperationsController {
   constructor(private readonly people:PersonnelService,private readonly infra:InfrastructureService,private readonly db:DatabaseService) {}
@@ -19,6 +19,8 @@ export class OperationsController {
   createStaff(@Req() r:ActorRequest,@Body() d:StaffDto,@Headers('idempotency-key') k?:string){return this.people.save(r.actor,null,d,k);}
   @Patch('personal/:id') @RequirePermission('personal.gestionar') @ApiOperation({summary:'Editar o inactivar personal con versión y motivo'})
   editStaff(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:StaffDto,@Headers('idempotency-key') k?:string){return this.people.save(r.actor,id,d,k);}
+  @Post('personal/:id/inscripciones') @RequirePermission('personal.gestionar') @ApiOperation({summary:'Registrar inscripción profesional con vigencia, versión y motivo'})
+  registerRegistration(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:RegistrationDto,@Headers('idempotency-key') k?:string){return this.people.register(r.actor,id,d,k);}
   @Get('turnos') @RequirePermission('turnos.ver') @ApiOperation({summary:'Consultar la planificación de turnos'})
   shifts(@Req() r:ActorRequest){return this.people.shifts(r.actor);}
   @Get('turnos/mios') @RequirePermission('turnos.ver') @ApiOperation({summary:'Turnos publicados de la persona vinculada a la cuenta'})

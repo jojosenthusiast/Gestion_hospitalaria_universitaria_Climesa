@@ -279,6 +279,23 @@ export interface paths {
         patch: operations["OperationsController_editStaff"];
         trace?: never;
     };
+    "/api/v1/personal/{id}/inscripciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Registrar inscripción profesional con vigencia, versión y motivo */
+        post: operations["OperationsController_registerRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/turnos": {
         parameters: {
             query?: never;
@@ -582,6 +599,23 @@ export interface components {
             active?: boolean;
             version?: number;
             reason?: string;
+        };
+        RegistrationDto: {
+            /** @enum {string} */
+            board: "JVPM" | "JVPE" | "JVPL" | "JVPO" | "otra";
+            number: string;
+            /**
+             * Format: date
+             * @example 2026-01-01
+             */
+            validFrom: string;
+            /**
+             * Format: date
+             * @example 2026-12-31
+             */
+            validTo: string;
+            version: number;
+            reason: string;
         };
         ShiftDto: {
             /** Format: uuid */
@@ -1034,6 +1068,32 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperationsController_registerRegistration: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
