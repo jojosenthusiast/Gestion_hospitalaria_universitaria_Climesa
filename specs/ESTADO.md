@@ -18,7 +18,7 @@
 | [107 Laboratorio](./107-laboratorio/spec.md) | En revisión | 11/2/0 | 1/7 | █░░░░░░░░░ |
 | [108 Admisión y hospitalización](./108-admision-hospitalizacion/spec.md) | En revisión | 14/2/0 | 1/10 | █░░░░░░░░░ |
 | [109 Ambulancia](./109-ambulancia/spec.md) | En revisión | 14/3/0 | 2/10 | ██░░░░░░░░ |
-| [110 Privacidad y auditoría](./110-privacidad-auditoria/spec.md) | En revisión | 8/2/0 | 0/8 | ░░░░░░░░░░ |
+| [110 Privacidad y auditoría](./110-privacidad-auditoria/spec.md) | En revisión | 8/2/0 | 1/8 | █░░░░░░░░░ |
 | [111 Inventario de insumos](./111-inventario/spec.md) | En revisión | 7/1/0 | 1/4 | ██░░░░░░░░ |
 | [112 Información pública y avisos](./112-informacion-publica/spec.md) | En revisión | 4/2/0 | 0/3 | ░░░░░░░░░░ |
 | [113 Métricas y tablero](./113-metricas-tablero/spec.md) | En revisión | 5/1/0 | 0/4 | ░░░░░░░░░░ |
@@ -73,7 +73,7 @@
 - [x] 108-T01 · Migración de hospitalización con exclusión de ocupaciones y vista publicada
 - [x] 109-T01 · Migración de ambulancia con unidad única y servicio activo único
 - [x] 109-T02 · Estado de la unidad visible en vivo y regla de paramédico de turno
-- [ ] 110-T06 · Matriz RBAC y política de campos generadas y verificadas
+- [x] 110-T06 · Matriz RBAC y política de campos generadas y verificadas
 - [x] 111-T01 · Migración de inventario y semilla
 - [ ] 113-T01 · Tablero inicial con tarjetas de camas, turnos y pacientes y marcadores de semana
 - [x] 120-T01 · Proyecto React con TypeScript, rutas, ingreso con Supabase y despliegue
