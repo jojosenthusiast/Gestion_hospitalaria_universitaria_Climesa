@@ -60,6 +60,12 @@ export class OperationsController {
   @Get('eventos') @RequirePermission('sesion.perfil') @ApiOperation({summary:'Eventos delgados de canales autorizados para recuperar cambios tras reconexión'})
   async events(@Req() r:ActorRequest,@Query('after') after='0'){
     const cursor=/^\d{1,18}$/.test(after)?after:'0';
+    // Sin cursor (o "0") el cliente no tiene punto de partida: se le da la cabeza actual y ningún evento viejo.
+    // Al reconectar ya invalida todas sus vistas, así que no necesita el historial.
+    if(cursor==='0'){
+      const head=(await this.db.query<{head:string|null}>('SELECT max(seq)::text AS head FROM plataforma.outbox'))[0]?.head??'0';
+      return {cursor:head,events:[]};
+    }
     const events=await this.db.query('SELECT seq,tipo AS type,entidad AS entity,entidad_id AS id,version FROM plataforma.outbox WHERE seq>$1 AND canales && $2::text[] ORDER BY seq LIMIT 200',[cursor,r.actor.channels]);
     return {cursor:events.at(-1)?.seq??cursor,events};
   }
