@@ -1,13 +1,15 @@
 # 120. Tareas
 
-- [ ] T01 · S2 · R · Proyecto React con TypeScript, rutas, ingreso con Supabase y despliegue
+- [x] T01 · S2 · R · Proyecto React con TypeScript, rutas, ingreso con Supabase y despliegue
   - Cubre: FR-120-01, FR-101-01
   - Depende de: ninguna
   - Hecho cuando: la URL desplegada permite ingresar con un usuario de prueba
-- [ ] T02 · S2 · R · Navegación por rol desde `/me`, estados comunes y cliente de API generado
+  - Verificado: 29-oct-2026 de solo lectura, sin imprimir ni guardar credenciales: `https://sghu-web.onrender.com` responde 200; el ingreso con Supabase Auth (`/auth/v1/token?grant_type=password`) de las cuentas demo ADM, REC y LAB devuelve sesión y `GET https://sghu-api.onrender.com/api/v1/auth/me` responde con plataformas que incluyen web y 15, 28 y 11 permisos (los mismos que `permisos.csv`). No se abrió el formulario en un navegador; la pantalla de ingreso se cubre con `web/src/__tests__/acceso.test.tsx`
+- [x] T02 · S2 · R · Navegación por rol desde `/me`, estados comunes y cliente de API generado
   - Cubre: FR-120-02, FR-120-03, FR-120-06, FR-120-07
   - Depende de: T01, 101-T03
   - Hecho cuando: escenario 1 pasa y cada rol web ve su menú
+  - Verificado: 29-oct-2026 `web/src/__tests__/navegacion.test.tsx` (19 pruebas) renderiza el portal con los permisos reales de ADM, JOP, REC, LAB y DPD leídos de `docs/arquitectura/datos/permisos.csv` y comprueba el menú exacto de cada rol y la ausencia de entradas ajenas (el laboratorista ve Inicio, Laboratorio, Inventario y Perfil), que el menú sigue los permisos de `/auth/me` y no el nombre del rol, la ruta ajena con "Sin permiso", el rol sin web (FR-120-03), los estados cargando, vacío, error, sin permiso (403) y sin conexión/reconectando, y el uso del cliente generado (`web/src/lib/generated/openapi.d.ts`). Corrección mínima en `shell.tsx`: las entradas Laboratorio, Inventario, Fila del día, Citas y Accesos excepcionales ahora exigen su permiso y "Mi cuenta" pasa a "Perfil" (W35). `npm test` en `web/`: 6 archivos, 58 pruebas pasan; `npx tsc --noEmit` sin errores. El conflicto por versión y la idempotencia (FR-120-06/07) ya cubiertos en `api-error.test.tsx`. Pendiente fuera de esta tarea: `live.ts` aún usa sondeo cada 5 s (120-T03)
 - [ ] T03 · S2 · R · Suscripción a Realtime con invalidación y reconexión
   - Cubre: FR-120-04, FR-120-05
   - Depende de: T02, 100-T03
