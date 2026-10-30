@@ -2,7 +2,7 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 41 de 131 (31%) · **Requisitos:** 221 · **Specs:** 20
+**Tareas:** 42 de 131 (32%) · **Requisitos:** 221 · **Specs:** 20
 
 ## Por spec
 
@@ -35,7 +35,7 @@
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
 | S2 | 24 a 30 oct | 24/36 | 1/1 | ███████░░░ |
-| S3 | 31 oct a 6 nov | 2/29 | 0/0 | █░░░░░░░░░ |
+| S3 | 31 oct a 6 nov | 3/29 | 0/0 | █░░░░░░░░░ |
 | S4 | 7 a 13 nov | 0/22 | 0/0 | ░░░░░░░░░░ |
 | S5 | 14 a 20 nov | 0/8 | 2/23 | █░░░░░░░░░ |
 
