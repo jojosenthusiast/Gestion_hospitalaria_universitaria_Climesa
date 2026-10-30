@@ -20,7 +20,7 @@ flowchart TB
 
 Los tres clientes obtienen tokens de Supabase Auth. La API comprueba emisor, audiencia y vencimiento y valida la identidad con `auth.getUser`. Después resuelve cuenta activa, roles, permisos, plataformas y canales en la base. Ningún permiso se toma de `user_metadata`.
 
-En este corte, Realtime se consume en web; Android e iOS actualizan por consulta y refresco. Sus suscripciones nativas corresponden a S3. La web combina Broadcast con recuperación de outbox cada cinco segundos y nueva consulta al reconectar. `publico` es un Broadcast público sin datos personales; los canales de rol y usuario son privados. Su política de autorización consulta la cuenta vigente.
+En este corte, Realtime se consume en web; Android e iOS actualizan por consulta y refresco. Sus suscripciones nativas corresponden a S3. La web usa Broadcast sin sondeo periódico (regla 9): solo tras una caída del canal o al volver la red pide una vez los eventos pendientes a `GET /eventos?after=` y vuelve a consultar (ver `web/src/lib/live.ts` y `tiempo-real.md`). `publico` es un Broadcast público sin datos personales; los canales de rol y usuario son privados. Su política de autorización consulta la cuenta vigente.
 
 ## API modular
 

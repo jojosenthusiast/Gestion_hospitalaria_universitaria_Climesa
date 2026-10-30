@@ -36,6 +36,6 @@ cd android
 ./gradlew connectedAndroidTest   # pruebas de UI (necesita emulador)
 ```
 
-## Variables (`android/local.properties`, nunca se sube)
+## Variables (propiedades de Gradle `CLIMESA_*`)
 
-Ver `local.properties.example`. Se leen en `build.gradle.kts` hacia `BuildConfig`.
+`app/build.gradle.kts` lee `CLIMESA_API_BASE_URL`, `CLIMESA_SUPABASE_URL` y `CLIMESA_SUPABASE_PUBLISHABLE_KEY` con `providers.gradleProperty` (por ejemplo en `~/.gradle/gradle.properties`) y las pasa a `BuildConfig` como `API_BASE_URL`, `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`. `android/local.properties` solo contiene `sdk.dir` (lo escribe Android Studio) y nunca se sube. Detalle en `README.md`.

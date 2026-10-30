@@ -9,6 +9,8 @@ Hecho ese día: `core_semanas_1_2` aplicada; `/salud` responde 200 con `database
 - [ ] **Gancho de token (el que falta para que cada rol vea lo suyo).** Supabase → Authentication → Hooks → *Customize Access Token (JWT) Claims* → Postgres → esquema `acceso`, función `hook_token`.
 - [ ] **URL de Auth.** Supabase → Authentication → URL Configuration: Site URL `https://sghu-web.onrender.com` y Redirect URL `https://sghu-web.onrender.com/**`.
 - [ ] **Antes de usar datos reales:** dar clave a `sghu_api` (paso 2 de abajo) y cambiar `DATABASE_URL` en Render a `sghu_api.<ref>` (paso 5); borrar las cuentas de demostración, porque `adm@climesa` es administrador y la web es pública.
+- [ ] **Monitor externo de `/salud`.** Crear el monitor gratuito cada 5 minutos descrito en [despliegue-render.md](despliegue-render.md) para que la API no duerma; este documento no confirma que ya exista.
+- [x] Migración `core_semanas_1_2` aplicada en el remoto (28-oct-2026); el paso 1 de abajo queda como referencia.
 - [ ] Limpieza opcional: `delete from plataforma.outbox where entidad_id = 'humo-1';`
 - [ ] Opcional: activar *Leaked Password Protection* en Authentication (único aviso del asesor de seguridad).
 
@@ -21,7 +23,7 @@ Al terminar el gancho de token, comprobar que un inicio de sesión devuelve un t
 | Elemento | Remoto | Falta |
 |---|---|---|
 | Migraciones base (13) + invitaciones (`acceso_invitacion`, `acceso_invitacion_politicas`) | aplicadas | nada |
-| `20261024070241_core_semanas_1_2.sql` (`acceso.canales_actuales`, `acceso.proteger_desactivacion`) | **no aplicada** | aplicarla |
+| `20261024070241_core_semanas_1_2.sql` (`acceso.canales_actuales`, `acceso.proteger_desactivacion`) | aplicada el 28-oct-2026 (estaba pendiente al hacer esta consulta) | nada |
 | Rol `sghu_api` | existe, `rolcanlogin = false` | contraseña y login |
 | Gancho `acceso.hook_token` | función existe | activarlo en el panel |
 | Administrador principal (`acceso.administrador_principal`) | 1 fila | nada |
@@ -33,7 +35,7 @@ Las migraciones remotas se aplicaron con otra marca de versión (p. ej. `2026101
 
 ## Pasos (en este orden)
 
-1. **Aplicar `core_semanas_1_2`.** En el SQL Editor de Supabase, pega el contenido de `supabase/migrations/20261024070241_core_semanas_1_2.sql` y ejecútalo. Después, en Security Advisor, no debe aparecer ningún hallazgo nuevo.
+1. **(Hecho el 28-oct-2026) Aplicar `core_semanas_1_2`.** En el SQL Editor de Supabase, pega el contenido de `supabase/migrations/20261024070241_core_semanas_1_2.sql` y ejecútalo. Después, en Security Advisor, no debe aparecer ningún hallazgo nuevo.
 2. **Contraseña del rol de la API** (nunca en el repositorio ni en el chat):
    `alter role sghu_api login password '<contraseña larga y aleatoria>';`
 3. **Gancho de token.** Authentication → Hooks → *Customize Access Token (JWT) Claims* → tipo Postgres → función `acceso.hook_token`.
