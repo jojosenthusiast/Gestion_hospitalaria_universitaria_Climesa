@@ -5,10 +5,13 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
 import { Clock } from '../platform/clock';
 import { PoolClient } from 'pg';
+import { channelsFor } from '../platform/channels';
 import { BedBlockDto, BedTransitionDto, SpaceDto } from './operations.dto';
 @Injectable()
 export class InfrastructureService {
   constructor(private readonly db:DatabaseService,private readonly commands:CommandService,private readonly clock:Clock) {}
+  /** Roles que ven el tablero de camas o el árbol de espacios según el catálogo de permisos. */
+  private spaceChannels(c:PoolClient){return channelsFor(c,['camas.ver_tablero','espacios.ver']);}
   async tree() {
     return this.db.query(`WITH RECURSIVE descendants(ancestor,id) AS (SELECT id,id FROM infra.espacio WHERE activo UNION ALL SELECT d.ancestor,e.id FROM descendants d JOIN infra.espacio e ON e.padre_id=d.id AND e.activo)
       SELECT e.id,e.padre_id AS "parentId",e.tipo AS type,e.codigo AS code,e.nombre AS name,e.categoria AS category,e.capacidad AS capacity,e.nivel AS level,e.activo AS active,e.version,infra.ruta(e.id) AS path,
@@ -63,7 +66,7 @@ export class InfrastructureService {
         row=(await c.query('INSERT INTO infra.espacio(padre_id,tipo,codigo,nombre,categoria,capacidad,nivel) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,version',[dto.type==='hospital'?null:dto.parentId,dto.type,dto.code.toUpperCase(),dto.name,dto.type==='habitacion'?dto.category:null,dto.capacity||null,dto.level??null])).rows[0];
       }
       await this.commands.audit(c,actor,{action:id?'espacios.editar':'espacios.crear',entity:'espacio',entityId:row.id,permission:'espacios.configurar',reason:dto.reason});
-      await this.commands.event(c,'espacio.actualizado','espacio',row.id,row.version,['rol:ADM','rol:JOP','rol:REC','rol:ENF']);
+      await this.commands.event(c,'espacio.actualizado','espacio',row.id,row.version,await this.spaceChannels(c));
       return row;
     });
   }
@@ -99,7 +102,7 @@ export class InfrastructureService {
       const cleaning=(await c.query<{id:string}>('INSERT INTO infra.limpieza_cama(cama_id,pendiente_desde) VALUES($1,$2) RETURNING id',[id,pending])).rows[0];
       const version=await this.advanceBedVersion(c,id);
       await this.recordBedChange(c,actor,id,version,'camas.solicitar_limpieza','camas.registrar_limpieza',dto.reason,{state:'limpieza'});
-      await this.commands.event(c,'cama.limpieza_pendiente','cama',id,version,['rol:JOP','rol:REC','rol:ENF','rol:MED']);
+      await this.commands.event(c,'cama.limpieza_pendiente','cama',id,version,await this.spaceChannels(c));
       return {id:cleaning.id,camaId:id,state:'limpieza',version,pendienteDesde:pending.toISOString()};
     });
   }
@@ -144,7 +147,7 @@ export class InfrastructureService {
   }
   private async recordBedChange(c:PoolClient,actor:Actor,id:string,version:number,action:string,permission:string,reason:string,detail:Record<string,unknown>) {
     await this.commands.audit(c,actor,{action,entity:'cama',entityId:id,permission,reason,detail});
-    await this.commands.event(c,'cama.estado_cambiado','cama',id,version,['rol:REC','rol:JOP','rol:ENF','rol:MED']);
+    await this.commands.event(c,'cama.estado_cambiado','cama',id,version,await this.spaceChannels(c));
   }
   async dashboard(actor:Actor) {
     const result:Record<string,unknown>={lastUpdate:this.clock.now().toISOString()};
