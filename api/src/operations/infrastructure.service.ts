@@ -148,11 +148,15 @@ export class InfrastructureService {
   }
   async dashboard(actor:Actor) {
     const result:Record<string,unknown>={lastUpdate:this.clock.now().toISOString()};
-    if(hasPermission(actor,'espacios.ver')||hasPermission(actor,'metricas.ver'))result.beds=(await this.db.query("SELECT count(*)::int AS total,count(*) FILTER(WHERE estado='libre')::int AS free,count(*) FILTER(WHERE estado='ocupada')::int AS occupied FROM infra.v_estado_cama"))[0];
-    if(hasPermission(actor,'pacientes.buscar'))result.patients=(await this.db.query("SELECT count(*)::int AS total,count(*) FILTER(WHERE estado='activo')::int AS active FROM pacientes.paciente"))[0];
+    if(hasPermission(actor,'espacios.ver')||hasPermission(actor,'metricas.ver'))result.beds=(await this.db.query("SELECT count(*)::int AS total,count(*) FILTER(WHERE estado='libre')::int AS free,count(*) FILTER(WHERE estado='ocupada')::int AS occupied,count(*) FILTER(WHERE estado='limpieza')::int AS cleaning FROM infra.v_estado_cama"))[0];
+    if(hasPermission(actor,'pacientes.buscar')||hasPermission(actor,'metricas.ver'))result.patients=(await this.db.query("SELECT count(*)::int AS total,count(*) FILTER(WHERE estado='activo')::int AS active FROM pacientes.paciente"))[0];
     if(hasPermission(actor,'personal.ver'))result.staff=(await this.db.query('SELECT count(*)::int AS total,count(*) FILTER(WHERE activo)::int AS active FROM personal.persona'))[0];
     if(hasPermission(actor,'usuarios.ver'))result.users=(await this.db.query("SELECT count(*)::int AS total,count(*) FILTER(WHERE estado='activo')::int AS active FROM acceso.usuario"))[0];
-    if(hasPermission(actor,'turnos.planificar'))result.shifts=(await this.db.query("SELECT count(*) FILTER(WHERE periodo @> $1::timestamptz)::int AS current,count(*) FILTER(WHERE estado='borrador')::int AS draft FROM personal.turno WHERE estado<>'cancelado'",[this.clock.now()]))[0];
+    if(hasPermission(actor,'turnos.planificar')||hasPermission(actor,'metricas.ver')){
+      const shifts=(await this.db.query("SELECT count(*) FILTER(WHERE periodo @> $1::timestamptz AND estado IN ('publicado','en_curso'))::int AS current,count(*) FILTER(WHERE estado='borrador')::int AS draft FROM personal.turno WHERE estado<>'cancelado'",[this.clock.now()]))[0] as {current:number;draft:number};
+      // Los borradores son trabajo de quien planifica; el tablero solo agrega el conteo de turnos en curso.
+      result.shifts=hasPermission(actor,'turnos.planificar')?shifts:{current:shifts.current};
+    }
     return result;
   }
 }
