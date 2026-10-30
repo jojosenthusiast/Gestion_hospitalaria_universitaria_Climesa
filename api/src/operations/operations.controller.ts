@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../auth';
 import { PermissionGuard } from '../auth';
 import { RequirePermission } from '../auth';
@@ -7,7 +7,7 @@ import { ActorRequest } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
-import { BedBlockDto, BedTransitionDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
+import { BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
 export class OperationsController {
   constructor(private readonly people:PersonnelService,private readonly infra:InfrastructureService,private readonly db:DatabaseService) {}
@@ -25,6 +25,10 @@ export class OperationsController {
   shifts(@Req() r:ActorRequest){return this.people.shifts(r.actor);}
   @Get('turnos/mios') @RequirePermission('turnos.ver') @ApiOperation({summary:'Turnos publicados de la persona vinculada a la cuenta'})
   myShifts(@Req() r:ActorRequest){return this.people.shifts(r.actor,true);}
+  @Get('turnos/cobertura') @RequirePermission('turnos.ver') @ApiOperation({summary:'Huecos de cobertura por área y hora frente al mínimo vigente'}) @ApiQuery({name:'from',description:'Primer día local, yyyy-MM-dd'}) @ApiQuery({name:'to',description:'Último día local, yyyy-MM-dd'}) @ApiQuery({name:'areaId',required:false})
+  coverage(@Query('from') from='',@Query('to') to='',@Query('areaId') areaId?:string){return this.people.coverage(from,to,areaId);}
+  @Post('turnos/publicar') @RequirePermission('turnos.publicar') @ApiOperation({summary:'Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó'})
+  publishShifts(@Req() r:ActorRequest,@Body() d:PublishDto,@Headers('idempotency-key') k?:string){return this.people.publish(r.actor,d,k);}
   @Post('turnos') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Planificar turno con duración, traslapes y descanso'})
   createShift(@Req() r:ActorRequest,@Body() d:ShiftDto,@Headers('idempotency-key') k?:string){return this.people.saveShift(r.actor,null,d,k);}
   @Patch('turnos/:id') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Mover o cancelar turno con versión y motivo'})
