@@ -1480,6 +1480,77 @@
         "x-permiso": "camas.verificar_limpieza"
       }
     },
+    "/api/v1/ambulancia": {
+      "get": {
+        "operationId": "OperationsController_ambulanceStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado de la unidad y servicio activo",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "ambulancia.ver_estado"
+      }
+    },
+    "/api/v1/ambulancia/mantenimiento": {
+      "post": {
+        "operationId": "OperationsController_ambulanceMaintenance",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaintenanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Entrar o salir de mantenimiento; salir exige paramédico con turno en curso",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "ambulancia.mantenimiento"
+      }
+    },
     "/api/v1/auditoria": {
       "get": {
         "operationId": "OperationsController_audit",
@@ -2129,6 +2200,29 @@
         },
         "required": [
           "version",
+          "reason"
+        ]
+      },
+      "MaintenanceDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "inMaintenance": {
+            "type": "boolean",
+            "description": "true entra a mantenimiento; false sale y deja la unidad Disponible"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "inMaintenance",
           "reason"
         ]
       }

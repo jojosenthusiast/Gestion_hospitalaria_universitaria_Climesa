@@ -60,3 +60,8 @@ export class BedTransitionDto {
   @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
   @Text(10,500) reason!:string;
 }
+export class MaintenanceDto {
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+  @ApiProperty({description:'true entra a mantenimiento; false sale y deja la unidad Disponible'}) @IsBoolean() inMaintenance!:boolean;
+  @Text(10,500) reason!:string;
+}
