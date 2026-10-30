@@ -15,11 +15,12 @@
   - Depende de: T01
   - Hecho cuando: escenarios 1, 2 y 3 pasan
   - Verificado: 29-oct-2026 npm test -- --ci en api/: core.integration.spec.ts "turnos respetan duración, solapamiento y descanso de guardia" (duración 400, traslape 409, descanso 409, mover con versión y cancelar); 188 pruebas pasadas, 0 fallidas
-- [ ] T04 · S2 · R · Pantallas de personal en web (W07, W08)
+- [x] T04 · S2 · R · Pantallas de personal en web (W07, W08)
   - Cubre: FR-103-01
   - Depende de: T02, 120-T02
   - Hecho cuando: el administrador crea y edita personal desde la web
-  - Avance: 29-oct-2026 `npm test` en web/: 9 archivos, 86 pruebas pasan (web/src/__tests__/personal.test.tsx, 13 pruebas contra un Api falso: listado con filtro de inactivos y estados cargando, vacío y error; sin `personal.gestionar` no hay botones de alta ni edición; crear con POST /personal sin versión ni motivo; editar con PATCH, versión y motivo de 10 caracteres; inactivar con `active` en falso; 409 `version_conflicto` con aviso y recarga; 409 por turnos futuros y 400 de la API con su mensaje; validación previa en español de nombres, teléfono, DUI y motivo); `npx tsc --noEmit` en web/ sin errores. El alta y la edición contra la API real ya están en T02 (api/). Falta W08: ficha de personal con inscripciones y turnos próximos (el formulario de inscripción no existe en la web), y comprobarlo en la web desplegada contra Supabase
+  - Verificado: 29-oct-2026 `npm test` en web/: 10 archivos, 100 pruebas pasan; `npx tsc --noEmit` en web/ y api/ sin errores; `npm test -- --ci` en api/: 19 suites, 209 pruebas pasan. W07 (personal.test.tsx, 13 pruebas contra un Api falso): listado con filtro de inactivos y estados cargando, vacío y error; sin `personal.gestionar` no hay botones de alta ni edición; crear con POST /personal; editar con PATCH, versión y motivo de 10 caracteres; inactivar; 409 `version_conflicto` con aviso y recarga; validación previa en español. W08 (personal-ficha.test.tsx, 14 pruebas): la ficha se abre desde el directorio y muestra datos, inscripciones con vigencia y estado (vigente, por vencer a 30 días, vencida, aún no vigente) y solo los turnos publicados por venir de esa persona; estados vacío, cargando y error; «Registrar inscripción» envía junta, número, vigencia, versión y motivo (>=10 caracteres), valida en español y ante 409 pide recargar; sin `personal.gestionar` no hay acción. API: `GET /personal` ahora devuelve `registrations` por persona (api/tests/personal-ficha.spec.ts, 2 pruebas), sin endpoint ni permiso nuevos
+  - Avance: pendiente solo la comprobación manual en la web desplegada contra Supabase; el umbral de 30 días para «por vencer» es supuesto de la web (la spec 103 no define aviso de vencimiento)
 - [x] T05 · S2 · E · Inscripciones y bloqueo de roles clínicos sin inscripción
   - Cubre: FR-103-03, FR-103-10
   - Depende de: T02
