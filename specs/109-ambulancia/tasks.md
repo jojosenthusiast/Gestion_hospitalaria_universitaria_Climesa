@@ -9,6 +9,7 @@
   - Cubre: FR-109-01, FR-109-06
   - Depende de: T01, 103-T06
   - Hecho cuando: escenario 2 pasa
+  - Avance 29-oct-2026 (solo API): `api/tests/ambulancia-estado.spec.ts` (5 pruebas) cubre el escenario 2: sin paramédico con turno en curso (turno futuro o persona no paramédica no cuentan) salir de mantenimiento responde 409 `sin_paramedico_de_turno`; con uno de turno la unidad queda Disponible con versión, `cambio_estado`, auditoría y evento `ambulancia.estado_cambiado` en el canal `ambulancia`. `GET /ambulancia` (`ambulancia.ver_estado`) devuelve unidad, servicio activo y tripulación sin datos del paciente. El cambio de estado se hace con `POST /ambulancia/mantenimiento` (`ambulancia.mantenimiento`, JOP), el único endpoint que mueve la unidad antes de T03/T04. **Sigue abierta**: falta la tarjeta web y la prueba en vivo con teléfono.
 - [ ] T03 · S4 · R · Solicitudes del paciente y por teléfono, confirmación y despacho con bloqueo
   - Cubre: FR-109-02, FR-109-03, FR-109-04, FR-109-05
   - Depende de: T02, 101-T07
