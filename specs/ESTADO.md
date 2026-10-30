@@ -11,7 +11,7 @@
 | [100 Plataforma de la API](./100-plataforma-api/spec.md) | En revisión | 17/2/0 | 8/10 | ████████░░ |
 | [101 Identidad, cuentas y acceso](./101-identidad-acceso/spec.md) | En revisión | 15/1/0 | 4/8 | █████░░░░░ |
 | [102 Pacientes](./102-pacientes/spec.md) | En revisión | 11/1/0 | 4/7 | ██████░░░░ |
-| [103 Personal de salud y turnos](./103-personal-turnos/spec.md) | En revisión | 11/3/0 | 6/9 | ███████░░░ |
+| [103 Personal de salud y turnos](./103-personal-turnos/spec.md) | En revisión | 11/3/0 | 7/9 | ████████░░ |
 | [104 Edificio, camas y recursos](./104-infraestructura-recursos/spec.md) | En revisión | 12/1/0 | 5/7 | ███████░░░ |
 | [105 Fila del día y citas](./105-fila-citas/spec.md) | En revisión | 10/2/0 | 1/6 | ██░░░░░░░░ |
 | [106 Consulta general](./106-consulta-general/spec.md) | En revisión | 11/1/0 | 1/7 | █░░░░░░░░░ |
@@ -62,7 +62,7 @@
 - [x] 103-T01 · Migración 0004 de personal y turnos con exclusión
 - [x] 103-T02 · CRUD de personal (con y sin cuenta)
 - [x] 103-T03 · Crear y mover turnos con duración y descanso por política
-- [ ] 103-T04 · Pantallas de personal en web (W07, W08)
+- [x] 103-T04 · Pantallas de personal en web (W07, W08)
 - [x] 103-T06 · Cobertura, publicación con advertencias y estados automáticos
 - [x] 104-T01 · Migración 0005 del árbol de espacios con capacidad y semilla del curso
 - [x] 104-T02 · Consultas recursivas de árbol, ruta y disponibilidad

@@ -1,7 +1,8 @@
 import type { components } from './generated/openapi';
 export type AccessProfile={canInviteAdmin?:boolean;id:string;user:{id:string;email?:string};email:string;name:string;roles:string[];platforms:string[];permissions:{code:string;context:string}[];channels:string[];patientId:string|null;staffId:string|null};
 export type Patient={id:string;record:string;fullName:string;givenNames:string;surnames:string;state:string;active:boolean;sex:string;birth?:string|null;birthPrecision?:string;phone?:string|null;dui?:string|null;email?:string|null;address?:string|null;version:number;matchReason?:string;history?:{version:number;at:string;reason:string;changes:Record<string,{before:unknown;after:unknown}>}[]};
-export type Staff={id:string;givenNames:string;surnames:string;type:string;specialty?:string;areaId?:string;area?:string;phone?:string;dui?:string;active:boolean;version:number};
+export type Registration={id:string;board:string;number:string;validFrom:string;validTo:string};
+export type Staff={id:string;givenNames:string;surnames:string;type:string;specialty?:string;areaId?:string;area?:string;phone?:string;dui?:string;active:boolean;version:number;registrations?:Registration[]};
 export type Space={id:string;parentId:string|null;type:string;code:string;name:string;category?:string;capacity?:number;level?:number;active:boolean;version:number;path:string;totalBeds:number;freeBeds:number};
 export type Bed={id:string;code:string;roomId:string;room:string;category:string;level:number;state:string;version:number;cleaningPending:boolean;cleaningCompleted:boolean;cleanedByCurrentUser:boolean;path:string;occupant?:string;occupantRestricted?:boolean;patientId?:string};
 export type Shift={id:string;staffId:string;person:string;areaId:string;area:string;start:string;end:string;type:string;state:string;justification?:string;version:number};
@@ -11,6 +12,7 @@ export type Summary={lastUpdate:string;beds?:{total:number;free:number;occupied:
 export type SearchReceipt={token:string;expiresAt:string;candidates:Patient[]};
 export type PatientInput=Omit<components['schemas']['PatientCreateDto'],'searchToken'|'searchQuery'>;
 export type StaffInput=components['schemas']['StaffDto'];
+export type RegistrationInput=components['schemas']['RegistrationDto'];
 export type ShiftInput=components['schemas']['ShiftDto'];
 export type SpaceInput=components['schemas']['SpaceDto'];
 export type BedBlockInput=components['schemas']['BedBlockDto'];
