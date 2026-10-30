@@ -8,6 +8,7 @@ Uso:  python3 tools/generar_docs.py            (escribe)
       python3 tools/generar_docs.py --verificar (falla si las salidas no están al día o hay inconsistencias)
 """
 import csv
+import re
 import sys
 from collections import OrderedDict, defaultdict
 from pathlib import Path
@@ -300,10 +301,95 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
     return errores
 
 
+PRIVACIDAD = RAIZ / "docs" / "arquitectura" / "privacidad.md"
+# Columna de la tabla de campos (privacidad.md §2) -> código de rol de roles.csv. "Público" no es un rol.
+COLUMNAS_CAMPOS = {
+    "Paciente": "PAC", "Recepción": "REC", "Asistente": "AST", "Enfermería": "ENF", "Médico tratante": "MED",
+    "Laboratorio": "LAB", "Paramédico": "PAR", "Jefe Op.": "JOP", "Admin": "ADM", "Público": None,
+}
+# Permisos de lectura o escritura clínica: ni Administrador, Jefe de Operaciones ni Recepción los tienen por rol (D-031).
+PERMISOS_CLINICOS = [
+    "expediente.ver", "consulta.iniciar", "consulta.registrar", "consulta.corregir", "signos.registrar", "recetas.emitir",
+    "laboratorio.ordenar", "laboratorio.procesar", "laboratorio.validar", "laboratorio.revisar", "resultados.ver",
+    "alta.firmar", "enfermeria.registrar", "ambulancia.recibir_prehospital",
+]
+# Desvíos conocidos entre permisos.csv y privacidad.md §2, pendientes de decisión de producto (ver docs/preguntas-abiertas.md).
+# Si uno deja de ser cierto, verificar exige quitarlo de aquí.
+DIVERGENCIAS_CONOCIDAS = {
+    ("ambulancia.recibir_prehospital", "JOP"),
+    ("ambulancia.recibir_prehospital", "REC"),
+}
+CELDA_CAMPO = re.compile(r"^(✔|·|Solo agregado|Número sin nombre)( \(.+\))?$")
+
+
+def leer_tabla_campos():
+    """Devuelve (columnas, filas) de la tabla '## 2. Campos del expediente del paciente' de privacidad.md."""
+    lineas = PRIVACIDAD.read_text(encoding="utf-8").splitlines()
+    inicio = next((i for i, l in enumerate(lineas) if l.startswith("## 2.")), None)
+    if inicio is None:
+        return [], [], ["privacidad.md: falta la sección '## 2.' con la tabla de campos"]
+    tabla = []
+    for l in lineas[inicio + 1:]:
+        if l.startswith("## "):
+            break
+        if l.startswith("|"):
+            tabla.append([c.strip() for c in l.strip().strip("|").split("|")])
+    if len(tabla) < 3:
+        return [], [], ["privacidad.md §2: no se encontró la tabla de campos"]
+    return tabla[0], [f for f in tabla[2:]], []
+
+
+def verificar_politica_campos(permisos, roles):
+    """Verifica la política de campos (privacidad.md §2) contra los catálogos: estructura, celdas válidas y D-031."""
+    errores = []
+    cabecera, filas, previos = leer_tabla_campos()
+    if previos:
+        return previos
+    esperado = ["Campo", "Clase"] + list(COLUMNAS_CAMPOS)
+    if cabecera != esperado:
+        errores.append(f"privacidad.md §2: columnas {cabecera}, se esperaban {esperado}")
+        return errores
+    codigos = {r["codigo"] for r in roles}
+    for rol in (c for c in COLUMNAS_CAMPOS.values() if c):
+        if rol not in codigos:
+            errores.append(f"privacidad.md §2 usa el rol {rol}, que no está en roles.csv")
+    nombres = [f[0] for f in filas]
+    if len(nombres) != len(set(nombres)):
+        errores.append("privacidad.md §2: hay campos repetidos")
+    for fila in filas:
+        if len(fila) != len(esperado):
+            errores.append(f"privacidad.md §2: la fila '{fila[0]}' tiene {len(fila)} celdas, se esperaban {len(esperado)}")
+            continue
+        if fila[1] not in ("Personal", "Clínica (sensible)", "Clínica"):
+            errores.append(f"privacidad.md §2: '{fila[0]}' con clase inválida '{fila[1]}'")
+        for columna, celda_ in zip(esperado[2:], fila[2:]):
+            if not CELDA_CAMPO.match(celda_):
+                errores.append(f"privacidad.md §2: celda inválida '{celda_}' en '{fila[0]}' / {columna}")
+        if fila[1].startswith("Clínica"):
+            for columna in ("Recepción", "Jefe Op.", "Admin", "Público"):
+                if fila[2 + list(COLUMNAS_CAMPOS).index(columna)] != "·":
+                    errores.append(f"privacidad.md §2: '{fila[0]}' es clínico y no debe verlo {columna} por su rol (D-031)")
+    por_nombre = {p["permiso"]: p for p in permisos}
+    vistas = set()
+    for permiso in PERMISOS_CLINICOS:
+        if permiso not in por_nombre:
+            errores.append(f"PERMISOS_CLINICOS menciona {permiso}, que no está en permisos.csv")
+            continue
+        for rol in ("ADM", "JOP", "REC"):
+            if por_nombre[permiso][rol]:
+                if (permiso, rol) in DIVERGENCIAS_CONOCIDAS:
+                    vistas.add((permiso, rol))
+                else:
+                    errores.append(f"permisos.csv da {permiso} a {rol}, pero el contenido clínico no es de ese rol (D-031, privacidad.md §2)")
+    for sobrante in sorted(DIVERGENCIAS_CONOCIDAS - vistas):
+        errores.append(f"DIVERGENCIAS_CONOCIDAS ya no aplica: {sobrante}; quítala de tools/generar_docs.py")
+    return errores
+
+
 def main():
     roles, permisos = leer("roles.csv"), leer("permisos.csv")
     endpoints, pantallas = leer("endpoints.csv"), leer("pantallas.csv")
-    errores = verificar_consistencia(permisos, endpoints, pantallas, roles)
+    errores = verificar_consistencia(permisos, endpoints, pantallas, roles) + verificar_politica_campos(permisos, roles)
     salidas = {
         SALIDA_RBAC: generar_rbac(roles, permisos, endpoints),
         SALIDA_PANTALLAS: generar_pantallas(pantallas, roles),

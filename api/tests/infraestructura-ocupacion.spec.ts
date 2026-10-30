@@ -91,5 +91,20 @@ describe('HU-104 · disponibilidad recursiva, tablero por permiso y capacidad ba
   const result=await call('ADM','PATCH',`/espacios/${room.id}`,{code:room.code,name:room.name,type:room.type,parentId:room.parentId,category:room.category,capacity:1,level:room.level,version:room.version,reason:'Reducción de capacidad de prueba'});
   expect(result.status).toBe(409);expect(result.body.codigo).toBe('capacidad_menor_que_camas');
  });
+ test('113-T01: /inicio da camas libres, ocupadas y en limpieza, turnos en curso y pacientes a quien tiene metricas.ver, solo agregados',async()=>{
+  const bed=(await bedsOf('HAB-204'))[0];
+  await fixture.pg.query('INSERT INTO infra.limpieza_cama(cama_id) VALUES($1)',[bed.id]);
+  const camas=(await call('REC','GET','/camas')).body as {state:string}[];
+  const adm=await call('ADM','GET','/inicio');
+  expect(adm.status).toBe(200);
+  expect(adm.body.beds).toEqual({total:17,free:camas.filter(c=>c.state==='libre').length,occupied:3,cleaning:1});
+  expect(adm.body.patients).toMatchObject({active:expect.any(Number)});
+  expect(adm.body.shifts).toEqual({current:expect.any(Number)});
+  const texto=JSON.stringify(adm.body);
+  expect(texto).not.toMatch(/Ana|Ejemplo|0000001|00000001|7000/);
+  const jop=await call('JOP','GET','/inicio');
+  expect(jop.body.shifts).toEqual({current:expect.any(Number),draft:expect.any(Number)});
+  const pac=await call('PAC','GET','/inicio');
+  expect(pac.body.beds).toBeUndefined();expect(pac.body.patients).toBeUndefined();expect(pac.body.shifts).toBeUndefined();
+ });
 });
-

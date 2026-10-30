@@ -149,7 +149,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/personal` | `personal.ver` |  | R | 2 | ✔ | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/personal` | `personal.ver` | Incluye las inscripciones de cada persona (W07 y W08) | R | 2 | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/personal` | `personal.gestionar` |  | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | PUT | `/api/v1/personal/{id}` | `personal.gestionar` | Versión optimista | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/personal/{id}/inscripciones` | `personal.gestionar` | Versión optimista y motivo; sin inscripción vigente no se programa MED ni ENF | E | 4 | ✔ | · | · | · | · | · | · | · | · | · |
