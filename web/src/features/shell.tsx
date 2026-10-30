@@ -16,12 +16,12 @@ export const modules:Module[]=[
  {id:'turnos',label:'Turnos',permission:'turnos.ver',roles:['ADM','JOP','REC']},
  {id:'usuarios',label:'Usuarios',permission:'usuarios.ver',roles:['ADM','DPD']},
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver',roles:['DPD']},
- {id:'laboratorio',label:'Laboratorio',roles:['LAB'],future:true},
- {id:'inventario',label:'Inventario',roles:['JOP','LAB'],future:true},
- {id:'fila',label:'Fila del día',roles:['REC'],future:true},
- {id:'citas',label:'Citas',roles:['REC'],future:true},
- {id:'privacidad',label:'Accesos excepcionales',roles:['DPD'],future:true},
- {id:'perfil',label:'Mi cuenta',roles:['ADM','JOP','REC','LAB','DPD']},
+ {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola',roles:['LAB'],future:true},
+ {id:'inventario',label:'Inventario',permission:'inventario.ver',roles:['JOP','LAB'],future:true},
+ {id:'fila',label:'Fila del día',permission:'fila.ver',roles:['REC'],future:true},
+ {id:'citas',label:'Citas',permission:'citas.ver',roles:['REC'],future:true},
+ {id:'privacidad',label:'Accesos excepcionales',permission:'privacidad.aprobar_acceso',roles:['DPD'],future:true},
+ {id:'perfil',label:'Perfil',roles:['ADM','JOP','REC','LAB','DPD']},
 ];
 const readRoute=()=>location.hash.replace(/^#\/?/,'').split('?')[0]||'inicio';
 export function HospitalShell({api,profile,version=0,connection='live',onLogout}:{api:Api;profile:AccessProfile;version?:number;connection?:'live'|'offline'|'reconnecting';onLogout:()=>void}){
