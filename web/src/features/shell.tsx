@@ -1,6 +1,7 @@
 import { useEffect,useState,type ReactNode } from 'react';
 import { Brand,Icon } from '../components/ui';
 import { can,roleNames,type AccessProfile,type Api,type AuditRow,type Summary } from '../lib/api';
+import { AmbulancePage } from './ambulance';
 import { Empty,Heading,RemoteState,Tag,formatDateTime,useData } from './common';
 import { PatientsPage } from './patients';
 import { PersonnelPage,ShiftsPage } from './personnel';
@@ -13,6 +14,7 @@ export const modules:Module[]=[
  {id:'personal',label:'Personal',permission:'personal.ver',roles:['ADM','JOP']},
  {id:'camas',label:'Camas',permission:'camas.ver_tablero',roles:['JOP','REC']},
  {id:'espacios',label:'Edificio',permission:'espacios.ver',roles:['ADM','JOP','REC']},
+ {id:'ambulancia',label:'Ambulancia',permission:'ambulancia.ver_estado',roles:['JOP','REC']},
  {id:'turnos',label:'Turnos',permission:'turnos.ver',roles:['ADM','JOP','REC']},
  {id:'usuarios',label:'Usuarios',permission:'usuarios.ver',roles:['ADM','DPD']},
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver',roles:['DPD']},
@@ -38,6 +40,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  else if(route==='turnos')content=<ShiftsPage api={api} profile={profile} version={version}/>;
  else if(route==='espacios')content=<SpacesPage api={api} profile={profile} version={version}/>;
  else if(route==='camas')content=<BedsPage api={api} profile={profile} version={version}/>;
+ else if(route==='ambulancia')content=<AmbulancePage api={api} version={version}/>;
  else if(route==='usuarios')content=<UsersPage api={api} profile={profile} version={version}/>;
  else if(route==='auditoria')content=<AuditPage api={api} version={version}/>;
  else if(route==='perfil')content=<ProfilePage profile={profile} onLogout={onLogout}/>;
