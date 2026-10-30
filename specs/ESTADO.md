@@ -2,7 +2,7 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 37 de 131 (28%) · **Requisitos:** 221 · **Specs:** 20
+**Tareas:** 38 de 131 (29%) · **Requisitos:** 221 · **Specs:** 20
 
 ## Por spec
 
@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | [100 Plataforma de la API](./100-plataforma-api/spec.md) | En revisión | 17/2/0 | 8/10 | ████████░░ |
 | [101 Identidad, cuentas y acceso](./101-identidad-acceso/spec.md) | En revisión | 15/1/0 | 4/8 | █████░░░░░ |
-| [102 Pacientes](./102-pacientes/spec.md) | En revisión | 11/1/0 | 4/7 | ██████░░░░ |
+| [102 Pacientes](./102-pacientes/spec.md) | En revisión | 11/1/0 | 5/7 | ███████░░░ |
 | [103 Personal de salud y turnos](./103-personal-turnos/spec.md) | En revisión | 11/3/0 | 6/9 | ███████░░░ |
 | [104 Edificio, camas y recursos](./104-infraestructura-recursos/spec.md) | En revisión | 12/1/0 | 5/7 | ███████░░░ |
 | [105 Fila del día y citas](./105-fila-citas/spec.md) | En revisión | 10/2/0 | 1/6 | ██░░░░░░░░ |
@@ -35,7 +35,7 @@
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
 | S2 | 24 a 30 oct | 20/36 | 1/1 | ██████░░░░ |
-| S3 | 31 oct a 6 nov | 2/29 | 0/0 | █░░░░░░░░░ |
+| S3 | 31 oct a 6 nov | 3/29 | 0/0 | █░░░░░░░░░ |
 | S4 | 7 a 13 nov | 0/22 | 0/0 | ░░░░░░░░░░ |
 | S5 | 14 a 20 nov | 0/8 | 2/23 | █░░░░░░░░░ |
 

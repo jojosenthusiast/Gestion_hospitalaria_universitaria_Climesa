@@ -7,6 +7,7 @@ import { DatabaseService } from '../src/platform/database.service';
 import { SupabaseService } from '../src/supabase/supabase.service';
 import { Clock } from '../src/platform/clock';
 import { createDatabase,userId } from './support/database';
+import { ageOn,ageRange,fichaFields } from '../src/patients/patient.privacy';
 const now=new Date('2026-10-24T12:00:00Z');
 const issuer='https://gvmvmrusscsfbndnbvbr.supabase.co/auth/v1';
 const jwt=(role:string)=>{
@@ -126,5 +127,30 @@ describe('Pacientes · dominio: búsqueda con motivo, DUI repetido, corrección 
    expect((await call('REC','PATCH',`/pacientes/${id}`,{givenNames:'Persona',surnames:'Pendiente',sex:'masculino',birth:'1995-03-02',version:1,reason:'Se confirma la fecha con documento'})).status).toBe(200);
    expect((await fields(id)).precision_nacimiento).toBe('exacta');
   });
+ });
+});
+
+describe('Pacientes · política de campos de la ficha (privacidad.md §2)',()=>{
+ test('rango de edad por decenios y 90+ sin fecha exacta',()=>{
+  expect([0,9,10,34,89,90,104].map(ageRange)).toEqual(['0-9','0-9','10-19','30-39','80-89','90+','90+']);
+  expect(ageRange(null)).toBeNull();expect(ageRange(-1)).toBeNull();
+ });
+ test('la edad cuenta años cumplidos en la fecha de consulta',()=>{
+  expect(ageOn('1992-03-04','2026-10-24')).toBe(34);
+  expect(ageOn('1992-10-25','2026-10-24')).toBe(33);
+  expect(ageOn('1992-10-24','2026-10-24')).toBe(34);
+ });
+ test.each([
+  [['REC'],false,{birth:true,ageRange:false,contact:true}],
+  [['MED'],false,{birth:true,ageRange:false,contact:true}],
+  [['PAC'],true,{birth:true,ageRange:false,contact:true}],
+  [['LAB'],false,{birth:false,ageRange:true,contact:false}],
+  [['AST'],false,{birth:true,ageRange:false,contact:false}],
+  [['ENF'],false,{birth:true,ageRange:false,contact:false}],
+  [['PAR'],false,{birth:true,ageRange:false,contact:false}],
+  [['JOP'],false,{birth:false,ageRange:false,contact:false}],
+  [['LAB','ENF'],false,{birth:true,ageRange:false,contact:false}],
+ ])('%j (dueño: %s) recibe %j',(roles,owner,expected)=>{
+  expect(fichaFields(roles,owner)).toEqual(expected);
  });
 });

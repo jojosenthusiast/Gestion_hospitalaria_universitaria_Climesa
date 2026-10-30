@@ -111,7 +111,10 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   const detail=(await call('REC','GET',`/pacientes/${patientId}`)).body;expect(detail.history[0].changes.primer_apellido.before).toBe('Ejemplo Hernández');expect(detail.version).toBe(2);
  });
  test('filtra campos para laboratorio y rechaza al médico sin relación y paciente ajeno',async()=>{
-  const lab=await call('LAB','GET',`/pacientes/${patientId}`);expect(lab.status).toBe(200);expect(lab.body.birth).toBe('1990-02-03');for(const key of ['dui','phone','address','history'])expect(lab.body[key]).toBeUndefined();
+  expect((await call('LAB','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  await fixture.pg.query("INSERT INTO laboratorio.orden(admision_id,paciente_id,medico_id,estado) VALUES($1,$2,$3,'pendiente')",[randomUUID(),patientId,randomUUID()]);
+  const lab=await call('LAB','GET',`/pacientes/${patientId}`);expect(lab.status).toBe(200);expect(lab.body.ageRange).toBe('30-39');for(const key of ['birth','birthPrecision','dui','phone','address','history'])expect(lab.body[key]).toBeUndefined();
+  await fixture.pg.query('DELETE FROM laboratorio.orden WHERE paciente_id=$1',[patientId]);
   expect((await call('MED','GET',`/pacientes/${patientId}`)).status).toBe(403);expect((await call('PAC','GET',`/pacientes/${patientId}`)).status).toBe(403);
  });
  test('PAC solo recibe sus propios datos y no el historial de edición',async()=>{

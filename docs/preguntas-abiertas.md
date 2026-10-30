@@ -8,6 +8,7 @@
 | 28 | ¿Cuándo necesita Figma el inventario? | Ya está listo: `docs/diseno/inventario-pantallas.md` |
 | 29 | ¿Defensa en dispositivos reales y con qué red? | Se prepara el entorno `demo` y un punto de acceso propio como respaldo (spec 131) |
 | 30 | ¿Nombre y dueño del repositorio en GitHub? | El monorepo está listo para subirse con cualquier nombre |
+| 31 | ¿La ficha de AST, ENF y LAB se limita por el contexto del permiso (rea, consultorio, orden) en permisos.csv en lugar de por rol en el servicio? Hoy el servicio la limita por rol (turno en curso en el área, número llamado al consultorio, orden pendiente) porque pacientes.ver_ficha sigue con x | La regla funciona y está probada; cambiar permisos.csv y la semilla de acceso la haría coherente con la regla 8 de AGENTS.md |
 
 ## Para confirmar al aprobar specs
 
