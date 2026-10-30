@@ -1,9 +1,10 @@
 # 131. Tareas
 
-- [ ] T01 · S2 · R · Diagrama ER, arquitectura, RBAC y privacidad para el avance
+- [x] T01 · S2 · R · Diagrama ER, arquitectura, RBAC y privacidad para el avance
   - Cubre: FR-131-02
   - Depende de: ninguna
   - Hecho cuando: `docs/arquitectura` contiene los cuatro documentos revisados
+  - Verificado: 29-oct-2026 `docs/arquitectura` contiene `arquitectura.md`, `modelo-datos.md`, `roles-y-permisos.md` (generado) y `privacidad.md`, más el resumen `avance-31-octubre.md` con diagramas Mermaid de arquitectura, ER del esquema real, RBAC y privacidad. Las tablas del ER se contrastaron con `create table` de las 16 migraciones de `supabase/migrations` (esquemas acceso, pacientes, personal, infra, atencion, laboratorio, hospitalizacion, ambulancia, inventario, publico, plataforma) y se corrigió en `arquitectura.md` la mención a recuperación "cada cinco segundos", que contradecía `web/src/lib/live.ts`. El PDF (T05) y el enlace de Figma (T03) siguen fuera de esta tarea.
 - [ ] T02 · S2 · R · README raíz con instalación de las tres plataformas
   - Cubre: FR-131-01
   - Depende de: 120-T01, 121-T01, 122-T01, 100-T08

@@ -4,7 +4,9 @@ Requisitos: diagrama de base de datos con modelos de doctores, pacientes, turnos
 
 Convenciones: un esquema PostgreSQL por módulo; llaves `uuid` generadas en la base; `version int` para concurrencia optimista en tablas editables; `creado_en`, `creado_por`; instantes `timestamptz`. Ningún módulo lee ni escribe tablas de otro. Un módulo puede publicar **vistas de solo lectura** con prefijo `v_` como parte de su contrato (por ejemplo `hospitalizacion.v_ocupacion_activa`); solo esas vistas se consultan desde otro esquema. El modelo completo contiene también módulos de semanas posteriores. El core S1/S2 usa vistas e información de relación de los esquemas vecinos para orquestar autorización, camas y turnos; conserva cada escritura en el esquema de su dominio. Las relaciones entre esquemas son llaves lógicas, sin llaves foráneas cruzadas. El cliente accede únicamente a la API; RLS impide el acceso directo a tablas de negocio.
 
-Corte actual: 14 migraciones SQL, semilla con 17 camas (12 semiprivadas y 5 VIP), diez roles y 75 permisos. La revisión local carga todas las migraciones; el estado remoto de la nueva migración está pendiente de conexión al proyecto correcto.
+Esquema real, con los nombres exactos de tablas y columnas de las migraciones: [avance-31-octubre.md](avance-31-octubre.md), sección 2. Donde este diseño objetivo difiera (por ejemplo `acceso.asignacion_rol` no tiene `vigencia`), manda la migración.
+
+Corte actual: 16 archivos en `supabase/migrations` (incluida la semilla de acceso generada), semilla con 17 camas (12 semiprivadas y 5 VIP), diez roles y 75 permisos. La revisión local carga todas las migraciones; el estado remoto de la nueva migración está pendiente de conexión al proyecto correcto.
 
 ## Vista general
 

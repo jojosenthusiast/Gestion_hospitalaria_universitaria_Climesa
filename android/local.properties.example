@@ -1,4 +1,5 @@
 # Copiar a android/local.properties (no se sube). Android Studio agrega sdk.dir solo.
-API_URL=http://10.0.2.2:5080
-SUPABASE_URL=https://<ref>.supabase.co
-SUPABASE_ANON_KEY=<llave anon o publishable; nunca service_role>
+# Las URL de la API y de Supabase NO van aqui: el build las lee como propiedades de Gradle
+# (CLIMESA_API_BASE_URL, CLIMESA_SUPABASE_URL, CLIMESA_SUPABASE_PUBLISHABLE_KEY).
+# Defínelas en ~/.gradle/gradle.properties; ver android/README.md. Nunca pongas service_role.
+sdk.dir=<ruta del SDK de Android>

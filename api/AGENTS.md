@@ -17,7 +17,7 @@ api/
     auth/                        guard de JWT de Supabase, @RequirePermission, acceso
     supabase/                    cliente de Supabase en el servidor
     health/, users/, patients/, operations/   módulos por dominio (spec 100 a 103 y siguientes)
-  tests/                         Jest, contra PostgreSQL real donde la prueba lo pide
+  tests/                         Jest, contra PGlite (tests/support/database.ts)
 ```
 
 Cada módulo de dominio vive en su carpeta de `src/` con su `*.module.ts`, controlador, servicios, DTO y reglas puras (`*.rules.ts`). Un módulo solo usa lo que otro exporta por su módulo o `index.ts`, nunca su interior. Los módulos futuros (specs 104 a 113) siguen la misma forma.
@@ -39,7 +39,8 @@ Cada módulo de dominio vive en su carpeta de `src/` con su `*.module.ts`, contr
 cd api
 npm ci
 npm run build
-npm test                    # necesita PostgreSQL; ver supabase/README.md para crear sghu_test
+npm test                    # Jest contra PGlite (PostgreSQL WASM) con todas las migraciones; no necesita PostgreSQL instalado
+                            # PostgreSQL nativo (carreras multisesión): ver supabase/README.md (sghu_test) y compose.test.yaml
 npm run lint
 npm run start:dev           # http://localhost:3000
 npm run api:generate        # escribe ../contrato/openapi.json
