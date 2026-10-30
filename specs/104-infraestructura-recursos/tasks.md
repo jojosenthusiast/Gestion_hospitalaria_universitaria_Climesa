@@ -31,6 +31,7 @@
   - Depende de: T03
   - Hecho cuando: escenario 3 pasa en Android con el tablero web abierto
   - Avance 29-oct-2026 (API y web): `POST /camas/:id/bloquear`, `desbloquear`, `limpieza`, `limpieza/completar` y `limpieza/verificar` con versión, motivo, auditoría y evento `cama.estado_cambiado`; `api/tests/core.integration.spec.ts` cubre las transiciones y `web/src/__tests__/spaces.test.tsx` las acciones del tablero. **Sigue abierta**: falta el escenario 3 en Android con el tablero web abierto.
+  - Avance 30-oct-2026 (Android): `BedsViewModel` y `BedsScreen` con bloquear, retirar bloqueo, solicitar, completar y verificar limpieza según los permisos de `/auth/me`, versión y motivo en el cuerpo, mensajes en español para 403 y 409 (incluida la regla de que quien limpió no verifica) y recarga al llegar `cama.*` por Realtime. Hay pruebas unitarias con repositorios falsos (`BedsViewModelTest`, `BedRulesTest`). **No verificado en emulador ni dispositivo**; la tarea sigue abierta hasta correr el escenario 3 con el tablero web abierto.
 - [ ] T07 · S5 · E · Equipo médico por espacio
   - Cubre: FR-104-12
   - Depende de: T01

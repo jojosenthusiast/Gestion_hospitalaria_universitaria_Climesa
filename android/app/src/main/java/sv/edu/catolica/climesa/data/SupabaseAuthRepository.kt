@@ -132,4 +132,4 @@ class SupabaseAuthRepository(
     }
 }
 
-class AuthRequestException(message: String, val statusCode: Int? = null) : Exception(message)
+class AuthRequestException(message: String, val statusCode: Int? = null, val code: String? = null) : Exception(message)

@@ -8,10 +8,12 @@
   - Cubre: FR-121-03, FR-121-07
   - Depende de: T01, 101-T03
   - Hecho cuando: escenario 1 pasa para los 7 roles de Android (criterio del avance)
+  - Avance 30-oct-2026: `AndroidSections.visible` deriva la navegación de los permisos de `/auth/me` (quien tiene `ambulancia.operar` ve Unidad, Servicio, Bitácora y Perfil); sin pantallas útiles se muestra "Tu rol no usa esta aplicación"; Servicio y Bitácora quedan como "Próxima entrega". Pruebas unitarias en `AndroidSectionsTest`. **No verificado en emulador ni dispositivo**; Recepción conserva su navegación propia (`ReceptionApp`) y falta recorrer los 7 roles en un dispositivo.
 - [ ] T03 · S2 · R · Repositorio de Realtime e invalidación en ViewModels
   - Cubre: FR-121-04
   - Depende de: T02, 100-T03
   - Hecho cuando: un cambio de cama hecho en web aparece en el tablero Android sin recargar
+  - Avance 30-oct-2026: cliente Phoenix mínimo sobre OkHttp (`SupabaseRealtimeRepository`) que se une a los canales de `/auth/me`, emite `Flow<RealtimeSignal>` con el estado de conexión (en vivo, reconectando, sin conexión) y hace una sola consulta a `/eventos?after=` tras una caída, sin sondeo. `BedsViewModel` filtra `cama.*` y vuelve a pedir el tablero. Pruebas unitarias con transporte falso (`RealtimeRepositoryTest`, `RealtimeProtocolTest`). Se usó OkHttp y no supabase-kt realtime-kt. **No verificado contra Supabase real, emulador ni dispositivo**; la tarea sigue abierta hasta ver un cambio hecho en web aparecer en Android.
 - [ ] T04 · S5 · E · Cola sin conexión del paramédico
   - Cubre: FR-121-06, FR-121-08
   - Depende de: T03, 109-T04
