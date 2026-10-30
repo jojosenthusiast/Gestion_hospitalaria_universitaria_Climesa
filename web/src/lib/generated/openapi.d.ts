@@ -331,6 +331,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/turnos/cobertura": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Huecos de cobertura por área y hora frente al mínimo vigente */
+        get: operations["OperationsController_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/turnos/publicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó */
+        post: operations["OperationsController_publishShifts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/turnos/{id}": {
         parameters: {
             query?: never;
@@ -485,6 +519,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ambulancia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de la unidad y servicio activo */
+        get: operations["OperationsController_ambulanceStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/mantenimiento": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Entrar o salir de mantenimiento; salir exige paramédico con turno en curso */
+        post: operations["OperationsController_ambulanceMaintenance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auditoria": {
         parameters: {
             query?: never;
@@ -617,6 +685,20 @@ export interface components {
             version: number;
             reason: string;
         };
+        PublishDto: {
+            /**
+             * Format: date
+             * @example 2026-11-10
+             */
+            from: string;
+            /**
+             * Format: date
+             * @example 2026-11-16
+             */
+            to: string;
+            /** Format: uuid */
+            areaId?: string;
+        };
         ShiftDto: {
             /** Format: uuid */
             staffId: string;
@@ -655,6 +737,12 @@ export interface components {
         };
         BedTransitionDto: {
             version: number;
+            reason: string;
+        };
+        MaintenanceDto: {
+            version: number;
+            /** @description true entra a mantenimiento; false sale y deja la unidad Disponible */
+            inMaintenance: boolean;
             reason: string;
         };
     };
@@ -1159,6 +1247,53 @@ export interface operations {
             };
         };
     };
+    OperationsController_coverage: {
+        parameters: {
+            query: {
+                areaId?: string;
+                /** @description Último día local, yyyy-MM-dd */
+                to: unknown;
+                /** @description Primer día local, yyyy-MM-dd */
+                from: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperationsController_publishShifts: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     OperationsController_editShift: {
         parameters: {
             query?: never;
@@ -1388,6 +1523,47 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["BedTransitionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperationsController_ambulanceStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperationsController_ambulanceMaintenance: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaintenanceDto"];
             };
         };
         responses: {

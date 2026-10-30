@@ -34,6 +34,11 @@ export class ShiftDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) version?:number;
   @Text(10,500,true) reason?:string;
 }
+export class PublishDto {
+  @ApiProperty({format:'date',example:'2026-11-10'}) @Matches(/^\d{4}-\d{2}-\d{2}$/) from!:string;
+  @ApiProperty({format:'date',example:'2026-11-16'}) @Matches(/^\d{4}-\d{2}-\d{2}$/) to!:string;
+  @ApiPropertyOptional({format:'uuid'}) @IsOptional() @IsUUID() areaId?:string;
+}
 export const spaceTypes=['hospital','planta','area','habitacion','cama','consultorio','cubiculo','bodega','bahia'];
 export class SpaceDto {
   @Text(2,40) code!:string;
@@ -53,5 +58,10 @@ export class BedBlockDto {
 }
 export class BedTransitionDto {
   @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+  @Text(10,500) reason!:string;
+}
+export class MaintenanceDto {
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+  @ApiProperty({description:'true entra a mantenimiento; false sale y deja la unidad Disponible'}) @IsBoolean() inMaintenance!:boolean;
   @Text(10,500) reason!:string;
 }
