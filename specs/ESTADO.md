@@ -60,8 +60,8 @@
 - [x] 102-T03 · CRUD: buscar, registrar tras buscar, ver, editar con historial, inactivar
 - [ ] 102-T05 · Pantallas de pacientes en web (W26) y Android (A30)
 - [x] 103-T01 · Migración 0004 de personal y turnos con exclusión
-- [ ] 103-T02 · CRUD de personal (con y sin cuenta)
-- [ ] 103-T03 · Crear y mover turnos con duración y descanso por política
+- [x] 103-T02 · CRUD de personal (con y sin cuenta)
+- [x] 103-T03 · Crear y mover turnos con duración y descanso por política
 - [ ] 103-T04 · Pantallas de personal en web (W07, W08)
 - [ ] 103-T06 · Cobertura, publicación con advertencias y estados automáticos
 - [x] 104-T01 · Migración 0005 del árbol de espacios con capacidad y semilla del curso

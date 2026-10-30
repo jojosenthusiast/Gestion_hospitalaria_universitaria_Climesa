@@ -152,7 +152,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/personal` | `personal.ver` |  | R | 2 | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/personal` | `personal.gestionar` |  | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | PUT | `/api/v1/personal/{id}` | `personal.gestionar` | Versión optimista | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
-| POST | `/api/v1/personal/{id}/inscripciones` | `personal.gestionar` |  | E | 4 | ✔ | · | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/personal/{id}/inscripciones` | `personal.gestionar` | Versión optimista y motivo; sin inscripción vigente no se programa MED ni ENF | E | 4 | ✔ | · | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/turnos` | `turnos.ver` | PAR, AST, ENF ven los suyos y los de su área | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/turnos` | `turnos.planificar` | Sin traslape; reglas D-054 | R | 2 | · | ✔ | · | · | · | · | · | · | · | · |
 | PUT | `/api/v1/turnos/{id}` | `turnos.planificar` | Versión optimista | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |

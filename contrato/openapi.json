@@ -742,6 +742,64 @@
         "x-permiso": "personal.gestionar"
       }
     },
+    "/api/v1/personal/{id}/inscripciones": {
+      "post": {
+        "operationId": "OperationsController_registerRegistration",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar inscripción profesional con vigencia, versión y motivo",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "personal.gestionar"
+      }
+    },
     "/api/v1/turnos": {
       "get": {
         "operationId": "OperationsController_shifts",
@@ -1753,6 +1811,53 @@
           "givenNames",
           "surnames",
           "type"
+        ]
+      },
+      "RegistrationDto": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "string",
+            "enum": [
+              "JVPM",
+              "JVPE",
+              "JVPL",
+              "JVPO",
+              "otra"
+            ]
+          },
+          "number": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-01-01"
+          },
+          "validTo": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-12-31"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "board",
+          "number",
+          "validFrom",
+          "validTo",
+          "version",
+          "reason"
         ]
       },
       "ShiftDto": {
