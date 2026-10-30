@@ -5,11 +5,12 @@
   - Depende de: 100-T03
   - Hecho cuando: dos servicios activos para la unidad se rechazan en prueba
   - Verificado: Aplicada en Supabase; prueba 12 y 02_concurrencia.sh caso 3: 1 servicio activo de 2 despachos
-- [ ] T02 · S2 · R · Estado de la unidad visible en vivo y regla de paramédico de turno
+- [x] T02 · S2 · R · Estado de la unidad visible en vivo y regla de paramédico de turno
   - Cubre: FR-109-01, FR-109-06
   - Depende de: T01, 103-T06
   - Hecho cuando: escenario 2 pasa
-  - Avance 29-oct-2026 (solo API): `api/tests/ambulancia-estado.spec.ts` (5 pruebas) cubre el escenario 2: sin paramédico con turno en curso (turno futuro o persona no paramédica no cuentan) salir de mantenimiento responde 409 `sin_paramedico_de_turno`; con uno de turno la unidad queda Disponible con versión, `cambio_estado`, auditoría y evento `ambulancia.estado_cambiado` en el canal `ambulancia`. `GET /ambulancia` (`ambulancia.ver_estado`) devuelve unidad, servicio activo y tripulación sin datos del paciente. El cambio de estado se hace con `POST /ambulancia/mantenimiento` (`ambulancia.mantenimiento`, JOP), el único endpoint que mueve la unidad antes de T03/T04. **Sigue abierta**: falta la tarjeta web y la prueba en vivo con teléfono.
+  - Verificado: 29-oct-2026, `npm test -- --ci` en api/ (17 suites, 202 pruebas, 5 nuevas en `ambulancia-estado.spec.ts` con el escenario 2) y `npm test` en web/ (5 archivos, 41 pruebas, `ambulancia.test.tsx`); `npx tsc --noEmit` limpio en ambas. `GET /ambulancia` y el cambio de estado emiten `ambulancia.estado_cambiado` y la tarjeta web (`#/ambulancia`, JOP y REC con `ambulancia.ver_estado`) se vuelve a pedir con la versión del canal en vivo.
+  - Avance 29-oct-2026: `api/tests/ambulancia-estado.spec.ts` cubre el escenario 2 (sin paramédico con turno en curso, salir de mantenimiento responde 409 `sin_paramedico_de_turno`; con uno de turno la unidad queda Disponible con `cambio_estado`, auditoría y evento). El cambio de estado usa `POST /ambulancia/mantenimiento` (`ambulancia.mantenimiento`, JOP). **Sin probar**: el evento en vivo de extremo a extremo con un teléfono Android; la web lo asume por la versión del canal `ambulancia` y no se abrió contra la nube.
 - [ ] T03 · S4 · R · Solicitudes del paciente y por teléfono, confirmación y despacho con bloqueo
   - Cubre: FR-109-02, FR-109-03, FR-109-04, FR-109-05
   - Depende de: T02, 101-T07
