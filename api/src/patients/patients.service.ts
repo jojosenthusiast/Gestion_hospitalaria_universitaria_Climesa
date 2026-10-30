@@ -6,7 +6,7 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
 import { Clock } from '../platform/clock';
 import { PatientCreateDto, PatientUpdateDto, PatientStateDto } from './patient-write.dto';
-import { ageOn, ageRange, fichaFields, SCOPED_ROLES } from './patient.privacy';
+import { ageOn, ageRange, fichaFields } from './patient.privacy';
 import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateDemographics } from './patient.rules';
 type Row = Record<string, any>;
 @Injectable()
@@ -42,7 +42,9 @@ export class PatientsService {
   private async permitted(c:PoolClient,actor:Actor,id:string) {
     if(!hasPermission(actor,'pacientes.ver_ficha'))throw new ForbiddenException('No puedes consultar esta ficha.');
     const contexts=actor.permissions.filter(p=>p.code==='pacientes.ver_ficha').map(p=>p.context);
-    if((contexts.includes('x') && await this.inScope(c,actor,id)) || (contexts.includes('propio') && actor.patientId===id))return;
+    if(contexts.includes('x') || (contexts.includes('propio') && actor.patientId===id))return;
+    if(contexts.includes('area') && await this.inArea(c,actor,id))return;
+    if(contexts.includes('orden') && await this.hasOpenOrder(c,id))return;
     if(contexts.includes('relacion') && actor.staffId){
       const linked=(await c.query(`SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz
         UNION ALL SELECT 1 FROM atencion.consulta WHERE paciente_id=$1 AND medico_id=$2 AND estado='abierta'
@@ -52,24 +54,23 @@ export class PatientsService {
     }
     throw new ForbiddenException('La ficha requiere una relación de atención o ser su titular.');
   }
+  /** Contexto `orden` (laboratorio): el paciente tiene una orden pendiente o en proceso. */
+  private async hasOpenOrder(c:PoolClient,id:string) {
+    return (await c.query("SELECT 1 FROM laboratorio.orden WHERE paciente_id=$1 AND estado IN ('pendiente','en_proceso') LIMIT 1",[id])).rows.length>0;
+  }
   /**
-   * Contexto `x` de pacientes.ver_ficha con el límite de privacidad.md §2 para AST, ENF y LAB (REC y JOP no dependen de un área).
-   * ENF: paciente hospitalizado en una cama de un área donde la persona tiene turno en curso. AST: paciente con número llamado
-   * hoy a un consultorio de un área donde tiene turno en curso, o con consulta abierta en él. LAB: paciente con orden pendiente o en proceso.
+   * Contexto `area` (el mismo que usa camas.ver_ocupante): la persona tiene un turno en curso en un área y el paciente está ahí, sea
+   * hospitalizado en una cama de esa área, con un número llamado hoy a un consultorio de ella o con una consulta abierta en él.
    */
-  private async inScope(c:PoolClient,actor:Actor,id:string) {
-    const scoped=SCOPED_ROLES.filter(r=>actor.roles.includes(r));
-    if(!scoped.length||actor.roles.some(r=>['REC','JOP'].includes(r)))return true;
+  private async inArea(c:PoolClient,actor:Actor,id:string) {
+    if(!actor.staffId)return false;
     const now=this.clock.now();
-    if(scoped.includes('LAB')&&(await c.query("SELECT 1 FROM laboratorio.orden WHERE paciente_id=$1 AND estado IN ('pendiente','en_proceso') LIMIT 1",[id])).rows.length)return true;
-    if(!actor.staffId||!scoped.some(r=>r!=='LAB'))return false;
     const areas=(await c.query("SELECT area_id FROM personal.turno WHERE persona_id=$1 AND estado IN ('publicado','en_curso') AND periodo @> $2::timestamptz",[actor.staffId,now])).rows.map(r=>r.area_id);
     if(!areas.length)return false;
     const inside=(space:string)=>`EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=${space} UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($2::uuid[]))`;
-    if(scoped.includes('ENF')&&(await c.query(`SELECT 1 FROM hospitalizacion.admision a JOIN hospitalizacion.ocupacion_cama o ON o.admision_id=a.id WHERE a.paciente_id=$1 AND a.estado IN ('hospitalizado','alta_firmada') AND o.periodo @> $3::timestamptz AND ${inside('o.habitacion_id')} LIMIT 1`,[id,areas,now])).rows.length)return true;
-    if(scoped.includes('AST')&&(await c.query(`SELECT 1 FROM atencion.ticket_fila t WHERE t.paciente_id=$1 AND t.fecha=($3::timestamptz AT TIME ZONE 'America/El_Salvador')::date AND t.estado IN ('llamado','en_atencion') AND t.consultorio_id IS NOT NULL AND ${inside('t.consultorio_id')}
-      UNION ALL SELECT 1 FROM atencion.consulta k WHERE k.paciente_id=$1 AND k.estado='abierta' AND k.consultorio_id IS NOT NULL AND ${inside('k.consultorio_id')} LIMIT 1`,[id,areas,now])).rows.length)return true;
-    return false;
+    return (await c.query(`SELECT 1 FROM hospitalizacion.admision a JOIN hospitalizacion.ocupacion_cama o ON o.admision_id=a.id WHERE a.paciente_id=$1 AND a.estado IN ('hospitalizado','alta_firmada') AND o.periodo @> $3::timestamptz AND ${inside('o.habitacion_id')}
+      UNION ALL SELECT 1 FROM atencion.ticket_fila t WHERE t.paciente_id=$1 AND t.fecha=($3::timestamptz AT TIME ZONE 'America/El_Salvador')::date AND t.estado IN ('llamado','en_atencion') AND t.consultorio_id IS NOT NULL AND ${inside('t.consultorio_id')}
+      UNION ALL SELECT 1 FROM atencion.consulta k WHERE k.paciente_id=$1 AND k.estado='abierta' AND k.consultorio_id IS NOT NULL AND ${inside('k.consultorio_id')} LIMIT 1`,[id,areas,now])).rows.length>0;
   }
   /** Edad en años hoy (America/El_Salvador): por fecha de nacimiento o, en provisionales, la edad estimada más los años desde que se estimó. */
   private age(p:Row):number|null {

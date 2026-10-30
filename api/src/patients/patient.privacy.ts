@@ -1,15 +1,14 @@
 /** Política de campos de la ficha del paciente según docs/arquitectura/privacidad.md §2 (FR-102-10). Reglas puras, sin acceso a datos. */
 export type FichaFields = { birth: boolean; ageRange: boolean; contact: boolean };
 
-/** Roles cuyo permiso `pacientes.ver_ficha` tiene contexto `x` pero privacidad.md §2 limita a un área, consultorio u orden. */
-export const SCOPED_ROLES = ['AST', 'ENF', 'LAB'] as const;
-
 /**
  * Qué grupos de campos recibe quien consulta la ficha. Número de expediente, nombre y sexo los reciben todos los roles con acceso.
  * - birth: fecha de nacimiento exacta (PAC dueño, REC, AST, ENF, MED, PAR).
  * - ageRange: rango de edad en lugar de la fecha exacta (LAB).
  * - contact: DUI, teléfono, correo y dirección (PAC dueño, REC, MED).
  * JOP solo recibe lo básico (la asignación de cama usa nombre y sexo). Con varios roles se suma lo que da cada uno.
+ * Esto es por rol a propósito: el catálogo (permisos.csv) decide QUIÉN abre la ficha y en qué contexto, pero no tiene permisos por campo;
+ * privacidad.md §2 es una tabla campo por rol y no hay un permiso por grupo de campos al que preguntar (regla 8). Si se crean, esta función pasa a leerlos.
  */
 export function fichaFields(roles: string[], owner: boolean): FichaFields {
   const has = (...codes: string[]) => roles.some(r => codes.includes(r));

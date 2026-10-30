@@ -17,6 +17,16 @@ DATOS = RAIZ / "docs" / "arquitectura" / "datos"
 SALIDA_RBAC = RAIZ / "docs" / "arquitectura" / "roles-y-permisos.md"
 SALIDA_PANTALLAS = RAIZ / "docs" / "diseno" / "inventario-pantallas.md"
 SALIDA_SQL = RAIZ / "supabase" / "migrations" / "20261017000210_acceso_semilla.sql"
+SALIDA_CONTEXTOS = RAIZ / "supabase" / "migrations" / "20261029000100_acceso_contextos_ficha.sql"
+
+# Contextos que permisos.csv cambió después de aplicada la semilla (regla 10 de AGENTS.md: las migraciones aplicadas no se editan).
+# (rol, permiso, contexto en la semilla, contexto actual en permisos.csv). La semilla conserva el histórico y la migración
+# de SALIDA_CONTEXTOS lo actualiza; añadir aquí un cambio nuevo regenera ambas y verificar_consistencia exige que el CSV coincida.
+AJUSTES_CONTEXTO = [
+    ("AST", "pacientes.ver_ficha", "x", "area"),
+    ("ENF", "pacientes.ver_ficha", "x", "area"),
+    ("LAB", "pacientes.ver_ficha", "x", "orden"),
+]
 
 FLUJOS = [
     ("F01 Cuenta del paciente", "A01 Ingreso → A02 Crear cuenta → A03 Vincular expediente → (recepción A33 o W27 aprueba) → A04 Inicio del paciente"),
@@ -42,6 +52,7 @@ CONTEXTO = {
     "propio_revisado": "propio revisado",
     "consumo": "consumo",
     "reactivos": "reactivos",
+    "orden": "orden",
 }
 
 
@@ -241,12 +252,28 @@ def generar_sql(roles, permisos):
     l += ["", "insert into acceso.permiso (codigo, descripcion) values"]
     l.append(",\n".join(f"  ({sql_txt(p['permiso'])}, {sql_txt(p['descripcion'])})" for p in permisos) + ";")
     l += ["", "insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values"]
+    historico = {(r, p): desde for r, p, desde, _ in AJUSTES_CONTEXTO}
     filas = []
     for p in permisos:
         for c in codigos:
             if p[c]:
-                filas.append(f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(p[c])})")
+                filas.append(f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(historico.get((c, p['permiso']), p[c]))})")
     l.append(",\n".join(filas) + ";")
+    return "\n".join(l) + "\n"
+
+
+def generar_sql_contextos():
+    l = [
+        "-- Generado por tools/generar_docs.py desde AJUSTES_CONTEXTO y permisos.csv. No editar a mano.",
+        "-- Contextos de rol_permiso que cambiaron después de la semilla de acceso (regla 10: no se edita la semilla).",
+        "-- Idempotente: solo actualiza filas que aún tienen el contexto anterior. acceso.rol_permiso.contexto no tiene check.",
+        "",
+    ]
+    for r, p, desde, hasta in AJUSTES_CONTEXTO:
+        l.append(
+            f"update acceso.rol_permiso set contexto = {sql_txt(hasta)} "
+            f"where rol_codigo = {sql_txt(r)} and permiso_codigo = {sql_txt(p)} and contexto = {sql_txt(desde)};"
+        )
     return "\n".join(l) + "\n"
 
 
@@ -258,6 +285,11 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
             errores.append(f"Endpoint {e['metodo']} {e['ruta']} usa permiso inexistente {e['permiso']}")
         if e["nivel"] not in ("R", "E", "F"):
             errores.append(f"Endpoint {e['ruta']} con nivel inválido {e['nivel']}")
+    por_permiso = {p["permiso"]: p for p in permisos}
+    for r, perm, _, hasta in AJUSTES_CONTEXTO:
+        actual = por_permiso.get(perm, {}).get(r)
+        if actual != hasta:
+            errores.append(f"AJUSTES_CONTEXTO dice {r} {perm} = {hasta} y permisos.csv dice {actual!r}")
     usados = {e["permiso"] for e in endpoints}
     for p in permisos:
         if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante":
@@ -276,6 +308,7 @@ def main():
         SALIDA_RBAC: generar_rbac(roles, permisos, endpoints),
         SALIDA_PANTALLAS: generar_pantallas(pantallas, roles),
         SALIDA_SQL: generar_sql(roles, permisos),
+        SALIDA_CONTEXTOS: generar_sql_contextos(),
     }
     if "--verificar" in sys.argv:
         for ruta, contenido in salidas.items():

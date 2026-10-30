@@ -47,7 +47,7 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `pacientes.buscar` | Buscar pacientes (datos mínimos) | · | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | `pacientes.registrar` | Registrar paciente tras buscar | · | · | ✔ | · | · | · | · | · | · | · |
 | `pacientes.registrar_provisional` | Registrar paciente sin identidad confirmada | · | · | ✔ | · | ✔ | · | · | ✔ | · | · |
-| `pacientes.ver_ficha` | Ver datos personales del paciente | · | ✔ | ✔ | ✔ | ✔ | relación | ✔ | relación | · | propio |
+| `pacientes.ver_ficha` | Ver datos personales del paciente | · | ✔ | ✔ | área | área | relación | orden | relación | · | propio |
 | `pacientes.editar_demograficos` | Corregir datos personales con historial | · | · | ✔ | · | · | · | · | · | · | · |
 | `pacientes.gestionar_duplicados` | Revisar casos de posible duplicado | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `expediente.ver` | Ver historial clínico | · | · | · | · | relación | relación | · | · | · | propio revisado |
@@ -139,11 +139,11 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/pacientes` | `pacientes.buscar` | Devuelve datos mínimos y motivo de coincidencia | R | 2 | · | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/pacientes` | `pacientes.registrar` | Exige búsqueda previa reciente | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/pacientes/provisional` | `pacientes.registrar_provisional` |  | R | 4 | · | · | ✔ | · | ✔ | · | · | ✔ | · | · |
-| GET | `/api/v1/pacientes/{id}` | `pacientes.ver_ficha` | Relación de atención para MED y PAR; propio para PAC | R | 2 | · | ✔ | ✔ | ✔ | ✔ | relación | ✔ | relación | · | propio |
+| GET | `/api/v1/pacientes/{id}` | `pacientes.ver_ficha` | Relación de atención para MED y PAR; propio para PAC | R | 2 | · | ✔ | ✔ | área | área | relación | orden | relación | · | propio |
 | PUT | `/api/v1/pacientes/{id}` | `pacientes.editar_demograficos` | Versión optimista; historial | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/pacientes/{id}/desactivar` | `pacientes.editar_demograficos` | Nunca borra | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/pacientes/casos-duplicado` | `pacientes.gestionar_duplicados` |  | E | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
-| GET | `/api/v1/me/paciente` | `pacientes.ver_ficha` | Propio | R | 2 | · | ✔ | ✔ | ✔ | ✔ | relación | ✔ | relación | · | propio |
+| GET | `/api/v1/me/paciente` | `pacientes.ver_ficha` | Propio | R | 2 | · | ✔ | ✔ | área | área | relación | orden | relación | · | propio |
 
 ### Spec 103
 

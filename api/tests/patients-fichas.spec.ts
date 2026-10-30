@@ -15,8 +15,7 @@ const jwt=(role:string)=>{
  return `${h}.${b}.${createHmac('sha256','test-only-key').update(h+'.'+b).digest('base64url')}`;
 };
 jest.setTimeout(120000);
-// Prueba de caracterización (FR-102-10): fija lo que el código HACE hoy con la misma ficha según el rol.
-// No es la política: las diferencias con docs/arquitectura/privacidad.md §2 están pendientes de decisión de producto.
+// FR-102-10: la misma ficha según el rol (campos) y según el contexto del permiso pacientes.ver_ficha en el catálogo (acceso).
 const base=['active','fullName','givenNames','id','provisional','record','sex','state','surnames','version'];
 const nacimiento=['birth','birthPrecision'];
 const rango=['ageRange'];
@@ -104,7 +103,7 @@ describe('Pacientes · la misma ficha según el rol y el contexto (privacidad.md
   await ticket('2026-10-24');
   await shift('AST',null);
   expect((await call('AST','GET',`/pacientes/${patientId}`)).status).toBe(403);
-  await shift('AST','P2-HOS');
+  await shift('AST','P1-EMG');
   expect((await call('AST','GET',`/pacientes/${patientId}`)).status).toBe(403);
   await shift('AST','P1-CON');
   expect((await call('AST','GET',`/pacientes/${patientId}`)).status).toBe(200);
@@ -121,6 +120,32 @@ describe('Pacientes · la misma ficha según el rol y el contexto (privacidad.md
   await shift('ENF',null);await shift('AST',null);await order(null);await ticket(null);
   expect((await call('REC','GET',`/pacientes/${patientId}`)).status).toBe(200);
   expect((await call('JOP','GET',`/pacientes/${patientId}`)).status).toBe(200);
+ });
+
+ // El contexto sale de acceso.rol_permiso (catálogo), no del nombre del rol (regla 8 de AGENTS.md; pregunta 31).
+ const contextOf=async(role:string)=>(await fixture.pg.query<{contexto:string}>('SELECT contexto FROM acceso.rol_permiso WHERE rol_codigo=$1 AND permiso_codigo=$2',[role,'pacientes.ver_ficha'])).rows.map(r=>r.contexto);
+ const withContext=async(role:string,context:string,body:()=>Promise<void>)=>{
+  const original=(await contextOf(role))[0];
+  await fixture.pg.query("UPDATE acceso.rol_permiso SET contexto=$2 WHERE rol_codigo=$1 AND permiso_codigo='pacientes.ver_ficha'",[role,context]);
+  try{await body();}finally{await fixture.pg.query("UPDATE acceso.rol_permiso SET contexto=$2 WHERE rol_codigo=$1 AND permiso_codigo='pacientes.ver_ficha'",[role,original]);}
+ };
+ test('el catálogo sembrado da a AST y ENF el contexto area y a LAB el contexto orden; el resto conserva el suyo',async()=>{
+  const expected:Record<string,string>={JOP:'x',REC:'x',AST:'area',ENF:'area',MED:'relacion',LAB:'orden',PAR:'relacion',PAC:'propio'};
+  for(const [role,context] of Object.entries(expected))expect([role,await contextOf(role)]).toEqual([role,[context]]);
+  expect(await contextOf('ADM')).toEqual([]);
+  expect(await contextOf('DPD')).toEqual([]);
+ });
+ test('cambiar el contexto de un rol en la base cambia el resultado: la política ya no depende del nombre del rol',async()=>{
+  await admit();await shift('ENF',null);await shift('AST',null);await order(null);await ticket(null);
+  expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  await withContext('ENF','x',async()=>{expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(200);});
+  expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  expect((await call('REC','GET',`/pacientes/${patientId}`)).status).toBe(200);
+  await withContext('REC','area',async()=>{expect((await call('REC','GET',`/pacientes/${patientId}`)).status).toBe(403);});
+  await order('pendiente');
+  await withContext('ENF','orden',async()=>{expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(200);});
+  await withContext('LAB','area',async()=>{expect((await call('LAB','GET',`/pacientes/${patientId}`)).status).toBe(403);});
+  await order(null);
  });
 
  // Campos de la misma ficha según privacidad.md §2 (PAC dueño, REC, MED, AST, ENF, LAB, PAR, JOP).
