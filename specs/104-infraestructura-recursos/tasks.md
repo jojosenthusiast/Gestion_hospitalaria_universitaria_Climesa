@@ -5,18 +5,21 @@
   - Depende de: 100-T03
   - Hecho cuando: la semilla deja 17 camas de hospitalización y el escenario 1 pasa
   - Verificado: Aplicada en Supabase con semilla: 17 camas (12 semiprivadas, 5 VIP); prueba 2: capacidad_excedida
-- [ ] T02 · S2 · R · Consultas recursivas de árbol, ruta y disponibilidad
+- [x] T02 · S2 · R · Consultas recursivas de árbol, ruta y disponibilidad
   - Cubre: FR-104-05, FR-104-13
   - Depende de: T01
   - Hecho cuando: escenario 2 pasa con datos de ocupación de prueba
-- [ ] T03 · S3 · R · Tablero de camas con estados y ocupante según permiso
+  - Verificado: 29-oct-2026 `npm test -- --ci` en api: `api/tests/infraestructura-ocupacion.spec.ts` ocupa 3 camas de la planta 2 y comprueba P2 con 9 de 12 libres, conteo por habitación (0, 2, 1, 2, 2, 2) y ruta legible; 15 suites y 186 pruebas pasan, `npx tsc --noEmit` sin errores
+- [x] T03 · S3 · R · Tablero de camas con estados y ocupante según permiso
   - Cubre: FR-104-06, FR-104-08
   - Depende de: T02, 108-T01
   - Hecho cuando: REC ve nombres, ENF de otra planta ve iniciales
-- [ ] T04 · S2 · R · Edición de espacios (ADM) con regla de capacidad bajo ocupación
+  - Verificado: 29-oct-2026 `npm test -- --ci` en api: REC ve "Ana Lucía Ejemplo Hernández", ENF fuera del área ve "A.L.E.H." sin `patientId`, y una cama con reserva activa sale `reservada`
+- [x] T04 · S2 · R · Edición de espacios (ADM) con regla de capacidad bajo ocupación
   - Cubre: FR-104-04
   - Depende de: T01
   - Hecho cuando: reducir capacidad de habitación ocupada responde 409
+  - Verificado: 29-oct-2026 `npm test -- --ci` en api: reducir HAB-201 con 2 camas ocupadas responde 409 `capacidad_bajo_ocupacion` con mensaje de ocupación y no cambia versión; con camas activas sin ocupación el P0001 `capacidad_menor_que_camas` responde 409 (no 500)
 - [ ] T05 · S3 · R · Pantallas W09 (árbol) y W12 (plano por planta) en web
   - Cubre: FR-104-05, FR-104-06
   - Depende de: T03, 120-T02

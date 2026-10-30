@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException,VersionConflictException } from '../platform/problem';
 import { Actor, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
@@ -51,6 +51,10 @@ export class InfrastructureService {
         if(old.tipo==='cama'&&(dto.parentId!==old.padre_id||dto.active===false||dto.type!=='cama')){
           const state=(await c.query('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1',[id])).rows[0]?.estado;
           if(state&&state!=='libre')throw new ConflictException('Solo puedes mover o desactivar una cama libre.');
+        }
+        if(old.tipo==='habitacion'&&dto.capacity&&dto.capacity<old.capacidad){
+          const {total,occupied}=(await c.query<{total:number;occupied:number}>("SELECT count(*)::int AS total,count(*) FILTER(WHERE estado='ocupada')::int AS occupied FROM infra.v_estado_cama WHERE habitacion_id=$1",[id])).rows[0];
+          if(occupied>0&&dto.capacity<total)throw new ProblemException('capacidad_bajo_ocupacion',409,`La habitación tiene ${occupied} cama(s) ocupada(s); no puedes dejar su capacidad en ${dto.capacity}.`,'capacity');
         }
         if(dto.active===false&&(await c.query('SELECT id FROM infra.espacio WHERE padre_id=$1 AND activo LIMIT 1',[id])).rowCount)throw new ConflictException('Desactiva primero los espacios hijos.');
         row=(await c.query('UPDATE infra.espacio SET padre_id=$2,tipo=$3,codigo=$4,nombre=$5,categoria=$6,capacidad=$7,nivel=$8,activo=$9,version=version+1 WHERE id=$1 RETURNING id,version',[id,dto.type==='hospital'?null:dto.parentId,dto.type,dto.code.toUpperCase(),dto.name,dto.type==='habitacion'?dto.category:null,dto.capacity||null,dto.level??null,dto.active??true])).rows[0];
