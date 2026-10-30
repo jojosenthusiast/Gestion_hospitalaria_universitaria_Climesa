@@ -2,7 +2,7 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 37 de 131 (28%) · **Requisitos:** 221 · **Specs:** 20
+**Tareas:** 39 de 131 (29%) · **Requisitos:** 221 · **Specs:** 20
 
 ## Por spec
 
@@ -26,15 +26,15 @@
 | [120 Cliente web](./120-cliente-web/spec.md) | En revisión | 10/0/0 | 3/5 | ██████░░░░ |
 | [121 Cliente Android](./121-cliente-android/spec.md) | En revisión | 6/2/0 | 0/6 | ░░░░░░░░░░ |
 | [122 Cliente iOS](./122-cliente-ios/spec.md) | En revisión | 6/1/0 | 0/5 | ░░░░░░░░░░ |
-| [130 Calidad y pruebas de concurrencia](./130-calidad-concurrencia/spec.md) | En revisión | 6/0/0 | 0/6 | ░░░░░░░░░░ |
-| [131 Documentación y entrega](./131-documentacion-entrega/spec.md) | En revisión | 5/1/0 | 0/6 | ░░░░░░░░░░ |
+| [130 Calidad y pruebas de concurrencia](./130-calidad-concurrencia/spec.md) | En revisión | 6/0/0 | 1/6 | ██░░░░░░░░ |
+| [131 Documentación y entrega](./131-documentacion-entrega/spec.md) | En revisión | 5/1/0 | 1/6 | ██░░░░░░░░ |
 
 ## Por semana
 
 | Semana | Fechas | R hechas | E hechas | Total |
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
-| S2 | 24 a 30 oct | 20/36 | 1/1 | ██████░░░░ |
+| S2 | 24 a 30 oct | 22/36 | 1/1 | ██████░░░░ |
 | S3 | 31 oct a 6 nov | 2/29 | 0/0 | █░░░░░░░░░ |
 | S4 | 7 a 13 nov | 0/22 | 0/0 | ░░░░░░░░░░ |
 | S5 | 14 a 20 nov | 0/8 | 2/23 | █░░░░░░░░░ |
@@ -85,8 +85,8 @@
 - [ ] 122-T01 · Proyecto Xcode con SwiftUI, paquetes y pantalla de ingreso
 - [ ] 122-T02 · Pestañas por rol y maquetación de las pantallas de Médico y Paciente
 - [ ] 122-T03 · Servicio de Realtime e invalidación en view models
-- [ ] 130-T06 · Lista de pruebas manuales por pantalla
-- [ ] 131-T01 · Diagrama ER, arquitectura, RBAC y privacidad para el avance
+- [x] 130-T06 · Lista de pruebas manuales por pantalla
+- [x] 131-T01 · Diagrama ER, arquitectura, RBAC y privacidad para el avance
 - [ ] 131-T02 · README raíz con instalación de las tres plataformas
 - [ ] 131-T03 · Enlace de Figma y sistema de diseño en la documentación
 

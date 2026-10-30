@@ -201,7 +201,7 @@ python tools/backlog.py --verificar
 
 Las pruebas de API ejecutan el pipeline HTTP y todas las migraciones sobre PostgreSQL WASM (PGlite); el verificador de identidad y el proveedor de invitaciones están simulados solo en tests. No sustituyen las pruebas de login, correo y concurrencia multisesión en Supabase. Se incluyen workflows de CI para API/web, PostgreSQL nativo, Android e iOS; no se han ejecutado remotamente en esta revisión.
 
-[API](api/README.md) · [Web](web/README.md) · [Android](android/README.md) · [iOS](ios/README.md) · [Despliegue y migraciones](deployment/README.md) · [Arquitectura](docs/arquitectura/arquitectura.md) · [Modelo ER](docs/arquitectura/modelo-datos.md) · [RBAC](docs/arquitectura/roles-y-permisos.md) · [Privacidad](docs/arquitectura/privacidad.md).
+[API](api/README.md) · [Web](web/README.md) · [Android](android/README.md) · [iOS](ios/README.md) · [Despliegue y migraciones](deployment/README.md) · [Arquitectura](docs/arquitectura/arquitectura.md) · [Modelo ER](docs/arquitectura/modelo-datos.md) · [RBAC](docs/arquitectura/roles-y-permisos.md) · [Privacidad](docs/arquitectura/privacidad.md) · [Resumen de arquitectura para el avance](docs/arquitectura/avance-31-octubre.md) · [Pruebas manuales por pantalla](docs/pruebas/pruebas-manuales.md).
 
 ## Figma y alcance
 
