@@ -4,17 +4,17 @@
   - Cubre: FR-122-01, FR-122-02, FR-101-01
   - Depende de: ninguna
   - Hecho cuando: el simulador inicia sesión contra Supabase de la nube
-  - Avance: `ios/AGENTS.md` y `ios/README.md` quedaron alineados con el proyecto real (CLIMESA, iOS 17, carpetas, pestañas). Sin compilar, sin Xcode; el ingreso no se probó en simulador.
+  - Avance: `ios/AGENTS.md` y `ios/README.md` quedaron alineados con el proyecto real (CLIMESA, iOS 17, carpetas, pestañas). Compila y pasa las pruebas en el CI de macOS (macos-15, 30-oct-2026); el ingreso no se probó en simulador.
 - [ ] T02 · S2 · R · Pestañas por rol y maquetación de las pantallas de Médico y Paciente
   - Cubre: FR-122-03, FR-122-06
   - Depende de: T01, 101-T03
   - Hecho cuando: escenarios 1 y 2 pasan (criterio del avance)
-  - Avance: código escrito, sin compilar, sin Xcode y sin ejecutar en simulador. `TabPolicy` (`ios/Core/Access.swift`) decide las pestañas de Médico y Paciente desde `/auth/me` y devuelve rol sin iOS; `WorkspaceView.swift` las dibuja con "Próxima entrega" en las que aún no tienen datos y muestra "Tu rol no usa esta aplicación" con cierre de sesión. Textos en `Localizable.xcstrings`. Pruebas XCTest escritas en `ios/Tests/CoreTests/AccessTests.swift`, sin correr. Falta la maquetación completa de cada pantalla y sus estados.
+  - Avance: código escrito; compila en el CI de macOS (`xcodebuild` para simulador sin firma) y pasan las 34 pruebas del paquete, 0 fallos (30-oct-2026); sin ejecutar en simulador. `TabPolicy` (`ios/Core/Access.swift`) decide las pestañas de Médico y Paciente desde `/auth/me` y devuelve rol sin iOS; `WorkspaceView.swift` las dibuja con "Próxima entrega" en las que aún no tienen datos y muestra "Tu rol no usa esta aplicación" con cierre de sesión. Textos en `Localizable.xcstrings`. Pruebas XCTest escritas en `ios/Tests/CoreTests/AccessTests.swift`, sin correr. Falta la maquetación completa de cada pantalla y sus estados.
 - [ ] T03 · S2 · R · Servicio de Realtime e invalidación en view models
   - Cubre: FR-122-04
   - Depende de: T02, 100-T03
   - Hecho cuando: el número de fila del paciente cambia en vivo al ser llamado
-  - Avance: código escrito, sin compilar, sin Xcode y sin ejecutar en simulador. `ios/Core/Realtime` porta el protocolo Phoenix de web y Android (tramas, latido, unión a canales de `/auth/me`, reconexión con espera creciente y una sola consulta `GET /eventos?after=` tras una caída) sobre `URLSessionWebSocketTask` detrás de un protocolo; `LiveViewModel` lo consume en `.task {}` y la pestaña Turnos vuelve a pedir datos; la banda muestra en vivo, recuperando y sin conexión. Pruebas XCTest con socket falso escritas, sin correr. Falta la pantalla de fila del paciente, que depende de 105, y la prueba contra Supabase real.
+  - Avance: código escrito; compila en el CI de macOS (`xcodebuild` para simulador sin firma) y pasan las 34 pruebas del paquete, 0 fallos (30-oct-2026); sin ejecutar en simulador. `ios/Core/Realtime` porta el protocolo Phoenix de web y Android (tramas, latido, unión a canales de `/auth/me`, reconexión con espera creciente y una sola consulta `GET /eventos?after=` tras una caída) sobre `URLSessionWebSocketTask` detrás de un protocolo; `LiveViewModel` lo consume en `.task {}` y la pestaña Turnos vuelve a pedir datos; la banda muestra en vivo, recuperando y sin conexión. Pruebas XCTest con socket falso escritas, sin correr. Falta la pantalla de fila del paciente, que depende de 105, y la prueba contra Supabase real.
 - [ ] T04 · S5 · E · Notificaciones APNs
   - Cubre: FR-122-05
   - Depende de: T03, 100-T10
