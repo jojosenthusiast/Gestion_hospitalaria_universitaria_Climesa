@@ -203,6 +203,7 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
  test('turnos respetan duración, solapamiento y descanso de guardia',async()=>{
   const account=(await call('MED','GET','/auth/me')).body,tree=(await call('JOP','GET','/espacios')).body,area=tree.find((n:any)=>n.code==='P1-CON');
   const b={staffId:account.staffId,areaId:area.id,type:'guardia',start:'2026-11-01T07:00:00-06:00',end:'2026-11-02T07:00:00-06:00'};
+  await fixture.pg.query("INSERT INTO personal.inscripcion(persona_id,junta,numero,vigencia) VALUES($1,'JVPM','CORE-MED-1',daterange('2026-01-01','2027-01-01'))",[account.staffId]);
   const first=await call('JOP','POST','/turnos',b);expect(first.status).toBe(201);expect((await call('JOP','POST','/turnos',{...b,start:'2026-11-01T15:00:00-06:00',end:'2026-11-01T23:00:00-06:00'})).status).toBe(409);
   expect((await call('JOP','POST','/turnos',{...b,type:'diurno',start:'2026-11-02T15:00:00-06:00',end:'2026-11-02T23:00:00-06:00'})).status).toBe(409);
   expect((await call('JOP','POST','/turnos',{...b,type:'diurno',start:'2026-11-02T19:00:00-06:00',end:'2026-11-03T03:00:00-06:00'})).status).toBe(201);

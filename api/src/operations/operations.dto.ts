@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsUUID, Matches, Min } from 'class-validator';
 import { Text } from '../platform/dto';
 export const staffTypes=['medico','enfermero','asistente','recepcionista','laboratorista','paramedico','motorista','limpieza','administrativo','otro'];
 export class StaffDto {
@@ -13,6 +13,15 @@ export class StaffDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() active?:boolean;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) version?:number;
   @Text(10,500,true) reason?:string;
+}
+export const boards=['JVPM','JVPE','JVPL','JVPO','otra'];
+export class RegistrationDto {
+  @ApiProperty({enum:boards}) @IsIn(boards) board!:string;
+  @Text(2,40) number!:string;
+  @ApiProperty({format:'date',example:'2026-01-01'}) @Matches(/^\d{4}-\d{2}-\d{2}$/) validFrom!:string;
+  @ApiProperty({format:'date',example:'2026-12-31'}) @Matches(/^\d{4}-\d{2}-\d{2}$/) validTo!:string;
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+  @Text(10,500) reason!:string;
 }
 export class ShiftDto {
   @ApiProperty({format:'uuid'}) @IsUUID() staffId!:string;
