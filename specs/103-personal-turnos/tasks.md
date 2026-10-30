@@ -19,6 +19,7 @@
   - Cubre: FR-103-01
   - Depende de: T02, 120-T02
   - Hecho cuando: el administrador crea y edita personal desde la web
+  - Avance: 29-oct-2026 `npm test` en web/: 9 archivos, 86 pruebas pasan (web/src/__tests__/personal.test.tsx, 13 pruebas contra un Api falso: listado con filtro de inactivos y estados cargando, vacío y error; sin `personal.gestionar` no hay botones de alta ni edición; crear con POST /personal sin versión ni motivo; editar con PATCH, versión y motivo de 10 caracteres; inactivar con `active` en falso; 409 `version_conflicto` con aviso y recarga; 409 por turnos futuros y 400 de la API con su mensaje; validación previa en español de nombres, teléfono, DUI y motivo); `npx tsc --noEmit` en web/ sin errores. El alta y la edición contra la API real ya están en T02 (api/). Falta W08: ficha de personal con inscripciones y turnos próximos (el formulario de inscripción no existe en la web), y comprobarlo en la web desplegada contra Supabase
 - [x] T05 · S2 · E · Inscripciones y bloqueo de roles clínicos sin inscripción
   - Cubre: FR-103-03, FR-103-10
   - Depende de: T02
