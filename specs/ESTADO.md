@@ -2,7 +2,7 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 24 de 131 (18%) · **Requisitos:** 221 · **Specs:** 20
+**Tareas:** 25 de 131 (19%) · **Requisitos:** 221 · **Specs:** 20
 
 ## Por spec
 
@@ -23,7 +23,7 @@
 | [112 Información pública y avisos](./112-informacion-publica/spec.md) | En revisión | 4/2/0 | 0/3 | ░░░░░░░░░░ |
 | [113 Métricas y tablero](./113-metricas-tablero/spec.md) | En revisión | 5/1/0 | 0/4 | ░░░░░░░░░░ |
 | [114 Avisos y alarmas](./114-avisos-alarmas/spec.md) | En revisión | 6/4/0 | 0/3 | ░░░░░░░░░░ |
-| [120 Cliente web](./120-cliente-web/spec.md) | En revisión | 10/0/0 | 0/5 | ░░░░░░░░░░ |
+| [120 Cliente web](./120-cliente-web/spec.md) | En revisión | 10/0/0 | 1/5 | ██░░░░░░░░ |
 | [121 Cliente Android](./121-cliente-android/spec.md) | En revisión | 6/2/0 | 0/6 | ░░░░░░░░░░ |
 | [122 Cliente iOS](./122-cliente-ios/spec.md) | En revisión | 6/1/0 | 0/5 | ░░░░░░░░░░ |
 | [130 Calidad y pruebas de concurrencia](./130-calidad-concurrencia/spec.md) | En revisión | 6/0/0 | 0/6 | ░░░░░░░░░░ |
@@ -34,7 +34,7 @@
 | Semana | Fechas | R hechas | E hechas | Total |
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
-| S2 | 24 a 30 oct | 11/36 | 0/1 | ███░░░░░░░ |
+| S2 | 24 a 30 oct | 12/36 | 0/1 | ███░░░░░░░ |
 | S3 | 31 oct a 6 nov | 0/29 | 0/0 | ░░░░░░░░░░ |
 | S4 | 7 a 13 nov | 0/22 | 0/0 | ░░░░░░░░░░ |
 | S5 | 14 a 20 nov | 0/8 | 1/23 | ░░░░░░░░░░ |
@@ -78,7 +78,7 @@
 - [ ] 113-T01 · Tablero inicial con tarjetas de camas, turnos y pacientes y marcadores de semana
 - [ ] 120-T01 · Proyecto React con TypeScript, rutas, ingreso con Supabase y despliegue
 - [ ] 120-T02 · Navegación por rol desde `/me`, estados comunes y cliente de API generado
-- [ ] 120-T03 · Suscripción a Realtime con invalidación y reconexión
+- [x] 120-T03 · Suscripción a Realtime con invalidación y reconexión
 - [ ] 121-T01 · Proyecto Gradle con Compose, Hilt, red y pantalla de ingreso
 - [ ] 121-T02 · Navegación por rol y maquetación de las pantallas principales de cada rol
 - [ ] 121-T03 · Repositorio de Realtime e invalidación en ViewModels

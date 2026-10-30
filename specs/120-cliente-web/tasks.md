@@ -8,10 +8,12 @@
   - Cubre: FR-120-02, FR-120-03, FR-120-06, FR-120-07
   - Depende de: T01, 101-T03
   - Hecho cuando: escenario 1 pasa y cada rol web ve su menú
-- [ ] T03 · S2 · R · Suscripción a Realtime con invalidación y reconexión
+- [x] T03 · S2 · R · Suscripción a Realtime con invalidación y reconexión
   - Cubre: FR-120-04, FR-120-05
   - Depende de: T02, 100-T03
   - Hecho cuando: escenario 2 pasa
+  - Verificado: 29-oct-2026 en web/: `npm test` 5 archivos y 42 pruebas pasan (8 nuevas en `tiempo-real.test.tsx`: sin sondeo al avanzar el reloj, evento de canal sube `version`, reconexión de canal con una sola consulta `/eventos?after=`, falla de la recuperación sin reintento por reloj, y escenario 2 con el tablero de camas que vuelve a pedir `/camas` al volver la red); `npx tsc --noEmit` sin errores. Las pruebas nuevas fallaban (7 de 8) contra el `setInterval` anterior. Se eliminó el estado `polling`: quedan en vivo, reconectando y sin conexión.
+  - Avance 29-oct-2026: la validación con dos clientes remotos (un cliente sin red durante un cambio de cama en Supabase Realtime real) necesita la nube y **no se ejecutó**; lo automatizado usa Supabase y fetch simulados. `T02` sigue sin marcarse en `main` (su rama `feat/web-navegacion-roles` aún no está integrada).
 - [ ] T04 · S3 · R · Pantalla pública en modo televisor
   - Cubre: FR-120-09
   - Depende de: T03, 112-T01

@@ -24,6 +24,8 @@ sequenceDiagram
 
 Reglas: si la transacción falla, no hay evento. El cliente ignora eventos con versión menor o igual a la que ya tiene. Al reconectarse, pide el estado completo en lugar de esperar mensajes perdidos.
 
+Reconexión en la web: no hay sondeo periódico. Al volver un canal a `SUBSCRIBED` tras una caída, o al dispararse el evento `online` del navegador, la web hace una sola consulta de recuperación a `GET /eventos?after=<cursor>`, invalida todas las vistas (suben `version` y cada pantalla vuelve a pedir lo suyo) y refresca el perfil si cambió una cuenta de usuario. Si esa consulta falla, no se reintenta por reloj: queda pendiente hasta la siguiente reconexión. La banda muestra tres estados: en vivo (sin banda), recuperando la conexión y sin conexión.
+
 ## Canales
 
 | Canal | Quién puede escuchar |
