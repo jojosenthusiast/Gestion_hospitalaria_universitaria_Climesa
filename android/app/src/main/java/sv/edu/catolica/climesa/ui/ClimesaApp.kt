@@ -53,6 +53,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
         Box(Modifier.weight(1f)){if(role=="REC"){
             val reception:ReceptionViewModel=viewModel()
             DisposableEffect(account.session.userId){reception.reload();onDispose{reception.clear()}}
+            LaunchedEffect(account.session.userId,account.profile.channels){reception.startLive(account.profile.channels)}
             ReceptionApp(reception,dark,setDark,account,signingOut,logout)
         }else RolePortal(account,role,dark,setDark,signingOut,logout,refresh)}
     }

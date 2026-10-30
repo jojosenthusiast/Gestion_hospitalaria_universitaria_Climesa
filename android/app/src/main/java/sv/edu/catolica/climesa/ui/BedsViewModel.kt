@@ -28,6 +28,8 @@ data class BedsUiState(
     val beds: List<Bed> = emptyList(),
     val error: String? = null,
     val connection: ConnectionState = ConnectionState.RECONNECTING,
+    /** Aviso no fatal: algún canal fue rechazado y quedó fuera; puede que falten avisos de otros roles. */
+    val partialLive: Boolean = false,
     val permissions: Set<String> = emptySet(),
     val pending: PendingBedAction? = null,
     val reason: String = "",
@@ -54,6 +56,7 @@ class BedsViewModel @Inject constructor(
         val key = channels.joinToString("|")
         if (key == channelsKey) return
         channelsKey = key
+        mutable.update { it.copy(partialLive = false) }
         liveJob?.cancel()
         reload()
         liveJob = viewModelScope.launch {
@@ -62,6 +65,7 @@ class BedsViewModel @Inject constructor(
                     is RealtimeSignal.State -> mutable.update { it.copy(connection = signal.state) }
                     is RealtimeSignal.Event -> if (BedEvents.matches(signal.event)) reload()
                     RealtimeSignal.Resync -> reload()
+                    is RealtimeSignal.ChannelsDropped -> mutable.update { it.copy(partialLive = signal.channels.isNotEmpty()) }
                 }
             }
         }
