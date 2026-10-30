@@ -9,7 +9,7 @@ usuarios.desactivar,Desactivar una cuenta,x,,,,,,,,,
 pacientes.buscar,Buscar pacientes (datos mínimos),,x,x,x,x,x,x,x,,
 pacientes.registrar,Registrar paciente tras buscar,,,x,,,,,,,
 pacientes.registrar_provisional,Registrar paciente sin identidad confirmada,,,x,,x,,,x,,
-pacientes.ver_ficha,Ver datos personales del paciente,,x,x,x,x,relacion,x,relacion,,propio
+pacientes.ver_ficha,Ver datos personales del paciente,,x,x,area,area,relacion,orden,relacion,,propio
 pacientes.editar_demograficos,Corregir datos personales con historial,,,x,,,,,,,
 pacientes.gestionar_duplicados,Revisar casos de posible duplicado,,x,x,,,,,,,
 expediente.ver,Ver historial clínico,,,,,relacion,relacion,,,,propio_revisado

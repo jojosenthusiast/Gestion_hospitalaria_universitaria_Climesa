@@ -6,6 +6,7 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
 import { Clock } from '../platform/clock';
 import { PatientCreateDto, PatientUpdateDto, PatientStateDto } from './patient-write.dto';
+import { ageOn, ageRange, fichaFields } from './patient.privacy';
 import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateDemographics } from './patient.rules';
 type Row = Record<string, any>;
 @Injectable()
@@ -42,6 +43,8 @@ export class PatientsService {
     if(!hasPermission(actor,'pacientes.ver_ficha'))throw new ForbiddenException('No puedes consultar esta ficha.');
     const contexts=actor.permissions.filter(p=>p.code==='pacientes.ver_ficha').map(p=>p.context);
     if(contexts.includes('x') || (contexts.includes('propio') && actor.patientId===id))return;
+    if(contexts.includes('area') && await this.inArea(c,actor,id))return;
+    if(contexts.includes('orden') && await this.hasOpenOrder(c,id))return;
     if(contexts.includes('relacion') && actor.staffId){
       const linked=(await c.query(`SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz
         UNION ALL SELECT 1 FROM atencion.consulta WHERE paciente_id=$1 AND medico_id=$2 AND estado='abierta'
@@ -51,19 +54,44 @@ export class PatientsService {
     }
     throw new ForbiddenException('La ficha requiere una relación de atención o ser su titular.');
   }
+  /** Contexto `orden` (laboratorio): el paciente tiene una orden pendiente o en proceso. */
+  private async hasOpenOrder(c:PoolClient,id:string) {
+    return (await c.query("SELECT 1 FROM laboratorio.orden WHERE paciente_id=$1 AND estado IN ('pendiente','en_proceso') LIMIT 1",[id])).rows.length>0;
+  }
+  /**
+   * Contexto `area` (el mismo que usa camas.ver_ocupante): la persona tiene un turno en curso en un área y el paciente está ahí, sea
+   * hospitalizado en una cama de esa área, con un número llamado hoy a un consultorio de ella o con una consulta abierta en él.
+   */
+  private async inArea(c:PoolClient,actor:Actor,id:string) {
+    if(!actor.staffId)return false;
+    const now=this.clock.now();
+    const areas=(await c.query("SELECT area_id FROM personal.turno WHERE persona_id=$1 AND estado IN ('publicado','en_curso') AND periodo @> $2::timestamptz",[actor.staffId,now])).rows.map(r=>r.area_id);
+    if(!areas.length)return false;
+    const inside=(space:string)=>`EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=${space} UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($2::uuid[]))`;
+    return (await c.query(`SELECT 1 FROM hospitalizacion.admision a JOIN hospitalizacion.ocupacion_cama o ON o.admision_id=a.id WHERE a.paciente_id=$1 AND a.estado IN ('hospitalizado','alta_firmada') AND o.periodo @> $3::timestamptz AND ${inside('o.habitacion_id')}
+      UNION ALL SELECT 1 FROM atencion.ticket_fila t WHERE t.paciente_id=$1 AND t.fecha=($3::timestamptz AT TIME ZONE 'America/El_Salvador')::date AND t.estado IN ('llamado','en_atencion') AND t.consultorio_id IS NOT NULL AND ${inside('t.consultorio_id')}
+      UNION ALL SELECT 1 FROM atencion.consulta k WHERE k.paciente_id=$1 AND k.estado='abierta' AND k.consultorio_id IS NOT NULL AND ${inside('k.consultorio_id')} LIMIT 1`,[id,areas,now])).rows.length>0;
+  }
+  /** Edad en años hoy (America/El_Salvador): por fecha de nacimiento o, en provisionales, la edad estimada más los años desde que se estimó. */
+  private age(p:Row):number|null {
+    const day=(d:Date)=>d.toLocaleDateString('en-CA',{timeZone:'America/El_Salvador'});
+    const text=(v:unknown)=>v instanceof Date?v.toISOString().slice(0,10):v?String(v).slice(0,10):null;
+    const today=day(this.clock.now()),birth=text(p.nacimiento);
+    if(birth)return ageOn(birth,today);
+    return p.edad_estimada===null||p.edad_estimada===undefined||!p.edad_estimada_en?null:p.edad_estimada+ageOn(day(new Date(p.edad_estimada_en)),today);
+  }
   private async detail(c:PoolClient,actor:Actor,id:string) {
     await this.permitted(c,actor,id);
     const p=(await c.query('SELECT * FROM pacientes.paciente WHERE id=$1',[id])).rows[0];
     if(!p)throw new NotFoundException('No se encontró el paciente.');
-    const full=actor.roles.includes('REC')||actor.roles.includes('MED')||actor.patientId===id;
-    const birth=full||actor.roles.some(r=>['AST','ENF','LAB','PAR'].includes(r));
+    const fields=fichaFields(actor.roles,actor.patientId===id);
     const result:Row={id:p.id,record:p.expediente,fullName:this.name(p),givenNames:p.nombres??'',surnames:[p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' '),state:p.estado,active:p.estado!=='inactivo',sex:p.sexo,version:p.version,provisional:p.estado==='provisional'};
-    if(birth){result.birth=p.nacimiento instanceof Date?p.nacimiento.toISOString().slice(0,10):p.nacimiento;result.birthPrecision=p.precision_nacimiento;}
-    if(full){
+    if(fields.birth){result.birth=p.nacimiento instanceof Date?p.nacimiento.toISOString().slice(0,10):p.nacimiento;result.birthPrecision=p.precision_nacimiento;}
+    if(fields.ageRange)result.ageRange=ageRange(this.age(p));
+    if(fields.contact){
       const dui=(await c.query("SELECT valor_original FROM pacientes.identificador WHERE paciente_id=$1 AND tipo='dui' AND estado IN ('sin_verificar','verificado')",[id])).rows[0];
       Object.assign(result,{dui:dui?.valor_original??null,phone:p.telefono,email:p.correo,address:p.direccion});
-    }
-    if(hasPermission(actor,'pacientes.editar_demograficos'))result.history=(await c.query('SELECT version,cambiado_en AS at,motivo AS reason,cambios AS changes FROM pacientes.historial_demografico WHERE paciente_id=$1 ORDER BY version DESC',[id])).rows;
+    }    if(hasPermission(actor,'pacientes.editar_demograficos'))result.history=(await c.query('SELECT version,cambiado_en AS at,motivo AS reason,cambios AS changes FROM pacientes.historial_demografico WHERE paciente_id=$1 ORDER BY version DESC',[id])).rows;
     return result;
   }
   async get(actor:Actor,id:string) {

@@ -15,12 +15,12 @@ const jwt=(role:string)=>{
  return `${h}.${b}.${createHmac('sha256','test-only-key').update(h+'.'+b).digest('base64url')}`;
 };
 jest.setTimeout(120000);
-// Prueba de caracterización (FR-102-10): fija lo que el código HACE hoy con la misma ficha según el rol.
-// No es la política: las diferencias con docs/arquitectura/privacidad.md §2 están pendientes de decisión de producto.
+// FR-102-10: la misma ficha según el rol (campos) y según el contexto del permiso pacientes.ver_ficha en el catálogo (acceso).
 const base=['active','fullName','givenNames','id','provisional','record','sex','state','surnames','version'];
 const nacimiento=['birth','birthPrecision'];
+const rango=['ageRange'];
 const contacto=['address','dui','email','phone'];
-describe('Pacientes · la misma ficha según el rol (caracterización de detail() y permitted())',()=>{
+describe('Pacientes · la misma ficha según el rol y el contexto (privacidad.md §2)',()=>{
  let app:NestFastifyApplication,fixture:Awaited<ReturnType<typeof createDatabase>>,patientId:string;
  const call=async(role:string,method:string,path:string,body?:unknown)=>{
   const response=await app.inject({method:method as any,url:'/api/v1'+path,headers:{authorization:`Bearer ${jwt(role)}`,...(body?{'content-type':'application/json','idempotency-key':randomUUID()}:{})},...(body?{payload:body as object}:{})});
@@ -30,6 +30,31 @@ describe('Pacientes · la misma ficha según el rol (caracterización de detail(
  const relate=async(role:string,origin:'consulta'|'ambulancia')=>{
   await fixture.pg.query("INSERT INTO atencion.relacion_atencion(paciente_id,profesional_id,origen,origen_id,vigencia) VALUES($1,$2,$3,$4,tstzrange('2026-10-01','2026-12-01'))",[patientId,await staff(role),origin,randomUUID()]);
  };
+ const space=async(code:string)=>(await fixture.pg.query<{id:string}>('SELECT id FROM infra.espacio WHERE codigo=$1',[code])).rows[0].id;
+ // Turno publicado que cubre el reloj de la prueba (24-oct 12:00Z) en el área indicada; null lo retira.
+ const shift=async(role:string,area:string|null)=>{
+  const id=await staff(role);
+  await fixture.pg.query('DELETE FROM personal.turno WHERE persona_id=$1',[id]);
+  if(area)await fixture.pg.query("INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) VALUES($1,$2,tstzrange('2026-10-24T06:00Z','2026-10-24T18:00Z','[)'),'diurno','publicado')",[id,await space(area)]);
+ };
+ let admitted=false;
+ const admit=async()=>{
+  if(admitted)return;
+  const bed=(await fixture.pg.query<{id:string;padre_id:string}>("SELECT id,padre_id FROM infra.espacio WHERE tipo='cama' AND padre_id=(SELECT id FROM infra.espacio WHERE codigo='HAB-201') ORDER BY codigo LIMIT 1")).rows[0];
+  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado') RETURNING id",[patientId,randomUUID(),await staff('MED')])).rows[0];
+  await fixture.pg.query("INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo) VALUES($1,$2,$3,'semiprivada',tstzrange('2026-10-24T00:00Z',NULL,'[)'))",[admission.id,bed.id,bed.padre_id]);
+  admitted=true;
+ };
+ // Número llamado a un consultorio de Consulta general en la fecha indicada.
+ const ticket=async(date:string|null)=>{
+  await fixture.pg.query('DELETE FROM atencion.ticket_fila WHERE paciente_id=$1',[patientId]);
+  if(date)await fixture.pg.query("INSERT INTO atencion.ticket_fila(servicio,fecha,numero,paciente_id,estado,consultorio_id) VALUES('consulta_general',$2,1,$1,'llamado',$3)",[patientId,date,await space('C-101')]);
+ };
+ const order=async(state:'pendiente'|'completado'|null)=>{
+  await fixture.pg.query('DELETE FROM laboratorio.orden WHERE paciente_id=$1',[patientId]);
+  if(state)await fixture.pg.query('INSERT INTO laboratorio.orden(admision_id,paciente_id,medico_id,estado) VALUES($1,$2,$3,$4)',[randomUUID(),patientId,await staff('MED'),state]);
+ };
+ const grantContexts=async()=>{await admit();await shift('ENF','P2-HOS');await ticket('2026-10-24');await shift('AST','P1-CON');await order('pendiente');};
  beforeAll(async()=>{
   fixture=await createDatabase();
   const auth={authClient:{auth:{getUser:async(token:string)=>{
@@ -48,6 +73,7 @@ describe('Pacientes · la misma ficha según el rol (caracterización de detail(
 
  test.each([
   ['MED','sin relación de atención'],['PAR','sin servicio de ambulancia'],['PAC','que no es el titular'],
+  ['AST','sin número llamado a su consultorio'],['ENF','sin paciente hospitalizado en su área'],['LAB','sin orden pendiente de procesar'],
  ])('403 · %s %s',async(role,_motivo)=>{
   const r=await call(role,'GET',`/pacientes/${patientId}`);
   expect(r.status).toBe(403);
@@ -64,17 +90,76 @@ describe('Pacientes · la misma ficha según el rol (caracterización de detail(
   expect((await call('PAR','GET',`/pacientes/${patientId}`)).status).toBe(200);
  });
 
- // Cada fila es lo que el CÓDIGO entrega hoy. Entre paréntesis, lo que dice privacidad.md §2 cuando difiere.
+ test('ENF: la ficha de un hospitalizado solo se abre con turno en curso en su área',async()=>{
+  await admit();
+  await shift('ENF',null);
+  expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  await shift('ENF','P1-CON');
+  expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  await shift('ENF','P2-HOS');
+  expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(200);
+ });
+ test('AST: la ficha de un número llamado a su consultorio solo se abre el día del número y con turno en esa área',async()=>{
+  await ticket('2026-10-24');
+  await shift('AST',null);
+  expect((await call('AST','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  await shift('AST','P1-EMG');
+  expect((await call('AST','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  await shift('AST','P1-CON');
+  expect((await call('AST','GET',`/pacientes/${patientId}`)).status).toBe(200);
+  await ticket('2026-10-23');
+  expect((await call('AST','GET',`/pacientes/${patientId}`)).status).toBe(403);
+ });
+ test('LAB: la ficha solo se abre mientras el paciente tiene una orden pendiente o en proceso',async()=>{
+  await order('completado');
+  expect((await call('LAB','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  await order('pendiente');
+  expect((await call('LAB','GET',`/pacientes/${patientId}`)).status).toBe(200);
+ });
+ test('REC y JOP no dependen de un área: abren la ficha sin contexto',async()=>{
+  await shift('ENF',null);await shift('AST',null);await order(null);await ticket(null);
+  expect((await call('REC','GET',`/pacientes/${patientId}`)).status).toBe(200);
+  expect((await call('JOP','GET',`/pacientes/${patientId}`)).status).toBe(200);
+ });
+
+ // El contexto sale de acceso.rol_permiso (catálogo), no del nombre del rol (regla 8 de AGENTS.md; pregunta 31).
+ const contextOf=async(role:string)=>(await fixture.pg.query<{contexto:string}>('SELECT contexto FROM acceso.rol_permiso WHERE rol_codigo=$1 AND permiso_codigo=$2',[role,'pacientes.ver_ficha'])).rows.map(r=>r.contexto);
+ const withContext=async(role:string,context:string,body:()=>Promise<void>)=>{
+  const original=(await contextOf(role))[0];
+  await fixture.pg.query("UPDATE acceso.rol_permiso SET contexto=$2 WHERE rol_codigo=$1 AND permiso_codigo='pacientes.ver_ficha'",[role,context]);
+  try{await body();}finally{await fixture.pg.query("UPDATE acceso.rol_permiso SET contexto=$2 WHERE rol_codigo=$1 AND permiso_codigo='pacientes.ver_ficha'",[role,original]);}
+ };
+ test('el catálogo sembrado da a AST y ENF el contexto area y a LAB el contexto orden; el resto conserva el suyo',async()=>{
+  const expected:Record<string,string>={JOP:'x',REC:'x',AST:'area',ENF:'area',MED:'relacion',LAB:'orden',PAR:'relacion',PAC:'propio'};
+  for(const [role,context] of Object.entries(expected))expect([role,await contextOf(role)]).toEqual([role,[context]]);
+  expect(await contextOf('ADM')).toEqual([]);
+  expect(await contextOf('DPD')).toEqual([]);
+ });
+ test('cambiar el contexto de un rol en la base cambia el resultado: la política ya no depende del nombre del rol',async()=>{
+  await admit();await shift('ENF',null);await shift('AST',null);await order(null);await ticket(null);
+  expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  await withContext('ENF','x',async()=>{expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(200);});
+  expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(403);
+  expect((await call('REC','GET',`/pacientes/${patientId}`)).status).toBe(200);
+  await withContext('REC','area',async()=>{expect((await call('REC','GET',`/pacientes/${patientId}`)).status).toBe(403);});
+  await order('pendiente');
+  await withContext('ENF','orden',async()=>{expect((await call('ENF','GET',`/pacientes/${patientId}`)).status).toBe(200);});
+  await withContext('LAB','area',async()=>{expect((await call('LAB','GET',`/pacientes/${patientId}`)).status).toBe(403);});
+  await order(null);
+ });
+
+ // Campos de la misma ficha según privacidad.md §2 (PAC dueño, REC, MED, AST, ENF, LAB, PAR, JOP).
  test.each([
   ['REC','recepción',[...base,...nacimiento,...contacto,'history']],
   ['MED','médico con relación',[...base,...nacimiento,...contacto]],
   ['PAC','titular',[...base,...nacimiento,...contacto]],
-  ['LAB','laboratorio (el doc dice rangos de edad y sexo, no la fecha exacta)',[...base,...nacimiento]],
-  ['AST','asistente',[...base,...nacimiento]],
-  ['ENF','enfermería (el doc agrega contacto de emergencia en el área)',[...base,...nacimiento]],
-  ['PAR','paramédico con servicio (el doc agrega dirección del servicio)',[...base,...nacimiento]],
-  ['JOP','jefe de operaciones (el doc no le da fecha de nacimiento ni DUI)',[...base]],
+  ['LAB','laboratorio: rango de edad y sexo, sin fecha exacta ni contacto',[...base,...rango]],
+  ['AST','asistente en su consultorio',[...base,...nacimiento]],
+  ['ENF','enfermería en su área',[...base,...nacimiento]],
+  ['PAR','paramédico con servicio',[...base,...nacimiento]],
+  ['JOP','jefe de operaciones: nombre y sexo para la asignación, sin fecha ni documento',[...base]],
  ])('%s · %s recibe exactamente estos campos',async(role,_label,keys)=>{
+  await grantContexts();
   if(role==='PAC')await fixture.pg.query('UPDATE acceso.usuario SET paciente_id=$2 WHERE id=$1',[userId('PAC'),patientId]);
   try{
    const r=await call(role,'GET',`/pacientes/${patientId}`);
@@ -82,13 +167,16 @@ describe('Pacientes · la misma ficha según el rol (caracterización de detail(
    expect(Object.keys(r.body).sort()).toEqual([...keys].sort());
    expect(r.body.record).toBe('0000001-X');
    expect(r.body.fullName).toBe('Lucía Fichas Ejemplo');
+   expect(r.body.sex).toBe('femenino');
    if(keys.includes('birth'))expect(r.body.birth).toBe('1992-03-04');
    if(keys.includes('dui'))expect(r.body.dui).toBe('00000001-8');
+   if(role==='LAB')expect(r.body.ageRange).toBe('30-39');
   }finally{
    if(role==='PAC')await fixture.pg.query('UPDATE acceso.usuario SET paciente_id=NULL WHERE id=$1',[userId('PAC')]);
   }
  });
  test('solo recepción recibe el historial de cambios',async()=>{
+  await grantContexts();
   const rec=(await call('REC','GET',`/pacientes/${patientId}`)).body;
   expect(Array.isArray(rec.history)).toBe(true);
   for(const role of ['MED','LAB','AST','ENF','PAR','JOP'])expect((await call(role,'GET',`/pacientes/${patientId}`)).body.history).toBeUndefined();

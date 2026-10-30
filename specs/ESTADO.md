@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | [100 Plataforma de la API](./100-plataforma-api/spec.md) | En revisión | 17/2/0 | 8/10 | ████████░░ |
 | [101 Identidad, cuentas y acceso](./101-identidad-acceso/spec.md) | En revisión | 15/1/0 | 4/8 | █████░░░░░ |
-| [102 Pacientes](./102-pacientes/spec.md) | En revisión | 11/1/0 | 4/7 | ██████░░░░ |
+| [102 Pacientes](./102-pacientes/spec.md) | En revisión | 11/1/0 | 5/7 | ███████░░░ |
 | [103 Personal de salud y turnos](./103-personal-turnos/spec.md) | En revisión | 11/3/0 | 7/9 | ████████░░ |
 | [104 Edificio, camas y recursos](./104-infraestructura-recursos/spec.md) | En revisión | 12/1/0 | 5/7 | ███████░░░ |
 | [105 Fila del día y citas](./105-fila-citas/spec.md) | En revisión | 10/2/0 | 1/6 | ██░░░░░░░░ |
