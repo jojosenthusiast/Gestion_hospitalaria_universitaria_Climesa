@@ -11,9 +11,30 @@ import SwiftUI
     private var revision=0
     let auth:AuthService?
     let api:APIClient?
+    private let config:AppConfiguration?
     init() {
-        do { let config=try AppConfiguration.load(); let auth=AuthService(config:config); self.auth=auth; self.api=APIClient(config:config,auth:auth) }
-        catch { auth=nil; api=nil; self.error=error.localizedDescription; loading=false }
+        do { let config=try AppConfiguration.load(); let auth=AuthService(config:config); self.config=config; self.auth=auth; self.api=APIClient(config:config,auth:auth) }
+        catch { config=nil; auth=nil; api=nil; self.error=error.localizedDescription; loading=false }
+    }
+    /// Servicio de tiempo real con el token vigente de la sesión y la recuperación por /eventos tras una caída.
+    func makeRealtime() -> (any RealtimeService)? {
+        guard let config, let auth, let api else { return nil }
+        let url=RealtimeProtocol.websocketURL(supabaseURL:config.supabase.absoluteString,publishableKey:config.publicKey)
+        return SupabaseRealtimeService(
+            websocketURL:url,
+            accessToken:{ (try? await auth.session())?.access_token },
+            catchUp:{ cursor in
+                let data=try await api.getData(RealtimeProtocol.catchUpPath(after:cursor))
+                guard let recovered=RealtimeProtocol.parseCatchUp(data:data) else { throw ClientError.message("No se pudo recuperar lo ocurrido sin conexión.") }
+                return recovered
+            },
+            sockets:URLSessionRealtimeSocketFactory()
+        )
+    }
+    /// Vuelve a verificar roles y permisos sin pasar por la pantalla de carga (la usa el tiempo real).
+    func refreshProfile() async {
+        guard profile != nil, !busy else { return }
+        try? await verify()
     }
     func restore() async {
         guard !busy, let auth else { return }; let stamp=revision; loading=true
@@ -28,8 +49,8 @@ import SwiftUI
         let stamp=revision
         let verified=try await api.get("/auth/me",as:AccessProfile.self)
         guard stamp==revision else { throw CancellationError() }
-        guard !verified.allowedIOSRoles.isEmpty else { throw ClientError.message("Esta cuenta no tiene acceso a iOS. Utiliza la plataforma asignada a tu rol.") }
-        profile=verified; role=verified.allowedIOSRoles.contains(role) ? role : verified.allowedIOSRoles[0]; pending=false; error=nil; notice=nil
+        // Un rol sin iOS (por ejemplo Recepción) no es un error: la pantalla muestra "Tu rol no usa esta aplicación".
+        profile=verified; if let first=verified.allowedIOSRoles.first { role=verified.allowedIOSRoles.contains(role) ? role : first }; pending=false; error=nil; notice=nil
     }
     func signIn(email:String,password:String) async {
         guard !busy, let auth else { return }; let stamp=revision; busy=true; error=nil
@@ -56,7 +77,7 @@ struct Shift:Decodable,Identifiable {
     static func display(_ value:String)->String {
         let iso=ISO8601DateFormatter(); iso.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
         let date=iso.date(from:value) ?? ISO8601DateFormatter().date(from:value)
-        guard let date else { return "Fecha no disponible" }; let formatter=DateFormatter(); formatter.locale=Locale(identifier:"es_SV"); formatter.timeZone=TimeZone(identifier:"America/El_Salvador"); formatter.dateStyle = .medium; formatter.timeStyle = .short; return formatter.string(from:date)
+        guard let date else { return L.text("shift.unavailable") }; let formatter=DateFormatter(); formatter.locale=Locale(identifier:"es_SV"); formatter.timeZone=TimeZone(identifier:"America/El_Salvador"); formatter.dateStyle = .medium; formatter.timeStyle = .short; return formatter.string(from:date)
     }
 }
 @MainActor final class ShiftModel:ObservableObject {

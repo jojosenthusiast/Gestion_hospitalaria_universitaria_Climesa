@@ -69,6 +69,11 @@ actor APIClient {
     private let config: AppConfiguration; private let auth: AuthService
     init(config: AppConfiguration,auth: AuthService) { self.config=config; self.auth=auth }
     func get<T:Decodable>(_ path: String, as type: T.Type) async throws -> T {
+        let data=try await getData(path)
+        return try JSONDecoder().decode(T.self,from:data)
+    }
+    /// Respuesta cruda de un GET autenticado; la usa la recuperación de eventos de tiempo real.
+    func getData(_ path: String) async throws -> Data {
         guard let session=try await auth.session() else { throw ClientError.message("Inicia sesión para continuar.") }
         guard let url=URL(string:config.api.absoluteString.trimmingCharacters(in:CharacterSet(charactersIn:"/"))+path) else { throw ClientError.message("Servidor inválido.") }
         var request=URLRequest(url:url,cachePolicy:.reloadIgnoringLocalCacheData,timeoutInterval:20); request.setValue("Bearer \(session.access_token)",forHTTPHeaderField:"Authorization"); request.setValue("application/json",forHTTPHeaderField:"Accept")
@@ -79,6 +84,6 @@ actor APIClient {
             let message=(try? JSONDecoder().decode(APIErrorEnvelope.self,from:data))?.text
             throw ClientError.message(message ?? "No se pudo consultar la información. Vuelve a intentar.")
         }
-        return try JSONDecoder().decode(T.self,from:data)
+        return data
     }
 }
