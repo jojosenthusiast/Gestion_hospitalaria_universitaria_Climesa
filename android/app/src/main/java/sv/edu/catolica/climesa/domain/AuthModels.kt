@@ -41,16 +41,43 @@ object RoleAccess {
         return catalog.filter { it in profile.roles }
     }
     fun label(role: String) = mapOf("REC" to "Recepción", "AST" to "Asistencia", "ENF" to "Enfermería", "MED" to "Medicina", "LAB" to "Laboratorio", "PAR" to "Paramédico", "PAC" to "Paciente")[role] ?: role
-    fun sections(role: String): List<String> = when(role) {
-        "REC" -> listOf("Inicio", "Pacientes", "Mi cuenta")
-        "AST" -> listOf("Inicio", "Fila", "Pacientes", "Mi cuenta")
-        "ENF" -> listOf("Inicio", "Camas", "Mi cuenta")
-        "MED" -> listOf("Inicio", "Consultas", "Mis turnos", "Mi cuenta")
-        "LAB" -> listOf("Inicio", "Laboratorio", "Mi cuenta")
-        "PAR" -> listOf("Inicio", "Ambulancia", "Mi cuenta")
-        "PAC" -> listOf("Inicio", "Citas", "Resultados", "Mi cuenta")
-        else -> emptyList()
+}
+
+/**
+ * Secciones de la navegación inferior. Cada una exige un permiso de `/auth/me` (regla 8: se pregunta por permiso,
+ * no por rol). `ready` indica si la sección ya tiene pantalla; las demás muestran "Próxima entrega".
+ */
+enum class AndroidSection(val label: String, val permission: String, val ready: Boolean) {
+    HOME("Inicio", "sesion.perfil", true),
+    PATIENTS("Pacientes", "pacientes.buscar", true),
+    QUEUE("Fila", "fila.ver", false),
+    BEDS("Camas", "camas.ver_tablero", true),
+    CONSULTATIONS("Consultas", "consulta.iniciar", false),
+    SHIFTS("Mis turnos", "turnos.ver", true),
+    LAB("Laboratorio", "laboratorio.ver_cola", false),
+    APPOINTMENTS("Citas", "citas.ver", false),
+    RESULTS("Resultados", "resultados.ver", false),
+    UNIT("Unidad", "ambulancia.ver_estado", true),
+    SERVICE("Servicio", "ambulancia.operar", false),
+    LOG("Bitácora", "ambulancia.ver_bitacora", false),
+    PROFILE("Perfil", "sesion.perfil", true),
+}
+
+object AndroidSections {
+    private val ambulanceCrew = listOf(AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.PROFILE)
+
+    /**
+     * Quien opera la ambulancia (`ambulancia.operar`) trabaja en campo: ve Unidad, Servicio, Bitácora y Perfil
+     * (spec 121, escenario 1) y los permisos que le falten no se muestran. El resto ve cada sección cuyo permiso tenga.
+     */
+    fun visible(permissions: Collection<String>): List<AndroidSection> {
+        if (AndroidSection.SERVICE.permission in permissions) return ambulanceCrew.filter { it.permission in permissions }
+        return AndroidSection.entries.filter { it.permission in permissions }
     }
+
+    /** Sin ninguna pantalla más allá de Inicio y Perfil, el rol no usa Android. */
+    fun hasAppScreens(permissions: Collection<String>) =
+        visible(permissions).any { it != AndroidSection.HOME && it != AndroidSection.PROFILE }
 }
 object RegistrationRules {
     fun validate(name: String, email: String, password: String, confirmation: String): Map<String,String> = buildMap {

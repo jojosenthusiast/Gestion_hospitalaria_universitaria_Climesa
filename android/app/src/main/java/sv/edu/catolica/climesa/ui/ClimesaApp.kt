@@ -44,7 +44,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
 }
 @Composable private fun AuthorizedWorkspace(account:AuthenticatedAccount,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit,refresh:()->Unit){
     val destination=account.profile.androidDestination()
-    val roles=if(destination==AndroidDestination.NOT_AVAILABLE||destination==AndroidDestination.PENDING_VERIFICATION)emptyList() else RoleAccess.allowed(account.profile,"android")
+    val roles=if(destination==AndroidDestination.NOT_AVAILABLE||destination==AndroidDestination.PENDING_VERIFICATION||!AndroidSections.hasAppScreens(account.profile.permissions))emptyList() else RoleAccess.allowed(account.profile,"android")
     var selectedRole by rememberSaveable(account.session.userId){mutableStateOf(roles.firstOrNull().orEmpty())}
     val role=selectedRole.takeIf{it in roles}?:roles.firstOrNull().orEmpty()
     if(roles.isEmpty()){Surface{Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center){Text("Tu rol no usa esta aplicación",style=MaterialTheme.typography.headlineMedium);Spacer(Modifier.height(16.dp));Text("Ingresa desde la plataforma habilitada para tu cuenta.");Spacer(Modifier.height(24.dp));Button(onClick=logout){Text("Cerrar sesión")}}};return}
