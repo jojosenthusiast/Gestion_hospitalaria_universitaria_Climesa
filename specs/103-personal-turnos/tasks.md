@@ -24,10 +24,12 @@
   - Depende de: T02
   - Hecho cuando: programar a un médico vencido se rechaza
   - Verificado: 29-oct-2026 npm test -- --ci en api/: personal-inscripciones.spec.ts (7 pruebas): médico sin inscripción o vencido y mover fuera de vigencia dan 409 inscripcion_no_vigente; ENF también, AST y ADMINISTRATIVO no; turno publicado con inscripción vencida se conserva y se puede cancelar; 188 pruebas pasadas, 0 fallidas
-- [ ] T06 · S2 · R · Cobertura, publicación con advertencias y estados automáticos
+- [x] T06 · S2 · R · Cobertura, publicación con advertencias y estados automáticos
   - Cubre: FR-103-08, FR-103-09, FR-103-13
   - Depende de: T03
   - Hecho cuando: escenario 4 pasa y un turno cambia a "en curso" con el reloj de prueba
+  - Verificado: 29-oct-2026 npm test -- --ci en api/: personal-turnos.spec.ts (6 pruebas): hueco de médico 22:00-06:00 en Emergencia (escenario 4), publicar con huecos devuelve advertencias y registra publicado_por y auditoría, un turno pasa a en_curso y completado con el reloj sustituido; 194 pruebas pasadas, 0 fallidas
+  - Avance: la cobertura solo evalúa Emergencia (24 h); planta con ocupación, recepción y laboratorio quedan pendientes porque la política no define su horario ni el cruce con camas ocupadas
 - [ ] T07 · S3 · R · Planificador web (W16, W17) y mis turnos en Android e iOS (A26, I26)
   - Cubre: FR-103-11
   - Depende de: T06, 121-T02, 122-T02
@@ -36,10 +38,11 @@
   - Cubre: FR-103-12
   - Depende de: T06
   - Hecho cuando: escenario 5 pasa contra `/publico/medicos-de-turno`
-- [ ] T09 · S5 · E · Aviso de horas semanales con justificación
+- [x] T09 · S5 · E · Aviso de horas semanales con justificación
   - Cubre: FR-103-07
   - Depende de: T03
   - Hecho cuando: el turno que pasa de 44 h pide justificación y se guarda
+  - Verificado: 29-oct-2026 npm test -- --ci en api/: personal-turnos.spec.ts (9 pruebas, 3 de horas semanales): el turno que lleva la semana a 48 h diurnas da 409 horas_semanales_excedidas sin justificación de 10 caracteres y con ella se guarda con advertencias, justificación y auditoría; 44 h exactas, turnos nocturnos y otra semana no piden nada; mover a una semana saturada también la exige; 197 pruebas pasadas, 0 fallidas
 
 
 ## Verificación del corte 0.3.0 · 24-oct-2026
