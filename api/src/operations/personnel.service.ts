@@ -1,11 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException,VersionConflictException } from '../platform/problem';
 import { Actor } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
-import { Clock } from '../platform/clock';
-import { StaffDto, ShiftDto } from './operations.dto';
+import { Clock,businessDate } from '../platform/clock';
+import { StaffDto, ShiftDto, RegistrationDto } from './operations.dto';
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
 @Injectable()
@@ -36,6 +36,21 @@ export class PersonnelService {
       return row;
     });
   }
+  async register(actor:Actor,id:string,dto:RegistrationDto,key?:string) {
+    const valid=(d:string)=>new Date(`${d}T00:00:00Z`).toISOString().slice(0,10)===d;
+    if(!valid(dto.validFrom)||!valid(dto.validTo)||dto.validTo<dto.validFrom)throw new BadRequestException('Indica una vigencia con fechas válidas; el fin no puede ser anterior al inicio.');
+    return this.commands.run(actor,`personal.gestionar:${id}:inscripcion`,key,dto,async c=>{
+      const person=(await c.query('SELECT version FROM personal.persona WHERE id=$1 FOR UPDATE',[id])).rows[0];
+      if(!person)throw new NotFoundException('No se encontró la persona.');
+      if(person.version!==dto.version)throw new VersionConflictException(person.version,'La ficha cambió; vuelve a abrirla.');
+      if((await c.query('SELECT 1 FROM personal.inscripcion WHERE junta=$1 AND numero=$2',[dto.board,dto.number.trim()])).rowCount)throw new ConflictException('Esa inscripción ya está registrada.');
+      const row=(await c.query("INSERT INTO personal.inscripcion(persona_id,junta,numero,vigencia) VALUES($1,$2,$3,daterange($4::date,$5::date,'[]')) RETURNING id",[id,dto.board,dto.number.trim(),dto.validFrom,dto.validTo])).rows[0];
+      const version=(await c.query('UPDATE personal.persona SET version=version+1 WHERE id=$1 RETURNING version',[id])).rows[0].version;
+      await this.commands.audit(c,actor,{action:'personal.inscripcion.registrar',entity:'personal',entityId:id,permission:'personal.gestionar',reason:dto.reason,detail:{inscripcionId:row.id,junta:dto.board}});
+      await this.commands.event(c,'personal.actualizado','personal',id,version,['rol:ADM','rol:JOP']);
+      return {id:row.id,version};
+    });
+  }
   async shifts(actor:Actor,mine=false) {
     if(mine&&!actor.staffId)return [];
     return this.db.query(`SELECT t.id,t.persona_id AS "staffId",p.nombres||' '||p.apellidos AS person,t.area_id AS "areaId",e.nombre AS area,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.tipo AS type,t.estado AS state,t.justificacion AS justification,t.version
@@ -49,6 +64,8 @@ export class PersonnelService {
       const person=(await c.query('SELECT id,tipo,activo FROM personal.persona WHERE id=$1 FOR UPDATE',[dto.staffId])).rows[0];
       if(!person?.activo)throw new BadRequestException('Selecciona personal activo.');
       await this.area(c,dto.areaId);
+      // FR-103-10: medicina y enfermería no se programan sin inscripción vigente en la fecha del turno; cancelar siempre se permite.
+      if(dto.state!=='cancelado'&&['medico','enfermero'].includes(person.tipo)&&!(await c.query('SELECT personal.inscrito($1,$2::date) AS ok',[dto.staffId,businessDate(start)])).rows[0].ok)throw new ProblemException('inscripcion_no_vigente',409,'La persona no tiene una inscripción profesional vigente en la fecha del turno.','staffId');
       const duration=await this.policies.value<{min_horas:number;max_horas:number;max_guardia_medica:number}>(c,'turnos.duracion',start);
       const rest=await this.policies.value<{min_horas:number;tras_guardia_24h:number}>(c,'turnos.descanso',start);
       const hours=(end.valueOf()-start.valueOf())/3600000;
