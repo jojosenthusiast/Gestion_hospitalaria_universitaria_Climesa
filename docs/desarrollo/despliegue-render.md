@@ -29,7 +29,7 @@ Se compila con `npm ci && npm run build` y las variables `VITE_*` quedan **dentr
 
 ## Mantener la API despierta (plan free)
 
-El plan `free` duerme la API tras 15 minutos sin tráfico y la primera llamada tarda ~1 minuto. Para ambulancia eso es un riesgo: el paramédico puede ser quien llame cuando nadie más tiene la web abierta (la web consulta `/eventos` cada 5 s mientras hay una sesión abierta, pero sin sesiones no hay tráfico).
+El plan `free` duerme la API tras 15 minutos sin tráfico y la primera llamada tarda ~1 minuto. Para ambulancia eso es un riesgo: el paramédico puede ser quien llame cuando nadie más tiene la web abierta (la web ya no sondea: solo consulta `/eventos` al reconectar, así que sin sesiones no hay tráfico).
 
 Mitigación sin costo:
 
