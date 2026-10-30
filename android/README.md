@@ -17,7 +17,7 @@ Las URL se leen como propiedades de Gradle (`app/build.gradle.kts`), no de `loca
 | `CLIMESA_SUPABASE_URL` | No | Opcional: solo si cambia el proyecto de Supabase |
 | `CLIMESA_SUPABASE_PUBLISHABLE_KEY` | No | Opcional: solo si cambia el proyecto de Supabase |
 
-Nunca pongas una clave `service_role` ni secreta en la app. El archivo `local.properties.example` usa nombres anteriores (`API_URL`, `SUPABASE_ANON_KEY`) que el build actual no lee.
+Nunca pongas una clave `service_role` ni secreta en la app. El archivo `local.properties.example` solo documenta `sdk.dir`; las URL no se leen de `local.properties`.
 
 ## Ejecutar
 
