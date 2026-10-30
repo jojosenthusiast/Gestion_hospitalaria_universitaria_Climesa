@@ -8,6 +8,7 @@
   - Cubre: FR-131-01
   - Depende de: 120-T01, 121-T01, 122-T01, 100-T08
   - Hecho cuando: escenario 1 pasa con un compañero
+  - Avance 29-oct-2026: `README.md` raíz, `api/README.md`, `web/README.md` (ahora con `npm ci`) y `android/README.md` documentan requisitos, tabla de variables de entorno (nombre, secreta, origen; sin valores reales), base de datos y semilla sin `supabase db push`, ejecución, pruebas y entorno demo. Comandos revisados contra los `package.json`, `build.gradle.kts` y `.env.example`; `npm test -- --ci` en `api/` pasa (14 suites, 181 pruebas). **Sigue abierta**: el escenario 1 exige que un compañero levante las tres plataformas desde una máquina limpia, y no se pudo comprobar aquí (Android e iOS no se compilaron). Faltan además `ios/README.md` revisado contra el README raíz y el comando único de restauración del entorno demo (FR-131-05).
 - [ ] T03 · S2 · R · Enlace de Figma y sistema de diseño en la documentación
   - Cubre: FR-131-03
   - Depende de: ninguna
