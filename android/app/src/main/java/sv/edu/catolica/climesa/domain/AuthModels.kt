@@ -24,7 +24,8 @@ data class AuthenticatedAccount(
 )
 
 object AuthRules {
-    private val emailPattern = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
+    // Igual que la web: acepta también dominios sin punto, como las cuentas de demostración (enf@climesa).
+    private val emailPattern = Regex("^[^\\s@]+@[^\\s@]+$")
 
     fun validate(email: String, password: String): Map<String, String> = buildMap {
         if (!emailPattern.matches(email.trim())) put("email", "Ingresa un correo válido.")
