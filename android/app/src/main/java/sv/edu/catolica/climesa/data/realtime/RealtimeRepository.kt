@@ -1,4 +1,4 @@
-package sv.edu.catolica.climesa.data.realtime
+﻿package sv.edu.catolica.climesa.data.realtime
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -67,7 +67,9 @@ class SupabaseRealtimeRepository(
 
     private class Dropped : Exception()
 
-    override fun observe(channels: List<String>): Flow<RealtimeSignal> = channelFlow {
+    override fun observe(requested: List<String>): Flow<RealtimeSignal> = channelFlow {
+        // publico es el canal de la pantalla sin sesión; el portal no lo usa, así que no se une a él.
+        val channels = requested.filter { it != RealtimeProtocol.PUBLIC_CHANNEL }
         var cursor: String? = null
         var wasDown = false
         var failures = 0
@@ -199,3 +201,4 @@ class SupabaseRealtimeRepository(
         awaitClose()
     }
 }
+

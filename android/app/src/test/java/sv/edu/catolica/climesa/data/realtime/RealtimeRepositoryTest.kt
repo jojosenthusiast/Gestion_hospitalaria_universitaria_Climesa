@@ -1,4 +1,4 @@
-package sv.edu.catolica.climesa.data.realtime
+﻿package sv.edu.catolica.climesa.data.realtime
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -35,7 +35,7 @@ private fun bedEvent(channel: String, id: String) =
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RealtimeRepositoryTest {
-    private val channels = listOf("publico", "rol:ENF")
+    private val channels = listOf("rol:MED", "rol:ENF")
 
     private class Harness(
         val sockets: MutableList<FakeSocket> = mutableListOf(),
@@ -67,7 +67,7 @@ class RealtimeRepositoryTest {
         backgroundScope.launch { repository(h).observe(channels).collect { signals += it } }
         runCurrent()
         assertEquals(2, h.sockets.single().sent.size)
-        h.sockets[0].receive(joined("publico"))
+        h.sockets[0].receive(joined("rol:MED"))
         runCurrent()
         assertFalse(RealtimeSignal.Resync in signals)
         h.sockets[0].receive(joined("rol:ENF"))
@@ -76,6 +76,20 @@ class RealtimeRepositoryTest {
         assertEquals(RealtimeSignal.State(ConnectionState.LIVE), signals.last())
         assertEquals("la primera union solo pide la cabeza del cursor", listOf("0"), h.catchUps)
         assertFalse("la cabeza del cursor no emite eventos", signals.any { it is RealtimeSignal.Event })
+    }
+
+    @Test fun noSeUneAlCanalPublicoQueElPortalNoUsa() = runTest {
+        val h = Harness()
+        val signals = mutableListOf<RealtimeSignal>()
+        backgroundScope.launch { repository(h).observe(listOf("publico", "rol:ENF")).collect { signals += it } }
+        runCurrent()
+        val sent = h.sockets.single().sent
+        assertEquals(1, sent.size)
+        assertTrue(sent.single().contains("realtime:rol:ENF"))
+        assertFalse(sent.any { it.contains("realtime:publico") })
+        h.sockets[0].receive(joined("rol:ENF"))
+        runCurrent()
+        assertEquals(RealtimeSignal.State(ConnectionState.LIVE), signals.last())
     }
 
     @Test fun reenviaLosEventosDeLosCanales() = runTest {
@@ -93,7 +107,7 @@ class RealtimeRepositoryTest {
         val signals = mutableListOf<RealtimeSignal>()
         backgroundScope.launch { repository(h).observe(channels).collect { signals += it } }
         runCurrent()
-        h.sockets[0].receive(joined("publico")); h.sockets[0].receive(joined("rol:ENF"))
+        h.sockets[0].receive(joined("rol:MED")); h.sockets[0].receive(joined("rol:ENF"))
         runCurrent()
         h.sockets[0].inbox.trySend(SocketEvent.Closed("red"))
         runCurrent()
@@ -101,7 +115,7 @@ class RealtimeRepositoryTest {
         advanceTimeBy(20)
         runCurrent()
         assertEquals(2, h.sockets.size)
-        h.sockets[1].receive(joined("publico")); h.sockets[1].receive(joined("rol:ENF"))
+        h.sockets[1].receive(joined("rol:MED")); h.sockets[1].receive(joined("rol:ENF"))
         runCurrent()
         assertEquals("cabeza inicial y luego recuperacion desde el cursor devuelto", listOf("0", "9"), h.catchUps)
         assertTrue(signals.contains(RealtimeSignal.Event(EventoDominio("cama.estado_cambiado", "cama", "perdida", 1))))
@@ -130,7 +144,7 @@ class RealtimeRepositoryTest {
         val h = Harness(); val signals = mutableListOf<RealtimeSignal>()
         collectInto(signals, SupabaseRealtimeRepository("wss://x", { "t" }, { h.recovered }, h.factory, heartbeatMillis = 1_000, heartbeatTimeoutMillis = 500, backoffMillis = { 10 }))
         runCurrent()
-        h.sockets[0].receive(joined("publico")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
+        h.sockets[0].receive(joined("rol:MED")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
         advanceTimeBy(1_001); runCurrent()
         assertTrue(h.sockets[0].sent.last().contains("heartbeat"))
         assertEquals(1, h.sockets.size)
@@ -145,7 +159,7 @@ class RealtimeRepositoryTest {
         val h = Harness(); val signals = mutableListOf<RealtimeSignal>()
         collectInto(signals, SupabaseRealtimeRepository("wss://x", { "t" }, { h.recovered }, h.factory, heartbeatMillis = 1_000, heartbeatTimeoutMillis = 500, backoffMillis = { 10 }))
         runCurrent()
-        h.sockets[0].receive(joined("publico")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
+        h.sockets[0].receive(joined("rol:MED")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
         advanceTimeBy(1_001); runCurrent()
         val ref = JSONObject(h.sockets[0].sent.last()).getString("ref")
         h.sockets[0].receive(hbReply(ref)); runCurrent()
@@ -160,11 +174,11 @@ class RealtimeRepositoryTest {
         var token = "token-1"
         collectInto(signals, SupabaseRealtimeRepository("wss://x", { token }, { h.recovered }, h.factory, heartbeatMillis = 1_000, heartbeatTimeoutMillis = 500, backoffMillis = { 10 }))
         runCurrent()
-        h.sockets[0].receive(joined("publico")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
+        h.sockets[0].receive(joined("rol:MED")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
         token = "token-2"
         advanceTimeBy(1_001); runCurrent()
         val renewed = h.sockets[0].sent.map { JSONObject(it) }.filter { it.getString("event") == "access_token" }
-        assertEquals(setOf("realtime:publico", "realtime:rol:ENF"), renewed.map { it.getString("topic") }.toSet())
+        assertEquals(setOf("realtime:rol:MED", "realtime:rol:ENF"), renewed.map { it.getString("topic") }.toSet())
         assertTrue(renewed.all { it.getJSONObject("payload").getString("access_token") == "token-2" })
     }
 
@@ -172,7 +186,7 @@ class RealtimeRepositoryTest {
         val h = Harness(); val signals = mutableListOf<RealtimeSignal>()
         collectInto(signals, SupabaseRealtimeRepository("wss://x", { "token-1" }, { h.recovered }, h.factory, heartbeatMillis = 1_000, heartbeatTimeoutMillis = 500, backoffMillis = { 10 }))
         runCurrent()
-        h.sockets[0].receive(joined("publico")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
+        h.sockets[0].receive(joined("rol:MED")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
         advanceTimeBy(1_001); runCurrent()
         assertTrue(h.sockets[0].sent.none { JSONObject(it).getString("event") == "access_token" })
     }
@@ -183,7 +197,7 @@ class RealtimeRepositoryTest {
         runCurrent()
         for (i in 0..2) {
             if (i > 0) { advanceTimeBy(11); runCurrent() }
-            h.sockets[i].receive(joined("publico")); h.sockets[i].receive(rejected("rol:ENF")); runCurrent()
+            h.sockets[i].receive(joined("rol:MED")); h.sockets[i].receive(rejected("rol:ENF")); runCurrent()
             if (i < 2) assertFalse("aun no se reporta en vivo", RealtimeSignal.State(ConnectionState.LIVE) in signals)
         }
         assertEquals(3, h.sockets.size)
@@ -198,9 +212,9 @@ class RealtimeRepositoryTest {
         val h = Harness(); val signals = mutableListOf<RealtimeSignal>()
         collectInto(signals, repository(h))
         runCurrent()
-        h.sockets[0].receive(joined("publico")); h.sockets[0].receive(rejected("rol:ENF")); runCurrent()
+        h.sockets[0].receive(joined("rol:MED")); h.sockets[0].receive(rejected("rol:ENF")); runCurrent()
         advanceTimeBy(11); runCurrent()
-        h.sockets[1].receive(joined("publico")); h.sockets[1].receive(joined("rol:ENF")); runCurrent()
+        h.sockets[1].receive(joined("rol:MED")); h.sockets[1].receive(joined("rol:ENF")); runCurrent()
         assertTrue(signals.none { it is RealtimeSignal.ChannelsDropped })
         assertEquals(RealtimeSignal.State(ConnectionState.LIVE), signals.last())
     }
@@ -214,10 +228,10 @@ class RealtimeRepositoryTest {
         }, h.factory, heartbeatMillis = 1_000_000, backoffMillis = { 10 })
         collectInto(signals, repo)
         runCurrent()
-        h.sockets[0].receive(joined("publico")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
+        h.sockets[0].receive(joined("rol:MED")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
         h.sockets[0].inbox.trySend(SocketEvent.Closed("red")); runCurrent()
         advanceTimeBy(11); runCurrent()
-        h.sockets[1].receive(joined("publico")); h.sockets[1].receive(joined("rol:ENF")); runCurrent()
+        h.sockets[1].receive(joined("rol:MED")); h.sockets[1].receive(joined("rol:ENF")); runCurrent()
         assertEquals(listOf("0", "5", "6"), calls)
         assertEquals(203, signals.count { it is RealtimeSignal.Event })
         assertEquals(RealtimeSignal.State(ConnectionState.LIVE), signals.last())
@@ -229,10 +243,11 @@ class RealtimeRepositoryTest {
             h.factory, heartbeatMillis = 1_000_000, backoffMillis = { 10 })
         collectInto(signals, repo)
         runCurrent()
-        h.sockets[0].receive(joined("publico")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
+        h.sockets[0].receive(joined("rol:MED")); h.sockets[0].receive(joined("rol:ENF")); runCurrent()
         assertFalse(RealtimeSignal.State(ConnectionState.LIVE) in signals)
         advanceTimeBy(11); runCurrent()
-        h.sockets[1].receive(joined("publico")); h.sockets[1].receive(joined("rol:ENF")); runCurrent()
+        h.sockets[1].receive(joined("rol:MED")); h.sockets[1].receive(joined("rol:ENF")); runCurrent()
         assertEquals(RealtimeSignal.State(ConnectionState.LIVE), signals.last())
     }
 }
+

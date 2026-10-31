@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="camas_titulo">Camas.</string>
     <string name="camas_vacio">No hay camas disponibles en esta vista.</string>
@@ -24,8 +24,18 @@
     <string name="unidad_sin_servicio">Sin servicio activo.</string>
     <string name="unidad_paramedico_turno">Paramédico de turno</string>
     <string name="unidad_si">Sí</string>
-    <string name="unidad_no">No</string>
+    <string name="mantenimiento_titulo">Mantenimiento</string>
+    <string name="mantenimiento_poner">Poner en mantenimiento</string>
+    <string name="mantenimiento_sacar">Sacar de mantenimiento</string>
+    <string name="mantenimiento_requiere_paramedico">Para sacar la unidad de mantenimiento debe haber un paramédico con turno en curso.</string>
+    <string name="mantenimiento_efecto_poner">La unidad no podrá despacharse mientras esté en mantenimiento.</string>
+    <string name="mantenimiento_efecto_sacar">La unidad queda Disponible.</string>
+    <string name="mantenimiento_motivo">Motivo (al menos 10 caracteres)</string>
+    <string name="mantenimiento_guardando">Guardando…</string>
+    <string name="mantenimiento_cancelar">Cancelar</string>
+    <string name="mantenimiento_cerrar">Cerrar y recargar</string>    <string name="unidad_no">No</string>
     <string name="rol_sin_app">Tu rol no usa esta aplicación</string>
     <string name="rol_sin_app_detalle">Ingresa desde la plataforma habilitada para tu cuenta.</string>
     <string name="cerrar_sesion">Cerrar sesión</string>
 </resources>
+

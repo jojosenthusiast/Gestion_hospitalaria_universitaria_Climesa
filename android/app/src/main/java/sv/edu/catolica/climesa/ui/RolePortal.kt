@@ -38,12 +38,31 @@ import java.time.format.DateTimeFormatter
 
 data class RoleData(val loading:Boolean=false,val data:Any?=null,val error:String?=null)
 /** Lectura de datos del portal por rol; separada de [ApiClient] para poder probar el ViewModel. */
-fun interface RoleDataSource{suspend fun get(path:String):Any}
+fun interface RoleDataSource{
+    suspend fun get(path:String):Any
+    /** Escritura del portal (por ahora, el mantenimiento de la unidad); por defecto no escribe. */
+    suspend fun post(path:String,body:JSONObject):Any=throw UnsupportedOperationException("Este origen de datos es de solo lectura.")
+}
+/** Estado de la acción de mantenimiento: `conflict` es un 409 de versión (la unidad cambió y nada se guardó). */
+data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val conflict:Boolean=false,val saved:Boolean=false)
 @HiltViewModel class RoleViewModel @Inject constructor(private val source:RoleDataSource,realtime:RealtimeRepository):ViewModel(){
     private val mutable=MutableStateFlow(RoleData());val state=mutable.asStateFlow()
     private var job:Job?=null
     private var current:String?=null
     private val live=LiveSubscription(realtime)
+    private val maintenanceMutable=MutableStateFlow(MaintenanceState());val maintenance=maintenanceMutable.asStateFlow()
+    fun resetMaintenance(){maintenanceMutable.value=MaintenanceState()}
+    /** `POST /ambulancia/mantenimiento`; el motivo se valida aquí por comodidad, la garantía es la API (regla 5). */
+    fun setMaintenance(version:Int,inMaintenance:Boolean,reason:String){
+        MaintenanceRules.reasonError(reason)?.let{maintenanceMutable.value=MaintenanceState(error=it);return}
+        maintenanceMutable.value=MaintenanceState(busy=true)
+        viewModelScope.launch{
+            try{source.post("/ambulancia/mantenimiento",MaintenanceRules.body(version,inMaintenance,reason));maintenanceMutable.value=MaintenanceState(saved=true);load(current,silent=true)}
+            catch(e:Exception){if(e is CancellationException)throw e
+                val conflict=(e as? sv.edu.catolica.climesa.data.AuthRequestException)?.let{it.statusCode==409||it.code=="version_conflicto"}==true
+                maintenanceMutable.value=MaintenanceState(conflict=conflict,error=if(conflict)"La unidad cambió. Cierra y vuelve a abrir para ver su estado actual; el cambio no se guardó." else e.message?:"No se pudo guardar. Intenta de nuevo.")}
+        }
+    }
     fun load(path:String?,silent:Boolean=false){current=path;job?.cancel();job=viewModelScope.launch{if(!silent||path==null)mutable.value=RoleData(loading=path!=null);if(path!=null)try{mutable.value=RoleData(data=source.get(path))}catch(e:Exception){if(e is CancellationException)throw e;if(silent&&mutable.value.data!=null)return@launch;mutable.value=RoleData(error=e.message?:"No se pudo cargar la información.")}}}
     /** Idempotente: refresca la sección abierta cuando llega un evento que le importa, sin mostrar el indicador de carga. */
     fun start(channels:List<String>){live.start(viewModelScope,channels){signal->
@@ -89,12 +108,38 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
             }else if(page==AndroidSection.UNIT){
                 val unit=(data.data as? JSONObject)?.optJSONObject("unit");val service=(data.data as? JSONObject)?.optJSONObject("activeService")
                 item{Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(unit?.optString("plate").orEmpty(),style=MaterialTheme.typography.titleMedium);Text("${stringResource(R.string.unidad_estado)}: ${unitStates[unit?.optString("state")]?:unit?.optString("state").orEmpty()}",color=MaterialTheme.colorScheme.primary);Text("${stringResource(R.string.unidad_paramedico_turno)}: ${stringResource(if((data.data as? JSONObject)?.optBoolean("paramedicOnDuty")==true)R.string.unidad_si else R.string.unidad_no)}",style=MaterialTheme.typography.bodySmall);HorizontalDivider();if(service==null)Text(stringResource(R.string.unidad_sin_servicio)) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${service.optString("origin")} → ${service.optString("destination")}")}}}}
+                if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.optString("state")))item{MaintenanceControl(model,unit.optString("state"),unit.optInt("version"),(data.data as? JSONObject)?.optBoolean("paramedicOnDuty")==true)}
             }else if(page==AndroidSection.SHIFTS){
                 val rows=data.data as? JSONArray
                 if(rows==null||rows.length()==0)item{Text("No tienes turnos publicados.",style=MaterialTheme.typography.bodyMedium)}
-                else items((0 until rows.length()).toList()){i->val r=rows.getJSONObject(i);Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(r.optString("area"),style=MaterialTheme.typography.titleMedium);val format=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.of("America/El_Salvador"));Text(format.format(Instant.parse(r.getString("start")))+" — "+format.format(Instant.parse(r.getString("end"))),style=MaterialTheme.typography.bodyMedium);Text(r.optString("state"),style=MaterialTheme.typography.labelSmall)}}}
+                else items((0 until rows.length()).toList()){i->val r=rows.getJSONObject(i);Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(r.optString("area"),style=MaterialTheme.typography.titleMedium);val format=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.of("America/El_Salvador"));Text(format.format(Instant.parse(r.getString("start")))+" — "+format.format(Instant.parse(r.getString("end"))),style=MaterialTheme.typography.bodyMedium);Text(StaffLabels.shiftState(r.optString("state")),style=MaterialTheme.typography.labelSmall)}}}
             }else item{PendingModule()}
         }
     }
+}
+/** Entrar o salir de mantenimiento; el motivo y el diálogo sobreviven al giro de pantalla. */
+@Composable private fun MaintenanceControl(model:RoleViewModel,unitState:String,version:Int,paramedicOnDuty:Boolean){
+    val leaving=unitState=="en_mantenimiento";val blocked=MaintenanceRules.leavingBlocked(unitState,paramedicOnDuty)
+    val state by model.maintenance.collectAsStateWithLifecycle()
+    var open by rememberSaveable{mutableStateOf(false)};var reason by rememberSaveable{mutableStateOf("")}
+    val title=stringResource(if(leaving)R.string.mantenimiento_sacar else R.string.mantenimiento_poner)
+    LaunchedEffect(state.saved){if(state.saved){open=false;reason="";model.resetMaintenance()}}
+    Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+        Text(stringResource(R.string.mantenimiento_titulo),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
+        if(blocked)Text(stringResource(R.string.mantenimiento_requiere_paramedico),style=MaterialTheme.typography.bodySmall)
+        Button(onClick={model.resetMaintenance();open=true},enabled=!blocked,modifier=Modifier.fillMaxWidth()){Text(title)}
+    }
+    if(open)AlertDialog(
+        onDismissRequest={if(!state.busy){open=false;model.resetMaintenance()}},
+        title={Text(title)},
+        text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+            Text(stringResource(if(leaving)R.string.mantenimiento_efecto_sacar else R.string.mantenimiento_efecto_poner),style=MaterialTheme.typography.bodySmall)
+            state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+            if(!state.conflict)OutlinedTextField(reason,{reason=it.take(MaintenanceRules.MAX_REASON)},label={Text(stringResource(R.string.mantenimiento_motivo))},modifier=Modifier.fillMaxWidth())
+        }},
+        confirmButton={if(state.conflict)TextButton(onClick={open=false;model.resetMaintenance()}){Text(stringResource(R.string.mantenimiento_cerrar))}
+            else Button(onClick={model.setMaintenance(version,!leaving,reason)},enabled=!state.busy){Text(if(state.busy)stringResource(R.string.mantenimiento_guardando) else title)}},
+        dismissButton={if(!state.conflict)TextButton(onClick={open=false;model.resetMaintenance()},enabled=!state.busy){Text(stringResource(R.string.mantenimiento_cancelar))}},
+    )
 }
 @Composable private fun PendingModule(){Column{HorizontalDivider();Spacer(Modifier.height(22.dp));Text(stringResource(R.string.portal_proxima_entrega),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary);Spacer(Modifier.height(14.dp));Text(stringResource(R.string.portal_modulo_pendiente),style=MaterialTheme.typography.titleLarge);Spacer(Modifier.height(12.dp));Text(stringResource(R.string.portal_modulo_pendiente_detalle),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
