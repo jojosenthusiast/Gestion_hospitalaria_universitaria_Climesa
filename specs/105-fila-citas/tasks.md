@@ -4,7 +4,7 @@
   - Cubre: FR-105-01, FR-105-07
   - Depende de: 100-T03
   - Hecho cuando: escenarios 1 y 4 pasan como pruebas concurrentes
-  - Verificado: Aplicada en Supabase; 02_concurrencia.sh casos 1 (50 números distintos) y 6 (1 cita de 2 simultáneas)
+  - Verificado: Aplicada en Supabase; 02_concurrencia.sh casos 1 (50 números distintos) y 6 (1 cita de 2 simultáneas) (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
 - [ ] T02 · S3 · R · Emitir, llamar y cambiar estado de números con reinicio diario
   - Cubre: FR-105-01 a FR-105-04
   - Depende de: T01
