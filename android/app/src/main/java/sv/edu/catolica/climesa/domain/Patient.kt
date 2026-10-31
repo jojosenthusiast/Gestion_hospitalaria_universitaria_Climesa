@@ -56,7 +56,7 @@ object PatientRules {
         require(validate(d,today).isEmpty()) { "Revisa los campos del formulario." }
         val old=id?.let { key -> r.patients.firstOrNull { it.id==key } ?: error("El paciente ya no está disponible.") }
         require(old==null || old.version==expectedVersion) { "La ficha cambió. Vuelve a abrirla antes de guardar." }
-        require(old==null || reason.trim().length>=10) { "Explica el motivo del cambio (mínimo 10 caracteres)." }
+        require(old==null || ChangeReason.error(reason)==null) { ChangeReason.error(reason) ?: "" }
         val dui=d.dui.takeIf(String::isNotBlank)?.let(::formatDui)
         val duplicate=r.patients.firstOrNull { it.id!=id && dui!=null && it.dui==dui }
         require(duplicate==null) { "Ese DUI ya pertenece al expediente ${duplicate?.record}, aunque esté inactivo." }
@@ -76,7 +76,7 @@ object PatientRules {
             audit=r.audit+AuditEvent(p.record,if(old==null) "Registro" else "Edición",reason.trim(),p.version,changes=changes))
     }
     fun setActive(r:Registry,id:String,version:Int,active:Boolean,reason:String):Registry {
-        require(reason.trim().length>=10) { "Explica el motivo (mínimo 10 caracteres)." }
+        require(ChangeReason.error(reason)==null) { ChangeReason.error(reason) ?: "" }
         val old=r.patients.first { it.id==id }
         require(old.version==version) { "La ficha cambió. Vuelve a abrirla." }
         val p=old.copy(active=active,version=old.version+1)

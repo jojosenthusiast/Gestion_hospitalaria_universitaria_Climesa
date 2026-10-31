@@ -106,8 +106,8 @@ import java.time.format.DateTimeFormatter
         item { Text("Pacientes.",style=MaterialTheme.typography.displaySmall);Spacer(Modifier.height(8.dp));Text("Busca antes de abrir un expediente.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
         item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text("Nombre, DUI o expediente")},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,"Limpiar búsqueda")}}) }
         item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            Button(onClick=model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2,modifier=Modifier.weight(1f)) {Text(if(state.searching) "Buscando…" else "Buscar")}
-            OutlinedButton(onClick=model::newPatient,enabled=state.searchedQuery!=null) {Icon(Icons.Default.Add,null);Text("Registrar")}
+            if(PatientAction.SEARCH in state.actions) Button(onClick=model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2,modifier=Modifier.weight(1f)) {Text(if(state.searching) "Buscando…" else "Buscar")}
+            if(PatientAction.REGISTER in state.actions) OutlinedButton(onClick=model::newPatient,enabled=state.searchedQuery!=null) {Icon(Icons.Default.Add,null);Text("Registrar")}
         } }
         item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf("Activos","Inactivos","Todos").forEachIndexed {i,label -> FilterChip(selected=state.filter==i,onClick={model.filter(i)},label={Text(label)})}} }
         item { Text(if(state.searchedQuery==null) "Registro compartido · ${state.results.size} resultados" else "${state.results.size} coincidencias · ${state.searchedQuery}",style=MaterialTheme.typography.labelLarge)
@@ -143,8 +143,8 @@ import java.time.format.DateTimeFormatter
         item {Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)) {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
             Value("DUI",p.dui ?: "Sin documento registrado");Value("Nacimiento",p.birth?.toString() ?: "No registrado");Value("Sexo",p.sex.label);Value("Teléfono",p.phone.ifBlank {"No registrado"})
         }}}
-        item {Button(onClick={model.edit(p)},modifier=Modifier.fillMaxWidth()) {Icon(Icons.Default.Edit,null);Spacer(Modifier.width(8.dp));Text("Editar datos")}
-            OutlinedButton(onClick={dialog=true},enabled=!state.saving,modifier=Modifier.fillMaxWidth()) {Text(if(p.active) "Inactivar paciente" else "Reactivar paciente")}}
+        item {if(PatientAction.EDIT in state.actions) Button(onClick={model.edit(p)},modifier=Modifier.fillMaxWidth()) {Icon(Icons.Default.Edit,null);Spacer(Modifier.width(8.dp));Text("Editar datos")}
+            if(PatientAction.CHANGE_STATUS in state.actions) OutlinedButton(onClick={dialog=true},enabled=!state.saving,modifier=Modifier.fillMaxWidth()) {Text(if(p.active) "Inactivar paciente" else "Reactivar paciente")}}
         item {Text("Historial de actividad",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         val events=state.registry.audit.filter {it.record==p.record}.reversed()
         if(events.isEmpty()) item {Text("Ficha de ejemplo. Todavía no tiene cambios.")}
@@ -153,7 +153,7 @@ import java.time.format.DateTimeFormatter
     }
     if(dialog) AlertDialog(onDismissRequest={if(!state.saving)dialog=false},title={Text(if(p.active) "Inactivar paciente" else "Reactivar paciente")},
         text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("La ficha y su historial se conservan.");OutlinedTextField(reason,{reason=it.take(500)},label={Text("Motivo")},supportingText={Text("Mínimo 10 caracteres")})}},
-        confirmButton={TextButton(enabled=reason.trim().length>=10 && !state.saving,onClick={model.changeActive(p,reason)}) {Text(if(state.saving) "Guardando…" else "Confirmar")}},
+        confirmButton={TextButton(enabled=ChangeReason.error(reason)==null && !state.saving,onClick={model.changeActive(p,reason)}) {Text(if(state.saving) "Guardando…" else "Confirmar")}},
         dismissButton={TextButton(enabled=!state.saving,onClick={dialog=false}) {Text("Cancelar")}})
 }
 @Composable private fun Value(label:String,value:String) {Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {Text(label.uppercase(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Text(value,style=MaterialTheme.typography.bodyLarge);HorizontalDivider()}}
