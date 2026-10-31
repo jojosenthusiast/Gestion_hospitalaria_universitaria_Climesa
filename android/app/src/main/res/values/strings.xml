@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="camas_titulo">Camas.</string>
     <string name="camas_vacio">No hay camas disponibles en esta vista.</string>
@@ -37,5 +37,34 @@
     <string name="rol_sin_app">Tu rol no usa esta aplicación</string>
     <string name="rol_sin_app_detalle">Ingresa desde la plataforma habilitada para tu cuenta.</string>
     <string name="cerrar_sesion">Cerrar sesión</string>
-</resources>
+    <string name="plan_titulo">Planificación</string>
+    <string name="plan_nuevo">Planificar turno</string>
+    <string name="plan_publicar">Publicar planificación</string>
+    <string name="plan_vacio">Sin turnos en esta vista. Ajusta el filtro para consultar otros horarios.</string>
+    <string name="plan_solo_lectura">Solo lectura: tu cuenta no puede planificar ni publicar turnos.</string>
+    <string name="plan_editar">Editar</string>
+    <string name="plan_cancelar_turno">Cancelar turno</string>
+    <string name="plan_volver">Volver</string>
+    <string name="plan_entendido">Entendido</string>
+    <string name="plan_guardando">Guardando…</string>
+    <string name="plan_guardar_borrador">Crear borrador</string>
+    <string name="plan_guardar_cambios">Guardar turno</string>
+    <string name="plan_publicar_turnos">Publicar turnos</string>
+    <string name="plan_persona">Persona</string>
+    <string name="plan_area">Área</string>
+    <string name="plan_area_todas">Todas las áreas</string>
+    <string name="plan_seleccionar">Seleccionar</string>
+    <string name="plan_tipo">Tipo de turno</string>
+    <string name="plan_inicio_fecha">Inicio · fecha (AAAA-MM-DD)</string>
+    <string name="plan_inicio_hora">Inicio · hora (HH:mm)</string>
+    <string name="plan_fin_fecha">Fin · fecha (AAAA-MM-DD)</string>
+    <string name="plan_fin_hora">Fin · hora (HH:mm)</string>
+    <string name="plan_observacion">Observación · opcional</string>
+    <string name="plan_motivo_cambio">Motivo del cambio (al menos 10 caracteres)</string>
+    <string name="plan_motivo_cancelacion">Motivo de la cancelación (al menos 10 caracteres)</string>
+    <string name="plan_horario">Horarios de El Salvador (UTC−6). La duración y el descanso se comprueban con la política vigente.</string>
+    <string name="plan_publicar_detalle">Se publican los turnos en borrador del rango (máximo 31 días). Si quedan huecos de cobertura se publica igual y se te avisa.</string>
+    <string name="plan_desde">Desde (AAAA-MM-DD)</string>
+    <string name="plan_hasta">Hasta (AAAA-MM-DD)</string>
+    <string name="plan_cerrar_recargar">Cerrar y recargar</string></resources>
 

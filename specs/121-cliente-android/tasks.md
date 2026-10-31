@@ -9,6 +9,7 @@
   - Depende de: T01, 101-T03
   - Hecho cuando: escenario 1 pasa para los 7 roles de Android (criterio del avance)
   - Avance 30-oct-2026: `AndroidSections.visible` deriva la navegación de los permisos de `/auth/me` (quien tiene `ambulancia.operar` ve Unidad, Servicio, Bitácora y Perfil); sin pantallas útiles se muestra "Tu rol no usa esta aplicación"; Servicio y Bitácora quedan como "Próxima entrega". Pruebas unitarias en `AndroidSectionsTest`. **No verificado en emulador ni dispositivo**; Recepción conserva su navegación propia (`ReceptionApp`) y falta recorrer los 7 roles en un dispositivo.
+  - Avance 30-oct-2026 (planificación de turnos): nueva sección "Planificación" (ShiftPlanningScreen/ShiftPlanningViewModel, reglas en ShiftPlanning) que lista GET /turnos, crea y edita borradores (	urnos.planificar), publica con huecos de cobertura (	urnos.publicar) y cancela con versión y motivo; solo lectura sin esos permisos y se refresca con eventos 	urno, personal y espacio sin sondeo. Pruebas unitarias en ShiftPlanningRulesTest, ShiftPlanningViewModelTest y AndroidSectionsTest. **No verificado en emulador ni contra la API real**; los roles que tienen estos permisos (JOP) figuran como Web en oles.csv, así que la pantalla queda sin ruta de acceso hasta decidir si JOP usa Android.
 - [ ] T03 · S2 · R · Repositorio de Realtime e invalidación en ViewModels
   - Cubre: FR-121-04
   - Depende de: T02, 100-T03

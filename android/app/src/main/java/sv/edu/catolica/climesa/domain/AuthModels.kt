@@ -54,6 +54,7 @@ enum class AndroidSection(val label: String, val permission: String, val ready: 
     BEDS("Camas", "camas.ver_tablero", true),
     CONSULTATIONS("Consultas", "consulta.iniciar", false),
     SHIFTS("Mis turnos", "turnos.ver", true),
+    PLANNING("Planificación", "turnos.planificar", true),
     LAB("Laboratorio", "laboratorio.ver_cola", false),
     APPOINTMENTS("Citas", "citas.ver", false),
     RESULTS("Resultados", "resultados.ver", false),
@@ -72,7 +73,7 @@ object AndroidSections {
      */
     fun visible(permissions: Collection<String>): List<AndroidSection> {
         if (AndroidSection.SERVICE.permission in permissions) return ambulanceCrew.filter { it.permission in permissions }
-        return AndroidSection.entries.filter { it.permission in permissions }
+        return AndroidSection.entries.filter { if (it == AndroidSection.PLANNING) ShiftPlanning.canView(permissions) else it.permission in permissions }
     }
 
     /** Sin ninguna pantalla más allá de Inicio y Perfil, el rol no usa Android. */

@@ -32,6 +32,15 @@ class AndroidSectionsTest {
         assertTrue(AndroidSections.hasAppScreens(listOf("sesion.perfil", "camas.ver_tablero")))
     }
 
+    @Test fun laPlanificacionSoloSaleConPermisoDeTurnosYNoSustituyeAMisTurnos() {
+        val jefe = AndroidSections.visible(listOf("sesion.perfil", "turnos.ver", "turnos.ver_borradores", "turnos.planificar", "turnos.publicar"))
+        assertTrue(AndroidSection.PLANNING in jefe)
+        assertTrue(AndroidSection.SHIFTS in jefe)
+        assertFalse(AndroidSection.PLANNING in AndroidSections.visible(listOf("sesion.perfil", "turnos.ver")))
+        assertFalse(AndroidSection.PLANNING in AndroidSections.visible(listOf("sesion.perfil", "turnos.planificar")))
+        assertTrue(AndroidSection.PLANNING.ready)
+    }
+
     @Test fun lasSeccionesSinPantallaQuedanComoProximaEntrega() {
         assertFalse(AndroidSection.SERVICE.ready)
         assertFalse(AndroidSection.LOG.ready)
