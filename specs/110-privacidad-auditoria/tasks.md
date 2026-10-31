@@ -16,6 +16,7 @@
   - Cubre: FR-110-07
   - Depende de: 100-T02, 120-T03
   - Hecho cuando: el delegado detecta un registro alterado desde la web
+  - Límite conocido (30-oct-2026): la pantalla web `#/auditoria` ya se sirve con la `version` del canal en vivo, pero ninguna mutación emite un evento de auditoría, así que solo se refresca cuando llega otro evento; ver `docs/arquitectura/tiempo-real.md`, sección Límites conocidos. No se implementaron eventos nuevos.
 - [ ] T05 · S4 · R · Pantallas de accesos (W30, W31) y estado "sin permiso" con pedir acceso
   - Cubre: FR-110-04, FR-110-05
   - Depende de: T03

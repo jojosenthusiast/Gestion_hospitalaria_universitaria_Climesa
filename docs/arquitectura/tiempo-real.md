@@ -62,3 +62,7 @@ Reconexión en la web: no hay sondeo periódico. Al volver un canal a `SUBSCRIBE
 | `inventario.bajo_minimo` | `rol:JOP`, `rol:LAB` (reactivos) | Inventario, tablero | No | 111 |
 | `aviso.publicado` | `publico` | Pantalla pública, app del paciente | No | 112 |
 | `metricas.recalculadas` | `rol:ADM`, `rol:JOP` | Tablero | No | 113 |
+
+## Límites conocidos
+
+- **Pantalla de auditoría (W32, `#/auditoria`).** La web la sirve con la `version` del canal en vivo, pero ninguna mutación emite hoy un evento de auditoría: las filas de `plataforma.auditoria` no pasan por el outbox. La pantalla solo se refresca cuando llega otro evento (que sube `version`), al reconectar o al recargar a mano. No hay evento `auditoria.*` en el catálogo; crearlo queda fuera de este corte y se decide con 110-T04.
