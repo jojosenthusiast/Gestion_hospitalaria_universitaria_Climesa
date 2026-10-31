@@ -72,9 +72,9 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); window.l
 // FR-120-02 / escenario 1: cada rol con web ve únicamente el menú que sus permisos reales habilitan.
 const menuEsperado: Record<string, string[]> = {
   ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Perfil'],
-  JOP: ['Inicio', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Inventario', 'Perfil'],
+  JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Inventario', 'Fila del día', 'Citas', 'Perfil'],
   REC: ['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Fila del día', 'Citas', 'Perfil'],
-  LAB: ['Inicio', 'Laboratorio', 'Inventario', 'Perfil'],
+  LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil'],
   DPD: ['Inicio', 'Usuarios', 'Auditoría', 'Accesos excepcionales', 'Perfil'],
 };
 const todas = [...new Set(Object.values(menuEsperado).flat())];
@@ -96,9 +96,9 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
     });
   }
 
-  it('el laboratorista del escenario 1 solo ve Inicio, Laboratorio, Inventario y Perfil', async () => {
+  it('el laboratorista ve lo que el catálogo le da: Pacientes, Turnos, Laboratorio e Inventario', async () => {
     const nav = await entrar(perfil('LAB'));
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Laboratorio', 'Inventario', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil']);
   });
 
   it('el menú depende de los permisos de /auth/me, no del nombre del rol', async () => {
@@ -111,7 +111,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
   it('un laboratorista sin laboratorio.ver_cola ni inventario.ver no ve esos módulos', async () => {
     const solo = permisosDe('LAB').filter((p) => !['laboratorio.ver_cola', 'inventario.ver'].includes(p.code));
     const nav = await entrar(perfil('LAB', solo));
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Turnos', 'Perfil']);
   });
 
   it('una ruta ajena al rol muestra "Sin permiso" y no pide datos del módulo', async () => {
@@ -123,6 +123,93 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
   });
 });
 
+// Regla 8: el menú sale del catálogo (permisos.csv), no del nombre del rol. Aun los roles de móvil
+// verían exactamente lo que el catálogo les da si una cuenta suya tuviera la web habilitada.
+const menuCatalogo: Record<string, string[]> = {
+  AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
+  ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario'],
+  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Fila del día', 'Citas'],
+  PAR: ['Pacientes', 'Ambulancia', 'Turnos'],
+  PAC: ['Fila del día', 'Citas'],
+};
+
+describe('el menú depende solo del permiso (regla 8)', () => {
+  for (const [rol, modulosRol] of Object.entries(menuCatalogo)) {
+    it(`${rol}, si tuviera web, ve exactamente lo que el catálogo le da: ${modulosRol.join(', ')}`, async () => {
+      const nav = await entrar(perfil(rol));
+      expect(etiquetas(nav)).toEqual(['Inicio', ...modulosRol, 'Perfil']);
+    });
+  }
+
+  it('el módulo no lleva roles: un JOP sin pacientes.buscar no ve Pacientes y un LAB con él sí', async () => {
+    const sinBuscar = permisosDe('JOP').filter((p) => p.code !== 'pacientes.buscar');
+    const nav = await entrar(perfil('JOP', sinBuscar));
+    expect(within(nav).queryByRole('link', { name: 'Pacientes' })).toBeNull();
+    cleanup();
+    const navLab = await entrar(perfil('LAB'));
+    expect(within(navLab).getByRole('link', { name: 'Pacientes' })).toBeTruthy();
+  });
+
+  it('un mismo perfil con dos roles ve la unión de sus permisos, sin selector de rol', async () => {
+    const permisos = [...permisosDe('ADM'), ...permisosDe('LAB')];
+    auth.getSession.mockResolvedValue({ data: { session } });
+    simular({ ...perfil('ADM', permisos), roles: ['ADM', 'LAB'] });
+    render(<App />);
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Laboratorio', 'Inventario', 'Perfil']);
+    expect(screen.queryByRole('combobox', { name: 'Rol de trabajo' })).toBeNull();
+    expect(screen.getByText('Administración · Laboratorio')).toBeTruthy();
+  });
+
+  it('una cuenta con web pero sin ningún módulo con permiso ve "Tu rol no usa esta aplicación"', async () => {
+    auth.getSession.mockResolvedValue({ data: { session } });
+    simular(perfil('PAC', [{ code: 'sesion.perfil', context: 'x' }]));
+    render(<App />);
+    expect(await screen.findByText('Tu rol no usa esta aplicación')).toBeTruthy();
+    expect(screen.queryByRole('navigation', { name: 'Navegación principal' })).toBeNull();
+  });
+
+  it('el encabezado de Edificio no nombra al área de Administración cuando lo abre Recepción', async () => {
+    await entrar(perfil('REC'), { '/espacios': () => json([]) }, '#/espacios');
+    expect(await screen.findByText('Hospital / Edificio')).toBeTruthy();
+    expect(screen.queryByText(/Administración \//)).toBeNull();
+  });
+
+  it('Inicio no antepone el nombre de un rol al encabezado', async () => {
+    await entrar(perfil('LAB'));
+    expect(await screen.findByText('CLIMESA / Inicio')).toBeTruthy();
+  });
+});
+
+describe('pantallas de solo lectura según el permiso', () => {
+  it('Pacientes para JOP (buscar y ver ficha, sin registrar ni editar) no ofrece escritura y no falla', async () => {
+    await entrar(perfil('JOP'), { '/pacientes': () => json([]) }, '#/pacientes');
+    expect(await screen.findByText('No hay coincidencias')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Registrar paciente/ })).toBeNull();
+    expect(screen.getByText('Consulta de solo lectura.')).toBeTruthy();
+  });
+
+  it('Pacientes para LAB abre y muestra la lista sin acciones de escritura', async () => {
+    await entrar(perfil('LAB'), { '/pacientes': () => json([]) }, '#/pacientes');
+    expect(await screen.findByText('No hay coincidencias')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Registrar paciente/ })).toBeNull();
+  });
+
+  it('Turnos para LAB solo lista: sin planificar, publicar, editar ni cancelar', async () => {
+    const turno = { id: 't-1', staffId: 's-1', person: 'Persona Ficticia', areaId: 'a-1', area: 'Laboratorio', start: '2026-11-10T14:00:00.000Z', end: '2026-11-10T22:00:00.000Z', type: 'diurno', state: 'publicado', version: 1 };
+    await entrar(perfil('LAB'), { '/turnos': () => json([turno]), '/espacios': () => json([]) }, '#/turnos');
+    expect((await screen.findAllByText('Persona Ficticia')).length).toBeGreaterThan(0);
+    for (const nombre of [/Planificar turno/, /Publicar planificación/, /Editar/, /Cancelar turno/]) {
+      expect(screen.queryByRole('button', { name: nombre })).toBeNull();
+    }
+  });
+
+  it('Turnos para JOP ofrece publicar y planificar porque el catálogo se lo da', async () => {
+    await entrar(perfil('JOP'), { '/turnos': () => json([]), '/espacios': () => json([]), '/personal': () => json([]) }, '#/turnos');
+    expect(await screen.findByRole('button', { name: /Publicar planificación/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Planificar turno/ })).toBeTruthy();
+  });
+});
 describe('rol sin web (FR-120-03)', () => {
   it('un médico (Android e iOS) ve "Tu rol no usa esta aplicación" y ningún menú', async () => {
     auth.getSession.mockResolvedValue({ data: { session } });
