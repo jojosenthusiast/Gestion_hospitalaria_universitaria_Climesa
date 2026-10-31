@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -65,6 +66,48 @@ class LiveViewModelsTest {
         assertTrue(vm.state.value.data != null && vm.state.value.error == null)
     }
 
+
+    private class MaintenanceSource(val failure: Exception? = null) : RoleDataSource {
+        val posts = mutableListOf<Pair<String, org.json.JSONObject>>()
+        override suspend fun get(path: String): Any = org.json.JSONObject()
+        override suspend fun post(path: String, body: org.json.JSONObject): Any {
+            posts += path to body
+            failure?.let { throw it }
+            return org.json.JSONObject()
+        }
+    }
+
+    @Test fun elMantenimientoSeEnviaConVersionYMotivo() = runTest(dispatcher) {
+        val source = MaintenanceSource(); val vm = RoleViewModel(source, SignalBus())
+        vm.setMaintenance(version = 4, inMaintenance = true, reason = "Cambio de aceite"); runCurrent()
+        assertEquals("/ambulancia/mantenimiento", source.posts.single().first)
+        assertEquals(4, source.posts.single().second.getInt("version"))
+        assertTrue(vm.maintenance.value.saved)
+        assertNull(vm.maintenance.value.error)
+    }
+
+    @Test fun unMotivoCortoNoLlegaALaApi() = runTest(dispatcher) {
+        val source = MaintenanceSource(); val vm = RoleViewModel(source, SignalBus())
+        vm.setMaintenance(version = 4, inMaintenance = true, reason = "corto"); runCurrent()
+        assertTrue(source.posts.isEmpty())
+        assertEquals("Indica el motivo, de al menos 10 caracteres.", vm.maintenance.value.error)
+    }
+
+    @Test fun unConflictoDeVersionPideRecargarYNoGuarda() = runTest(dispatcher) {
+        val source = MaintenanceSource(sv.edu.catolica.climesa.data.AuthRequestException("otra version", 409, "version_conflicto"))
+        val vm = RoleViewModel(source, SignalBus())
+        vm.setMaintenance(version = 4, inMaintenance = false, reason = "Revision terminada"); runCurrent()
+        assertTrue(vm.maintenance.value.conflict)
+        assertFalse(vm.maintenance.value.saved)
+    }
+
+    @Test fun otroErrorConservaElMensajeDeLaApi() = runTest(dispatcher) {
+        val source = MaintenanceSource(sv.edu.catolica.climesa.data.AuthRequestException("Hay un servicio activo.", 422))
+        val vm = RoleViewModel(source, SignalBus())
+        vm.setMaintenance(version = 4, inMaintenance = true, reason = "Cambio de aceite"); runCurrent()
+        assertEquals("Hay un servicio activo.", vm.maintenance.value.error)
+        assertFalse(vm.maintenance.value.conflict)
+    }
     private class FakePatients(var rows: List<Patient>) : PatientRepository {
         override val remote = true
         var loads = 0; val details = mutableListOf<String>()
@@ -102,3 +145,4 @@ class LiveViewModelsTest {
         assertEquals(1, repo.loads)
     }
 }
+

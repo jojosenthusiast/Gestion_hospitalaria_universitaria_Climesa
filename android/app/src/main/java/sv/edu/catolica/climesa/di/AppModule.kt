@@ -1,4 +1,4 @@
-package sv.edu.catolica.climesa.di
+﻿package sv.edu.catolica.climesa.di
 import android.content.Context
 import dagger.Module
 import dagger.Provides
@@ -22,7 +22,10 @@ object AppModule {
     @Provides @Singleton fun api(auth:SupabaseAuthRepository)=ApiClient(BuildConfig.API_BASE_URL,auth)
     @Provides @Singleton fun patients(api:ApiClient):PatientRepository=RemotePatientRepository(api)
     @Provides @Singleton fun beds(api:ApiClient):BedRepository=RemoteBedRepository(api)
-    @Provides @Singleton fun roleSource(api:ApiClient):sv.edu.catolica.climesa.ui.RoleDataSource=sv.edu.catolica.climesa.ui.RoleDataSource{api.request(it)}
+    @Provides @Singleton fun roleSource(api:ApiClient):sv.edu.catolica.climesa.ui.RoleDataSource=object:sv.edu.catolica.climesa.ui.RoleDataSource{
+        override suspend fun get(path:String):Any=api.request(path)
+        override suspend fun post(path:String,body:JSONObject):Any=api.request(path,"POST",body)
+    }
     /** Un solo socket para toda la app: los ViewModels que piden los mismos canales lo comparten. */
     @Provides @Singleton fun realtime(auth:SupabaseAuthRepository,api:ApiClient):RealtimeRepository=SharedRealtime(
         upstream=SupabaseRealtimeRepository(
@@ -34,3 +37,4 @@ object AppModule {
         scope=CoroutineScope(SupervisorJob()+Dispatchers.Default),
     )
 }
+
