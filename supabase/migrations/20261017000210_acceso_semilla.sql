@@ -3,7 +3,7 @@
 
 insert into acceso.rol (codigo, nombre, plataformas, descripcion) values
   ('ADM', 'Administrador', array['Web'], 'Configura y asegura el sistema: usuarios y roles, edificio, catálogos, políticas. No opera pacientes ni ve contenido clínico (D-050).'),
-  ('JOP', 'Jefe de Operaciones', array['Web'], 'Opera el día: tablero de camas, autorizaciones de admisión y traslado, turnos, mantenimiento de ambulancia, inventario, avisos, métricas.'),
+  ('JOP', 'Jefe de Operaciones', array['Android', 'Web'], 'Opera el día: tablero de camas, autorizaciones de admisión y traslado, turnos, mantenimiento de ambulancia, inventario, avisos, métricas.'),
   ('REC', 'Recepcionista', array['Android', 'Web'], 'Registro y verificación de pacientes, fila del día, citas, admisión, asignación de cama, despacho de ambulancia.'),
   ('AST', 'Asistente', array['Android'], 'Apoya la consulta: prepara al paciente, toma signos vitales, llama y mueve la fila del consultorio.'),
   ('ENF', 'Enfermero/a', array['Android'], 'Cuidado del hospitalizado: signos, notas de enfermería, limpieza de cama, consumo de insumos.'),

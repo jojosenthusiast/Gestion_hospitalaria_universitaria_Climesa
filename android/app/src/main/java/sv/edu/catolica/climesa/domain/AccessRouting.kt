@@ -13,7 +13,7 @@ fun AccessProfile.androidDestination(): AndroidDestination {
     if (!verifiedByBackend) return AndroidDestination.PENDING_VERIFICATION
     if (roles.any { it == "PAC" }) return AndroidDestination.PATIENT
     if (roles.any { it == "REC" }) return AndroidDestination.RECEPTION
-    if (roles.any { it in setOf("AST", "ENF", "MED", "LAB", "PAR") }) {
+    if (roles.any { it in setOf("JOP", "AST", "ENF", "MED", "LAB", "PAR") }) {
         return AndroidDestination.STAFF_PLACEHOLDER
     }
     return AndroidDestination.NOT_AVAILABLE

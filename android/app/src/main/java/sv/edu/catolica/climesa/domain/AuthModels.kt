@@ -33,14 +33,14 @@ object AuthRules {
 }
 
 object RoleAccess {
-    val androidRoles = listOf("REC", "AST", "ENF", "MED", "LAB", "PAR", "PAC")
+    val androidRoles = listOf("JOP", "REC", "AST", "ENF", "MED", "LAB", "PAR", "PAC")
     val iosRoles = listOf("MED", "PAC")
     fun allowed(profile: AccessProfile, platform: String): List<String> {
         if (!profile.verifiedByBackend || platform.lowercase() !in profile.platforms || "sesion.perfil" !in profile.permissions) return emptyList()
         val catalog = if (platform == "android") androidRoles else if (platform == "ios") iosRoles else emptyList()
         return catalog.filter { it in profile.roles }
     }
-    fun label(role: String) = mapOf("REC" to "Recepción", "AST" to "Asistencia", "ENF" to "Enfermería", "MED" to "Medicina", "LAB" to "Laboratorio", "PAR" to "Paramédico", "PAC" to "Paciente")[role] ?: role
+    fun label(role: String) = mapOf("JOP" to "Jefe de Operaciones", "REC" to "Recepción", "AST" to "Asistencia", "ENF" to "Enfermería", "MED" to "Medicina", "LAB" to "Laboratorio", "PAR" to "Paramédico", "PAC" to "Paciente")[role] ?: role
 }
 
 /**

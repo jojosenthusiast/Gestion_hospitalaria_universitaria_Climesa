@@ -1095,7 +1095,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 | Rol | Web | Android | iOS |
 |---|---|---|---|
 | Administrador | W01, W03, W05, W06, W07, W08, W09, W10, W11, W31, W33, W35, W36 | no usa | no usa |
-| Jefe de Operaciones | W01, W03, W07, W09, W12, W13, W14, W15, W16, W17, W18, W19, W22, W23, W24, W25, W31, W33, W35, W36 | no usa | no usa |
+| Jefe de Operaciones | W01, W03, W07, W09, W12, W13, W14, W15, W16, W17, W18, W19, W22, W23, W24, W25, W31, W33, W35, W36 | A01, A10, A12, A26 | no usa |
 | Recepcionista | W01, W04, W09, W12, W13, W14, W15, W18, W19, W26, W27, W28, W29, W35, W36 | A01, A10, A12, A26, A30, A31, A32, A33, A34, A35, A36 | no usa |
 | Asistente | no usa | A01, A10, A12, A26, A40, A41 | no usa |
 | Enfermero/a | no usa | A01, A10, A12, A26, A41, A50, A51, A52, A53, A54 | no usa |
