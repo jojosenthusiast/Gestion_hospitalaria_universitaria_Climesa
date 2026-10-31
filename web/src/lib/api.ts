@@ -17,6 +17,11 @@ export type ShiftInput=components['schemas']['ShiftDto'];
 export type SpaceInput=components['schemas']['SpaceDto'];
 export type BedBlockInput=components['schemas']['BedBlockDto'];
 export type BedTransitionInput=components['schemas']['BedTransitionDto'];
+export type PublishInput=components['schemas']['PublishDto'];
+export type MaintenanceInput=components['schemas']['MaintenanceDto'];
+/** Hueco de cobertura que `POST /turnos/publicar` devuelve como advertencia (publica igual, FR-103-09). */
+export type CoverageGap={areaId:string;area:string;role:string;start:string;end:string;required:number;actual:number};
+export type PublishResult={from:string;to:string;published:number;publishedBy:string;publishedAt:string;warnings:CoverageGap[]};
 export type InvitationResult={userId:string;email:string;roles:string[];role:string;status:'sent'};
 export interface Api {request<T>(path:string,init?:RequestInit):Promise<T>;write<T>(path:string,body:unknown,method?:string):Promise<T>;}
 /** `code` y `currentVersion` vienen del problem+json de la API (`codigo`, `versionActual`); faltan en errores de red o sin cuerpo. */
@@ -42,4 +47,6 @@ export class HttpApi implements Api {
 export const getAccessProfile=(token:string)=>new HttpApi(async()=>token).request<AccessProfile>('/auth/me');
 export const invitePatient=(token:string,input:{email:string;displayName:string})=>new HttpApi(async()=>token).write<InvitationResult>('/usuarios/invitaciones',input);
 export const can=(profile:AccessProfile,permission:string)=>profile.permissions.some(p=>p.code===permission);
+/** Función del personal (`type` de la API) con su etiqueta en español. */
+export const staffTypeNames:Record<string,string>={medico:'Médico',enfermero:'Enfermería',asistente:'Asistencia',recepcionista:'Recepción',laboratorista:'Laboratorio',paramedico:'Paramédico',motorista:'Motorista',limpieza:'Limpieza',administrativo:'Administración',otro:'Otro'};
 export const roleNames:Record<string,string>={ADM:'Administración',JOP:'Operaciones',REC:'Recepción',AST:'Asistencia',ENF:'Enfermería',MED:'Medicina',LAB:'Laboratorio',PAR:'Atención prehospitalaria',DPD:'Protección de datos',PAC:'Paciente'};
