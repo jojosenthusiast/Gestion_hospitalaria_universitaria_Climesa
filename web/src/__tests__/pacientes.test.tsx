@@ -1,4 +1,4 @@
-﻿import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api, type Patient } from '../lib/api';
@@ -13,7 +13,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const perfil: AccessProfile = {
   id: 'u-1', user: { id: 'u-1' }, email: 'rec@example.test', name: 'Recepción de prueba', roles: ['REC'], platforms: ['web'],
-  permissions: [{ code: 'pacientes.registrar', context: 'global' }, { code: 'pacientes.editar_demograficos', context: 'global' }],
+  permissions: ['pacientes.buscar', 'pacientes.ver_ficha', 'pacientes.registrar', 'pacientes.editar_demograficos'].map(code => ({ code, context: 'global' })),
   channels: [], patientId: null, staffId: null,
 };
 const paciente: Patient = {

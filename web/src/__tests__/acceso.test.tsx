@@ -18,10 +18,10 @@ import App from '../App';
 
 const session = { access_token: 'token-ficticio', user: { id: 'u-1', email: 'prueba@example.test' } };
 
-function perfil(roles: string[], platforms: string[]): AccessProfile {
+function perfil(roles: string[], platforms: string[], permisos: string[] = ['usuarios.ver']): AccessProfile {
   return {
     id: 'u-1', user: { id: 'u-1', email: 'prueba@example.test' }, email: 'prueba@example.test',
-    name: 'Cuenta de prueba', roles, platforms, permissions: [], channels: ['publico'], patientId: null, staffId: null,
+    name: 'Cuenta de prueba', roles, platforms, permissions: permisos.map(code => ({ code, context: 'global' })), channels: ['publico'], patientId: null, staffId: null,
   };
 }
 

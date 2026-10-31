@@ -1,6 +1,6 @@
 import { useState,type FormEvent } from 'react';
 import { Field,Icon,Notice } from '../components/ui';
-import { can,type AccessProfile,type Api,type Registration,type RegistrationInput,type Shift,type Staff } from '../lib/api';
+import { can,staffTypeNames,type AccessProfile,type Api,type Registration,type RegistrationInput,type Shift,type Staff } from '../lib/api';
 import { Dialog,Empty,RemoteState,SaveButton,Select,Tag,WriteError,formatDate,formatDateTime,isVersionConflict,useAction,useData } from './common';
 
 /** Aviso de vencimiento: no hay regla escrita en la spec 103; se usa una ventana fija de 30 días, pendiente de confirmar con el negocio. */
@@ -31,7 +31,7 @@ export function StaffFicha({api,profile,person,version,onClose,onEdit,onChanged}
   <div className="module-form">
    <section aria-labelledby="ficha-datos"><h3 id="ficha-datos">Datos</h3>
     <dl className="detail-list">
-     <div><dt>Función</dt><dd>{person.type}</dd></div>
+     <div><dt>Función</dt><dd>{staffTypeNames[person.type]??person.type}</dd></div>
      <div><dt>Especialidad</dt><dd>{person.specialty||'Sin especialidad registrada'}</dd></div>
      <div><dt>Área</dt><dd>{person.area||'Sin asignar'}</dd></div>
      <div><dt>Estado</dt><dd><Tag value={person.active?'activo':'inactivo'}/></dd></div>
