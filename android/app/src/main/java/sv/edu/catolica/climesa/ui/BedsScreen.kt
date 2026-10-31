@@ -48,6 +48,7 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
             Text(stringResource(R.string.camas_titulo), style = MaterialTheme.typography.displaySmall)
             Spacer(Modifier.height(6.dp))
             ConnectionBadge(state.connection)
+            if (state.partialLive) Text(stringResource(R.string.tiempo_real_parcial), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
         }
         state.message?.let { item { Text(it, color = MaterialTheme.colorScheme.primary) } }
         when {

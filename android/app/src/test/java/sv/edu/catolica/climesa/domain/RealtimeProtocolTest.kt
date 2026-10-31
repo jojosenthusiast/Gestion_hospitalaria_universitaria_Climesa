@@ -48,6 +48,44 @@ class RealtimeProtocolTest {
         assertEquals(listOf(EventoDominio("cama.estado_cambiado", "cama", "b1", 3L)), recuperado.events)
     }
 
+    @Test fun elTableroTambienAtiendeEventosDeEspacio() {
+        assertTrue(BedEvents.matches(EventoDominio("espacio.actualizado", "espacio", "e1", 2)))
+        assertTrue(BedEvents.matches(EventoDominio("espacio.actualizado", "", "e1", 2)))
+    }
+
+    @Test fun cadaPantallaFiltraSusEntidades() {
+        assertTrue(PatientEvents.matches(EventoDominio("paciente.actualizado", "paciente", "p1", 2)))
+        assertFalse(PatientEvents.matches(EventoDominio("cama.estado_cambiado", "cama", "b1", 1)))
+        assertTrue(ProfileEvents.matches(EventoDominio("usuario.actualizado", "usuario", "u1", 1)))
+        assertFalse(ProfileEvents.matches(EventoDominio("paciente.actualizado", "paciente", "p1", 1)))
+        val turno = EventoDominio("turno.publicado", "turno", "t1", 1)
+        val personal = EventoDominio("personal.actualizado", "personal", "s1", 1)
+        val ambulancia = EventoDominio("ambulancia.estado_cambiado", "ambulancia", "a1", 1)
+        assertTrue(PortalEvents.matches("/turnos/mios", turno))
+        assertTrue(PortalEvents.matches("/turnos/mios", personal))
+        assertFalse(PortalEvents.matches("/turnos/mios", ambulancia))
+        assertTrue(PortalEvents.matches("/ambulancia", ambulancia))
+        assertTrue(PortalEvents.matches("/pacientes?limit=50", EventoDominio("paciente.creado", "paciente", "p2", 1)))
+        assertTrue(PortalEvents.matches("/inicio", EventoDominio("cama.estado_cambiado", "cama", "b1", 1)))
+        assertFalse(PortalEvents.matches(null, turno))
+    }
+
+    @Test fun elPlanDePacientesNoReemplazaUnaBusquedaActiva() {
+        val ev = EventoDominio("paciente.actualizado", "paciente", "p1", 2)
+        assertEquals(PatientEvents.Refresh.Detail("p1"), PatientEvents.refreshFor(ev, setOf("p1"), null, true))
+        assertEquals(PatientEvents.Refresh.Detail("p1"), PatientEvents.refreshFor(ev, emptySet(), "p1", false))
+        assertEquals(PatientEvents.Refresh.None, PatientEvents.refreshFor(ev.copy(id = "nuevo"), setOf("p1"), null, true))
+        assertEquals(PatientEvents.Refresh.List, PatientEvents.refreshFor(ev.copy(id = "nuevo"), setOf("p1"), null, false))
+        assertEquals(PatientEvents.Refresh.None, PatientEvents.refreshFor(EventoDominio("cama.x", "cama", "p1", 1), setOf("p1"), null, false))
+    }
+
+    @Test fun reconoceLaRespuestaDelLatidoYArmaAccessToken() {
+        assertEquals(RealtimeFrame.HeartbeatReply("7"), RealtimeProtocol.parse("""{"topic":"phoenix","event":"phx_reply","payload":{"status":"ok"},"ref":"7"}"""))
+        val frame = JSONObject(RealtimeProtocol.accessToken("rol:ENF", "9", "nuevo"))
+        assertEquals("access_token", frame.getString("event"))
+        assertEquals("realtime:rol:ENF", frame.getString("topic"))
+        assertEquals("nuevo", frame.getJSONObject("payload").getString("access_token"))
+    }
     @Test fun elTableroSoloAtiendeEventosDeCama() {
         assertTrue(BedEvents.matches(EventoDominio("cama.limpieza_pendiente", "cama", "b1", 1)))
         assertFalse(BedEvents.matches(EventoDominio("lab.estado_cambiado", "orden", "o1", 1)))

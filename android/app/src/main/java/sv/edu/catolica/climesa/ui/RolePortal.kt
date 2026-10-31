@@ -28,7 +28,8 @@ import kotlinx.coroutines.Job
 import org.json.JSONArray
 import org.json.JSONObject
 import sv.edu.catolica.climesa.R
-import sv.edu.catolica.climesa.data.ApiClient
+import sv.edu.catolica.climesa.data.realtime.LiveSubscription
+import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.*
 import java.net.URLEncoder
 import java.time.Instant
@@ -36,10 +37,22 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 data class RoleData(val loading:Boolean=false,val data:Any?=null,val error:String?=null)
-@HiltViewModel class RoleViewModel @Inject constructor(private val api:ApiClient):ViewModel(){
+/** Lectura de datos del portal por rol; separada de [ApiClient] para poder probar el ViewModel. */
+fun interface RoleDataSource{suspend fun get(path:String):Any}
+@HiltViewModel class RoleViewModel @Inject constructor(private val source:RoleDataSource,realtime:RealtimeRepository):ViewModel(){
     private val mutable=MutableStateFlow(RoleData());val state=mutable.asStateFlow()
     private var job:Job?=null
-    fun load(path:String?){job?.cancel();job=viewModelScope.launch{mutable.value=RoleData(loading=path!=null);if(path!=null)try{mutable.value=RoleData(data=api.request(path))}catch(e:Exception){if(e is CancellationException)throw e;mutable.value=RoleData(error=e.message?:"No se pudo cargar la información.")}}}
+    private var current:String?=null
+    private val live=LiveSubscription(realtime)
+    fun load(path:String?,silent:Boolean=false){current=path;job?.cancel();job=viewModelScope.launch{if(!silent||path==null)mutable.value=RoleData(loading=path!=null);if(path!=null)try{mutable.value=RoleData(data=source.get(path))}catch(e:Exception){if(e is CancellationException)throw e;if(silent&&mutable.value.data!=null)return@launch;mutable.value=RoleData(error=e.message?:"No se pudo cargar la información.")}}}
+    /** Idempotente: refresca la sección abierta cuando llega un evento que le importa, sin mostrar el indicador de carga. */
+    fun start(channels:List<String>){live.start(viewModelScope,channels){signal->
+        when(signal){
+            is RealtimeSignal.Event->if(PortalEvents.matches(current,signal.event))load(current,silent=true)
+            RealtimeSignal.Resync->if(current!=null)load(current,silent=true)
+            else->Unit
+        }
+    }}
 }
 private fun sectionIcon(s:AndroidSection)=when(s){AndroidSection.HOME->Icons.Default.Home;AndroidSection.PROFILE->Icons.Default.AccountCircle;AndroidSection.SHIFTS,AndroidSection.APPOINTMENTS->Icons.Default.DateRange;AndroidSection.PATIENTS->Icons.Default.Person;AndroidSection.UNIT,AndroidSection.SERVICE->Icons.Default.Info;else->Icons.Default.List}
 private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.HOME->"/inicio";AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";else->null}
@@ -51,6 +64,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     val sections=AndroidSections.visible(account.profile.permissions);val page=sections[selected.coerceIn(0,sections.lastIndex)]
     val path=sectionPath(page)
     LaunchedEffect(role,page){model.load(path)}
+    LaunchedEffect(account.profile.channels){model.start(account.profile.channels)}
     Scaffold(containerColor=MaterialTheme.colorScheme.background,topBar={TopAppBar(title={Column{Text("climesa",style=MaterialTheme.typography.titleMedium);Text(RoleAccess.label(role),style=MaterialTheme.typography.labelSmall,color=Color(0xFFB0B4C9))}},actions={IconButton(onClick={setDark(!dark)}){Icon(Icons.Default.Settings,"Cambiar apariencia")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=BrandNavy,titleContentColor=Color.White,actionIconContentColor=Color.White))},bottomBar={NavigationBar(containerColor=BrandNavy,tonalElevation=0.dp){sections.forEachIndexed{i,s->NavigationBarItem(selected=selected==i,onClick={selected=i},icon={Icon(sectionIcon(s),null)},label={Text(s.label)},colors=NavigationBarItemDefaults.colors(selectedIconColor=Color.White,selectedTextColor=Color.White,indicatorColor=BrandBlue,unselectedIconColor=Color(0xFFB0B4C9),unselectedTextColor=Color(0xFFB0B4C9)))}}}){padding->
         if(page==AndroidSection.BEDS){BedsScreen(account.profile,Modifier.padding(padding));return@Scaffold}
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(20.dp)){

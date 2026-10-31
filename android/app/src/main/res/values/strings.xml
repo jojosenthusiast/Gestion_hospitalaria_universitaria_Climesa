@@ -6,6 +6,7 @@
     <string name="camas_en_vivo">En vivo</string>
     <string name="camas_reconectando">Reconectando…</string>
     <string name="camas_sin_conexion">Sin conexión</string>
+    <string name="tiempo_real_parcial">Actualización en vivo parcial: algunos avisos pueden tardar en llegar.</string>
     <string name="camas_motivo">Motivo</string>
     <string name="camas_cancelar">Cancelar</string>
     <string name="camas_confirmar">Confirmar</string>

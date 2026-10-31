@@ -6,6 +6,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.json.JSONObject
 import sv.edu.catolica.climesa.BuildConfig
 import sv.edu.catolica.climesa.data.*
@@ -19,10 +22,15 @@ object AppModule {
     @Provides @Singleton fun api(auth:SupabaseAuthRepository)=ApiClient(BuildConfig.API_BASE_URL,auth)
     @Provides @Singleton fun patients(api:ApiClient):PatientRepository=RemotePatientRepository(api)
     @Provides @Singleton fun beds(api:ApiClient):BedRepository=RemoteBedRepository(api)
-    @Provides @Singleton fun realtime(auth:SupabaseAuthRepository,api:ApiClient):RealtimeRepository=SupabaseRealtimeRepository(
-        websocketUrl=RealtimeProtocol.websocketUrl(BuildConfig.SUPABASE_URL,BuildConfig.SUPABASE_PUBLISHABLE_KEY),
-        accessToken={auth.restoreSession()?.accessToken},
-        catchUp={cursor->RealtimeProtocol.parseCatchUp(api.request("/eventos?after=$cursor") as JSONObject)},
-        sockets=OkHttpRealtimeSocketFactory(),
+    @Provides @Singleton fun roleSource(api:ApiClient):sv.edu.catolica.climesa.ui.RoleDataSource=sv.edu.catolica.climesa.ui.RoleDataSource{api.request(it)}
+    /** Un solo socket para toda la app: los ViewModels que piden los mismos canales lo comparten. */
+    @Provides @Singleton fun realtime(auth:SupabaseAuthRepository,api:ApiClient):RealtimeRepository=SharedRealtime(
+        upstream=SupabaseRealtimeRepository(
+            websocketUrl=RealtimeProtocol.websocketUrl(BuildConfig.SUPABASE_URL,BuildConfig.SUPABASE_PUBLISHABLE_KEY),
+            accessToken={auth.restoreSession()?.accessToken},
+            catchUp={cursor->RealtimeProtocol.parseCatchUp(api.request("/eventos?after=$cursor") as JSONObject)},
+            sockets=OkHttpRealtimeSocketFactory(),
+        ),
+        scope=CoroutineScope(SupervisorJob()+Dispatchers.Default),
     )
 }
