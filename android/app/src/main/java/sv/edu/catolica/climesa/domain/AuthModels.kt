@@ -33,14 +33,14 @@ object AuthRules {
 }
 
 object RoleAccess {
-    val androidRoles = listOf("REC", "AST", "ENF", "MED", "LAB", "PAR", "PAC")
+    val androidRoles = listOf("JOP", "REC", "AST", "ENF", "MED", "LAB", "PAR", "PAC")
     val iosRoles = listOf("MED", "PAC")
     fun allowed(profile: AccessProfile, platform: String): List<String> {
         if (!profile.verifiedByBackend || platform.lowercase() !in profile.platforms || "sesion.perfil" !in profile.permissions) return emptyList()
         val catalog = if (platform == "android") androidRoles else if (platform == "ios") iosRoles else emptyList()
         return catalog.filter { it in profile.roles }
     }
-    fun label(role: String) = mapOf("REC" to "Recepción", "AST" to "Asistencia", "ENF" to "Enfermería", "MED" to "Medicina", "LAB" to "Laboratorio", "PAR" to "Paramédico", "PAC" to "Paciente")[role] ?: role
+    fun label(role: String) = mapOf("JOP" to "Jefe de Operaciones", "REC" to "Recepción", "AST" to "Asistencia", "ENF" to "Enfermería", "MED" to "Medicina", "LAB" to "Laboratorio", "PAR" to "Paramédico", "PAC" to "Paciente")[role] ?: role
 }
 
 /**
@@ -54,6 +54,7 @@ enum class AndroidSection(val label: String, val permission: String, val ready: 
     BEDS("Camas", "camas.ver_tablero", true),
     CONSULTATIONS("Consultas", "consulta.iniciar", false),
     SHIFTS("Mis turnos", "turnos.ver", true),
+    PLANNING("Planificación", "turnos.planificar", true),
     LAB("Laboratorio", "laboratorio.ver_cola", false),
     APPOINTMENTS("Citas", "citas.ver", false),
     RESULTS("Resultados", "resultados.ver", false),
@@ -72,7 +73,7 @@ object AndroidSections {
      */
     fun visible(permissions: Collection<String>): List<AndroidSection> {
         if (AndroidSection.SERVICE.permission in permissions) return ambulanceCrew.filter { it.permission in permissions }
-        return AndroidSection.entries.filter { it.permission in permissions }
+        return AndroidSection.entries.filter { if (it == AndroidSection.PLANNING) ShiftPlanning.canView(permissions) else it.permission in permissions }
     }
 
     /** Sin ninguna pantalla más allá de Inicio y Perfil, el rol no usa Android. */

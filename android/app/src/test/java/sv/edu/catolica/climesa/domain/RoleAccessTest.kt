@@ -3,7 +3,12 @@ import org.junit.Assert.*
 import org.junit.Test
 class RoleAccessTest {
     private fun profile(roles:List<String>,verified:Boolean=true,platforms:List<String> = listOf("android"))=AccessProfile(roles=roles,permissions=listOf("sesion.perfil"),verifiedByBackend=verified,platforms=platforms)
-    @Test fun exposesExactlySevenAndroidRoles(){assertEquals(7,RoleAccess.allowed(profile(RoleAccess.androidRoles+"ADM"),"android").size)}
+    @Test fun exposesExactlyEightAndroidRoles(){assertEquals(8,RoleAccess.allowed(profile(RoleAccess.androidRoles+"ADM"),"android").size)}
+    @Test fun operationsChiefUsesAndroid(){
+        assertTrue("JOP" in RoleAccess.androidRoles)
+        assertEquals(listOf("JOP"),RoleAccess.allowed(profile(listOf("JOP")),"android"))
+        assertEquals("Jefe de Operaciones",RoleAccess.label("JOP"))
+    }
     @Test fun rejectsUnverifiedProfileAndWrongPlatform(){assertTrue(RoleAccess.allowed(profile(listOf("MED"),false),"android").isEmpty());assertTrue(RoleAccess.allowed(profile(listOf("MED"),platforms=listOf("ios")),"android").isEmpty())}
     @Test fun medicalAndPatientTabsDiffer(){
         val medico=AndroidSections.visible(listOf("sesion.perfil","turnos.ver","consulta.iniciar"))
