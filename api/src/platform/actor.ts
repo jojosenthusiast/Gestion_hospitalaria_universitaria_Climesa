@@ -21,3 +21,5 @@ export type ActorRequest = {
   denialAudited?: boolean;
 };
 export const hasPermission = (actor: Actor, code: string) => actor.permissions.some(p => p.code === code);
+/** Contextos con los que el actor tiene el permiso (vacío si no lo tiene). */
+export const contextsOf = (actor: Pick<Actor, 'permissions'>, code: string) => actor.permissions.filter(p => p.code === code).map(p => p.context);

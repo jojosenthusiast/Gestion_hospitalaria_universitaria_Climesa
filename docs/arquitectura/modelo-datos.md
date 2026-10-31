@@ -6,7 +6,7 @@ Convenciones: un esquema PostgreSQL por módulo; llaves `uuid` generadas en la b
 
 Esquema real, con los nombres exactos de tablas y columnas de las migraciones: [avance-31-octubre.md](avance-31-octubre.md), sección 2. Donde este diseño objetivo difiera (por ejemplo `acceso.asignacion_rol` no tiene `vigencia`), manda la migración.
 
-Corte actual: 16 archivos en `supabase/migrations` (incluida la semilla de acceso generada), semilla con 17 camas (12 semiprivadas y 5 VIP), diez roles y 75 permisos. La revisión local carga todas las migraciones; el estado remoto de la nueva migración está pendiente de conexión al proyecto correcto.
+Corte actual: 19 archivos en `supabase/migrations` (incluida la semilla de acceso generada), semilla con 17 camas (12 semiprivadas y 5 VIP), diez roles y 79 permisos. La revisión local carga todas las migraciones; el estado remoto de la nueva migración está pendiente de conexión al proyecto correcto.
 
 ## Vista general
 

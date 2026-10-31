@@ -48,14 +48,18 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `pacientes.registrar` | Registrar paciente tras buscar | · | · | ✔ | · | · | · | · | · | · | · |
 | `pacientes.registrar_provisional` | Registrar paciente sin identidad confirmada | · | · | ✔ | · | ✔ | · | · | ✔ | · | · |
 | `pacientes.ver_ficha` | Ver datos personales del paciente | · | ✔ | ✔ | área | área | relación | orden | relación | · | propio |
+| `pacientes.ver_nacimiento` | Ver la fecha de nacimiento exacta (rango de edad si el contexto es rango) | · | · | ✔ | ✔ | ✔ | ✔ | rango de edad | ✔ | · | propio |
+| `pacientes.ver_contacto` | Ver DUI teléfono correo y dirección del paciente | · | · | ✔ | · | · | ✔ | · | · | · | propio |
 | `pacientes.editar_demograficos` | Corregir datos personales con historial | · | · | ✔ | · | · | · | · | · | · | · |
 | `pacientes.gestionar_duplicados` | Revisar casos de posible duplicado | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `expediente.ver` | Ver historial clínico | · | · | · | · | relación | relación | · | · | · | propio revisado |
 | `personal.ver` | Ver personal de salud | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | `personal.gestionar` | Crear y editar personal e inscripciones | ✔ | · | · | · | · | · | · | · | · | · |
+| `personal.ver_datos_personales` | Ver DUI y teléfono del personal | ✔ | · | · | · | · | · | · | · | · | · |
 | `turnos.ver` | Ver horarios del personal | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | `turnos.planificar` | Crear y editar turnos | · | ✔ | · | · | · | · | · | · | · | · |
 | `turnos.publicar` | Publicar una planificación | · | ✔ | · | · | · | · | · | · | · | · |
+| `turnos.ver_borradores` | Ver turnos en borrador antes de publicarlos | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | `espacios.ver` | Ver el árbol del edificio | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · | · | · |
 | `espacios.configurar` | Crear y editar espacios y capacidades | ✔ | · | · | · | · | · | · | · | · | · |
 | `camas.ver_tablero` | Ver tablero de camas sin ocupantes | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |

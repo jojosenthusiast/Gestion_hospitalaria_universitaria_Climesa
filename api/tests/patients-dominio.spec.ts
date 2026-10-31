@@ -1,6 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { FastifyAdapter,NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createHmac,timingSafeEqual,randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/main';
 import { DatabaseService } from '../src/platform/database.service';
@@ -16,6 +18,12 @@ const jwt=(role:string)=>{
  return `${h}.${b}.${createHmac('sha256','test-only-key').update(h+'.'+b).digest('base64url')}`;
 };
 jest.setTimeout(120000);
+// Permisos y contextos de los roles según permisos.csv (matriz-rbac.spec.ts exige que la base sembrada coincida con él).
+const catalogPermissions=(roles:string[])=>{
+ const rows=readFileSync(resolve(__dirname,'../../docs/arquitectura/datos/permisos.csv'),'utf8').split(/\r?\n/).filter(Boolean).map(l=>l.match(/("([^"]|"")*"|[^,]*)(,|$)/g)!.map(c=>c.replace(/,$/,'').replace(/^"|"$/g,'')));
+ const [head,...body]=rows;
+ return body.flatMap(r=>roles.filter(role=>r[head.indexOf(role)]).map(role=>({code:r[0],context:r[head.indexOf(role)]})));
+};
 // Escenarios 1, 2 y 4 de la spec 102 y correcciones de dominio del módulo de pacientes (FR-102-01, -03, -05, -06).
 describe('Pacientes · dominio: búsqueda con motivo, DUI repetido, corrección y provisional',()=>{
  let app:NestFastifyApplication,fixture:Awaited<ReturnType<typeof createDatabase>>;
@@ -151,6 +159,7 @@ describe('Pacientes · política de campos de la ficha (privacidad.md §2)',()=>
   [['JOP'],false,{birth:false,ageRange:false,contact:false}],
   [['LAB','ENF'],false,{birth:true,ageRange:false,contact:false}],
  ])('%j (dueño: %s) recibe %j',(roles,owner,expected)=>{
-  expect(fichaFields(roles,owner)).toEqual(expected);
+  const permissions=catalogPermissions(roles);
+  expect(fichaFields({permissions},owner)).toEqual(expected);
  });
 });
