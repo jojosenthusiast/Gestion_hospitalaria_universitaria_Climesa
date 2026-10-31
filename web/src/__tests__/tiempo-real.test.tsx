@@ -16,7 +16,7 @@ vi.mock('../lib/supabase', () => ({
   supabase: { realtime: { setAuth: realtime.setAuth }, channel: realtime.channel, removeChannel: realtime.removeChannel },
 }));
 
-import { useLive } from '../lib/live';
+import { INVALIDATION_BATCH_MS, useLive } from '../lib/live';
 
 const perfil = (channels: string[]): AccessProfile => ({
   id: 'u-1', user: { id: 'u-1' }, email: 'prueba@example.test', name: 'Cuenta de prueba', roles: ['JOP'], platforms: ['web'],
@@ -38,6 +38,7 @@ function crearApi(eventos: () => Promise<unknown> = async () => ({ cursor: '7', 
   };
 }
 
+const lote = () => act(async () => { await vi.advanceTimersByTimeAsync(INVALIDATION_BATCH_MS + 10); });
 const vaciar = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
 const enRed = (valor: boolean) => vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(valor);
 
@@ -58,8 +59,8 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
 
-function montarHook(api = crearApi(), refreshProfile = vi.fn(), canalesPerfil = ['rol:JOP']) {
-  const hook = renderHook(() => useLive(api as unknown as Api, perfil(canalesPerfil), 'token-ficticio', refreshProfile));
+function montarHook(api = crearApi(), refreshProfile = vi.fn(), canalesPerfil = ['rol:JOP'], token = 'token-ficticio') {
+  const hook = renderHook(({ t }) => useLive(api as unknown as Api, perfil(canalesPerfil), t, refreshProfile), { initialProps: { t: token } });
   return { api, refreshProfile, ...hook };
 }
 
@@ -77,24 +78,63 @@ describe('tiempo real sin sondeo', () => {
     const { result, refreshProfile } = montarHook();
     await vaciar();
     act(() => canales()[0].estado('SUBSCRIBED'));
+    await lote();
     const base = result.current.version;
     act(() => canales()[0].mensaje({ payload: { entidad: 'cama' } }));
+    await lote();
     expect(result.current.version).toBe(base + 1);
     expect(refreshProfile).not.toHaveBeenCalled();
     act(() => canales()[0].mensaje({ payload: { entidad: 'usuario' } }));
+    await lote();
     expect(result.current.version).toBe(base + 2);
     expect(refreshProfile).toHaveBeenCalledTimes(1);
   });
 
   it('se suscribe a cada canal del perfil y pasa a en vivo cuando todos están unidos', async () => {
-    const { result } = montarHook(crearApi(), vi.fn(), ['rol:JOP', 'publico']);
+    const { result } = montarHook(crearApi(), vi.fn(), ['rol:JOP', 'usuario:u-1']);
     await vaciar();
-    expect(canales().map(c => c.name)).toEqual(['rol:JOP', 'publico']);
+    expect(canales().map(c => c.name)).toEqual(['rol:JOP', 'usuario:u-1']);
     expect(result.current.status).toBe('reconnecting');
     act(() => canales()[0].estado('SUBSCRIBED'));
     expect(result.current.status).toBe('reconnecting');
     act(() => canales()[1].estado('SUBSCRIBED'));
     expect(result.current.status).toBe('live');
+  });
+
+  it('no se une al canal publico: el portal no lo usa (S12)', async () => {
+    const { result } = montarHook(crearApi(), vi.fn(), ['rol:JOP', 'publico']);
+    await vaciar();
+    expect(canales().map(c => c.name)).toEqual(['rol:JOP']);
+    act(() => canales()[0].estado('SUBSCRIBED'));
+    expect(result.current.status).toBe('live');
+  });
+
+  it('una ráfaga de eventos y de uniones de canal produce una sola invalidación, no una por canal (S9)', async () => {
+    const { result } = montarHook(crearApi(), vi.fn(), ['rol:JOP', 'usuario:u-1', 'ambulancia']);
+    await vaciar();
+    await lote();
+    const base = result.current.version;
+    act(() => { for (const c of canales()) c.estado('SUBSCRIBED'); });
+    act(() => { for (const c of canales()) c.mensaje({ payload: { entidad: 'cama' } }); });
+    expect(result.current.version).toBe(base);
+    await lote();
+    expect(result.current.version).toBe(base + 1);
+    await lote();
+    expect(result.current.version).toBe(base + 1);
+  });
+
+  it('al renovarse el token los canales unidos reciben el nuevo sin quitarse ni volver a crearse (S10)', async () => {
+    const { rerender } = montarHook();
+    await vaciar();
+    act(() => canales()[0].estado('SUBSCRIBED'));
+    expect(realtime.setAuth).toHaveBeenCalledTimes(1);
+    expect(realtime.setAuth).toHaveBeenLastCalledWith('token-ficticio');
+    rerender({ t: 'token-renovado' });
+    await vaciar();
+    expect(realtime.setAuth).toHaveBeenCalledTimes(2);
+    expect(realtime.setAuth).toHaveBeenLastCalledWith('token-renovado');
+    expect(realtime.removeChannel).not.toHaveBeenCalled();
+    expect(canales()).toHaveLength(1);
   });
 
   it('al reconectar un canal caído hace una sola consulta de recuperación e invalida las vistas', async () => {
@@ -104,9 +144,11 @@ describe('tiempo real sin sondeo', () => {
     act(() => canales()[0].estado('CLOSED'));
     expect(result.current.status).toBe('reconnecting');
     expect(consultas(api, '/eventos')).toBe(0);
+    await lote();
     const base = result.current.version;
     act(() => canales()[0].estado('SUBSCRIBED'));
     await vaciar();
+    await lote();
     expect(api.request).toHaveBeenCalledWith('/eventos?after=0');
     expect(consultas(api, '/eventos')).toBe(1);
     expect(result.current.version).toBeGreaterThan(base);
