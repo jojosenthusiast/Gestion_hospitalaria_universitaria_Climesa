@@ -30,6 +30,10 @@ object AppModule {
         override suspend fun get(path:String):Any=api.request(path)
         override suspend fun send(path:String,method:String,body:JSONObject):Any=api.request(path,method,body)
     }
+    @Provides @Singleton fun staffSource(api:ApiClient):sv.edu.catolica.climesa.ui.StaffDataSource=object:sv.edu.catolica.climesa.ui.StaffDataSource{
+        override suspend fun get(path:String):Any=api.request(path)
+        override suspend fun send(path:String,method:String,body:JSONObject):Any=api.request(path,method,body)
+    }
     /** Un solo socket para toda la app: los ViewModels que piden los mismos canales lo comparten. */
     @Provides @Singleton fun realtime(auth:SupabaseAuthRepository,api:ApiClient):RealtimeRepository=SharedRealtime(
         upstream=SupabaseRealtimeRepository(

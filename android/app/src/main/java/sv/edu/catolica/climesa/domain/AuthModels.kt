@@ -55,6 +55,7 @@ enum class AndroidSection(val label: String, val permission: String, val ready: 
     CONSULTATIONS("Consultas", "consulta.iniciar", false),
     SHIFTS("Mis turnos", "turnos.ver", true),
     PLANNING("Planificación", "turnos.planificar", true),
+    STAFF("Personal", "personal.ver", true),
     LAB("Laboratorio", "laboratorio.ver_cola", false),
     APPOINTMENTS("Citas", "citas.ver", false),
     RESULTS("Resultados", "resultados.ver", false),
