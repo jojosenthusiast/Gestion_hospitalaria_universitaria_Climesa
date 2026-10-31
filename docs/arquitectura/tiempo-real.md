@@ -26,6 +26,16 @@ Reglas: si la transacción falla, no hay evento. El cliente ignora eventos con v
 
 Reconexión en la web: no hay sondeo periódico. Al volver un canal a `SUBSCRIBED` tras una caída, o al dispararse el evento `online` del navegador, la web hace una sola consulta de recuperación a `GET /eventos?after=<cursor>`, invalida todas las vistas (suben `version` y cada pantalla vuelve a pedir lo suyo) y refresca el perfil si cambió una cuenta de usuario. Si esa consulta falla, no se reintenta por reloj: queda pendiente hasta la siguiente reconexión. La banda muestra tres estados: en vivo (sin banda), recuperando la conexión y sin conexión.
 
+### Cursor de recuperación (`GET /eventos`)
+
+- Sin `after`, o con `after=0`, la API devuelve la cabeza actual (`{cursor, events: []}`) y ningún evento viejo: un cliente sin punto de partida no necesita el historial porque invalida todo al reconectar.
+- Con `after=<seq>` devuelve hasta 200 eventos posteriores, ordenados, y `cursor` es el último `seq` devuelto. Si había más de 200, el cliente vuelve a llamar con ese cursor.
+- Los canales de cada evento se derivan del catálogo de permisos (`acceso.rol_permiso`) al momento de emitirlo, no de listas de roles en el código. Los eventos de un paciente incluyen además `usuario:<id>` de la cuenta vinculada a ese paciente.
+
+### Limitación conocida del cursor
+
+`seq` se asigna al insertar en `plataforma.outbox`, pero la fila solo se ve cuando la transacción hace commit. Si una transacción lenta obtiene un `seq` menor que otra que confirma antes, y un cliente ya avanzó su cursor más allá de ese `seq`, el evento tardío queda por debajo del cursor y esa consulta de recuperación no lo devuelve. No se corrige en el código. Los clientes lo mitigan porque, al reconectar, invalidan todas las vistas y vuelven a pedir su estado completo; el cursor solo acota cuántos eventos se leen, no es la fuente de verdad.
+
 ## Canales
 
 | Canal | Quién puede escuchar |

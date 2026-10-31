@@ -5,6 +5,7 @@ import { Actor, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
 import { Clock } from '../platform/clock';
+import { channelsFor, patientAccount } from '../platform/channels';
 import { PatientCreateDto, PatientUpdateDto, PatientStateDto } from './patient-write.dto';
 import { ageOn, ageRange, fichaFields } from './patient.privacy';
 import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateDemographics } from './patient.rules';
@@ -102,6 +103,8 @@ export class PatientsService {
     const row=(await c.query(`SELECT p.expediente FROM pacientes.identificador i JOIN pacientes.paciente p ON p.id=i.paciente_id WHERE i.tipo='dui' AND i.valor_normalizado=$1 AND i.estado IN ('sin_verificar','verificado') AND ($2::uuid IS NULL OR p.id<>$2)`,[dui,id??null])).rows[0];
     if(row)throw new ConflictException(`Ese DUI pertenece al expediente ${row.expediente}, incluso si está inactivo.`);
   }
+  /** Roles que leen pacientes según el catálogo (sin el acceso `propio` del paciente) más la cuenta del propio paciente. */
+  private async patientChannels(c:PoolClient,patientId:string){return channelsFor(c,['pacientes.buscar','pacientes.ver_ficha'],{excludeContexts:['propio'],users:[await patientAccount(c,patientId)]});}
   async create(actor:Actor,dto:PatientCreateDto,key?:string) {
     const data=validateDemographics(dto,this.clock.now());
     const permission=data.provisional?'pacientes.registrar_provisional':'pacientes.registrar';
@@ -119,7 +122,7 @@ export class PatientsService {
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id,version`,[recordNumber(seq),data.provisional?'provisional':'activo',data.givenNames||null,data.surnames||null,data.sex,data.birth,data.provisional?'estimada':data.birth?'exacta':'desconocida',data.phone,data.email||null,data.address||null,actor.id,text,phonetic(data.surnames),phonetic(data.givenNames),alias,data.provisional?data.estimatedAge:null,data.provisional?this.clock.now():null,data.provisional?data.description:null])).rows[0];
       if(data.dui)await c.query("INSERT INTO pacientes.identificador(paciente_id,tipo,emisor,valor_original,valor_normalizado,exclusivo) VALUES($1,'dui','RNPN',$2,$3,true)",[row.id,`${data.dui.slice(0,8)}-${data.dui[8]}`,data.dui]);
       await this.commands.audit(c,actor,{action:'pacientes.registrar',entity:'paciente',entityId:row.id,patientId:row.id,permission});
-      await this.commands.event(c,'paciente.creado','paciente',row.id,1,['rol:REC','rol:JOP']);
+      await this.commands.event(c,'paciente.creado','paciente',row.id,1,await this.patientChannels(c,row.id));
       await this.openDuplicateCases(c,actor,{id:row.id,fonApellido:phonetic(data.surnames),fonNombres:phonetic(data.givenNames),nacimiento:data.birth});
       return {id:row.id,record:recordNumber(seq),version:1};
     });
@@ -159,7 +162,7 @@ export class PatientsService {
       if((previous?.replace('-','')??null)!==data.dui)changes.dui={before:previous,after:data.dui};
       await c.query('INSERT INTO pacientes.historial_demografico(paciente_id,version,actor_id,motivo,cambios) VALUES($1,$2,$3,$4,$5)',[id,row.version,actor.id,dto.reason,changes]);
       await this.commands.audit(c,actor,{action:'pacientes.editar',entity:'paciente',entityId:id,patientId:id,permission:'pacientes.editar_demograficos',detail:{fields:Object.keys(changes)}});
-      await this.commands.event(c,'paciente.actualizado','paciente',id,row.version,['rol:REC',`usuario:${actor.id}`]);
+      await this.commands.event(c,'paciente.actualizado','paciente',id,row.version,await this.patientChannels(c,id));
       return {id,version:row.version};
     });
   }
@@ -172,7 +175,7 @@ export class PatientsService {
       await c.query('UPDATE pacientes.paciente SET estado=$2,version=version+1 WHERE id=$1',[id,state]);
       await c.query('INSERT INTO pacientes.historial_demografico(paciente_id,version,actor_id,motivo,cambios) VALUES($1,$2,$3,$4,$5)',[id,old.version+1,actor.id,dto.reason,{estado:{before:old.estado,after:state}}]);
       await this.commands.audit(c,actor,{action:'pacientes.estado',entity:'paciente',entityId:id,patientId:id,permission:'pacientes.editar_demograficos'});
-      await this.commands.event(c,'paciente.actualizado','paciente',id,old.version+1,['rol:REC','rol:JOP']);
+      await this.commands.event(c,'paciente.actualizado','paciente',id,old.version+1,await this.patientChannels(c,id));
       return {id,version:old.version+1,state};
     });
   }
