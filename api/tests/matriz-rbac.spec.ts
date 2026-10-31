@@ -30,25 +30,18 @@ function csv(nombre:string):Record<string,string>[]{
 const rolesCsv=csv('roles.csv'),permisosCsv=csv('permisos.csv'),endpointsCsv=csv('endpoints.csv');
 const codigosRol=rolesCsv.map(r=>r.codigo);
 /**
- * Rutas que la API sirve hoy con otro método o nombre que el catálogo endpoints.csv (clave API → clave del catálogo).
- * Se exige que el permiso coincida igual. Al alinear el catálogo o la ruta, la entrada sobra y la prueba obliga a quitarla.
+ * Operaciones de infraestructura sin fila en endpoints.csv (no son parte del catálogo funcional): públicas, sin permiso.
  */
-const desviosDeRuta:Record<string,string>={
- 'GET /api/v1/auth/me':'GET /api/v1/me',
- 'PATCH /api/v1/usuarios/{id}/roles':'PUT /api/v1/usuarios/{id}/roles',
- 'PATCH /api/v1/usuarios/{id}/estado':'POST /api/v1/usuarios/{id}/desactivar',
- 'POST /api/v1/pacientes/provisionales':'POST /api/v1/pacientes/provisional',
- 'PATCH /api/v1/pacientes/{id}':'PUT /api/v1/pacientes/{id}',
- 'POST /api/v1/pacientes/{id}/estado':'POST /api/v1/pacientes/{id}/desactivar',
- 'PATCH /api/v1/personal/{id}':'PUT /api/v1/personal/{id}',
- 'PATCH /api/v1/turnos/{id}':'PUT /api/v1/turnos/{id}',
- 'GET /api/v1/turnos/mios':'GET /api/v1/me/turnos',
- 'GET /api/v1/espacios':'GET /api/v1/espacios/arbol',
- 'PATCH /api/v1/espacios/{id}':'PUT /api/v1/espacios/{id}',
-};
-/** Operaciones de la API sin fila en endpoints.csv: su permiso debe existir en permisos.csv (o ser público). */
-const sinFilaEnCatalogo=['GET /api/v1/inicio','GET /api/v1/eventos','GET /api/v1/health','GET /salud','POST /api/v1/pacientes/busquedas'];
-jest.setTimeout(120000);
+const infraestructura=['GET /api/v1/health','GET /salud'];
+/**
+ * Filas de endpoints.csv planificadas para la semana 2 o antes cuyo controlador aún no existe. Son pendientes
+ * explícitos de su tarea, no desvíos: al implementarse, la entrada sobra y la prueba obliga a quitarla.
+ */
+const pendientesSemana2=[
+ 'POST /api/v1/cuentas/vinculacion',// 101: vinculación de cuenta del paciente (GES-15 / app de paciente)
+ 'GET /api/v1/me/paciente',// 102: ficha propia del paciente (app de paciente)
+ 'GET /api/v1/metricas/tablero',// 113: tablero de métricas
+];jest.setTimeout(120000);
 describe('110-T06 · matriz RBAC: CSV ↔ base ↔ OpenAPI',()=>{
  let app:NestFastifyApplication,fixture:Awaited<ReturnType<typeof createDatabase>>,operaciones:Record<string,string>;
  beforeAll(async()=>{
@@ -82,24 +75,24 @@ describe('110-T06 · matriz RBAC: CSV ↔ base ↔ OpenAPI',()=>{
   const invalidas=Object.entries(operaciones).filter(([,permiso])=>permiso!=='publico'&&!conocidos.has(permiso)).map(([op,permiso])=>`${op} → ${permiso}`);
   expect(invalidas).toEqual([]);
  });
- test('el permiso de cada operación de la API coincide con su fila de endpoints.csv',()=>{
+ test('el permiso de cada operación de la API coincide con su fila de endpoints.csv, sin alias de ruta',()=>{
   const catalogo=new Map(endpointsCsv.map(e=>[`${e.metodo} ${e.ruta}`,e.permiso==='(público)'?'publico':e.permiso]));
   const distintos:string[]=[],sinCatalogo:string[]=[];
   for(const [op,permiso] of Object.entries(operaciones)){
-   const clave=catalogo.has(op)?op:desviosDeRuta[op];
-   if(!clave){if(!sinFilaEnCatalogo.includes(op))sinCatalogo.push(op);continue;}
-   if(catalogo.get(clave)!==permiso)distintos.push(`${op}: API ${permiso}, catálogo ${catalogo.get(clave)}`);
+   if(infraestructura.includes(op))continue;
+   if(!catalogo.has(op)){sinCatalogo.push(op);continue;}
+   if(catalogo.get(op)!==permiso)distintos.push(`${op}: API ${permiso}, catálogo ${catalogo.get(op)}`);
   }
   expect(distintos).toEqual([]);
   expect(sinCatalogo).toEqual([]);
  });
- test('las listas de desvíos no guardan entradas viejas',()=>{
+ test('toda fila del catálogo de semana 2 o antes existe en la API o está declarada como pendiente',()=>{
+  const sinControlador=endpointsCsv.filter(e=>Number(e.semana)<=2&&!(`${e.metodo} ${e.ruta}` in operaciones)).map(e=>`${e.metodo} ${e.ruta}`);
+  expect(sinControlador.sort()).toEqual([...pendientesSemana2].sort());
+ });
+ test('las listas explícitas no guardan entradas viejas',()=>{
   const catalogo=new Set(endpointsCsv.map(e=>`${e.metodo} ${e.ruta}`));
-  for(const [api,cat] of Object.entries(desviosDeRuta)){
-   expect(operaciones).toHaveProperty([api]);
-   expect(catalogo.has(api)).toBe(false);
-   expect(catalogo.has(cat)).toBe(true);
-  }
-  for(const op of sinFilaEnCatalogo){expect(operaciones).toHaveProperty([op]);expect(catalogo.has(op)).toBe(false);}
+  for(const op of infraestructura){expect(operaciones).toHaveProperty([op]);expect(catalogo.has(op)).toBe(false);}
+  for(const op of pendientesSemana2){expect(operaciones).not.toHaveProperty([op]);expect(catalogo.has(op)).toBe(true);}
  });
 });
