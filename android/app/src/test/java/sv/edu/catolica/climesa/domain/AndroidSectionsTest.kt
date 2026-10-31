@@ -34,10 +34,10 @@ class AndroidSectionsTest {
 
     @Test fun elJefeDeOperacionesVeCamasAmbulanciaTurnosYPlanificacion() {
         val jefe = AndroidSections.visible(
-            listOf("sesion.perfil", "pacientes.buscar", "camas.ver_tablero", "ambulancia.ver_estado", "turnos.ver", "turnos.ver_borradores", "turnos.planificar", "turnos.publicar"),
+            listOf("sesion.perfil", "pacientes.buscar", "camas.ver_tablero", "ambulancia.ver_estado", "turnos.ver", "turnos.ver_borradores", "turnos.planificar", "turnos.publicar", "personal.ver"),
         )
         assertEquals(
-            listOf(AndroidSection.HOME, AndroidSection.PATIENTS, AndroidSection.BEDS, AndroidSection.SHIFTS, AndroidSection.PLANNING, AndroidSection.UNIT, AndroidSection.PROFILE),
+            listOf(AndroidSection.HOME, AndroidSection.PATIENTS, AndroidSection.BEDS, AndroidSection.SHIFTS, AndroidSection.PLANNING, AndroidSection.STAFF, AndroidSection.UNIT, AndroidSection.PROFILE),
             jefe,
         )
         assertTrue(AndroidSections.hasAppScreens(listOf("sesion.perfil", "turnos.ver", "turnos.planificar", "turnos.ver_borradores")))

@@ -73,7 +73,7 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
         }
     }}
 }
-private fun sectionIcon(s:AndroidSection)=when(s){AndroidSection.HOME->Icons.Default.Home;AndroidSection.PROFILE->Icons.Default.AccountCircle;AndroidSection.SHIFTS,AndroidSection.PLANNING,AndroidSection.APPOINTMENTS->Icons.Default.DateRange;AndroidSection.PATIENTS->Icons.Default.Person;AndroidSection.UNIT,AndroidSection.SERVICE->Icons.Default.Info;else->Icons.Default.List}
+private fun sectionIcon(s:AndroidSection)=when(s){AndroidSection.HOME->Icons.Default.Home;AndroidSection.PROFILE->Icons.Default.AccountCircle;AndroidSection.SHIFTS,AndroidSection.PLANNING,AndroidSection.APPOINTMENTS->Icons.Default.DateRange;AndroidSection.PATIENTS,AndroidSection.STAFF->Icons.Default.Person;AndroidSection.UNIT,AndroidSection.SERVICE->Icons.Default.Info;else->Icons.Default.List}
 private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.HOME->"/inicio";AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";else->null}
 private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En servicio","en_mantenimiento" to "En mantenimiento")
 @Composable fun RolePortal(account:AuthenticatedAccount,role:String,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit,refresh:()->Unit){
@@ -87,12 +87,13 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     Scaffold(containerColor=MaterialTheme.colorScheme.background,topBar={TopAppBar(title={Column{Text("climesa",style=MaterialTheme.typography.titleMedium);Text(RoleAccess.label(role),style=MaterialTheme.typography.labelSmall,color=Color(0xFFB0B4C9))}},actions={IconButton(onClick={setDark(!dark)}){Icon(Icons.Default.Settings,"Cambiar apariencia")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=BrandNavy,titleContentColor=Color.White,actionIconContentColor=Color.White))},bottomBar={NavigationBar(containerColor=BrandNavy,tonalElevation=0.dp){sections.forEachIndexed{i,s->NavigationBarItem(selected=selected==i,onClick={selected=i},icon={Icon(sectionIcon(s),null)},label={Text(s.label)},colors=NavigationBarItemDefaults.colors(selectedIconColor=Color.White,selectedTextColor=Color.White,indicatorColor=BrandBlue,unselectedIconColor=Color(0xFFB0B4C9),unselectedTextColor=Color(0xFFB0B4C9)))}}}){padding->
         if(page==AndroidSection.BEDS){BedsScreen(account.profile,Modifier.padding(padding));return@Scaffold}
         if(page==AndroidSection.PLANNING){ShiftPlanningScreen(account.profile,Modifier.padding(padding));return@Scaffold}
+        if(page==AndroidSection.STAFF){StaffScreen(account.profile,Modifier.padding(padding));return@Scaffold}
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(20.dp)){
             item{Text("${RoleAccess.label(role).uppercase()} / CLIMESA",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary);Spacer(Modifier.height(12.dp));Text(if(page==AndroidSection.HOME)"Tu jornada."else"${page.label}.",style=MaterialTheme.typography.displaySmall)}
             if(page==AndroidSection.PROFILE){
                 item{Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)){Column(Modifier.fillMaxWidth().padding(22.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Text(account.profile.name.ifBlank{account.session.email},style=MaterialTheme.typography.titleLarge);Text(account.session.email);HorizontalDivider();Text("Roles: ${account.profile.roles.joinToString{RoleAccess.label(it)}}",style=MaterialTheme.typography.bodyMedium);Text("Tu cuenta es personal. Cierra sesión al terminar tu jornada.",style=MaterialTheme.typography.bodySmall)}}}
                 item{OutlinedButton(onClick=refresh,modifier=Modifier.fillMaxWidth()){Text("Actualizar acceso")};Spacer(Modifier.height(10.dp));Button(onClick=logout,enabled=!signingOut,modifier=Modifier.fillMaxWidth()){Text(if(signingOut)"Cerrando sesión…"else stringResource(R.string.cerrar_sesion))}}
-            }else if(!page.ready)item{PendingModule()}
+            }else if(!page.ready){val maqueta=Maquetas.of(page);if(maqueta!=null)item{MaquetaContent(maqueta)}else item{PendingModule()}}
             else if(data.loading)item{Box(Modifier.fillMaxWidth().height(200.dp),contentAlignment=Alignment.Center){CircularProgressIndicator()}}
             else if(data.error!=null)item{Text(data.error!!,color=MaterialTheme.colorScheme.error);Button(onClick={model.load(path)}){Text(stringResource(R.string.camas_reintentar))}}
             else if(page==AndroidSection.HOME){
