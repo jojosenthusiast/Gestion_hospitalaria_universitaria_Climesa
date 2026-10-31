@@ -93,7 +93,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
             if(page==AndroidSection.PROFILE){
                 item{Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)){Column(Modifier.fillMaxWidth().padding(22.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Text(account.profile.name.ifBlank{account.session.email},style=MaterialTheme.typography.titleLarge);Text(account.session.email);HorizontalDivider();Text("Roles: ${account.profile.roles.joinToString{RoleAccess.label(it)}}",style=MaterialTheme.typography.bodyMedium);Text("Tu cuenta es personal. Cierra sesión al terminar tu jornada.",style=MaterialTheme.typography.bodySmall)}}}
                 item{OutlinedButton(onClick=refresh,modifier=Modifier.fillMaxWidth()){Text("Actualizar acceso")};Spacer(Modifier.height(10.dp));Button(onClick=logout,enabled=!signingOut,modifier=Modifier.fillMaxWidth()){Text(if(signingOut)"Cerrando sesión…"else stringResource(R.string.cerrar_sesion))}}
-            }else if(!page.ready)item{PendingModule()}
+            }else if(!page.ready){val maqueta=Maquetas.of(page);if(maqueta!=null)item{MaquetaContent(maqueta)}else item{PendingModule()}}
             else if(data.loading)item{Box(Modifier.fillMaxWidth().height(200.dp),contentAlignment=Alignment.Center){CircularProgressIndicator()}}
             else if(data.error!=null)item{Text(data.error!!,color=MaterialTheme.colorScheme.error);Button(onClick={model.load(path)}){Text(stringResource(R.string.camas_reintentar))}}
             else if(page==AndroidSection.HOME){
