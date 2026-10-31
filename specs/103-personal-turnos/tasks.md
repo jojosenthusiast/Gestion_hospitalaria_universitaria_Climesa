@@ -4,7 +4,7 @@
   - Cubre: FR-103-04
   - Depende de: 100-T03, 104-T01
   - Hecho cuando: prueba de traslape concurrente deja un solo turno
-  - Verificado: Aplicada en Supabase; 02_concurrencia.sh caso 4: 1 turno guardado de 2 simultáneos
+  - Verificado: Aplicada en Supabase; 02_concurrencia.sh caso 4: 1 turno guardado de 2 simultáneos (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
 - [x] T02 · S2 · R · CRUD de personal (con y sin cuenta)
   - Cubre: FR-103-01, FR-103-02
   - Depende de: T01, 100-T05

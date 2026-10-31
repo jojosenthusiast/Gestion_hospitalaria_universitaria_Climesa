@@ -4,17 +4,17 @@
   - Cubre: FR-100-18
   - Depende de: ninguna
   - Hecho cuando: `npm run build --prefix api` sin errores y `tools/generar_docs.py --verificar` pasa en el repositorio
-  - Verificado: 24-oct-2026 en api/: `npm run build` sin errores; en la raíz: `python tools/generar_docs.py --verificar` sale con código 0 (10 roles, 75 permisos, 108 endpoints, 116 pantallas)
+  - Verificado: 24-oct-2026 en api/: `npm run build` sin errores; en la raíz: `python tools/generar_docs.py --verificar` sale con código 0 (10 roles, 75 permisos, 108 endpoints, 116 pantallas el 24-oct; las cifras vigentes son las que imprime la herramienta, hoy 112 endpoints y 116 pantallas)
 - [x] T02 · S2 · R · Portar plataforma del legado (Db, CommandRunner, Idempotency, Outbox, Audit, PolicyRegistry, Clock)
   - Cubre: FR-100-04, FR-100-05, FR-100-06, FR-100-07, FR-100-10, FR-100-16
   - Depende de: T01
-  - Hecho cuando: las pruebas de plataforma portadas pasan contra PostgreSQL local
+  - Hecho cuando: las pruebas de plataforma portadas pasan en PostgreSQL embebido (PGlite) con `npm test` en `api/`, y las invariantes de `supabase/pruebas/` pasan contra PostgreSQL nativo en el job `postgres-native` de `.github/workflows/supabase.yml` (CI, no verificado desde esta rama)
   - Verificado: 24-oct-2026 `npm test -- --ci` en api/: 9 suites, 52 pruebas pasan; tests/platform.spec.ts cubre idempotencia con auditoría del conflicto, PolicyRegistry por fecha y sin política vigente, cadena de auditoría con fila alterada y borrada, y zona America/El_Salvador. El SQL corre en PGlite (PostgreSQL embebido), no en un servidor PostgreSQL ni en la nube
 - [x] T03 · S1 · R · Migración 0001 de plataforma con roles, RLS y disparador de Realtime
   - Cubre: FR-100-08, FR-100-09
   - Depende de: ninguna
-  - Hecho cuando: `supabase db push` aplica en el proyecto de la nube y la prueba local de reversión no publica eventos
-  - Verificado: Migración aplicada en Supabase (proyecto gvmvmrusscsfbndnbvbr, 17-oct) y prueba local 15 de supabase/pruebas/01_invariantes.sql: OK outbox y Realtime (reversión no publica)
+  - Hecho cuando: la migración se aplica a mano en el SQL Editor de Supabase (no con `supabase db push`, que el README prohíbe por las marcas de versión del remoto) y la prueba de reversión no publica eventos
+  - Verificado: Migración aplicada a mano en Supabase (proyecto gvmvmrusscsfbndnbvbr, 17-oct; comprobación manual e histórica). Evidencia repetible: prueba 15 de supabase/pruebas/01_invariantes.sql (OK outbox y Realtime, la reversión no publica), que corre en el job `postgres-native` de `.github/workflows/supabase.yml` contra PostgreSQL nativo
 - [x] T04 · S2 · R · Validación del JWT de Supabase y construcción del actor
   - Cubre: FR-100-01
   - Depende de: T02
@@ -35,12 +35,12 @@ pm test -- --ci en api: 9 suites, 52 pruebas OK
   - Cubre: FR-100-13, FR-100-14
   - Depende de: T05
   - Hecho cuando: `/openapi/v1.json` lista cada endpoint con `x-permiso` y `/salud` responde 200
-  - Verificado: `npm test -- --ci` en api: 9 suites, 52 pruebas OK. `tests/core.integration.spec.ts` comprueba que `GET /salud` responde 200 sin sesión con `cache-control: no-store` y que cada operación de `/openapi/v1.json` (28 de 28 en `contrato/openapi.json`) trae `x-permiso`; `POST /api/v1/pacientes` declara `pacientes.registrar`. Alcance: solo el contrato local; la URL pública pertenece a T08.
+  - Verificado: `npm test -- --ci` en api: 9 suites, 52 pruebas OK. `tests/core.integration.spec.ts` comprueba que `GET /salud` responde 200 sin sesión con `cache-control: no-store` y que cada operación de `/openapi/v1.json` (39 de 39 en `contrato/openapi.json` al 30-oct-2026, incluidas `/salud` y `/health`; el 24-oct eran 28 de 28) trae `x-permiso`; `POST /api/v1/pacientes` declara `pacientes.registrar`. Alcance: solo el contrato local; la URL pública pertenece a T08.
 - [x] T08 · S2 · R · Contenedor y despliegue de la API en la nube
   - Cubre: FR-100-18
   - Depende de: T07
   - Hecho cuando: `/salud` responde desde la URL pública con la base de Supabase
-  - Verificado: 28-oct-2026 en Render (servicio `sghu-api`, imagen de `api/Dockerfile`, plan free, Virginia): `GET https://sghu-api.onrender.com/salud` responde 200 con `{"status":"ok","database":"ok"}` y `GET /openapi/v1.json` responde 200 con 28 de 28 operaciones con `x-permiso`. La base es el proyecto Supabase `gvmvmrusscsfbndnbvbr` por el Session pooler. Alcance: la API corre con el rol `postgres` (se le concedió `SET` sobre `sghu_api`); pasar a conectar como `sghu_api` y aplicar `core_semanas_1_2` siguen pendientes en GES-15 (`docs/desarrollo/ges-15-supabase-remoto.md`).
+  - Verificado: 28-oct-2026 en Render (servicio `sghu-api`, imagen de `api/Dockerfile`, plan free, Virginia): `GET https://sghu-api.onrender.com/salud` responde 200 con `{"status":"ok","database":"ok"}` y `GET /openapi/v1.json` responde 200 con 28 de 28 operaciones con `x-permiso`. La base es el proyecto Supabase `gvmvmrusscsfbndnbvbr` por el Session pooler. Alcance y límite conocido: la evidencia en la nube es una comprobación manual con fecha (28-oct-2026), no una prueba automatizada; y mientras la API corra como `postgres` (el rol omite RLS) las políticas RLS no se aplican a sus consultas hasta que GES-15 fije el rol `sghu_api`. La API corre con el rol `postgres` (se le concedió `SET` sobre `sghu_api`); pasar a conectar como `sghu_api` y aplicar `core_semanas_1_2` siguen pendientes en GES-15 (`docs/desarrollo/ges-15-supabase-remoto.md`).
 - [ ] T09 · S5 · E · Límite de búsquedas por usuario
   - Cubre: FR-100-17
   - Depende de: T05

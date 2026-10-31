@@ -4,7 +4,7 @@
   - Cubre: FR-101-12
   - Depende de: 100-T03
   - Hecho cuando: la base tiene 10 roles y 75 permisos iguales a `docs/arquitectura/datos/`
-  - Verificado: Aplicada en Supabase; prueba 17: 10 roles y 75 permisos, 171 asignaciones rol-permiso
+  - Verificado: Aplicada en Supabase; prueba 17: 10 roles y 75 permisos, 171 asignaciones rol-permiso (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
 - [x] T02 · S1 · R · Disparador de alta de usuario y rol Paciente por defecto
   - Cubre: FR-101-02
   - Depende de: T01

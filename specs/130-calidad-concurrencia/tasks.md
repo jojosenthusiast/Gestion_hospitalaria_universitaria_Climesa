@@ -23,8 +23,8 @@
 - [x] T06 · S2 · R · Lista de pruebas manuales por pantalla
   - Cubre: FR-130-06
   - Depende de: ninguna
-  - Hecho cuando: el equipo de pruebas tiene la lista generada
-  - Verificado: 29-oct-2026 `docs/pruebas/pruebas-manuales.md` existe y cubre, por rol web (ADM, JOP, REC, LAB, DPD), las pantallas web implementadas (W01, W02, W03/W04, W05/W06, W07, W09, W12, W16/W17, W18, W26, W32, W35) con pasos, resultado esperado y requisito de nube/dispositivo/2 sesiones; los casos se contrastaron con `web/src/features/shell.tsx`, `permisos.csv` e `inventario-pantallas.md`. Todos los casos están en estado "sin ejecutar": la ejecución con el equipo de pruebas sigue pendiente y no se afirma como hecha.
+  - Hecho cuando: el equipo de pruebas tiene la lista escrita
+  - Verificado: 29-oct-2026 `docs/pruebas/pruebas-manuales.md` (escrito a mano, no generado por herramienta) existe y cubre, por rol web (ADM, JOP, REC, LAB, DPD), las pantallas web implementadas (W01, W02, W03/W04, W05/W06, W07, W09, W12, W16/W17, W18, W26, W32, W35) con pasos, resultado esperado y requisito de nube/dispositivo/2 sesiones; los casos se contrastaron con `web/src/features/shell.tsx`, `permisos.csv` e `inventario-pantallas.md`. Todos los casos están en estado "sin ejecutar": la ejecución con el equipo de pruebas sigue pendiente y no se afirma como hecha.
 
 
 ## Verificación del corte 0.3.0 · 24-oct-2026

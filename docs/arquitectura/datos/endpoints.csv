@@ -1,5 +1,7 @@
 spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
-101,GET,/api/v1/me,sesion.perfil,,R,2,"Perfil, roles, permisos y canales de tiempo real del usuario"
+101,GET,/api/v1/auth/me,sesion.perfil,,R,2,"Perfil, roles, permisos y canales de tiempo real del usuario"
+101,GET,/api/v1/inicio,sesion.perfil,,R,2,Resumen de inicio según rol y permisos
+101,GET,/api/v1/eventos,sesion.perfil,Solo eventos de canales permitidos al usuario,R,2,Consulta de recuperación de eventos desde un cursor (?after=) tras reconectar
 101,PUT,/api/v1/me/dispositivos,sesion.perfil,,E,5,Registrar token de push FCM o APNs
 101,POST,/api/v1/cuentas/vinculacion,cuenta.vincular,Solo su cuenta,R,2,Paciente pide vincular su cuenta con DUI y fecha de nacimiento
 101,GET,/api/v1/cuentas/vinculaciones,cuentas.verificar,,R,3,Vinculaciones pendientes
@@ -7,29 +9,30 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 101,POST,/api/v1/cuentas/vinculaciones/{id}/rechazar,cuentas.verificar,Motivo obligatorio,R,3,Rechazar vinculación
 101,GET,/api/v1/usuarios,usuarios.ver,,R,2,Listado de usuarios con roles y estado
 101,POST,/api/v1/usuarios/invitaciones,usuarios.invitar,,R,2,Crear cuenta de personal e invitarla
-101,PUT,/api/v1/usuarios/{id}/roles,usuarios.asignar_roles,Nunca a sí mismo,R,2,Asignar roles
-101,POST,/api/v1/usuarios/{id}/desactivar,usuarios.desactivar,Nunca a sí mismo,R,2,Desactivar cuenta
+101,PATCH,/api/v1/usuarios/{id}/roles,usuarios.asignar_roles,Nunca a sí mismo,R,2,Asignar roles
+101,PATCH,/api/v1/usuarios/{id}/estado,usuarios.desactivar,Nunca a sí mismo,R,2,Desactivar cuenta
 102,GET,/api/v1/pacientes,pacientes.buscar,Devuelve datos mínimos y motivo de coincidencia,R,2,"Búsqueda fonética por nombre, DUI o expediente"
+102,POST,/api/v1/pacientes/busquedas,pacientes.buscar,Registra la búsqueda previa que exige el alta,R,2,Búsqueda con datos sensibles en el cuerpo y no en la URL
 102,POST,/api/v1/pacientes,pacientes.registrar,Exige búsqueda previa reciente,R,2,Registrar paciente
-102,POST,/api/v1/pacientes/provisional,pacientes.registrar_provisional,,R,4,Paciente sin identidad confirmada (NN)
+102,POST,/api/v1/pacientes/provisionales,pacientes.registrar_provisional,,R,4,Paciente sin identidad confirmada (NN)
 102,GET,/api/v1/pacientes/{id},pacientes.ver_ficha,Relación de atención para MED y PAR; propio para PAC,R,2,Ficha personal
-102,PUT,/api/v1/pacientes/{id},pacientes.editar_demograficos,Versión optimista; historial,R,2,Corregir datos personales
-102,POST,/api/v1/pacientes/{id}/desactivar,pacientes.editar_demograficos,Nunca borra,R,2,Inactivar registro conservando historial
+102,PATCH,/api/v1/pacientes/{id},pacientes.editar_demograficos,Versión optimista; historial,R,2,Corregir datos personales
+102,POST,/api/v1/pacientes/{id}/estado,pacientes.editar_demograficos,Nunca borra,R,2,Inactivar registro conservando historial
 102,GET,/api/v1/pacientes/casos-duplicado,pacientes.gestionar_duplicados,,E,4,Casos de posible duplicado
 102,GET,/api/v1/me/paciente,pacientes.ver_ficha,Propio,R,2,Ficha del paciente autenticado
 103,GET,/api/v1/personal,personal.ver,Incluye las inscripciones de cada persona (W07 y W08),R,2,Listado de personal de salud
 103,POST,/api/v1/personal,personal.gestionar,,R,2,Crear personal
-103,PUT,/api/v1/personal/{id},personal.gestionar,Versión optimista,R,2,Editar personal
+103,PATCH,/api/v1/personal/{id},personal.gestionar,Versión optimista,R,2,Editar personal
 103,POST,/api/v1/personal/{id}/inscripciones,personal.gestionar,"Versión optimista y motivo; sin inscripción vigente no se programa MED ni ENF",E,4,Registrar inscripción profesional con vigencia
 103,GET,/api/v1/turnos,turnos.ver,"PAR, AST, ENF ven los suyos y los de su área",R,2,"Turnos por rango, área y persona"
 103,POST,/api/v1/turnos,turnos.planificar,Sin traslape; reglas D-054,R,2,Crear turno
-103,PUT,/api/v1/turnos/{id},turnos.planificar,Versión optimista,R,3,Editar turno
+103,PATCH,/api/v1/turnos/{id},turnos.planificar,Versión optimista,R,3,Editar turno
 103,POST,/api/v1/turnos/publicar,turnos.publicar,Advierte huecos de cobertura,R,4,Publicar planificación de un rango
 103,GET,/api/v1/turnos/cobertura,turnos.ver,,E,4,Huecos de cobertura por área y hora
-103,GET,/api/v1/me/turnos,turnos.ver,Propio,R,3,Mis turnos
-104,GET,/api/v1/espacios/arbol,espacios.ver,,R,2,Árbol del edificio con disponibilidad agregada (CTE recursiva)
+103,GET,/api/v1/turnos/mios,turnos.ver,Propio,R,3,Mis turnos
+104,GET,/api/v1/espacios,espacios.ver,,R,2,Árbol del edificio con disponibilidad agregada (CTE recursiva)
 104,POST,/api/v1/espacios,espacios.configurar,,R,2,Crear espacio
-104,PUT,/api/v1/espacios/{id},espacios.configurar,No reduce capacidad bajo ocupación,R,2,Editar espacio
+104,PATCH,/api/v1/espacios/{id},espacios.configurar,No reduce capacidad bajo ocupación,R,2,Editar espacio
 104,GET,/api/v1/camas,camas.ver_tablero,Ocupante solo con camas.ver_ocupante,R,2,Estado y versión de cada cama
 104,POST,/api/v1/camas/{id}/bloquear,camas.bloquear,Motivo y versión obligatorios,R,4,Bloquear una cama libre
 104,POST,/api/v1/camas/{id}/desbloquear,camas.bloquear,Versión y motivo obligatorios,R,4,Retirar el bloqueo activo sin borrar historial

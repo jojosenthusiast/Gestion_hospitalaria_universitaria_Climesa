@@ -4,7 +4,7 @@
   - Cubre: FR-106-03, FR-106-04
   - Depende de: 100-T03
   - Hecho cuando: la semilla carga el subconjunto CIE-10 y las tablas existen en la nube
-  - Verificado: Aplicada en Supabase; semilla con 30 códigos CIE-10 de consulta general
+  - Verificado: Aplicada en Supabase; semilla con 30 códigos CIE-10 de consulta general (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
 - [ ] T02 · S3 · R · Iniciar consulta, signos, diagnósticos, recetas y órdenes
   - Cubre: FR-106-01 a FR-106-05
   - Depende de: T01, 105-T02

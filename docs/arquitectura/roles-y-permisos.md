@@ -121,7 +121,9 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/me` | `sesion.perfil` |  | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| GET | `/api/v1/auth/me` | `sesion.perfil` |  | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| GET | `/api/v1/inicio` | `sesion.perfil` |  | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| GET | `/api/v1/eventos` | `sesion.perfil` | Solo eventos de canales permitidos al usuario | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | PUT | `/api/v1/me/dispositivos` | `sesion.perfil` |  | E | 5 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | POST | `/api/v1/cuentas/vinculacion` | `cuenta.vincular` | Solo su cuenta | R | 2 | · | · | · | · | · | · | · | · | · | propio |
 | GET | `/api/v1/cuentas/vinculaciones` | `cuentas.verificar` |  | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
@@ -129,19 +131,20 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/cuentas/vinculaciones/{id}/rechazar` | `cuentas.verificar` | Motivo obligatorio | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/usuarios` | `usuarios.ver` |  | R | 2 | ✔ | · | · | · | · | · | · | · | ✔ | · |
 | POST | `/api/v1/usuarios/invitaciones` | `usuarios.invitar` |  | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
-| PUT | `/api/v1/usuarios/{id}/roles` | `usuarios.asignar_roles` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
-| POST | `/api/v1/usuarios/{id}/desactivar` | `usuarios.desactivar` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
+| PATCH | `/api/v1/usuarios/{id}/roles` | `usuarios.asignar_roles` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
+| PATCH | `/api/v1/usuarios/{id}/estado` | `usuarios.desactivar` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 
 ### Spec 102
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | GET | `/api/v1/pacientes` | `pacientes.buscar` | Devuelve datos mínimos y motivo de coincidencia | R | 2 | · | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
+| POST | `/api/v1/pacientes/busquedas` | `pacientes.buscar` | Registra la búsqueda previa que exige el alta | R | 2 | · | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/pacientes` | `pacientes.registrar` | Exige búsqueda previa reciente | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
-| POST | `/api/v1/pacientes/provisional` | `pacientes.registrar_provisional` |  | R | 4 | · | · | ✔ | · | ✔ | · | · | ✔ | · | · |
+| POST | `/api/v1/pacientes/provisionales` | `pacientes.registrar_provisional` |  | R | 4 | · | · | ✔ | · | ✔ | · | · | ✔ | · | · |
 | GET | `/api/v1/pacientes/{id}` | `pacientes.ver_ficha` | Relación de atención para MED y PAR; propio para PAC | R | 2 | · | ✔ | ✔ | área | área | relación | orden | relación | · | propio |
-| PUT | `/api/v1/pacientes/{id}` | `pacientes.editar_demograficos` | Versión optimista; historial | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
-| POST | `/api/v1/pacientes/{id}/desactivar` | `pacientes.editar_demograficos` | Nunca borra | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
+| PATCH | `/api/v1/pacientes/{id}` | `pacientes.editar_demograficos` | Versión optimista; historial | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/pacientes/{id}/estado` | `pacientes.editar_demograficos` | Nunca borra | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/pacientes/casos-duplicado` | `pacientes.gestionar_duplicados` |  | E | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/me/paciente` | `pacientes.ver_ficha` | Propio | R | 2 | · | ✔ | ✔ | área | área | relación | orden | relación | · | propio |
 
@@ -151,22 +154,22 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | GET | `/api/v1/personal` | `personal.ver` | Incluye las inscripciones de cada persona (W07 y W08) | R | 2 | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/personal` | `personal.gestionar` |  | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
-| PUT | `/api/v1/personal/{id}` | `personal.gestionar` | Versión optimista | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
+| PATCH | `/api/v1/personal/{id}` | `personal.gestionar` | Versión optimista | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/personal/{id}/inscripciones` | `personal.gestionar` | Versión optimista y motivo; sin inscripción vigente no se programa MED ni ENF | E | 4 | ✔ | · | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/turnos` | `turnos.ver` | PAR, AST, ENF ven los suyos y los de su área | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/turnos` | `turnos.planificar` | Sin traslape; reglas D-054 | R | 2 | · | ✔ | · | · | · | · | · | · | · | · |
-| PUT | `/api/v1/turnos/{id}` | `turnos.planificar` | Versión optimista | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
+| PATCH | `/api/v1/turnos/{id}` | `turnos.planificar` | Versión optimista | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/publicar` | `turnos.publicar` | Advierte huecos de cobertura | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/turnos/cobertura` | `turnos.ver` |  | E | 4 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
-| GET | `/api/v1/me/turnos` | `turnos.ver` | Propio | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
+| GET | `/api/v1/turnos/mios` | `turnos.ver` | Propio | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 
 ### Spec 104
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/espacios/arbol` | `espacios.ver` |  | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · | · | · |
+| GET | `/api/v1/espacios` | `espacios.ver` |  | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/espacios` | `espacios.configurar` |  | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
-| PUT | `/api/v1/espacios/{id}` | `espacios.configurar` | No reduce capacidad bajo ocupación | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
+| PATCH | `/api/v1/espacios/{id}` | `espacios.configurar` | No reduce capacidad bajo ocupación | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/camas` | `camas.ver_tablero` | Ocupante solo con camas.ver_ocupante | R | 2 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/camas/{id}/bloquear` | `camas.bloquear` | Motivo y versión obligatorios | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/camas/{id}/desbloquear` | `camas.bloquear` | Versión y motivo obligatorios | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |

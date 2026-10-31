@@ -4,7 +4,7 @@
   - Cubre: FR-102-03, FR-102-04, FR-102-12
   - Depende de: 100-T03
   - Hecho cuando: el índice parcial del DUI rechaza duplicados en una prueba concurrente
-  - Verificado: Aplicada en Supabase; supabase/pruebas/02_concurrencia.sh caso 5: 1 DUI registrado de 2 simultáneos
+  - Verificado: Aplicada en Supabase; supabase/pruebas/02_concurrencia.sh caso 5: 1 DUI registrado de 2 simultáneos (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
 - [x] T02 · S2 · R · Portar dominio: claves fonéticas, DUI, expediente, identidad provisional
   - Cubre: FR-102-04, FR-102-05
   - Depende de: T01

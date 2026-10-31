@@ -4,7 +4,7 @@
   - Cubre: FR-107-01, FR-107-03
   - Depende de: 100-T03
   - Hecho cuando: agregar un ciclo al catálogo se rechaza
-  - Verificado: Aplicada en Supabase; prueba 11: ciclo_en_catalogo y 7 hojas del perfil prenatal
+  - Verificado: Aplicada en Supabase; prueba 11: ciclo_en_catalogo y 7 hojas del perfil prenatal (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
 - [ ] T02 · S3 · R · Crear orden desde consulta con expansión recursiva
   - Cubre: FR-107-02, FR-107-04
   - Depende de: T01, 106-T02

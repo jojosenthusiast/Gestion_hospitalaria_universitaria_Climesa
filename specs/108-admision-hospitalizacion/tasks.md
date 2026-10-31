@@ -4,7 +4,7 @@
   - Cubre: FR-108-05, FR-108-15
   - Depende de: 104-T01
   - Hecho cuando: dos ocupaciones traslapadas de la misma cama se rechazan en prueba
-  - Verificado: Aplicada en Supabase; prueba 1 (23P01) y 02_concurrencia.sh caso 2: 1 ocupación de 2 simultáneas
+  - Verificado: Aplicada en Supabase; prueba 1 (23P01) y 02_concurrencia.sh caso 2: 1 ocupación de 2 simultáneas (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
 - [ ] T02 · S4 · R · Crear admisión con origen y unicidad por paciente
   - Cubre: FR-108-01, FR-108-02
   - Depende de: T01, 102-T03

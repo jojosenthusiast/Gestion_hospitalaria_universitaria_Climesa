@@ -4,7 +4,7 @@
   - Cubre: FR-104-01, FR-104-02, FR-104-03
   - Depende de: 100-T03
   - Hecho cuando: la semilla deja 17 camas de hospitalización y el escenario 1 pasa
-  - Verificado: Aplicada en Supabase con semilla: 17 camas (12 semiprivadas, 5 VIP); prueba 2: capacidad_excedida
+  - Verificado: Aplicada en Supabase con semilla: 17 camas (12 semiprivadas, 5 VIP); prueba 2: capacidad_excedida (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
 - [x] T02 · S2 · R · Consultas recursivas de árbol, ruta y disponibilidad
   - Cubre: FR-104-05, FR-104-13
   - Depende de: T01
@@ -24,7 +24,7 @@
   - Cubre: FR-104-05, FR-104-06
   - Depende de: T03, 120-T02
   - Hecho cuando: se ven las plantas 2 y 3 con sus 17 camas y estados
-  - Avance 29-oct-2026 (web): `web/src/__tests__/espacios.test.tsx` comprueba con datos ficticios que W12 (`BedsPage`) muestra la planta 2 con 12 camas y la planta 3 con 5 (17 en total) con su estado por habitación, el cambio de planta y el filtro por estado, y que W09 (`SpacesPage`) lista el árbol con camas libres por nodo y el plano por planta; `spaces.tsx` ya agrupaba por planta y habitación, sin cambios. 120-T02 ya está hecha.
+  - Avance 29-oct-2026 (web): `web/src/__tests__/espacios.test.tsx` comprueba con datos ficticios que W12 (`BedsPage`) muestra la planta 2 con 12 camas y la planta 3 con 5 (17 en total) con su estado por habitación, el cambio de planta y el filtro por estado, y que W09 (`SpacesPage`) lista el árbol con camas libres por nodo y el plano por planta; `spaces.tsx` ya agrupaba por planta y habitación, sin cambios. 120-T02 ya está hecha. Evidencia solo con pruebas de web y datos ficticios, sin nube. Límite conocido: la evidencia en la nube es una comprobación manual con fecha, no automatizada, y la API corre como `postgres` (omite RLS) hasta que GES-15 fije el rol `sghu_api`.
   - Verificado: 29-oct-2026 `web/src/__tests__/espacios.test.tsx` (5 pruebas) y `web/src/__tests__/navegacion.test.tsx` (19 pruebas; JOP y REC ven Camas y Edificio, ADM solo Edificio, LAB y DPD ninguno) pasan: `npm test` en `web/` 58 pruebas. De solo lectura contra la API desplegada, `GET /api/v1/camas` con la cuenta demo REC devuelve 17 camas: 12 en la planta 2 y 5 en la planta 3, todas libres. No se abrió la pantalla en un navegador contra la API; el render del plano y del árbol se comprueba con datos ficticios en pruebas
 - [ ] T06 · S4 · R · Bloqueo, limpieza y verificación con eventos en vivo
   - Cubre: FR-104-07, FR-104-09, FR-104-10, FR-104-11

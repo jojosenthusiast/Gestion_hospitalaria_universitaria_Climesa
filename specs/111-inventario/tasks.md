@@ -4,7 +4,7 @@
   - Cubre: FR-111-01, FR-111-02
   - Depende de: 104-T01
   - Hecho cuando: la semilla carga artículos con lotes en dos bodegas
-  - Verificado: Aplicada en Supabase; semilla de 10 artículos con lotes en BOD-CEN y BOD-LAB
+  - Verificado: Aplicada en Supabase; semilla de 10 artículos con lotes en BOD-CEN y BOD-LAB (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
 - [ ] T02 · S3 · R · Movimientos atómicos sin negativos y sin lotes vencidos
   - Cubre: FR-111-03, FR-111-04, FR-111-05, FR-111-08
   - Depende de: T01
