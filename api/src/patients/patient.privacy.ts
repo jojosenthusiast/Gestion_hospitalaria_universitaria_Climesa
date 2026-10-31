@@ -1,20 +1,25 @@
 /** Política de campos de la ficha del paciente según docs/arquitectura/privacidad.md §2 (FR-102-10). Reglas puras, sin acceso a datos. */
+import { Actor, contextsOf, hasPermission } from '../platform/actor';
 export type FichaFields = { birth: boolean; ageRange: boolean; contact: boolean };
 
 /**
  * Qué grupos de campos recibe quien consulta la ficha. Número de expediente, nombre y sexo los reciben todos los roles con acceso.
- * - birth: fecha de nacimiento exacta (PAC dueño, REC, AST, ENF, MED, PAR).
- * - ageRange: rango de edad en lugar de la fecha exacta (LAB).
- * - contact: DUI, teléfono, correo y dirección (PAC dueño, REC, MED).
- * JOP solo recibe lo básico (la asignación de cama usa nombre y sexo). Con varios roles se suma lo que da cada uno.
- * Esto es por rol a propósito: el catálogo (permisos.csv) decide QUIÉN abre la ficha y en qué contexto, pero no tiene permisos por campo;
- * privacidad.md §2 es una tabla campo por rol y no hay un permiso por grupo de campos al que preguntar (regla 8). Si se crean, esta función pasa a leerlos.
+ * - birth: fecha de nacimiento exacta (permiso `pacientes.ver_nacimiento`, contexto x; el dueño siempre).
+ * - ageRange: rango de edad en lugar de la fecha exacta (`pacientes.ver_nacimiento`, contexto rango).
+ * - contact: DUI, teléfono, correo y dirección (`pacientes.ver_contacto`, contexto x; el dueño siempre).
+ * Quien solo tiene lo básico (la asignación de cama usa nombre y sexo) no recibe ninguno. Con varios roles se suma lo que da cada uno.
+ * Los permisos son los de privacidad.md §2 en permisos.csv; esta función ya no compara códigos de rol (regla 8).
  */
-export function fichaFields(roles: string[], owner: boolean): FichaFields {
-  const has = (...codes: string[]) => roles.some(r => codes.includes(r));
-  const contact = owner || has('REC', 'MED');
-  const birth = contact || has('AST', 'ENF', 'PAR');
-  return { birth, ageRange: !birth && has('LAB'), contact };
+export function fichaFields(actor: Pick<Actor, 'permissions'>, owner: boolean): FichaFields {
+  const birthContexts = contextsOf(actor, 'pacientes.ver_nacimiento');
+  const contact = owner || contextsOf(actor, 'pacientes.ver_contacto').includes('x');
+  const birth = contact || birthContexts.includes('x');
+  return { birth, ageRange: !birth && birthContexts.includes('rango'), contact };
+}
+
+/** La búsqueda de pacientes devuelve la fecha de nacimiento solo a quien puede verla (exacta o por rango) en la ficha. */
+export function searchShowsBirth(actor: Actor): boolean {
+  return hasPermission(actor, 'pacientes.ver_nacimiento');
 }
 
 /** Años cumplidos de `birth` (yyyy-MM-dd) al día `today` (yyyy-MM-dd). */

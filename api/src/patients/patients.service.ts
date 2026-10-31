@@ -6,7 +6,7 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
 import { Clock } from '../platform/clock';
 import { PatientCreateDto, PatientUpdateDto, PatientStateDto } from './patient-write.dto';
-import { ageOn, ageRange, fichaFields } from './patient.privacy';
+import { ageOn, ageRange, fichaFields, searchShowsBirth } from './patient.privacy';
 import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateDemographics } from './patient.rules';
 type Row = Record<string, any>;
 @Injectable()
@@ -27,7 +27,7 @@ export class PatientsService {
     return this.db.transaction(async c=>{
       const result=await this.candidates(c,query??'',limit,state);
       await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query??'')),count:result.length}});
-      return actor.roles.includes('JOP')&&!actor.roles.some(r=>['REC','AST','ENF','MED','LAB','PAR'].includes(r))?result.map(({birth,...p})=>p):result;
+      return searchShowsBirth(actor)?result:result.map(({birth,...p})=>p);
     });
   }
   async recordSearch(actor:Actor, query:string) {
@@ -36,7 +36,7 @@ export class PatientsService {
       const candidates=await this.candidates(c,query,50);
       const row=(await c.query('INSERT INTO pacientes.busqueda_registro(usuario_id,huella_criterios,resultados,vence_en,creado_en) VALUES($1,$2,$3,$4,$5) RETURNING token,vence_en',[actor.id,fingerprint(normalize(query)),candidates.length,new Date(this.clock.now().valueOf()+600000),this.clock.now()])).rows[0];
       await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query)),count:candidates.length}});
-      return {token:row.token,expiresAt:row.vence_en,candidates:actor.roles.includes('JOP')&&!actor.roles.some(r=>['REC','AST','ENF','MED','LAB','PAR'].includes(r))?candidates.map(({birth,...p})=>p):candidates};
+      return {token:row.token,expiresAt:row.vence_en,candidates:searchShowsBirth(actor)?candidates:candidates.map(({birth,...p})=>p)};
     });
   }
   private async permitted(c:PoolClient,actor:Actor,id:string) {
@@ -84,7 +84,7 @@ export class PatientsService {
     await this.permitted(c,actor,id);
     const p=(await c.query('SELECT * FROM pacientes.paciente WHERE id=$1',[id])).rows[0];
     if(!p)throw new NotFoundException('No se encontró el paciente.');
-    const fields=fichaFields(actor.roles,actor.patientId===id);
+    const fields=fichaFields(actor,actor.patientId===id);
     const result:Row={id:p.id,record:p.expediente,fullName:this.name(p),givenNames:p.nombres??'',surnames:[p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' '),state:p.estado,active:p.estado!=='inactivo',sex:p.sexo,version:p.version,provisional:p.estado==='provisional'};
     if(fields.birth){result.birth=p.nacimiento instanceof Date?p.nacimiento.toISOString().slice(0,10):p.nacimiento;result.birthPrecision=p.precision_nacimiento;}
     if(fields.ageRange)result.ageRange=ageRange(this.age(p));
