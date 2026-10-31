@@ -10,14 +10,18 @@ pacientes.buscar,Buscar pacientes (datos mínimos),,x,x,x,x,x,x,x,,
 pacientes.registrar,Registrar paciente tras buscar,,,x,,,,,,,
 pacientes.registrar_provisional,Registrar paciente sin identidad confirmada,,,x,,x,,,x,,
 pacientes.ver_ficha,Ver datos personales del paciente,,x,x,area,area,relacion,orden,relacion,,propio
+pacientes.ver_nacimiento,Ver la fecha de nacimiento exacta (rango de edad si el contexto es rango),,,x,x,x,x,rango,x,,propio
+pacientes.ver_contacto,Ver DUI teléfono correo y dirección del paciente,,,x,,,x,,,,propio
 pacientes.editar_demograficos,Corregir datos personales con historial,,,x,,,,,,,
 pacientes.gestionar_duplicados,Revisar casos de posible duplicado,,x,x,,,,,,,
 expediente.ver,Ver historial clínico,,,,,relacion,relacion,,,,propio_revisado
 personal.ver,Ver personal de salud,x,x,,,,,,,,
 personal.gestionar,Crear y editar personal e inscripciones,x,,,,,,,,,
+personal.ver_datos_personales,Ver DUI y teléfono del personal,x,,,,,,,,,
 turnos.ver,Ver horarios del personal,x,x,x,x,x,x,x,x,,
 turnos.planificar,Crear y editar turnos,,x,,,,,,,,
 turnos.publicar,Publicar una planificación,,x,,,,,,,,
+turnos.ver_borradores,Ver turnos en borrador antes de publicarlos,x,x,,,,,,,,
 espacios.ver,Ver el árbol del edificio,x,x,x,x,x,x,,,,
 espacios.configurar,Crear y editar espacios y capacidades,x,,,,,,,,,
 camas.ver_tablero,Ver tablero de camas sin ocupantes,,x,x,,x,x,,,,

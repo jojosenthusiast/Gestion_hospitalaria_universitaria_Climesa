@@ -19,6 +19,17 @@ SALIDA_RBAC = RAIZ / "docs" / "arquitectura" / "roles-y-permisos.md"
 SALIDA_PANTALLAS = RAIZ / "docs" / "diseno" / "inventario-pantallas.md"
 SALIDA_SQL = RAIZ / "supabase" / "migrations" / "20261017000210_acceso_semilla.sql"
 SALIDA_CONTEXTOS = RAIZ / "supabase" / "migrations" / "20261029000100_acceso_contextos_ficha.sql"
+SALIDA_ATRIBUTOS = RAIZ / "supabase" / "migrations" / "20261030000100_permisos_atributos.sql"
+
+# Permisos que se agregaron al catálogo después de aplicada la semilla (regla 10 de AGENTS.md: la semilla no se edita). La semilla
+# no los emite; la migración de SALIDA_ATRIBUTOS los inserta. Son permisos de atributo: deciden qué campos o filas ve quien ya
+# entró por un endpoint, así que ningún endpoint los declara y no cuentan como "sin endpoint" (el código los consulta con hasPermission).
+PERMISOS_POSTERIORES = [
+    "pacientes.ver_nacimiento",
+    "pacientes.ver_contacto",
+    "personal.ver_datos_personales",
+    "turnos.ver_borradores",
+]
 
 # Contextos que permisos.csv cambió después de aplicada la semilla (regla 10 de AGENTS.md: las migraciones aplicadas no se editan).
 # (rol, permiso, contexto en la semilla, contexto actual en permisos.csv). La semilla conserva el histórico y la migración
@@ -54,6 +65,7 @@ CONTEXTO = {
     "consumo": "consumo",
     "reactivos": "reactivos",
     "orden": "orden",
+    "rango": "rango de edad",
 }
 
 
@@ -250,6 +262,7 @@ def generar_sql(roles, permisos):
         plats = "array[" + ", ".join(sql_txt(x.strip()) for x in r["plataformas"].split(";")) + "]"
         filas.append(f"  ({sql_txt(r['codigo'])}, {sql_txt(r['nombre'])}, {plats}, {sql_txt(r['descripcion'])})")
     l.append(",\n".join(filas) + ";")
+    permisos = [p for p in permisos if p["permiso"] not in PERMISOS_POSTERIORES]
     l += ["", "insert into acceso.permiso (codigo, descripcion) values"]
     l.append(",\n".join(f"  ({sql_txt(p['permiso'])}, {sql_txt(p['descripcion'])})" for p in permisos) + ";")
     l += ["", "insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values"]
@@ -278,6 +291,26 @@ def generar_sql_contextos():
     return "\n".join(l) + "\n"
 
 
+def generar_sql_atributos(roles, permisos):
+    codigos = [r["codigo"] for r in roles]
+    nuevos = [p for p in permisos if p["permiso"] in PERMISOS_POSTERIORES]
+    l = [
+        "-- Generado por tools/generar_docs.py desde PERMISOS_POSTERIORES y permisos.csv. No editar a mano.",
+        "-- Permisos de atributo: reemplazan decisiones por código de rol en la API (regla 8 de AGENTS.md). Conservan el comportamiento vigente.",
+        "-- Idempotente: no duplica permisos ni asignaciones que ya existan.",
+        "",
+        "insert into acceso.permiso (codigo, descripcion) values",
+        ",\n".join(f"  ({sql_txt(p['permiso'])}, {sql_txt(p['descripcion'])})" for p in nuevos),
+        "on conflict (codigo) do nothing;",
+        "",
+        "insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values",
+    ]
+    filas = [f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(p[c])})" for p in nuevos for c in codigos if p[c]]
+    l.append(",\n".join(filas))
+    l.append("on conflict (rol_codigo, permiso_codigo) do nothing;")
+    return "\n".join(l) + "\n"
+
+
 def verificar_consistencia(permisos, endpoints, pantallas, roles):
     errores = []
     nombres = {p["permiso"] for p in permisos}
@@ -291,9 +324,12 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
         actual = por_permiso.get(perm, {}).get(r)
         if actual != hasta:
             errores.append(f"AJUSTES_CONTEXTO dice {r} {perm} = {hasta} y permisos.csv dice {actual!r}")
+    for codigo in PERMISOS_POSTERIORES:
+        if codigo not in nombres:
+            errores.append(f"PERMISOS_POSTERIORES menciona {codigo}, que no está en permisos.csv")
     usados = {e["permiso"] for e in endpoints}
     for p in permisos:
-        if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante":
+        if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante" and p["permiso"] not in PERMISOS_POSTERIORES:
             errores.append(f"Permiso {p['permiso']} sin endpoint")
     ids = [p["id"] for p in pantallas]
     if len(ids) != len(set(ids)):
@@ -395,6 +431,7 @@ def main():
         SALIDA_PANTALLAS: generar_pantallas(pantallas, roles),
         SALIDA_SQL: generar_sql(roles, permisos),
         SALIDA_CONTEXTOS: generar_sql_contextos(),
+        SALIDA_ATRIBUTOS: generar_sql_atributos(roles, permisos),
     }
     if "--verificar" in sys.argv:
         for ruta, contenido in salidas.items():
