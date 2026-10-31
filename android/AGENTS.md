@@ -1,6 +1,6 @@
 # Android (Kotlin + Jetpack Compose, MVVM)
 
-Lee antes `../AGENTS.md`. Spec base: `specs/121-cliente-android/`. Roles en Android: Recepción, Asistente, Enfermería, Médico, Laboratorio, Paramédico y Paciente.
+Lee antes `../AGENTS.md`. Spec base: `specs/121-cliente-android/`. Roles en Android: Jefe de Operaciones, Recepción, Asistente, Enfermería, Médico, Laboratorio, Paramédico y Paciente.
 
 ## Proyecto (lo crea 121-T01)
 

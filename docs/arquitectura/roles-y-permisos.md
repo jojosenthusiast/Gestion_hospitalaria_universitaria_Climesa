@@ -9,7 +9,7 @@ Requisitos: REQ-PRV-04 (matriz por rol de endpoints y vistas), REQ-ROL-01 a 06. 
 | Código | Rol | Plataformas | Origen | Qué hace |
 |---|---|---|---|---|
 | ADM | Administrador | Web | CUR REQ-ROL-01 | Configura y asegura el sistema: usuarios y roles, edificio, catálogos, políticas. No opera pacientes ni ve contenido clínico (D-050). |
-| JOP | Jefe de Operaciones | Web | CUR (panel web); D-050 | Opera el día: tablero de camas, autorizaciones de admisión y traslado, turnos, mantenimiento de ambulancia, inventario, avisos, métricas. |
+| JOP | Jefe de Operaciones | Android; Web | CUR (panel web); D-050 | Opera el día: tablero de camas, autorizaciones de admisión y traslado, turnos, mantenimiento de ambulancia, inventario, avisos, métricas. |
 | REC | Recepcionista | Android; Web | CUR REQ-ROL-03; base pedida | Registro y verificación de pacientes, fila del día, citas, admisión, asignación de cama, despacho de ambulancia. |
 | AST | Asistente | Android | CUR REQ-ROL-03; base pedida | Apoya la consulta: prepara al paciente, toma signos vitales, llama y mueve la fila del consultorio. |
 | ENF | Enfermero/a | Android | CUR (Android); base pedida | Cuidado del hospitalizado: signos, notas de enfermería, limpieza de cama, consumo de insumos. |
