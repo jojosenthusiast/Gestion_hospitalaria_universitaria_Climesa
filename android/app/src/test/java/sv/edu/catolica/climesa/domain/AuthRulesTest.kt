@@ -9,6 +9,15 @@ class AuthRulesTest {
         assertTrue(AuthRules.validate("admin@climesa.test", "Segura#2026").isEmpty())
     }
 
+    @Test fun acceptsDemoEmailWithoutDomainDot() {
+        assertTrue(AuthRules.validate("enf@climesa", "Segura#2026").isEmpty())
+    }
+
+    @Test fun rejectsEmailWithSpacesOrTwoAtSigns() {
+        assertEquals("Ingresa un correo válido.", AuthRules.validate("enf @climesa", "Segura#2026")["email"])
+        assertEquals("Ingresa un correo válido.", AuthRules.validate("a@b@climesa", "Segura#2026")["email"])
+    }
+
     @Test fun rejectsInvalidEmailAndShortPassword() {
         val errors = AuthRules.validate("correo-invalido", "123")
         assertEquals("Ingresa un correo válido.", errors["email"])
