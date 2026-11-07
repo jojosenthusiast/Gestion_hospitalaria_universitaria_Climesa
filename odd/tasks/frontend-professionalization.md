@@ -12,8 +12,8 @@ Validación: el usuario ejecutará todas las pruebas; el trabajo nuevo se report
 7. **S7.** “no quiero que tu hagas las pruebas yo las hare”
 
 ## Tasks
-- [ ] **T1 · S1-S5, S7 · Android UI foundations and existing screens** · Route: parent fallback (`gentle-ai-worker` unavailable: `invalid-published-state`) · Commit: not authorized · Status: awaiting user verification
-  - Structural readback only: shared UI primitives, semantic navigation icons, adaptive forms/actions, rounded cards and subtle content-size motion applied; executable verification deferred to the user per S7.
+- [x] **T1 · S1-S5, S7 · Android UI foundations and existing screens** · Route: parent fallback (`gentle-ai-worker` unavailable: `invalid-published-state`) · Commit: `6d1b069` plus corrective follow-up
+  - Verified after user reported the compiler failure: RED `Unresolved reference 'heightIn'`; GREEN `testDebugUnitTest assembleDebug` with the Render API property, `BUILD SUCCESSFUL` (52 tasks). Physical role walkthrough remains tracked separately.
 - [x] **T2 · S1-S5, S7 · Web UI foundations and existing screens** · Route: `gentle-ai-worker` · Commit: not authorized
   - Verified after user authorization: Vite HTTP 200; focused navigation/personnel-detail tests 48/48; full Web suite 143/143; production build successful.
 - [x] **T3 · S4, S6-S7 · Structural reconciliation and role-flow handoff** · Route: parent readback + read-only independent inspection · Commit: not authorized
@@ -25,3 +25,4 @@ Validación: el usuario ejecutará todas las pruebas; el trabajo nuevo se report
 - **L3.** Exploration scoped the change to behavior-preserving presentation: polish existing implemented screens and existing maquetas; do not add endpoints, permissions, destinations, validations, or business actions.
 - **L4.** Independent static inspection found non-scrollable Android drawers, 14sp body text and intermediate-width Web table clipping risk; all three were corrected. Compilation and manual visual validation remain explicitly assigned to the user.
 - **L5.** User later requested Web verification. RED: 11/143 tests failed because the visual “Próximo” badge polluted menu text and the loading title lost its ellipsis. GREEN: both regressions corrected; focused tests 48/48, full suite 143/143, Vite HTTP 200 and production build successful.
+- **L6.** User ran Android verification and reported `ShiftPlanningScreen.kt:141:65 Unresolved reference 'heightIn'`. Adding the missing layout import produced GREEN: `testDebugUnitTest assembleDebug` completed `BUILD SUCCESSFUL` with 52 tasks. The S24 Ultra role walkthrough remains pending.
