@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Upcoming
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,21 +24,17 @@ import sv.edu.catolica.climesa.domain.Maquetas
 @Composable
 fun MaquetaContent(maqueta: Maqueta) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        AssistChip(onClick = {}, label = { Text(Maquetas.LABEL) }, enabled = false)
-        Text(maqueta.title, style = MaterialTheme.typography.headlineSmall)
-        Text(maqueta.purpose, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AssistChip(onClick = {}, label = { Text(Maquetas.LABEL) }, leadingIcon = { Icon(Icons.Default.Upcoming, null) }, enabled = false)
+        SectionIntro("Próxima entrega", maqueta.title, maqueta.purpose)
         maqueta.rows.forEach { row ->
-            Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(0.dp), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(row.label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ClimesaCard {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(row.label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Text(row.value, style = MaterialTheme.typography.bodyLarge)
                 }
             }
-            HorizontalDivider()
         }
-        maqueta.actions.forEach { action ->
-            Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text(action) }
-        }
-        Text(Maquetas.NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        maqueta.actions.forEach { action -> ClimesaButton(action, Icons.Default.Lock, {}, enabled = false, outlined = true) }
+        AnimatedVisibility(visible = true) { InlineStatus(Maquetas.NOTE, Icons.Default.Lock) }
     }
 }

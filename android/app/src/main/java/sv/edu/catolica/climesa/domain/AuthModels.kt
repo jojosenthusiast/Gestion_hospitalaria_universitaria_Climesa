@@ -48,41 +48,92 @@ object RoleAccess {
  * Secciones de la navegación inferior. Cada una exige un permiso de `/auth/me` (regla 8: se pregunta por permiso,
  * no por rol). `ready` indica si la sección ya tiene pantalla; las demás muestran "Próxima entrega".
  */
-enum class AndroidSection(val label: String, val permission: String, val ready: Boolean) {
-    HOME("Inicio", "sesion.perfil", true),
-    PATIENTS("Pacientes", "pacientes.buscar", true),
-    QUEUE("Fila", "fila.ver", false),
-    BEDS("Camas", "camas.ver_tablero", true),
-    CONSULTATIONS("Consultas", "consulta.iniciar", false),
-    SHIFTS("Mis turnos", "turnos.ver", true),
-    PLANNING("Planificación", "turnos.planificar", true),
-    STAFF("Personal", "personal.ver", true),
-    LAB("Laboratorio", "laboratorio.ver_cola", false),
-    APPOINTMENTS("Citas", "citas.ver", false),
-    APPOINTMENT_REQUEST("Pedir cita", "citas.solicitar", false),
-    RESULTS("Resultados", "resultados.ver", false),
-    AMBULANCE_REQUEST("Ambulancia", "ambulancia.solicitar", false),
-    UNIT("Unidad", "ambulancia.ver_estado", true),
-    SERVICE("Servicio", "ambulancia.operar", false),
-    LOG("Bitácora", "ambulancia.ver_bitacora", false),
-    PROFILE("Perfil", "sesion.perfil", true),
+enum class AndroidSection(val screenId: String, val label: String, val permission: String, val ready: Boolean) {
+    HOME("A04", "Inicio", "sesion.perfil", true),
+    PATIENT_QUEUE("A05", "Mi turno", "fila.ver", false),
+    MY_APPOINTMENTS("A06", "Mis citas", "citas.ver", false),
+    RESULTS("A07", "Mis exámenes", "resultados.ver", false),
+    HISTORY("A08", "Mi historial", "expediente.ver", false),
+    AMBULANCE_REQUEST("A09", "Pedir ambulancia", "ambulancia.solicitar", false),
+    HOSPITAL_INFO("A10", "Hospital", "sesion.perfil", false),
+    MY_ACCESS("A11", "Quién vio mi expediente", "auditoria.mis_accesos", false),
+    PROFILE("A12", "Perfil", "sesion.perfil", true),
+    MEDICAL_DAY("A20", "Mi día", "consulta.iniciar", false),
+    CONSULTATIONS("A21", "Consulta", "consulta.iniciar", false),
+    RECORD("A22", "Expediente", "expediente.ver", false),
+    RESULT_REVIEW("A23", "Resultados por revisar", "laboratorio.revisar", false),
+    HOSPITALIZED("A24", "Mis hospitalizados", "admision.ver", false),
+    AMBULANCE_ARRIVAL("A25", "Llegada de ambulancia", "ambulancia.recibir_prehospital", false),
+    SHIFTS("A26", "Mis turnos", "turnos.ver", true),
+    PATIENTS("A30", "Pacientes", "pacientes.buscar", true),
+    QUEUE("A31", "Emitir número", "fila.emitir", false),
+    APPOINTMENTS("A32", "Citas", "citas.ver", false),
+    LINKING("A33", "Vinculaciones", "cuentas.verificar", false),
+    ADMISSION("A34", "Admisión y cama", "admision.crear", false),
+    BEDS("A35", "Tablero de camas", "camas.ver_tablero", true),
+    DISPATCH("A36", "Despacho", "ambulancia.despachar", false),
+    ASSISTANT_STATION("A40", "Mi consultorio", "fila.llamar", false),
+    VITAL_SIGNS("A41", "Signos vitales", "signos.registrar", false),
+    WARD("A50", "Mi planta", "admision.ver", false),
+    INPATIENT_CARE("A51", "Paciente hospitalizado", "enfermeria.registrar", false),
+    CLEANING("A52", "Limpieza de camas", "camas.registrar_limpieza", false),
+    SUPPLIES("A53", "Consumo de insumos", "inventario.mover", false),
+    AMBULANCE_RECEPTION("A54", "Recepción de ambulancia", "ambulancia.recibir_prehospital", false),
+    LAB("A60", "Laboratorio", "laboratorio.ver_cola", false),
+    SAMPLE("A61", "Toma de muestra", "laboratorio.procesar", false),
+    CAPTURE_RESULTS("A62", "Captura de resultados", "laboratorio.procesar", false),
+    UNIT("A70", "Unidad", "ambulancia.ver_estado", true),
+    SERVICE("A71", "Servicio", "ambulancia.operar", false),
+    PREHOSPITAL_REPORT("A72", "Reporte prehospital", "ambulancia.reportar_prehospital", false),
+    UNIDENTIFIED_PATIENT("A73", "Paciente sin identidad", "pacientes.registrar_provisional", false),
+    LOG("A74", "Mi bitácora", "ambulancia.ver_bitacora", false),
+    PLANNING("", "Planificación", "turnos.planificar", true),
+    STAFF("", "Personal", "personal.ver", true),
 }
 
 object AndroidSections {
-    private val ambulanceCrew = listOf(AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.PROFILE)
+    private val roleCatalog = mapOf(
+        "JOP" to listOf(AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "REC" to listOf(AndroidSection.PATIENTS, AndroidSection.QUEUE, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "AST" to listOf(AndroidSection.ASSISTANT_STATION, AndroidSection.VITAL_SIGNS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "ENF" to listOf(AndroidSection.WARD, AndroidSection.VITAL_SIGNS, AndroidSection.INPATIENT_CARE, AndroidSection.CLEANING, AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "MED" to listOf(AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.RECORD, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "LAB" to listOf(AndroidSection.LAB, AndroidSection.SAMPLE, AndroidSection.CAPTURE_RESULTS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "PAR" to listOf(AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "PAC" to listOf(AndroidSection.HOME, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
+    )
 
     /**
-     * Quien opera la ambulancia (`ambulancia.operar`) trabaja en campo: ve Unidad, Servicio, Bitácora y Perfil
-     * (spec 121, escenario 1) y los permisos que le falten no se muestran. El resto ve cada sección cuyo permiso tenga.
+     * Permissions remain the security source of truth. The role catalog only prevents the UI from exposing a
+     * destination that does not exist for that role in `pantallas.csv`.
      */
-    fun visible(permissions: Collection<String>): List<AndroidSection> {
-        if (AndroidSection.SERVICE.permission in permissions) return ambulanceCrew.filter { it.permission in permissions }
-        return AndroidSection.entries.filter { if (it == AndroidSection.PLANNING) ShiftPlanning.canView(permissions) else it.permission in permissions }
+    fun visible(role: String, permissions: Collection<String>): List<AndroidSection> =
+        roleCatalog[role].orEmpty().filter { it.permission in permissions }
+
+    /** Without a destination beyond Home and Profile, the role has no operational Android flow. */
+    fun hasAppScreens(role: String, permissions: Collection<String>) =
+        visible(role, permissions).any { it != AndroidSection.HOSPITAL_INFO && it != AndroidSection.PROFILE }
+}
+
+enum class AndroidNavigationMode { BOTTOM_BAR, RAIL, DRAWER }
+
+data class CompactNavigation(
+    val primary: List<AndroidSection>,
+    val overflow: List<AndroidSection>,
+)
+
+object AndroidNavigationPolicy {
+    fun mode(widthDp: Int) = when {
+        widthDp >= 840 -> AndroidNavigationMode.DRAWER
+        widthDp >= 600 -> AndroidNavigationMode.RAIL
+        else -> AndroidNavigationMode.BOTTOM_BAR
     }
 
-    /** Sin ninguna pantalla más allá de Inicio y Perfil, el rol no usa Android. */
-    fun hasAppScreens(permissions: Collection<String>) =
-        visible(permissions).any { it != AndroidSection.HOME && it != AndroidSection.PROFILE }
+    fun compact(sections: List<AndroidSection>): CompactNavigation {
+        if (sections.size <= 5) return CompactNavigation(sections, emptyList())
+        val primary = sections.take(4)
+        return CompactNavigation(primary, sections.drop(primary.size))
+    }
 }
 object RegistrationRules {
     fun validate(name: String, email: String, password: String, confirmation: String): Map<String,String> = buildMap {

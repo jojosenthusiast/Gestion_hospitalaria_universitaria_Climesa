@@ -20,27 +20,18 @@ object Maquetas {
     const val NOTE = "Datos ficticios. Esta pantalla no consulta la API."
 
     private val catalog: Map<AndroidSection, Maqueta> = mapOf(
-        AndroidSection.QUEUE to Maqueta(
+        AndroidSection.PATIENT_QUEUE to Maqueta(
             "A05", "Mi turno en fila", "Seguir mi número",
             listOf(MaquetaRow("Mi número", "C-014"), MaquetaRow("Turnos antes que yo", "3"), MaquetaRow("Consultorio", "Se muestra al ser llamado")),
             emptyList(),
         ),
-        AndroidSection.APPOINTMENTS to Maqueta(
+        AndroidSection.MY_APPOINTMENTS to Maqueta(
             "A06", "Mis citas", "Ver, pedir y cancelar",
             listOf(
                 MaquetaRow("Próxima", "Ejemplo Rivas · Medicina general · 04/11/2026 09:30"),
                 MaquetaRow("Pasada", "Ejemplo Castro · Laboratorio · 12/10/2026 08:00"),
             ),
             listOf("Pedir cita", "Cancelar cita"),
-        ),
-        AndroidSection.APPOINTMENT_REQUEST to Maqueta(
-            "A06", "Pedir cita", "Elegir médico o especialidad, fecha y horario libre",
-            listOf(
-                MaquetaRow("Médico o especialidad", "Medicina general"),
-                MaquetaRow("Fecha", "05/11/2026"),
-                MaquetaRow("Horarios libres", "08:00 · 08:30 · 10:15"),
-            ),
-            listOf("Solicitar cita"),
         ),
         AndroidSection.RESULTS to Maqueta(
             "A07", "Mis exámenes", "Estado de cada examen; el valor aparece cuando el médico lo revisa",
@@ -97,5 +88,13 @@ object Maquetas {
         ),
     )
 
-    fun of(section: AndroidSection): Maqueta? = catalog[section]
+    fun of(section: AndroidSection): Maqueta? = catalog[section] ?: section.takeIf { !it.ready && it.screenId.isNotBlank() }?.let {
+        Maqueta(
+            screen = it.screenId,
+            title = it.label,
+            purpose = "Destino catalogado para este rol",
+            rows = listOf(MaquetaRow("Estado", "Disponible en una próxima entrega")),
+            actions = emptyList(),
+        )
+    }
 }
