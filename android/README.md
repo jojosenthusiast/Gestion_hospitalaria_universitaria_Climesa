@@ -13,7 +13,7 @@ Las URL se leen como propiedades de Gradle (`app/build.gradle.kts`), no de `loca
 
 | Propiedad | Secreta | Valor por defecto / de dónde sale |
 |---|---|---|
-| `CLIMESA_API_BASE_URL` | No | Debug: `http://10.0.2.2:3000/api/v1` (la API de tu computadora vista desde el emulador). Teléfono físico o Release: URL HTTPS de la API |
+| `CLIMESA_API_BASE_URL` | No | Debug: `https://sghu-api.onrender.com/api/v1` (entorno demo, funciona en emulador y teléfono). Para la API de tu computadora: `http://10.0.2.2:3000/api/v1` en el emulador. Release: URL HTTPS de la API |
 | `CLIMESA_SUPABASE_URL` | No | Opcional: solo si cambia el proyecto de Supabase |
 | `CLIMESA_SUPABASE_PUBLISHABLE_KEY` | No | Opcional: solo si cambia el proyecto de Supabase |
 
@@ -22,7 +22,7 @@ Nunca pongas una clave `service_role` ni secreta en la app. El archivo `local.pr
 ## Ejecutar
 
 1. Abre la carpeta `android/` (no la raíz del repositorio) en Android Studio y espera la sincronización de Gradle.
-2. Inicia la API en tu computadora.
+2. Solo si vas a usar la API de tu computadora, iníciala; con el entorno demo no hace falta.
 3. Ejecuta la configuración `app` en un emulador, o por consola:
 
 ```sh
@@ -41,4 +41,4 @@ La APK queda en `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Entorno demo
 
-Para usar el entorno desplegado, define `CLIMESA_API_BASE_URL` con la URL de la API indicada en el [README raíz](../README.md#entorno-demo-en-la-nube). Las contraseñas de las cuentas de demostración no están en el repositorio.
+Debug usa por defecto el entorno desplegado (`https://sghu-api.onrender.com/api/v1`), así que la app funciona al instalarla con una cuenta de demostración. Para usar la API local define `CLIMESA_API_BASE_URL=http://10.0.2.2:3000/api/v1` (emulador) o la URL de la API de la tabla del [README raíz](../README.md#entorno-demo-en-la-nube). Las contraseñas de las cuentas de demostración no están en el repositorio.

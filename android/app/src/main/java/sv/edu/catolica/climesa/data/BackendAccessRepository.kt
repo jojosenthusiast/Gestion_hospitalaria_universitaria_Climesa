@@ -10,7 +10,7 @@ class BackendAccessRepository(private val apiBaseUrl:String) {
     suspend fun profile(session:AuthSession):AccessProfile=withContext(Dispatchers.IO) {
         if(apiBaseUrl.isBlank())throw AuthRequestException("Configura la API de CLIMESA para verificar los permisos.")
         val c=(URL(apiBaseUrl.trimEnd('/')+"/auth/me").openConnection() as HttpURLConnection).apply {
-            useCaches=false;requestMethod="GET";connectTimeout=15000;readTimeout=20000;setRequestProperty("Accept","application/json");setRequestProperty("Authorization","Bearer ${session.accessToken}")
+            useCaches=false;requestMethod="GET";connectTimeout=20_000;readTimeout=60_000;setRequestProperty("Accept","application/json");setRequestProperty("Authorization","Bearer ${session.accessToken}")
         }
         try {
             val status=c.responseCode
@@ -21,6 +21,6 @@ class BackendAccessRepository(private val apiBaseUrl:String) {
             val permissions=json.optJSONArray("permissions")?.let{a->(0 until a.length()).map{a.getJSONObject(it).getString("code")}}?:emptyList()
             if(strings("roles").isEmpty()||"sesion.perfil" !in permissions)throw AuthRequestException("La cuenta no tiene permisos vigentes.",403)
             AccessProfile(roles=strings("roles"),permissions=permissions,verifiedByBackend=true,platforms=strings("platforms"),channels=strings("channels"),name=json.optString("name"))
-        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("No se pudo verificar el acceso. Revisa la conexión e intenta de nuevo.")} finally {c.disconnect()}
+        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("No pudimos conectar con ${apiHostLabel(apiBaseUrl)}. Revisa la conexión e intenta de nuevo.")} finally {c.disconnect()}
     }
 }

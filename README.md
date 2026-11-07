@@ -173,7 +173,7 @@ cd android
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-En Windows: `.\gradlew.bat testDebugUnitTest assembleDebug`. Para un dispositivo o Release configura `CLIMESA_API_BASE_URL` con la URL HTTPS del backend. Los roles móviles son REC, AST, ENF, MED, LAB, PAR y PAC. Recepción consume los pacientes remotos; enfermería consulta camas y medicina sus turnos publicados. Los módulos de semanas posteriores muestran su estado pendiente.
+En Windows: `.\gradlew.bat testDebugUnitTest assembleDebug`. Debug apunta al entorno demo de la nube, así que funciona en emulador y teléfono sin montar la API; para la API de tu computadora define `CLIMESA_API_BASE_URL=http://10.0.2.2:3000/api/v1`. Los roles móviles son REC, AST, ENF, MED, LAB, PAR y PAC. Recepción consume los pacientes remotos; enfermería consulta camas y medicina sus turnos publicados. Los módulos de semanas posteriores muestran su estado pendiente.
 
 ## iOS
 

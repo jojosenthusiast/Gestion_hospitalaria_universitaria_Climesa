@@ -12,7 +12,9 @@ val climesaSupabaseUrl = providers.gradleProperty("CLIMESA_SUPABASE_URL")
     .getOrElse("https://gvmvmrusscsfbndnbvbr.supabase.co")
 val climesaSupabasePublishableKey = providers.gradleProperty("CLIMESA_SUPABASE_PUBLISHABLE_KEY")
     .getOrElse("sb_publishable_7gL_lw2MMSwIFf_0nmHDzA_ILdkTI1T")
-val climesaApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("http://10.0.2.2:3000/api/v1")
+// Debug apunta al entorno demo desplegado para que la app funcione al instalarla sin montar la API
+// local. Para usar la API de tu computadora: -PCLIMESA_API_BASE_URL=http://10.0.2.2:3000/api/v1
+val climesaApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("https://sghu-api.onrender.com/api/v1")
 
 android {
     namespace = "sv.edu.catolica.climesa"
