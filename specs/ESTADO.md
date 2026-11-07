@@ -2,7 +2,7 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 42 de 131 (32%) · **Requisitos:** 221 · **Specs:** 20
+**Tareas:** 43 de 131 (32%) · **Requisitos:** 221 · **Specs:** 20
 
 ## Por spec
 
@@ -24,7 +24,7 @@
 | [113 Métricas y tablero](./113-metricas-tablero/spec.md) | En revisión | 5/1/0 | 0/4 | ░░░░░░░░░░ |
 | [114 Avisos y alarmas](./114-avisos-alarmas/spec.md) | En revisión | 6/4/0 | 0/3 | ░░░░░░░░░░ |
 | [120 Cliente web](./120-cliente-web/spec.md) | En revisión | 10/0/0 | 3/5 | ██████░░░░ |
-| [121 Cliente Android](./121-cliente-android/spec.md) | En revisión | 6/2/0 | 0/6 | ░░░░░░░░░░ |
+| [121 Cliente Android](./121-cliente-android/spec.md) | En revisión | 6/2/0 | 1/6 | ██░░░░░░░░ |
 | [122 Cliente iOS](./122-cliente-ios/spec.md) | En revisión | 6/1/0 | 0/5 | ░░░░░░░░░░ |
 | [130 Calidad y pruebas de concurrencia](./130-calidad-concurrencia/spec.md) | En revisión | 6/0/0 | 1/6 | ██░░░░░░░░ |
 | [131 Documentación y entrega](./131-documentacion-entrega/spec.md) | En revisión | 5/1/0 | 1/6 | ██░░░░░░░░ |
@@ -34,7 +34,7 @@
 | Semana | Fechas | R hechas | E hechas | Total |
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
-| S2 | 24 a 30 oct | 24/36 | 1/1 | ███████░░░ |
+| S2 | 24 a 30 oct | 25/36 | 1/1 | ███████░░░ |
 | S3 | 31 oct a 6 nov | 3/29 | 0/0 | █░░░░░░░░░ |
 | S4 | 7 a 13 nov | 0/22 | 0/0 | ░░░░░░░░░░ |
 | S5 | 14 a 20 nov | 0/8 | 2/23 | █░░░░░░░░░ |
@@ -79,7 +79,7 @@
 - [x] 120-T01 · Proyecto React con TypeScript, rutas, ingreso con Supabase y despliegue
 - [x] 120-T02 · Navegación por rol desde `/me`, estados comunes y cliente de API generado
 - [x] 120-T03 · Suscripción a Realtime con invalidación y reconexión
-- [ ] 121-T01 · Proyecto Gradle con Compose, Hilt, red y pantalla de ingreso
+- [x] 121-T01 · Proyecto Gradle con Compose, Hilt, red y pantalla de ingreso
 - [ ] 121-T02 · Navegación por rol y maquetación de las pantallas principales de cada rol
 - [ ] 121-T03 · Repositorio de Realtime e invalidación en ViewModels
 - [ ] 122-T01 · Proyecto Xcode con SwiftUI, paquetes y pantalla de ingreso

@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="login_brand">climesa</string>
+    <string name="login_brand_subtitle">Hospital universitario</string>
+    <string name="login_section">ACCESO A CLIMESA</string>
+    <string name="login_welcome">Hola de nuevo.</string>
+    <string name="login_prompt">Ingresa con tu cuenta institucional.</string>
+    <string name="login_email">Correo electrónico</string>
+    <string name="login_password">Contraseña</string>
+    <string name="login_show_password">Mostrar contraseña</string>
+    <string name="login_hide_password">Ocultar contraseña</string>
+    <string name="login_submit">Iniciar sesión</string>
+    <string name="login_checking">Verificando…</string>
+    <string name="login_first_time">¿Primera vez aquí?</string>
+    <string name="login_staff_help">El personal ingresa con una invitación del hospital.</string>
+    <string name="login_register_patient">Crear cuenta de paciente</string>
+    <string name="login_tagline">Tu espacio de trabajo.</string>
     <string name="camas_titulo">Camas.</string>
     <string name="camas_vacio">No hay camas disponibles en esta vista.</string>
     <string name="camas_reintentar">Volver a intentar</string>

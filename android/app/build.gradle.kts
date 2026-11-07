@@ -1,4 +1,10 @@
-plugins { id("com.google.dagger.hilt.android"); id("org.jetbrains.kotlin.kapt"); id("com.android.application"); id("org.jetbrains.kotlin.android"); id("org.jetbrains.kotlin.plugin.compose") }
+plugins {
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+}
 
 fun buildConfigString(value: String) = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
@@ -6,7 +12,9 @@ val climesaSupabaseUrl = providers.gradleProperty("CLIMESA_SUPABASE_URL")
     .getOrElse("https://gvmvmrusscsfbndnbvbr.supabase.co")
 val climesaSupabasePublishableKey = providers.gradleProperty("CLIMESA_SUPABASE_PUBLISHABLE_KEY")
     .getOrElse("sb_publishable_7gL_lw2MMSwIFf_0nmHDzA_ILdkTI1T")
-val climesaApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("http://10.0.2.2:3000/api/v1")
+// Debug apunta al entorno demo desplegado para que la app funcione al instalarla sin montar la API
+// local. Para usar la API de tu computadora: -PCLIMESA_API_BASE_URL=http://10.0.2.2:3000/api/v1
+val climesaApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("https://sghu-api.onrender.com/api/v1")
 
 android {
     namespace = "sv.edu.catolica.climesa"
@@ -33,19 +41,19 @@ android {
 }
 kapt { correctErrorTypes = true }
 dependencies {
-    implementation("com.google.dagger:hilt-android:2.57.1")
-    kapt("com.google.dagger:hilt-android-compiler:2.57.1")
-    implementation(platform("androidx.compose:compose-bom:2025.04.01"))
-    implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
-    testImplementation("org.json:json:20240303")
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.okhttp)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.json)
 }

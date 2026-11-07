@@ -1,4 +1,5 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile } from '../lib/api';
 import permisosCsv from '../../../docs/arquitectura/datos/permisos.csv?raw';
@@ -95,6 +96,22 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
       }
     });
   }
+
+  it('el drawer móvil gestiona foco y Escape sin perder la ruta activa', async () => {
+    const nav = await entrar(perfil('JOP'));
+    expect(nav.classList.contains('shell-sidebar')).toBe(true);
+    const inicio = within(nav).getByRole('link', { name: 'Inicio' });
+    expect(inicio.getAttribute('aria-current')).toBe('page');
+    const abrir = screen.getByRole('button', { name: 'Abrir navegación' });
+    expect(abrir.getAttribute('aria-expanded')).toBe('false');
+    await userEvent.click(abrir);
+    expect(screen.getByRole('button', { name: 'Cerrar navegación' }).getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(inicio);
+    await userEvent.keyboard('{Escape}');
+    const restaurado = screen.getByRole('button', { name: 'Abrir navegación' });
+    expect(restaurado.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(restaurado);
+  });
 
   it('el laboratorista ve lo que el catálogo le da: Pacientes, Turnos, Laboratorio e Inventario', async () => {
     const nav = await entrar(perfil('LAB'));

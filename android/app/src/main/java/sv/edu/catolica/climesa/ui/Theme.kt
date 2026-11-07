@@ -12,52 +12,56 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import sv.edu.catolica.climesa.R
 
-internal val BrandBlue = Color(0xFF2E49E6)
-internal val BrandNavy = Color(0xFF171B2D)
-internal val BrandLime = Color(0xFFDCED83)
+internal val BrandBlue = Color(0xFF0043B2)
+internal val BrandNavy = Color(0xFF0E1B33)
+internal val BrandAccent = Color(0xFFE6EEFB)
+internal val StateFree = Color(0xFF1D7444)
 internal val ClimesaSans = FontFamily(
-    Font(R.font.dm_sans_regular, FontWeight.Normal),
-    Font(R.font.dm_sans_medium, FontWeight.Medium),
-    Font(R.font.dm_sans_semibold, FontWeight.SemiBold),
-    Font(R.font.dm_sans_bold, FontWeight.Bold),
+    Font(R.font.atkinson_hyperlegible_next, FontWeight.Normal),
+    Font(R.font.atkinson_hyperlegible_next, FontWeight.Medium),
+    Font(R.font.atkinson_hyperlegible_next, FontWeight.SemiBold),
+    Font(R.font.atkinson_hyperlegible_next, FontWeight.Bold),
 )
 internal val ClimesaMono = FontFamily(
-    Font(R.font.ibm_plex_mono_regular, FontWeight.Normal),
-    Font(R.font.ibm_plex_mono_medium, FontWeight.Medium),
+    Font(R.font.atkinson_hyperlegible_mono, FontWeight.Normal),
+    Font(R.font.atkinson_hyperlegible_mono, FontWeight.Medium),
+    Font(R.font.atkinson_hyperlegible_mono, FontWeight.Bold),
 )
 private val Light = lightColorScheme(
     primary = BrandBlue, onPrimary = Color.White,
-    primaryContainer = Color(0xFFEEF0FF), onPrimaryContainer = Color(0xFF2339BA),
-    background = Color(0xFFF6F5F1), surface = Color.White,
+    primaryContainer = Color(0xFFE6EEFB), onPrimaryContainer = BrandNavy,
+    secondary = Color(0xFF1F55A3), onSecondary = Color.White,
+    background = Color(0xFFF2F5F9), surface = Color.White,
     onBackground = BrandNavy, onSurface = BrandNavy,
-    onSurfaceVariant = Color(0xFF6B6C7C), outline = Color(0xFFB8BBC9),
-    outlineVariant = Color(0xFFDCDCE2), surfaceVariant = Color(0xFFF0F0F6),
-    error = Color(0xFFAA2C3B), errorContainer = Color(0xFFFFF0F1),
+    onSurfaceVariant = Color(0xFF55617A), outline = Color(0xFF55617A),
+    outlineVariant = Color(0xFFD3DBE6), surfaceVariant = Color(0xFFE6EEFB),
+    error = Color(0xFFB71C1C), errorContainer = Color(0xFFFCEAEA),
 )
 private val Dark = darkColorScheme(
-    primary = Color(0xFFA8B5FF), onPrimary = Color(0xFF192464),
-    primaryContainer = Color(0xFF263377), onPrimaryContainer = Color(0xFFD9DFFF),
-    background = Color(0xFF101320), surface = BrandNavy,
-    onBackground = Color(0xFFE9EAF2), onSurface = Color(0xFFE9EAF2),
-    onSurfaceVariant = Color(0xFFA8ADC4), outline = Color(0xFF626A89),
-    outlineVariant = Color(0xFF343B58), surfaceVariant = Color(0xFF20263D),
-    error = Color(0xFFFFB2BB), errorContainer = Color(0xFF45242C),
+    primary = Color(0xFF1D4FB8), onPrimary = Color.White,
+    primaryContainer = Color(0xFF18284A), onPrimaryContainer = Color(0xFF8DB3FA),
+    secondary = Color(0xFF8CB2F0), onSecondary = Color(0xFF0C1220),
+    background = Color(0xFF0C1220), surface = Color(0xFF141C2D),
+    onBackground = Color(0xFFE4EAF3), onSurface = Color(0xFFE4EAF3),
+    onSurfaceVariant = Color(0xFF9AA6BA), outline = Color(0xFF9AA6BA),
+    outlineVariant = Color(0xFF28344C), surfaceVariant = Color(0xFF18284A),
+    error = Color(0xFFF2918A), errorContainer = Color(0xFF3A1A17),
 )
 private val Type = Typography(
-    displaySmall = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.SemiBold, fontSize = 44.sp, lineHeight = 47.sp, letterSpacing = (-1.8).sp),
-    headlineLarge = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.SemiBold, fontSize = 38.sp, lineHeight = 42.sp, letterSpacing = (-1.4).sp),
-    headlineMedium = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.SemiBold, fontSize = 30.sp, lineHeight = 35.sp, letterSpacing = (-1).sp),
-    headlineSmall = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.Medium, fontSize = 26.sp, lineHeight = 31.sp, letterSpacing = (-0.7).sp),
-    titleLarge = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, lineHeight = 29.sp, letterSpacing = (-0.7).sp),
-    titleMedium = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 23.sp),
-    bodyLarge = TextStyle(fontFamily = ClimesaSans, fontSize = 16.sp, lineHeight = 25.sp),
-    bodyMedium = TextStyle(fontFamily = ClimesaSans, fontSize = 14.sp, lineHeight = 22.sp),
-    bodySmall = TextStyle(fontFamily = ClimesaSans, fontSize = 12.sp, lineHeight = 19.sp),
-    labelLarge = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
-    labelMedium = TextStyle(fontFamily = ClimesaMono, fontSize = 11.sp, lineHeight = 17.sp),
-    labelSmall = TextStyle(fontFamily = ClimesaMono, fontSize = 10.sp, lineHeight = 16.sp),
+    displaySmall = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 37.sp, letterSpacing = (-.6).sp),
+    headlineLarge = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-.4).sp),
+    headlineMedium = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 30.sp),
+    headlineSmall = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
+    titleLarge = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 25.sp),
+    titleMedium = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 23.sp),
+    bodyLarge = TextStyle(fontFamily = ClimesaSans, fontSize = 16.sp, lineHeight = 24.sp),
+    bodyMedium = TextStyle(fontFamily = ClimesaSans, fontSize = 16.sp, lineHeight = 24.sp),
+    bodySmall = TextStyle(fontFamily = ClimesaSans, fontSize = 16.sp, lineHeight = 23.sp),
+    labelLarge = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
+    labelMedium = TextStyle(fontFamily = ClimesaMono, fontSize = 13.sp, lineHeight = 18.sp),
+    labelSmall = TextStyle(fontFamily = ClimesaMono, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 17.sp),
 )
 @Composable fun ClimesaTheme(dark: Boolean, content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = if (dark) Dark else Light, typography = Type,
-        shapes = Shapes(extraSmall = RoundedCornerShape(0.dp), small = RoundedCornerShape(3.dp), medium = RoundedCornerShape(3.dp), large = RoundedCornerShape(4.dp), extraLarge = RoundedCornerShape(8.dp)), content = content)
+        shapes = Shapes(extraSmall = RoundedCornerShape(6.dp), small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(10.dp), large = RoundedCornerShape(16.dp), extraLarge = RoundedCornerShape(16.dp)), content = content)
 }

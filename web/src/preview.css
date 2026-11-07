@@ -1,18 +1,25 @@
-.preview-shell { min-height: 100vh; background: #e5e5ed; }
-.preview-toolbar { display: flex; align-items: center; gap: 24px; padding: 18px 28px; background: white; border-bottom: 1px solid #cfd0da; flex-wrap: wrap; }
-.preview-toolbar>.brand { margin-right: 5px; }
-.preview-toolbar>span { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: #6b6c7c; }
-.preview-toolbar select { margin-left: auto; max-width: 100%; padding: 10px 14px; background: white; border: 1px solid #c0c2d1; color: #171b2d; }
-.preview-switch { display: flex; gap: 4px; background: #f0f0f6; padding: 3px; }
-.preview-switch button { border: 0; background: transparent; color: #6b6c7c; padding: 10px 12px; font-size: 12px; }
-.preview-switch button[aria-pressed=true] { background: #2e49e6; color: white; }
-.preview-description { padding: 17px 28px; font-size: 11px; color: #6b6c7c; line-height: 1.6; }
-.preview-stage { padding: 6px 28px 40px; display: flex; justify-content: center; overflow: auto; }
-.preview-stage iframe { border: 0; max-width: 100%; background: white; flex-shrink: 0; }
-@media(max-width:700px) {
-  .preview-toolbar { padding: 16px; gap: 14px; }
-  .preview-toolbar>span { display: none; }
-  .preview-toolbar select { margin-left: 0; width: 100%; }
-  .preview-stage { padding: 5px 0 25px; }
+.preview-shell { min-height: 100vh; background: var(--bg, #f2f5f9); color: var(--ink, #0e1b33); }
+.preview-toolbar { position: sticky; top: 0; z-index: 10; padding: 14px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; border-bottom: 1px solid var(--line, #d3dbe6); background: color-mix(in srgb, var(--surface, #ffffff) 94%, transparent); box-shadow: 0 6px 20px rgb(14 27 51 / 0.06); backdrop-filter: blur(12px); }
+.preview-toolbar > .brand { margin-right: 4px; }
+.preview-toolbar > span { color: var(--muted, #55617a); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 11px; }
+.preview-toolbar select { min-height: 44px; max-width: 100%; margin-left: auto; padding: 9px 36px 9px 12px; border: 1px solid var(--control-line, #8794aa); border-radius: var(--radius-control, 6px); background: var(--surface, #ffffff); color: var(--ink, #0e1b33); font-size: 14px; }
+.preview-switch { padding: 4px; display: flex; gap: 4px; border-radius: var(--radius-card, 10px); background: var(--soft, #e6eefb); }
+.preview-switch button { min-height: 40px; padding: 8px 12px; border: 1px solid transparent; border-radius: var(--radius-control, 6px); background: transparent; color: var(--muted, #55617a); font-size: 13px; font-weight: 700; }
+.preview-switch button:hover { color: var(--primary-text, #0043b2); }
+.preview-switch button[aria-pressed="true"] { border-color: var(--primary, #0043b2); background: var(--primary, #0043b2); color: var(--on-primary, #ffffff); box-shadow: 0 4px 12px rgb(0 67 178 / 0.16); }
+.preview-description { max-width: 80ch; padding: 16px 24px; color: var(--muted, #55617a); font-size: 13px; line-height: 1.55; }
+.preview-stage { padding: 8px 24px 40px; display: flex; justify-content: center; overflow: auto; }
+.preview-stage iframe { max-width: 100%; flex-shrink: 0; border: 1px solid var(--line, #d3dbe6); border-radius: var(--radius-card, 10px); background: var(--surface, #ffffff); box-shadow: var(--shadow-float, 0 18px 50px rgb(14 27 51 / 0.12)); }
+@media (max-width: 700px) {
+  .preview-toolbar { padding: 12px 14px; gap: 10px; }
+  .preview-toolbar > span { display: none; }
+  .preview-toolbar select { width: 100%; margin-left: 0; }
+  .preview-switch { flex: 1; }
+  .preview-switch button { flex: 1; }
+  .preview-stage { padding: 4px 0 24px; }
   .preview-description { padding: 14px 16px; }
+  .preview-stage iframe { border-inline: 0; border-radius: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-switch button { transition: none; }
 }

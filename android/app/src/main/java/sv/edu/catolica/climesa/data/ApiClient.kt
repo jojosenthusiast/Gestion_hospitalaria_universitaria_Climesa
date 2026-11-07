@@ -14,6 +14,8 @@ internal fun apiErrorMessage(body:String):String?=runCatching {
 }.getOrNull()
 /** Código estable (`codigo`) del problem+json, por ejemplo `version_conflicto`. */
 internal fun apiErrorCode(body:String):String?=runCatching{JSONObject(body).optString("codigo").takeIf{it.isNotBlank()}}.getOrNull()
+/** Servidor al que apunta la app, para los mensajes de error; nunca incluye credenciales. */
+internal fun apiHostLabel(baseUrl:String):String=runCatching{java.net.URI(baseUrl).host}.getOrNull()?.takeIf{it.isNotBlank()}?:baseUrl
 class ApiClient(private val baseUrl:String,private val auth:SupabaseAuthRepository) {
     private val attempts=ConcurrentHashMap<String,String>()
     suspend fun request(path:String,method:String="GET",body:JSONObject?=null):Any=withContext(Dispatchers.IO) {
@@ -22,7 +24,7 @@ class ApiClient(private val baseUrl:String,private val auth:SupabaseAuthReposito
         val signature=method+path+(body?.toString()?:"")
         val key=if(method!="GET")attempts.getOrPut(signature){UUID.randomUUID().toString()}else null
         val c=(URL(baseUrl.trimEnd('/')+path).openConnection() as HttpURLConnection).apply {
-            useCaches=false;requestMethod=method;connectTimeout=15000;readTimeout=20000
+            useCaches=false;requestMethod=method;connectTimeout=20_000;readTimeout=60_000
             setRequestProperty("Accept","application/json");setRequestProperty("Authorization","Bearer ${session.accessToken}")
             key?.let{setRequestProperty("Idempotency-Key",it)}
             if(body!=null){doOutput=true;setRequestProperty("Content-Type","application/json; charset=utf-8")}
@@ -34,6 +36,6 @@ class ApiClient(private val baseUrl:String,private val auth:SupabaseAuthReposito
             if(status !in 200..299){val message=apiErrorMessage(text);throw AuthRequestException(message?.takeIf{it.isNotBlank()}?:"No se pudo completar la operación (HTTP $status).",status,apiErrorCode(text))}
             attempts.remove(signature)
             if(text.isBlank())JSONObject()else JSONTokener(text).nextValue()
-        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("Sin conexión. Conservamos el formulario; vuelve a intentar.")} finally {c.disconnect()}
+        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("Sin conexión con ${apiHostLabel(baseUrl)}. Conservamos el formulario; vuelve a intentar.")} finally {c.disconnect()}
     }
 }

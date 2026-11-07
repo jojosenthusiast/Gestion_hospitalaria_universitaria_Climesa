@@ -2,14 +2,21 @@ package sv.edu.catolica.climesa.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.ToggleOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,28 +61,25 @@ fun StaffScreen(profile: AccessProfile, modifier: Modifier = Modifier) {
         return
     }
     LazyColumn(modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { SectionIntro("Equipo / CLIMESA", "Personal.", "Personal de salud registrado.") }
         item {
-            Text("Personal.", style = MaterialTheme.typography.displaySmall)
-            Text("Personal de salud registrado.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !state.showInactive, onClick = { if (state.showInactive) model.toggleInactive() }, label = { Text("Activos") })
-                FilterChip(selected = state.showInactive, onClick = { if (!state.showInactive) model.toggleInactive() }, label = { Text("Todos") })
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { FilterChip(selected = !state.showInactive, onClick = { if (state.showInactive) model.toggleInactive() }, label = { Text("Activos") }) }
+                item { FilterChip(selected = state.showInactive, onClick = { if (!state.showInactive) model.toggleInactive() }, label = { Text("Todos") }) }
             }
         }
-        if (state.canManage) item { Button(onClick = model::newMember, modifier = Modifier.fillMaxWidth()) { Text("Registrar personal") } }
+        if (state.canManage) item { ClimesaButton("Registrar personal", Icons.Default.Add, model::newMember) }
         state.message?.let { item { Text(it, color = MaterialTheme.colorScheme.primary) } }
         when {
             state.loading -> item { CircularProgressIndicator() }
             state.error != null -> item { Text(state.error!!, color = MaterialTheme.colorScheme.error) }
             state.visible.isEmpty() -> item { Text("No hay personal para mostrar con este filtro.") }
             else -> items(state.visible, key = { it.id }) { m ->
-                Surface(onClick = { model.select(m.id) }, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                ClimesaClickableCard(onClick = { model.select(m.id) }) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(m.fullName, style = MaterialTheme.typography.titleMedium)
-                        Text("${StaffRules.typeLabel(m.type)} · ${if (m.active) "Activo" else "Inactivo"}", style = MaterialTheme.typography.bodySmall)
-                        HorizontalDivider()
+                        Text(StaffRules.typeLabel(m.type), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (m.active) "● Activo" else "○ Inactivo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -88,7 +92,7 @@ private fun StaffDetail(m: StaffMember, state: StaffState, model: StaffViewModel
     var dialog by remember(m.id) { mutableStateOf(false) }
     var reason by remember(m.id) { mutableStateOf("") }
     LazyColumn(modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { TextButton(onClick = { model.select(null) }) { Text("← Volver") } }
+        item { TextButton(onClick = { model.select(null) }) { androidx.compose.material3.Icon(Icons.AutoMirrored.Filled.ArrowBack, null); Text("Volver") } }
         item {
             Text(m.fullName, style = MaterialTheme.typography.headlineMedium)
             Text(if (m.active) "Activo" else "Inactivo", color = MaterialTheme.colorScheme.primary)
@@ -98,12 +102,8 @@ private fun StaffDetail(m: StaffMember, state: StaffState, model: StaffViewModel
         if (state.canSeePersonalData) item { Text("DUI: ${m.dui ?: "Sin registrar"} · Teléfono: ${m.phone.ifBlank { "Sin registrar" }}") }
         state.formError?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         if (state.canManage) {
-            item { Button(onClick = { model.edit(m) }, modifier = Modifier.fillMaxWidth()) { Text("Editar datos") } }
-            item {
-                OutlinedButton(onClick = { dialog = true }, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (m.active) "Inactivar" else "Reactivar")
-                }
-            }
+            item { ClimesaButton("Editar datos", Icons.Default.Edit, { model.edit(m) }) }
+            item { ClimesaButton(if (m.active) "Inactivar" else "Reactivar", Icons.Default.ToggleOff, { dialog = true }, enabled = !state.saving, outlined = true) }
         }
     }
     if (dialog) AlertDialog(
@@ -126,33 +126,26 @@ private fun StaffDetail(m: StaffMember, state: StaffState, model: StaffViewModel
 private fun StaffFormView(state: StaffState, model: StaffViewModel, modifier: Modifier) {
     val form = state.form ?: return
     val d = form.draft
-    Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(if (form.editingId == null) "Nuevo personal" else "Editar personal", style = MaterialTheme.typography.titleLarge)
-        StaffField("Nombres", d.givenNames, form.fields["givenNames"], !state.saving) { model.draft(d.copy(givenNames = it.take(80))) }
-        StaffField("Apellidos", d.surnames, form.fields["surnames"], !state.saving) { model.draft(d.copy(surnames = it.take(100))) }
-        Text("Función", style = MaterialTheme.typography.labelLarge)
-        StaffRules.typeCodes.chunked(2).forEach { pair ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                pair.forEach { code ->
-                    FilterChip(selected = d.type == code, onClick = { model.draft(d.copy(type = code)) }, enabled = !state.saving, label = { Text(StaffRules.typeLabel(code)) })
-                }
+    LazyColumn(modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item { SectionIntro("Personal / CLIMESA", if (form.editingId == null) "Nuevo personal" else "Editar personal", "Los campos se adaptan al tamaño de texto y al teclado del dispositivo.") }
+        item { StaffField("Nombres", d.givenNames, form.fields["givenNames"], !state.saving) { model.draft(d.copy(givenNames = it.take(80))) } }
+        item { StaffField("Apellidos", d.surnames, form.fields["surnames"], !state.saving) { model.draft(d.copy(surnames = it.take(100))) } }
+        item { Text("Función", style = MaterialTheme.typography.labelLarge) }
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                itemsIndexed(StaffRules.typeCodes) { _, code -> FilterChip(selected = d.type == code, onClick = { model.draft(d.copy(type = code)) }, enabled = !state.saving, label = { Text(StaffRules.typeLabel(code)) }) }
             }
         }
-        StaffField("Especialidad · opcional", d.specialty, form.fields["specialty"], !state.saving) { model.draft(d.copy(specialty = it.take(120))) }
-        if (state.canSeePersonalData) {
-            StaffField("DUI · opcional", d.dui, form.fields["dui"], !state.saving) { model.draft(d.copy(dui = it.take(10))) }
+        item { StaffField("Especialidad · opcional", d.specialty, form.fields["specialty"], !state.saving) { model.draft(d.copy(specialty = it.take(120))) } }
+        if (state.canSeePersonalData) item { StaffField("DUI · opcional", d.dui, form.fields["dui"], !state.saving) { model.draft(d.copy(dui = it.take(10))) } }
+        item { StaffField("Teléfono · opcional", d.phone, form.fields["phone"], !state.saving) { model.draft(d.copy(phone = it.take(9))) } }
+        if (form.editingId != null) item {
+            OutlinedTextField(form.reason, model::reason, modifier = Modifier.fillMaxWidth(), enabled = !state.saving, label = { Text("Motivo del cambio *") }, supportingText = { Text("Mínimo ${ChangeReason.MIN} caracteres. Queda en el historial.") })
         }
-        StaffField("Teléfono · opcional", d.phone, form.fields["phone"], !state.saving) { model.draft(d.copy(phone = it.take(9))) }
-        if (form.editingId != null) {
-            OutlinedTextField(
-                form.reason, model::reason, modifier = Modifier.fillMaxWidth(), enabled = !state.saving,
-                label = { Text("Motivo del cambio *") }, supportingText = { Text("Mínimo ${ChangeReason.MIN} caracteres. Queda en el historial.") },
-            )
-        }
-        state.formError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        Button(onClick = model::save, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) { Text(if (state.saving) "Guardando…" else "Guardar") }
-        OutlinedButton(onClick = model::closeForm, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
-        Spacer(Modifier.height(24.dp))
+        state.formError?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
+        item { ClimesaButton(if (state.saving) "Guardando…" else "Guardar", Icons.Default.Save, model::save, enabled = !state.saving) }
+        item { ClimesaButton("Cancelar", Icons.AutoMirrored.Filled.ArrowBack, model::closeForm, enabled = !state.saving, outlined = true) }
+        item { Spacer(Modifier.height(24.dp)) }
     }
 }
 

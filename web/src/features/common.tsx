@@ -1,4 +1,4 @@
-import { useEffect,useRef,useState,type ReactNode } from 'react';
+import { useEffect,useId,useRef,useState,type ReactNode } from 'react';
 import { ApiError,type Api } from '../lib/api';
 import { Icon,Notice } from '../components/ui';
 export type Remote<T>={data:T|null;loading:boolean;error:ApiError|null;refresh:()=>void};
@@ -12,19 +12,19 @@ export function useAction(api:Api){
  async function run<T>(path:string,body:unknown,method='POST'):Promise<T|undefined>{setBusy(true);setError(null);try{return await api.write<T>(path,body,method);}catch(e){setError(e instanceof ApiError?e:new ApiError('No se pudo guardar.'));return undefined;}finally{setBusy(false);}}
  return {busy,error,run};
 }
-export function Heading({eyebrow,title,description,actions}:{eyebrow:string;title:string;description:string;actions?:ReactNode}){return <div className="module-heading"><div><span className="eyebrow">{eyebrow}</span><h1>{title}<span>.</span></h1><p>{description}</p></div>{actions&&<div className="heading-actions">{actions}</div>}</div>;}
+export function Heading({eyebrow,title,description,actions}:{eyebrow:string;title:string;description:string;actions?:ReactNode}){return <header className="module-heading reveal"><div><span className="eyebrow">{eyebrow}</span><h1>{title}<span>.</span></h1><p>{description}</p></div>{actions&&<div className="heading-actions">{actions}</div>}</header>;}
 export function RemoteState<T>({state,children}:{state:Remote<T>;children:(data:T)=>ReactNode}){
- if(state.loading&&!state.data)return <div className="module-state" role="status"><span className="status-spinner"/>Cargando información…</div>;
- if(state.error)return <div className="module-state"><Notice kind="error">{state.error.status===403?'Tu cuenta no tiene permiso para consultar esta sección.':state.error.message}</Notice><button className="secondary-button" onClick={state.refresh}>Volver a intentar</button></div>;
+ if(state.loading&&!state.data)return <div className="module-state module-state-loading" role="status" aria-live="polite"><span className="status-symbol"><span className="status-spinner"/></span><div><strong>Cargando información…</strong><span>Estamos preparando esta sección…</span></div></div>;
+ if(state.error)return <div className="module-state module-state-error"><Notice kind="error">{state.error.status===403?'Tu cuenta no tiene permiso para consultar esta sección.':state.error.message}</Notice><button className="secondary-button" onClick={state.refresh}><Icon name="retry" size={18}/>Volver a intentar</button></div>;
  if(!state.data)return null;
- return <>{state.loading&&<p className="refresh-hint" role="status">Actualizando…</p>}{children(state.data)}</>;
+ return <>{state.loading&&<p className="refresh-hint" role="status" aria-live="polite"><span className="spinner"/>Actualizando información…</p>}{children(state.data)}</>;
 }
-export function Empty({title,description}:{title:string;description:string}){return <div className="empty-state"><Icon name="search" size={26}/><h2>{title}</h2><p>{description}</p></div>;}
+export function Empty({title,description}:{title:string;description:string}){return <div className="empty-state" role="status"><span className="empty-state-icon"><Icon name="search" size={28}/></span><h2>{title}</h2><p>{description}</p></div>;}
 export function WriteError({error}:{error:ApiError|null}){return error?<Notice kind="error">{isVersionConflict(error)?`${error.message} Conservamos lo que escribiste; cierra y vuelve a abrir el registro para cargar su estado actual.`:error.message}</Notice>:null;}
 export function Dialog({title,onClose,busy=false,children}:{title:string;onClose:()=>void;busy?:boolean;children:ReactNode}){
- const ref=useRef<HTMLDialogElement>(null);
+ const ref=useRef<HTMLDialogElement>(null),titleId=useId();
  useEffect(()=>{const node=ref.current;node?.showModal();return()=>{node?.close();};},[]);
- return <dialog ref={ref} className="work-dialog" aria-label={title} onCancel={e=>{e.preventDefault();if(!busy)onClose();}}><header><h2>{title}</h2><button className="icon-button" type="button" aria-label="Cerrar formulario" disabled={busy} onClick={onClose}><Icon name="close"/></button></header><div className="dialog-content">{children}</div></dialog>;
+ return <dialog ref={ref} className="work-dialog" aria-labelledby={titleId} onCancel={e=>{e.preventDefault();if(!busy)onClose();}}><header><h2 id={titleId}>{title}</h2><button className="icon-button" type="button" aria-label="Cerrar formulario" disabled={busy} onClick={onClose}><Icon name="close"/></button></header><div className="dialog-content">{children}</div></dialog>;
 }
 export const formatDate=(s:string|undefined|null)=>s?new Intl.DateTimeFormat('es-SV',{timeZone:'UTC'}).format(new Date(s.length===10?s+'T12:00:00Z':s)):'Sin registrar';
 export const formatDateTime=(s:string)=>new Intl.DateTimeFormat('es-SV',{dateStyle:'medium',timeStyle:'short',timeZone:'America/El_Salvador'}).format(new Date(s));
