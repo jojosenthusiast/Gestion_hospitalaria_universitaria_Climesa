@@ -17,8 +17,8 @@ const resumen: Summary = {
   shifts: { current: 4, draft: 1 },
 };
 
-function montar(respuesta: () => Promise<unknown>, opciones: { perfil?: AccessProfile; version?: number } = {}) {
-  const api = { request: vi.fn(respuesta), write: vi.fn() };
+function montar(respuesta: (path: string) => Promise<unknown>, opciones: { perfil?: AccessProfile; version?: number } = {}) {
+  const api = { request: vi.fn((path: string) => respuesta(path)), write: vi.fn() };
   const vista = (version: number) => <Tablero api={api as unknown as Api} profile={opciones.perfil ?? perfil()} version={version} />;
   const resultado = render(vista(opciones.version ?? 0));
   return { api, cambiarVersion: (version: number) => resultado.rerender(vista(version)) };
@@ -37,6 +37,31 @@ describe('W03 · tablero inicial con datos reales', () => {
     expect(within(tarjeta('Turnos')).getByText('En curso ahora').previousElementSibling?.textContent).toBe('4');
     expect(within(tarjeta('Pacientes')).getByText('Activos').previousElementSibling?.textContent).toBe('38');
     expect(screen.getByText(/Actualizado:/)).toBeTruthy();
+  });
+
+  it('muestra personal activo, ocupación por planta y huecos de cobertura sin datos personales', async () => {
+    const { api } = montar(async (path) => {
+      if (path === '/inicio') return { ...resumen, staff: { total: 11, active: 9 } };
+      if (path === '/espacios') return [
+        { id: 'p-1', type: 'planta', name: 'Planta 1', level: 1, totalBeds: 12, freeBeds: 6 },
+        { id: 'p-2', type: 'planta', name: 'Planta 2', level: 2, totalBeds: 5, freeBeds: 1 },
+      ];
+      if (path.startsWith('/turnos/cobertura?')) return [{ areaId: 'a-1', area: 'Emergencia', role: 'ENF', start: '2026-11-05T14:00:00Z', end: '2026-11-05T22:00:00Z', required: 2, actual: 1 }];
+      throw new Error(`Ruta inesperada: ${path}`);
+    }, { perfil: perfil(['metricas.ver', 'espacios.ver', 'turnos.ver']) });
+
+    expect(within(await screen.findByRole('region', { name: 'Personal' })).getByText('Activas').previousElementSibling?.textContent).toBe('9');
+    const plantas = await screen.findByRole('region', { name: 'Ocupación por planta' });
+    expect(within(plantas).getByText('Planta 1')).toBeTruthy();
+    expect(within(plantas).getByText('6 no disponibles de 12')).toBeTruthy();
+    expect(within(plantas).getByRole('img', { name: 'Planta 1: 50% de camas no disponibles' })).toBeTruthy();
+    expect(within(plantas).getByText('Planta 2')).toBeTruthy();
+    expect(within(plantas).getByText('4 no disponibles de 5')).toBeTruthy();
+    const cobertura = await screen.findByRole('region', { name: 'Cobertura de turnos' });
+    expect(within(cobertura).getByText('1 hueco de cobertura')).toBeTruthy();
+    expect(within(cobertura).getByText(/Emergencia · ENF/)).toBeTruthy();
+    expect(api.request).toHaveBeenCalledWith('/espacios', expect.anything());
+    expect(api.request.mock.calls.some(([path]) => String(path).startsWith('/turnos/cobertura?'))).toBe(true);
   });
 
   it('las tarjetas de módulos sin construir dicen en qué semana llegan, no cero', async () => {
