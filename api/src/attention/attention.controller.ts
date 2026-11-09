@@ -9,10 +9,10 @@ import { AttentionService } from './attention.service';
 export class AttentionController {
   constructor(private readonly attention: AttentionService) {}
 
-  @Get('catalogos') @RequirePermission('citas.agendar') @ApiOperation({ summary: 'Consultar pacientes y médicos disponibles para agendar' })
+  @Get('catalogos') @RequirePermission('citas.agendar', 'citas.solicitar') @ApiOperation({ summary: 'Consultar pacientes y médicos disponibles para agendar' })
   catalogs(@Req() r: ActorRequest) { return this.attention.catalogs(r.actor); }
 
-  @Get('disponibilidad') @RequirePermission('citas.agendar') @ApiOperation({ summary: 'Consultar franjas libres de un médico para una fecha' })
+  @Get('disponibilidad') @RequirePermission('citas.agendar', 'citas.solicitar') @ApiOperation({ summary: 'Consultar franjas libres de un médico para una fecha' })
   availability(@Req() r: ActorRequest, @Query('doctorId') doctorId?: string, @Query('date') date?: string) {
     return this.attention.availability(r.actor, doctorId ?? '', date ?? '');
   }
