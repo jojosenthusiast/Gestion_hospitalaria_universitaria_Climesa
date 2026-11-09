@@ -13,7 +13,10 @@ export function configureApplication(app:NestFastifyApplication) {
   if(config.get('NODE_ENV')==='production'&&!config.get<string>('SUPABASE_URL')?.startsWith('https://'))throw new Error('Supabase requiere HTTPS en producción.');
   const prefix=config.get<string>('API_PREFIX','api/v1');
   app.setGlobalPrefix(prefix,{exclude:[{path:'salud',method:RequestMethod.GET}]});
-  app.enableCors({origin:config.get<string>('WEB_APP_URL','http://localhost:5173'),methods:['GET','POST','PATCH','PUT','DELETE','OPTIONS'],allowedHeaders:['Authorization','Content-Type','Idempotency-Key']});
+  const primaryWebOrigin=config.get<string>('WEB_APP_URL','http://localhost:5173');
+  const extraWebOrigins=config.get<string>('WEB_APP_URLS','').split(',').map((origin)=>origin.trim()).filter(Boolean);
+  const allowedWebOrigins=[...new Set([primaryWebOrigin,...extraWebOrigins])];
+  app.enableCors({origin:allowedWebOrigins,methods:['GET','POST','PATCH','PUT','DELETE','OPTIONS'],allowedHeaders:['Authorization','Content-Type','Idempotency-Key']});
   app.getHttpAdapter().getInstance().addHook('onSend',async(_request:unknown,reply:{header:(name:string,value:string)=>unknown},payload:unknown)=>{reply.header('Cache-Control','no-store');return payload;});
   app.enableShutdownHooks();
   app.useGlobalPipes(new ValidationPipe({whitelist:true,transform:true,forbidNonWhitelisted:true,forbidUnknownValues:true}));
