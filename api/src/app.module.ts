@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PlatformModule } from './platform/platform.module';
 import { OperationsModule } from './operations/operations.module';
+import { AttentionModule } from './attention/attention.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { OperationsModule } from './operations/operations.module';
     UsersModule,
     HealthModule,
     OperationsModule,
+    AttentionModule,
   ],
 })
 export class AppModule {}
