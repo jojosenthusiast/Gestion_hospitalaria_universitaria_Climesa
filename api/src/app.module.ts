@@ -19,6 +19,7 @@ import { OperationsModule } from './operations/operations.module';
         PORT: Joi.number().port().default(3000),
         API_PREFIX: Joi.string().default('api/v1'),
         WEB_APP_URL: Joi.string().uri({ scheme: ['http', 'https'] }).default('http://localhost:5173'),
+        WEB_APP_URLS: Joi.string().allow('').default(''),
         SUPABASE_URL: Joi.string().uri({ scheme: ['http','https'] }).default('https://gvmvmrusscsfbndnbvbr.supabase.co'),
         SUPABASE_PUBLISHABLE_KEY: Joi.string().allow('').default(''),
         SUPABASE_SECRET_KEY: Joi.string().allow('').default(''),
