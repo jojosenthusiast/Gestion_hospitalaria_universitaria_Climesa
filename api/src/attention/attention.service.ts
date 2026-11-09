@@ -51,15 +51,16 @@ export class AttentionService {
     return channelsFor(c, ['citas.ver'], { excludeContexts: ['propio'], users: [await patientAccount(c, patientId)] });
   }
 
-  async catalogs(_actor: Actor) {
+  async catalogs(actor: Actor) {
+    const canManagePatients = contextsOf(actor, 'citas.agendar').length > 0;
     const [patients, doctors] = await Promise.all([
       this.db.query(`SELECT id, expediente AS record,
         coalesce(nullif(concat_ws(' ',nombres,primer_apellido,segundo_apellido),''),alias_provisional) AS "fullName",
         (estado IN ('activo','provisional')) AS active
         FROM pacientes.paciente
-        WHERE estado IN ('activo','provisional')
+        WHERE estado IN ('activo','provisional') AND ($1::boolean OR id=$2::uuid)
         ORDER BY primer_apellido,nombres,id
-        LIMIT 500`),
+        LIMIT 500`, [canManagePatients, actor.patientId]),
       this.db.query(`SELECT p.id,p.nombres AS "givenNames",p.apellidos AS surnames,p.tipo AS type,
         p.especialidad AS specialty,p.area_id AS "areaId",e.nombre AS area,p.activo AS active
         FROM personal.persona p LEFT JOIN infra.espacio e ON e.id=p.area_id
