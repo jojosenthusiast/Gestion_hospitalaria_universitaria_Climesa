@@ -7,12 +7,14 @@ import { CommandService } from '../platform/command.service';
 export class PermissionGuard implements CanActivate {
   constructor(private readonly reflector: Reflector, private readonly commands: CommandService) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const code = this.reflector.getAllAndOverride<string>(REQUIRED_PERMISSION, [context.getHandler(), context.getClass()]);
-    if (!code) return true;
+    const required = this.reflector.getAllAndOverride<string | string[]>(REQUIRED_PERMISSION, [context.getHandler(), context.getClass()]);
+    if (!required) return true;
+    const codes = Array.isArray(required) ? required : [required];
     const req = context.switchToHttp().getRequest<ActorRequest>();
-    req.permission = code;
-    if (req.actor && hasPermission(req.actor, code)) return true;
-    if (req.actor) { await this.commands.denied(req.actor, code, req.method, req.url); req.denialAudited = true; }
+    const granted = req.actor ? codes.find(code => hasPermission(req.actor, code)) : undefined;
+    req.permission = granted ?? codes[0];
+    if (granted) return true;
+    if (req.actor) { await this.commands.denied(req.actor, codes[0], req.method, req.url); req.denialAudited = true; }
     throw new ForbiddenException('Tu cuenta no tiene permiso para esta operación.');
   }
 }
