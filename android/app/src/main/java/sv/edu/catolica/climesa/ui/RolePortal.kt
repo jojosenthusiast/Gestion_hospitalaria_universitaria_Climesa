@@ -21,8 +21,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import org.json.JSONArray
@@ -35,6 +37,7 @@ import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 data class RoleData(val loading:Boolean=false,val data:Any?=null,val error:String?=null)
 /** Lectura de datos del portal por rol; separada de [ApiClient] para poder probar el ViewModel. */
@@ -73,48 +76,74 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
         }
     }}
 }
-private fun sectionIcon(s:AndroidSection)=when(s){AndroidSection.HOME->Icons.Default.Home;AndroidSection.PROFILE->Icons.Default.AccountCircle;AndroidSection.SHIFTS,AndroidSection.PLANNING,AndroidSection.APPOINTMENTS->Icons.Default.DateRange;AndroidSection.PATIENTS,AndroidSection.STAFF->Icons.Default.Person;AndroidSection.UNIT,AndroidSection.SERVICE->Icons.Default.Info;else->Icons.Default.List}
 private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.HOME->"/inicio";AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";else->null}
 private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En servicio","en_mantenimiento" to "En mantenimiento")
+@Composable fun HospitalClock(){
+    var now by remember { mutableStateOf(Instant.now()) }
+    val zone=remember { ZoneId.of("America/El_Salvador") }
+    val timeFormatter=remember { DateTimeFormatter.ofPattern("HH:mm:ss",Locale("es","SV")).withZone(zone) }
+    val dateFormatter=remember { DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyyy",Locale("es","SV")).withZone(zone) }
+    LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(1000)}}
+    Column(horizontalAlignment=Alignment.End){
+        Text(timeFormatter.format(now),style=MaterialTheme.typography.labelLarge.copy(fontFeatureSettings="tnum"),color=MaterialTheme.colorScheme.onPrimary)
+        Text(dateFormatter.format(now).replaceFirstChar{it.uppercase(Locale("es","SV"))},style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),maxLines=1)
+    }
+}
 @Composable fun RolePortal(account:AuthenticatedAccount,role:String,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit,refresh:()->Unit){
     val model:RoleViewModel=viewModel(key="role-${account.session.userId}")
     val data by model.state.collectAsStateWithLifecycle()
-    var selected by rememberSaveable(role){mutableIntStateOf(0)};var query by rememberSaveable{mutableStateOf("")}
-    val sections=AndroidSections.visible(account.profile.permissions);val page=sections[selected.coerceIn(0,sections.lastIndex)]
+    var selectedName by rememberSaveable(role){mutableStateOf("")};var query by rememberSaveable{mutableStateOf("")}
+    val sections=AndroidSections.visible(role,account.profile.permissions)
+    val page=sections.firstOrNull{it.name==selectedName}?:sections.firstOrNull()?:return
     val path=sectionPath(page)
+    LaunchedEffect(role,sections){if(sections.none{it.name==selectedName})selectedName=sections.first().name}
     LaunchedEffect(role,page){model.load(path)}
     LaunchedEffect(account.profile.channels){model.start(account.profile.channels)}
-    Scaffold(containerColor=MaterialTheme.colorScheme.background,topBar={TopAppBar(title={Column{Text("climesa",style=MaterialTheme.typography.titleMedium);Text(RoleAccess.label(role),style=MaterialTheme.typography.labelSmall,color=Color(0xFFB0B4C9))}},actions={IconButton(onClick={setDark(!dark)}){Icon(Icons.Default.Settings,"Cambiar apariencia")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=BrandNavy,titleContentColor=Color.White,actionIconContentColor=Color.White))},bottomBar={NavigationBar(containerColor=BrandNavy,tonalElevation=0.dp){sections.forEachIndexed{i,s->NavigationBarItem(selected=selected==i,onClick={selected=i},icon={Icon(sectionIcon(s),null)},label={Text(s.label)},colors=NavigationBarItemDefaults.colors(selectedIconColor=Color.White,selectedTextColor=Color.White,indicatorColor=BrandBlue,unselectedIconColor=Color(0xFFB0B4C9),unselectedTextColor=Color(0xFFB0B4C9)))}}}){padding->
-        if(page==AndroidSection.BEDS){BedsScreen(account.profile,Modifier.padding(padding));return@Scaffold}
-        if(page==AndroidSection.PLANNING){ShiftPlanningScreen(account.profile,Modifier.padding(padding));return@Scaffold}
-        if(page==AndroidSection.STAFF){StaffScreen(account.profile,Modifier.padding(padding));return@Scaffold}
-        LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(20.dp)){
-            item{Text("${RoleAccess.label(role).uppercase()} / CLIMESA",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary);Spacer(Modifier.height(12.dp));Text(if(page==AndroidSection.HOME)"Tu jornada."else"${page.label}.",style=MaterialTheme.typography.displaySmall)}
+    AdaptiveRoleScaffold(
+        sections=sections,
+        selected=page,
+        onSelected={selectedName=it.name},
+        topBar={TopAppBar(title={Column{Text("climesa",style=MaterialTheme.typography.titleMedium);Text(RoleAccess.label(role),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f))}},actions={HospitalClock();IconButton(onClick={setDark(!dark)}){Icon(Icons.Default.Settings,"Cambiar apariencia")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=MaterialTheme.colorScheme.primary,titleContentColor=MaterialTheme.colorScheme.onPrimary,actionIconContentColor=MaterialTheme.colorScheme.onPrimary))},
+    ) content@{padding->
+        if(page==AndroidSection.BEDS){BedsScreen(account.profile,Modifier.padding(padding));return@content}
+        if(page==AndroidSection.PLANNING){ShiftPlanningScreen(account.profile,Modifier.padding(padding));return@content}
+        if(page==AndroidSection.STAFF){StaffScreen(account.profile,Modifier.padding(padding));return@content}
+        if(page==AndroidSection.MY_APPOINTMENTS){PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding));return@content}
+        LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
+            if(page!=AndroidSection.HOME)item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",page.label)}
             if(page==AndroidSection.PROFILE){
-                item{Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)){Column(Modifier.fillMaxWidth().padding(22.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Text(account.profile.name.ifBlank{account.session.email},style=MaterialTheme.typography.titleLarge);Text(account.session.email);HorizontalDivider();Text("Roles: ${account.profile.roles.joinToString{RoleAccess.label(it)}}",style=MaterialTheme.typography.bodyMedium);Text("Tu cuenta es personal. Cierra sesión al terminar tu jornada.",style=MaterialTheme.typography.bodySmall)}}}
-                item{OutlinedButton(onClick=refresh,modifier=Modifier.fillMaxWidth()){Text("Actualizar acceso")};Spacer(Modifier.height(10.dp));Button(onClick=logout,enabled=!signingOut,modifier=Modifier.fillMaxWidth()){Text(if(signingOut)"Cerrando sesión…"else stringResource(R.string.cerrar_sesion))}}
+                item{ClimesaCard {Column(Modifier.fillMaxWidth().padding(22.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){Text(account.profile.name.ifBlank{account.session.email},style=MaterialTheme.typography.titleLarge);Text(account.session.email);HorizontalDivider();Text("Roles: ${account.profile.roles.joinToString{RoleAccess.label(it)}}",style=MaterialTheme.typography.bodyMedium);Text("Tu cuenta es personal. Cierra sesión al terminar tu jornada.",style=MaterialTheme.typography.bodySmall)}}}
+                item{ClimesaActionGroup {ClimesaButton("Actualizar acceso",Icons.Default.Refresh,refresh,outlined=true);ClimesaButton(if(signingOut)"Cerrando sesión…"else stringResource(R.string.cerrar_sesion),Icons.Default.Logout,logout,enabled=!signingOut)}}
             }else if(!page.ready){val maqueta=Maquetas.of(page);if(maqueta!=null)item{MaquetaContent(maqueta)}else item{PendingModule()}}
             else if(data.loading)item{Box(Modifier.fillMaxWidth().height(200.dp),contentAlignment=Alignment.Center){CircularProgressIndicator()}}
-            else if(data.error!=null)item{Text(data.error!!,color=MaterialTheme.colorScheme.error);Button(onClick={model.load(path)}){Text(stringResource(R.string.camas_reintentar))}}
+            else if(data.error!=null)item{ClimesaActionGroup {Text(data.error!!,color=MaterialTheme.colorScheme.error);ClimesaButton(stringResource(R.string.camas_reintentar),Icons.Default.Refresh,{model.load(path)})}}
             else if(page==AndroidSection.HOME){
-                item{Surface(color=BrandBlue,shape=RoundedCornerShape(0.dp)){Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(13.dp)){Text(account.profile.name.ifBlank{"Bienvenido a CLIMESA"},style=MaterialTheme.typography.headlineMedium,color=Color.White);Text("${RoleAccess.label(role)} · Cuenta activa",color=Color(0xFFD4D9FF),style=MaterialTheme.typography.bodyMedium)}}}
+                item{Surface(color=BrandBlue,shape=MaterialTheme.shapes.large,tonalElevation=2.dp){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(account.profile.name.ifBlank{"Bienvenido a CLIMESA"},style=MaterialTheme.typography.titleLarge,color=Color.White);Text(RoleAccess.label(role),color=Color(0xFFD4D9FF),style=MaterialTheme.typography.bodySmall)}}}
                 val summary=data.data as? JSONObject
                 val beds=summary?.optJSONObject("beds")
-                if(beds!=null)item{Text("${beds.optInt("free")} de ${beds.optInt("total")} camas libres",style=MaterialTheme.typography.titleLarge);HorizontalDivider()}
-                items(sections.filter{it!=AndroidSection.HOME}){s->TextButton(onClick={selected=sections.indexOf(s)},modifier=Modifier.fillMaxWidth()){Text(s.label,Modifier.weight(1f));Text("→")};HorizontalDivider()}
+                if(beds!=null)item{ClimesaCard {Text("${beds.optInt("free")} de ${beds.optInt("total")} camas libres",Modifier.padding(18.dp),style=MaterialTheme.typography.titleMedium)}}
+                items(sections.filter{it!=AndroidSection.HOME}){s->ClimesaClickableCard(onClick={selectedName=s.name}){Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Text(s.label,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);Icon(Icons.Default.ChevronRight,null,tint=MaterialTheme.colorScheme.primary)}}}
             }else if(page==AndroidSection.PATIENTS){
-                item{OutlinedTextField(query,{query=it.take(100)},label={Text("Nombre, DUI o expediente")},modifier=Modifier.fillMaxWidth(),singleLine=true);Spacer(Modifier.height(12.dp));Button(onClick={model.load("/pacientes?query="+URLEncoder.encode(query,"UTF-8")+"&limit=50")},enabled=query.trim().length>=2,modifier=Modifier.fillMaxWidth()){Text("Buscar paciente")}}
+                item{ClimesaActionGroup {OutlinedTextField(query,{query=it.take(100)},label={Text("Nombre, DUI o expediente")},modifier=Modifier.fillMaxWidth(),singleLine=true);ClimesaButton("Buscar paciente",Icons.Default.Search,{model.load("/pacientes?query="+URLEncoder.encode(query,"UTF-8")+"&limit=50")},enabled=query.trim().length>=2)}}
                 val rows=data.data as? JSONArray
                 if(rows==null||rows.length()==0)item{Text("No hay coincidencias. Ajusta la búsqueda.")}
                 else items((0 until rows.length()).toList()){i->val p=rows.getJSONObject(i);Column(verticalArrangement=Arrangement.spacedBy(8.dp)){Text(p.optString("fullName"),style=MaterialTheme.typography.titleMedium);Text("EXP. ${p.optString("record")}",style=MaterialTheme.typography.labelSmall);HorizontalDivider()}}
             }else if(page==AndroidSection.UNIT){
                 val unit=(data.data as? JSONObject)?.optJSONObject("unit");val service=(data.data as? JSONObject)?.optJSONObject("activeService")
-                item{Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(unit?.optString("plate").orEmpty(),style=MaterialTheme.typography.titleMedium);Text("${stringResource(R.string.unidad_estado)}: ${unitStates[unit?.optString("state")]?:unit?.optString("state").orEmpty()}",color=MaterialTheme.colorScheme.primary);Text("${stringResource(R.string.unidad_paramedico_turno)}: ${stringResource(if((data.data as? JSONObject)?.optBoolean("paramedicOnDuty")==true)R.string.unidad_si else R.string.unidad_no)}",style=MaterialTheme.typography.bodySmall);HorizontalDivider();if(service==null)Text(stringResource(R.string.unidad_sin_servicio)) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${service.optString("origin")} → ${service.optString("destination")}")}}}}
+                item{ClimesaCard {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(unit?.optString("plate").orEmpty(),style=MaterialTheme.typography.titleMedium);Text("${stringResource(R.string.unidad_estado)}: ${unitStates[unit?.optString("state")]?:unit?.optString("state").orEmpty()}",color=MaterialTheme.colorScheme.primary);Text("${stringResource(R.string.unidad_paramedico_turno)}: ${stringResource(if((data.data as? JSONObject)?.optBoolean("paramedicOnDuty")==true)R.string.unidad_si else R.string.unidad_no)}",style=MaterialTheme.typography.bodySmall);HorizontalDivider();if(service==null)Text(stringResource(R.string.unidad_sin_servicio)) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${service.optString("origin")} → ${service.optString("destination")}")}}}}
                 if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.optString("state")))item{MaintenanceControl(model,unit.optString("state"),unit.optInt("version"),(data.data as? JSONObject)?.optBoolean("paramedicOnDuty")==true)}
             }else if(page==AndroidSection.SHIFTS){
                 val rows=data.data as? JSONArray
                 if(rows==null||rows.length()==0)item{Text("No tienes turnos publicados.",style=MaterialTheme.typography.bodyMedium)}
-                else items((0 until rows.length()).toList()){i->val r=rows.getJSONObject(i);Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(r.optString("area"),style=MaterialTheme.typography.titleMedium);val format=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.of("America/El_Salvador"));Text(format.format(Instant.parse(r.getString("start")))+" — "+format.format(Instant.parse(r.getString("end"))),style=MaterialTheme.typography.bodyMedium);Text(StaffLabels.shiftState(r.optString("state")),style=MaterialTheme.typography.labelSmall)}}}
+                else items((0 until rows.length()).toList()){i->
+                    val r=rows.getJSONObject(i)
+                    ClimesaCard {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                        Text(r.optString("area"),style=MaterialTheme.typography.titleMedium)
+                        val format=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.of("America/El_Salvador"))
+                        Text(format.format(Instant.parse(r.getString("start")))+" — "+format.format(Instant.parse(r.getString("end"))),style=MaterialTheme.typography.bodyMedium)
+                        Text(StaffLabels.shiftState(r.optString("state")),style=MaterialTheme.typography.labelSmall)
+                    }}
+                }
             }else item{PendingModule()}
         }
     }
