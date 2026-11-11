@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,40 +33,64 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+private fun receptionIcon(section: AndroidSection) = when (section) {
+    AndroidSection.PATIENTS -> Icons.Default.Person
+    AndroidSection.BEDS -> Icons.Default.Bed
+    AndroidSection.APPOINTMENTS,
+    AndroidSection.SHIFTS,
+    -> Icons.Default.DateRange
+    AndroidSection.PROFILE -> Icons.Default.AccountCircle
+    else -> Icons.AutoMirrored.Filled.List
+}
+private fun receptionNavigation(sections: List<AndroidSection>) = sections.map { AdaptiveNavItem(it.label, receptionIcon(it)) }
+
 @Composable fun ReceptionApp(model:ReceptionViewModel,dark:Boolean,setDark:(Boolean)->Unit,account:AuthenticatedAccount,signingOut:Boolean,logout:()->Unit) {
     val state by model.state.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val sections=AndroidSections.visible("REC",account.profile.permissions)
+    var selectedName by rememberSaveable { mutableStateOf(sections.firstOrNull()?.name.orEmpty()) }
+    val page=sections.firstOrNull { it.name==selectedName } ?: sections.firstOrNull() ?: return
+    val tab=sections.indexOf(page)
     var discard by remember { mutableStateOf(false) }
     val snack=remember { SnackbarHostState() }
+    LaunchedEffect(sections) { if(sections.none { it.name==selectedName }) selectedName=sections.first().name }
     LaunchedEffect(state.message) { state.message?.let { snack.showSnackbar(it);model.clearMessage() } }
     fun back() { if(state.saving)return;if(state.formOpen) discard=true else model.select(null) }
     BackHandler(state.formOpen || state.selected!=null) { back() }
-    Scaffold(containerColor=MaterialTheme.colorScheme.background,snackbarHost={ SnackbarHost(snack) },topBar={ TopAppBar(
-        colors=TopAppBarDefaults.topAppBarColors(containerColor=BrandNavy,titleContentColor=Color.White,navigationIconContentColor=Color.White,actionIconContentColor=Color.White),title={ Column { Text(if(state.formOpen) { if(state.editingId==null) "Registrar paciente" else "Editar ficha" } else if(state.selected!=null) "Ficha del paciente" else "climesa",style=MaterialTheme.typography.titleMedium)
-            if(!state.formOpen && state.selected==null) Text(listOf("Recepción","Pacientes","Mi espacio")[tab],style=MaterialTheme.typography.labelSmall,color=Color(0xFFB0B4C9)) } },
-        navigationIcon={ if(state.formOpen || state.selected!=null) IconButton(onClick={back()},enabled=!state.saving) { Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver") } },
-        actions={ IconButton(onClick={setDark(!dark)}) { Icon(Icons.Default.Settings,"Cambiar entre tema claro y oscuro") } }) },
-        bottomBar={ if(!state.formOpen && state.selected==null) NavigationBar(containerColor=BrandNavy,tonalElevation=0.dp) {
-            listOf("Inicio" to Icons.Default.Home,"Pacientes" to Icons.Default.Person,"Mi espacio" to Icons.Default.AccountCircle).forEachIndexed { i,pair ->
-                NavigationBarItem(colors=NavigationBarItemDefaults.colors(selectedIconColor=Color.White,selectedTextColor=Color.White,indicatorColor=BrandBlue,unselectedIconColor=Color(0xFFA5A9BD),unselectedTextColor=Color(0xFFA5A9BD)),selected=tab==i,onClick={tab=i},icon={Icon(pair.second,null)},label={Text(pair.first)})
-            }
-        } }
+    AdaptiveTabScaffold(
+        items=receptionNavigation(sections),
+        selected=tab,
+        onSelected={selectedName=sections[it].name},
+        showNavigation=!state.formOpen && state.selected==null,
+        snackbarHost={SnackbarHost(snack)},
+        topBar={TopAppBar(
+            colors=TopAppBarDefaults.topAppBarColors(containerColor=MaterialTheme.colorScheme.primary,titleContentColor=MaterialTheme.colorScheme.onPrimary,navigationIconContentColor=MaterialTheme.colorScheme.onPrimary,actionIconContentColor=MaterialTheme.colorScheme.onPrimary),
+            title={Column{Text(if(state.formOpen){if(state.editingId==null)"Registrar paciente" else "Editar ficha"}else if(state.selected!=null)"Ficha del paciente" else "climesa",style=MaterialTheme.typography.titleMedium);if(!state.formOpen&&state.selected==null)Text(page.label,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f))}},
+            navigationIcon={if(state.formOpen||state.selected!=null)IconButton(onClick={back()},enabled=!state.saving){Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver")}},
+            actions={HospitalClock();IconButton(onClick={setDark(!dark)}){Icon(Icons.Default.Settings,"Cambiar entre tema claro y oscuro")}},
+        )},
     ) { padding -> Column(Modifier.fillMaxSize().padding(padding)) {
-        Surface(color=MaterialTheme.colorScheme.surfaceVariant) { Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) { Icon(Icons.Default.Info,null,Modifier.size(14.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant);Text("Registro compartido · CLIMESA",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) } }
-        state.error?.let { error -> Surface(color=MaterialTheme.colorScheme.errorContainer) {
+        state.error?.takeIf { page==AndroidSection.PATIENTS }?.let { error -> Surface(color=MaterialTheme.colorScheme.errorContainer) {
             Row(Modifier.padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) {
                 Text(error,Modifier.weight(1f).padding(vertical=10.dp),style=MaterialTheme.typography.bodyMedium)
                 if(!state.fatal) IconButton(onClick=model::clearError) { Icon(Icons.Default.Close,"Cerrar aviso") }
             }
         } }
         when {
-            state.loading -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator() }
-            state.fatal -> Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) { Text("No pudimos abrir el registro. Tus datos no se han sobrescrito.");Button(onClick=model::reload) {Text("Reintentar")} }
             state.formOpen -> PatientForm(state,model)
             state.selected!=null -> PatientDetail(state.selected!!,state,model)
-            tab==0 -> Home(state,{tab=1},model::select)
-            tab==1 -> Patients(state,model)
-            else -> Profile(state,dark,setDark,account,signingOut,logout)
+            page==AndroidSection.BEDS -> BedsScreen(account.profile)
+            page==AndroidSection.PROFILE -> Profile(state,dark,setDark,account,signingOut,logout)
+            page!=AndroidSection.PATIENTS -> {
+                val mock=Maquetas.of(page)
+                if(mock!=null) Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) { MaquetaContent(mock) }
+                else Column(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Text(page.label,style=MaterialTheme.typography.headlineMedium)
+                    Text("Esta sección usa el destino ${page.screenId} del catálogo. Su contenido operativo se habilitará en la entrega correspondiente.")
+                }
+            }
+            state.loading -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator() }
+            state.fatal -> Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) { Text("No pudimos abrir el registro. Tus datos no se han sobrescrito.");Button(onClick=model::reload) {Text("Reintentar")} }
+            else -> Patients(state,model)
         }
     } }
     if(discard) AlertDialog(onDismissRequest={discard=false},title={Text("¿Salir del formulario?")},text={Text("Los cambios que aún no guardaste se perderán.")},
@@ -102,25 +128,24 @@ import java.time.format.DateTimeFormatter
     }
 }
 @Composable private fun Patients(state:ReceptionState,model:ReceptionViewModel) {
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item { Text("Pacientes.",style=MaterialTheme.typography.displaySmall);Spacer(Modifier.height(8.dp));Text("Busca antes de abrir un expediente.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        item { SectionIntro("Recepción / CLIMESA", "Pacientes", "Buscá antes de registrar.") }
         item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text("Nombre, DUI o expediente")},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,"Limpiar búsqueda")}}) }
-        item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            if(PatientAction.SEARCH in state.actions) Button(onClick=model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2,modifier=Modifier.weight(1f)) {Text(if(state.searching) "Buscando…" else "Buscar")}
-            if(PatientAction.REGISTER in state.actions) OutlinedButton(onClick=model::newPatient,enabled=state.searchedQuery!=null) {Icon(Icons.Default.Add,null);Text("Registrar")}
+        item { Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            if(PatientAction.SEARCH in state.actions) ClimesaButton(if(state.searching) "Buscando…" else "Buscar",Icons.Default.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)
+            if(PatientAction.REGISTER in state.actions) ClimesaButton("Registrar paciente",Icons.Default.Add,model::newPatient,enabled=state.searchedQuery!=null,outlined=true)
         } }
-        item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf("Activos","Inactivos","Todos").forEachIndexed {i,label -> FilterChip(selected=state.filter==i,onClick={model.filter(i)},label={Text(label)})}} }
-        item { Text(if(state.searchedQuery==null) "Registro compartido · ${state.results.size} resultados" else "${state.results.size} coincidencias · ${state.searchedQuery}",style=MaterialTheme.typography.labelLarge)
-            if(state.searchedQuery!=null) Text("Revisa también los inactivos antes de registrar. El DUI no puede repetirse.",style=MaterialTheme.typography.bodySmall) }
-        if(state.results.isEmpty()) item { Text("Sin coincidencias. Revisa la búsqueda y el filtro; si el paciente no existe, puedes registrarlo después de buscar.",Modifier.padding(16.dp)) }
+        item { LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(3) {i->val label=listOf("Activos","Inactivos","Todos")[i];FilterChip(selected=state.filter==i,onClick={model.filter(i)},label={Text(label)})}} }
+        item { Text(if(state.searchedQuery==null) "${state.results.size} pacientes" else "${state.results.size} coincidencias",style=MaterialTheme.typography.labelLarge) }
+        if(state.results.isEmpty()) item { Text("Sin coincidencias. Ajustá la búsqueda o el filtro.",Modifier.padding(vertical=12.dp),color=MaterialTheme.colorScheme.onSurfaceVariant) }
         items(state.results,key={it.id}) {p -> PatientRow(p) {model.select(p.id)} }
     }
 }
 @Composable private fun PatientRow(p:Patient,click:()->Unit) {
-    Surface(onClick=click,modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(0.dp),color=MaterialTheme.colorScheme.surface) {
+    ClimesaClickableCard(onClick=click) {
         Column {
             Row(Modifier.padding(vertical=19.dp,horizontal=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(13.dp)) {
-                Box(Modifier.size(36.dp).background(MaterialTheme.colorScheme.primaryContainer),contentAlignment=Alignment.Center) {
+                Box(Modifier.size(42.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),contentAlignment=Alignment.Center) {
                     Text(p.givenNames.take(1)+p.surnames.take(1),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
                 }
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
@@ -128,7 +153,7 @@ import java.time.format.DateTimeFormatter
                     Text("EXP. ${p.record}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(if(p.active) "Activo" else "Inactivo",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
                 }
-                Text("↗",style=MaterialTheme.typography.titleLarge,color=MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.ChevronRight,"Abrir ficha",tint=MaterialTheme.colorScheme.primary)
             }
             HorizontalDivider()
         }
@@ -139,12 +164,12 @@ import java.time.format.DateTimeFormatter
     var reason by remember(p.id) {mutableStateOf("")}
     LaunchedEffect(p.version) {dialog=false;reason=""}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        item {Surface(color=BrandBlue,shape=RoundedCornerShape(0.dp)) {Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {Text("EXPEDIENTE ${p.record}",style=MaterialTheme.typography.labelSmall,color=Color(0xFFD4D9FF));Text(p.fullName,style=MaterialTheme.typography.headlineMedium,color=Color.White);Text(if(p.active) "Activo" else "Inactivo",style=MaterialTheme.typography.bodySmall,color=BrandLime)}}}
-        item {Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)) {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
+        item {Surface(color=BrandBlue,shape=MaterialTheme.shapes.large) {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("EXPEDIENTE ${p.record}",style=MaterialTheme.typography.labelSmall,color=Color(0xFFD4D9FF));Text(p.fullName,style=MaterialTheme.typography.titleLarge,color=Color.White);Text(if(p.active) "Activo" else "Inactivo",style=MaterialTheme.typography.bodySmall,color=StateFree)}}}
+        item {ClimesaCard {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
             Value("DUI",p.dui ?: "Sin documento registrado");Value("Nacimiento",p.birth?.toString() ?: "No registrado");Value("Sexo",p.sex.label);Value("Teléfono",p.phone.ifBlank {"No registrado"})
         }}}
-        item {if(PatientAction.EDIT in state.actions) Button(onClick={model.edit(p)},modifier=Modifier.fillMaxWidth()) {Icon(Icons.Default.Edit,null);Spacer(Modifier.width(8.dp));Text("Editar datos")}
-            if(PatientAction.CHANGE_STATUS in state.actions) OutlinedButton(onClick={dialog=true},enabled=!state.saving,modifier=Modifier.fillMaxWidth()) {Text(if(p.active) "Inactivar paciente" else "Reactivar paciente")}}
+        item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) ClimesaButton("Editar datos",Icons.Default.Edit,{model.edit(p)})
+            if(PatientAction.CHANGE_STATUS in state.actions) ClimesaButton(if(p.active) "Inactivar paciente" else "Reactivar paciente",Icons.Default.ToggleOff,{dialog=true},enabled=!state.saving,outlined=true)}}
         item {Text("Historial de actividad",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         val events=state.registry.audit.filter {it.record==p.record}.reversed()
         if(events.isEmpty()) item {Text("Ficha de ejemplo. Todavía no tiene cambios.")}
@@ -161,7 +186,7 @@ import java.time.format.DateTimeFormatter
     val d=state.draft
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text(if(state.editingId==null) "Nuevo paciente" else "Actualizar información",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-        Text("Los campos con * son obligatorios. Deja vacíos el documento y el nacimiento si los desconoces.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Los campos con * son obligatorios.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Text("01 / DATOS PERSONALES",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
         FormField("Nombres *",d.givenNames,state.fields["givenNames"],enabled=!state.saving) {model.draft(d.copy(givenNames=it.take(80)))}
         FormField("Apellidos *",d.surnames,state.fields["surnames"],enabled=!state.saving) {model.draft(d.copy(surnames=it.take(100)))}
@@ -172,7 +197,7 @@ import java.time.format.DateTimeFormatter
         FormField("Teléfono · opcional",d.phone,state.fields["phone"],"7000-0000",KeyboardType.Phone,!state.saving) {model.draft(d.copy(phone=it.take(9)))}
         if(state.editingId!=null) OutlinedTextField(state.reason,model::reason,modifier=Modifier.fillMaxWidth(),enabled=!state.saving,label={Text("Motivo de modificación *")},supportingText={Text("Mínimo 10 caracteres. Quedará en el historial.")})
         Button(onClick=model::save,enabled=!state.saving,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text(if(state.saving) "Guardando…" else "Guardar paciente")}
-        Text("El expediente se genera automáticamente. Revisa posibles duplicados; la app no fusiona pacientes.",style=MaterialTheme.typography.bodySmall)
+        Text("Revisá posibles duplicados antes de guardar.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -182,12 +207,12 @@ import java.time.format.DateTimeFormatter
 @Composable private fun Profile(state:ReceptionState,dark:Boolean,setDark:(Boolean)->Unit,account:AuthenticatedAccount,signingOut:Boolean,logout:()->Unit) {
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {Text("MI ESPACIO / CLIMESA",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary);Spacer(Modifier.height(12.dp));Text("Tu cuenta.",style=MaterialTheme.typography.displaySmall);Spacer(Modifier.height(14.dp));Text(account.session.email,style=MaterialTheme.typography.bodyLarge)}
-        item {Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)) {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        item {ClimesaCard {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Text(if(account.profile.verifiedByBackend) "Permisos verificados" else "Cuenta autenticada",fontWeight=FontWeight.Bold)
             if(account.profile.roles.isNotEmpty()) Text("Roles: ${account.profile.roles.joinToString()}")
             account.profile.notice?.let {Text("La validación de permisos todavía no está disponible.",style=MaterialTheme.typography.bodySmall)}
         }}}
-        item {Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)) {Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=Alignment.CenterVertically) {Column(Modifier.weight(1f)) {Text("Modo oscuro",fontWeight=FontWeight.Bold);Text("Se conserva en este dispositivo",style=MaterialTheme.typography.bodySmall)};Switch(dark,setDark)}}}
+        item {ClimesaCard {Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=Alignment.CenterVertically) {Column(Modifier.weight(1f)) {Text("Modo oscuro",fontWeight=FontWeight.Bold);Text("Se conserva en este dispositivo",style=MaterialTheme.typography.bodySmall)};Switch(dark,setDark)}}}
         item {Text("Actividad reciente",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         if(state.registry.audit.isEmpty()) item {Text("Aquí aparecerán los registros y cambios.")}
         items(state.registry.audit.takeLast(20).reversed()) {AuditRow(it)}
@@ -195,7 +220,7 @@ import java.time.format.DateTimeFormatter
         item {OutlinedButton(onClick=logout,enabled=!signingOut,modifier=Modifier.fillMaxWidth()) {Icon(Icons.AutoMirrored.Filled.ExitToApp,null);Spacer(Modifier.width(8.dp));Text(if(signingOut) "Cerrando sesión…" else "Cerrar sesión")}}
     }
 }
-@Composable private fun AuditRow(a:AuditEvent) {Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(0.dp)) {Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+@Composable private fun AuditRow(a:AuditEvent) {ClimesaCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
     Text("${a.action} · ${a.record}",fontWeight=FontWeight.SemiBold);Text(a.reason)
     a.changes.forEach { (field,value) -> Text("$field: $value",style=MaterialTheme.typography.bodySmall) }
     Text("${DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.of("America/El_Salvador")).format(Instant.parse(a.at))} · v${a.version}",style=MaterialTheme.typography.labelSmall)
