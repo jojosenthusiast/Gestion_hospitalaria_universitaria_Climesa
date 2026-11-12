@@ -9,7 +9,6 @@ import { StaffDto, ShiftDto, RegistrationDto, PublishDto } from './operations.dt
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
 const HOUR=3600_000,DAY=24*HOUR,LOCAL_OFFSET=6*HOUR;
-const JOP_CUTOFF_MINUTES=16*60;
 /** Lunes 00:00 local (en UTC) de la semana que contiene el instante; la semana va de lunes a domingo (RN-14). */
 export const weekStart=(at:Date)=>{const day=new Date(`${businessDate(at)}T00:00:00Z`);return new Date(day.getTime()-((day.getUTCDay()+6)%7)*DAY+LOCAL_OFFSET);};
 /** Horas de [a,b) (ms UTC) que caen entre las 06:00 y las 22:00 locales. */
@@ -86,14 +85,6 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     return hasPermission(actor,'personal.ver_datos_personales')?rows:rows.map(({dui,phone,...row})=>row);
   }
   private async area(c:PoolClient,id?:string){if(id&&!(await c.query("SELECT id FROM infra.espacio WHERE id=$1 AND activo AND tipo IN ('area','planta','consultorio','hospital')",[id])).rowCount)throw new BadRequestException('Selecciona un área activa.');}
-  /** La planificación ordinaria de JOP está abierta de 00:00 a 16:00, hora de El Salvador.
-   * ADM conserva el permiso de emergencia; toda escritura queda auditada por CommandService. */
-  private assertJopPlanningWindow(actor:Actor,at:Date){
-    if(!actor.roles.includes('JOP')||actor.roles.includes('ADM'))return;
-    const local=new Date(at.valueOf()-LOCAL_OFFSET);
-    const minutes=local.getUTCHours()*60+local.getUTCMinutes();
-    if(minutes>=JOP_CUTOFF_MINUTES)throw new ProblemException('ventana_jop_cerrada',409,'La ventana de planificación de JOP está cerrada desde las 16:00. Se abrirá nuevamente a las 00:00.','turnos.planificar');
-  }
   async save(actor:Actor,id:string|null,dto:StaffDto,key?:string) {
     if(!/^[\p{L}\p{M} .’'-]+$/u.test(dto.givenNames+dto.surnames))throw new BadRequestException('Los nombres y apellidos no pueden contener números.');
     if(dto.dui&&(!/^\d{8}-?\d$/.test(dto.dui)||!validDui(dto.dui)))throw new BadRequestException('Revisa el dígito verificador del DUI.');
@@ -140,7 +131,6 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     const start=new Date(dto.start),end=new Date(dto.end);
     if(!/(Z|[+-]\d\d:\d\d)$/.test(dto.start)||!/(Z|[+-]\d\d:\d\d)$/.test(dto.end)||!Number.isFinite(start.valueOf())||end<=start)throw new BadRequestException('Indica inicio y fin con zona horaria.');
     const at=this.clock.now();
-    if(dto.state!=='cancelado')this.assertJopPlanningWindow(actor,at);
     return this.commands.run(actor,`turnos.planificar:${id??'nuevo'}`,key,dto,async c=>{
       const person=(await c.query('SELECT id,tipo,activo FROM personal.persona WHERE id=$1 FOR UPDATE',[dto.staffId])).rows[0];
       if(!person?.activo)throw new BadRequestException('Selecciona personal activo.');
@@ -152,15 +142,38 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       const hours=(end.valueOf()-start.valueOf())/3600000;
       const max=dto.type==='guardia'&&person.tipo==='medico'?duration.max_guardia_medica:duration.max_horas;
       if(hours<duration.min_horas||hours>max)throw new BadRequestException(`La duración permitida es de ${duration.min_horas} a ${max} horas.`);
-      const nearby=(await c.query("SELECT id,lower(periodo) AS start,upper(periodo) AS \"end\",tipo FROM personal.turno WHERE persona_id=$1 AND estado<>'cancelado' AND ($2::uuid IS NULL OR id<>$2) AND periodo && tstzrange($3::timestamptz-interval '1 day',$4::timestamptz+interval '1 day')",[dto.staffId,id,start,end])).rows;
+      const nearby=(await c.query("SELECT id,lower(periodo) AS start,upper(periodo) AS \"end\",tipo FROM personal.turno WHERE persona_id=$1 AND estado<>'cancelado' AND ($2::uuid IS NULL OR id<>$2) AND periodo && tstzrange($3::timestamptz-interval '3 days',$4::timestamptz+interval '3 days')",[dto.staffId,id,start,end])).rows;
+      const targetDay=businessDayRange(businessDate(start));
+      const localLabel=(value:Date)=>new Intl.DateTimeFormat('es-SV',{dateStyle:'medium',timeStyle:'short',timeZone:'America/El_Salvador'}).format(value);
+      const mandatoryRestUntil=(shiftStart:Date,shiftEnd:Date,shiftType:string)=>{
+        const hours=(shiftEnd.valueOf()-shiftStart.valueOf())/HOUR;
+        const endDate=businessDate(new Date(shiftEnd.valueOf()-1));
+        const startDate=businessDate(shiftStart);
+        const startLocal=new Date(shiftStart.valueOf()-LOCAL_OFFSET);
+        const startsAtNight=startLocal.getUTCHours()>=18;
+        if(hours<24&&(startDate===endDate||(!startsAtNight&&shiftType!=='nocturno')))return null;
+        return businessDayRange(businessDate(shiftEnd)).end;
+      };
       if(dto.state!=='cancelado')for(const old of nearby){
         const a=new Date(old.start).valueOf(),b=new Date(old.end).valueOf();
         if(a<end.valueOf()&&b>start.valueOf())throw new ConflictException('Este horario se traslapa con otro turno de la misma persona.');
+        if(b<=start.valueOf()){
+          const restUntil=mandatoryRestUntil(new Date(old.start),new Date(old.end),old.tipo);
+          if(restUntil&&start<restUntil)throw new ProblemException('personal_en_descanso',409,`La persona está en descanso obligatorio hasta ${localLabel(restUntil)} por su turno anterior.`,'staffId',{disponibleDesde:restUntil.toISOString()});
+        }
+        if(a>=end.valueOf()){
+          const restUntil=mandatoryRestUntil(start,end,dto.type);
+          if(restUntil&&new Date(a)<restUntil)throw new ProblemException('personal_en_descanso',409,`La persona debe descansar después de este turno; el siguiente horario podrá iniciar desde ${localLabel(restUntil)}.`,'staffId',{disponibleDesde:restUntil.toISOString()});
+        }
         const previousHours=(b-a)/3600000;
         const required=old.tipo==='guardia'&&previousHours>=24?rest.tras_guardia_24h:rest.min_horas;
         if(b<=start.valueOf()&&(start.valueOf()-b)/3600000<required)throw new ConflictException(`Necesita al menos ${required} horas de descanso después del turno anterior.`);
         const nextRest=dto.type==='guardia'&&hours>=24?rest.tras_guardia_24h:rest.min_horas;
         if(a>=end.valueOf()&&(a-end.valueOf())/3600000<nextRest)throw new ConflictException(`Necesita al menos ${nextRest} horas de descanso antes del siguiente turno.`);
+      }
+      if(dto.state!=='cancelado'){
+        const sameJornada=nearby.find(old=>new Date(old.start)<targetDay.end&&new Date(old.end)>targetDay.start);
+        if(sameJornada)throw new ProblemException('personal_jornada_ocupada',409,`La persona ya tiene un turno asignado para la jornada del ${businessDate(start)}.`,'staffId',{jornada:businessDate(start)});
       }
       // FR-103-07 / RN-14: aviso, no bloqueo, de más de 44 h diurnas por semana (lunes a domingo, 06:00-22:00 local); excederlas exige justificación.
       const warnings:{codigo:string;horasSemana:number;limite:number}[]=[];
