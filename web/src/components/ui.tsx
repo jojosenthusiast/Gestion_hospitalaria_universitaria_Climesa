@@ -1,6 +1,6 @@
 import { useState, type InputHTMLAttributes, type ReactNode, type FormEvent } from 'react';
 
-export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back';
+export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'clock';
 const paths: Record<IconName, ReactNode> = {
   arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
   back: <><path d="M19 12H5M11 6l-6 6 6 6" /></>,
@@ -20,6 +20,7 @@ const paths: Record<IconName, ReactNode> = {
   lock: <><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
   search: <><circle cx="10" cy="10" r="6" /><path d="m15 15 6 6" /></>,
+  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
 };
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
