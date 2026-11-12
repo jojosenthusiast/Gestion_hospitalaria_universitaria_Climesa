@@ -25,7 +25,7 @@ export class AttentionService {
     const start = this.instant(startText, 'El inicio');
     const end = this.instant(endText, 'El fin');
     const minutes = (end.valueOf() - start.valueOf()) / 60_000;
-    if (minutes < 15 || minutes > 240) throw new BadRequestException('La cita debe durar entre 15 minutos y 4 horas.');
+    if (minutes !== 20) throw new BadRequestException('Las citas duran exactamente 20 minutos.');
     if (start <= this.clock.now()) throw new BadRequestException('La cita debe programarse en una fecha futura.');
     return { start, end };
   }
@@ -111,7 +111,13 @@ export class AttentionService {
       }
     }
     slots.sort((a, b) => a.start.localeCompare(b.start));
-    return { doctorId, date, durationMinutes, slots };
+    const workPeriods = shifts
+      .map((shift: any) => ({
+        start: new Date(shift.start).toISOString(),
+        end: new Date(shift.end).toISOString(),
+      }))
+      .filter(period => Number.isFinite(Date.parse(period.start)) && Number.isFinite(Date.parse(period.end)));
+    return { doctorId, date, durationMinutes, workPeriods, slots };
   }
 
   async list(actor: Actor, from?: string, to?: string, patientId?: string, doctorId?: string) {
