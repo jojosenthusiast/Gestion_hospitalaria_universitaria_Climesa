@@ -1,5 +1,5 @@
-import { useEffect,useRef,useState,type ReactNode } from 'react';
-import { Brand,Icon,StatusView,type IconName } from '../components/ui';
+import { useEffect,useState,type ReactNode } from 'react';
+import { Brand,Icon,StatusView } from '../components/ui';
 import { can,roleNames,type AccessProfile,type Api,type AuditRow,type Summary } from '../lib/api';
 import { AmbulancePage } from './ambulance';
 import { Empty,Heading,RemoteState,Tag,formatDateTime,useData } from './common';
@@ -8,7 +8,6 @@ import { PersonnelPage,ShiftsPage } from './personnel';
 import { Tablero } from './tablero';
 import { BedsPage,SpacesPage } from './spaces';
 import { UsersPage } from './users';
-import { AppointmentsPage } from './appointments';
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión. */
 export type Module={id:string;label:string;permission?:string;future?:boolean};
 export const modules:Module[]=[
@@ -24,11 +23,10 @@ export const modules:Module[]=[
  {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola',future:true},
  {id:'inventario',label:'Inventario',permission:'inventario.ver',future:true},
  {id:'fila',label:'Fila del día',permission:'fila.ver',future:true},
- {id:'citas',label:'Citas',permission:'citas.ver'},
+ {id:'citas',label:'Citas',permission:'citas.ver',future:true},
  {id:'privacidad',label:'Accesos excepcionales',permission:'privacidad.aprobar_acceso',future:true},
  {id:'perfil',label:'Perfil'},
 ];
-const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',fila:'queue',citas:'calendar',privacidad:'privacy',perfil:'user'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
 export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||can(profile,m.permission));
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
@@ -39,26 +37,12 @@ function HospitalClock(){
  useEffect(()=>{let timer:number;const tick=()=>{setNow(new Date());timer=window.setTimeout(tick,1000);};timer=window.setTimeout(tick,1000);return()=>window.clearTimeout(timer);},[]);
  const time=new Intl.DateTimeFormat('es-SV',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,hourCycle:'h23',timeZone:'America/El_Salvador'}).format(now).replace(/^24:/,'00:');
  const date=new Intl.DateTimeFormat('es-SV',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'America/El_Salvador'}).format(now);
- return <div className="hospital-clock" aria-label={`Hora actual ${time}, ${date}`}><Icon name="calendar" size={18}/><div><time className="hospital-clock-time" dateTime={now.toISOString()}>{time}</time><span className="hospital-clock-date">{date}</span></div></div>;
+ return <div className="hospital-clock" aria-label={'Hora actual '+time+', '+date}><Icon name="clock" size={18}/><div><time className="hospital-clock-time" dateTime={now.toISOString()}>{time}</time><span className="hospital-clock-date">{date}</span></div></div>;
 }
+
 export function HospitalShell({api,profile,version=0,connection='live',onLogout}:{api:Api;profile:AccessProfile;version?:number;connection?:'live'|'offline'|'reconnecting';onLogout:()=>void}){
- const [route,setRoute]=useState(readRoute),[navOpen,setNavOpen]=useState(false),[mobileNav,setMobileNav]=useState(false),menu=visibleModules(profile),roleLabel=profile.roles.map(r=>roleNames[r]??r).join(' · ');
- const navRef=useRef<HTMLElement>(null),toggleRef=useRef<HTMLButtonElement>(null);
- useEffect(()=>{const handle=()=>{setRoute(readRoute());setNavOpen(false);};window.addEventListener('hashchange',handle);return()=>window.removeEventListener('hashchange',handle);},[]);
- useEffect(()=>{if(!window.matchMedia)return;const media=window.matchMedia('(max-width: 767px)'),sync=()=>setMobileNav(media.matches);sync();media.addEventListener('change',sync);return()=>media.removeEventListener('change',sync);},[]);
- useEffect(()=>{
-  if(!navOpen)return;
-  const nav=navRef.current,focusable=nav?[...nav.querySelectorAll<HTMLElement>('a[href],button:not([disabled])')]:[];
-  focusable[0]?.focus();
-  const handleKey=(event:KeyboardEvent)=>{
-   if(event.key==='Escape'){event.preventDefault();setNavOpen(false);toggleRef.current?.focus();return;}
-   if(event.key!=='Tab'||focusable.length===0)return;
-   const first=focusable[0],last=focusable[focusable.length-1];
-   if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
-   else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
-  };
-  document.addEventListener('keydown',handleKey);return()=>document.removeEventListener('keydown',handleKey);
- },[navOpen]);
+ const [route,setRoute]=useState(readRoute),menu=visibleModules(profile),roleLabel=profile.roles.map(r=>roleNames[r]??r).join(' · ');
+ useEffect(()=>{const handle=()=>setRoute(readRoute());window.addEventListener('hashchange',handle);return()=>window.removeEventListener('hashchange',handle);},[]);
  if(!hasWebModule(profile))return <StatusView title="Tu rol no usa esta aplicación" detail="Tu cuenta no tiene módulos habilitados en la web. Ingresa desde la aplicación que corresponde a tu función." action="Cerrar sesión" onAction={onLogout}/>;
  const active=menu.find(m=>m.id===route);
  let content:ReactNode;
@@ -71,33 +55,10 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  else if(route==='camas')content=<BedsPage api={api} profile={profile} version={version}/>;
  else if(route==='ambulancia')content=<AmbulancePage api={api} profile={profile} version={version}/>;
  else if(route==='usuarios')content=<UsersPage api={api} profile={profile} version={version}/>;
- else if(route==='citas')content=<AppointmentsPage api={api} profile={profile} version={version}/>;
  else if(route==='auditoria')content=<AuditPage api={api} version={version}/>;
  else if(route==='perfil')content=<ProfilePage profile={profile} onLogout={onLogout}/>;
  else content=<><Heading eyebrow={`Próxima entrega / ${active.label}`} title={active.label} description="Espacio de trabajo del módulo."/><div className="future-module"><span className="eyebrow">Próxima entrega</span><h2>Este módulo todavía no está habilitado.</h2><p>Su acceso y navegación ya están definidos según tus permisos. Las operaciones se habilitarán en la siguiente entrega.</p><a href="#/inicio" className="row-action">Volver al inicio <Icon name="arrow" size={18}/></a></div></>;
- return <div className={`hospital-shell${navOpen?' nav-open':''}`}>
-  <a href="#main-content" className="skip-link">Ir al contenido</a>
-  <header className="hospital-header">
-   <div className="hospital-header-inner">
-    <button ref={toggleRef} className="nav-toggle" type="button" aria-label={navOpen?'Cerrar navegación':'Abrir navegación'} aria-expanded={navOpen} aria-controls="primary-navigation" onClick={()=>setNavOpen(open=>!open)}><Icon name={navOpen?'close':'menu'} size={22}/></button>
-    <Brand light/>
-    <div className="workspace-role"><span>{roleLabel}</span><span className="mono-label">HOSPITAL UNIVERSITARIO</span></div><HospitalClock />
-    <details className="account-menu"><summary aria-label="Opciones de cuenta"><span className="account-avatar">{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><span className="account-menu-label">Mi cuenta</span><span aria-hidden="true">⌄</span></summary><div className="account-popover"><span>Sesión iniciada</span><strong>{profile.email}</strong><a href="#/perfil">Ver mi cuenta</a><button onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></div></details>
-   </div>
-  </header>
-  <div className="hospital-frame">
-   <nav ref={navRef} id="primary-navigation" className={`module-nav shell-sidebar${navOpen?' is-open':''}`} aria-label="Navegación principal" aria-hidden={mobileNav&&!navOpen||undefined}>
-    <div className="sidebar-heading"><span className="mono-label">ESPACIO DE TRABAJO</span><strong>CLIMESA</strong></div>
-    {menu.map(m=><a href={`#/${m.id}`} key={m.id} aria-label={m.label} title={m.label} aria-current={route===m.id?'page':undefined} tabIndex={mobileNav&&!navOpen?-1:undefined} onClick={()=>setNavOpen(false)}><span className="module-icon" aria-hidden="true"><Icon name={moduleIcons[m.id]??'grid'} size={20}/></span><span className="module-label">{m.label}</span>{m.future&&<span className="module-future" aria-hidden="true"/>}</a>)}
-   </nav>
-   {navOpen&&<button className="nav-backdrop" type="button" aria-label="Cerrar panel de navegación" onClick={()=>{setNavOpen(false);toggleRef.current?.focus();}}/>}
-   <div className="hospital-workspace">
-    {connection!=='live'&&<div role="status" className={`connection-band connection-${connection}`}><Icon name="info" size={16}/>{connection==='offline'?'Sin conexión. No se pueden guardar cambios.':'Recuperando la conexión…'}</div>}
-    <main id="main-content" className="hospital-main" key={route}>{content}</main>
-    <footer className="hospital-footer"><Brand/><span>Hospital universitario CLIMESA</span><span><Icon name="lock" size={13}/>Acceso personal</span></footer>
-   </div>
-  </div>
- </div>;
+ return <div className="hospital-shell"><a href="#main-content" className="skip-link">Ir al contenido</a><header className="hospital-header"><div className="hospital-header-inner"><Brand light/><div className="workspace-role"><span>{roleLabel}</span><span className="mono-label">HOSPITAL UNIVERSITARIO</span></div><HospitalClock /><details className="account-menu"><summary aria-label="Opciones de cuenta"><span className="account-avatar">{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><span className="account-menu-label">Mi cuenta</span><span aria-hidden="true">⌄</span></summary><div className="account-popover"><span>Sesión iniciada</span><strong>{profile.email}</strong><a href="#/perfil">Ver mi cuenta</a><button onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></div></details></div><nav className="module-nav" aria-label="Navegación principal">{menu.map(m=><a href={`#/${m.id}`} key={m.id} aria-current={route===m.id?'page':undefined}>{m.label}</a>)}</nav></header>{connection!=='live'&&<div role="status" className={`connection-band connection-${connection}`}><Icon name="info" size={16}/>{connection==='offline'?'Sin conexión. No se pueden guardar cambios.':'Recuperando la conexión…'}</div>}<main id="main-content" className="hospital-main" key={route}>{content}</main><footer className="hospital-footer"><Brand/><span>Hospital universitario CLIMESA</span><span><Icon name="lock" size={13}/>Acceso personal</span></footer></div>;
 }
 function Dashboard({api,profile,version,menu}:{api:Api;profile:AccessProfile;version:number;menu:Module[]}){
  const board=can(profile,'metricas.ver');
@@ -109,3 +70,4 @@ function AuditPage({api,version}:{api:Api;version:number}){
  const data=useData<AuditRow[]>(api,'/auditoria',version);
  return <><Heading eyebrow="Protección de datos / Trazabilidad" title="Auditoría" description="Quién realizó cada operación, cuándo y con qué resultado."/><section className="data-workbench"><RemoteState state={data}>{rows=>rows.length?<table className="record-table"><caption className="sr-only">Últimas cien operaciones auditadas</caption><thead><tr><th>Fecha</th><th>Persona</th><th>Operación</th><th>Entidad</th><th>Resultado</th></tr></thead><tbody>{rows.map(r=><tr key={r.seq}><td data-label="Fecha">{formatDateTime(r.at)}</td><td data-label="Persona"><strong>{r.actor||'Cuenta del sistema'}</strong><small>{r.role}</small></td><td data-label="Operación">{r.action}</td><td data-label="Entidad">{r.entity}<small className="mono-data">{r.entityId}</small></td><td data-label="Resultado"><Tag value={r.result}/></td></tr>)}</tbody></table>:<Empty title="Todavía no hay actividad" description="Las operaciones aparecerán aquí después de registrarse."/>}</RemoteState><p className="table-footnote">Se muestran las últimas 100 operaciones. Los eventos no incluyen valores clínicos.</p></section></>;
 }
+
