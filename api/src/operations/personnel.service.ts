@@ -9,6 +9,7 @@ import { StaffDto, ShiftDto, RegistrationDto, PublishDto } from './operations.dt
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
 const HOUR=3600_000,DAY=24*HOUR,LOCAL_OFFSET=6*HOUR;
+const JOP_CUTOFF_MINUTES=16*60;
 /** Lunes 00:00 local (en UTC) de la semana que contiene el instante; la semana va de lunes a domingo (RN-14). */
 export const weekStart=(at:Date)=>{const day=new Date(`${businessDate(at)}T00:00:00Z`);return new Date(day.getTime()-((day.getUTCDay()+6)%7)*DAY+LOCAL_OFFSET);};
 /** Horas de [a,b) (ms UTC) que caen entre las 06:00 y las 22:00 locales. */
@@ -85,6 +86,14 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     return hasPermission(actor,'personal.ver_datos_personales')?rows:rows.map(({dui,phone,...row})=>row);
   }
   private async area(c:PoolClient,id?:string){if(id&&!(await c.query("SELECT id FROM infra.espacio WHERE id=$1 AND activo AND tipo IN ('area','planta','consultorio','hospital')",[id])).rowCount)throw new BadRequestException('Selecciona un área activa.');}
+  /** La planificación ordinaria de JOP está abierta de 00:00 a 16:00, hora de El Salvador.
+   * ADM conserva el permiso de emergencia; toda escritura queda auditada por CommandService. */
+  private assertJopPlanningWindow(actor:Actor,at:Date){
+    if(!actor.roles.includes('JOP')||actor.roles.includes('ADM'))return;
+    const local=new Date(at.valueOf()-LOCAL_OFFSET);
+    const minutes=local.getUTCHours()*60+local.getUTCMinutes();
+    if(minutes>=JOP_CUTOFF_MINUTES)throw new ProblemException('ventana_jop_cerrada',409,'La ventana de planificación de JOP está cerrada desde las 16:00. Se abrirá nuevamente a las 00:00.','turnos.planificar');
+  }
   async save(actor:Actor,id:string|null,dto:StaffDto,key?:string) {
     if(!/^[\p{L}\p{M} .’'-]+$/u.test(dto.givenNames+dto.surnames))throw new BadRequestException('Los nombres y apellidos no pueden contener números.');
     if(dto.dui&&(!/^\d{8}-?\d$/.test(dto.dui)||!validDui(dto.dui)))throw new BadRequestException('Revisa el dígito verificador del DUI.');
@@ -130,6 +139,8 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   async saveShift(actor:Actor,id:string|null,dto:ShiftDto,key?:string) {
     const start=new Date(dto.start),end=new Date(dto.end);
     if(!/(Z|[+-]\d\d:\d\d)$/.test(dto.start)||!/(Z|[+-]\d\d:\d\d)$/.test(dto.end)||!Number.isFinite(start.valueOf())||end<=start)throw new BadRequestException('Indica inicio y fin con zona horaria.');
+    const at=this.clock.now();
+    if(dto.state!=='cancelado')this.assertJopPlanningWindow(actor,at);
     return this.commands.run(actor,`turnos.planificar:${id??'nuevo'}`,key,dto,async c=>{
       const person=(await c.query('SELECT id,tipo,activo FROM personal.persona WHERE id=$1 FOR UPDATE',[dto.staffId])).rows[0];
       if(!person?.activo)throw new BadRequestException('Selecciona personal activo.');
@@ -171,7 +182,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
         if(old.version!==dto.version)throw new VersionConflictException(old.version,'El turno cambió; actualiza la planificación.');
         if(!dto.reason||dto.reason.trim().length<10)throw new BadRequestException('Indica el motivo del cambio.');
         row=(await c.query("UPDATE personal.turno SET persona_id=$2,area_id=$3,periodo=tstzrange($4,$5,'[)'),tipo=$6,justificacion=$7,estado=coalesce($8,estado),version=version+1 WHERE id=$1 RETURNING id,version",[id,dto.staffId,dto.areaId,start,end,dto.type,dto.justification||null,dto.state||null])).rows[0];
-      }else row=(await c.query("INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,justificacion,creado_por) VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7) RETURNING id,version",[dto.staffId,dto.areaId,start,end,dto.type,dto.justification||null,actor.id])).rows[0];
+      }else row=(await c.query("INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,justificacion,estado,publicado_por,publicado_en,creado_por) VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,'publicado',$7,$8,$7) RETURNING id,version",[dto.staffId,dto.areaId,start,end,dto.type,dto.justification||null,actor.id,at])).rows[0];
       await this.commands.audit(c,actor,{action:id?'turnos.mover':'turnos.crear',entity:'turno',entityId:row.id,permission:'turnos.planificar',reason:dto.reason,...(warnings.length?{detail:{horasSemana:warnings[0].horasSemana,limite:warnings[0].limite,justificacion:dto.justification!.trim()}}:{})});
       const accounts=(await c.query('SELECT id FROM acceso.usuario WHERE persona_personal_id=$1',[dto.staffId])).rows;
       await this.commands.event(c,'turno.actualizado','turno',row.id,row.version,['rol:JOP','rol:ADM',...accounts.map(a=>`usuario:${a.id}`)]);
