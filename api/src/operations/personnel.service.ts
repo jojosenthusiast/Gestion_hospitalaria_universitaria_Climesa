@@ -140,7 +140,9 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       const duration=await this.policies.value<{min_horas:number;max_horas:number;max_guardia_medica:number}>(c,'turnos.duracion',start);
       const rest=await this.policies.value<{min_horas:number;tras_guardia_24h:number}>(c,'turnos.descanso',start);
       const hours=(end.valueOf()-start.valueOf())/3600000;
-      const max=dto.type==='guardia'&&person.tipo==='medico'?duration.max_guardia_medica:duration.max_horas;
+      // Las guardias y los turnos nocturnos extendidos pueden cubrir hasta 24 h;
+      // la jornada de 24 h no se limita únicamente al rol médico.
+      const max=['guardia','nocturno'].includes(dto.type)?duration.max_guardia_medica:duration.max_horas;
       if(hours<duration.min_horas||hours>max)throw new BadRequestException(`La duración permitida es de ${duration.min_horas} a ${max} horas.`);
       const nearby=(await c.query("SELECT id,lower(periodo) AS start,upper(periodo) AS \"end\",tipo FROM personal.turno WHERE persona_id=$1 AND estado<>'cancelado' AND ($2::uuid IS NULL OR id<>$2) AND periodo && tstzrange($3::timestamptz-interval '3 days',$4::timestamptz+interval '3 days')",[dto.staffId,id,start,end])).rows;
       const targetDay=businessDayRange(businessDate(start));
@@ -168,7 +170,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
         const previousHours=(b-a)/3600000;
         const required=old.tipo==='guardia'&&previousHours>=24?rest.tras_guardia_24h:rest.min_horas;
         if(b<=start.valueOf()&&(start.valueOf()-b)/3600000<required)throw new ConflictException(`Necesita al menos ${required} horas de descanso después del turno anterior.`);
-        const nextRest=dto.type==='guardia'&&hours>=24?rest.tras_guardia_24h:rest.min_horas;
+        const nextRest=['guardia','nocturno'].includes(dto.type)&&hours>=24?rest.tras_guardia_24h:rest.min_horas;
         if(a>=end.valueOf()&&(a-end.valueOf())/3600000<nextRest)throw new ConflictException(`Necesita al menos ${nextRest} horas de descanso antes del siguiente turno.`);
       }
       if(dto.state!=='cancelado'){
