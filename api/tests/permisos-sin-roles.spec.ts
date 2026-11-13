@@ -77,13 +77,15 @@ describe('Decisiones por rol que ahora salen del catálogo de permisos',()=>{
   });
  });
 
- describe('borradores de turnos',()=>{
-  test('ADM y JOP ven el borrador; los demás roles solo turnos publicados',async()=>{
+ describe('turnos de publicación automática',()=>{
+  test('la asignación nace publicada y es visible para quienes consultan turnos',async()=>{
    const tree=(await call('JOP','GET','/espacios')).body;
    const areaId=tree.find((n:any)=>n.code==='P1-EMG').id;
    const created=await call('JOP','POST','/turnos',{staffId:await staff(),areaId,type:'diurno',start:'2026-11-10T06:00:00-06:00',end:'2026-11-10T14:00:00-06:00'});
    expect(created.status).toBe(201);draftId=created.body.id;
-   for(const [role,sees] of [['ADM',true],['JOP',true],['REC',false],['AST',false],['ENF',false],['MED',false],['LAB',false],['PAR',false]] as [string,boolean][]){
+   const saved=(await fixture.pg.query<{estado:string}>('SELECT estado FROM personal.turno WHERE id=$1',[draftId])).rows[0];
+   expect(saved.estado).toBe('publicado');
+   for(const [role,sees] of [['ADM',true],['JOP',true],['REC',true],['AST',true],['ENF',true],['MED',true],['LAB',true],['PAR',true]] as [string,boolean][]){
     const list=await call(role,'GET','/turnos');
     expect([role,list.status]).toEqual([role,200]);
     expect([role,list.body.some((t:any)=>t.id===draftId)]).toEqual([role,sees]);

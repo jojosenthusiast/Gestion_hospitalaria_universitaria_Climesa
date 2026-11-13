@@ -81,6 +81,8 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
  test('publicar con huecos publica igual, devuelve la advertencia y registra quién publicó',async()=>{
   const doctor=await person('medico'),d='2026-11-17';
   const draft=(await shift(doctor.id,local(d,'08:00'),local(d,'16:00'))).body;
+  // Compatibilidad: un borrador legado todavía se puede publicar explícitamente.
+  await fixture.pg.query("UPDATE personal.turno SET estado='borrador',publicado_por=NULL,publicado_en=NULL WHERE id=$1",[draft.id]);
   const key=randomUUID();
   const published=await call('JOP','POST','/turnos/publicar',{from:d,to:d},key);
   expect(published.status).toBe(201);
@@ -103,6 +105,7 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   expect((await shift(doctor.id,local(d,'00:00'),local('2026-11-13','00:00'),{type:'guardia'})).status).toBe(201);
   expect((await shift(nurseA.id,local(d,'00:00'),local(d,'12:00'))).status).toBe(201);
   expect((await shift(nurseB.id,local(d,'12:00'),local('2026-11-13','00:00'))).status).toBe(201);
+  await fixture.pg.query("UPDATE personal.turno SET estado='borrador',publicado_por=NULL,publicado_en=NULL WHERE persona_id=ANY($1::uuid[])",[[doctor.id,nurseA.id,nurseB.id]]);
   const published=await call('JOP','POST','/turnos/publicar',{from:d,to:d,areaId:emergencyId});
   expect(published.status).toBe(201);expect(published.body.published).toBe(3);expect(published.body.warnings).toEqual([]);
  });
@@ -118,19 +121,20 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   expect((await state()).estado).toBe('publicado');
   current=new Date('2026-11-20T14:00:00Z');// 08:00 local
   await app.get(PersonnelService).advanceStates();
-  expect(await state()).toEqual({estado:'en_curso',version:3});
+  expect(await state()).toEqual({estado:'en_curso',version:2});
   await app.get(PersonnelService).advanceStates();
-  expect((await state()).version).toBe(3);// idempotente
+  expect((await state()).version).toBe(2);// idempotente
   current=new Date('2026-11-20T22:00:00Z');// 16:00 local
   expect((await call('JOP','GET','/turnos')).body.find((s:any)=>s.id===created.id).state).toBe('completado');
   const events=(await fixture.pg.query<any>("SELECT tipo FROM plataforma.outbox WHERE entidad_id=$1 ORDER BY seq",[created.id])).rows.map(r=>r.tipo);
-  expect(events).toEqual(['turno.actualizado','turno.publicado','turno.actualizado','turno.actualizado']);
+  expect(events).toEqual(['turno.actualizado','turno.actualizado','turno.actualizado']);
   current=new Date('2026-10-24T12:00:00Z');
  });
 
  test('un borrador o un turno cancelado nunca cambia de estado por el reloj',async()=>{
   const assistant=await person('asistente'),d='2026-11-24';
   const draft=(await shift(assistant.id,local(d,'07:00'),local(d,'15:00'),{areaId})).body;
+  await fixture.pg.query("UPDATE personal.turno SET estado='borrador',publicado_por=NULL,publicado_en=NULL WHERE id=$1",[draft.id]);
   current=new Date('2026-11-25T12:00:00Z');
   await app.get(PersonnelService).advanceStates();
   current=new Date('2026-10-24T12:00:00Z');

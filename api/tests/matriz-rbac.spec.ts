@@ -72,7 +72,7 @@ describe('110-T06 · matriz RBAC: CSV ↔ base ↔ OpenAPI',()=>{
  });
  test('toda operación de la API declara un permiso que existe en permisos.csv (o es pública)',()=>{
   const conocidos=new Set(permisosCsv.map(p=>p.permiso));
-  const invalidas=Object.entries(operaciones).filter(([,permiso])=>permiso!=='publico'&&!conocidos.has(permiso)).map(([op,permiso])=>`${op} → ${permiso}`);
+  const invalidas=Object.entries(operaciones).filter(([,permiso])=>permiso!=='publico'&&permiso.split(' OR ').some(code=>!conocidos.has(code))).map(([op,permiso])=>`${op} → ${permiso}`);
   expect(invalidas).toEqual([]);
  });
  test('el permiso de cada operación de la API coincide con su fila de endpoints.csv, sin alias de ruta',()=>{
