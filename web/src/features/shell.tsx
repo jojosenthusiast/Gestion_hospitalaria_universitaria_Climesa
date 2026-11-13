@@ -14,8 +14,8 @@ import { QueuePage } from './queue';
 import { LaboratoryPage } from './laboratory';
 import { InventoryPage } from './inventory';
 import { HospitalizationPage } from './hospitalization';
-/** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión. */
-export type Module={id:string;label:string;permission?:string;future?:boolean};
+/** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión; `alsoPermissions` abre el mismo módulo a otros permisos. */
+export type Module={id:string;label:string;permission?:string;alsoPermissions?:string[];future?:boolean};
 export const modules:Module[]=[
  {id:'inicio',label:'Inicio'},
  {id:'pacientes',label:'Pacientes',permission:'pacientes.buscar'},
@@ -26,7 +26,7 @@ export const modules:Module[]=[
  {id:'turnos',label:'Turnos',permission:'turnos.ver'},
  {id:'usuarios',label:'Usuarios',permission:'usuarios.ver'},
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver'},
- {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola'},
+ {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola',alsoPermissions:['laboratorio.ordenar']},
  {id:'inventario',label:'Inventario',permission:'inventario.ver'},
  {id:'hospitalizacion',label:'Hospitalización',permission:'admision.crear'},
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
@@ -37,7 +37,7 @@ export const modules:Module[]=[
 ];
 const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',privacidad:'privacy',perfil:'user'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
-export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||can(profile,m.permission));
+export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
 export const hasWebModule=(profile:AccessProfile)=>visibleModules(profile).some(m=>m.permission);
 const readRoute=()=>location.hash.replace(/^#\/?/,'').split('?')[0]||'inicio';

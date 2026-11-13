@@ -58,3 +58,47 @@ describe('W-consultorio · signos vitales (WEB-09)', () => {
     await waitFor(() => expect((within(dialog).getByLabelText('PA sistólica') as HTMLInputElement).value).toBe(''));
   });
 });
+
+const catalog = [
+  { id: '11111111-1111-4111-8111-111111111111', code: 'HEM', name: 'Hemograma completo', isPanel: true, unit: null, resultType: 'panel' },
+  { id: '22222222-2222-4222-8222-222222222222', code: 'GLU', name: 'Glucosa en ayunas', isPanel: false, unit: 'mg/dL', resultType: 'numerico' },
+];
+
+describe('W-consultorio · orden de laboratorio desde la consulta (REQ-04)', () => {
+  it('con laboratorio.ordenar elige exámenes del catálogo y prioridad, y envía la orden con clave de idempotencia', async () => {
+    const api = mount(['consulta.iniciar', 'laboratorio.ordenar'], { '/laboratorio/catalogo': catalog }, async () => ({ id: 'ord-1', version: 1, state: 'pendiente' }) as never);
+    const dialog = await openConsultation();
+    const section = await within(dialog).findByRole('group', { name: 'Exámenes y paneles' });
+    await userEvent.click(within(section).getByLabelText(/Glucosa en ayunas/));
+    await userEvent.click(within(section).getByLabelText(/Hemograma completo/));
+    await userEvent.selectOptions(within(dialog).getByLabelText('Prioridad'), 'urgente');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Enviar orden al laboratorio' }));
+    expect(await within(dialog).findByText('Orden enviada al laboratorio. Aparecerá en la cola de Laboratorio.')).toBeTruthy();
+    expect(api.write).toHaveBeenCalledWith('/laboratorio/ordenes', { consultationId: 'cons-1', exams: [catalog[1].id, catalog[0].id], priority: 'urgente' }, 'POST');
+    expect((within(section).getByLabelText(/Glucosa en ayunas/) as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('no permite enviar sin exámenes y conserva la selección si la API rechaza', async () => {
+    mount(['consulta.iniciar', 'laboratorio.ordenar'], { '/laboratorio/catalogo': catalog }, async () => { throw new ApiError('Selecciona exámenes activos del catálogo.', 400); });
+    const dialog = await openConsultation();
+    const send = await within(dialog).findByRole('button', { name: 'Enviar orden al laboratorio' });
+    expect((send as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(within(dialog).getByLabelText(/Glucosa en ayunas/));
+    await userEvent.click(send);
+    expect(await within(dialog).findByText('Selecciona exámenes activos del catálogo.')).toBeTruthy();
+    expect((within(dialog).getByLabelText(/Glucosa en ayunas/) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('sin laboratorio.ordenar no muestra la sección ni pide el catálogo', async () => {
+    const api = mount(['consulta.iniciar']);
+    const dialog = await openConsultation();
+    expect(within(dialog).queryByRole('group', { name: 'Exámenes y paneles' })).toBeNull();
+    expect(api.request.mock.calls.map(([path]) => path)).not.toContain('/laboratorio/catalogo');
+  });
+
+  it('con catálogo vacío lo explica', async () => {
+    mount(['consulta.iniciar', 'laboratorio.ordenar'], { '/laboratorio/catalogo': [] });
+    const dialog = await openConsultation();
+    expect(await within(dialog).findByText('El catálogo de laboratorio no tiene exámenes activos.')).toBeTruthy();
+  });
+});

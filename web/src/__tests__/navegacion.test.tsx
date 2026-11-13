@@ -145,7 +145,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 const menuCatalogo: Record<string, string[]> = {
   AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
   ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario'],
-  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Fila del día', 'Citas', 'Mi consultorio'],
+  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Laboratorio', 'Fila del día', 'Citas', 'Mi consultorio'],
   PAR: ['Pacientes', 'Ambulancia', 'Turnos'],
   PAC: ['Fila del día', 'Citas'],
 };
@@ -291,5 +291,13 @@ describe('sin marcadores de entregas futuras (WEB-03)', () => {
     expect(await screen.findByRole('heading', { name: /Accesos excepcionales/ })).toBeTruthy();
     expect(screen.queryByText(/Próxima entrega|siguiente entrega/i)).toBeNull();
     expect(screen.getByText('Este módulo no tiene operaciones habilitadas.')).toBeTruthy();
+  });
+});
+
+describe('módulos abiertos por un segundo permiso', () => {
+  it('quien puede emitir órdenes de laboratorio (laboratorio.ordenar) ve el módulo Laboratorio', async () => {
+    const nav = await entrar(perfil('MED'));
+    expect(within(nav).getByRole('link', { name: 'Laboratorio' })).toBeTruthy();
+    expect(within(nav).getByRole('link', { name: 'Mi consultorio' })).toBeTruthy();
   });
 });
