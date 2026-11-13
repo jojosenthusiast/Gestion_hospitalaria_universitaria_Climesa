@@ -111,7 +111,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         if(page==AndroidSection.STAFF){StaffScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.MY_APPOINTMENTS){PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding));return@content}
         if(page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION){QueueScreen(account.profile,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.MEDICAL_DAY||page==AndroidSection.CONSULTATIONS){ConsultationScreen(Modifier.padding(padding));return@content}
+        if(page==AndroidSection.MEDICAL_DAY||page==AndroidSection.CONSULTATIONS){ConsultationScreen(account.profile,Modifier.padding(padding));return@content}
         LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=18.dp,vertical=22.dp),verticalArrangement=Arrangement.spacedBy(20.dp)){
             if(page!=AndroidSection.HOME)item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",page.label)}
             if(page==AndroidSection.PROFILE){
@@ -179,4 +179,3 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     )
 }
 @Composable private fun PendingModule(){Column{HorizontalDivider();Spacer(Modifier.height(22.dp));Text(stringResource(R.string.portal_proxima_entrega),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary);Spacer(Modifier.height(14.dp));Text(stringResource(R.string.portal_modulo_pendiente),style=MaterialTheme.typography.titleLarge);Spacer(Modifier.height(12.dp));Text(stringResource(R.string.portal_modulo_pendiente_detalle),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
-
