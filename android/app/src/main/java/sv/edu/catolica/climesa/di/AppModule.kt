@@ -20,6 +20,7 @@ object AppModule {
     @Provides @Singleton fun auth(@ApplicationContext context:Context)=SupabaseAuthRepository(BuildConfig.SUPABASE_URL,BuildConfig.SUPABASE_PUBLISHABLE_KEY,SecureSessionStore(context))
     @Provides @Singleton fun backend()=BackendAccessRepository(BuildConfig.API_BASE_URL)
     @Provides @Singleton fun api(auth:SupabaseAuthRepository)=ApiClient(BuildConfig.API_BASE_URL,auth)
+    @Provides @Singleton fun gateway(api:ApiClient):ApiGateway=api
     @Provides @Singleton fun patients(api:ApiClient):PatientRepository=RemotePatientRepository(api)
     @Provides @Singleton fun beds(api:ApiClient):BedRepository=RemoteBedRepository(api)
     @Provides @Singleton fun roleSource(api:ApiClient):sv.edu.catolica.climesa.ui.RoleDataSource=object:sv.edu.catolica.climesa.ui.RoleDataSource{

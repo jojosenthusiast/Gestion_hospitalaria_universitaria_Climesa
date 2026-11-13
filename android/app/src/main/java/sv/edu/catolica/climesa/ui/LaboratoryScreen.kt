@@ -41,6 +41,7 @@ fun LaboratoryScreen(profile: AccessProfile, modifier: Modifier = Modifier, mode
     var selected by rememberSaveable { mutableStateOf<Pair<String, String>?>(null) }
     var sampleOrderId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     val selectedOrder = selected?.let { key -> state.orders.firstOrNull { it.id == key.first } }
     val selectedItem = selectedOrder?.items?.firstOrNull { it.id == selected?.second }
     val sampleOrder = sampleOrderId?.let { id -> state.orders.firstOrNull { it.id == id } }

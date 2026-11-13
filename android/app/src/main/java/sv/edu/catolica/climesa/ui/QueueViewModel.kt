@@ -5,28 +5,47 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import sv.edu.catolica.climesa.data.ApiClient
+import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.AuthRequestException
+import sv.edu.catolica.climesa.data.realtime.LiveSubscription
+import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
+import sv.edu.catolica.climesa.domain.QueueEvents
 import sv.edu.catolica.climesa.domain.QueueTicket
+import sv.edu.catolica.climesa.domain.RealtimeSignal
 
 data class QueueState(val loading: Boolean = true, val tickets: List<QueueTicket> = emptyList(), val busy: Boolean = false, val error: String? = null, val notice: String? = null)
 
 @HiltViewModel
-class QueueViewModel @Inject constructor(private val api: ApiClient) : ViewModel() {
+class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
     private val mutable = MutableStateFlow(QueueState())
     val state = mutable.asStateFlow()
+    private val live = LiveSubscription(realtime)
+    private var loadJob: Job? = null
 
-    fun load() {
-        mutable.value = mutable.value.copy(loading = true, error = null)
-        viewModelScope.launch {
-            try { mutable.value = QueueState(loading = false, tickets = parse(api.request("/fila"))) }
+    /**
+     * Loads the queue. A [silent] reload (realtime invalidation) keeps the current list and messages visible and
+     * keeps the shown tickets if it fails. A newer load replaces one still running.
+     */
+    fun load(silent: Boolean = false) {
+        if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            try { val tickets = parse(api.request("/fila")); mutable.value = mutable.value.copy(loading = false, tickets = tickets) }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { mutable.value = mutable.value.copy(loading = false, error = message(e)) }
+            catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) }
+        }
+    }
+
+    /** Idempotent per channel list: reloads when a queue event arrives or after a reconnection gap. */
+    fun startLive(channels: List<String>) {
+        live.start(viewModelScope, channels) { signal ->
+            if (signal is RealtimeSignal.Event && QueueEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load(silent = true)
         }
     }
 

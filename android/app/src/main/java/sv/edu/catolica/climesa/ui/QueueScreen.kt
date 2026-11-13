@@ -43,6 +43,7 @@ fun QueueScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Qu
     val canCall = "fila.llamar" in profile.permissions
     val canManage = "fila.gestionar" in profile.permissions
     LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     if (issueOpen) QueueIssueDialog(busy = state.busy, onClose = { issueOpen = false }, onSubmit = { service -> issueOpen = false; model.issue(service) })
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { SectionIntro("Atención / Llegada", "Fila del día", "El número se emite al llegar y avanza sin alterar la hora de la cita.") }

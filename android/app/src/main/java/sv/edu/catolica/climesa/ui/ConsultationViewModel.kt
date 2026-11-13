@@ -5,14 +5,19 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import sv.edu.catolica.climesa.data.ApiClient
+import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.data.realtime.LiveSubscription
+import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
+import sv.edu.catolica.climesa.domain.ConsultationEvents
 import sv.edu.catolica.climesa.data.AuthRequestException
 import sv.edu.catolica.climesa.domain.MedicalAppointment
+import sv.edu.catolica.climesa.domain.RealtimeSignal
 
 data class ConsultationState(
     val loading: Boolean = true,
@@ -23,18 +28,32 @@ data class ConsultationState(
 )
 
 @HiltViewModel
-class ConsultationViewModel @Inject constructor(private val api: ApiClient) : ViewModel() {
+class ConsultationViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
     private val mutable = MutableStateFlow(ConsultationState())
     val state = mutable.asStateFlow()
+    private val live = LiveSubscription(realtime)
+    private var loadJob: Job? = null
 
-    fun load() {
-        mutable.value = mutable.value.copy(loading = true, error = null, notice = null)
-        viewModelScope.launch {
+    /**
+     * Loads the agenda. A [silent] reload (realtime invalidation, or after an action) keeps the shown agenda and
+     * messages, and keeps the agenda if it fails. A newer load replaces one still running.
+     */
+    fun load(silent: Boolean = false) {
+        if (!silent) mutable.value = mutable.value.copy(loading = true, error = null, notice = null)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             try {
                 val rows = parse(api.request("/consultas/agenda"))
-                mutable.value = ConsultationState(loading = false, appointments = rows)
+                mutable.value = mutable.value.copy(loading = false, appointments = rows)
             } catch (e: CancellationException) { throw e
-            } catch (e: Exception) { mutable.value = mutable.value.copy(loading = false, error = message(e)) }
+            } catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) }
+        }
+    }
+
+    /** Idempotent per channel list: reloads when a consultation or appointment event arrives, or after a gap. */
+    fun startLive(channels: List<String>) {
+        live.start(viewModelScope, channels) { signal ->
+            if (signal is RealtimeSignal.Event && ConsultationEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load(silent = true)
         }
     }
 

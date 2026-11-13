@@ -42,17 +42,40 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import sv.edu.catolica.climesa.data.ApiClient
+import kotlinx.coroutines.Job
+import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.data.realtime.LiveSubscription
+import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
+import sv.edu.catolica.climesa.domain.AccessProfile
+import sv.edu.catolica.climesa.domain.AdmissionEvents
+import sv.edu.catolica.climesa.domain.RealtimeSignal
 
 data class HospitalAdmission(val id: String, val patientName: String, val state: String, val bed: String, val category: String, val isolation: Boolean, val version: Int)
 data class HospitalBedSuggestion(val id: String, val version: Int, val code: String, val room: String, val category: String, val reason: String)
 data class HospitalizationState(val loading: Boolean = true, val busy: Boolean = false, val admissions: List<HospitalAdmission> = emptyList(), val suggestions: List<HospitalBedSuggestion> = emptyList(), val selectedId: String? = null, val error: String? = null, val notice: String? = null)
 
 @HiltViewModel
-class HospitalizationViewModel @Inject constructor(private val api: ApiClient) : ViewModel() {
+class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
     private val mutable = MutableStateFlow(HospitalizationState())
     val state = mutable.asStateFlow()
-    fun load() { mutable.value = mutable.value.copy(loading = true, error = null); viewModelScope.launch { try { mutable.value = HospitalizationState(loading = false, admissions = parseAdmissions(api.request("/admisiones"))) } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.value = mutable.value.copy(loading = false, error = e.message ?: "No se pudieron cargar las admisiones.") } } }
+    private val live = LiveSubscription(realtime)
+    private var loadJob: Job? = null
+    /** A [silent] reload (realtime invalidation) keeps the open dialog, messages and shown admissions, even if it fails. */
+    fun load(silent: Boolean = false) {
+        if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            try { val admissions = parseAdmissions(api.request("/admisiones")); mutable.value = mutable.value.copy(loading = false, admissions = admissions) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = e.message ?: "No se pudieron cargar las admisiones.") }
+        }
+    }
+    /** Idempotent per channel list: reloads when an admission event arrives or after a reconnection gap. */
+    fun startLive(channels: List<String>) {
+        live.start(viewModelScope, channels) { signal ->
+            if (signal is RealtimeSignal.Event && AdmissionEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load(silent = true)
+        }
+    }
     fun open(admission: HospitalAdmission) { mutable.value = mutable.value.copy(selectedId = admission.id, suggestions = emptyList(), error = null); viewModelScope.launch { try { mutable.value = mutable.value.copy(suggestions = parseSuggestions(api.request("/admisiones/${admission.id}/sugerencias-cama"))) } catch (e: Exception) { mutable.value = mutable.value.copy(error = e.message ?: "No se pudieron consultar las camas.") } } }
     fun close() { mutable.value = mutable.value.copy(selectedId = null, suggestions = emptyList(), error = null) }
     fun assign(admission: HospitalAdmission, suggestion: HospitalBedSuggestion) = mutate("/admisiones/${admission.id}/cama", JSONObject().put("bedId", suggestion.id).put("version", suggestion.version).put("reason", "Asignación confirmada desde Android."), "Cama asignada.")
@@ -65,8 +88,9 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiClient) :
 }
 
 @Composable
-fun HospitalizationScreen(modifier: Modifier = Modifier, model: HospitalizationViewModel = viewModel()) {
+fun HospitalizationScreen(modifier: Modifier = Modifier, profile: AccessProfile? = null, model: HospitalizationViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle(); LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
     val admission = state.selectedId?.let { id -> state.admissions.firstOrNull { it.id == id } }
     if (admission != null) BedSuggestionDialog(admission, state, model)
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

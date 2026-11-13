@@ -5,30 +5,46 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import sv.edu.catolica.climesa.data.ApiClient
+import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.data.realtime.LiveSubscription
+import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.data.AuthRequestException
+import sv.edu.catolica.climesa.domain.LaboratoryEvents
 import sv.edu.catolica.climesa.domain.LaboratoryItem
 import sv.edu.catolica.climesa.domain.LaboratoryOrder
 import sv.edu.catolica.climesa.domain.LaboratoryResult
+import sv.edu.catolica.climesa.domain.RealtimeSignal
 
 data class LaboratoryState(val loading: Boolean = true, val orders: List<LaboratoryOrder> = emptyList(), val busy: Boolean = false, val error: String? = null, val notice: String? = null)
 
 @HiltViewModel
-class LaboratoryViewModel @Inject constructor(private val api: ApiClient) : ViewModel() {
+class LaboratoryViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
     private val mutable = MutableStateFlow(LaboratoryState())
     val state = mutable.asStateFlow()
+    private val live = LiveSubscription(realtime)
+    private var loadJob: Job? = null
 
-    fun load() {
-        mutable.value = mutable.value.copy(loading = true, error = null)
-        viewModelScope.launch {
-            try { mutable.value = LaboratoryState(loading = false, orders = parse(api.request("/laboratorio/ordenes"))) }
+    /** A [silent] reload (realtime invalidation) keeps the shown orders and messages, even if it fails. */
+    fun load(silent: Boolean = false) {
+        if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            try { val orders = parse(api.request("/laboratorio/ordenes")); mutable.value = mutable.value.copy(loading = false, orders = orders) }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { mutable.value = mutable.value.copy(loading = false, error = message(e)) }
+            catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) }
+        }
+    }
+
+    /** Idempotent per channel list: reloads when a laboratory event arrives or after a reconnection gap. */
+    fun startLive(channels: List<String>) {
+        live.start(viewModelScope, channels) { signal ->
+            if (signal is RealtimeSignal.Event && LaboratoryEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load(silent = true)
         }
     }
 

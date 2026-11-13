@@ -46,6 +46,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     val state by model.state.collectAsStateWithLifecycle()
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
     val selectedItem = state.appointments.firstOrNull { it.appointmentId == selected }
     selectedItem?.let { item -> ConsultationDialog(item, profile, state.saving, model, onClose = { selected = null }) }
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
