@@ -79,6 +79,24 @@ class ConsultationViewModel @Inject constructor(private val api: ApiClient) : Vi
         }
     }
 
+    fun signs(item: MedicalAppointment, systolic: String, diastolic: String, heartRate: String, temperature: String, oxygenSaturation: String) {
+        if (item.consultationId == null) return
+        val body = JSONObject().apply {
+            number(systolic)?.let { put("systolic", it) }
+            number(diastolic)?.let { put("diastolic", it) }
+            number(heartRate)?.let { put("heartRate", it) }
+            number(temperature)?.let { put("temperature", it) }
+            number(oxygenSaturation)?.let { put("oxygenSaturation", it) }
+        }
+        if (body.length() == 0) { mutable.value = mutable.value.copy(error = "Escribe al menos un signo vital."); return }
+        mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        viewModelScope.launch {
+            try { api.request("/consultas/${item.consultationId}/signos", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Signos vitales registrados.") }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
+        }
+    }
+
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
 
     private fun replace(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, version: Int, notice: String) {
@@ -93,5 +111,5 @@ class ConsultationViewModel @Inject constructor(private val api: ApiClient) : Vi
     }
 
     private fun message(error: Exception) = when (error) { is AuthRequestException -> error.message ?: "No se pudo completar la operación."; else -> error.message ?: "No se pudo completar la operación." }
+    private fun number(value: String): Double? = value.trim().toDoubleOrNull()
 }
-
