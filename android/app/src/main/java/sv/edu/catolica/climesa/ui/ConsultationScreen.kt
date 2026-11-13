@@ -37,17 +37,18 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import sv.edu.catolica.climesa.domain.MedicalAppointment
+import sv.edu.catolica.climesa.domain.AccessProfile
 
 private val sanSalvador = ZoneId.of("America/El_Salvador")
 private val appointmentFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 
 @Composable
-fun ConsultationScreen(modifier: Modifier = Modifier, model: ConsultationViewModel = viewModel()) {
+fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modifier, model: ConsultationViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { model.load() }
     val selectedItem = state.appointments.firstOrNull { it.appointmentId == selected }
-    selectedItem?.let { item -> ConsultationDialog(item, state.saving, model, onClose = { selected = null }) }
+    selectedItem?.let { item -> ConsultationDialog(item, profile, state.saving, model, onClose = { selected = null }) }
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { SectionIntro("Medicina / Atención", "Mi consultorio", "Agenda propia y registro clínico conectado a cada cita confirmada.") }
         state.error?.let { error -> item { ClimesaActionGroup { Text(error, color = MaterialTheme.colorScheme.error); ClimesaButton("Reintentar", Icons.Default.Refresh, { model.clearMessages(); model.load() }, outlined = true) } } }
@@ -70,10 +71,15 @@ private fun MedicalAppointmentCard(item: MedicalAppointment, onOpen: () -> Unit)
 }
 
 @Composable
-private fun ConsultationDialog(item: MedicalAppointment, busy: Boolean, model: ConsultationViewModel, onClose: () -> Unit) {
+private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, model: ConsultationViewModel, onClose: () -> Unit) {
     var reason by rememberSaveable(item.appointmentId) { mutableStateOf(item.consultationReason ?: item.reason.orEmpty()) }
     var physicalExam by rememberSaveable(item.appointmentId) { mutableStateOf(item.physicalExam.orEmpty()) }
     var plan by rememberSaveable(item.appointmentId) { mutableStateOf(item.plan.orEmpty()) }
+    var systolic by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var diastolic by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var heartRate by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var temperature by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var oxygenSaturation by rememberSaveable(item.appointmentId) { mutableStateOf("") }
     val signed = item.consultationState == "firmada"
     AlertDialog(onDismissRequest = { if (!busy) onClose() }, title = { Text(if (signed) "Consulta firmada" else if (item.consultationId == null) "Iniciar consulta" else "Continuar consulta") }, text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Paciente: ${item.patientName}\nCita: ${formatDateTime(item.start)}", style = MaterialTheme.typography.bodySmall)
@@ -81,6 +87,12 @@ private fun ConsultationDialog(item: MedicalAppointment, busy: Boolean, model: C
         OutlinedTextField(reason, { reason = it.take(2000) }, label = { Text("Motivo de consulta") }, enabled = !signed, modifier = Modifier.fillMaxWidth(), minLines = 2)
         OutlinedTextField(physicalExam, { physicalExam = it.take(10000) }, label = { Text("Examen físico") }, enabled = !signed, modifier = Modifier.fillMaxWidth(), minLines = 3)
         OutlinedTextField(plan, { plan = it.take(5000) }, label = { Text("Plan") }, enabled = !signed, modifier = Modifier.fillMaxWidth(), minLines = 3)
+        if (item.consultationId != null && profile?.permissions?.contains("signos.registrar") == true) {
+            Text("Signos vitales", style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(systolic, { systolic = it }, label = { Text("PA sis.") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(diastolic, { diastolic = it }, label = { Text("PA dia.") }, modifier = Modifier.weight(1f), singleLine = true) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(heartRate, { heartRate = it }, label = { Text("FC") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(temperature, { temperature = it }, label = { Text("Temp.") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(oxygenSaturation, { oxygenSaturation = it }, label = { Text("Sat. O₂") }, modifier = Modifier.weight(1f), singleLine = true) }
+            OutlinedButton(onClick = { model.signs(item, systolic, diastolic, heartRate, temperature, oxygenSaturation) }, enabled = !busy && listOf(systolic, diastolic, heartRate, temperature, oxygenSaturation).any { it.isNotBlank() }, modifier = Modifier.fillMaxWidth()) { Text("Registrar signos") }
+        }
     } }, confirmButton = { if (!signed) Button(onClick = { if (item.consultationId == null) model.start(item, reason) else model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(if (busy) "Guardando…" else if (item.consultationId == null) "Iniciar consulta" else "Guardar borrador") } }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (!signed && item.consultationId != null) Button(onClick = { model.sign(item, reason, physicalExam, plan, onClose) }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) { Text("Firmar") }; TextButton(onClick = onClose, enabled = !busy) { Text("Cerrar") } } })
 }
 
@@ -88,4 +100,3 @@ private fun appointmentState(value: String) = mapOf("confirmada" to "Confirmada"
 private fun consultationState(value: String?) = mapOf(null to "Sin iniciar", "abierta" to "Abierta", "firmada" to "Firmada")[value] ?: value.orEmpty()
 private fun formatDateTime(value: String) = runCatching { appointmentFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
 private fun formatTime(value: String) = runCatching { DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
-
