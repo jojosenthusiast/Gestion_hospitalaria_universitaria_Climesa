@@ -11,6 +11,7 @@ import { UsersPage } from './users';
 import { AppointmentsPage } from './appointments';
 import { ConsultationsPage } from './consultations';
 import { QueuePage } from './queue';
+import { LaboratoryPage } from './laboratory';
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión. */
 export type Module={id:string;label:string;permission?:string;future?:boolean};
 export const modules:Module[]=[
@@ -23,7 +24,7 @@ export const modules:Module[]=[
  {id:'turnos',label:'Turnos',permission:'turnos.ver'},
  {id:'usuarios',label:'Usuarios',permission:'usuarios.ver'},
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver'},
- {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola',future:true},
+ {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola'},
  {id:'inventario',label:'Inventario',permission:'inventario.ver',future:true},
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
  {id:'citas',label:'Citas',permission:'citas.ver'},
@@ -77,6 +78,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  else if(route==='citas')content=<AppointmentsPage api={api} profile={profile} version={version}/>;
  else if(route==='consultas')content=<ConsultationsPage api={api} profile={profile} version={version}/>;
  else if(route==='fila')content=<QueuePage api={api} profile={profile} version={version}/>;
+ else if(route==='laboratorio')content=<LaboratoryPage api={api} profile={profile} version={version}/>;
  else if(route==='auditoria')content=<AuditPage api={api} version={version}/>;
  else if(route==='perfil')content=<ProfilePage profile={profile} onLogout={onLogout}/>;
  else content=<><Heading eyebrow={`Próxima entrega / ${active.label}`} title={active.label} description="Espacio de trabajo del módulo."/><div className="future-module"><span className="eyebrow">Próxima entrega</span><h2>Este módulo todavía no está habilitado.</h2><p>Su acceso y navegación ya están definidos según tus permisos. Las operaciones se habilitarán en la siguiente entrega.</p><a href="#/inicio" className="row-action">Volver al inicio <Icon name="arrow" size={18}/></a></div></>;
@@ -114,4 +116,3 @@ function AuditPage({api,version}:{api:Api;version:number}){
  const data=useData<AuditRow[]>(api,'/auditoria',version);
  return <><Heading eyebrow="Protección de datos / Trazabilidad" title="Auditoría" description="Quién realizó cada operación, cuándo y con qué resultado."/><section className="data-workbench"><RemoteState state={data}>{rows=>rows.length?<table className="record-table"><caption className="sr-only">Últimas cien operaciones auditadas</caption><thead><tr><th>Fecha</th><th>Persona</th><th>Operación</th><th>Entidad</th><th>Resultado</th></tr></thead><tbody>{rows.map(r=><tr key={r.seq}><td data-label="Fecha">{formatDateTime(r.at)}</td><td data-label="Persona"><strong>{r.actor||'Cuenta del sistema'}</strong><small>{r.role}</small></td><td data-label="Operación">{r.action}</td><td data-label="Entidad">{r.entity}<small className="mono-data">{r.entityId}</small></td><td data-label="Resultado"><Tag value={r.result}/></td></tr>)}</tbody></table>:<Empty title="Todavía no hay actividad" description="Las operaciones aparecerán aquí después de registrarse."/>}</RemoteState><p className="table-footnote">Se muestran las últimas 100 operaciones. Los eventos no incluyen valores clínicos.</p></section></>;
 }
-
