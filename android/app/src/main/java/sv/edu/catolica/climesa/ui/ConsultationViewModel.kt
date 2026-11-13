@@ -97,6 +97,29 @@ class ConsultationViewModel @Inject constructor(private val api: ApiClient) : Vi
         }
     }
 
+    fun diagnosis(item: MedicalAppointment, code: String, note: String, principal: Boolean) {
+        if (item.consultationId == null || code.trim().isBlank()) return
+        val body = JSONObject().put("code", code.trim().uppercase()).put("principal", principal).apply { if (note.trim().isNotBlank()) put("note", note.trim()) }
+        mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        viewModelScope.launch {
+            try { api.request("/consultas/${item.consultationId}/diagnosticos", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Diagnóstico registrado.") }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
+        }
+    }
+
+    fun prescription(item: MedicalAppointment, medication: String, dose: String, route: String, frequency: String, duration: String, instructions: String) {
+        if (item.consultationId == null || listOf(medication, dose, route, frequency, duration).any { it.trim().isBlank() }) { mutable.value = mutable.value.copy(error = "Completa medicamento, dosis, vía, frecuencia y duración."); return }
+        val itemBody = JSONObject().put("medication", medication.trim()).put("dose", dose.trim()).put("route", route.trim()).put("frequency", frequency.trim()).put("duration", duration.trim()).apply { if (instructions.trim().isNotBlank()) put("instructions", instructions.trim()) }
+        val body = JSONObject().put("items", JSONArray().put(itemBody))
+        mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        viewModelScope.launch {
+            try { api.request("/consultas/${item.consultationId}/receta", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Receta emitida.") }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
+        }
+    }
+
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
 
     private fun replace(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, version: Int, notice: String) {
