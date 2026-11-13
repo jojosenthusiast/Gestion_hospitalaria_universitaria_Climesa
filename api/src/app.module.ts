@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { PlatformModule } from './platform/platform.module';
 import { OperationsModule } from './operations/operations.module';
 import { AttentionModule } from './attention/attention.module';
+import { LaboratoryModule } from './laboratory/laboratory.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AttentionModule } from './attention/attention.module';
     HealthModule,
     OperationsModule,
     AttentionModule,
+    LaboratoryModule,
   ],
 })
 export class AppModule {}
