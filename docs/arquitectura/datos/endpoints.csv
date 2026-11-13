@@ -48,7 +48,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/fila/tickets/{id}/estado,fila.gestionar,Transiciones válidas,R,3,"En atención, atendido, no se presentó"
 105,GET,/api/v1/me/fila,fila.ver,Propio,R,3,Mi número y cuántos faltan
 105,GET,/api/v1/citas,citas.ver,MED y PAC solo propias,R,3,"Citas por fecha, médico o paciente"
-105,GET,/api/v1/citas/disponibilidad,citas.ver,PAC también,R,3,Horarios libres por médico y fecha
+105,GET,/api/v1/citas/disponibilidad,citas.agendar OR citas.solicitar,PAC y REC según permisos,R,3,Horarios libres por médico y fecha
 105,POST,/api/v1/citas,citas.agendar,Sin traslape por médico,R,3,Agendar cita
 105,POST,/api/v1/citas/solicitudes,citas.solicitar,Cuenta verificada,R,4,Paciente pide cita
 105,POST,/api/v1/citas/solicitudes/{id}/confirmar,citas.agendar,,R,4,Confirmar solicitud con horario
@@ -63,7 +63,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 106,POST,/api/v1/consultas/{id}/firmar,consulta.registrar,Inscripción vigente en el acto,R,3,Firmar y cerrar consulta
 106,POST,/api/v1/consultas/{id}/addendum,consulta.corregir,Solo el autor; conserva original,E,4,Corregir consulta firmada
 106,GET,/api/v1/pacientes/{id}/historial,expediente.ver,"Relación, acceso excepcional o propio revisado",R,3,Historial clínico
-107,GET,/api/v1/laboratorio/ordenes,laboratorio.ver_cola,,R,3,Cola por estado
+107,GET,/api/v1/laboratorio/ordenes,laboratorio.ver_cola OR resultados.ver,Filtra por laboratorio médico o paciente y oculta valores no revisados,R,3,Cola por estado
 107,GET,/api/v1/laboratorio/ordenes/{id},resultados.ver,Ver contexto,R,3,Detalle de orden y resultados
 107,POST,/api/v1/laboratorio/ordenes/{id}/muestra,laboratorio.procesar,Pendiente a En Proceso,R,3,Registrar toma de muestra
 107,PUT,/api/v1/laboratorio/ordenes/{id}/resultados,laboratorio.procesar,Valida unidades y rangos,R,3,Capturar valores
@@ -101,6 +101,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 110,POST,/api/v1/auditoria/verificacion,auditoria.ver,,R,4,Verificar cadena de hash
 110,GET,/api/v1/me/accesos,auditoria.mis_accesos,Propio,E,5,Quién vio mi expediente
 111,GET,/api/v1/inventario/existencias,inventario.ver,,R,4,"Existencias por bodega, lote y vencimiento"
+111,GET,/api/v1/inventario/movimientos,inventario.ver,,R,4,"Historial de movimientos por artículo y lote"
 111,POST,/api/v1/inventario/movimientos,inventario.mover,Sin existencia negativa,R,4,"Entrada, salida, ajuste o traslado"
 111,PUT,/api/v1/inventario/articulos/{id},inventario.configurar,,R,4,Artículo y mínimo
 112,GET,/api/v1/publico/ocupacion,(público),Solo agregados,R,3,Ocupación por planta y tipo
@@ -111,3 +112,17 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 113,GET,/api/v1/metricas/tablero,metricas.ver,Agregados sin datos personales,R,2,Tablero inicial
 113,GET,/api/v1/metricas/{indicador},metricas.ver,,E,5,Serie de un indicador
 111,POST,/api/v1/inventario/articulos,inventario.configurar,,R,4,Crear artículo
+105,GET,/api/v1/citas/catalogos,citas.agendar OR citas.solicitar,Pacientes y médicos según relación,R,3,Catálogos para agendar o solicitar citas
+106,GET,/api/v1/consultas/agenda,consulta.iniciar,Solo agenda propia,R,3,Agenda de consultas del médico
+106,PATCH,/api/v1/consultas/{id},consulta.registrar,Versión y autor,R,3,Guardar borrador de consulta
+105,GET,/api/v1/fila,fila.ver,Filtra según relación,R,3,Fila del día
+105,POST,/api/v1/fila,fila.emitir,Número único por servicio y día,R,3,Emitir número de fila
+105,POST,/api/v1/fila/{id}/llamar,fila.llamar,Transición válida,R,3,Llamar número de fila
+105,POST,/api/v1/fila/{id}/atender,fila.gestionar,Transición válida,R,3,Pasar número a atención
+105,POST,/api/v1/fila/{id}/completar,fila.gestionar,Transición válida,R,3,Marcar número atendido
+105,POST,/api/v1/fila/{id}/no-se-presento,fila.gestionar,Transición válida,R,3,Marcar ausencia
+106,GET,/api/v1/consultas/{id}/detalle,expediente.ver OR consulta.iniciar,Relación clínica y auditoría,R,3,Detalle permitido de consulta
+106,POST,/api/v1/consultas/{id}/receta,recetas.emitir,Inscripción vigente,R,3,Emitir receta
+107,GET,/api/v1/laboratorio/catalogo,laboratorio.ordenar OR catalogo.configurar,Catálogo activo,R,3,Exámenes y paneles
+107,POST,/api/v1/laboratorio/ordenes,laboratorio.ordenar,Consulta propia,R,3,Crear orden desde consulta
+107,POST,/api/v1/laboratorio/ordenes/{id}/resultados,laboratorio.procesar,Marca calculada en servidor,R,3,Capturar o corregir resultado con motivo
