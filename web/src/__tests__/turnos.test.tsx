@@ -44,57 +44,30 @@ describe('turnos · permisos de escritura', () => {
     expect(screen.queryByRole('button', { name: /Cancelar turno/ })).toBeNull();
   });
 
-  it('turnos.planificar sin turnos.publicar no ofrece publicar', async () => {
+  it('turnos.planificar no necesita el permiso legado de publicación', async () => {
     montar(perfil(['turnos.ver', 'turnos.planificar']), [turno('t-1', 'borrador')]);
     await screen.findByRole('table');
     expect(screen.queryByRole('button', { name: /Publicar planificación/ })).toBeNull();
-    expect(screen.getByRole('button', { name: /Planificar turno/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Asignar turno/ })).toBeTruthy();
   });
 });
 
-describe('turnos · publicar planificación (POST /turnos/publicar)', () => {
-  it('envía el rango y muestra cuántos se publicaron y los huecos de cobertura', async () => {
-    const api = montar(jefatura, [turno('t-1', 'borrador')], async () => ({
-      from: '2026-11-10', to: '2026-11-16', published: 4, publishedBy: 'u-1', publishedAt: '2026-11-09T12:00:00.000Z',
-      warnings: [{ areaId: 'a-1', area: 'Emergencia', role: 'medico', start: '2026-11-11T06:00:00.000Z', end: '2026-11-11T12:00:00.000Z', required: 2, actual: 1 }],
-    }));
+describe('turnos · jornada automática', () => {
+  it('JOP ve la jornada abierta y asigna horarios sin un paso de publicación manual', async () => {
+    const api = montar(jefatura, [turno('t-1', 'publicado')]);
     await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('button', { name: /Publicar planificación/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Publicar planificación' });
-    await userEvent.type(within(dialogo).getByLabelText('Desde'), '2026-11-10');
-    await userEvent.type(within(dialogo).getByLabelText('Hasta'), '2026-11-16');
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Publicar turnos/ }));
-    expect(api.write).toHaveBeenCalledWith('/turnos/publicar', { from: '2026-11-10', to: '2026-11-16' }, 'POST');
-    const aviso = await screen.findByRole('status', { name: 'Resultado de la publicación' });
-    expect(aviso.textContent).toMatch(/Se publicaron 4 turnos/);
-    expect(aviso.textContent).toMatch(/1 huecos de cobertura|Hay 1 huecos/);
-    expect(aviso.textContent).toMatch(/Medicina/);
-  });
-
-  it('envía el área cuando se elige una y exige un rango válido antes de llamar a la API', async () => {
-    const api = montar(jefatura, [turno('t-1', 'borrador')], async () => ({ from: '2026-11-10', to: '2026-11-10', published: 0, publishedBy: 'u-1', publishedAt: '2026-11-09T12:00:00.000Z', warnings: [] }));
-    await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('button', { name: /Publicar planificación/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Publicar planificación' });
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Publicar turnos/ }));
-    expect(within(dialogo).getByText(/Indica el inicio y el fin del rango/)).toBeTruthy();
+    expect(screen.getByText('Jornada laboral abierta')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Asignar turno/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Publicar planificación/ })).toBeNull();
     expect(api.write).not.toHaveBeenCalled();
-    await userEvent.type(within(dialogo).getByLabelText('Desde'), '2026-11-10');
-    await userEvent.type(within(dialogo).getByLabelText('Hasta'), '2026-11-10');
-    await userEvent.selectOptions(within(dialogo).getByLabelText(/Área/), 'a-1');
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Publicar turnos/ }));
-    expect(api.write).toHaveBeenCalledWith('/turnos/publicar', { from: '2026-11-10', to: '2026-11-10', areaId: 'a-1' }, 'POST');
-    expect((await screen.findByRole('status', { name: 'Resultado de la publicación' })).textContent).toMatch(/No había turnos en borrador/);
   });
-
-  it('muestra el error de la API sin cerrar el formulario', async () => {
-    montar(jefatura, [], async () => { throw new ApiError('Indica un rango de fechas válido.', 400); });
-    await userEvent.click(await screen.findByRole('button', { name: /Publicar planificación/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Publicar planificación' });
-    await userEvent.type(within(dialogo).getByLabelText('Desde'), '2026-11-10');
-    await userEvent.type(within(dialogo).getByLabelText('Hasta'), '2026-11-12');
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Publicar turnos/ }));
-    expect(await within(dialogo).findByText('Indica un rango de fechas válido.')).toBeTruthy();
+  it('el formulario filtra el personal por rol y área antes de asignar', async () => {
+    montar(jefatura, []);
+    await userEvent.click(await screen.findByRole('button', { name: /Asignar turno/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Asignar turno' });
+    expect(within(dialogo).getByLabelText('Filtrar personal por área')).toBeTruthy();
+    expect(within(dialogo).getByLabelText('Filtrar personal por rol')).toBeTruthy();
+    expect(within(dialogo).getByLabelText('Persona · disponibilidad')).toBeTruthy();
   });
 });
 
