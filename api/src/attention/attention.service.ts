@@ -40,6 +40,28 @@ export class AttentionService {
     if (!row) throw new BadRequestException('Selecciona un médico activo.');
   }
 
+  /** Una cita solo puede existir dentro de una jornada publicada o en curso del médico. */
+  private async doctorHasShift(c: PoolClient, doctorId: string, start: Date, end: Date) {
+    const row = (await c.query(`SELECT 1
+      FROM personal.turno
+      WHERE persona_id=$1 AND estado IN ('publicado','en_curso')
+        AND periodo @> $2::timestamptz
+        AND periodo @> ($3::timestamptz - interval '1 microsecond')
+      LIMIT 1`, [doctorId, start, end])).rows[0];
+    if (!row) throw new ConflictException('El médico no tiene una jornada publicada para esa franja.');
+  }
+
+  /** Evita que un mismo paciente quede con dos citas simultáneas, incluso con médicos distintos. */
+  private async patientHasConflict(c: PoolClient, patientId: string, start: Date, end: Date, excludeId?: string) {
+    const row = (await c.query(`SELECT 1
+      FROM atencion.cita
+      WHERE paciente_id=$1 AND estado IN ('solicitada','confirmada')
+        AND horario && tstzrange($2::timestamptz,$3::timestamptz,'[)')
+        AND ($4::uuid IS NULL OR id<>$4::uuid)
+      LIMIT 1`, [patientId, start, end, excludeId ?? null])).rows[0];
+    if (row) throw new ConflictException('El paciente ya tiene otra cita en ese horario.');
+  }
+
   private async allowedToSee(actor: Actor, patientId?: string, doctorId?: string) {
     const contexts = contextsOf(actor, 'citas.ver');
     if (contexts.includes('x')) return;
@@ -144,6 +166,8 @@ export class AttentionService {
     return this.commands.run(actor, permission, key, dto, async c => {
       await this.patient(c, patientId);
       await this.doctor(c, dto.doctorId);
+      await this.doctorHasShift(c, dto.doctorId, start, end);
+      await this.patientHasConflict(c, patientId, start, end);
       const row = (await c.query(`INSERT INTO atencion.cita(paciente_id,medico_id,horario,motivo,estado,origen,creado_por)
         VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7,$8) RETURNING id,version`, [patientId, dto.doctorId, start, end, dto.reason?.trim() || null, state, patientRequest ? 'paciente' : 'recepcion', actor.id])).rows[0];
       await this.commands.audit(c, actor, { action: patientRequest ? 'citas.solicitar' : 'citas.agendar', entity: 'cita', entityId: row.id, permission, detail: { patientId, doctorId: dto.doctorId, start: start.toISOString(), end: end.toISOString() } });
@@ -154,11 +178,15 @@ export class AttentionService {
 
   async changeStatus(actor: Actor, id: string, dto: AppointmentStatusDto, key?: string) {
     return this.commands.run(actor, 'citas.agendar', key, dto, async c => {
-      const old = (await c.query('SELECT paciente_id,medico_id,estado,version FROM atencion.cita WHERE id=$1 FOR UPDATE', [id])).rows[0] as AppointmentRow | undefined;
+      const old = (await c.query('SELECT paciente_id,medico_id,lower(horario) AS start,upper(horario) AS "end",estado,version FROM atencion.cita WHERE id=$1 FOR UPDATE', [id])).rows[0] as AppointmentRow | undefined;
       if (!old) throw new NotFoundException('No se encontró la cita.');
       if (old.version !== (dto.version ?? old.version)) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
       if (dto.status === 'rechazada' && (dto.rejectionReason?.trim().length ?? 0) < 10) throw new BadRequestException('Indica el motivo del rechazo.');
       if (!['solicitada', 'confirmada'].includes(old.estado)) throw new ConflictException('La cita ya no admite cambios de agenda.');
+      if (dto.status === 'confirmada') {
+        await this.doctorHasShift(c, old.medico_id, new Date(old.start), new Date(old.end));
+        await this.patientHasConflict(c, old.paciente_id, new Date(old.start), new Date(old.end), id);
+      }
       const row = (await c.query('UPDATE atencion.cita SET estado=$2,motivo_rechazo=$3,version=version+1 WHERE id=$1 RETURNING version', [id, dto.status, dto.rejectionReason?.trim() || null])).rows[0];
       await this.commands.audit(c, actor, { action: 'citas.estado', entity: 'cita', entityId: id, permission: 'citas.agendar', detail: { from: old.estado, to: dto.status } });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, old.paciente_id));
