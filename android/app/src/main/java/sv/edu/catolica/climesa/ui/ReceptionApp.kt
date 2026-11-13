@@ -86,6 +86,9 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
             state.formOpen -> PatientForm(state,model)
             state.selected!=null -> PatientDetail(state.selected!!,state,model)
             page==AndroidSection.BEDS -> BedsScreen(account.profile)
+            page==AndroidSection.QUEUE -> QueueScreen(account.profile)
+            page==AndroidSection.ADMISSION -> HospitalizationScreen(profile=account.profile)
+            page==AndroidSection.SHIFTS -> MyShiftsScreen(account,"REC")
             page==AndroidSection.PROFILE -> Profile(state,dark,setDark,account){selectedName=it.name}
             page!=AndroidSection.PATIENTS -> {
                 val mock=Maquetas.of(page)

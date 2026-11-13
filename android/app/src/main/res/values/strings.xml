@@ -81,5 +81,6 @@
     <string name="plan_publicar_detalle">Se publican los turnos en borrador del rango (máximo 31 días). Si quedan huecos de cobertura se publica igual y se te avisa.</string>
     <string name="plan_desde">Desde (AAAA-MM-DD)</string>
     <string name="plan_hasta">Hasta (AAAA-MM-DD)</string>
-    <string name="plan_cerrar_recargar">Cerrar y recargar</string></resources>
+    <string name="plan_cerrar_recargar">Cerrar y recargar</string>
+    <string name="turnos_vacio">No tienes turnos publicados.</string></resources>
 

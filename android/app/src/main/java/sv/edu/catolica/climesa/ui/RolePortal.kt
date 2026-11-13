@@ -148,6 +148,23 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         }
     }
 }
+/** A26 "Mis turnos" as a standalone screen, for scaffolds that do not use [RolePortal] (Recepción). */
+@Composable fun MyShiftsScreen(account:AuthenticatedAccount,role:String,modifier:Modifier=Modifier){
+    val model:RoleViewModel=viewModel(key="shifts-${account.session.userId}")
+    val data by model.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit){model.load("/turnos/mios")}
+    LaunchedEffect(account.profile.channels){model.start(account.profile.channels)}
+    LazyColumn(modifier.fillMaxSize(),contentPadding=PaddingValues(horizontal=18.dp,vertical=22.dp),verticalArrangement=Arrangement.spacedBy(20.dp)){
+        item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",AndroidSection.SHIFTS.label)}
+        if(data.loading)item{Box(Modifier.fillMaxWidth().height(200.dp),contentAlignment=Alignment.Center){CircularProgressIndicator()}}
+        else if(data.error!=null)item{ClimesaActionGroup {Text(data.error!!,color=MaterialTheme.colorScheme.error);ClimesaButton(stringResource(R.string.camas_reintentar),Icons.Default.Refresh,{model.load("/turnos/mios")})}}
+        else{
+            val shifts=MyShifts.parse(data.data)
+            if(shifts.isEmpty())item{Text(stringResource(R.string.turnos_vacio),style=MaterialTheme.typography.bodyMedium)}
+            else items(shifts){shift->MyShiftCard(shift)}
+        }
+    }
+}
 @Composable internal fun MyShiftCard(shift:MyShift){
     ClimesaCard {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text(shift.area,style=MaterialTheme.typography.titleMedium)
