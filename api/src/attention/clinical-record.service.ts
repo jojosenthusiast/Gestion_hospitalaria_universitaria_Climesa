@@ -1,7 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
-import { channelsFor, patientAccount } from '../platform/channels';
+import { channelsFor } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
@@ -46,7 +46,7 @@ export class ClinicalRecordService {
       const row = (await c.query(`INSERT INTO atencion.signos_vitales(paciente_id,consulta_id,admision_id,tomado_por,pa_sistolica,pa_diastolica,fc,fr,temperatura,sat_o2,peso_kg,talla_cm)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id,tomado_en AS "takenAt"`, [consultation.patientId,id,dto.admissionId ?? null,actor.staffId,dto.systolic ?? null,dto.diastolic ?? null,dto.heartRate ?? null,dto.respiratoryRate ?? null,dto.temperature ?? null,dto.oxygenSaturation ?? null,dto.weightKg ?? null,dto.heightCm ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: 'signos.registrar', entity: 'signos_vitales', entityId: row.id, patientId: consultation.patientId, permission: 'signos.registrar', detail: { consultationId: id } });
-      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, consultation.version, await channelsFor(c, ['expediente.ver', 'signos.registrar'], { users: [await patientAccount(c, consultation.patientId)] }));
+      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, consultation.version, await channelsFor(c, ['expediente.ver', 'signos.registrar']));
       return row;
     });
   }
@@ -63,7 +63,7 @@ export class ClinicalRecordService {
       const row = (await c.query(`INSERT INTO atencion.diagnostico(consulta_id,cie10,principal,nota) VALUES($1,$2,$3,$4)
         RETURNING id,cie10 AS code,principal,nota AS note`, [id, code, dto.principal ?? false, dto.note?.trim() || null])).rows[0];
       await this.commands.audit(c, actor, { action: 'diagnostico.registrar', entity: 'diagnostico', entityId: row.id, patientId: consultation.patientId, permission: 'consulta.registrar', detail: { consultationId: id, code } });
-      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, consultation.version, await channelsFor(c, ['expediente.ver', 'consulta.iniciar'], { users: [await patientAccount(c, consultation.patientId)] }));
+      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, consultation.version, await channelsFor(c, ['expediente.ver', 'consulta.iniciar']));
       return { ...row, description: cie10.descripcion };
     });
   }
@@ -82,7 +82,7 @@ export class ClinicalRecordService {
         items.push(row);
       }
       await this.commands.audit(c, actor, { action: 'receta.emitir', entity: 'receta', entityId: prescription.id, patientId: consultation.patientId, permission: 'recetas.emitir', detail: { consultationId: id, itemCount: items.length } });
-      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, consultation.version, await channelsFor(c, ['expediente.ver', 'recetas.emitir'], { users: [await patientAccount(c, consultation.patientId)] }));
+      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, consultation.version, await channelsFor(c, ['expediente.ver', 'recetas.emitir']));
       return { ...prescription, items };
     });
   }

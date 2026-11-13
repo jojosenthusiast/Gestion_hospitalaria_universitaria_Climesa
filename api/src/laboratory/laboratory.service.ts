@@ -69,7 +69,7 @@ export class LaboratoryService {
       const order = (await c.query(`INSERT INTO laboratorio.orden(consulta_id,paciente_id,medico_id,prioridad) VALUES($1,$2,$3,$4) RETURNING id,version,estado AS state`, [dto.consultationId, consultation.patientId, actor.staffId, dto.priority ?? LabPriority.ROUTINE])).rows[0];
       for (const [examId, requestedId] of leaves) await c.query('INSERT INTO laboratorio.orden_item(orden_id,examen_id,pedido_como) VALUES($1,$2,$3)', [order.id, examId, requestedId]);
       await this.commands.audit(c, actor, { action: 'laboratorio.ordenar', entity: 'orden_laboratorio', entityId: order.id, patientId: consultation.patientId, permission: 'laboratorio.ordenar', detail: { consultationId: dto.consultationId, exams: requested } });
-      await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', order.id, order.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver'], { users: [await patientAccount(c, consultation.patientId)] }));
+      await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', order.id, order.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver']));
       return { ...order, consultationId: dto.consultationId, patientId: consultation.patientId, itemCount: leaves.size };
     });
   }
@@ -86,7 +86,7 @@ export class LaboratoryService {
       }
       const row = (await c.query(`UPDATE laboratorio.orden SET estado='en_proceso',muestra_tomada_en=$2,muestra_tomada_por=$3,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version,muestra_tomada_en AS "sampleTakenAt"`, [id, this.clock.now(), actor.staffId])).rows[0];
       await this.commands.audit(c, actor, { action: 'laboratorio.muestra', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.procesar' });
-      await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver'], { users: [await patientAccount(c, old.patientId)] }));
+      await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver']));
       return row;
     });
   }
@@ -121,7 +121,7 @@ export class LaboratoryService {
         ON CONFLICT (orden_item_id) DO UPDATE SET valor=EXCLUDED.valor,texto=EXCLUDED.texto,marca=EXCLUDED.marca,rango_id=EXCLUDED.rango_id,capturado_por=EXCLUDED.capturado_por,capturado_en=now(),version=laboratorio.resultado.version+1
         RETURNING orden_item_id AS "orderItemId",valor,texto,marca,version`, [dto.orderItemId, value ?? null, dto.text ?? null, mark, range?.id ?? null, actor.staffId])).rows[0];
       await this.commands.audit(c, actor, { action: previous ? 'laboratorio.resultado_corregido' : 'laboratorio.resultado', entity: 'resultado_laboratorio', entityId: dto.orderItemId, patientId: old.patientId, permission: 'laboratorio.procesar', reason: dto.reason, detail: { mark, rangeId: range?.id ?? null } });
-      await this.commands.event(c, mark.startsWith('critico_') ? 'laboratorio.critico' : 'laboratorio.actualizado', 'orden_laboratorio', id, old.version, await channelsFor(c, ['resultados.ver', 'laboratorio.ver_cola'], { users: [await patientAccount(c, old.patientId)] }));
+      await this.commands.event(c, mark.startsWith('critico_') ? 'laboratorio.critico' : 'laboratorio.actualizado', 'orden_laboratorio', id, old.version, await channelsFor(c, ['resultados.ver', 'laboratorio.ver_cola']));
       return row;
     });
   }
@@ -135,7 +135,7 @@ export class LaboratoryService {
       if (missing) throw new ConflictException('Captura todos los resultados antes de completar la orden.');
       const row = (await c.query(`UPDATE laboratorio.orden SET estado='completado',completada_en=$2,completada_por=$3,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version,completada_en AS "completedAt"`, [id, this.clock.now(), actor.staffId])).rows[0];
       await this.commands.audit(c, actor, { action: 'laboratorio.completar', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.validar' });
-      await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver'], { users: [await patientAccount(c, old.patientId)] }));
+      await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver']));
       return row;
     });
   }
@@ -148,6 +148,7 @@ export class LaboratoryService {
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
       const row = (await c.query(`UPDATE laboratorio.orden SET revisada_en=$2,revisada_por=$3,version=version+1 WHERE id=$1 RETURNING id,version,revisada_en AS "reviewedAt"`, [id, this.clock.now(), actor.staffId])).rows[0];
       await this.commands.audit(c, actor, { action: 'laboratorio.revisar', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.revisar' });
+      // SEG-05: the patient hears about the order only once the doctor reviews and releases it (`propio_revisado`).
       await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['resultados.ver'], { users: [await patientAccount(c, old.patientId)] }));
       return row;
     });
@@ -161,7 +162,7 @@ export class LaboratoryService {
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
       const row = (await c.query(`UPDATE laboratorio.orden SET estado='cancelado',motivo_cancelacion=$2,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version`, [id, dto.reason.trim()])).rows[0];
       await this.commands.audit(c, actor, { action: 'laboratorio.cancelar', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.cancelar', reason: dto.reason });
-      await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver'], { users: [await patientAccount(c, old.patientId)] }));
+      await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver']));
       return row;
     });
   }

@@ -5,6 +5,7 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { VersionConflictException } from '../platform/problem';
 import { Clock } from '../platform/clock';
+import { channelsFor, patientAccount } from '../platform/channels';
 import { ConsultationSignDto, ConsultationStartDto, ConsultationUpdateDto } from './consultation.dto';
 
 type Row = Record<string, any>;
@@ -17,9 +18,9 @@ export class ConsultationService {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a un médico.');
   }
 
-  private async channels(c: PoolClient, patientId: string) {
-    const rows = (await c.query(`SELECT id FROM acceso.usuario WHERE paciente_id=$1 AND estado='activo'`, [patientId])).rows;
-    return ['rol:ADM', 'rol:MED', ...rows.map(row => `usuario:${row.id}`)];
+  /** Roles that read clinical records; the patient's account only once the note is signed (SEG-05, SEG-07). */
+  private async channels(c: PoolClient, patientId: string, notifyPatient = false) {
+    return channelsFor(c, ['expediente.ver', 'consulta.iniciar'], { users: notifyPatient ? [await patientAccount(c, patientId)] : [] });
   }
 
   async agenda(actor: Actor) {
@@ -87,7 +88,7 @@ export class ConsultationService {
       const row = (await c.query(`UPDATE atencion.consulta SET estado='firmada',firmada_en=$2,version=version+1 WHERE id=$1 RETURNING id,version,estado,firmada_en AS "signedAt"`, [id, this.clock.now()])).rows[0];
       await c.query(`UPDATE atencion.cita SET estado='atendida',version=version+1 WHERE id=(SELECT cita_id FROM atencion.consulta WHERE id=$1) AND estado='confirmada'`, [id]);
       await this.commands.audit(c, actor, { action: 'consulta.firmar', entity: 'consulta', entityId: id, patientId: old.paciente_id, permission: 'consulta.registrar' });
-      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, row.version, await this.channels(c, old.paciente_id));
+      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, row.version, await this.channels(c, old.paciente_id, true));
       return { id: row.id, version: row.version, state: row.estado, signedAt: row.signedAt };
     });
   }

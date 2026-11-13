@@ -45,6 +45,7 @@ export async function createTestApp(start: Date) {
   const one = async <T = any>(sql: string, params: unknown[] = []) => (await pg.query<T>(sql, params)).rows[0];
   const staffOf = async (role: string) => (await one<{ id: string }>('SELECT persona_personal_id AS id FROM acceso.usuario WHERE id=$1', [userId(role)])).id;
   let sequence = 0;
+  let slots = 0;
   /** Fictitious patient inserted directly; optionally linked to the PAC account. */
   const patient = async (options: { sex?: string; linkPac?: boolean; name?: string } = {}) => {
     sequence++;
@@ -67,7 +68,8 @@ export async function createTestApp(start: Date) {
   };
   /** Opens a consultation as MED through the API. */
   const consultation = async (patientId: string) => {
-    const start = new Date(current.valueOf() - 60 * 60_000);
+    // Each consultation uses its own past slot so the doctor's appointments never overlap.
+    const start = new Date(current.valueOf() - (60 + 20 * ++slots) * 60_000);
     const appointmentId = await appointment(patientId, start);
     const started = await call('MED', 'POST', '/consultas', { appointmentId });
     if (started.status !== 201) throw new Error(`consulta: ${started.status} ${JSON.stringify(started.body)}`);

@@ -31,9 +31,13 @@ export class QueueService {
     const row = (await c.query(`SELECT id,servicio AS service,fecha,numero,paciente_id AS "patientId",estado AS state,
       consultorio_id AS "officeId",llamados,version FROM atencion.ticket_fila WHERE id=$1 ${lock ? 'FOR UPDATE' : ''}`, [id])).rows[0] as QueueRow | undefined;
     if (!row) throw new NotFoundException('No se encontró el número de fila.');
-    const own = contextsOf(actor, 'fila.ver').includes('propio');
-    if (own && actor.patientId !== row.patientId) throw new ForbiddenException('Solo puedes consultar tu propio número de fila.');
+    if (!this.seesWholeQueue(actor) && (!actor.patientId || actor.patientId !== row.patientId)) throw new ForbiddenException('Solo puedes consultar tu propio número de fila.');
     return row;
+  }
+
+  /** `fila.ver` con contexto distinto de `propio` ve la fila completa; con `propio`, solo el número del paciente vinculado. */
+  private seesWholeQueue(actor: Actor) {
+    return contextsOf(actor, 'fila.ver').some(context => context !== 'propio');
   }
 
   private async channels(c: PoolClient, patientId?: string) {
@@ -43,7 +47,10 @@ export class QueueService {
   async list(actor: Actor, dateText?: string, service?: string) {
     const date = this.date(dateText);
     if (service && !QUEUE_SERVICES.includes(service as any)) throw new BadRequestException('Selecciona un servicio válido.');
-    const own = contextsOf(actor, 'fila.ver').includes('propio') && actor.patientId ? actor.patientId : null;
+    const whole = this.seesWholeQueue(actor);
+    // SEG-01: una cuenta con solo `propio` y sin expediente vinculado no tiene número que ver.
+    if (!whole && !actor.patientId) return [];
+    const own = whole ? null : actor.patientId;
     return this.db.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       t.estado AS state,t.consultorio_id AS "officeId",t.llamados,t.version,t.emitido_en AS "issuedAt"
