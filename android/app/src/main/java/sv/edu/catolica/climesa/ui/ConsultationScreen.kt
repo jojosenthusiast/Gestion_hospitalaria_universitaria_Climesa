@@ -1,0 +1,91 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+package sv.edu.catolica.climesa.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Stethoscope
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import sv.edu.catolica.climesa.domain.MedicalAppointment
+
+private val sanSalvador = ZoneId.of("America/El_Salvador")
+private val appointmentFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+
+@Composable
+fun ConsultationScreen(modifier: Modifier = Modifier, model: ConsultationViewModel = viewModel()) {
+    val state by model.state.collectAsStateWithLifecycle()
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { model.load() }
+    val selectedItem = state.appointments.firstOrNull { it.appointmentId == selected }
+    selectedItem?.let { item -> ConsultationDialog(item, state.saving, model, onClose = { selected = null }) }
+    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { SectionIntro("Medicina / Atención", "Mi consultorio", "Agenda propia y registro clínico conectado a cada cita confirmada.") }
+        state.error?.let { error -> item { ClimesaActionGroup { Text(error, color = MaterialTheme.colorScheme.error); ClimesaButton("Reintentar", Icons.Default.Refresh, { model.clearMessages(); model.load() }, outlined = true) } } }
+        state.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.CheckCircle) } }
+        if (state.loading) item { CircularProgressIndicator() }
+        else if (state.appointments.isEmpty()) item { ClimesaCard { Text("No tienes citas confirmadas en el rango actual.", Modifier.padding(18.dp)) } }
+        else items(state.appointments, key = { it.appointmentId }) { item -> MedicalAppointmentCard(item, onOpen = { selected = item.appointmentId }) }
+    }
+}
+
+@Composable
+private fun MedicalAppointmentCard(item: MedicalAppointment, onOpen: () -> Unit) {
+    ClimesaCard { Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(item.patientName.ifBlank { "Paciente sin nombre" }, style = MaterialTheme.typography.titleMedium)
+        Text("${formatDateTime(item.start)} — ${formatTime(item.end)}", style = MaterialTheme.typography.bodyMedium)
+        Text("Cita: ${appointmentState(item.appointmentState)} · Consulta: ${consultationState(item.consultationState)}", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+        item.reason?.let { Text("Motivo informado: $it", style = MaterialTheme.typography.bodySmall) }
+        OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(if (item.consultationState == "firmada") Icons.Default.CheckCircle else Icons.Default.EditNote, null); Spacer(Modifier.padding(4.dp)); Text(if (item.consultationState == "firmada") "Ver consulta" else if (item.consultationId == null) "Iniciar consulta" else "Continuar consulta") }
+    } }
+}
+
+@Composable
+private fun ConsultationDialog(item: MedicalAppointment, busy: Boolean, model: ConsultationViewModel, onClose: () -> Unit) {
+    var reason by rememberSaveable(item.appointmentId) { mutableStateOf(item.consultationReason ?: item.reason.orEmpty()) }
+    var physicalExam by rememberSaveable(item.appointmentId) { mutableStateOf(item.physicalExam.orEmpty()) }
+    var plan by rememberSaveable(item.appointmentId) { mutableStateOf(item.plan.orEmpty()) }
+    val signed = item.consultationState == "firmada"
+    AlertDialog(onDismissRequest = { if (!busy) onClose() }, title = { Text(if (signed) "Consulta firmada" else if (item.consultationId == null) "Iniciar consulta" else "Continuar consulta") }, text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Paciente: ${item.patientName}\nCita: ${formatDateTime(item.start)}", style = MaterialTheme.typography.bodySmall)
+        if (signed) Text("Este registro está firmado. Las correcciones futuras se harán mediante addendum.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+        OutlinedTextField(reason, { reason = it.take(2000) }, label = { Text("Motivo de consulta") }, enabled = !signed, modifier = Modifier.fillMaxWidth(), minLines = 2)
+        OutlinedTextField(physicalExam, { physicalExam = it.take(10000) }, label = { Text("Examen físico") }, enabled = !signed, modifier = Modifier.fillMaxWidth(), minLines = 3)
+        OutlinedTextField(plan, { plan = it.take(5000) }, label = { Text("Plan") }, enabled = !signed, modifier = Modifier.fillMaxWidth(), minLines = 3)
+    } }, confirmButton = { if (!signed) Button(onClick = { if (item.consultationId == null) model.start(item, reason) else model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(if (busy) "Guardando…" else if (item.consultationId == null) "Iniciar consulta" else "Guardar borrador") } }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (!signed && item.consultationId != null) Button(onClick = { model.sign(item, reason, physicalExam, plan, onClose) }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) { Text("Firmar") }; TextButton(onClick = onClose, enabled = !busy) { Text("Cerrar") } } })
+}
+
+private fun appointmentState(value: String) = mapOf("confirmada" to "Confirmada", "atendida" to "Atendida")[value] ?: value
+private fun consultationState(value: String?) = mapOf(null to "Sin iniciar", "abierta" to "Abierta", "firmada" to "Firmada")[value] ?: value.orEmpty()
+private fun formatDateTime(value: String) = runCatching { appointmentFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
+private fun formatTime(value: String) = runCatching { DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
+
