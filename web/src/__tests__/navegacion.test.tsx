@@ -1,4 +1,5 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile } from '../lib/api';
 import permisosCsv from '../../../docs/arquitectura/datos/permisos.csv?raw';
@@ -72,8 +73,8 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); window.l
 // FR-120-02 / escenario 1: cada rol con web ve únicamente el menú que sus permisos reales habilitan.
 const menuEsperado: Record<string, string[]> = {
   ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Perfil'],
-  JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Inventario', 'Fila del día', 'Citas', 'Perfil'],
-  REC: ['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Fila del día', 'Citas', 'Perfil'],
+  JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
+  REC: ['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
   LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil'],
   DPD: ['Inicio', 'Usuarios', 'Auditoría', 'Accesos excepcionales', 'Perfil'],
 };
@@ -96,6 +97,22 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
     });
   }
 
+  it('el drawer móvil gestiona foco y Escape sin perder la ruta activa', async () => {
+    const nav = await entrar(perfil('JOP'));
+    expect(nav.classList.contains('shell-sidebar')).toBe(true);
+    const inicio = within(nav).getByRole('link', { name: 'Inicio' });
+    expect(inicio.getAttribute('aria-current')).toBe('page');
+    const abrir = screen.getByRole('button', { name: 'Abrir navegación' });
+    expect(abrir.getAttribute('aria-expanded')).toBe('false');
+    await userEvent.click(abrir);
+    expect(screen.getByRole('button', { name: 'Cerrar navegación' }).getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(inicio);
+    await userEvent.keyboard('{Escape}');
+    const restaurado = screen.getByRole('button', { name: 'Abrir navegación' });
+    expect(restaurado.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(restaurado);
+  });
+
   it('el laboratorista ve lo que el catálogo le da: Pacientes, Turnos, Laboratorio e Inventario', async () => {
     const nav = await entrar(perfil('LAB'));
     expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil']);
@@ -105,7 +122,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
     // Un REC al que la API no le concede fila.ver ni citas.ver no ve esas entradas.
     const sinAgenda = permisosDe('REC').filter((p) => !['fila.ver', 'citas.ver'].includes(p.code));
     const nav = await entrar(perfil('REC', sinAgenda));
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Hospitalización', 'Perfil']);
   });
 
   it('un laboratorista sin laboratorio.ver_cola ni inventario.ver no ve esos módulos', async () => {
@@ -128,7 +145,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 const menuCatalogo: Record<string, string[]> = {
   AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
   ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario'],
-  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Fila del día', 'Citas'],
+  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Fila del día', 'Citas', 'Mi consultorio'],
   PAR: ['Pacientes', 'Ambulancia', 'Turnos'],
   PAC: ['Fila del día', 'Citas'],
 };
@@ -204,10 +221,10 @@ describe('pantallas de solo lectura según el permiso', () => {
     }
   });
 
-  it('Turnos para JOP ofrece publicar y planificar porque el catálogo se lo da', async () => {
+  it('Turnos para JOP ofrece asignar, sin publicación manual', async () => {
     await entrar(perfil('JOP'), { '/turnos': () => json([]), '/espacios': () => json([]), '/personal': () => json([]) }, '#/turnos');
-    expect(await screen.findByRole('button', { name: /Publicar planificación/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Planificar turno/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Asignar turno/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Publicar planificación/ })).toBeNull();
   });
 });
 describe('rol sin web (FR-120-03)', () => {
