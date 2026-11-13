@@ -75,4 +75,3 @@ private fun QueueIssueDialog(busy: Boolean, onClose: () -> Unit, onSubmit: (Stri
     var service by rememberSaveable { mutableStateOf(QueueLabels.services.first().first) }
     AlertDialog(onDismissRequest = { if (!busy) onClose() }, title = { Text("Emitir número") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("Selecciona el servicio de llegada.") ; QueueLabels.services.forEach { (value, label) -> androidx.compose.material3.RadioButton(selected = service == value, onClick = { service = value }); Text(label, Modifier.padding(start = 8.dp)) } } }, confirmButton = { Button(onClick = { onSubmit(service) }, enabled = !busy) { Text(if (busy) "Guardando…" else "Emitir") } }, dismissButton = { TextButton(onClick = onClose, enabled = !busy) { Text("Cancelar") } })
 }
-

@@ -15,4 +15,3 @@ data class MedicalAppointment(
     val plan: String?,
     val version: Int,
 )
-

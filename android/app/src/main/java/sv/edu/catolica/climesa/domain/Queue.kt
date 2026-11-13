@@ -15,4 +15,3 @@ object QueueLabels {
     fun service(value: String) = services.firstOrNull { it.first == value }?.second ?: value
     fun state(value: String) = mapOf("en_espera" to "En espera", "llamado" to "Llamado", "en_atencion" to "En atención", "atendido" to "Atendido", "no_se_presento" to "No se presentó")[value] ?: value
 }
-

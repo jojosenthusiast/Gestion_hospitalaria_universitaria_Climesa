@@ -53,4 +53,3 @@ class QueueViewModel @Inject constructor(private val api: ApiClient) : ViewModel
     }
     private fun message(error: Exception) = if (error is AuthRequestException) error.message ?: "No se pudo completar la operación." else error.message ?: "No se pudo completar la operación."
 }
-

@@ -3,7 +3,11 @@ package sv.edu.catolica.climesa.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bed
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,30 +47,38 @@ fun ConnectionBadge(state: ConnectionState) {
 fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: BedsViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(profile.channels, profile.permissions) { model.start(profile.channels, profile.permissions.toSet()) }
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Text(stringResource(R.string.camas_titulo), style = MaterialTheme.typography.displaySmall)
-            Spacer(Modifier.height(6.dp))
-            ConnectionBadge(state.connection)
+            SectionIntro("Hospital / CLIMESA", stringResource(R.string.camas_titulo), "Estado de camas en tiempo real.")
+            Spacer(Modifier.height(10.dp))
+            InlineStatus(stringResource(when (state.connection) { ConnectionState.LIVE -> R.string.camas_en_vivo; ConnectionState.RECONNECTING -> R.string.camas_reconectando; ConnectionState.OFFLINE -> R.string.camas_sin_conexion }), if (state.connection == ConnectionState.LIVE) Icons.Default.CheckCircle else Icons.Default.WifiOff)
             if (state.partialLive) Text(stringResource(R.string.tiempo_real_parcial), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
         }
         state.message?.let { item { Text(it, color = MaterialTheme.colorScheme.primary) } }
         when {
             state.loading -> item { Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
             state.error != null -> item {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                Button(onClick = model::reload) { Text(stringResource(R.string.camas_reintentar)) }
+                ClimesaActionGroup {
+                    Text(state.error!!, color = MaterialTheme.colorScheme.error)
+                    ClimesaButton(stringResource(R.string.camas_reintentar), Icons.Default.Refresh, model::reload)
+                }
             }
             state.beds.isEmpty() -> item { Text(stringResource(R.string.camas_vacio)) }
             else -> items(state.beds, key = { it.id }) { bed ->
-                Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(0.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(bed.code, style = MaterialTheme.typography.titleMedium)
-                        Text(bed.room, style = MaterialTheme.typography.bodySmall)
-                        Text(BedRules.stateLabel(bed.state), color = MaterialTheme.colorScheme.primary)
+                ClimesaCard {
+                    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.Bed, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Column(Modifier.weight(1f)) { Text(bed.code, style = MaterialTheme.typography.titleMedium); Text(bed.room, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            Text(BedRules.stateLabel(bed.state), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        }
                         bed.occupant?.let { Text(it) }
-                        BedRules.availableActions(bed, state.permissions).forEach { action ->
-                            OutlinedButton(onClick = { model.select(bed, action) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(action.labelRes())) }
+                        val actions = BedRules.availableActions(bed, state.permissions)
+                        if (actions.isNotEmpty()) {
+                            HorizontalDivider()
+                            ClimesaActionGroup {
+                                actions.forEach { action -> ClimesaButton(stringResource(action.labelRes()), Icons.Default.Bed, { model.select(bed, action) }, outlined = true) }
+                            }
                         }
                     }
                 }

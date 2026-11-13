@@ -32,12 +32,16 @@ class LaboratoryViewModel @Inject constructor(private val api: ApiClient) : View
         }
     }
 
-    fun sample(order: LaboratoryOrder) = mutate("/laboratorio/ordenes/${order.id}/muestra", JSONObject().put("version", order.version), "Muestra tomada.")
+    fun sample(order: LaboratoryOrder, expediente: String, nombreCompleto: String) = mutate(
+        "/laboratorio/ordenes/${order.id}/muestra",
+        JSONObject().put("version", order.version).put("expediente", expediente.trim()).put("nombreCompleto", nombreCompleto.trim()),
+        "Muestra tomada."
+    )
     fun complete(order: LaboratoryOrder) = mutate("/laboratorio/ordenes/${order.id}/completar", JSONObject().put("version", order.version), "Orden completada.")
     fun review(order: LaboratoryOrder) = mutate("/laboratorio/ordenes/${order.id}/revisar", JSONObject().put("version", order.version), "Resultados revisados y liberados.")
 
-    fun saveResult(order: LaboratoryOrder, item: LaboratoryItem, value: String, text: String, mark: String) {
-        val body = JSONObject().put("orderItemId", item.id).put("mark", mark)
+    fun saveResult(order: LaboratoryOrder, item: LaboratoryItem, value: String, text: String) {
+        val body = JSONObject().put("orderItemId", item.id)
         if (value.trim().isNotBlank()) body.put("value", value.trim().toDoubleOrNull() ?: run { mutable.value = mutable.value.copy(error = "El valor debe ser numérico."); return })
         else if (text.trim().isNotBlank()) body.put("text", text.trim())
         else { mutable.value = mutable.value.copy(error = "Captura un valor numérico o un texto."); return }
