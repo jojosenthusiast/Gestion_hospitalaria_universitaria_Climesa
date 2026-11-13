@@ -7,6 +7,8 @@ val climesaSupabaseUrl = providers.gradleProperty("CLIMESA_SUPABASE_URL")
 val climesaSupabasePublishableKey = providers.gradleProperty("CLIMESA_SUPABASE_PUBLISHABLE_KEY")
     .getOrElse("sb_publishable_7gL_lw2MMSwIFf_0nmHDzA_ILdkTI1T")
 val climesaApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("http://10.0.2.2:3000/api/v1")
+// Release never ships with an empty API URL: it defaults to the deployed API unless CLIMESA_API_BASE_URL overrides it.
+val climesaReleaseApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("https://sghu-api.onrender.com/api/v1")
 
 android {
     namespace = "sv.edu.catolica.climesa"
@@ -24,7 +26,7 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     buildTypes {
         release {
-            buildConfigField("String", "API_BASE_URL", buildConfigString(providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("")))
+            buildConfigField("String", "API_BASE_URL", buildConfigString(climesaReleaseApiBaseUrl))
             isMinifyEnabled = false
         }
     }
