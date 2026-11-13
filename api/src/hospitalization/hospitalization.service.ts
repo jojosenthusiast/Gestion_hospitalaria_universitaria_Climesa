@@ -21,6 +21,30 @@ export class HospitalizationService {
     return row;
   }
 
+  /**
+   * RN-05: under the lock taken on the bed and its room, a semiprivate room only mixes patients of the
+   * same recorded sex, and isolation needs a room with nobody else in it (DAT-05, RN-05.5).
+   */
+  private async checkRoomCompatibility(c: PoolClient, roomId: string, admission: Row) {
+    const others = (await c.query(`SELECT sexo_paciente AS sex,aislamiento AS isolation,estado AS state FROM infra.v_estado_cama WHERE habitacion_id=$1 AND estado IN ('ocupada','reservada')`, [roomId])).rows as Row[];
+    if (admission.isolation && others.length) throw new ConflictException('Un paciente con aislamiento necesita una habitación sin otros ocupantes.');
+    const occupants = others.filter(other => other.state === 'ocupada');
+    if (occupants.some(other => other.isolation)) throw new ConflictException('La habitación tiene un paciente en aislamiento.');
+    if (occupants.some(other => other.sex !== admission.patientSex)) throw new ConflictException('La habitación semiprivada está ocupada por un paciente de otro sexo.');
+  }
+
+  /** DAT-02: isolation blocks the other beds of the room with the catalogued origin `aislamiento`. */
+  private async isolateRoom(c: PoolClient, roomId: string, bedId: string, at: Date, by: string) {
+    await c.query(`INSERT INTO infra.bloqueo_cama(cama_id,periodo,motivo,origen,creado_por) SELECT e.id,tstzrange($2::timestamptz,NULL,'[)'),'Aislamiento de paciente hospitalizado','aislamiento',$3
+      FROM infra.espacio e WHERE e.padre_id=$1 AND e.tipo='cama' AND e.id<>$4 AND e.activo ON CONFLICT DO NOTHING`, [roomId, at, by, bedId]);
+  }
+
+  /** Closes the open isolation blocks of a room when its isolated patient leaves it (exit or transfer). */
+  private async releaseIsolation(c: PoolClient, roomId: string, at: Date) {
+    await c.query(`UPDATE infra.bloqueo_cama b SET periodo=tstzrange(lower(b.periodo),greatest(lower(b.periodo),$2::timestamptz),'[)')
+      FROM infra.espacio e WHERE e.id=b.cama_id AND e.padre_id=$1 AND b.origen='aislamiento' AND upper_inf(b.periodo)`, [roomId, at]);
+  }
+
   async list(actor: Actor) {
     return this.db.transaction(async c => {
       const global = contextsOf(actor, 'admision.ver').includes('x');
@@ -75,7 +99,8 @@ export class HospitalizationService {
         SELECT beds.*,coalesce((SELECT count(*) FROM infra.v_estado_cama same WHERE same.habitacion_id=beds."roomId" AND same.estado='ocupada'),0)::int AS "occupiedInRoom",
         CASE WHEN coalesce((SELECT count(*) FROM infra.v_estado_cama same WHERE same.habitacion_id=beds."roomId" AND same.estado='ocupada'),0)>0 THEN 'habitación con ocupante compatible' ELSE 'habitación vacía' END AS reason
         FROM beds WHERE ($2::boolean=false OR coalesce((SELECT count(*) FROM infra.v_estado_cama same WHERE same.habitacion_id=beds."roomId" AND same.estado IN ('ocupada','reservada')),0)=0)
-        ORDER BY "occupiedInRoom" DESC, level, room, code LIMIT 50`, [category, admission.isolation])).rows;
+          AND NOT EXISTS (SELECT 1 FROM infra.v_estado_cama same WHERE same.habitacion_id=beds."roomId" AND same.estado='ocupada' AND (same.sexo_paciente IS DISTINCT FROM $3 OR same.aislamiento))
+        ORDER BY "occupiedInRoom" DESC, level, room, code LIMIT 50`, [category, admission.isolation, admission.patientSex])).rows;
       await this.commands.audit(c, actor, { action: 'camas.sugerencias', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'camas.asignar', detail: { count: rows.length, category } });
       return rows;
     });
@@ -91,12 +116,11 @@ export class HospitalizationService {
       const state = (await c.query('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1', [dto.bedId])).rows[0]?.estado;
       if (state !== 'libre') throw new ConflictException('Otra persona tomó esta cama.');
       if (bed.categoria !== admission.requestedCategory && admission.requestedCategory === 'semiprivada' && !admission.authorizedBy) throw new ConflictException('La categoría de cama no coincide con la solicitud.');
+      await this.checkRoomCompatibility(c, bed.roomId, admission);
       const now = this.clock.now();
       const occ = (await c.query(`INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo,asignado_por) VALUES($1,$2,$3,$4,tstzrange($5::timestamptz,NULL,'[)'),$6) RETURNING id`, [id,dto.bedId,bed.roomId,bed.categoria,now,actor.id])).rows[0];
       await c.query(`UPDATE hospitalizacion.admision SET estado='hospitalizado',version=version+1 WHERE id=$1`, [id]);
-      if (admission.isolation) {
-        await c.query(`INSERT INTO infra.bloqueo_cama(cama_id,periodo,motivo,origen,creado_por) SELECT e.id,tstzrange($2::timestamptz,NULL,'[)'), 'Aislamiento de paciente hospitalizado','sistema',$3 FROM infra.espacio e WHERE e.padre_id=$1 AND e.tipo='cama' AND e.id<>$4 AND e.activo`, [bed.roomId,now,actor.id,dto.bedId]);
-      }
+      if (admission.isolation) await this.isolateRoom(c, bed.roomId, dto.bedId, now, actor.id);
       await this.commands.audit(c, actor, { action: 'camas.asignar', entity: 'ocupacion_cama', entityId: occ.id, patientId: admission.patientId, permission: 'camas.asignar', reason: dto.reason });
       await this.commands.event(c, 'admision.cama_asignada', 'admision', id, admission.version + 1, await channelsFor(c, ['admision.ver', 'camas.ver_tablero']));
       return { id, bedId: dto.bedId, state: 'hospitalizado', version: admission.version + 1 };
@@ -116,15 +140,20 @@ export class HospitalizationService {
   async transfer(actor: Actor, id: string, dto: TransferDto, key?: string) {
     return this.commands.run(actor, `camas.trasladar:${id}`, key, dto, async c => {
       const admission = await this.admission(c, id, true);
-      const current = (await c.query(`SELECT o.id,o.cama_id AS "bedId",o.categoria,o.periodo,e.version FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio e ON e.id=o.cama_id WHERE o.admision_id=$1 AND o.periodo @> $2::timestamptz FOR UPDATE`, [id,this.clock.now()])).rows[0] as Row | undefined;
+      const current = (await c.query(`SELECT o.id,o.cama_id AS "bedId",o.habitacion_id AS "roomId",o.categoria,o.periodo,e.version FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio e ON e.id=o.cama_id WHERE o.admision_id=$1 AND o.periodo @> $2::timestamptz FOR UPDATE`, [id,this.clock.now()])).rows[0] as Row | undefined;
       if (!current) throw new ConflictException('El paciente no tiene una cama activa.');
       if (current.categoria === 'vip') throw new ConflictException('Una ocupación VIP no se puede trasladar.');
       const target = (await c.query(`SELECT e.id,e.version,h.id AS "roomId",h.categoria FROM infra.espacio e JOIN infra.espacio h ON h.id=e.padre_id WHERE e.id=$1 AND e.tipo='cama' AND e.activo FOR UPDATE`, [dto.bedId])).rows[0] as Row | undefined;
       if (!target) throw new NotFoundException('No se encontró la cama destino.');
       const state = (await c.query('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1', [dto.bedId])).rows[0]?.estado;
       if (state !== 'libre') throw new ConflictException('La cama destino ya no está disponible.');
+      if (target.roomId !== current.roomId) await this.checkRoomCompatibility(c, target.roomId, admission);
       const now = this.clock.now();
       await c.query(`UPDATE hospitalizacion.ocupacion_cama SET periodo=tstzrange(lower(periodo),$2::timestamptz,'[)'),motivo_fin='traslado' WHERE id=$1`, [current.id,now]);
+      if (admission.isolation && target.roomId !== current.roomId) {
+        await this.releaseIsolation(c, current.roomId, now);
+        await this.isolateRoom(c, target.roomId, dto.bedId, now, actor.id);
+      }
       const dest = (await c.query(`INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo,asignado_por) VALUES($1,$2,$3,$4,tstzrange($5::timestamptz,NULL,'[)'),$6) RETURNING id`, [id,dto.bedId,target.roomId,target.categoria,now,actor.id])).rows[0];
       await c.query(`INSERT INTO hospitalizacion.traslado(admision_id,ocupacion_origen_id,ocupacion_destino_id,motivo,realizado_por) VALUES($1,$2,$3,$4,$5)`, [id,current.id,dest.id,dto.reason,actor.id]);
       await c.query(`INSERT INTO infra.limpieza_cama(cama_id,pendiente_desde) VALUES($1,$2)`, [current.bedId,now]);
@@ -161,10 +190,11 @@ export class HospitalizationService {
     return this.commands.run(actor, 'admision.registrar_salida', key, dto, async c => {
       const admission = await this.admission(c, id, true);
       if (admission.state !== 'alta_firmada') throw new ConflictException('Primero debe firmarse el alta.');
-      const occupation = (await c.query(`SELECT id,cama_id AS "bedId" FROM hospitalizacion.ocupacion_cama WHERE admision_id=$1 AND periodo @> $2::timestamptz FOR UPDATE`, [id,this.clock.now()])).rows[0];
+      const occupation = (await c.query(`SELECT id,cama_id AS "bedId",habitacion_id AS "roomId" FROM hospitalizacion.ocupacion_cama WHERE admision_id=$1 AND periodo @> $2::timestamptz FOR UPDATE`, [id,this.clock.now()])).rows[0];
       if (!occupation) throw new ConflictException('No hay ocupación activa para registrar salida.');
       const now = this.clock.now();
       await c.query(`UPDATE hospitalizacion.ocupacion_cama SET periodo=tstzrange(lower(periodo),$2::timestamptz,'[)'),motivo_fin='egreso' WHERE id=$1`, [occupation.id,now]);
+      if (admission.isolation) await this.releaseIsolation(c, occupation.roomId, now);
       await c.query(`UPDATE hospitalizacion.admision SET estado='egresado',version=version+1 WHERE id=$1`, [id]);
       await c.query(`INSERT INTO infra.limpieza_cama(cama_id,pendiente_desde) VALUES($1,$2)`, [occupation.bedId,now]);
       await this.commands.audit(c, actor, { action: 'admision.salida', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'admision.registrar_salida', reason: dto.reason });
