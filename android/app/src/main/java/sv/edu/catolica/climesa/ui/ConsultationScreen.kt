@@ -80,6 +80,15 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
     var heartRate by rememberSaveable(item.appointmentId) { mutableStateOf("") }
     var temperature by rememberSaveable(item.appointmentId) { mutableStateOf("") }
     var oxygenSaturation by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var diagnosisCode by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var diagnosisNote by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var diagnosisPrincipal by rememberSaveable(item.appointmentId) { mutableStateOf(false) }
+    var medication by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var dose by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var route by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var frequency by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var duration by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var instructions by rememberSaveable(item.appointmentId) { mutableStateOf("") }
     val signed = item.consultationState == "firmada"
     AlertDialog(onDismissRequest = { if (!busy) onClose() }, title = { Text(if (signed) "Consulta firmada" else if (item.consultationId == null) "Iniciar consulta" else "Continuar consulta") }, text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Paciente: ${item.patientName}\nCita: ${formatDateTime(item.start)}", style = MaterialTheme.typography.bodySmall)
@@ -92,6 +101,20 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(systolic, { systolic = it }, label = { Text("PA sis.") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(diastolic, { diastolic = it }, label = { Text("PA dia.") }, modifier = Modifier.weight(1f), singleLine = true) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(heartRate, { heartRate = it }, label = { Text("FC") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(temperature, { temperature = it }, label = { Text("Temp.") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(oxygenSaturation, { oxygenSaturation = it }, label = { Text("Sat. O₂") }, modifier = Modifier.weight(1f), singleLine = true) }
             OutlinedButton(onClick = { model.signs(item, systolic, diastolic, heartRate, temperature, oxygenSaturation) }, enabled = !busy && listOf(systolic, diastolic, heartRate, temperature, oxygenSaturation).any { it.isNotBlank() }, modifier = Modifier.fillMaxWidth()) { Text("Registrar signos") }
+        }
+        if (item.consultationId != null && !signed && profile?.permissions?.contains("consulta.registrar") == true) {
+            Text("Diagnóstico CIE-10", style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(diagnosisCode, { diagnosisCode = it.take(20) }, label = { Text("Código") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(diagnosisNote, { diagnosisNote = it.take(2000) }, label = { Text("Nota") }, modifier = Modifier.weight(2f), singleLine = true) }
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(diagnosisPrincipal, { diagnosisPrincipal = it }); Text("Principal") }
+            OutlinedButton(onClick = { model.diagnosis(item, diagnosisCode, diagnosisNote, diagnosisPrincipal); diagnosisCode = ""; diagnosisNote = ""; diagnosisPrincipal = false }, enabled = !busy && diagnosisCode.trim().isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Registrar diagnóstico") }
+        }
+        if (item.consultationId != null && !signed && profile?.permissions?.contains("recetas.emitir") == true) {
+            Text("Emitir receta", style = MaterialTheme.typography.titleSmall)
+            OutlinedTextField(medication, { medication = it.take(200) }, label = { Text("Medicamento") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(dose, { dose = it.take(200) }, label = { Text("Dosis") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(route, { route = it.take(100) }, label = { Text("Vía") }, modifier = Modifier.weight(1f), singleLine = true) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(frequency, { frequency = it.take(200) }, label = { Text("Frecuencia") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(duration, { duration = it.take(100) }, label = { Text("Duración") }, modifier = Modifier.weight(1f), singleLine = true) }
+            OutlinedTextField(instructions, { instructions = it.take(1000) }, label = { Text("Indicaciones") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            OutlinedButton(onClick = { model.prescription(item, medication, dose, route, frequency, duration, instructions); medication = ""; dose = ""; route = ""; frequency = ""; duration = ""; instructions = "" }, enabled = !busy && listOf(medication, dose, route, frequency, duration).all { it.trim().isNotBlank() }, modifier = Modifier.fillMaxWidth()) { Text("Emitir receta") }
         }
     } }, confirmButton = { if (!signed) Button(onClick = { if (item.consultationId == null) model.start(item, reason) else model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(if (busy) "Guardando…" else if (item.consultationId == null) "Iniciar consulta" else "Guardar borrador") } }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (!signed && item.consultationId != null) Button(onClick = { model.sign(item, reason, physicalExam, plan, onClose) }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) { Text("Firmar") }; TextButton(onClick = onClose, enabled = !busy) { Text("Cerrar") } } })
 }
