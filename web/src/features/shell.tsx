@@ -12,6 +12,8 @@ import { AppointmentsPage } from './appointments';
 import { ConsultationsPage } from './consultations';
 import { QueuePage } from './queue';
 import { LaboratoryPage } from './laboratory';
+import { InventoryPage } from './inventory';
+import { HospitalizationPage } from './hospitalization';
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión. */
 export type Module={id:string;label:string;permission?:string;future?:boolean};
 export const modules:Module[]=[
@@ -25,14 +27,15 @@ export const modules:Module[]=[
  {id:'usuarios',label:'Usuarios',permission:'usuarios.ver'},
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver'},
  {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola'},
- {id:'inventario',label:'Inventario',permission:'inventario.ver',future:true},
+ {id:'inventario',label:'Inventario',permission:'inventario.ver'},
+ {id:'hospitalizacion',label:'Hospitalización',permission:'admision.crear'},
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
  {id:'citas',label:'Citas',permission:'citas.ver'},
  {id:'consultas',label:'Mi consultorio',permission:'consulta.iniciar'},
  {id:'privacidad',label:'Accesos excepcionales',permission:'privacidad.aprobar_acceso',future:true},
  {id:'perfil',label:'Perfil'},
 ];
-const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',fila:'queue',citas:'calendar',consultas:'calendar',privacidad:'privacy',perfil:'user'};
+const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',privacidad:'privacy',perfil:'user'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
 export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||can(profile,m.permission));
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
@@ -79,6 +82,8 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  else if(route==='consultas')content=<ConsultationsPage api={api} profile={profile} version={version}/>;
  else if(route==='fila')content=<QueuePage api={api} profile={profile} version={version}/>;
  else if(route==='laboratorio')content=<LaboratoryPage api={api} profile={profile} version={version}/>;
+ else if(route==='inventario')content=<InventoryPage api={api} profile={profile} version={version}/>;
+ else if(route==='hospitalizacion')content=<HospitalizationPage api={api} profile={profile} version={version}/>;
  else if(route==='auditoria')content=<AuditPage api={api} version={version}/>;
  else if(route==='perfil')content=<ProfilePage profile={profile} onLogout={onLogout}/>;
  else content=<><Heading eyebrow={`Próxima entrega / ${active.label}`} title={active.label} description="Espacio de trabajo del módulo."/><div className="future-module"><span className="eyebrow">Próxima entrega</span><h2>Este módulo todavía no está habilitado.</h2><p>Su acceso y navegación ya están definidos según tus permisos. Las operaciones se habilitarán en la siguiente entrega.</p><a href="#/inicio" className="row-action">Volver al inicio <Icon name="arrow" size={18}/></a></div></>;
