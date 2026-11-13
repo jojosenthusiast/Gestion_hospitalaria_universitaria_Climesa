@@ -110,6 +110,8 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         if(page==AndroidSection.PLANNING){ShiftPlanningScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.STAFF){StaffScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.MY_APPOINTMENTS){PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding));return@content}
+        if(page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD||page==AndroidSection.INPATIENT_CARE){HospitalizationScreen(Modifier.padding(padding));return@content}
+        if(page==AndroidSection.SUPPLIES){InventoryScreen(Modifier.padding(padding));return@content}
         if(page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION){QueueScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.LAB||page==AndroidSection.SAMPLE||page==AndroidSection.CAPTURE_RESULTS||page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW){LaboratoryScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.MEDICAL_DAY||page==AndroidSection.CONSULTATIONS){ConsultationScreen(account.profile,Modifier.padding(padding));return@content}
