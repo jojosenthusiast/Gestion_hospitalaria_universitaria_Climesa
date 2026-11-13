@@ -18,6 +18,18 @@ npm run dev              # http://localhost:5173
 
 Usa `npm ci` (no `npm install`) para respetar `package-lock.json`.
 
+### Probar localmente contra la API desplegada
+
+La API de producción conserva CORS estricto para `https://sghu-web.onrender.com`. Para probar desde Vite sin relajar esa política, usa el proxy de desarrollo y una ruta relativa:
+
+```powershell
+Invoke-RestMethod "https://sghu-api.onrender.com/salud"
+$env:VITE_API_BASE_URL = "/api/v1"
+npm run dev
+```
+
+Continúa solo cuando `/salud` responda `status: ok` y `database: ok`. El proxy existe únicamente en `npm run dev`; el build desplegado sigue usando la URL absoluta configurada por el entorno.
+
 ## Variables de entorno
 
 Solo variables `VITE_*`: quedan dentro del bundle, así que nunca llevan una clave secreta ni `service_role`. Vite lee `.env` y `.env.local`; ninguno se sube.

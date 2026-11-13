@@ -83,7 +83,7 @@ export class QueueService {
   }
 
   async transition(actor: Actor, id: string, state: 'en_atencion' | 'atendido' | 'no_se_presento', dto: QueueTransitionDto, key?: string) {
-    return this.commands.run(actor, `fila.estado:${id}:${state}`, key, dto, async c => {
+    return this.commands.run(actor, `fila.gestionar:estado:${id}:${state}`, key, dto, async c => {
       const old = await this.ownTicket(c, actor, id);
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
       const allowed: Record<string, string[]> = { en_atencion: ['llamado'], atendido: ['en_atencion'], no_se_presento: ['en_espera', 'llamado'] };

@@ -2,7 +2,7 @@ import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Req, UseGua
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { LabCancelDto, LabOrderDto, LabResultDto, LabVersionDto } from './laboratory.dto';
+import { LabCancelDto, LabOrderDto, LabResultDto, LabSampleDto, LabVersionDto } from './laboratory.dto';
 import { LaboratoryService } from './laboratory.service';
 
 @ApiTags('laboratory') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('laboratorio')
@@ -19,7 +19,7 @@ export class LaboratoryController {
   create(@Req() r: ActorRequest, @Body() dto: LabOrderDto, @Headers('idempotency-key') key?: string) { return this.laboratory.create(r.actor, dto, key); }
 
   @Post('ordenes/:id/muestra') @RequirePermission('laboratorio.procesar') @ApiOperation({ summary: 'Tomar muestra y pasar la orden a proceso' })
-  sample(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabVersionDto, @Headers('idempotency-key') key?: string) { return this.laboratory.sample(r.actor, id, dto, key); }
+  sample(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabSampleDto, @Headers('idempotency-key') key?: string) { return this.laboratory.sample(r.actor, id, dto, key); }
 
   @Post('ordenes/:id/resultados') @RequirePermission('laboratorio.procesar') @ApiOperation({ summary: 'Capturar o actualizar el resultado de un examen' })
   result(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabResultDto, @Headers('idempotency-key') key?: string) { return this.laboratory.result(r.actor, id, dto, key); }

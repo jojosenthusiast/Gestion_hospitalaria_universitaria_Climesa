@@ -1,6 +1,6 @@
-import { useState, type InputHTMLAttributes, type ReactNode, type FormEvent } from 'react';
+import { useId, useState, type InputHTMLAttributes, type ReactNode, type FormEvent } from 'react';
 
-export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'clock';
+export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry';
 const paths: Record<IconName, ReactNode> = {
   arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
   back: <><path d="M19 12H5M11 6l-6 6 6 6" /></>,
@@ -20,10 +20,21 @@ const paths: Record<IconName, ReactNode> = {
   lock: <><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
   search: <><circle cx="10" cy="10" r="6" /><path d="m15 15 6 6" /></>,
-  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  home: <><path d="m3 11 9-8 9 8" /><path d="M5 10v11h14V10M9 21v-7h6v7" /></>,
+  building: <><path d="M4 21V5l8-3 8 3v16" /><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M9 16h.01M15 16h.01M2 21h20" /></>,
+  bed: <><path d="M3 19V7M21 19v-6a3 3 0 0 0-3-3H9v6h12M3 16h18M6 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" /></>,
+  ambulance: <><path d="M3 6h11v13H3zM14 10h4l3 4v5h-7z" /><path d="M7 9v6M4 12h6M6 19a2 2 0 1 0 4 0M16 19a2 2 0 1 0 4 0" /></>,
+  calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></>,
+  audit: <><path d="M9 4H5a2 2 0 0 0-2 2v14h12v-4" /><path d="M9 2h6v4H9zM8 11h4M8 15h3" /><circle cx="17" cy="11" r="4" /><path d="m20 14 2 2" /></>,
+  lab: <><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3M8 15h8" /></>,
+  inventory: <><path d="m4 7 8-4 8 4-8 4zM4 7v10l8 4 8-4V7M12 11v10" /></>,
+  queue: <><path d="M5 7h14M5 12h10M5 17h6" /><path d="m17 14 3 3-3 3" /></>,
+  privacy: <><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" /><path d="M9 12a3 3 0 0 1 6 0v3H9z" /></>,
+  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  retry: <><path d="M20 7v5h-5" /><path d="M19 12a7 7 0 1 0-2 5" /></>,
 };
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{paths[name]}</svg>;
 }
 export function Brand({ light = false }: { light?: boolean }) {
   return (
@@ -35,20 +46,22 @@ export function Brand({ light = false }: { light?: boolean }) {
 }
 
 export function Notice({ kind, children }: { kind: 'success' | 'error' | 'info'; children: ReactNode }) {
-  return <div className={`notice ${kind}`} role={kind === 'error' ? 'alert' : 'status'}><Icon name={kind === 'success' ? 'check' : 'info'} /><span>{children}</span></div>;
+  return <div className={`notice ${kind}`} role={kind === 'error' ? 'alert' : 'status'} aria-live={kind === 'error' ? 'assertive' : 'polite'} aria-atomic="true"><span className="notice-icon"><Icon name={kind === 'success' ? 'check' : 'info'} /></span><span>{children}</span></div>;
 }
 
 export function Field({ label, value, onChange, hint, ...props }: { label: string; value: string; onChange: (value: string) => void; hint?: string } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   const [visible, setVisible] = useState(false);
+  const hintId = useId();
   const password = props.type === 'password';
+  const describedBy = [props['aria-describedby'], hint ? hintId : undefined].filter(Boolean).join(' ') || undefined;
   return (
     <label className="field">
       <span>{label}</span>
       <span className="input-wrap">
-        <input {...props} type={password && visible ? 'text' : props.type} value={value} onChange={e => onChange(e.target.value)} />
+        <input {...props} aria-describedby={describedBy} type={password && visible ? 'text' : props.type} value={value} onChange={e => onChange(e.target.value)} />
         {password && <button type="button" className="password-toggle" aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={visible} onClick={() => setVisible(!visible)}><Icon name={visible ? 'eyeOff' : 'eye'} /></button>}
       </span>
-      {hint && <small>{hint}</small>}
+      {hint && <small id={hintId}>{hint}</small>}
     </label>
   );
 }

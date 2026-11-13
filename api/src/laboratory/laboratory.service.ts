@@ -6,7 +6,8 @@ import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { VersionConflictException } from '../platform/problem';
-import { LabCancelDto, LabMark, LabOrderDto, LabPriority, LabResultDto, LabVersionDto } from './laboratory.dto';
+import { LabCancelDto, LabOrderDto, LabPriority, LabResultDto, LabSampleDto, LabVersionDto } from './laboratory.dto';
+import { classifyLabValue, matchesDoubleIdentification } from './laboratory.rules';
 
 type Row = Record<string, any>;
 
@@ -33,15 +34,19 @@ export class LaboratoryService {
     const patient = contextsOf(actor, 'resultados.ver').includes('propio_revisado') && actor.patientId;
     const doctor = actor.staffId && contextsOf(actor, 'resultados.ver').includes('relacion') ? actor.staffId : null;
     if (!lab && !patient && !doctor) throw new ForbiddenException('No tienes permiso para consultar órdenes de laboratorio.');
-    const rows = await this.db.query(`SELECT o.id,o.consulta_id AS "consultationId",o.paciente_id AS "patientId",o.medico_id AS "doctorId",
+    const rows = await this.db.transaction(async c => {
+      const result = await c.query(`SELECT o.id,o.consulta_id AS "consultationId",o.paciente_id AS "patientId",o.medico_id AS "doctorId",
       o.prioridad AS priority,o.estado AS state,o.creada_en AS "createdAt",o.muestra_tomada_en AS "sampleTakenAt",
       o.completada_en AS "completedAt",o.revisada_en AS "reviewedAt",o.version,
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
-      coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'result',CASE WHEN ($1::boolean OR $2::boolean) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
+      coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'result',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND o.medico_id=$3 OR $2::boolean AND o.revisada_en IS NOT NULL) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
       FROM laboratorio.orden o JOIN pacientes.paciente p ON p.id=o.paciente_id
       LEFT JOIN laboratorio.orden_item oi ON oi.orden_id=o.id LEFT JOIN laboratorio.examen e ON e.id=oi.examen_id LEFT JOIN laboratorio.resultado r ON r.orden_item_id=oi.id
-      WHERE ($3::boolean AND o.estado IN ('pendiente','en_proceso')) OR ($4::uuid IS NOT NULL AND o.paciente_id=$4 AND o.revisada_en IS NOT NULL) OR ($5::uuid IS NOT NULL AND o.medico_id=$5)
-      GROUP BY o.id,p.id ORDER BY o.creada_en DESC LIMIT 300`, [lab, !!patient, lab, patient || null, doctor]);
+      WHERE ($1::boolean AND o.estado IN ('pendiente','en_proceso','completado')) OR ($4::uuid IS NOT NULL AND o.paciente_id=$4) OR ($3::uuid IS NOT NULL AND o.medico_id=$3)
+      GROUP BY o.id,p.id ORDER BY o.creada_en DESC LIMIT 300`, [lab, !!patient, doctor, patient || null]);
+      for (const row of result.rows) await this.commands.audit(c, actor, { action: 'laboratorio.leer', entity: 'orden_laboratorio', entityId: row.id, patientId: row.patientId, permission: 'resultados.ver' });
+      return result.rows;
+    });
     return rows;
   }
 
@@ -69,11 +74,16 @@ export class LaboratoryService {
     });
   }
 
-  async sample(actor: Actor, id: string, dto: LabVersionDto, key?: string) {
+  async sample(actor: Actor, id: string, dto: LabSampleDto, key?: string) {
     return this.commands.run(actor, 'laboratorio.procesar', key, dto, async c => {
       const old = await this.order(c, id, true);
       if (old.state !== 'pendiente') throw new ConflictException('Solo una orden pendiente puede pasar a toma de muestra.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargar la cola.');
+      const identity = (await c.query(`SELECT expediente,trim(concat_ws(' ',nombres,primer_apellido,segundo_apellido)) AS "fullName"
+        FROM pacientes.paciente WHERE id=$1`, [old.patientId])).rows[0];
+      if (!identity || !matchesDoubleIdentification(identity, dto.expediente, dto.nombreCompleto)) {
+        throw new ConflictException('La doble identificación no coincide con el expediente. Verifica expediente y nombre completo.');
+      }
       const row = (await c.query(`UPDATE laboratorio.orden SET estado='en_proceso',muestra_tomada_en=$2,muestra_tomada_por=$3,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version,muestra_tomada_en AS "sampleTakenAt"`, [id, this.clock.now(), actor.staffId])).rows[0];
       await this.commands.audit(c, actor, { action: 'laboratorio.muestra', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.procesar' });
       await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver'], { users: [await patientAccount(c, old.patientId)] }));
@@ -85,13 +95,33 @@ export class LaboratoryService {
     return this.commands.run(actor, 'laboratorio.procesar', key, dto, async c => {
       const old = await this.order(c, id, true);
       if (old.state !== 'en_proceso') throw new ConflictException('La orden debe estar en proceso para capturar resultados.');
-      const item = (await c.query('SELECT id FROM laboratorio.orden_item WHERE id=$1 AND orden_id=$2', [dto.orderItemId, id])).rows[0];
+      const item = (await c.query(`SELECT oi.id,e.id AS "examId",e.tipo_resultado AS "resultType",e.unidad AS unit,p.sexo AS sex,
+        CASE WHEN p.precision_nacimiento='exacta' THEN date_part('year',age((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,p.nacimiento))::int
+             WHEN p.precision_nacimiento='estimada' THEN p.edad_estimada + date_part('year',age((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,p.edad_estimada_en))::int END AS age,
+        (o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date AS "sampleDate"
+        FROM laboratorio.orden_item oi JOIN laboratorio.examen e ON e.id=oi.examen_id
+        JOIN laboratorio.orden o ON o.id=oi.orden_id JOIN pacientes.paciente p ON p.id=o.paciente_id
+        WHERE oi.id=$1 AND oi.orden_id=$2`, [dto.orderItemId, id])).rows[0];
       if (!item) throw new BadRequestException('El examen no pertenece a esta orden.');
       if (dto.value === undefined && dto.text === undefined) throw new BadRequestException('Captura un valor numérico o un resultado textual.');
-      const row = (await c.query(`INSERT INTO laboratorio.resultado(orden_item_id,valor,texto,marca,capturado_por) VALUES($1,$2,$3,$4,$5)
-        ON CONFLICT (orden_item_id) DO UPDATE SET valor=EXCLUDED.valor,texto=EXCLUDED.texto,marca=EXCLUDED.marca,capturado_por=EXCLUDED.capturado_por,capturado_en=now(),version=laboratorio.resultado.version+1
-        RETURNING orden_item_id AS "orderItemId",valor,texto,marca,version`, [dto.orderItemId, dto.value ?? null, dto.text ?? null, dto.mark, actor.staffId])).rows[0];
-      await this.commands.audit(c, actor, { action: 'laboratorio.resultado', entity: 'resultado_laboratorio', entityId: dto.orderItemId, patientId: old.patientId, permission: 'laboratorio.procesar' });
+      if (item.resultType === 'numerico' && (dto.value === undefined || dto.text !== undefined)) throw new BadRequestException('Este examen requiere un valor numérico.');
+      if (item.resultType === 'texto' && (dto.text === undefined || dto.value !== undefined)) throw new BadRequestException('Este examen requiere un resultado textual.');
+      if (dto.unit !== undefined && dto.unit !== item.unit) throw new BadRequestException('La unidad debe coincidir con el catálogo del examen.');
+      const previous = (await c.query('SELECT * FROM laboratorio.resultado WHERE orden_item_id=$1 FOR UPDATE', [dto.orderItemId])).rows[0];
+      if (previous && !dto.reason?.trim()) throw new BadRequestException('Indica el motivo para corregir un resultado existente.');
+      const ranges = dto.value === undefined ? [] : (await c.query(`SELECT id,minimo,maximo,critico_bajo,critico_alto FROM laboratorio.rango_referencia
+        WHERE examen_id=$1 AND (sexo=$2 OR sexo='cualquiera') AND $3::int <@ edad_anios AND $4::date <@ vigencia
+        ORDER BY (sexo=$2) DESC LIMIT 1`, [item.examId, item.sex, item.age, item.sampleDate])).rows;
+      const range = ranges[0];
+      const value = dto.value;
+      const mark = classifyLabValue(value, range);
+      if (previous) await c.query(`INSERT INTO laboratorio.resultado_historial(orden_item_id,version,valor,texto,marca,cambiado_por,motivo)
+        VALUES($1,$2,$3,$4,$5,$6,$7)`, [dto.orderItemId, previous.version, previous.valor, previous.texto, previous.marca, actor.staffId, dto.reason!.trim()]);
+      const row = (await c.query(`INSERT INTO laboratorio.resultado(orden_item_id,valor,texto,marca,rango_id,capturado_por) VALUES($1,$2,$3,$4,$5,$6)
+        ON CONFLICT (orden_item_id) DO UPDATE SET valor=EXCLUDED.valor,texto=EXCLUDED.texto,marca=EXCLUDED.marca,rango_id=EXCLUDED.rango_id,capturado_por=EXCLUDED.capturado_por,capturado_en=now(),version=laboratorio.resultado.version+1
+        RETURNING orden_item_id AS "orderItemId",valor,texto,marca,version`, [dto.orderItemId, value ?? null, dto.text ?? null, mark, range?.id ?? null, actor.staffId])).rows[0];
+      await this.commands.audit(c, actor, { action: previous ? 'laboratorio.resultado_corregido' : 'laboratorio.resultado', entity: 'resultado_laboratorio', entityId: dto.orderItemId, patientId: old.patientId, permission: 'laboratorio.procesar', reason: dto.reason, detail: { mark, rangeId: range?.id ?? null } });
+      await this.commands.event(c, mark.startsWith('critico_') ? 'laboratorio.critico' : 'laboratorio.actualizado', 'orden_laboratorio', id, old.version, await channelsFor(c, ['resultados.ver', 'laboratorio.ver_cola'], { users: [await patientAccount(c, old.patientId)] }));
       return row;
     });
   }
