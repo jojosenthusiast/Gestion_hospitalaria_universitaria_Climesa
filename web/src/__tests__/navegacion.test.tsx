@@ -284,3 +284,12 @@ describe('cliente de API generado (FR-120-01)', () => {
     }
   });
 });
+
+describe('sin marcadores de entregas futuras (WEB-03)', () => {
+  it('un módulo sin operaciones no promete una próxima entrega', async () => {
+    await entrar(perfil('DPD'), {}, '#/privacidad');
+    expect(await screen.findByRole('heading', { name: /Accesos excepcionales/ })).toBeTruthy();
+    expect(screen.queryByText(/Próxima entrega|siguiente entrega/i)).toBeNull();
+    expect(screen.getByText('Este módulo no tiene operaciones habilitadas.')).toBeTruthy();
+  });
+});
