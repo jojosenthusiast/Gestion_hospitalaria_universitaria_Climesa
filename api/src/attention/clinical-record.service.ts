@@ -1,11 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
-import { VitalSignsDto } from './clinical-record.dto';
+import { DiagnosisDto, PrescriptionDto, VitalSignsDto } from './clinical-record.dto';
 
 type Row = Record<string, any>;
 
@@ -22,7 +22,7 @@ export class ClinicalRecordService {
     const ownPatient = actor.patientId && actor.patientId === row.patientId;
     const ownDoctor = actor.staffId && actor.staffId === row.doctorId;
     const relation = actor.staffId ? (await c.query(`SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz LIMIT 1`, [row.patientId, actor.staffId, this.clock.now()])).rowCount : 0;
-    const canRelation = contextsOf(actor, 'expediente.ver').includes('relacion') || contextsOf(actor, 'signos.registrar').includes('x');
+    const canRelation = contextsOf(actor, 'expediente.ver').includes('relacion') || contextsOf(actor, 'signos.registrar').includes('x') || contextsOf(actor, 'consulta.registrar').includes('relacion') || contextsOf(actor, 'recetas.emitir').includes('relacion');
     if (!ownPatient && !ownDoctor && !(canRelation && relation)) throw new ForbiddenException('No tienes relación de atención con este paciente.');
     return row;
   }
@@ -50,5 +50,40 @@ export class ClinicalRecordService {
       return row;
     });
   }
-}
 
+  async addDiagnosis(actor: Actor, id: string, dto: DiagnosisDto, key?: string) {
+    if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
+    return this.commands.run(actor, 'consulta.registrar', key, dto, async c => {
+      const consultation = await this.consultation(c, actor, id);
+      if (consultation.state !== 'abierta') throw new ConflictException('La consulta ya está firmada y no admite diagnósticos nuevos.');
+      const code = dto.code.trim().toUpperCase();
+      const cie10 = (await c.query('SELECT codigo,descripcion FROM atencion.cie10 WHERE codigo=$1', [code])).rows[0] as Row | undefined;
+      if (!cie10) throw new NotFoundException('El código CIE-10 no existe en el catálogo.');
+      if (dto.principal) await c.query('UPDATE atencion.diagnostico SET principal=false WHERE consulta_id=$1', [id]);
+      const row = (await c.query(`INSERT INTO atencion.diagnostico(consulta_id,cie10,principal,nota) VALUES($1,$2,$3,$4)
+        RETURNING id,cie10 AS code,principal,nota AS note`, [id, code, dto.principal ?? false, dto.note?.trim() || null])).rows[0];
+      await this.commands.audit(c, actor, { action: 'diagnostico.registrar', entity: 'diagnostico', entityId: row.id, patientId: consultation.patientId, permission: 'consulta.registrar', detail: { consultationId: id, code } });
+      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, consultation.version, await channelsFor(c, ['expediente.ver', 'consulta.iniciar'], { users: [await patientAccount(c, consultation.patientId)] }));
+      return { ...row, description: cie10.descripcion };
+    });
+  }
+
+  async addPrescription(actor: Actor, id: string, dto: PrescriptionDto, key?: string) {
+    if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
+    return this.commands.run(actor, 'recetas.emitir', key, dto, async c => {
+      const consultation = await this.consultation(c, actor, id);
+      if (consultation.state !== 'abierta') throw new ConflictException('La consulta ya está firmada y no admite recetas nuevas.');
+      const prescription = (await c.query(`INSERT INTO atencion.receta(consulta_id) VALUES($1) RETURNING id,emitida_en AS "issuedAt"`, [id])).rows[0];
+      const items: Row[] = [];
+      for (const item of dto.items) {
+        const row = (await c.query(`INSERT INTO atencion.receta_item(receta_id,medicamento,dosis,via,frecuencia,duracion,indicaciones)
+          VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,medicamento AS medication,dosis AS dose,via AS route,frecuencia AS frequency,duracion AS duration,indicaciones AS instructions`,
+          [prescription.id, item.medication.trim(), item.dose.trim(), item.route.trim(), item.frequency.trim(), item.duration.trim(), item.instructions?.trim() || null])).rows[0];
+        items.push(row);
+      }
+      await this.commands.audit(c, actor, { action: 'receta.emitir', entity: 'receta', entityId: prescription.id, patientId: consultation.patientId, permission: 'recetas.emitir', detail: { consultationId: id, itemCount: items.length } });
+      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, consultation.version, await channelsFor(c, ['expediente.ver', 'recetas.emitir'], { users: [await patientAccount(c, consultation.patientId)] }));
+      return { ...prescription, items };
+    });
+  }
+}
