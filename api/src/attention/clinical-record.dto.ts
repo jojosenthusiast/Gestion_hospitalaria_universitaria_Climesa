@@ -1,5 +1,6 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNumber, IsOptional, Max, Min, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class VitalSignsDto {
   @ApiPropertyOptional({ minimum: 40, maximum: 300 }) @IsOptional() @IsInt() @Min(40) @Max(300) systolic?: number;
@@ -13,3 +14,23 @@ export class VitalSignsDto {
   @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() admissionId?: string;
 }
 
+export class DiagnosisDto {
+  @ApiProperty({ example: 'J06.9' }) @IsString() @IsNotEmpty() @MaxLength(20) code!: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() principal?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) note?: string;
+}
+
+export class PrescriptionItemDto {
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(200) medication!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(200) dose!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(100) route!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(200) frequency!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(100) duration!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) instructions?: string;
+}
+
+export class PrescriptionDto {
+  @ApiProperty({ type: [PrescriptionItemDto], minItems: 1, maxItems: 20 })
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => PrescriptionItemDto)
+  items!: PrescriptionItemDto[];
+}
