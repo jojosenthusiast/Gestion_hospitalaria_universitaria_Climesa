@@ -52,7 +52,7 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     HOME("A04", "Inicio", "sesion.perfil", true),
     PATIENT_QUEUE("A05", "Mi turno", "fila.ver", true),
     MY_APPOINTMENTS("A06", "Mis citas", "citas.ver", true),
-    RESULTS("A07", "Mis exámenes", "resultados.ver", false),
+    RESULTS("A07", "Mis exámenes", "resultados.ver", true),
     HISTORY("A08", "Mi historial", "expediente.ver", false),
     AMBULANCE_REQUEST("A09", "Pedir ambulancia", "ambulancia.solicitar", false),
     HOSPITAL_INFO("A10", "Hospital", "sesion.perfil", false),
@@ -61,7 +61,7 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     MEDICAL_DAY("A20", "Mi día", "consulta.iniciar", true),
     CONSULTATIONS("A21", "Consulta", "consulta.iniciar", true),
     RECORD("A22", "Expediente", "expediente.ver", false),
-    RESULT_REVIEW("A23", "Resultados por revisar", "laboratorio.revisar", false),
+    RESULT_REVIEW("A23", "Resultados por revisar", "laboratorio.revisar", true),
     HOSPITALIZED("A24", "Mis hospitalizados", "admision.ver", false),
     AMBULANCE_ARRIVAL("A25", "Llegada de ambulancia", "ambulancia.recibir_prehospital", false),
     SHIFTS("A26", "Mis turnos", "turnos.ver", true),
@@ -79,9 +79,9 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     CLEANING("A52", "Limpieza de camas", "camas.registrar_limpieza", false),
     SUPPLIES("A53", "Consumo de insumos", "inventario.mover", false),
     AMBULANCE_RECEPTION("A54", "Recepción de ambulancia", "ambulancia.recibir_prehospital", false),
-    LAB("A60", "Laboratorio", "laboratorio.ver_cola", false),
-    SAMPLE("A61", "Toma de muestra", "laboratorio.procesar", false),
-    CAPTURE_RESULTS("A62", "Captura de resultados", "laboratorio.procesar", false),
+    LAB("A60", "Laboratorio", "laboratorio.ver_cola", true),
+    SAMPLE("A61", "Toma de muestra", "laboratorio.procesar", true),
+    CAPTURE_RESULTS("A62", "Captura de resultados", "laboratorio.procesar", true),
     UNIT("A70", "Unidad", "ambulancia.ver_estado", true),
     SERVICE("A71", "Servicio", "ambulancia.operar", false),
     PREHOSPITAL_REPORT("A72", "Reporte prehospital", "ambulancia.reportar_prehospital", false),
@@ -146,4 +146,3 @@ object RegistrationRules {
         if(password!=confirmation)put("confirmation","Las contraseñas no coinciden.")
     }
 }
-
