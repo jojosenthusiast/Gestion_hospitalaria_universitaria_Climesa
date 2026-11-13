@@ -2,7 +2,7 @@ import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Req, UseGua
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { VitalSignsDto } from './clinical-record.dto';
+import { DiagnosisDto, PrescriptionDto, VitalSignsDto } from './clinical-record.dto';
 import { ClinicalRecordService } from './clinical-record.service';
 
 @ApiTags('clinical-record') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('consultas')
@@ -14,5 +14,10 @@ export class ClinicalRecordController {
 
   @Post(':id/signos') @RequirePermission('signos.registrar') @ApiOperation({ summary: 'Registrar signos vitales de una consulta' })
   signs(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VitalSignsDto, @Headers('idempotency-key') key?: string) { return this.clinical.addVitalSigns(r.actor, id, dto, key); }
-}
 
+  @Post(':id/diagnosticos') @RequirePermission('consulta.registrar') @ApiOperation({ summary: 'Registrar un diagnóstico CIE-10' })
+  diagnosis(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: DiagnosisDto, @Headers('idempotency-key') key?: string) { return this.clinical.addDiagnosis(r.actor, id, dto, key); }
+
+  @Post(':id/receta') @RequirePermission('recetas.emitir') @ApiOperation({ summary: 'Emitir una receta con sus indicaciones' })
+  prescription(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PrescriptionDto, @Headers('idempotency-key') key?: string) { return this.clinical.addPrescription(r.actor, id, dto, key); }
+}
