@@ -34,8 +34,12 @@ const rules: [RegExp, (match: RegExpMatchArray) => LiveScope][] = [
   [/^\/laboratorio\/catalogo(\?|$)/, () => []],
   [/^\/laboratorio(\/|\?|$)/, () => of('orden_laboratorio')],
   [new RegExp(`^/admisiones/${uuid}/sugerencias-cama$`), () => of('cama', 'admision')],
+  // Doctors available at admission time depend on who is on shift, not on admissions.
+  [/^\/admisiones\/medicos-disponibles(\?|$)/, () => of('turno', 'personal')],
+  [/^\/admisiones\/mapa-camas(\?|$)/, () => of('cama', 'admision', 'espacio')],
   [/^\/admisiones(\/|\?|$)/, () => of('admision', 'cama')],
-  [/^\/ambulancia(\/|\?|$)/, () => of('unidad', 'solicitud', 'servicio')],
+  // Crew coverage (paramedic and driver on duty, RN-30) comes from shifts.
+  [/^\/ambulancia(\/|\?|$)/, () => of('unidad', 'solicitud', 'servicio', 'turno')],
   [/^\/inventario(\/|\?|$)/, () => of('articulo')],
   [/^\/cuentas\/vinculaciones(\/|\?|$)/, () => of('vinculacion_paciente', 'paciente')],
   [/^\/me\/laboratorio(\?|$)/, () => of('orden_laboratorio')],

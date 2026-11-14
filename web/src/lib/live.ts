@@ -8,6 +8,13 @@ export type ConnectionStatus = 'live' | 'offline' | 'reconnecting';
 export const INVALIDATION_BATCH_MS = 150;
 
 /**
+ * Una pestaña oculta más de este tiempo (equipo suspendido, otra aplicación al frente) pudo perder
+ * eventos sin que el socket lo notara todavía. Al volver a verse se hace la misma recuperación que al
+ * reconectar. No es un reloj: solo se compara la hora al ocultarse con la hora al volver.
+ */
+export const RESUME_STALE_MS = 30_000;
+
+/**
  * WEB-01: invalidación por entidad. `counts` lleva un contador por `entidad` y por `entidad:id`
  * (`entidad:*` si el evento no trae id); `any` sube con cualquier evento. Cada lectura (`useData`)
  * depende solo de los contadores de las entidades que le afectan (`features/live-scope.ts`).
@@ -19,7 +26,8 @@ export type LiveSignal = { any: number; counts: Readonly<Record<string, number>>
 // vuelve a pedir solo lo afectado. `version` sube solo al (re)unirse a los canales o tras la
 // recuperación: entonces se invalidan todas las vistas, porque pudo perderse cualquier evento.
 // Solo hay UNA consulta a /eventos, la de recuperación, y únicamente tras una caída: cuando un
-// canal vuelve a estar suscrito o cuando el navegador recupera la red. Nunca por reloj.
+// canal vuelve a estar suscrito, cuando el navegador recupera la red o cuando la pestaña vuelve a verse
+// tras estar oculta al menos `RESUME_STALE_MS`. Nunca por reloj.
 // El temporizador de abajo no sondea: solo espera a que termine una ráfaga de eventos ya recibidos.
 export function useLive(api: Api, profile: AccessProfile, token: string, refreshProfile: () => void) {
   const [version, setVersion] = useState(0);
@@ -92,8 +100,20 @@ export function useLive(api: Api, profile: AccessProfile, token: string, refresh
 
     const offline = () => { wasDown = true; setStatus('offline'); };
     const online = () => { setStatus(allJoined() ? 'live' : 'reconnecting'); latest.current.refreshProfile(); void catchUp(); };
+    // Regreso a la pestaña (o restauración desde la caché de páginas): si estuvo oculta lo suficiente,
+    // recupera e invalida todo, como tras una caída. Un vistazo corto a otra pestaña no pide nada.
+    let hiddenAt: number | undefined = document.visibilityState === 'hidden' ? Date.now() : undefined;
+    const visibility = () => {
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      const away = hiddenAt === undefined ? 0 : Date.now() - hiddenAt;
+      hiddenAt = undefined;
+      if (away >= RESUME_STALE_MS) void catchUp();
+    };
+    const pageshow = (event: PageTransitionEvent) => { if (event.persisted) void catchUp(); };
     window.addEventListener('offline', offline);
     window.addEventListener('online', online);
+    document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('pageshow', pageshow);
 
     if (supabase) {
       const client = supabase;
@@ -129,6 +149,8 @@ export function useLive(api: Api, profile: AccessProfile, token: string, refresh
       if (pending !== undefined) clearTimeout(pending);
       window.removeEventListener('offline', offline);
       window.removeEventListener('online', online);
+      document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pageshow', pageshow);
       for (const channel of channels) void supabase?.removeChannel(channel);
     };
   }, [key]);

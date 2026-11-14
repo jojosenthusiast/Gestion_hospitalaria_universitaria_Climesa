@@ -64,4 +64,14 @@ describe('invalidación por entidad (WEB-01)', () => {
     expect(liveScope(`/pacientes/${PATIENT}/historial`)).toContainEqual({ entity: 'paciente', id: PATIENT });
     expect(liveScope('/metricas/tablero')).toBe('*');
   });
+
+  it('un turno asignado en otra plataforma vuelve a pedir la tripulación de la ambulancia y los médicos disponibles, no las admisiones', async () => {
+    const doctors = '/admisiones/medicos-disponibles?at=2026-11-20T10%3A00%3A00Z';
+    const { llamadas, evento } = montar(['/ambulancia', doctors, '/admisiones']);
+    await evento('turno', 'turno:turno-1');
+    expect(llamadas('/ambulancia')).toBe(2);
+    expect(llamadas(doctors)).toBe(2);
+    expect(llamadas('/admisiones')).toBe(1);
+    expect(liveScope('/admisiones/mapa-camas?patientId=p-1')).toContainEqual({ entity: 'espacio' });
+  });
 });
