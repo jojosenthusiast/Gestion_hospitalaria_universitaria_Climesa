@@ -207,4 +207,9 @@ Cambios de producto autorizados por el dueño. Quedan registrados porque agregan
 | Quién pidió | `GET /ambulancia` no traía el solicitante | `pendingRequests[]` agrega `requesterName` (paciente o quien llamó), `callerName` y `patientRecord`. Nueva columna opcional `ambulancia.solicitud.solicitante_nombre` y campo opcional `callerName` en `POST /ambulancia/solicitudes` (solo recepción). La consulta de solicitudes de pacientes registrados ya se audita. |
 | Paciente en la bitácora | La bitácora no muestra al paciente (D-056). El dueño pide «paciente Y» para DPD | Se muestra solo `patientRef`: el expediente enmascarado (últimos 3 caracteres), nunca nombre ni id. ¿Se debe ocultar también para DPD, o mostrar el nombre a quien tiene relación de atención? |
 | Búsqueda y hitos | `GET /ambulancia/bitacora` solo filtraba por columnas exactas | Se agrega `q` (texto libre sin acentos sobre origen, destino, municipio y tripulación) y `milestones[]` por servicio para contar la historia. |
+
+## Ronda 2 · Auditoría y avisos (rama `feat/r2-auditoria-avisos`; observaciones 14 a 19)
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
 | Ronda 2 · avisos | `avisos.publicar` solo lo tiene el Jefe de Operaciones; la observación 14 dice «JOP/ADM según permisos». ¿Debe poder publicar también Administración? | No: se respeta `permisos.csv` (D-050, segregación de funciones). Si se quiere, es una fila nueva en `permisos.csv` y una migración. |
