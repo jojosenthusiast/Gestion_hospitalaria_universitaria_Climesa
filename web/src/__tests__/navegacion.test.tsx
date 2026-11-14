@@ -65,6 +65,8 @@ async function entrar(profile: AccessProfile, rutas: Rutas = {}, hash = '') {
 const etiquetas = (nav: HTMLElement) => within(nav).getAllByRole('link').map((a) => a.textContent);
 
 beforeEach(() => {
+  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.open = true; };
+  HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) { this.open = false; };
   live.status = 'live';
   auth.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
   auth.signOut.mockResolvedValue({ error: null });
