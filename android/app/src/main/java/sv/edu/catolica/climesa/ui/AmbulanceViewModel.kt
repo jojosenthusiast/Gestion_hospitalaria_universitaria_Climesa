@@ -23,6 +23,7 @@ import sv.edu.catolica.climesa.domain.AmbulanceRequestRow
 import sv.edu.catolica.climesa.domain.AmbulanceRules
 import sv.edu.catolica.climesa.domain.AmbulanceService
 import sv.edu.catolica.climesa.domain.AmbulanceStatus
+import sv.edu.catolica.climesa.domain.LogFilters
 import sv.edu.catolica.climesa.domain.PrehospitalForm
 import sv.edu.catolica.climesa.domain.PrehospitalView
 import sv.edu.catolica.climesa.domain.RealtimeSignal
@@ -37,6 +38,7 @@ data class AmbulanceUiState(
     val loading: Boolean = false,
     val status: AmbulanceStatus? = null,
     val log: List<AmbulanceLogEntry> = emptyList(),
+    val logFilters: LogFilters = LogFilters(),
     val arrival: PrehospitalView? = null,
     val arrivalServiceId: String? = null,
     val ownRequest: OwnAmbulanceRequest? = null,
@@ -75,7 +77,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             try {
                 when (current) {
                     AmbulanceMode.STATUS -> mutable.value = mutable.value.copy(loading = false, status = AmbulanceParser.status(api.request("/ambulancia")))
-                    AmbulanceMode.LOG -> mutable.value = mutable.value.copy(loading = false, log = AmbulanceParser.log(api.request("/ambulancia/bitacora")))
+                    AmbulanceMode.LOG -> mutable.value = mutable.value.copy(loading = false, log = AmbulanceParser.log(api.request(AmbulanceRules.logPath(mutable.value.logFilters))))
                     AmbulanceMode.ARRIVAL -> loadArrival()
                     AmbulanceMode.REQUEST -> Unit
                 }
@@ -148,6 +150,12 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             mutable.value = mutable.value.copy(formError = "Para terminar sin traslado elige el estado final y escribe el motivo."); return
         }
         write(notice = "Hito registrado.") { api.request("/ambulancia/servicios/${service.id}/hitos", "POST", AmbulanceRules.milestoneBody(type, finalState, reason)) }
+    }
+
+    /** A74: búsqueda y filtros de la bitácora; cada cambio vuelve a pedir con la consulta nueva. */
+    fun setLogFilters(filters: LogFilters) {
+        mutable.value = mutable.value.copy(logFilters = filters)
+        if (mode == AmbulanceMode.LOG) load()
     }
 
     fun updatePrehospital(form: PrehospitalForm) { mutable.value = mutable.value.copy(prehospital = form, formError = null) }

@@ -21,6 +21,7 @@ import org.junit.Test
 import sv.edu.catolica.climesa.data.AuthRequestException
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.EventoDominio
+import sv.edu.catolica.climesa.domain.LogFilters
 import sv.edu.catolica.climesa.domain.PrehospitalForm
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 import java.time.Instant
@@ -121,6 +122,20 @@ class AmbulanceViewModelTest {
         bus.signals.tryEmit(RealtimeSignal.Event(EventoDominio("ambulancia.estado_cambiado", "unidad", "u1", 6))); runCurrent()
         assertEquals(listOf("Despacho confirmó tu solicitud: la ambulancia va en camino."), vm.state.value.ownRequest!!.updates)
         assertTrue("el paciente no lee el tablero de despacho", api.calls.none { it.first == "/ambulancia" })
+    }
+
+    @Test fun laBitacoraVuelveAPedirConLaBusquedaYLosFiltros() = runTest(dispatcher) {
+        val api = FakeGateway()
+        api.responses["/ambulancia/bitacora"] = JSONArray()
+        api.responses["/ambulancia/bitacora?q=Apopa&priority=roja"] = JSONArray().put(JSONObject().put("id", "s1").put("type", "emergencia_domicilio").put("priority", "roja").put("origin", "Calle a Apopa").put("destination", "Hospital CLIMESA").put("dispatchedAt", "2026-11-15T14:00:00Z"))
+        val vm = AmbulanceViewModel(api, AmbulanceBus())
+        vm.open(AmbulanceMode.LOG); runCurrent()
+        assertTrue(vm.state.value.log.isEmpty())
+        vm.setLogFilters(LogFilters(query = "Apopa", priority = "roja")); runCurrent()
+        assertEquals("s1", vm.state.value.log.single().id)
+        assertEquals(2, api.calls.count { it.first.startsWith("/ambulancia/bitacora") })
+        vm.setLogFilters(LogFilters()); runCurrent()
+        assertTrue(vm.state.value.log.isEmpty())
     }
 
     @Test fun enfermeriaAbreElReporteDelServicioQueLlegaPorEvento() = runTest(dispatcher) {
