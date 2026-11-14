@@ -1,11 +1,14 @@
-import { useEffect,useId,useRef,useState,type ReactNode } from 'react';
+import { useEffect,useId,useMemo,useRef,useState,type ReactNode } from 'react';
 import { ApiError,type Api } from '../lib/api';
+import { liveScope,scopedVersion,useLiveSignal } from './live-scope';
 import { Icon,Notice } from '../components/ui';
 import { newIntentKey,withIntentKey } from './intent';
 export type Remote<T>={data:T|null;loading:boolean;error:ApiError|null;refresh:()=>void};
+/** `version` sube al reconectar (todo se vuelve a pedir); `live` sube solo con eventos de las entidades que afectan a `path` (WEB-01). */
 export function useData<T>(api:Api,path:string,version=0,enabled=true):Remote<T>{
  const [data,setData]=useState<T|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState<ApiError|null>(null),[tick,setTick]=useState(0);
- useEffect(()=>{if(!enabled){setLoading(false);setError(null);setData(null);return;}const controller=new AbortController();setLoading(true);setError(null);api.request<T>(path,{signal:controller.signal}).then(v=>{if(!controller.signal.aborted)setData(v);}).catch(e=>{if(!controller.signal.aborted)setError(e instanceof ApiError?e:new ApiError('No se pudo cargar la información.'));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return()=>controller.abort();},[api,path,version,tick,enabled]);
+ const scope=useMemo(()=>liveScope(path),[path]),live=scopedVersion(useLiveSignal(),scope);
+ useEffect(()=>{if(!enabled){setLoading(false);setError(null);setData(null);return;}const controller=new AbortController();setLoading(true);setError(null);api.request<T>(path,{signal:controller.signal}).then(v=>{if(!controller.signal.aborted)setData(v);}).catch(e=>{if(!controller.signal.aborted)setError(e instanceof ApiError?e:new ApiError('No se pudo cargar la información.'));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return()=>controller.abort();},[api,path,version,live,tick,enabled]);
  return {data,loading,error,refresh:()=>setTick(v=>v+1)};
 }
 export function useAction(api:Api){

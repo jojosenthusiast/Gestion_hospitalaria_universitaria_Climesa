@@ -5,7 +5,7 @@ import { BedsPage } from '../features/spaces';
 
 // Supabase simulado: cada canal guarda su función de estado y su manejador de mensajes
 // para que la prueba pueda emitir eventos y caídas sin tocar la red.
-type Canal = { name: string; estado: (s: string) => void; mensaje: (m: { payload?: { entidad?: string } }) => void };
+type Canal = { name: string; estado: (s: string) => void; mensaje: (m: { payload?: { entidad?: string; id?: string } }) => void };
 const realtime = vi.hoisted(() => ({
   canales: [] as unknown[],
   setAuth: vi.fn(),
@@ -74,20 +74,33 @@ describe('tiempo real sin sondeo', () => {
     expect(consultas(api, '/eventos')).toBe(0);
   });
 
-  it('un evento del canal incrementa la versión y solo refresca el perfil si cambia un usuario', async () => {
+  it('un evento sube solo los contadores de su entidad (WEB-01) y refresca el perfil si cambia un usuario', async () => {
     const { result, refreshProfile } = montarHook();
     await vaciar();
     act(() => canales()[0].estado('SUBSCRIBED'));
     await lote();
     const base = result.current.version;
-    act(() => canales()[0].mensaje({ payload: { entidad: 'cama' } }));
+    act(() => canales()[0].mensaje({ payload: { entidad: 'cama', id: 'bed-1' } }));
     await lote();
-    expect(result.current.version).toBe(base + 1);
+    expect(result.current.version).toBe(base);
+    expect(result.current.signal.counts).toEqual({ cama: 1, 'cama:bed-1': 1 });
+    expect(result.current.signal.any).toBe(1);
     expect(refreshProfile).not.toHaveBeenCalled();
     act(() => canales()[0].mensaje({ payload: { entidad: 'usuario' } }));
     await lote();
-    expect(result.current.version).toBe(base + 2);
+    expect(result.current.signal.counts).toMatchObject({ usuario: 1, 'usuario:*': 1, cama: 1 });
     expect(refreshProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('un evento sin entidad no se puede acotar e invalida todas las vistas', async () => {
+    const { result } = montarHook();
+    await vaciar();
+    act(() => canales()[0].estado('SUBSCRIBED'));
+    await lote();
+    const base = result.current.version;
+    act(() => canales()[0].mensaje({}));
+    await lote();
+    expect(result.current.version).toBe(base + 1);
   });
 
   it('se suscribe a cada canal del perfil y pasa a en vivo cuando todos están unidos', async () => {
@@ -119,8 +132,11 @@ describe('tiempo real sin sondeo', () => {
     expect(result.current.version).toBe(base);
     await lote();
     expect(result.current.version).toBe(base + 1);
+    expect(result.current.signal.any).toBe(1);
+    expect(result.current.signal.counts.cama).toBe(1);
     await lote();
     expect(result.current.version).toBe(base + 1);
+    expect(result.current.signal.any).toBe(1);
   });
 
   it('al renovarse el token los canales unidos reciben el nuevo sin quitarse ni volver a crearse (S10)', async () => {
