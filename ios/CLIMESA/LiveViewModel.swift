@@ -21,4 +21,9 @@ final class LiveViewModel {
             snapshot = LiveReducer.apply(signal, to: snapshot)
         }
     }
+
+    /// Deslizar para actualizar: la persona pide los datos de nuevo (no es un temporizador).
+    func refreshAll() {
+        snapshot = LiveReducer.apply(.resync, to: snapshot)
+    }
 }

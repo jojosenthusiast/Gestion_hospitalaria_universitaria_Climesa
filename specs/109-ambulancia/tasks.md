@@ -31,6 +31,7 @@
   - Depende de: T03, 122-T03
   - Hecho cuando: escenario 4 pasa
   - Avance 15-nov-2026: A09 envía la solicitud, muestra el aviso del 911 y lista los eventos de `usuario:<id>`. Bloqueado: no hay endpoint de lectura de la solicitud para el paciente (pregunta AMB-01).
+  - Avance 14-nov-2026 (iOS): I09 (aviso del 911 y `POST /ambulancia/solicitudes`; sin seguimiento ni cancelación porque la API no los ofrece al paciente) e I25 de solo lectura (`GET /ambulancia` y el reporte prehospital). compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
 - [x] T07 · S4 · R · Bitácora con filtros y privacidad (W19, A74)
   - Cubre: FR-109-14, FR-109-15
   - Depende de: T04

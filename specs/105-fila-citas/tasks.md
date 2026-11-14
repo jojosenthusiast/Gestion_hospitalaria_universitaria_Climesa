@@ -13,6 +13,7 @@
   - Cubre: FR-105-06
   - Depende de: T02, 121-T03, 122-T03
   - Hecho cuando: escenario 2 pasa en Android e iOS
+  - Avance 14-nov-2026 (iOS): I05 (número grande, estimación de cuántos faltan con `/publico/fila/{servicio}`, consultorio y vibración al pasar a Llamado), I06 (pedir con disponibilidad, cancelar con motivo y versión) e I20 (llamar siguiente con `POST /fila/{id}/llamar`). compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
 - [ ] T04 · S3 · R · Agenda, disponibilidad, agendar y cancelar
   - Cubre: FR-105-07, FR-105-09, FR-105-10, FR-105-12
   - Depende de: T01, 103-T06

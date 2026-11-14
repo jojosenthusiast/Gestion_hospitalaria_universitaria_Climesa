@@ -18,10 +18,12 @@
   - Depende de: T03
   - Hecho cuando: el paciente ve su consulta firmada en Android e iOS y la lectura queda auditada
   - Avance 13-nov-2026: `GET /pacientes/{id}/historial` (`expediente.ver`): el paciente ve solo sus consultas firmadas y valores revisados; el personal con relación de atención o acceso excepcional aprobado y vigente ve las consultas de todos los médicos, resultados y admisiones (borradores solo del autor); toda lectura queda auditada (`expediente.leer`, motivo `acceso_excepcional` cuando aplica) y el 403 queda como `acceso.denegado`. Pruebas en `api/tests/paciente-vinculacion-historial.spec.ts`; web usa el endpoint en el diálogo de historial (`historial.test.tsx`); Android A08 y A22 (`PatientRecordViewModelsTest`, `AccountLinkingTest`; `gradlew testDebugUnitTest assembleDebug` correcto). **Sigue abierta**: falta iOS y comprobarlo en un dispositivo.
+  - Avance 14-nov-2026 (iOS): I08 e I22 con `GET /pacientes/{id}/historial`; si el médico no es tratante (403) pide acceso excepcional (`POST /accesos-excepcionales`). compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
 - [ ] T05 · S3 · R · Pantallas de consulta en Android e iOS (A21, I21) y signos (A41)
   - Cubre: FR-106-01 a FR-106-06
   - Depende de: T02, 121-T03, 122-T03
   - Hecho cuando: escenario 1 pasa en ambas plataformas
+  - Avance 14-nov-2026 (iOS): I21 en `ios/CLIMESA/ConsultationView.swift`: iniciar desde cita o número llamado, signos, borrador con versión, diagnósticos CIE-10 (código a mano, sin buscador en la API), receta, órdenes de laboratorio, indicación de hospitalización y firma. compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
 - [ ] T06 · S4 · R · Indicar hospitalización desde la consulta
   - Cubre: FR-106-11
   - Depende de: T03, 108-T02

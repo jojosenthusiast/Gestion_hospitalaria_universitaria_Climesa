@@ -90,7 +90,7 @@ struct RoleTabsView:View {
     }
 
     private func refresh(_ tab:AppTab) async {
-        if tab == .turnos { await shifts.load(api:account.api) } else { await account.refreshProfile() }
+        if tab == .turnos { await shifts.load(api:account.api) } else { live.refreshAll(); await account.refreshProfile() }
     }
 }
 

@@ -33,6 +33,7 @@
   - Cubre: FR-108-14
   - Depende de: T06
   - Hecho cuando: el médico ve solo los suyos y enfermería solo su área
+  - Avance 14-nov-2026 (iOS): I24 (`GET /admisiones`, alta con pendientes y responsables por `POST /admisiones/{id}/alta`). compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo. Sin días de hospitalización: la respuesta no trae fecha de ingreso.
 - [ ] T09 · S5 · E · Reserva para admisión programada con vencimiento
   - Cubre: FR-108-09
   - Depende de: T04
