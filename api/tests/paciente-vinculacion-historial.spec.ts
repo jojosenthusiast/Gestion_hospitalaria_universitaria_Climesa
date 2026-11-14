@@ -152,7 +152,7 @@ describe('vinculación de cuenta e historial clínico (REQ-03, REQ-05)', () => {
 
     test('un acceso excepcional aprobado y vigente abre el historial con motivo auditado y no ve borradores ajenos', async () => {
       await t.pg.query(`INSERT INTO acceso.acceso_excepcional(solicitante_id,paciente_id,motivo,horas,vigencia,estado,resuelto_por,resuelto_en)
-        VALUES($1,$2,'Valoración de enfermería ficticia',2,tstzrange($3::timestamptz - interval '1 minute',$3::timestamptz + interval '2 hours'),'aprobado',$4,$3)`, [userId('ENF'), own, now, userId('DPD')]);
+        VALUES($1,$2,'Valoración de enfermería ficticia',2,tstzrange($3::timestamptz - interval '1 minute',$3::timestamptz + interval '1 hour'),'aprobado',$4,$3)`, [userId('ENF'), own, now, userId('DPD')]);
       const nurse = await t.call('ENF', 'GET', `/pacientes/${own}/historial`);
       expect(nurse.status).toBe(200);
       expect(nurse.body.access).toBe('acceso_excepcional');
