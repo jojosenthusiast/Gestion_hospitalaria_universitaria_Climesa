@@ -16,6 +16,7 @@ import { PrivacyModule } from './privacy/privacy.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { PublicModule } from './public/public.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { AmbulanceModule } from './ambulance/ambulance.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { MetricsModule } from './metrics/metrics.module';
     AccountsModule,
     PublicModule,
     MetricsModule,
+    AmbulanceModule,
   ],
 })
 export class AppModule {}

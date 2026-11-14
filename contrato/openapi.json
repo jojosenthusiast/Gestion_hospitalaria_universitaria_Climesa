@@ -1501,77 +1501,6 @@
         "x-permiso": "camas.verificar_limpieza"
       }
     },
-    "/api/v1/ambulancia": {
-      "get": {
-        "operationId": "OperationsController_ambulanceStatus",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Estado de la unidad y servicio activo",
-        "tags": [
-          "operations"
-        ],
-        "x-permiso": "ambulancia.ver_estado"
-      }
-    },
-    "/api/v1/ambulancia/mantenimiento": {
-      "post": {
-        "operationId": "OperationsController_ambulanceMaintenance",
-        "parameters": [
-          {
-            "name": "idempotency-key",
-            "required": true,
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 8,
-              "maxLength": 128
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MaintenanceDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Entrar o salir de mantenimiento; salir exige paramédico con turno en curso",
-        "tags": [
-          "operations"
-        ],
-        "x-permiso": "ambulancia.mantenimiento"
-      }
-    },
     "/api/v1/eventos": {
       "get": {
         "operationId": "OperationsController_events",
@@ -4526,6 +4455,501 @@
         ],
         "x-permiso": "metricas.ver"
       }
+    },
+    "/api/v1/ambulancia": {
+      "get": {
+        "operationId": "AmbulanceController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado de la unidad, servicio activo con hitos y, para despacho, solicitudes por confirmar",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.ver_estado"
+      }
+    },
+    "/api/v1/ambulancia/mantenimiento": {
+      "post": {
+        "operationId": "AmbulanceController_maintenance",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaintenanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Entrar o salir de mantenimiento; salir exige paramédico con turno en curso",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.mantenimiento"
+      }
+    },
+    "/api/v1/ambulancia/solicitudes": {
+      "post": {
+        "operationId": "AmbulanceController_request",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmbulanceRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Solicitar ambulancia; queda por confirmar (paciente verificado o recepción por teléfono)",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.solicitar"
+      }
+    },
+    "/api/v1/ambulancia/solicitudes/{id}/descartar": {
+      "post": {
+        "operationId": "AmbulanceController_discard",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscardRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Descartar una solicitud por confirmar con motivo",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.despachar"
+      }
+    },
+    "/api/v1/ambulancia/servicios": {
+      "post": {
+        "operationId": "AmbulanceController_dispatch",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Despachar: solo si la unidad está Disponible; la pasa a En Servicio en la misma transacción",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.despachar"
+      }
+    },
+    "/api/v1/ambulancia/servicios/{id}/hitos": {
+      "post": {
+        "operationId": "AmbulanceController_milestone",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MilestoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar hito en orden: salida, en escena, trasladando, en hospital, finalizado",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.operar"
+      }
+    },
+    "/api/v1/ambulancia/servicios/{id}/prehospital": {
+      "post": {
+        "operationId": "AmbulanceController_prehospital",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrehospitalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reporte prehospital; el reenvío con la misma Idempotency-Key no duplica",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.reportar_prehospital"
+      },
+      "get": {
+        "operationId": "AmbulanceController_readPrehospital",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ver el reporte prehospital; el contenido clínico solo con relación de atención",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.recibir_prehospital"
+      }
+    },
+    "/api/v1/ambulancia/ubicacion": {
+      "post": {
+        "operationId": "AmbulanceController_location",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ubicación en vivo de la tripulación; solo con servicio activo",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.operar"
+      }
+    },
+    "/api/v1/ambulancia/bitacora": {
+      "get": {
+        "operationId": "AmbulanceController_log",
+        "parameters": [
+          {
+            "name": "minResponseMinutes",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "municipality",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "crewId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "priority",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "finalState",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Último día local, yyyy-MM-dd",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Primer día local, yyyy-MM-dd",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bitácora filtrable (D-056); sin datos del paciente",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.ver_bitacora"
+      }
     }
   },
   "info": {
@@ -5134,29 +5558,6 @@
         },
         "required": [
           "version",
-          "reason"
-        ]
-      },
-      "MaintenanceDto": {
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "number",
-            "minimum": 1
-          },
-          "inMaintenance": {
-            "type": "boolean",
-            "description": "true entra a mantenimiento; false sale y deja la unidad Disponible"
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 10,
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "version",
-          "inMaintenance",
           "reason"
         ]
       },
@@ -6024,6 +6425,243 @@
           "titulo",
           "cuerpo",
           "hasta"
+        ]
+      },
+      "MaintenanceDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "inMaintenance": {
+            "type": "boolean",
+            "description": "true entra a mantenimiento; false sale y deja la unidad Disponible"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "inMaintenance",
+          "reason"
+        ]
+      },
+      "AmbulanceRequestDto": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          },
+          "municipality": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 80
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 500
+          },
+          "contactPhone": {
+            "type": "string",
+            "example": "7000-0000"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Solo recepción: paciente ya registrado que pide el servicio por teléfono"
+          }
+        },
+        "required": [
+          "address",
+          "reason",
+          "contactPhone"
+        ]
+      },
+      "DiscardRequestDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "reason"
+        ]
+      },
+      "DispatchDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "emergencia_domicilio",
+              "traslado_interhospitalario"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "roja",
+              "naranja",
+              "amarilla",
+              "verde"
+            ]
+          },
+          "origin": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300
+          },
+          "municipality": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "version",
+          "type",
+          "priority",
+          "destination"
+        ]
+      },
+      "MilestoneDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "salida",
+              "en_escena",
+              "trasladando",
+              "en_hospital",
+              "finalizado"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hora del teléfono; si falta, la del servidor"
+          },
+          "finalState": {
+            "type": "string",
+            "enum": [
+              "completado",
+              "cancelado",
+              "sin_traslado",
+              "rechaza_traslado"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "PrehospitalDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 500
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "roja",
+              "naranja",
+              "amarilla",
+              "verde"
+            ]
+          },
+          "vitalSigns": {
+            "$ref": "#/components/schemas/VitalSignsDto"
+          },
+          "estimatedArrival": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hora en que el teléfono capturó el reporte"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Paciente del servicio, por ejemplo uno provisional (FR-109-12)"
+          }
+        },
+        "required": [
+          "reason",
+          "priority",
+          "capturedAt"
+        ]
+      },
+      "LocationDto": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude",
+          "capturedAt"
         ]
       }
     }

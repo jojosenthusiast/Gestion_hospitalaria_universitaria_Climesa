@@ -536,40 +536,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/ambulancia": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Estado de la unidad y servicio activo */
-        get: operations["OperationsController_ambulanceStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ambulancia/mantenimiento": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Entrar o salir de mantenimiento; salir exige paramédico con turno en curso */
-        post: operations["OperationsController_ambulanceMaintenance"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/eventos": {
         parameters: {
             query?: never;
@@ -1589,6 +1555,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ambulancia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de la unidad, servicio activo con hitos y, para despacho, solicitudes por confirmar */
+        get: operations["AmbulanceController_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/mantenimiento": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Entrar o salir de mantenimiento; salir exige paramédico con turno en curso */
+        post: operations["AmbulanceController_maintenance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/solicitudes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Solicitar ambulancia; queda por confirmar (paciente verificado o recepción por teléfono) */
+        post: operations["AmbulanceController_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/solicitudes/{id}/descartar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Descartar una solicitud por confirmar con motivo */
+        post: operations["AmbulanceController_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/servicios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Despachar: solo si la unidad está Disponible; la pasa a En Servicio en la misma transacción */
+        post: operations["AmbulanceController_dispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/servicios/{id}/hitos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Registrar hito en orden: salida, en escena, trasladando, en hospital, finalizado */
+        post: operations["AmbulanceController_milestone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/servicios/{id}/prehospital": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver el reporte prehospital; el contenido clínico solo con relación de atención */
+        get: operations["AmbulanceController_readPrehospital"];
+        put?: never;
+        /** Reporte prehospital; el reenvío con la misma Idempotency-Key no duplica */
+        post: operations["AmbulanceController_prehospital"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/ubicacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ubicación en vivo de la tripulación; solo con servicio activo */
+        post: operations["AmbulanceController_location"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/bitacora": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bitácora filtrable (D-056); sin datos del paciente */
+        get: operations["AmbulanceController_log"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1739,12 +1859,6 @@ export interface components {
         };
         BedTransitionDto: {
             version: number;
-            reason: string;
-        };
-        MaintenanceDto: {
-            version: number;
-            /** @description true entra a mantenimiento; false sale y deja la unidad Disponible */
-            inMaintenance: boolean;
             reason: string;
         };
         AppointmentCreateDto: {
@@ -1998,6 +2112,78 @@ export interface components {
             hasta: string;
             /** @description Publicar aunque el texto parezca contener un DUI, expediente o teléfono (FR-112-05) */
             confirmarDatosPersonales?: boolean;
+        };
+        MaintenanceDto: {
+            version: number;
+            /** @description true entra a mantenimiento; false sale y deja la unidad Disponible */
+            inMaintenance: boolean;
+            reason: string;
+        };
+        AmbulanceRequestDto: {
+            address: string;
+            municipality?: string;
+            latitude?: number;
+            longitude?: number;
+            reason: string;
+            /** @example 7000-0000 */
+            contactPhone: string;
+            /**
+             * Format: uuid
+             * @description Solo recepción: paciente ya registrado que pide el servicio por teléfono
+             */
+            patientId?: string;
+        };
+        DiscardRequestDto: {
+            version: number;
+            reason: string;
+        };
+        DispatchDto: {
+            version: number;
+            /** Format: uuid */
+            requestId?: string;
+            /** @enum {string} */
+            type: "emergencia_domicilio" | "traslado_interhospitalario";
+            /** @enum {string} */
+            priority: "roja" | "naranja" | "amarilla" | "verde";
+            origin?: string;
+            destination: string;
+            municipality?: string;
+        };
+        MilestoneDto: {
+            /** @enum {string} */
+            type: "salida" | "en_escena" | "trasladando" | "en_hospital" | "finalizado";
+            /**
+             * Format: date-time
+             * @description Hora del teléfono; si falta, la del servidor
+             */
+            occurredAt?: string;
+            /** @enum {string} */
+            finalState?: "completado" | "cancelado" | "sin_traslado" | "rechaza_traslado";
+            reason?: string;
+        };
+        PrehospitalDto: {
+            reason: string;
+            /** @enum {string} */
+            priority: "roja" | "naranja" | "amarilla" | "verde";
+            vitalSigns?: components["schemas"]["VitalSignsDto"];
+            /** Format: date-time */
+            estimatedArrival?: string;
+            /**
+             * Format: date-time
+             * @description Hora en que el teléfono capturó el reporte
+             */
+            capturedAt: string;
+            /**
+             * Format: uuid
+             * @description Paciente del servicio, por ejemplo uno provisional (FR-109-12)
+             */
+            patientId?: string;
+        };
+        LocationDto: {
+            latitude: number;
+            longitude: number;
+            /** Format: date-time */
+            capturedAt: string;
         };
     };
     responses: never;
@@ -2794,47 +2980,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["BedTransitionDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperationsController_ambulanceStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperationsController_ambulanceMaintenance: {
-        parameters: {
-            query?: never;
-            header: {
-                "idempotency-key": string;
-                "Idempotency-Key": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MaintenanceDto"];
             };
         };
         responses: {
@@ -4334,6 +4479,244 @@ export interface operations {
             path: {
                 indicador: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_maintenance: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaintenanceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_request: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmbulanceRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_discard: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscardRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_dispatch: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispatchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_milestone: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MilestoneDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_readPrehospital: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_prehospital: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrehospitalDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_location: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AmbulanceController_log: {
+        parameters: {
+            query?: {
+                minResponseMinutes?: unknown;
+                municipality?: unknown;
+                crewId?: unknown;
+                priority?: unknown;
+                finalState?: unknown;
+                type?: unknown;
+                /** @description Último día local, yyyy-MM-dd */
+                to?: unknown;
+                /** @description Primer día local, yyyy-MM-dd */
+                from?: unknown;
+            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

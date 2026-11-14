@@ -71,8 +71,8 @@ class AndroidSectionsTest {
     }
 
     @Test fun lasSeccionesSinPantallaQuedanComoProximaEntrega() {
-        assertFalse(AndroidSection.SERVICE.ready)
-        assertFalse(AndroidSection.LOG.ready)
+        assertTrue(AndroidSection.SERVICE.ready)
+        assertTrue(AndroidSection.LOG.ready)
         assertTrue(AndroidSection.UNIT.ready)
         assertTrue(AndroidSection.BEDS.ready)
     }
