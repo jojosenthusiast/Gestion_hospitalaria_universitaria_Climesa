@@ -266,3 +266,13 @@ Decisión del dueño (2026-11-14): la ambulancia necesita paramédico **y** moto
 | Nombres en inglés | `errors[].field` y `errors[].message` contradicen la regla de JSON en español. | Se respeta el contrato compartido de Fase 0 que ya implementan Android e iOS; `campo` (en español) sigue con el primer campo para no romper clientes. |
 | Indicación desde consulta | `POST /admisiones/indicaciones` exigía `attendingDoctorId` aunque solo puede ser el propio médico. | Ahora es opcional (`AdmissionIndicationDto`) y por omisión es el médico que indica; la consulta de `originId` debe ser del paciente y de ese médico (403 si es de otro). |
 | Deriva móvil | ¿Qué cuerpos móviles no cumplen hoy el contrato? | `api/tests/contrato-movil.spec.ts` los listaría en `KNOWN_DRIFT`; hoy está vacío: iOS ya envía `motive` y Android ya arma la indicación de hospitalización. Android, iOS y la API leen un solo formato de fixture: `{ method, path, body }`, con `path` como en el contrato (`/api/v1/...`). |
+
+| Deriva móvil | ¿Qué cuerpos móviles no cumplen hoy el contrato? | `api/tests/contrato-movil.spec.ts` los lista en `KNOWN_DRIFT` (hoy: iOS `AdmissionBody` sin `motive`); Android aún no tiene la indicación de hospitalización. |
+
+## Tiempo real entre plataformas (rama `feat/tiempo-real`)
+
+| Tema | Pregunta | Decisión conservadora tomada |
+|---|---|---|
+| Canales en la API | `personnel.service.ts` e `invitations.service.ts` ponen `rol:JOP`/`rol:ADM` a mano (regla 8), y varios eventos no llegaban a todos los que leen ese dato. ¿Se corrige en la API? | La base amplía los canales al insertar en el outbox, derivándolos del catálogo de permisos (20261119004000). Queda pendiente que la API use `channelsFor` en esos servicios; la ampliación de la base es idempotente con ese cambio. |
+| Eventos que faltaban | Crear, editar o eliminar un artículo o lote no emitía `inventario.actualizado`; aislar una habitación bloqueaba camas sin `cama.estado_cambiado`. ¿Lo emite la API o la base? | Lo emite la base con disparadores (20261119004100), en la misma transacción. Si la API los emite después, se retiran los disparadores con su reversión. |
+| Avisos programados | Un aviso con inicio de vigencia futuro no emite nada cuando empieza a regir. | Sin cambio: aparece al siguiente evento, al reconectar o al volver a la app (no se agrega un reloj, regla 9). |
