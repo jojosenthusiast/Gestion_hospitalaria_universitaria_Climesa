@@ -12,9 +12,12 @@ import { HospitalShell } from './features/shell';
 import { PublicScreen } from './features/public-screen';
 import { PasswordRecoveryView,strongPassword } from './features/password';
 import './modules.css';
+/** La ruta del hash pertenece a la sesión: al salir se limpia para que la siguiente cuenta no herede una sección ajena (obs. 15). */
+const resetRoute=()=>{if(location.hash)history.replaceState(null,'',location.pathname+location.search);};
 export default function App(){
  const [session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(false),[expired,setExpired]=useState(false);
  useEffect(()=>{if(!supabase){setReady(true);return;}let cancelled=false;void supabase.auth.getSession().then(({data})=>{if(!cancelled){setSession(data.session);setReady(true);}});const {data}=supabase.auth.onAuthStateChange((_event,next)=>{setSession(next);setReady(true);});return()=>{cancelled=true;data.subscription.unsubscribe();};},[]);
+ useEffect(()=>{if(ready&&!session)resetRoute();},[ready,session]);
  // W34: la pantalla pública no usa sesión; sin Supabase solo pierde el tiempo real.
  if(location.pathname==='/publico')return <PublicScreen/>;
  if(!supabase)return <StatusView title="Configura tu conexión" detail="Copia web/.env.example como web/.env y configura la conexión de CLIMESA antes de iniciar el portal."/>;
@@ -47,8 +50,8 @@ function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
 }
 function LivePortal({api,profile,session,onExpired,refreshProfile}:{api:IntentApi;profile:AccessProfile;session:Session;onExpired:()=>void;refreshProfile:()=>void}){
  const live=useLive(api,profile,session.access_token,refreshProfile);
- const idle=useIdleSession(onExpired),logout=()=>void supabase?.auth.signOut({scope:'local'});
- return <LiveContext.Provider value={live.signal}><HospitalShell api={api} profile={profile} version={live.version} connection={live.status} updatedAt={live.updatedAt} onLogout={logout} onChangePassword={changePassword(profile.email)}/><SessionExpiryWarning remaining={idle.remaining} onContinue={idle.keepAlive} onLogout={logout}/></LiveContext.Provider>;
+ const idle=useIdleSession(onExpired),logout=()=>{resetRoute();void supabase?.auth.signOut({scope:'local'});};
+ return <LiveContext.Provider value={live.signal}><HospitalShell api={api} profile={profile} version={live.version} connection={live.status} onLogout={logout} onChangePassword={changePassword(profile.email)}/><SessionExpiryWarning remaining={idle.remaining} onContinue={idle.keepAlive} onLogout={logout}/></LiveContext.Provider>;
 }
 /** W35 (WEB-13): the current password is checked by signing in again; then Supabase stores the new one. */
 const changePassword=(email:string)=>async(current:string,next:string):Promise<string|null>=>{

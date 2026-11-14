@@ -23,10 +23,12 @@ describe('ruta inexistente (W-09)', () => {
     expect(screen.queryByRole('heading', { name: /Sin permiso/ })).toBeNull();
   });
 
-  it('una ruta que existe pero no corresponde al permiso sigue diciendo "Sin permiso"', () => {
+  it('una ruta que existe pero no corresponde al permiso vuelve a Inicio en lugar de quedarse en "Sin permiso"', () => {
     location.hash = '#/usuarios';
     render(<HospitalShell api={api} profile={profile} onLogout={() => undefined} />);
-    expect(screen.getByRole('heading', { name: /Sin permiso/ })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: /Sin permiso/ })).toBeNull();
+    expect(location.hash).toBe('#/inicio');
+    expect(screen.getByText('CLIMESA / Inicio')).toBeTruthy();
   });
 });
 

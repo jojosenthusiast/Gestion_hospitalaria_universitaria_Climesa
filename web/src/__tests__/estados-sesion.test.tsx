@@ -55,9 +55,10 @@ describe('en vivo, conflicto y carga', () => {
   const perfil: AccessProfile = { id: 'u', user: { id: 'u' }, email: 'jop@example.test', name: 'Cuenta', roles: ['JOP'], platforms: ['web'], permissions: [{ code: 'personal.ver', context: 'global' }], channels: [], patientId: null, staffId: null };
   const api = { request: vi.fn(async () => ({ lastUpdate: '2026-11-13T16:40:00Z' })), write: vi.fn() } as unknown as Api;
 
-  it('con la conexión al día muestra "En vivo · hh:mm" con la hora del último cambio (hora de El Salvador)', () => {
-    render(<HospitalShell api={api} profile={perfil} connection="live" updatedAt={new Date('2026-11-13T16:40:00Z')} onLogout={() => undefined} />);
-    expect(screen.getByText('En vivo · 10:40')).toBeTruthy();
+  it('con la conexión al día no muestra el indicador "En vivo" y conserva el reloj del hospital', () => {
+    render(<HospitalShell api={api} profile={perfil} connection="live" onLogout={() => undefined} />);
+    expect(screen.queryByText(/En vivo/)).toBeNull();
+    expect(screen.getByLabelText(/Hora actual/)).toBeTruthy();
   });
 
   it('sin conexión no dice "En vivo"', () => {

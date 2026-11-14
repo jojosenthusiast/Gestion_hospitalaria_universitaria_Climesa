@@ -38,7 +38,7 @@ const rules: [RegExp, (match: RegExpMatchArray) => LiveScope][] = [
   [/^\/ambulancia(\/|\?|$)/, () => of('unidad', 'solicitud', 'servicio')],
   [/^\/inventario(\/|\?|$)/, () => of('articulo')],
   [/^\/cuentas\/vinculaciones(\/|\?|$)/, () => of('vinculacion_paciente', 'paciente')],
-  [/^\/accesos-excepcionales(\/|\?|$)/, () => of('acceso_excepcional')],
+  [/^\/me\/laboratorio(\?|$)/, () => of('orden_laboratorio')],
   [/^\/publico\/avisos(\?|$)/, () => of('aviso')],
 ];
 
