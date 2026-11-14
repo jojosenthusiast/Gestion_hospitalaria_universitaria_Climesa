@@ -58,7 +58,7 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     RESULTS("A07", "Mis exámenes", "resultados.ver", true),
     HISTORY("A08", "Mi historial", "expediente.ver", true),
     AMBULANCE_REQUEST("A09", "Pedir ambulancia", "ambulancia.solicitar", false),
-    HOSPITAL_INFO("A10", "Hospital", "sesion.perfil", false),
+    HOSPITAL_INFO("A10", "Hospital", "sesion.perfil", true),
     MY_ACCESS("A11", "Quién vio mi expediente", "auditoria.mis_accesos", true),
     PROFILE("A12", "Perfil", "sesion.perfil", true),
     MEDICAL_DAY("A20", "Mi día", "consulta.iniciar", true),
