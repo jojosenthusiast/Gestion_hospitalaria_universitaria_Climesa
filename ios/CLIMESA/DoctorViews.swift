@@ -2,11 +2,12 @@ import SwiftUI
 
 // Pantallas del Médico (docs/arquitectura/datos/pantallas.csv, I20 y I22 a I25; I21 está en ConsultationView.swift).
 
+/// Cada parte se pide por separado: la que falla muestra su error con «Reintentar» (CH-02), nunca un cero falso.
 struct DoctorDay: Sendable {
     var agenda: [AgendaEntry]?
-    var tickets: [QueueTicket]?
-    var pendingResults: Int?
-    var hospitalized: Int?
+    var tickets: Part<[QueueTicket]>?
+    var pendingResults: Part<Int>?
+    var hospitalized: Part<Int>?
 }
 
 /// I20 · Mi día: citas del día, números de la fila, resultados por revisar y hospitalizados.
@@ -22,7 +23,8 @@ struct DoctorDayView: View {
         VStack(alignment: .leading, spacing: Spacing.l) {
             LoadState(loader: loader, retry: load) { day in
                 summary(day)
-                if let tickets = day.tickets { queueSection(tickets) }
+                partErrors(day)
+                if let tickets = day.tickets?.value { queueSection(tickets) }
                 if let agenda = day.agenda { agendaSection(agenda) }
                 moreSection(day)
             }
@@ -32,14 +34,26 @@ struct DoctorDayView: View {
 
     @ViewBuilder private func summary(_ day: DoctorDay) -> some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: Spacing.m), GridItem(.flexible(), spacing: Spacing.m)], spacing: Spacing.m) {
-            if let pending = day.pendingResults {
+            if let pending = day.pendingResults?.value {
                 Button { go(.resultados) } label: { StatTile(value: "\(pending)", label: L.text("day.results")) }.buttonStyle(.plain)
             }
             if let agenda = day.agenda { StatTile(value: "\(agenda.count)", label: L.text("day.appointments")) }
-            if let tickets = day.tickets {
+            if let tickets = day.tickets?.value {
                 StatTile(value: "\(tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count)", label: L.text("ds.medico.stat.waiting"))
             }
-            if let count = day.hospitalized { StatTile(value: "\(count)", label: L.text("ds.medico.stat.hospitalized")) }
+            if let count = day.hospitalized?.value { StatTile(value: "\(count)", label: L.text("ds.medico.stat.hospitalized")) }
+        }
+    }
+
+    /// Partes del día que no se pudieron leer, cada una con su título y «Reintentar».
+    @ViewBuilder private func partErrors(_ day: DoctorDay) -> some View {
+        let failed = [
+            PartFailure(title: L.text("day.queue"), message: day.tickets?.error),
+            PartFailure(title: L.text("day.results.title"), message: day.pendingResults?.error),
+            PartFailure(title: L.text("ds.medico.stat.hospitalized"), message: day.hospitalized?.error)
+        ].filter { $0.message != nil }
+        ForEach(failed) { part in
+            SectionCard(title: part.title) { PartError(message: part.message ?? "", retry: load) }
         }
     }
 
@@ -105,7 +119,7 @@ struct DoctorDayView: View {
                             Image(systemName: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
                             ListRow(title: L.text(section.titleKey)) {
                                 HStack(spacing: Spacing.s) {
-                                    if section == .hospitalizados, let count = day.hospitalized { Text(verbatim: "\(count)").font(Typo.label).foregroundStyle(Theme.ink) }
+                                    if section == .hospitalizados, let count = day.hospitalized?.value { Text(verbatim: "\(count)").font(Typo.label).foregroundStyle(Theme.ink) }
                                     Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
                                 }
                             }
@@ -125,12 +139,18 @@ struct DoctorDayView: View {
                 let entries = try await api.get("/consultas/agenda", as: [AgendaEntry].self)
                 day.agenda = entries.filter { ClimesaDates.parse($0.start).map(ClimesaDates.localDay) == today }.sorted { $0.start < $1.start }
             }
-            if profile.hasPermission("fila.ver") { day.tickets = try? await api.get("/fila", as: [QueueTicket].self) }
-            if profile.hasPermission("resultados.ver"), let orders = try? await api.get("/laboratorio/ordenes", as: [LabOrder].self) {
-                day.pendingResults = ReviewRules.pending(orders).count
+            if profile.hasPermission("fila.ver") { day.tickets = try await Part<[QueueTicket]>.load { try await api.get("/fila", as: [QueueTicket].self) } }
+            if profile.hasPermission("resultados.ver") {
+                day.pendingResults = try await Part<Int>.load {
+                    let orders = try await api.get("/laboratorio/ordenes", as: [LabOrder].self)
+                    return ReviewRules.pending(orders).count
+                }
             }
-            if profile.hasPermission("admision.ver"), let admissions = try? await api.get("/admisiones", as: [Admission].self) {
-                day.hospitalized = DischargeRules.current(admissions).count
+            if profile.hasPermission("admision.ver") {
+                day.hospitalized = try await Part<Int>.load {
+                    let admissions = try await api.get("/admisiones", as: [Admission].self)
+                    return DischargeRules.current(admissions).count
+                }
             }
             return day
         }
@@ -302,7 +322,7 @@ private struct DischargeView: View {
                         ForEach(DischargeType.allCases, id: \.self) { Text(verbatim: $0.label).tag($0) }
                     }.pickerStyle(.segmented)
                 }
-                MedicoTextArea(label: L.text("discharge.summary"), text: $summary, error: errors["summary"])
+                MedicoTextArea(label: L.text("discharge.summary"), text: $summary, error: errors["summary"] ?? submission.fieldErrors["summary"])
                 if type == .voluntaria {
                     Toggle("discharge.consent", isOn: $consent).font(Typo.body).tint(Theme.primary)
                     FieldError(text: errors["voluntaryConsent"])
@@ -313,7 +333,7 @@ private struct DischargeView: View {
                     FormField(label: L.text("discharge.pending.description"), text: $line.description)
                     FormField(label: L.text("discharge.pending.responsible"), text: $line.responsible)
                 }
-                FieldError(text: errors["pending"])
+                FieldError(text: errors["pending"] ?? submission.fieldErrors["pending"])
                 ClimesaButton(title: L.text("discharge.pending.add"), kind: .secondary) { pending.append(PendingLine()) }
             }
             WriteNotice(submission: submission, reload: reload)

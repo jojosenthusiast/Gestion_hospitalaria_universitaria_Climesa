@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "medication": "Amoxicilina 500 mg",
+      "dose": "1 cápsula",
+      "route": "oral",
+      "frequency": "cada 8 horas",
+      "duration": "7 días",
+      "instructions": "Tomar con alimentos"
+    },
+    {
+      "medication": "Acetaminofén 500 mg",
+      "dose": "1 tableta",
+      "route": "oral",
+      "frequency": "cada 6 horas si hay fiebre",
+      "duration": "3 días"
+    }
+  ]
+}

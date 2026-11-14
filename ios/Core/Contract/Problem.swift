@@ -2,6 +2,19 @@ import Foundation
 
 /// Esquema `Problem` del contrato (`application/problem+json`, CON-02). El cliente decide solo por `codigo`.
 public struct Problem: Decodable, Equatable, Sendable {
+    /// Error de validación de un campo (`errors[]` del problem+json): el campo del cuerpo y su mensaje en español.
+    public struct FieldIssue: Decodable, Equatable, Sendable {
+        public let field: String
+        public let message: String
+        enum CodingKeys: String, CodingKey { case field, campo, message, mensaje }
+        public init(field: String, message: String) { self.field = field; self.message = message }
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            field = try container.decodeIfPresent(String.self, forKey: .field) ?? container.decodeIfPresent(String.self, forKey: .campo) ?? ""
+            message = try container.decodeIfPresent(String.self, forKey: .message) ?? container.decodeIfPresent(String.self, forKey: .mensaje) ?? ""
+        }
+    }
+
     public let status: Int?
     public let code: String?
     public let detail: String?
@@ -10,12 +23,25 @@ public struct Problem: Decodable, Equatable, Sendable {
     public let currentVersion: Int?
     /// Solo en `consulta_ya_iniciada` cuando la consulta existente es del médico que intentó iniciarla.
     public let consultationId: String?
+    /// Errores por campo de una validación (400). Puede faltar en servidores anteriores.
+    public let errors: [FieldIssue]
     enum CodingKeys: String, CodingKey {
-        case status, code = "codigo", detail, field = "campo", requestId, currentVersion = "versionActual", consultationId = "consultaId"
+        case status, code = "codigo", detail, field = "campo", requestId, currentVersion = "versionActual", consultationId = "consultaId", errors
     }
-    public init(status: Int?, code: String?, detail: String?, field: String? = nil, requestId: String? = nil, currentVersion: Int? = nil, consultationId: String? = nil) {
+    public init(status: Int?, code: String?, detail: String?, field: String? = nil, requestId: String? = nil, currentVersion: Int? = nil, consultationId: String? = nil, errors: [FieldIssue] = []) {
         self.status = status; self.code = code; self.detail = detail; self.field = field; self.requestId = requestId; self.currentVersion = currentVersion
-        self.consultationId = consultationId
+        self.consultationId = consultationId; self.errors = errors
+    }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try? container.decodeIfPresent(Int.self, forKey: .status)
+        code = try? container.decodeIfPresent(String.self, forKey: .code)
+        detail = try? container.decodeIfPresent(String.self, forKey: .detail)
+        field = try? container.decodeIfPresent(String.self, forKey: .field)
+        requestId = try? container.decodeIfPresent(String.self, forKey: .requestId)
+        currentVersion = try? container.decodeIfPresent(Int.self, forKey: .currentVersion)
+        consultationId = try? container.decodeIfPresent(String.self, forKey: .consultationId)
+        errors = ((try? container.decodeIfPresent([FieldIssue].self, forKey: .errors)) ?? nil)?.filter { !$0.field.isEmpty && !$0.message.isEmpty } ?? []
     }
 
     /// Lee el cuerpo de un error; nil si no es un objeto problem+json.
@@ -81,11 +107,27 @@ public enum APIFailure: Error, Equatable, Sendable {
             case "version_conflicto": text = "Otra persona cambió este registro. Se cargó la versión actual: revísala y vuelve a intentar."
             case "idempotencia_conflicto": text = "Esta acción ya se había enviado con otros datos. Vuelve a intentar."
             case _ where isRouteNotFound: text = "Esta función todavía no está disponible en el servidor. Vuelve a intentar más tarde."
-            default: text = problem?.detail.flatMap { $0.isEmpty ? nil : $0 } ?? APIFailure.fallback(status)
+            default: text = problem?.detail.flatMap { ProblemText.isShowable($0) ? $0 : nil } ?? APIFailure.fallback(status)
             }
             guard let id = problem?.requestId, !id.isEmpty else { return text }
             return "\(text) (código de soporte: \(id))"
         }
+    }
+
+    /// Mensajes en español por campo del cuerpo (`motive`, `phone`...). La ruta `pending[0].description` queda también
+    /// bajo su raíz (`pending`). Sin `errors[]`, el `campo` del problema recibe el `detail` si está en español.
+    public var fieldErrors: [String: String] {
+        guard let problem else { return [:] }
+        var result: [String: String] = [:]
+        func put(_ field: String, _ message: String) {
+            guard ProblemText.isShowable(message) else { return }
+            let root = ProblemText.rootField(field)
+            if result[field] == nil { result[field] = message }
+            if result[root] == nil { result[root] = message }
+        }
+        for issue in problem.errors { put(issue.field, issue.message) }
+        if result.isEmpty, let field = problem.field, !field.isEmpty, let detail = problem.detail { put(field, detail) }
+        return result
     }
 
     static func fallback(_ status: Int) -> String {
@@ -98,6 +140,21 @@ public enum APIFailure: Error, Equatable, Sendable {
         case 500...: return "El servidor no está disponible. Vuelve a intentar en unos minutos."
         default: return "No se pudo completar la operación. Vuelve a intentar."
         }
+    }
+}
+
+/// Qué texto del servidor se puede mostrar: nunca el inglés crudo de class-validator ni del framework.
+public enum ProblemText {
+    private static let english = #"(?i)\b(must|should|property|longer|shorter|than|allowed|cannot|invalid|required|request|internal server error|not found|unauthorized|forbidden|each value|is not|an? (array|string|number|boolean|object))\b"#
+
+    public static func isShowable(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.range(of: english, options: .regularExpression) == nil
+    }
+
+    /// `pending[0].description` → `pending`; `motive` → `motive`.
+    public static func rootField(_ path: String) -> String {
+        String(path.prefix { $0 != "[" && $0 != "." })
     }
 }
 

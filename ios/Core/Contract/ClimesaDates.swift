@@ -4,6 +4,14 @@ import Foundation
 public enum ClimesaDates {
     public static let zone = TimeZone(identifier: "America/El_Salvador") ?? TimeZone(secondsFromGMT: -6 * 3600)!
 
+    /// Calendario gregoriano en la zona de El Salvador: los selectores de día lo usan para que el día elegido sea el
+    /// del hospital y no el de la zona horaria del teléfono.
+    public static var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        return calendar
+    }
+
     public static func parse(_ text: String?) -> Date? {
         guard let text, !text.isEmpty else { return nil }
         let fractional = ISO8601DateFormatter()
