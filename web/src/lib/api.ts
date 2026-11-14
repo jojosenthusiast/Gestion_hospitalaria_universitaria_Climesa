@@ -8,7 +8,10 @@ export type Bed={id:string;code:string;roomId:string;room:string;category:string
 export type Shift={id:string;staffId:string;person:string;areaId:string;area:string;start:string;end:string;type:string;state:string;justification?:string;version:number};
 export type UserAccount={id:string;email:string;name:string;roles:string[];state:string;staffId?:string;version:number};
 export type Appointment={id:string;patientId:string;patientName:string;doctorId:string;doctorName:string;start:string;end:string;reason?:string|null;state:string;origin:string;rejectionReason?:string|null;version:number};
-export type AuditRow={seq:string;at:string;role:string;actor:string;action:string;entity:string;entityId:string;result:string;reason?:string};
+export type AuditRow={seq:string;at:string;role:string;actor:string;actorId?:string|null;permission?:string|null;action:string;entity:string;entityId:string;patientId?:string|null;patientRecord?:string|null;result:string;reason?:string};
+/** Spec 110 (hand-written until the contract is regenerated): `vista` is the state shown to people. */
+export type ExceptionalAccess={id:string;solicitanteId:string;solicitante:string;solicitanteRoles:string|null;pacienteId:string;expediente:string;motivo:string;horas:number;urgencia:boolean;estado:'pendiente'|'aprobado'|'negado';vista:'pendiente'|'por_revisar'|'vigente'|'vencido'|'negado';resueltoPor:string|null;resueltoEn:string|null;desde:string|null;hasta:string|null;creadoEn:string;version:number};
+export type ChainCheck={integra:boolean;revisados:number;primeraFallida?:number;motivo?:string;verificadoEn:string};
 export type Summary={lastUpdate:string;beds?:{total:number;free:number;occupied:number;cleaning?:number};patients?:{total:number;active:number};staff?:{total:number;active:number};users?:{total:number;active:number};shifts?:{current:number;draft?:number}};
 export type SearchReceipt={token:string;expiresAt:string;candidates:Patient[]};
 export type PatientInput=Omit<components['schemas']['PatientCreateDto'],'searchToken'|'searchQuery'>;

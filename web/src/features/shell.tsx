@@ -1,8 +1,8 @@
 import { useEffect,useRef,useState,type ReactNode } from 'react';
 import { Brand,Icon,StatusView,type IconName } from '../components/ui';
-import { can,roleNames,type AccessProfile,type Api,type AuditRow,type Summary } from '../lib/api';
+import { can,roleNames,type AccessProfile,type Api,type Summary } from '../lib/api';
 import { AmbulancePage } from './ambulance';
-import { Empty,Heading,RemoteState,Tag,formatDateTime,useData } from './common';
+import { Heading,RemoteState,Tag,formatDateTime,useData } from './common';
 import { PatientsPage } from './patients';
 import { PersonnelPage,ShiftsPage } from './personnel';
 import { Tablero } from './tablero';
@@ -14,6 +14,7 @@ import { QueuePage } from './queue';
 import { LaboratoryPage } from './laboratory';
 import { InventoryPage } from './inventory';
 import { HospitalizationPage } from './hospitalization';
+import { AuditPage,ExceptionalAccessPage } from './privacy';
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión; `alsoPermissions` abre el mismo módulo a otros permisos. */
 export type Module={id:string;label:string;permission?:string;alsoPermissions?:string[];future?:boolean};
 export const modules:Module[]=[
@@ -32,7 +33,7 @@ export const modules:Module[]=[
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
  {id:'citas',label:'Citas',permission:'citas.ver'},
  {id:'consultas',label:'Mi consultorio',permission:'consulta.iniciar'},
- {id:'privacidad',label:'Accesos excepcionales',permission:'privacidad.aprobar_acceso',future:true},
+ {id:'privacidad',label:'Accesos excepcionales',permission:'privacidad.aprobar_acceso',alsoPermissions:['privacidad.solicitar_acceso']},
  {id:'perfil',label:'Perfil'},
 ];
 const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',privacidad:'privacy',perfil:'user'};
@@ -86,6 +87,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  else if(route==='inventario')content=<InventoryPage api={api} profile={profile} version={version}/>;
  else if(route==='hospitalizacion')content=<HospitalizationPage api={api} profile={profile} version={version}/>;
  else if(route==='auditoria')content=<AuditPage api={api} version={version}/>;
+ else if(route==='privacidad')content=<ExceptionalAccessPage api={api} profile={profile} version={version}/>;
  else if(route==='perfil')content=<ProfilePage profile={profile} onLogout={onLogout}/>;
  else content=<><Heading eyebrow={`CLIMESA / ${active.label}`} title={active.label} description="Espacio de trabajo del módulo."/><div className="future-module" role="status"><span className="eyebrow">Sin operaciones disponibles</span><h2>Este módulo no tiene operaciones habilitadas.</h2><p>Tu cuenta tiene acceso a esta sección, pero el sistema todavía no ofrece sus operaciones. Mientras tanto, no hay datos que mostrar.</p><a href="#/inicio" className="row-action">Volver al inicio <Icon name="arrow" size={18}/></a></div></>;
  return <div className={`hospital-shell${navOpen?' nav-open':''}`}>
@@ -118,7 +120,3 @@ function Dashboard({api,profile,version,menu}:{api:Api;profile:AccessProfile;ver
  return <><Heading eyebrow="CLIMESA / Inicio" title="Resumen del hospital" description={`Bienvenido${profile.name?', '+profile.name.split(' ')[0]:''}. Consulta la información de tu espacio de trabajo.`}/>{board?<Tablero api={api} profile={profile} version={version}/>:<RemoteState state={data}>{s=><><div className="number-strip">{s.beds&&<><div><strong>{s.beds.free}<small>/{s.beds.total}</small></strong><span>Camas libres</span></div><div><strong>{s.beds.occupied}</strong><span>Camas ocupadas</span></div></>}{s.patients&&<div><strong>{s.patients.active}</strong><span>Pacientes activos</span></div>}{s.staff&&<div><strong>{s.staff.active}</strong><span>Personas activas</span></div>}{s.users&&<div><strong>{s.users.active}</strong><span>Cuentas activas</span></div>}{s.shifts&&<div><strong>{s.shifts.draft}</strong><span>Turnos en borrador</span></div>}</div><p className="updated-at">Actualizado: {formatDateTime(s.lastUpdate)}</p></>}</RemoteState>}<section className="dashboard-links"><div><span className="eyebrow">Tu espacio de trabajo</span><h2>Accesos directos</h2></div><div>{menu.filter(m=>!m.future&&!['inicio','perfil'].includes(m.id)).map((m,i)=><a href={`#/${m.id}`} key={m.id}><span className="mono-data">{String(i+1).padStart(2,'0')}</span><span>{m.label}</span><Icon name="arrow" size={20}/></a>)}</div>{menu.filter(m=>!m.future&&!['inicio','perfil'].includes(m.id)).length===0&&<p className="muted">Tu cuenta está lista, pero tu función no tiene módulos de trabajo en la web.</p>}</section><div className="dashboard-account"><Icon name="shield" size={24}/><div><h3>Acceso según tu función</h3><p>Las operaciones y los datos disponibles corresponden a los roles de tu cuenta.</p></div><a className="row-action" href="#/perfil">Ver mi cuenta <Icon name="arrow" size={16}/></a></div></>;
 }
 function ProfilePage({profile,onLogout}:{profile:AccessProfile;onLogout:()=>void}){return <><Heading eyebrow="CLIMESA / Cuenta personal" title="Mi cuenta" description="Tu identidad y acceso dentro del hospital."/><section className="profile-sheet"><div className="profile-identity"><span>{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><div><h2>{profile.name||'Cuenta de CLIMESA'}</h2><p>{profile.email}</p></div></div><dl className="detail-grid"><div><dt>Estado</dt><dd><Tag value="activo"/></dd></div><div><dt>Plataformas habilitadas</dt><dd>{profile.platforms.map(p=>({web:'Web',android:'Android',ios:'iOS'} as Record<string,string>)[p]??p).join(' · ')}</dd></div><div className="full-width"><dt>Roles asignados</dt><dd>{profile.roles.map(r=>roleNames[r]??r).join(' · ')}</dd></div></dl><div className="profile-security"><Icon name="lock" size={20}/><p>Tu contraseña es personal. El administrador gestiona tus roles, sin conocerla.</p></div><button className="secondary-button" onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></section></>;}
-function AuditPage({api,version}:{api:Api;version:number}){
- const data=useData<AuditRow[]>(api,'/auditoria',version);
- return <><Heading eyebrow="Protección de datos / Trazabilidad" title="Auditoría" description="Quién realizó cada operación, cuándo y con qué resultado."/><section className="data-workbench"><RemoteState state={data}>{rows=>rows.length?<table className="record-table"><caption className="sr-only">Últimas cien operaciones auditadas</caption><thead><tr><th>Fecha</th><th>Persona</th><th>Operación</th><th>Entidad</th><th>Resultado</th></tr></thead><tbody>{rows.map(r=><tr key={r.seq}><td data-label="Fecha">{formatDateTime(r.at)}</td><td data-label="Persona"><strong>{r.actor||'Cuenta del sistema'}</strong><small>{r.role}</small></td><td data-label="Operación">{r.action}</td><td data-label="Entidad">{r.entity}<small className="mono-data">{r.entityId}</small></td><td data-label="Resultado"><Tag value={r.result}/></td></tr>)}</tbody></table>:<Empty title="Todavía no hay actividad" description="Las operaciones aparecerán aquí después de registrarse."/>}</RemoteState><p className="table-footnote">Se muestran las últimas 100 operaciones. Los eventos no incluyen valores clínicos.</p></section></>;
-}
