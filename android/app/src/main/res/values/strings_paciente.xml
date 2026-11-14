@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="paciente_maqueta_datos">Datos de referencia</string>
     <string name="recepcion_home_eyebrow">Recepción / CLIMESA</string>
     <string name="recepcion_home_titulo">Tu jornada.</string>
     <string name="recepcion_home_detalle">Pacientes y registro, en un mismo lugar.</string>
