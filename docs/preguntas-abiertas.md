@@ -54,3 +54,16 @@ Decisiones conservadoras tomadas mientras se confirman:
 ## Para producción CLIMESA (registro institucional INS01 a INS12 de P01)
 
 Siguen pendientes y no afectan al curso: habilitación y servicios (INS01, INS02), modalidades (INS03), organigrama (INS04), formatos de identidad y archivo (INS05), procedimientos de admisión y alta (INS06), catálogo y tarifas (INS07), pagadores (INS08), caja (INS09), régimen fiscal (INS10), sistemas actuales (INS11), continuidad (INS12). Detalle en `docs/investigacion/p01/`. El cuestionario y el mapa contable para la contadora están en `docs/climesa/`.
+
+## Vinculación de cuenta e historial clínico (REQ-03, REQ-05; specs 101, 102, 106, 107)
+
+Decisiones conservadoras tomadas mientras se confirman:
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| FR-101-10 | El paciente debe ver el motivo del rechazo, pero `endpoints.csv` no tiene una lectura de su propia solicitud (solo `POST /cuentas/vinculacion` y la bandeja `GET /cuentas/vinculaciones` con `cuentas.verificar`). ¿Se agrega `GET /api/v1/cuentas/vinculacion` (`cuenta.vincular`, propio)? | No se inventó la ruta. La API guarda el motivo y lo devuelve en la respuesta del rechazo; A03 muestra "Solicitud rechazada" con un texto genérico al recibir `vinculacion.resuelta` sin expediente enlazado. Falta mostrar el motivo exacto |
+| FR-101-11 | ¿Recepción elige el expediente al aprobar? | No: al aprobar, la API vuelve a buscar el expediente activo con el mismo DUI y la misma fecha de nacimiento declarados (RN-39). Sin coincidencia responde 409 `sin_expediente` (crear tras buscar y volver a aprobar); con más de una, 409 |
+| FR-106-09 | ¿El historial del médico incluye borradores de otros médicos? | No: firmadas e "ingresada por error" de todos; abiertas solo las del propio médico. El paciente ve solo firmadas |
+| FR-106-09 | ¿El historial del paciente incluye hospitalizaciones? | No (A08 pide consultas, diagnósticos y recetas); las ven solo el personal con relación o acceso excepcional |
+| W27 | ¿El nombre de la cuenta debe coincidir con el del expediente para aprobar? | Se muestra como dato de apoyo ("Coincide"/"Revisar"); la API solo exige DUI y fecha de nacimiento |
+| A22 | No hay rol web con `expediente.ver`; el diálogo de historial web solo aparece a quien lo tenga (hoy, nadie en la web por catálogo) | Se mantiene detrás del permiso; Android A22 es la vista del médico |

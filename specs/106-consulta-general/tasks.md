@@ -17,6 +17,7 @@
   - Cubre: FR-106-09, FR-106-10, FR-106-12
   - Depende de: T03
   - Hecho cuando: el paciente ve su consulta firmada en Android e iOS y la lectura queda auditada
+  - Avance 13-nov-2026: `GET /pacientes/{id}/historial` (`expediente.ver`): el paciente ve solo sus consultas firmadas y valores revisados; el personal con relación de atención o acceso excepcional aprobado y vigente ve las consultas de todos los médicos, resultados y admisiones (borradores solo del autor); toda lectura queda auditada (`expediente.leer`, motivo `acceso_excepcional` cuando aplica) y el 403 queda como `acceso.denegado`. Pruebas en `api/tests/paciente-vinculacion-historial.spec.ts`; web usa el endpoint en el diálogo de historial (`historial.test.tsx`); Android A08 y A22 (`PatientRecordViewModelsTest`, `AccountLinkingTest`; `gradlew testDebugUnitTest assembleDebug` correcto). **Sigue abierta**: falta iOS y comprobarlo en un dispositivo.
 - [ ] T05 · S3 · R · Pantallas de consulta en Android e iOS (A21, I21) y signos (A41)
   - Cubre: FR-106-01 a FR-106-06
   - Depende de: T02, 121-T03, 122-T03

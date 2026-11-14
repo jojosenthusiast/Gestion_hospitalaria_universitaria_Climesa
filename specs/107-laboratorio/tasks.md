@@ -21,6 +21,7 @@
   - Cubre: FR-107-10, FR-107-11
   - Depende de: T03
   - Hecho cuando: escenario 1 completo pasa en iOS y Android
+  - Avance 13-nov-2026: `GET /me/laboratorio` (`resultados.ver`): el paciente ve siempre el estado de sus órdenes y los valores solo tras la revisión médica (D-040); una cuenta sin vincular recibe 404. Prueba en `api/tests/paciente-vinculacion-historial.spec.ts` (sin valor antes de `revisar`, con marca después). Android A07 usa `/me/laboratorio` y muestra "En revisión médica" mientras falta la revisión. **Sigue abierta**: falta iOS y el escenario 1 completo en dispositivo.
 - [ ] T06 · S5 · E · Aviso de valor crítico con push
   - Cubre: FR-107-08
   - Depende de: T03, 100-T10
