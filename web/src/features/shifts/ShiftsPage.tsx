@@ -9,6 +9,7 @@ import { Dialog, Empty, Heading, RemoteState, SaveButton, Tag, WriteError, forma
 import { useQuickAction } from '../personal/accion';
 import { Field } from '../../components/ui';
 import { ShiftForm } from './ShiftForm';
+import { CrewCoverageAlert } from './CrewCoverageAlert';
 import { KIND_LABEL, type CatalogArea, type CatalogRole, type CatalogStaff, type ShiftCatalog } from './rules';
 import './shifts.css';
 
@@ -85,6 +86,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
         {plan && <button className="primary-button" onClick={() => { setEditing(null); setOpen(true); }}><Icon name="plus" size={18} />Asignar turno</button>}
       </>} />
     <div className="planning-window"><strong>Jornada laboral abierta</strong><span>{jornada} · Asignaciones habilitadas durante toda la jornada. El sistema controla traslapes y descansos.</span></div>
+    {data.data && remote.data && <CrewCoverageAlert shifts={all} typeOf={typeOf} now={now} onPlan={plan ? () => { setEditing(null); setOpen(true); } : undefined} />}
     <section className="data-workbench">
       <div className="shift-toolbar">
         <div className="shift-toolbar-row">

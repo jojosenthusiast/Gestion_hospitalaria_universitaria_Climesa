@@ -35,3 +35,7 @@
 .shift-who .shift-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .shift-more { margin: 16px 24px 24px; }
 @media (max-width: 720px) { .shift-toolbar { padding: 16px; } .shift-step { padding: 14px; } }
+.crew-coverage { display: grid; gap: 8px; margin: 0 0 16px; }
+.crew-coverage-list { margin: 0; padding-left: 20px; display: grid; gap: 2px; }
+.crew-coverage-more { margin: 0; color: var(--muted); }
+.crew-coverage .secondary-button { justify-self: start; }
