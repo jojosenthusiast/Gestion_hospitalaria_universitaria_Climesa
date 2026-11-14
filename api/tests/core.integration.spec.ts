@@ -52,7 +52,7 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
  test('cada rol recibe plataformas y permisos; no confía en user_metadata',async()=>{
   for(const role of roleNames){const r=await call(role,'GET','/auth/me');expect(r.status).toBe(200);expect(r.body.roles).toEqual([role]);expect(r.body.permissions.some((p:any)=>p.code==='sesion.perfil')).toBe(true);}
   const rec=(await call('REC','GET','/auth/me')).body;expect(rec.platforms.sort()).toEqual(['android','web']);expect(rec.channels).toContain('ambulancia');
-  const med=(await call('MED','GET','/auth/me')).body;expect(med.platforms.sort()).toEqual(['android','ios']);
+  const med=(await call('MED','GET','/auth/me')).body;expect(med.platforms.sort()).toEqual(['android','ios']);expect(rec.rolePlatforms).toEqual([{role:'REC',platforms:expect.arrayContaining(['android','web'])}]);
  });
  test('el perfil combina dos roles y el hook no acepta roles de metadatos',async()=>{
   await fixture.pg.query('INSERT INTO acceso.asignacion_rol(usuario_id,rol_codigo) VALUES($1,$2)',[userId('REC'),'LAB']);

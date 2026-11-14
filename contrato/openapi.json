@@ -13605,6 +13605,26 @@
           "id"
         ]
       },
+      "RolePlatformsResponse": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "Código de rol"
+          },
+          "platforms": {
+            "description": "Plataformas del rol en minúscula (web, android, ios)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "role",
+          "platforms"
+        ]
+      },
       "PermissionGrantResponse": {
         "type": "object",
         "properties": {
@@ -13653,6 +13673,13 @@
               "type": "string"
             }
           },
+          "rolePlatforms": {
+            "description": "Plataformas de cada rol; `platforms` es su unión",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RolePlatformsResponse"
+            }
+          },
           "permissions": {
             "type": "array",
             "items": {
@@ -13687,6 +13714,7 @@
           "name",
           "roles",
           "platforms",
+          "rolePlatforms",
           "permissions",
           "channels",
           "patientId",

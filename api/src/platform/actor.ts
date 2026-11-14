@@ -5,6 +5,8 @@ export type Actor = {
   name: string;
   roles: string[];
   platforms: string[];
+  /** Platforms of each role (lowercase), so clients can explain a multi-role account. Same source as `platforms`. */
+  rolePlatforms?: { role: string; platforms: string[] }[];
   permissions: Permission[];
   channels: string[];
   patientId: string | null;
