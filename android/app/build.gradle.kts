@@ -10,6 +10,14 @@ val climesaApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrEl
 // Release never ships with an empty API URL: it defaults to the deployed API unless CLIMESA_API_BASE_URL overrides it.
 val climesaReleaseApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("https://sghu-api.onrender.com/api/v1")
 
+// TEMPORARY testing aid (docs/operacion/login-de-prueba.md): with -PCLIMESA_DEMO_LOGIN=true and the git-ignored
+// ../demo-credenciales.json present, the login offers the fictitious test accounts (debug and release). Flag false
+// (default) or file missing: DEMO_CREDENTIALS is empty, so the APK carries no credential. Turn off before delivery.
+val climesaDemoLogin = providers.gradleProperty("CLIMESA_DEMO_LOGIN").map { it.toBoolean() }.getOrElse(false)
+val climesaDemoCredentialsFile = rootProject.layout.projectDirectory.file("../demo-credenciales.json")
+val climesaDemoCredentials = if (climesaDemoLogin) providers.fileContents(climesaDemoCredentialsFile).asText.orNull.orEmpty() else ""
+if (climesaDemoLogin && climesaDemoCredentials.isBlank()) logger.warn("CLIMESA: CLIMESA_DEMO_LOGIN=true pero no existe ../demo-credenciales.json; el ingreso no mostrará cuentas de prueba.")
+
 // Release signing comes only from Gradle properties (~/.gradle/gradle.properties) or environment variables, never
 // from the repository. Without all four values the release APK is built unsigned (app-release-unsigned.apk).
 fun releaseSetting(name: String): String? =
@@ -34,6 +42,8 @@ android {
         buildConfigField("String", "SUPABASE_URL", buildConfigString(climesaSupabaseUrl))
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildConfigString(climesaSupabasePublishableKey))
         buildConfigField("String", "API_BASE_URL", buildConfigString(climesaApiBaseUrl))
+        buildConfigField("boolean", "DEMO_LOGIN", (climesaDemoLogin && climesaDemoCredentials.isNotBlank()).toString())
+        buildConfigField("String", "DEMO_CREDENTIALS", buildConfigString(climesaDemoCredentials.lines().joinToString("")))
     }
     buildFeatures { compose = true; buildConfig = true }
     signingConfigs {

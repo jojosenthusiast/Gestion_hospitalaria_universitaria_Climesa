@@ -154,6 +154,7 @@ select:focus-visible {
 .field > span:first-child, .field > label:first-child { line-height: 1.4; }
 .input-wrap { position: relative; display: block; }
 .field input,
+.field select,
 .field textarea {
   width: 100%; min-height: 52px; padding: 12px 14px;
   border: 1px solid var(--control-line); border-radius: var(--radius-control);
