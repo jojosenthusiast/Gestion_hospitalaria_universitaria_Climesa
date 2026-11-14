@@ -30,3 +30,19 @@ describe('command scopes', () => {
     expect(permissions).toContain(scope.split(':')[0]);
   });
 });
+
+// CON-07, API-11: a command on an existing record scopes its Idempotency-Key with that record id, so the same key and
+// body on another record never replays the first answer. Only creations (and singletons) may use a scope without id.
+const creationScopes = [
+  'admision.crear', 'admision.solicitar', 'ambulancia.despachar:servicio', 'ambulancia.mantenimiento:unidad', 'ambulancia.operar:ubicacion',
+  'ambulancia.solicitar:solicitud', 'avisos.publicar:aviso', 'cuenta.vincular', 'fila.emitir', 'laboratorio.ordenar', 'turnos.publicar:rango', 'usuarios.invitar',
+];
+describe('command scopes include the target id (CON-07, API-11)', () => {
+  it.each(literalScopes.filter(({ scope }) => !scope.includes('${')))('$file: "$scope" is a creation', ({ scope }) => {
+    expect(creationScopes).toContain(scope);
+  });
+  it('keeps no stale creation scope', () => {
+    const used = new Set(literalScopes.map(({ scope }) => scope));
+    expect(creationScopes.filter(scope => !used.has(scope))).toEqual([]);
+  });
+});

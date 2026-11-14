@@ -6,6 +6,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { AppModule } from './app.module';
 import { ApiErrorsFilter } from './platform/errors.filter';
 import { CommandService } from './platform/command.service';
+import { completeDocument } from './platform/openapi';
 /** FR-100-15: el registro de solicitudes solo lleva método, ruta sin consulta e id; nunca cuerpos, encabezados ni cookies. */
 export const requestLogging={serializers:{req:(r:{method:string;url:string;id:string})=>({method:r.method,url:r.url.split('?')[0],id:r.id})},redact:['req.headers.authorization','req.headers.cookie']};
 export function configureApplication(app:NestFastifyApplication) {
@@ -21,8 +22,8 @@ export function configureApplication(app:NestFastifyApplication) {
   app.enableShutdownHooks();
   app.useGlobalPipes(new ValidationPipe({whitelist:true,transform:true,forbidNonWhitelisted:true,forbidUnknownValues:true}));
   app.useGlobalFilters(new ApiErrorsFilter(app.get(CommandService)));
-  const document=SwaggerModule.createDocument(app,new DocumentBuilder().setTitle('SGHU-CLIMESA API').setDescription('Core S1/S2: autorización, pacientes, personal, espacios y turnos. Cada operación incluye x-permiso. Las escrituras requieren Idempotency-Key.').setVersion('0.3.0').addBearerAuth().build());
-  for(const path of Object.values(document.paths))for(const method of ['post','patch','put','delete'] as const){const op=path[method];if(op&&op['x-permiso' as keyof typeof op]!=='pacientes.buscar'){op.parameters??=[];op.parameters.push({name:'Idempotency-Key',in:'header',required:true,schema:{type:'string',minLength:8,maxLength:128}});}}
+  const document=SwaggerModule.createDocument(app,new DocumentBuilder().setTitle('SGHU-CLIMESA API').setDescription('API de SGHU-CLIMESA. Cada operación incluye x-permiso. Las escrituras requieren Idempotency-Key (una por intención) y, si cambian un registro existente, su `version` en el cuerpo; un conflicto responde 409 problem+json con `codigo`. JSON en camelCase (docs/arquitectura/convenciones-api.md).').setVersion('0.4.0').addBearerAuth().build());
+  completeDocument(document);
   SwaggerModule.setup(`${prefix}/docs`,app,document,{jsonDocumentUrl:'/openapi/v1.json'});
   return document;
 }

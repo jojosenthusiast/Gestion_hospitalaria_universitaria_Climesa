@@ -23,6 +23,8 @@ export class LabSampleDto {
 
 export class LabResultDto {
   @ApiProperty({ format: 'uuid' }) @IsUUID() orderItemId!: string;
+  /** API-10: compared when sent; it becomes mandatory once every client sends it (docs/preguntas-abiertas.md). */
+  @ApiPropertyOptional({ minimum: 1, description: 'Versión vigente de la orden; cada captura la incrementa (`orderVersion` en la respuesta).' }) @IsOptional() @IsInt() @Min(1) version?: number;
   @ApiPropertyOptional() @ValidateIf(value => value.text === undefined) @IsNumber() value?: number;
   @ApiPropertyOptional() @ValidateIf(value => value.value === undefined) @IsString() @IsNotEmpty() @MaxLength(5000) text?: string;
   @ApiPropertyOptional({ description: 'Unidad del catálogo; si se envía debe coincidir.' }) @IsOptional() @IsString() @MaxLength(80) unit?: string;

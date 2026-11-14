@@ -15,8 +15,8 @@ export class PatientSearchQueryDto {
   @IsInt()
   @Min(1)
   @Max(50)
-  @ApiPropertyOptional({minimum:1,maximum:50,default:50})
-  limit = 50;
+  @ApiPropertyOptional({type:Number,minimum:1,maximum:50,default:50})
+  limit: number = 50;
 }
 
 export class PatientSearchDto {

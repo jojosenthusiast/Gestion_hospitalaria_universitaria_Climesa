@@ -1,10 +1,11 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { ActorRequest } from '../platform/actor';
 import { AccessService } from './access.service';
 import { RequirePermission } from './permission.decorator';
 import { PermissionGuard } from './permission.guard';
+import { SessionProfileResponse } from './auth.responses';
 @ApiTags('auth')
 @ApiBearerAuth()
 @UseGuards(SupabaseAuthGuard, PermissionGuard)
@@ -14,5 +15,5 @@ export class AuthController {
   @Get('me')
   @RequirePermission('sesion.perfil')
   @ApiOperation({ summary: 'Cuenta activa, roles, plataformas y permisos vigentes en la base' })
-  async me(@Req() req: ActorRequest) { return { user: req.user, ...req.actor, canInviteAdmin: await this.access.canInviteAdmin(req.actor) }; }
+  @ApiOkResponse({ type: SessionProfileResponse }) async me(@Req() req: ActorRequest) { return { user: req.user, ...req.actor, canInviteAdmin: await this.access.canInviteAdmin(req.actor) }; }
 }

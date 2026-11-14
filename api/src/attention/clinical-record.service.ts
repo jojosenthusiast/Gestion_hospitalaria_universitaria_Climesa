@@ -58,7 +58,7 @@ export class ClinicalRecordService {
 
   async addVitalSigns(actor: Actor, id: string, dto: VitalSignsDto, key?: string) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
-    return this.commands.run(actor, 'signos.registrar', key, dto, async c => {
+    return this.commands.run(actor, `signos.registrar:${id}`, key, dto, async c => {
       const consultation = await this.consultation(c, actor, id, true, true);
       // F-04: vital signs belong to the note; once signed they are rejected like any other change.
       if (consultation.state !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y no admite signos nuevos.');
@@ -76,7 +76,7 @@ export class ClinicalRecordService {
 
   async addDiagnosis(actor: Actor, id: string, dto: DiagnosisDto, key?: string) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
-    return this.commands.run(actor, 'consulta.registrar', key, dto, async c => {
+    return this.commands.run(actor, `consulta.registrar:${id}:diagnostico`, key, dto, async c => {
       const consultation = await this.consultation(c, actor, id, true);
       if (consultation.state !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y no admite diagnósticos nuevos.');
       const code = dto.code.trim().toUpperCase();
@@ -93,7 +93,7 @@ export class ClinicalRecordService {
 
   async addPrescription(actor: Actor, id: string, dto: PrescriptionDto, key?: string) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
-    return this.commands.run(actor, 'recetas.emitir', key, dto, async c => {
+    return this.commands.run(actor, `recetas.emitir:${id}`, key, dto, async c => {
       const consultation = await this.consultation(c, actor, id, true);
       if (consultation.state !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y no admite recetas nuevas.');
       await requireCurrentEnrollment(c, actor.staffId, this.clock.today());

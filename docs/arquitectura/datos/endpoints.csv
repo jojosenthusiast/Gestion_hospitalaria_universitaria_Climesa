@@ -41,11 +41,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 104,POST,/api/v1/camas/{id}/limpieza/verificar,camas.verificar_limpieza,Distinta persona; versión y motivo obligatorios,R,4,Verificar la limpieza y liberar la cama
 104,GET,/api/v1/recursos/equipos,recursos.gestionar,,E,4,Equipo médico por espacio
 104,POST,/api/v1/recursos/equipos/{id}/estado,recursos.gestionar,,E,4,Operativo o en mantenimiento
-105,POST,/api/v1/fila/tickets,fila.emitir,Número único por servicio y día,R,3,Emitir número de fila
-105,GET,/api/v1/fila/hoy,fila.ver,,R,3,Fila del día por servicio
 104,PUT,/api/v1/recursos/tipos/{id},recursos.configurar,,E,4,Tipos de equipo médico
-105,POST,/api/v1/fila/tickets/{id}/llamar,fila.llamar,,R,3,Llamar un número a un consultorio
-105,POST,/api/v1/fila/tickets/{id}/estado,fila.gestionar,Transiciones válidas,R,3,"En atención, atendido, no se presentó"
 105,GET,/api/v1/me/fila,fila.ver,Propio,R,3,Mi número y cuántos faltan
 105,GET,/api/v1/citas,citas.ver,MED y PAC solo propias,R,3,"Citas por fecha, médico o paciente"
 105,GET,/api/v1/citas/disponibilidad,citas.agendar OR citas.solicitar,PAC y REC según permisos,R,3,Horarios libres por médico y fecha
@@ -54,24 +50,19 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/citas/solicitudes/{id}/confirmar,citas.agendar,,R,4,Confirmar solicitud con horario
 105,POST,/api/v1/citas/solicitudes/{id}/rechazar,citas.agendar,Motivo,R,4,Rechazar solicitud
 105,POST,/api/v1/citas/{id}/cancelar,citas.cancelar,PAC solo propias,R,3,Cancelar cita
-106,POST,/api/v1/consultas,consulta.iniciar,Desde número llamado o cita,R,3,Iniciar consulta; crea relación de atención
-106,PUT,/api/v1/consultas/{id},consulta.registrar,Autor; antes de firmar,R,3,"Motivo, examen físico, plan"
+106,POST,/api/v1/consultas,consulta.iniciar,"Desde número llamado (ticketId) o cita confirmada (appointmentId), uno solo",R,3,Iniciar consulta; crea relación de atención
 106,POST,/api/v1/consultas/{id}/signos,signos.registrar,,R,3,Signos vitales
 106,POST,/api/v1/consultas/{id}/diagnosticos,consulta.registrar,CIE-10,R,3,Agregar diagnóstico
-106,POST,/api/v1/consultas/{id}/recetas,recetas.emitir,Inscripción vigente,R,3,Emitir receta
-106,POST,/api/v1/consultas/{id}/ordenes-laboratorio,laboratorio.ordenar,,R,3,Ordenar exámenes o paneles
 106,POST,/api/v1/consultas/{id}/firmar,consulta.registrar,Inscripción vigente en el acto,R,3,Firmar y cerrar consulta
 106,POST,/api/v1/consultas/{id}/addendum,consulta.corregir,Solo el autor; conserva original,E,4,Corregir consulta firmada
 106,GET,/api/v1/pacientes/{id}/historial,expediente.ver,"Relación, acceso excepcional o propio revisado",R,3,Historial clínico
 107,GET,/api/v1/laboratorio/ordenes,laboratorio.ver_cola OR resultados.ver,Filtra por laboratorio médico o paciente y oculta valores no revisados,R,3,Cola por estado
 107,GET,/api/v1/laboratorio/ordenes/{id},resultados.ver,Ver contexto,R,3,Detalle de orden y resultados
 107,POST,/api/v1/laboratorio/ordenes/{id}/muestra,laboratorio.procesar,Pendiente a En Proceso,R,3,Registrar toma de muestra
-107,PUT,/api/v1/laboratorio/ordenes/{id}/resultados,laboratorio.procesar,Valida unidades y rangos,R,3,Capturar valores
 107,POST,/api/v1/laboratorio/ordenes/{id}/completar,laboratorio.validar,Todos los exámenes con valor,R,3,En Proceso a Completado
 107,POST,/api/v1/laboratorio/ordenes/{id}/cancelar,laboratorio.cancelar,Motivo,R,4,Cancelar orden
 107,POST,/api/v1/laboratorio/ordenes/{id}/revisar,laboratorio.revisar,Solo Completado,R,4,Médico revisa y libera al paciente
 107,GET,/api/v1/me/laboratorio,resultados.ver,Estado siempre; valores solo revisados,R,3,Mis exámenes
-107,GET,/api/v1/catalogo/examenes,laboratorio.ordenar,LAB y ADM también,R,3,Catálogo con paneles (recursivo)
 107,PUT,/api/v1/catalogo/examenes/{id},catalogo.configurar,Versión con vigencia,R,3,"Editar examen, unidades y rangos"
 108,POST,/api/v1/admisiones,admision.crear,"Origen: consulta, emergencia, ambulancia, programada",R,4,Crear admisión
 108,GET,/api/v1/admisiones,admision.ver,,R,4,Admisiones activas

@@ -16,7 +16,8 @@ export class AdmissionDto {
 }
 export class BedAssignmentDto { @ApiProperty({ format: 'uuid' }) @IsUUID() bedId!: string; @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; @Text(10, 500, true) reason?: string; }
 export class BedSuggestionQuery { @ApiPropertyOptional({ enum: ['vip', 'semiprivada'] }) @IsOptional() @IsIn(['vip', 'semiprivada']) category?: string; }
-export class AuthorizationDto { @Text(10, 500) reason!: string; }
+/** API-10: authorizing changes the admission, so it carries and compares its version. */
+export class AuthorizationDto { @Text(10, 500) reason!: string; @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; }
 export class TransferDto { @ApiProperty({ format: 'uuid' }) @IsUUID() bedId!: string; @Text(10, 500) reason!: string; @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; }
 /** RN-11: a discharge pending item always names who is responsible for it. */
 export class DischargePendingDto {

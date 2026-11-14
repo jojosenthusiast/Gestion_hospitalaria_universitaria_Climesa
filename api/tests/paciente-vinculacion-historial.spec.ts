@@ -121,7 +121,7 @@ describe('vinculación de cuenta e historial clínico (REQ-03, REQ-05)', () => {
       expect(sample.status).toBe(201);
       const item = await t.one<{ id: string }>('SELECT id FROM laboratorio.orden_item WHERE orden_id=$1', [orderId]);
       expect((await t.call('LAB', 'POST', `/laboratorio/ordenes/${orderId}/resultados`, { orderItemId: item.id, value: 13.1 })).status).toBe(201);
-      const completed = await t.call('LAB', 'POST', `/laboratorio/ordenes/${orderId}/completar`, { version: sample.body.version });
+      const completed = await t.call('LAB', 'POST', `/laboratorio/ordenes/${orderId}/completar`, { version: sample.body.version + 1 /* API-10: the captured result moved it */ });
       expect(completed.status).toBe(201);
 
       const before = await t.call('PAC', 'GET', '/me/laboratorio');

@@ -3,7 +3,7 @@ import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException, VersionConflictException } from '../platform/problem';
 import { Clock } from '../platform/clock';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { requireCurrentEnrollment } from '../platform/enrollment';
@@ -45,22 +45,45 @@ export class ConsultationService {
     });
   }
 
+  /** Locks the appointment and checks it belongs to the doctor and is confirmed. */
+  private async fromAppointment(c: PoolClient, actor: Actor, id: string) {
+    const appointment = (await c.query(`SELECT id,paciente_id,medico_id,estado FROM atencion.cita WHERE id=$1 FOR UPDATE`, [id])).rows[0] as Row | undefined;
+    if (!appointment) throw new NotFoundException('No se encontró la cita.');
+    if (appointment.medico_id !== actor.staffId) throw new ForbiddenException('Solo puedes iniciar consultas de tu propia agenda.');
+    if (appointment.estado !== 'confirmada') throw new ProblemException('transicion_invalida', 409, 'La cita debe estar confirmada para iniciar la consulta.');
+    if ((await c.query(`SELECT 1 FROM atencion.consulta WHERE cita_id=$1 AND estado<>'ingresada_por_error' FOR UPDATE`, [id])).rowCount) throw new ProblemException('consulta_ya_iniciada', 409, 'La consulta ya fue iniciada para esta cita.');
+    return { patientId: appointment.paciente_id as string, officeId: null as string | null };
+  }
+
+  /**
+   * API-08, RN-22: a patient without an appointment is seen from the queue. The number must have a patient and be
+   * called (`llamado`) or already in attention; a called number moves to `en_atencion` in the same transaction.
+   */
+  private async fromTicket(c: PoolClient, id: string) {
+    const ticket = (await c.query(`SELECT id,paciente_id,estado,consultorio_id,version FROM atencion.ticket_fila WHERE id=$1 FOR UPDATE`, [id])).rows[0] as Row | undefined;
+    if (!ticket) throw new NotFoundException('No se encontró el número de fila.');
+    if (!ticket.paciente_id) throw new ProblemException('validacion', 400, 'El número de fila no tiene un paciente asociado.', 'ticketId');
+    if (!['llamado', 'en_atencion'].includes(ticket.estado)) throw new ProblemException('transicion_invalida', 409, 'Llama el número antes de iniciar la consulta.');
+    if ((await c.query(`SELECT 1 FROM atencion.consulta WHERE ticket_id=$1 AND estado<>'ingresada_por_error' FOR UPDATE`, [id])).rowCount) throw new ProblemException('consulta_ya_iniciada', 409, 'La consulta ya fue iniciada para este número.');
+    if (ticket.estado === 'llamado') {
+      const moved = (await c.query(`UPDATE atencion.ticket_fila SET estado='en_atencion',version=version+1 WHERE id=$1 RETURNING version`, [id])).rows[0];
+      await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, moved.version, await channelsFor(c, ['fila.ver', 'fila.llamar', 'fila.gestionar'], { users: [await patientAccount(c, ticket.paciente_id)] }));
+    }
+    return { patientId: ticket.paciente_id as string, officeId: ticket.consultorio_id as string | null };
+  }
+
   async start(actor: Actor, dto: ConsultationStartDto, key?: string) {
     this.requireDoctor(actor);
-    return this.commands.run(actor, 'consulta.iniciar', key, dto, async c => {
-      const appointment = (await c.query(`SELECT id,paciente_id,medico_id,estado FROM atencion.cita WHERE id=$1 FOR UPDATE`, [dto.appointmentId])).rows[0] as Row | undefined;
-      if (!appointment) throw new NotFoundException('No se encontró la cita.');
-      if (appointment.medico_id !== actor.staffId) throw new ForbiddenException('Solo puedes iniciar consultas de tu propia agenda.');
-      if (appointment.estado !== 'confirmada') throw new ConflictException('La cita debe estar confirmada para iniciar la consulta.');
-      const existing = (await c.query(`SELECT id,version FROM atencion.consulta WHERE cita_id=$1 AND estado<>'ingresada_por_error' FOR UPDATE`, [dto.appointmentId])).rows[0];
-      if (existing) throw new ConflictException('La consulta ya fue iniciada para esta cita.');
-      const row = (await c.query(`INSERT INTO atencion.consulta(paciente_id,medico_id,consultorio_id,cita_id,motivo,estado,iniciada_en)
-        VALUES($1,$2,$3,$4,$5,'abierta',$6) RETURNING id,version,estado`, [appointment.paciente_id, actor.staffId, dto.officeId ?? null, dto.appointmentId, dto.reason?.trim() || null, this.clock.now()])).rows[0];
+    if (!dto.appointmentId === !dto.ticketId) throw new ProblemException('validacion', 400, 'Indica la cita o el número de fila, no ambos.', dto.appointmentId ? 'ticketId' : 'appointmentId');
+    return this.commands.run(actor, `consulta.iniciar:${dto.appointmentId ?? dto.ticketId}`, key, dto, async c => {
+      const origin = dto.appointmentId ? await this.fromAppointment(c, actor, dto.appointmentId) : await this.fromTicket(c, dto.ticketId!);
+      const row = (await c.query(`INSERT INTO atencion.consulta(paciente_id,medico_id,consultorio_id,cita_id,ticket_id,motivo,estado,iniciada_en)
+        VALUES($1,$2,$3,$4,$5,$6,'abierta',$7) RETURNING id,version,estado`, [origin.patientId, actor.staffId, dto.officeId ?? origin.officeId, dto.appointmentId ?? null, dto.ticketId ?? null, dto.reason?.trim() || null, this.clock.now()])).rows[0];
       await c.query(`INSERT INTO atencion.relacion_atencion(paciente_id,profesional_id,origen,origen_id,vigencia)
-        VALUES($1,$2,'consulta',$3,tstzrange($4::timestamptz,$4::timestamptz+interval '30 days','[)'))`, [appointment.paciente_id, actor.staffId, row.id, this.clock.now()]);
-      await this.commands.audit(c, actor, { action: 'consulta.iniciar', entity: 'consulta', entityId: row.id, patientId: appointment.paciente_id, permission: 'consulta.iniciar', detail: { appointmentId: dto.appointmentId } });
-      await this.commands.event(c, 'consulta.actualizada', 'consulta', row.id, row.version, await this.channels(c, appointment.paciente_id));
-      return { id: row.id, appointmentId: dto.appointmentId, version: row.version, state: row.estado };
+        VALUES($1,$2,'consulta',$3,tstzrange($4::timestamptz,$4::timestamptz+interval '30 days','[)'))`, [origin.patientId, actor.staffId, row.id, this.clock.now()]);
+      await this.commands.audit(c, actor, { action: 'consulta.iniciar', entity: 'consulta', entityId: row.id, patientId: origin.patientId, permission: 'consulta.iniciar', detail: dto.appointmentId ? { appointmentId: dto.appointmentId } : { ticketId: dto.ticketId } });
+      await this.commands.event(c, 'consulta.actualizada', 'consulta', row.id, row.version, await this.channels(c, origin.patientId));
+      return { id: row.id, appointmentId: dto.appointmentId ?? null, ticketId: dto.ticketId ?? null, version: row.version, state: row.estado };
     });
   }
 
@@ -70,7 +93,7 @@ export class ConsultationService {
       FROM atencion.consulta WHERE id=$1 FOR UPDATE`, [id])).rows[0] as Row | undefined;
     if (!row) throw new NotFoundException('No se encontró la consulta.');
     if (row.medico_id !== actor.staffId) throw new ForbiddenException('Solo puedes consultar tus propios registros clínicos.');
-    if (row.estado !== 'abierta') throw new ConflictException('La consulta ya está firmada y solo admite un addendum.');
+    if (row.estado !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y solo admite un addendum.');
     return row;
   }
 

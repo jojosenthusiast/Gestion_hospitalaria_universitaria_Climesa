@@ -140,8 +140,9 @@ export class HospitalizationService {
   }
 
   async authorize(actor: Actor, id: string, dto: AuthorizationDto, key?: string) {
-    return this.commands.run(actor, 'admision.autorizar', key, dto, async c => {
+    return this.commands.run(actor, `admision.autorizar:${id}`, key, dto, async c => {
       const admission = await this.admission(c, id, true);
+      if (admission.version !== dto.version) throw new VersionConflictException(admission.version, 'La admisión cambió; vuelve a consultarla.');
       if (admission.state !== 'pendiente_cama') throw new ConflictException('Solo se puede autorizar una admisión pendiente.');
       const row = (await c.query('UPDATE hospitalizacion.admision SET autorizado_por=$2,version=version+1 WHERE id=$1 RETURNING id,version', [id,actor.id])).rows[0];
       await this.commands.audit(c, actor, { action: 'admision.autorizar', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'admision.autorizar', reason: dto.reason });
@@ -191,7 +192,7 @@ export class HospitalizationService {
   }
 
   async note(actor: Actor, id: string, dto: NursingNoteDto, key?: string) {
-    return this.commands.run(actor, 'enfermeria.registrar', key, dto, async c => {
+    return this.commands.run(actor, `enfermeria.registrar:${id}`, key, dto, async c => {
       const admission = await this.admission(c, id);
       const row = (await c.query(`INSERT INTO hospitalizacion.nota_enfermeria(admision_id,autor_id,texto) VALUES($1,$2,$3) RETURNING id,creada_en AS "createdAt"`, [id,actor.id,dto.text.trim()])).rows[0];
       await this.commands.audit(c, actor, { action: 'enfermeria.nota', entity: 'nota_enfermeria', entityId: row.id, patientId: admission.patientId, permission: 'enfermeria.registrar' });
@@ -201,7 +202,7 @@ export class HospitalizationService {
   }
 
   async discharge(actor: Actor, id: string, dto: DischargeDto, key?: string) {
-    return this.commands.run(actor, 'alta.firmar', key, dto, async c => {
+    return this.commands.run(actor, `alta.firmar:${id}`, key, dto, async c => {
       const admission = await this.admission(c, id, true);
       if (admission.version !== dto.version) throw new VersionConflictException(admission.version, 'La admisión cambió; vuelve a consultarla.');
       if (admission.state !== 'hospitalizado') throw new ConflictException('Solo se puede firmar el alta de un paciente hospitalizado.');
@@ -219,7 +220,7 @@ export class HospitalizationService {
   }
 
   async exit(actor: Actor, id: string, dto: ExitDto, key?: string) {
-    return this.commands.run(actor, 'admision.registrar_salida', key, dto, async c => {
+    return this.commands.run(actor, `admision.registrar_salida:${id}`, key, dto, async c => {
       const admission = await this.admission(c, id, true);
       if (admission.version !== dto.version) throw new VersionConflictException(admission.version, 'La admisión cambió; vuelve a consultarla.');
       if (admission.state !== 'alta_firmada') throw new ConflictException('Primero debe firmarse el alta.');
