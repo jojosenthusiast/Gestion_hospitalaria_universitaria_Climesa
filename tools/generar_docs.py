@@ -31,6 +31,22 @@ PERMISOS_POSTERIORES = [
     "turnos.ver_borradores",
 ]
 
+# Permisos que se retiraron del catálogo (observación 12: módulo de acceso excepcional) después de aplicada la semilla. Ya no están en
+# permisos.csv ni en los documentos RBAC, pero la semilla (aplicada, regla 10 de AGENTS.md) los sigue emitiendo tal como estaban, en su
+# posición original (`despues_de`), y la migración 20261117002000 los borra. Ningún endpoint los declara y `--verificar` no los trata
+# como "sin endpoint". Mientras figuren aquí no pueden volver a aparecer en permisos.csv.
+PERMISOS_RETIRADOS = [
+    {"permiso": "privacidad.solicitar_acceso", "descripcion": "Pedir acceso excepcional a datos clínicos", "despues_de": "ambulancia.ver_bitacora",
+     "roles": {"ADM": "x", "JOP": "x", "MED": "x"}},
+    {"permiso": "privacidad.aprobar_acceso", "descripcion": "Aprobar o negar accesos excepcionales", "despues_de": "ambulancia.ver_bitacora",
+     "roles": {"DPD": "x"}},
+]
+
+# Descripción de rol con que la semilla (aplicada) los insertó, cuando roles.csv ya la cambió. La semilla conserva el histórico.
+DESCRIPCIONES_ROL_SEMILLA = {
+    "DPD": "Aprueba accesos excepcionales a datos clínicos, revisa auditoría y verifica su integridad.",
+}
+
 # Contextos que permisos.csv cambió después de aplicada la semilla (regla 10 de AGENTS.md: las migraciones aplicadas no se editan).
 # (rol, permiso, contexto en la semilla, contexto actual en permisos.csv). La semilla conserva el histórico y la migración
 # de SALIDA_CONTEXTOS lo actualiza; añadir aquí un cambio nuevo regenera ambas y verificar_consistencia exige que el CSV coincida.
@@ -49,7 +65,7 @@ FLUJOS = [
     ("F06 Traslado", "Recepción W13 → W15 traslado (no existe para VIP) → W12 tablero actualizado"),
     ("F07 Ambulancia", "Paciente A09 pide (o recepción por teléfono en W18) → Despacho W18 confirma y despacha → Paramédico A70 acepta → A71 hitos → A72 reporte prehospital → Emergencia A54 y Médico A25 reciben → Recepción W14 admisión con origen ambulancia → W19 bitácora"),
     ("F08 Turnos", "Jefe W16 planificador → W17 turno (traslape rechazado) → publicar con advertencias → Personal A26 o I26 → Pantalla pública W34 médicos de turno"),
-    ("F09 Acceso excepcional", "Jefe o Admin W31 pide (o Médico desde estado sin permiso en A22) → Delegado W30 aprueba → acceso temporal → Delegado W32 auditoría → Paciente A11 ve el acceso"),
+    ("F09 Auditoría y transparencia", "Cualquier lectura de datos de un paciente queda auditada → Delegado W32 busca y verifica la cadena → Paciente A11 ve quién consultó su expediente"),
     ("F10 Inventario", "Enfermería A53 consumo → alerta en Jefe W03 y W22 → W23 entrada de reposición"),
     ("F11 Administración", "Admin W05 usuarios → W06 invitar con roles → persona W02 activa su cuenta → Admin W07 y W08 personal e inscripciones → W09 edificio → W10 catálogo de laboratorio"),
     ("F12 Información pública", "Jefe W25 publica aviso → W34 pantalla pública y A10 o I10 en las apps"),
@@ -120,7 +136,7 @@ def generar_rbac(roles, permisos, endpoints):
         "| Marca | Significado |",
         "|---|---|",
         "| ✔ | Permitido sin condición adicional |",
-        "| relación | Solo con relación de atención activa con el paciente (consulta, admisión, servicio de ambulancia) o acceso excepcional aprobado (D-031) |",
+        "| relación | Solo con relación de atención activa con el paciente (consulta, admisión, servicio de ambulancia) (D-031) |",
         "| propio | Solo sobre sí mismo (el paciente sobre su expediente, el médico sobre sus citas, el paramédico sobre sus servicios) |",
         "| propio revisado | El paciente ve sus resultados y su historial solo después de la revisión médica (D-040) |",
         "| área | Solo pacientes del área o planta donde la persona tiene turno en curso |",
@@ -274,9 +290,18 @@ def generar_sql(roles, permisos):
     filas = []
     for r in roles:
         plats = "array[" + ", ".join(sql_txt(x.strip()) for x in r["plataformas"].split(";")) + "]"
-        filas.append(f"  ({sql_txt(r['codigo'])}, {sql_txt(r['nombre'])}, {plats}, {sql_txt(r['descripcion'])})")
+        descripcion = DESCRIPCIONES_ROL_SEMILLA.get(r["codigo"], r["descripcion"])
+        filas.append(f"  ({sql_txt(r['codigo'])}, {sql_txt(r['nombre'])}, {plats}, {sql_txt(descripcion)})")
     l.append(",\n".join(filas) + ";")
     permisos = [p for p in permisos if p["permiso"] not in PERMISOS_POSTERIORES]
+    # La semilla histórica sigue incluyendo los permisos retirados, en su posición original.
+    con_retirados = []
+    for p in permisos:
+        con_retirados.append(p)
+        for ret in PERMISOS_RETIRADOS:
+            if ret["despues_de"] == p["permiso"]:
+                con_retirados.append({"permiso": ret["permiso"], "descripcion": ret["descripcion"], **{c: ret["roles"].get(c, "") for c in codigos}})
+    permisos = con_retirados
     l += ["", "insert into acceso.permiso (codigo, descripcion) values"]
     l.append(",\n".join(f"  ({sql_txt(p['permiso'])}, {sql_txt(p['descripcion'])})" for p in permisos) + ";")
     l += ["", "insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values"]
@@ -341,6 +366,14 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
         actual = por_permiso.get(perm, {}).get(r)
         if actual != hasta:
             errores.append(f"AJUSTES_CONTEXTO dice {r} {perm} = {hasta} y permisos.csv dice {actual!r}")
+    for ret in PERMISOS_RETIRADOS:
+        if ret["permiso"] in nombres:
+            errores.append(f"PERMISOS_RETIRADOS menciona {ret['permiso']}, que sigue en permisos.csv: quitarlo de uno de los dos")
+        if ret["despues_de"] not in nombres:
+            errores.append(f"PERMISOS_RETIRADOS: {ret['permiso']} va después de {ret['despues_de']}, que no está en permisos.csv")
+        for e in endpoints:
+            if ret["permiso"] in partes_permiso(e["permiso"]):
+                errores.append(f"Endpoint {e['metodo']} {e['ruta']} usa el permiso retirado {ret['permiso']}")
     for codigo in PERMISOS_POSTERIORES:
         if codigo not in nombres:
             errores.append(f"PERMISOS_POSTERIORES menciona {codigo}, que no está en permisos.csv")

@@ -55,7 +55,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 106,POST,/api/v1/consultas/{id}/diagnosticos,consulta.registrar,CIE-10,R,3,Agregar diagnóstico
 106,POST,/api/v1/consultas/{id}/firmar,consulta.registrar,Inscripción vigente en el acto,R,3,Firmar y cerrar consulta
 106,POST,/api/v1/consultas/{id}/addendum,consulta.corregir,Solo el autor; conserva original,E,4,Corregir consulta firmada
-106,GET,/api/v1/pacientes/{id}/historial,expediente.ver,"Relación, acceso excepcional o propio revisado",R,3,Historial clínico
+106,GET,/api/v1/pacientes/{id}/historial,expediente.ver,Relación o propio revisado,R,3,Historial clínico
 107,GET,/api/v1/laboratorio/ordenes,laboratorio.ver_cola OR resultados.ver,Filtra por laboratorio médico o paciente y oculta valores no revisados,R,3,Cola por estado
 107,GET,/api/v1/laboratorio/ordenes/{id},resultados.ver,Ver contexto,R,3,Detalle de orden y resultados
 107,POST,/api/v1/laboratorio/ordenes/{id}/muestra,laboratorio.procesar,Pendiente a En Proceso,R,3,Registrar toma de muestra
@@ -84,10 +84,6 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 109,POST,/api/v1/ambulancia/ubicacion,ambulancia.operar,Solo con servicio activo,E,5,Ubicación en vivo
 109,POST,/api/v1/ambulancia/mantenimiento,ambulancia.mantenimiento,Solo sin servicio activo,R,4,Entrar o salir de mantenimiento
 109,GET,/api/v1/ambulancia/bitacora,ambulancia.ver_bitacora,Datos del paciente ocultos sin relación,R,4,Bitácora filtrable (D-056)
-110,POST,/api/v1/accesos-excepcionales,privacidad.solicitar_acceso,Motivo y duración,R,4,Pedir acceso excepcional
-110,POST,/api/v1/accesos-excepcionales/{id}/aprobar,privacidad.aprobar_acceso,Nunca el propio,R,4,Aprobar
-110,POST,/api/v1/accesos-excepcionales/{id}/negar,privacidad.aprobar_acceso,,R,4,Negar
-110,GET,/api/v1/accesos-excepcionales,privacidad.aprobar_acceso,Solicitante ve los suyos,R,4,Listado
 110,GET,/api/v1/auditoria,auditoria.ver,,R,4,Consultar auditoría
 110,POST,/api/v1/auditoria/verificacion,auditoria.ver,,R,4,Verificar cadena de hash
 110,GET,/api/v1/me/accesos,auditoria.mis_accesos,Propio,E,5,Quién vio mi expediente

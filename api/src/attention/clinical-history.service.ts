@@ -6,12 +6,12 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 
 type Row = Record<string, any>;
-export type HistoryAccess = 'propio' | 'relacion' | 'acceso_excepcional';
+export type HistoryAccess = 'propio' | 'relacion';
 
 /**
  * GET /pacientes/{id}/historial (FR-106-09, FR-106-10, FR-106-12; privacidad.md §2).
  * - The patient (context `propio_revisado`) sees only signed consultations and the values of reviewed orders (D-040).
- * - A clinician with a care relationship, or with an approved and current exceptional access (D-031), sees the
+ * - A clinician with a care relationship sees the
  *   consultations of every doctor, results and admissions. Drafts are visible only to the doctor who writes them.
  * Every read, granted or denied, is audited.
  */
@@ -28,10 +28,6 @@ export class ClinicalHistoryService {
         UNION ALL SELECT 1 FROM hospitalizacion.admision WHERE paciente_id=$1 AND medico_tratante_id=$2 AND estado IN ('pendiente_cama','hospitalizado','alta_firmada') LIMIT 1`, [patientId, actor.staffId, now])).rowCount;
       if (related) return 'relacion';
     }
-    if (contexts.length) {
-      const exceptional = (await c.query(`SELECT 1 FROM acceso.acceso_excepcional WHERE solicitante_id=$1 AND paciente_id=$2 AND estado='aprobado' AND vigencia @> $3::timestamptz LIMIT 1`, [actor.id, patientId, now])).rowCount;
-      if (exceptional) return 'acceso_excepcional';
-    }
     if (actor.patientId === patientId && contexts.includes('propio_revisado')) return 'propio';
     return null;
   }
@@ -41,7 +37,7 @@ export class ClinicalHistoryService {
       const patient = (await c.query(`SELECT id,expediente,coalesce(nullif(concat_ws(' ',nombres,primer_apellido,segundo_apellido),''),alias_provisional) AS nombre FROM pacientes.paciente WHERE id=$1`, [patientId])).rows[0] as Row | undefined;
       const access = await this.access(c, actor, patientId);
       // The 403 is audited as a denial by the error filter; a missing record is not revealed to someone without access.
-      if (!access) throw new ForbiddenException('El historial requiere una relación de atención, un acceso excepcional aprobado o ser su titular.');
+      if (!access) throw new ForbiddenException('El historial requiere una relación de atención o ser su titular.');
       if (!patient) throw new NotFoundException('No se encontró el paciente.');
       const own = access === 'propio';
       const consultations = (await c.query(`SELECT k.id,k.estado AS state,k.iniciada_en AS "startedAt",k.firmada_en AS "signedAt",k.motivo AS reason,k.examen_fisico AS "physicalExam",k.plan,
@@ -64,7 +60,7 @@ export class ClinicalHistoryService {
           json_build_object('id',m.id,'name',concat_ws(' ',m.nombres,m.apellidos)) AS doctor
         FROM hospitalizacion.admision a LEFT JOIN personal.persona m ON m.id=a.medico_tratante_id WHERE a.paciente_id=$1 ORDER BY a.creado_en DESC LIMIT 100`, [patientId])).rows;
       await this.commands.audit(c, actor, { action: 'expediente.leer', entity: 'paciente', entityId: patientId, patientId, permission: 'expediente.ver',
-        reason: access === 'acceso_excepcional' ? 'acceso_excepcional' : undefined, detail: { access, consultations: consultations.length, orders: laboratory.length } });
+        detail: { access, consultations: consultations.length, orders: laboratory.length } });
       return { patient: { id: patient.id, record: patient.expediente, fullName: patient.nombre }, access, consultations, laboratory, admissions };
     });
   }

@@ -25,8 +25,6 @@ export const ESTADO_TURNO = ['borrador', 'publicado', 'en_curso', 'completado', 
 export const ESTADO_USUARIO = ['activo', 'desactivado'] as const;
 /** acceso.vinculacion_paciente.estado (20261017000200_acceso.sql). */
 export const ESTADO_VINCULACION = ['pendiente', 'aprobada', 'rechazada'] as const;
-/** acceso.acceso_excepcional.estado (20261017000200_acceso.sql). */
-export const ESTADO_ACCESO_EXCEPCIONAL = ['pendiente', 'aprobado', 'negado'] as const;
 /** pacientes.paciente.estado (20261017000300_pacientes.sql). */
 export const ESTADO_PACIENTE = ['provisional', 'activo', 'inactivo', 'ingresado_por_error'] as const;
 /** pacientes.caso_duplicado.estado (20261017000300_pacientes.sql). */

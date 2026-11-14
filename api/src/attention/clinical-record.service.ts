@@ -7,7 +7,6 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException } from '../platform/problem';
 import { requireCurrentEnrollment } from '../platform/enrollment';
-import { activeExceptionalAccess, EXCEPTIONAL_REASON } from '../privacy';
 import { DiagnosisDto, PrescriptionDto, VitalSignsDto } from './clinical-record.dto';
 
 type Row = Record<string, any>;
@@ -21,7 +20,7 @@ export class ClinicalRecordService {
    * `vitals`: `signos.registrar` with context `x` (AST, ENF, MED, PAR in permisos.csv) needs no care
    * relationship, so the nurse or assistant can take vital signs in the open consultation (F-02, API-06).
    */
-  private async consultation(c: PoolClient, actor: Actor, id: string, lock = false, vitals = false, read = false) {
+  private async consultation(c: PoolClient, actor: Actor, id: string, lock = false, vitals = false) {
     const row = (await c.query(`SELECT k.id,k.paciente_id AS "patientId",k.medico_id AS "doctorId",k.cita_id AS "appointmentId",
       k.motivo AS reason,k.examen_fisico AS "physicalExam",k.plan,k.estado AS state,k.version,
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName"
@@ -34,19 +33,14 @@ export class ClinicalRecordService {
     const relation = actor.staffId ? (await c.query(`SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz LIMIT 1`, [row.patientId, actor.staffId, this.clock.now()])).rowCount : 0;
     const canRelation = contextsOf(actor, 'expediente.ver').includes('relacion') || contextsOf(actor, 'consulta.registrar').includes('relacion') || contextsOf(actor, 'recetas.emitir').includes('relacion');
     if (ownPatient && !ownDoctor && !(canRelation && relation) && row.state !== 'firmada') throw new NotFoundException('No se encontró la consulta.');
-    if (!ownPatient && !ownDoctor && !(canRelation && relation)) {
-      // FR-110-01: a read (never a write) is also allowed by an approved exceptional access in force (spec 110, RN-40).
-      const exceptional = read && !ownPatient ? await activeExceptionalAccess(c, actor.id, row.patientId, this.clock.now()) : null;
-      if (!exceptional) throw new ForbiddenException('No tienes relación de atención con este paciente.');
-      return { ...row, exceptionalAccessId: exceptional };
-    }
+    if (!ownPatient && !ownDoctor && !(canRelation && relation)) throw new ForbiddenException('No tienes relación de atención con este paciente.');
     return row;
   }
 
   async detail(actor: Actor, id: string) {
     return this.db.transaction(async c => {
-      const { exceptionalAccessId, ...consultation } = await this.consultation(c, actor, id, false, false, true) as Row;
-      await this.commands.audit(c, actor, { action: 'consulta.leer', entity: 'consulta', entityId: id, patientId: consultation.patientId, permission: 'expediente.ver', ...(exceptionalAccessId ? { reason: EXCEPTIONAL_REASON, detail: { exceptionalAccessId } } : {}) });
+      const consultation = await this.consultation(c, actor, id);
+      await this.commands.audit(c, actor, { action: 'consulta.leer', entity: 'consulta', entityId: id, patientId: consultation.patientId, permission: 'expediente.ver' });
       const [vitals, diagnoses, prescriptions] = await Promise.all([
         c.query(`SELECT id,tomado_en AS "takenAt",tomado_por AS "takenBy",pa_sistolica AS systolic,pa_diastolica AS diastolic,fc AS "heartRate",fr AS "respiratoryRate",temperatura AS temperature,sat_o2 AS "oxygenSaturation",peso_kg AS "weightKg",talla_cm AS "heightCm" FROM atencion.signos_vitales WHERE consulta_id=$1 ORDER BY tomado_en DESC`, [id]),
         c.query(`SELECT id,cie10 AS code,principal,nota AS note FROM atencion.diagnostico WHERE consulta_id=$1 ORDER BY principal DESC,id`, [id]),

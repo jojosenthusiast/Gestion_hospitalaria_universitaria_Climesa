@@ -3,7 +3,7 @@ import { ESTADO_ADMISION, ESTADO_CITA, ESTADO_CONSULTA, ESTADO_FILA, ESTADO_ORDE
 import { QUEUE_SERVICES } from './queue.dto';
 
 export const ORIGEN_CITA = ['recepcion', 'paciente'] as const;
-export const ACCESO_HISTORIAL = ['propio', 'relacion', 'acceso_excepcional'] as const;
+export const ACCESO_HISTORIAL = ['propio', 'relacion'] as const;
 
 // ---- Citas (attention.controller.ts) ----
 

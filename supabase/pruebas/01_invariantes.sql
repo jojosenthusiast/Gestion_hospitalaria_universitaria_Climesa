@@ -118,8 +118,10 @@ select case when not exists (select 1 from acceso.asignacion_rol where usuario_i
 select pg_temp.espera_error($$insert into acceso.asignacion_rol (usuario_id, rol_codigo, asignado_por) values ('00000000-0000-0000-0000-00000000aaa2', 'ADM', '00000000-0000-0000-0000-00000000aaa2')$$, '23514');
 
 -- 17. Permisos sembrados
-select case when (select count(*) from acceso.rol) = 10 and (select count(*) from acceso.permiso) = 79
-  and exists (select 1 from acceso.rol_permiso where rol_codigo = 'DPD' and permiso_codigo = 'privacidad.aprobar_acceso')
+select case when (select count(*) from acceso.rol) = 10 and (select count(*) from acceso.permiso) = 77
+  and exists (select 1 from acceso.rol_permiso where rol_codigo = 'DPD' and permiso_codigo = 'auditoria.ver')
+  and not exists (select 1 from acceso.permiso where codigo in ('privacidad.solicitar_acceso', 'privacidad.aprobar_acceso'))
+  and not exists (select 1 from plataforma.politica where clave = 'privacidad.acceso_excepcional_max_horas')
   and not exists (select 1 from acceso.rol_permiso where rol_codigo = 'ADM' and permiso_codigo = 'expediente.ver')
   then 'OK catálogo de permisos' else 'FALLO permisos' end;
 
