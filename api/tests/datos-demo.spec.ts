@@ -92,7 +92,7 @@ describe('Datos de demostración (tools/demo)', () => {
     const todas = (await t.pg.query<{ t: string }>(`SELECT schemaname || '.' || tablename AS t FROM pg_tables
       WHERE schemaname IN ('plataforma','acceso','pacientes','infra','personal','atencion','laboratorio','hospitalizacion','ambulancia','inventario','publico')`)).rows.map(r => r.t);
     const catalogos = ['pacientes.tipo_identificador', 'infra.tipo_equipo', 'acceso.rol', 'acceso.permiso', 'acceso.rol_permiso', 'atencion.cie10',
-      'laboratorio.examen', 'laboratorio.examen_componente', 'laboratorio.rango_referencia', 'plataforma.politica', 'ambulancia.unidad'];
+      'laboratorio.examen', 'laboratorio.examen_componente', 'laboratorio.rango_referencia', 'plataforma.politica', 'ambulancia.unidad', 'personal.especialidad_catalogo'];
     expect(todas.filter(x => !(x in TABLAS) && !SIN_SEMBRAR.includes(x) && !catalogos.includes(x))).toEqual([]);
   });
 
