@@ -7,17 +7,16 @@ type HistoryConsultation = { id: string; state: string; startedAt: string; signe
 type HistoryOrder = { id: string; state: string; createdAt: string; reviewedAt?: string | null; items: { id: string; code: string; name: string; unit?: string | null; result?: { value?: number | null; text?: string | null; mark: string } | null }[] };
 type HistoryAdmission = { id: string; state: string; origin: string; createdAt: string; doctor: { id: string; name: string } };
 /** Response of `GET /pacientes/{id}/historial` (spec 106). */
-export type ClinicalHistory = { patient: { id: string; record: string; fullName: string }; access: 'propio' | 'relacion' | 'acceso_excepcional'; consultations: HistoryConsultation[]; laboratory: HistoryOrder[]; admissions: HistoryAdmission[] };
+export type ClinicalHistory = { patient: { id: string; record: string; fullName: string }; access: 'propio' | 'relacion'; consultations: HistoryConsultation[]; laboratory: HistoryOrder[]; admissions: HistoryAdmission[] };
 
 const accessText: Record<ClinicalHistory['access'], string> = {
   propio: 'Ves tu propio historial revisado.',
   relacion: 'Acceso por relación de atención.',
-  acceso_excepcional: 'Acceso excepcional aprobado: esta lectura queda auditada con su motivo.',
 };
 
 /**
  * REQ-03 · historial clínico completo del paciente (FR-106-09): consultas de todos los médicos, resultados y admisiones,
- * filtrados por la API según relación de atención, acceso excepcional o titularidad. La lectura queda auditada.
+ * filtrados por la API según relación de atención o titularidad. La lectura queda auditada.
  */
 export function ClinicalHistoryDialog({ api, patientId, patientName, version, onClose }: { api: Api; patientId: string; patientName: string; version: number; onClose: () => void }) {
   const history = useData<ClinicalHistory>(api, `/pacientes/${patientId}/historial`, version);
