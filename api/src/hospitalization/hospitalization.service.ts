@@ -5,11 +5,11 @@ import { channelsFor } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException, VersionConflictException } from '../platform/problem';
 import { requireCurrentEnrollment } from '../platform/enrollment';
 import { AdmissionIntakeService } from './admission-intake.service';
 import { Category, visitorError, visitorPolicy } from './admission-intake.rules';
-import { AdmissionDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, ExitDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
+import { AdmissionDto, AdmissionIndicationDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, ExitDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
 
 type Row = Record<string, any>;
 
@@ -114,14 +114,14 @@ export class HospitalizationService {
   }
 
   /** Rules shared by `create` and `createIndication`: isolation type, visitors and the source record of the admission. */
-  private async checkIntake(c: PoolClient, dto: AdmissionDto) {
+  private async checkIntake(c: PoolClient, dto: AdmissionDto | AdmissionIndicationDto) {
     if (dto.isolationType && !dto.isolation) throw new BadRequestException('Indica el aislamiento para elegir su tipo.');
     const error = visitorError(visitorPolicy(dto.visitorsAllowed, dto.visitorsMax), dto.requestedCategory as Category);
     if (error) throw new BadRequestException(error);
-    if (!await this.intake.originBelongsToPatient(c, dto.origin, dto.originId, dto.patientId)) throw new BadRequestException('El registro de origen no existe o no pertenece al paciente.');
+    if (!await this.intake.originBelongsToPatient(c, dto.origin, dto.originId, dto.patientId)) throw new ProblemException('validacion', 400, 'El registro de origen no existe o no pertenece al paciente.', 'originId');
   }
 
-  private intakeColumns(dto: AdmissionDto) {
+  private intakeColumns(dto: AdmissionDto | AdmissionIndicationDto) {
     const visitors = visitorPolicy(dto.visitorsAllowed, dto.visitorsMax);
     return [dto.motive.trim(), dto.isolationType ?? null, dto.unstable ?? false, dto.postSurgical ?? false, visitors.allowed, visitors.max];
   }
@@ -150,12 +150,15 @@ export class HospitalizationService {
     });
   }
 
-  async createIndication(actor: Actor, dto: AdmissionDto, key?: string) {
+  /** The indicating doctor is the attending one: `attendingDoctorId` defaults to the actor and the consultation must be theirs. */
+  async createIndication(actor: Actor, dto: AdmissionIndicationDto, key?: string) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
-    if (dto.attendingDoctorId !== actor.staffId) throw new ForbiddenException('La indicación debe pertenecer al médico actual.');
-    if (dto.origin !== 'consulta') throw new BadRequestException('La indicación debe enlazarse a una consulta.');
+    if (dto.attendingDoctorId !== undefined && dto.attendingDoctorId !== actor.staffId) throw new ForbiddenException('La indicación debe pertenecer al médico actual.');
+    if (dto.origin !== 'consulta') throw new ProblemException('validacion', 400, 'La indicación debe enlazarse a una consulta.', 'origin');
     return this.commands.run(actor, 'admision.solicitar', key, dto, async c => {
       await this.checkIntake(c, dto);
+      const consultation = (await c.query('SELECT medico_id AS "doctorId" FROM atencion.consulta WHERE id=$1', [dto.originId])).rows[0] as { doctorId: string } | undefined;
+      if (consultation?.doctorId !== actor.staffId) throw new ForbiddenException('La consulta no es tuya: solo su médico puede indicar la hospitalización.');
       const patient = (await c.query('SELECT id,coalesce(sexo,\'no_registrado\') AS sex FROM pacientes.paciente WHERE id=$1', [dto.patientId])).rows[0];
       if (!patient) throw new NotFoundException('No se encontró el paciente.');
       const row = (await c.query(`INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,aislamiento,medico_tratante_id,fecha_programada,creado_por,motivo,tipo_aislamiento,inestable,postquirurgico,visitas_permitidas,visitantes_max) VALUES($1,'consulta',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id,estado AS state,version`, [dto.patientId,dto.originId,dto.requestedCategory,patient.sex,dto.isolation,actor.staffId,dto.scheduledAt ?? null,actor.id,...this.intakeColumns(dto)])).rows[0];

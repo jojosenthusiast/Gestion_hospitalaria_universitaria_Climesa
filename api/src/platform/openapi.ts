@@ -21,6 +21,10 @@ export const problemSchema = {
     codigo: { $ref: '#/components/schemas/CodigoProblema' },
     detail: { type: 'string', description: 'Mensaje en español para mostrar; no sirve para decidir.' },
     campo: { type: 'string', description: 'Campo del cuerpo o cabecera que causó el error, si aplica.' },
+    errors: {
+      type: 'array', description: 'Solo en `validacion` (MOV-03): un mensaje en español por campo inválido; `field` es el nombre del campo tal como viaja (`items[0].dose` en listas). `campo` repite el primero.',
+      items: { type: 'object', required: ['field', 'message'], properties: { field: { type: 'string', example: 'motive' }, message: { type: 'string', example: 'Debe tener al menos 10 caracteres.' } } },
+    },
     requestId: { type: 'string', description: 'Correlación con los registros del servidor ("código de soporte").' },
     versionActual: { type: 'integer', description: 'Solo en `version_conflicto`: versión vigente del registro.' },
     disponibleDesde: { type: 'string', format: 'date-time', description: 'Solo en `personal_en_descanso`.' },

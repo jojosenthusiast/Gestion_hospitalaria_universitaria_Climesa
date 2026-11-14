@@ -3486,6 +3486,43 @@ export interface components {
             bedId: string;
             version: number;
         };
+        AdmissionIndicationDto: {
+            /** Format: uuid */
+            patientId: string;
+            /** @enum {string} */
+            origin: "cita" | "consulta" | "emergencia" | "ambulancia";
+            /**
+             * Format: uuid
+             * @description Registro de origen (cita, consulta, ticket de emergencia o servicio de ambulancia) del mismo paciente.
+             */
+            originId: string;
+            /** @enum {string} */
+            requestedCategory: "vip" | "semiprivada";
+            isolation: boolean;
+            /** Format: date-time */
+            scheduledAt?: string;
+            reason?: string;
+            motive: string;
+            /** @enum {string} */
+            isolationType?: "contacto" | "gotitas" | "aerea" | "protector";
+            unstable?: boolean;
+            postSurgical?: boolean;
+            /** @description Por omisión, sí. */
+            visitorsAllowed?: boolean;
+            /** @description Acompañantes permitidos; 0 si no se permiten visitas. */
+            visitorsMax?: number;
+            /**
+             * Format: uuid
+             * @description Cama elegida: se asigna en el mismo comando (ingreso inmediato).
+             */
+            bedId?: string;
+            bedVersion?: number;
+            /**
+             * Format: uuid
+             * @description Por omisión, el médico que indica; si se envía, debe ser ese mismo médico.
+             */
+            attendingDoctorId?: string;
+        };
         TransferDto: {
             /** Format: uuid */
             bedId: string;
@@ -4476,6 +4513,13 @@ export interface components {
             detail: string;
             /** @description Campo del cuerpo o cabecera que causó el error, si aplica. */
             campo?: string;
+            /** @description Solo en `validacion` (MOV-03): un mensaje en español por campo inválido; `field` es el nombre del campo tal como viaja (`items[0].dose` en listas). `campo` repite el primero. */
+            errors?: {
+                /** @example motive */
+                field: string;
+                /** @example Debe tener al menos 10 caracteres. */
+                message: string;
+            }[];
             /** @description Correlación con los registros del servidor ("código de soporte"). */
             requestId: string;
             /** @description Solo en `version_conflicto`: versión vigente del registro. */
@@ -10621,7 +10665,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AdmissionDto"];
+                "application/json": components["schemas"]["AdmissionIndicationDto"];
             };
         };
         responses: {
