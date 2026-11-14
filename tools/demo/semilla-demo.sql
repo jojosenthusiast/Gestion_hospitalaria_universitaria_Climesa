@@ -617,19 +617,21 @@ end $$;
 -- 9. Hospitalización: admisiones, camas ocupadas / reservada / bloqueada / en limpieza, traslado y altas
 -- ---------------------------------------------------------------------------------------------------------
 insert into hospitalizacion.admision (id, paciente_id, origen, origen_id, categoria_pedida, sexo_paciente, aislamiento, medico_tratante_id,
-  fecha_programada, estado, creado_por, creado_en)
+  fecha_programada, estado, creado_por, creado_en, motivo, tipo_aislamiento, inestable, postquirurgico, visitas_permitidas, visitantes_max)
 select pg_temp.did('0060', a.n), pg_temp.did('0001', a.pac), a.origen,
-       case a.origen when 'emergencia' then pg_temp.did('0005', 10) when 'ambulancia' then pg_temp.did('0070', 4) when 'consulta' then pg_temp.did('0006', 11) end,
+       case a.origen when 'emergencia' then pg_temp.did('0005', 10) when 'ambulancia' then pg_temp.did('0070', 4) when 'consulta' then pg_temp.did('0006', 11)
+         when 'cita' then coalesce((select c.id from atencion.cita c where c.paciente_id = pg_temp.did('0001', a.pac) order by c.horario limit 1), pg_temp.did('0004', 1)) end,
        a.cat, p.sexo, a.aisl, case a.tratante when 0 then pg_temp.persona('MED') else pg_temp.did('0002', a.tratante) end,
-       case a.origen when 'programada' then now() + a.prog end, a.estado, pg_temp.actor('MED'), now() - a.hace
+       case a.origen when 'cita' then now() + a.prog end, a.estado, pg_temp.actor('MED'), now() - a.hace,
+       '[DEMO] ' || a.motivo, case when a.aisl then 'contacto' end, a.n = 3, a.n = 2, a.n <> 3, case when a.n = 3 then 0 when a.cat = 'vip' then 2 else 1 end
 from (values
-  (1, 7,  'consulta',   'semiprivada', false, 1, interval '0',      'hospitalizado',  interval '2 days'),
-  (2, 8,  'programada', 'semiprivada', false, 1, interval '-3 days', 'hospitalizado', interval '3 days'),
-  (3, 9,  'emergencia', 'semiprivada', true,  3, interval '0',      'hospitalizado',  interval '1 day'),
-  (4, 10, 'ambulancia', 'vip',         false, 0, interval '0',      'alta_firmada',   interval '4 days'),
-  (5, 11, 'programada', 'vip',         false, 0, interval '1 day',  'pendiente_cama', interval '3 hours'),
-  (6, 12, 'programada', 'semiprivada', false, 1, interval '-3 days', 'egresado',      interval '3 days')
-) a(n, pac, origen, cat, aisl, tratante, prog, estado, hace)
+  (1, 7,  'consulta',   'semiprivada', false, 1, interval '0',      'hospitalizado',  interval '2 days',  'Observación por cuadro respiratorio'),
+  (2, 8,  'cita',       'semiprivada', false, 1, interval '-3 days', 'hospitalizado', interval '3 days',  'Cirugía programada, recuperación'),
+  (3, 9,  'emergencia', 'semiprivada', true,  3, interval '0',      'hospitalizado',  interval '1 day',   'Fiebre alta con aislamiento'),
+  (4, 10, 'ambulancia', 'vip',         false, 0, interval '0',      'alta_firmada',   interval '4 days',  'Traslado por trauma de miembro'),
+  (5, 11, 'cita',       'vip',         false, 0, interval '1 day',  'pendiente_cama', interval '3 hours', 'Ingreso programado por control'),
+  (6, 12, 'cita',       'semiprivada', false, 1, interval '-3 days', 'egresado',      interval '3 days',  'Tratamiento endovenoso completado')
+) a(n, pac, origen, cat, aisl, tratante, prog, estado, hace, motivo)
 join pacientes.paciente p on p.id = pg_temp.did('0001', a.pac)
 where case a.tratante when 0 then pg_temp.persona('MED') else pg_temp.did('0002', a.tratante) end is not null
 on conflict do nothing;

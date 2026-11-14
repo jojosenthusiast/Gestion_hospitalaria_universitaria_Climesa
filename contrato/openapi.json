@@ -7125,6 +7125,447 @@
         "x-permiso": "resultados.ver"
       }
     },
+    "/api/v1/admisiones/origenes": {
+      "get": {
+        "operationId": "HospitalizationController_origins",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cita",
+                "consulta",
+                "emergencia",
+                "ambulancia"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OriginOptionResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registros recientes del paciente que pueden originar el ingreso",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "admision.crear"
+      }
+    },
+    "/api/v1/admisiones/medicos-disponibles": {
+      "get": {
+        "operationId": "HospitalizationController_doctors",
+        "parameters": [
+          {
+            "name": "at",
+            "required": false,
+            "in": "query",
+            "description": "Instante de ingreso; por omisión, ahora.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DoctorAvailabilityResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Médicos con su disponibilidad (turno) en el instante de ingreso",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "admision.crear"
+      }
+    },
+    "/api/v1/admisiones/mapa-camas": {
+      "get": {
+        "operationId": "HospitalizationController_bedMap",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isolation",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "vip",
+                "semiprivada"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BedMapResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Camas por planta y habitación con su compatibilidad para el paciente",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "admision.crear"
+      }
+    },
+    "/api/v1/admisiones/factibilidad": {
+      "get": {
+        "operationId": "HospitalizationController_feasibility",
+        "parameters": [
+          {
+            "name": "patientId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cita",
+                "consulta",
+                "emergencia",
+                "ambulancia"
+              ]
+            }
+          },
+          {
+            "name": "originId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "doctorId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "at",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "vip",
+                "semiprivada"
+              ]
+            }
+          },
+          {
+            "name": "isolation",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "bedId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "visitorsAllowed",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "visitorsMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 4,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeasibilityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Comprobación previa a confirmar el ingreso (sin escribir)",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "admision.crear"
+      }
+    },
     "/api/v1/admisiones": {
       "get": {
         "operationId": "HospitalizationController_list",
@@ -16704,13 +17145,251 @@
           "version"
         ]
       },
+      "OrigenAdmisionNueva": {
+        "type": "string",
+        "enum": [
+          "cita",
+          "consulta",
+          "emergencia",
+          "ambulancia"
+        ]
+      },
+      "OriginOptionResponse": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrigenAdmisionNueva"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "label": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "id",
+          "at",
+          "label",
+          "detail"
+        ]
+      },
+      "DoctorAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "specialty": {
+            "type": "string",
+            "nullable": true
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo por el que no está disponible"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "specialty",
+          "available",
+          "reason"
+        ]
+      },
+      "BedMapCategoryResponse": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoriaHabitacion"
+              }
+            ]
+          },
+          "free": {
+            "type": "integer"
+          },
+          "compatible": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "free",
+          "compatible"
+        ]
+      },
+      "BedMapBedResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room": {
+            "type": "string"
+          },
+          "floor": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Planta de la habitación"
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoriaHabitacion"
+              }
+            ]
+          },
+          "capacity": {
+            "type": "integer",
+            "description": "Camas de la habitación"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoCama"
+              }
+            ]
+          },
+          "occupiedInRoom": {
+            "type": "integer"
+          },
+          "compatible": {
+            "type": "boolean",
+            "description": "Libre y compatible con el sexo y el aislamiento del paciente"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggested": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "code",
+          "roomId",
+          "room",
+          "floor",
+          "category",
+          "capacity",
+          "state",
+          "occupiedInRoom",
+          "compatible",
+          "reason",
+          "suggested"
+        ]
+      },
+      "BedMapResponse": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BedMapCategoryResponse"
+            }
+          },
+          "beds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BedMapBedResponse"
+            }
+          }
+        },
+        "required": [
+          "categories",
+          "beds"
+        ]
+      },
+      "FeasibilityCheckResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "ok",
+          "message"
+        ]
+      },
+      "FeasibilityResponse": {
+        "type": "object",
+        "properties": {
+          "feasible": {
+            "type": "boolean"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeasibilityCheckResponse"
+            }
+          }
+        },
+        "required": [
+          "feasible",
+          "checks"
+        ]
+      },
       "OrigenAdmision": {
         "type": "string",
         "enum": [
+          "cita",
           "consulta",
           "emergencia",
           "ambulancia",
           "programada"
+        ]
+      },
+      "TipoAislamiento": {
+        "type": "string",
+        "enum": [
+          "contacto",
+          "gotitas",
+          "aerea",
+          "protector"
         ]
       },
       "AdmissionResponse": {
@@ -16772,6 +17451,36 @@
             "type": "string",
             "format": "uuid",
             "nullable": true
+          },
+          "originId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "motive": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo del ingreso; nulo solo en admisiones anteriores a la regla."
+          },
+          "isolationType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoAislamiento"
+              }
+            ]
+          },
+          "unstable": {
+            "type": "boolean"
+          },
+          "postSurgical": {
+            "type": "boolean"
+          },
+          "visitorsAllowed": {
+            "type": "boolean"
+          },
+          "visitorsMax": {
+            "type": "integer"
           }
         },
         "required": [
@@ -16786,7 +17495,14 @@
           "attendingDoctorId",
           "version",
           "bed",
-          "occupationId"
+          "occupationId",
+          "originId",
+          "motive",
+          "isolationType",
+          "unstable",
+          "postSurgical",
+          "visitorsAllowed",
+          "visitorsMax"
         ]
       },
       "AdmissionDto": {
@@ -16799,15 +17515,16 @@
           "origin": {
             "type": "string",
             "enum": [
+              "cita",
               "consulta",
               "emergencia",
-              "ambulancia",
-              "programada"
+              "ambulancia"
             ]
           },
           "originId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Registro de origen (cita, consulta, ticket de emergencia o servicio de ambulancia) del mismo paciente."
           },
           "requestedCategory": {
             "type": "string",
@@ -16831,14 +17548,55 @@
             "type": "string",
             "minLength": 10,
             "maxLength": 500
+          },
+          "motive": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          },
+          "isolationType": {
+            "type": "string",
+            "enum": [
+              "contacto",
+              "gotitas",
+              "aerea",
+              "protector"
+            ]
+          },
+          "unstable": {
+            "type": "boolean"
+          },
+          "postSurgical": {
+            "type": "boolean"
+          },
+          "visitorsAllowed": {
+            "type": "boolean",
+            "description": "Por omisión, sí."
+          },
+          "visitorsMax": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "Acompañantes permitidos; 0 si no se permiten visitas."
+          },
+          "bedId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cama elegida: se asigna en el mismo comando (ingreso inmediato)."
+          },
+          "bedVersion": {
+            "type": "number",
+            "minimum": 1
           }
         },
         "required": [
           "patientId",
           "origin",
+          "originId",
           "requestedCategory",
           "isolation",
-          "attendingDoctorId"
+          "attendingDoctorId",
+          "motive"
         ]
       },
       "AdmissionCommandResponse": {

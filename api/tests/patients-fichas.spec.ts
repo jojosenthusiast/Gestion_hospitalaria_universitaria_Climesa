@@ -41,7 +41,7 @@ describe('Pacientes · la misma ficha según el rol y el contexto (privacidad.md
  const admit=async()=>{
   if(admitted)return;
   const bed=(await fixture.pg.query<{id:string;padre_id:string}>("SELECT id,padre_id FROM infra.espacio WHERE tipo='cama' AND padre_id=(SELECT id FROM infra.espacio WHERE codigo='HAB-201') ORDER BY codigo LIMIT 1")).rows[0];
-  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado') RETURNING id",[patientId,randomUUID(),await staff('MED')])).rows[0];
+  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado,motivo) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado','Ingreso de prueba') RETURNING id",[patientId,randomUUID(),await staff('MED')])).rows[0];
   await fixture.pg.query("INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo) VALUES($1,$2,$3,'semiprivada',tstzrange('2026-10-24T00:00Z',NULL,'[)'))",[admission.id,bed.id,bed.padre_id]);
   admitted=true;
  };

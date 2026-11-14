@@ -1,19 +1,21 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { Actor, contextsOf } from '../platform/actor';
+import { Actor, contextsOf, hasPermission } from '../platform/actor';
 import { channelsFor } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { VersionConflictException } from '../platform/problem';
 import { requireCurrentEnrollment } from '../platform/enrollment';
+import { AdmissionIntakeService } from './admission-intake.service';
+import { Category, visitorError, visitorPolicy } from './admission-intake.rules';
 import { AdmissionDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, ExitDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
 
 type Row = Record<string, any>;
 
 @Injectable()
 export class HospitalizationService {
-  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
+  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock, private readonly intake: AdmissionIntakeService) {}
 
   private async admission(c: PoolClient, id: string, lock = false) {
     const row = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",a.origen AS origin,a.origen_id AS "originId",a.categoria_pedida AS "requestedCategory",a.sexo_paciente AS "patientSex",a.aislamiento AS isolation,a.medico_tratante_id AS "attendingDoctorId",a.fecha_programada AS "scheduledAt",a.estado AS state,a.autorizado_por AS "authorizedBy",a.version,a.creado_en AS "createdAt",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName"
@@ -102,7 +104,7 @@ export class HospitalizationService {
       // SEG-03: context `area` (ENF) sees the admissions whose current bed is in an area of the nurse's current shift.
       const areas = !global && contextsOf(actor, 'admision.ver').includes('area') ? await this.currentAreas(c, actor.staffId) : [];
       if (!global && !ownDoctor && !ownPatient && !areas.length) return [];
-      const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed,oc.id AS "occupationId"
+      const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed,oc.id AS "occupationId",a.origen_id AS "originId",a.motivo AS motive,a.tipo_aislamiento AS "isolationType",a.inestable AS unstable,a.postquirurgico AS "postSurgical",a.visitas_permitidas AS "visitorsAllowed",a.visitantes_max AS "visitorsMax"
         FROM hospitalizacion.admision a JOIN pacientes.paciente p ON p.id=a.paciente_id LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $1::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id
         WHERE a.estado IN ('pendiente_cama','hospitalizado','alta_firmada') AND ($2::boolean OR ($3::uuid IS NOT NULL AND a.medico_tratante_id=$3) OR ($4::uuid IS NOT NULL AND a.paciente_id=$4)
           OR (cardinality($5::uuid[])>0 AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=oc.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($5::uuid[])))) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,ownDoctor ? actor.staffId : null,ownPatient ? actor.patientId : null,areas])).rows;
@@ -111,31 +113,52 @@ export class HospitalizationService {
     });
   }
 
+  /** Rules shared by `create` and `createIndication`: isolation type, visitors and the source record of the admission. */
+  private async checkIntake(c: PoolClient, dto: AdmissionDto) {
+    if (dto.isolationType && !dto.isolation) throw new BadRequestException('Indica el aislamiento para elegir su tipo.');
+    const error = visitorError(visitorPolicy(dto.visitorsAllowed, dto.visitorsMax), dto.requestedCategory as Category);
+    if (error) throw new BadRequestException(error);
+    if (!await this.intake.originBelongsToPatient(c, dto.origin, dto.originId, dto.patientId)) throw new BadRequestException('El registro de origen no existe o no pertenece al paciente.');
+  }
+
+  private intakeColumns(dto: AdmissionDto) {
+    const visitors = visitorPolicy(dto.visitorsAllowed, dto.visitorsMax);
+    return [dto.motive.trim(), dto.isolationType ?? null, dto.unstable ?? false, dto.postSurgical ?? false, visitors.allowed, visitors.max];
+  }
+
   async create(actor: Actor, dto: AdmissionDto, key?: string) {
     return this.commands.run(actor, 'admision.crear', key, dto, async c => {
-      if (dto.origin === 'programada' && !dto.scheduledAt) throw new BadRequestException('Una admisión programada necesita fecha prevista.');
-      if (dto.origin !== 'programada' && !dto.originId) throw new BadRequestException('La admisión necesita referencia de origen.');
+      await this.checkIntake(c, dto);
       const patient = (await c.query(`SELECT id,coalesce(sexo,'no_registrado') AS sex FROM pacientes.paciente WHERE id=$1`, [dto.patientId])).rows[0] as Row | undefined;
       if (!patient) throw new NotFoundException('No se encontró el paciente.');
       const doctor = (await c.query(`SELECT id FROM personal.persona WHERE id=$1 AND tipo='medico' AND activo`, [dto.attendingDoctorId])).rows[0];
       if (!doctor) throw new BadRequestException('El médico tratante no está activo.');
+      if (dto.bedId) {
+        if (!hasPermission(actor, 'camas.asignar')) throw new ForbiddenException('No tienes permiso para asignar cama.');
+        if (!dto.bedVersion) throw new BadRequestException('Indica la versión de la cama elegida.');
+        this.intake.assertBedAllowedAt(dto.scheduledAt);
+      }
+      if (!await this.intake.doctorOnShift(c, dto.attendingDoctorId, dto.scheduledAt ? new Date(dto.scheduledAt) : this.clock.now())) throw new ConflictException('El médico tratante no tiene turno en el horario del ingreso.');
       const existing = await c.query(`SELECT id FROM hospitalizacion.admision WHERE paciente_id=$1 AND estado IN ('pendiente_cama','hospitalizado','alta_firmada') LIMIT 1`, [dto.patientId]);
       if (existing.rowCount) throw new ConflictException('El paciente ya tiene una admisión activa.');
-      const row = (await c.query(`INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,aislamiento,medico_tratante_id,fecha_programada,creado_por) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,estado AS state,version`, [dto.patientId,dto.origin,dto.originId ?? null,dto.requestedCategory,patient.sex,dto.isolation,dto.attendingDoctorId,dto.scheduledAt ?? null,actor.id])).rows[0];
+      const row = (await c.query(`INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,aislamiento,medico_tratante_id,fecha_programada,creado_por,motivo,tipo_aislamiento,inestable,postquirurgico,visitas_permitidas,visitantes_max) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id,estado AS state,version`, [dto.patientId,dto.origin,dto.originId,dto.requestedCategory,patient.sex,dto.isolation,dto.attendingDoctorId,dto.scheduledAt ?? null,actor.id,...this.intakeColumns(dto)])).rows[0];
       await this.commands.audit(c, actor, { action: 'admision.crear', entity: 'admision', entityId: row.id, patientId: dto.patientId, permission: 'admision.crear', reason: dto.reason });
       await this.commands.event(c, 'admision.creada', 'admision', row.id, row.version, await channelsFor(c, ['admision.ver', 'camas.asignar'], { users: [actor.id] }));
-      return row;
+      if (!dto.bedId) return row;
+      // Immediate admission: the bed is assigned in the same transaction, so a conflict leaves no half-admitted patient.
+      return this.assignBedIn(c, actor, row.id, { bedId: dto.bedId, version: dto.bedVersion! });
     });
   }
 
   async createIndication(actor: Actor, dto: AdmissionDto, key?: string) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
     if (dto.attendingDoctorId !== actor.staffId) throw new ForbiddenException('La indicación debe pertenecer al médico actual.');
-    if (!dto.originId) throw new BadRequestException('La indicación debe enlazarse a una consulta.');
+    if (dto.origin !== 'consulta') throw new BadRequestException('La indicación debe enlazarse a una consulta.');
     return this.commands.run(actor, 'admision.solicitar', key, dto, async c => {
+      await this.checkIntake(c, dto);
       const patient = (await c.query('SELECT id,coalesce(sexo,\'no_registrado\') AS sex FROM pacientes.paciente WHERE id=$1', [dto.patientId])).rows[0];
       if (!patient) throw new NotFoundException('No se encontró el paciente.');
-      const row = (await c.query(`INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,aislamiento,medico_tratante_id,fecha_programada,creado_por) VALUES($1,'consulta',$2,$3,$4,$5,$6,$7,$8) RETURNING id,estado AS state,version`, [dto.patientId,dto.originId ?? null,dto.requestedCategory,patient.sex,dto.isolation,actor.staffId,dto.scheduledAt ?? null,actor.id])).rows[0];
+      const row = (await c.query(`INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,aislamiento,medico_tratante_id,fecha_programada,creado_por,motivo,tipo_aislamiento,inestable,postquirurgico,visitas_permitidas,visitantes_max) VALUES($1,'consulta',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id,estado AS state,version`, [dto.patientId,dto.originId,dto.requestedCategory,patient.sex,dto.isolation,actor.staffId,dto.scheduledAt ?? null,actor.id,...this.intakeColumns(dto)])).rows[0];
       await this.commands.audit(c, actor, { action: 'admision.solicitar', entity: 'admision', entityId: row.id, patientId: dto.patientId, permission: 'admision.solicitar' });
       await this.commands.event(c, 'admision.creada', 'admision', row.id, row.version, await channelsFor(c, ['admision.ver', 'camas.asignar']));
       return row;
@@ -160,25 +183,28 @@ export class HospitalizationService {
   }
 
   async assignBed(actor: Actor, id: string, dto: BedAssignmentDto, key?: string) {
-    return this.commands.run(actor, `camas.asignar:${id}`, key, dto, async c => {
-      const admission = await this.admission(c, id, true);
-      if (admission.state !== 'pendiente_cama') throw new ConflictException('La admisión ya no está pendiente de cama.');
-      const bed = (await c.query(`SELECT e.id,e.version,e.tipo,h.id AS "roomId",h.categoria FROM infra.espacio e JOIN infra.espacio h ON h.id=e.padre_id WHERE e.id=$1 AND e.tipo='cama' AND e.activo FOR UPDATE`, [dto.bedId])).rows[0] as Row | undefined;
-      if (!bed) throw new NotFoundException('No se encontró la cama activa.');
-      if (bed.version !== dto.version) throw new VersionConflictException(bed.version, 'La cama cambió; vuelve a consultar.');
-      const state = (await c.query('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1', [dto.bedId])).rows[0]?.estado;
-      if (state !== 'libre') throw new ConflictException('Otra persona tomó esta cama.');
-      if (bed.categoria !== admission.requestedCategory && admission.requestedCategory === 'semiprivada' && !admission.authorizedBy) throw new ConflictException('La categoría de cama no coincide con la solicitud.');
-      await this.checkRoomCompatibility(c, bed.roomId, admission);
-      const now = this.clock.now();
-      const occ = (await c.query(`INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo,asignado_por) VALUES($1,$2,$3,$4,tstzrange($5::timestamptz,NULL,'[)'),$6) RETURNING id`, [id,dto.bedId,bed.roomId,bed.categoria,now,actor.id])).rows[0];
-      await c.query(`UPDATE hospitalizacion.admision SET estado='hospitalizado',version=version+1 WHERE id=$1`, [id]);
-      if (admission.isolation) await this.isolateRoom(c, bed.roomId, dto.bedId, now, actor.id);
-      await this.commands.audit(c, actor, { action: 'camas.asignar', entity: 'ocupacion_cama', entityId: occ.id, patientId: admission.patientId, permission: 'camas.asignar', reason: dto.reason });
-      await this.commands.event(c, 'admision.cama_asignada', 'admision', id, admission.version + 1, await channelsFor(c, ['admision.ver', 'camas.ver_tablero']));
-      await this.bedChanged(c, dto.bedId, bed.version);
-      return { id, bedId: dto.bedId, state: 'hospitalizado', version: admission.version + 1 };
-    });
+    return this.commands.run(actor, `camas.asignar:${id}`, key, dto, c => this.assignBedIn(c, actor, id, dto));
+  }
+
+  /** Bed assignment inside the caller's transaction (also used by the immediate admission). */
+  private async assignBedIn(c: PoolClient, actor: Actor, id: string, dto: { bedId: string; version: number; reason?: string }) {
+    const admission = await this.admission(c, id, true);
+    if (admission.state !== 'pendiente_cama') throw new ConflictException('La admisión ya no está pendiente de cama.');
+    const bed = (await c.query(`SELECT e.id,e.version,e.tipo,h.id AS "roomId",h.categoria FROM infra.espacio e JOIN infra.espacio h ON h.id=e.padre_id WHERE e.id=$1 AND e.tipo='cama' AND e.activo FOR UPDATE`, [dto.bedId])).rows[0] as Row | undefined;
+    if (!bed) throw new NotFoundException('No se encontró la cama activa.');
+    if (bed.version !== dto.version) throw new VersionConflictException(bed.version, 'La cama cambió; vuelve a consultar.');
+    const state = (await c.query('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1', [dto.bedId])).rows[0]?.estado;
+    if (state !== 'libre') throw new ConflictException('Otra persona tomó esta cama.');
+    if (bed.categoria !== admission.requestedCategory && admission.requestedCategory === 'semiprivada' && !admission.authorizedBy) throw new ConflictException('La categoría de cama no coincide con la solicitud.');
+    await this.checkRoomCompatibility(c, bed.roomId, admission);
+    const now = this.clock.now();
+    const occ = (await c.query(`INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo,asignado_por) VALUES($1,$2,$3,$4,tstzrange($5::timestamptz,NULL,'[)'),$6) RETURNING id`, [id,dto.bedId,bed.roomId,bed.categoria,now,actor.id])).rows[0];
+    await c.query(`UPDATE hospitalizacion.admision SET estado='hospitalizado',version=version+1 WHERE id=$1`, [id]);
+    if (admission.isolation) await this.isolateRoom(c, bed.roomId, dto.bedId, now, actor.id);
+    await this.commands.audit(c, actor, { action: 'camas.asignar', entity: 'ocupacion_cama', entityId: occ.id, patientId: admission.patientId, permission: 'camas.asignar', reason: dto.reason });
+    await this.commands.event(c, 'admision.cama_asignada', 'admision', id, admission.version + 1, await channelsFor(c, ['admision.ver', 'camas.ver_tablero']));
+    await this.bedChanged(c, dto.bedId, bed.version);
+    return { id, bedId: dto.bedId, state: 'hospitalizado', version: admission.version + 1 };
   }
 
   async authorize(actor: Actor, id: string, dto: AuthorizationDto, key?: string) {

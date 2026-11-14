@@ -1,0 +1,42 @@
+.admission-stepper { gap: 18px; }
+.stepper-track { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.stepper-track li { display: grid; justify-items: center; gap: 4px; text-align: center; color: var(--muted); }
+.stepper-track li > span { width: 28px; height: 28px; display: inline-grid; place-items: center; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); font-size: 13px; font-weight: 700; }
+.stepper-track li small { font-size: 11px; line-height: 1.2; }
+.stepper-track li.is-current { color: var(--ink); }
+.stepper-track li.is-current > span { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+.stepper-track li.is-done > span { border-color: var(--success); background: var(--success-soft); color: var(--success); }
+.stepper-title { font-size: 18px; }
+.step-error { margin: 0; padding: 10px 12px; border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--soft); font-size: 14px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice-chip { position: relative; display: grid; gap: 2px; padding: 10px 14px; min-width: 110px; border: 2px solid var(--line); border-radius: var(--radius-control); cursor: pointer; background: var(--surface); }
+.choice-chip input { position: absolute; opacity: 0; inset: 0; cursor: inherit; }
+.choice-chip small { color: var(--muted); font-size: 12px; }
+.choice-chip.is-selected, .category-card.is-selected { border-color: var(--primary); background: var(--soft); box-shadow: 0 0 0 2px var(--primary) inset; }
+.choice-chip:focus-within, .category-card:focus-within { outline: 3px solid var(--outline); outline-offset: 1px; }
+.choice-chip.is-disabled, .category-card.is-disabled { border-style: dashed; background: var(--disabled); color: var(--muted); cursor: not-allowed; }
+.category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.category-card { position: relative; display: grid; gap: 4px; padding: 16px; border: 2px solid var(--line); border-radius: var(--radius-card); cursor: pointer; background: var(--surface); }
+.category-card input { position: absolute; opacity: 0; inset: 0; cursor: inherit; }
+.category-card strong { font-size: 18px; }
+.bed-picker { display: grid; gap: 16px; }
+.floor-block { display: grid; gap: 8px; }
+.floor-block h4 { font-size: 15px; color: var(--muted); }
+.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.room-card { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.room-card small { color: var(--muted); }
+.bed-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.bed-cell { display: grid; grid-template-columns: auto 1fr; gap: 2px 6px; align-items: center; padding: 6px 10px; min-width: 96px; border: 2px solid var(--success); border-radius: var(--radius-control); background: var(--success-soft); color: var(--success); font: inherit; cursor: pointer; text-align: left; }
+.bed-cell span { font-weight: 700; font-size: 13px; }
+.bed-cell small { grid-column: 1 / -1; font-size: 11px; color: inherit; }
+.bed-cell.is-selected { background: var(--success); color: var(--on-primary); outline: 3px solid var(--outline); outline-offset: 1px; }
+.bed-cell.is-blocked { border-style: dashed; border-color: var(--state-blocked); background: var(--state-blocked-soft); color: var(--state-blocked); cursor: not-allowed; }
+.summary-list { display: grid; gap: 8px; margin: 0; }
+.summary-list > div { display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.summary-list dt { color: var(--muted); font-size: 14px; }
+.summary-list dd { margin: 0; font-size: 15px; }
+.feasibility-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.feasibility-list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-control); border: 1px solid var(--line); font-size: 14px; }
+.feasibility-list li.is-ok { border-color: var(--success); background: var(--success-soft); }
+.feasibility-list li.is-fail { border-color: var(--state-blocked); background: var(--state-blocked-soft); }
+@media (max-width: 640px) { .stepper-track small { display: none; } .summary-list > div { grid-template-columns: 1fr; gap: 2px; } }

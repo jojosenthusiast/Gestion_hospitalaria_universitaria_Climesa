@@ -17,9 +17,9 @@ check 'último número' "$(sort -n "$task_output" | tail -1)" 50
 q "insert into pacientes.paciente(id,expediente,nombres,primer_apellido,sexo,precision_nacimiento) values
  ('00000000-0000-0000-0000-00000000c0c1','EXP-C1','Uno','Conc','femenino','desconocida'),
  ('00000000-0000-0000-0000-00000000c0c2','EXP-C2','Dos','Conc','femenino','desconocida')"
-q "insert into hospitalizacion.admision(id,paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id) values
- ('00000000-0000-0000-0000-00000000d0c1','00000000-0000-0000-0000-00000000c0c1','emergencia',gen_random_uuid(),'semiprivada','femenino',gen_random_uuid()),
- ('00000000-0000-0000-0000-00000000d0c2','00000000-0000-0000-0000-00000000c0c2','emergencia',gen_random_uuid(),'semiprivada','femenino',gen_random_uuid())"
+q "insert into hospitalizacion.admision(id,paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,motivo) values
+ ('00000000-0000-0000-0000-00000000d0c1','00000000-0000-0000-0000-00000000c0c1','emergencia',gen_random_uuid(),'semiprivada','femenino',gen_random_uuid(),'Ingreso de prueba'),
+ ('00000000-0000-0000-0000-00000000d0c2','00000000-0000-0000-0000-00000000c0c2','emergencia',gen_random_uuid(),'semiprivada','femenino',gen_random_uuid(),'Ingreso de prueba')"
 pids=()
 for a in d0c1 d0c2; do q "insert into hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo) select '00000000-0000-0000-0000-00000000$a',id,padre_id,'semiprivada',tstzrange(now(),NULL) from infra.espacio where codigo='HAB-206-B'" >/dev/null 2>&1 & pids+=("$!"); done
 wait_all

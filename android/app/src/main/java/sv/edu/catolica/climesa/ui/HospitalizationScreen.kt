@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bed
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -158,6 +159,7 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
     }
 
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
+    fun announce(text: String) { mutable.value = mutable.value.copy(notice = text) }
 
     private fun updateDischarge(change: (DischargeForm) -> DischargeForm) = mutable.update { state -> state.copy(discharge = state.discharge?.let(change), formError = null) }
 
@@ -185,8 +187,13 @@ fun HospitalizationScreen(
     quickAction: QuickAction? = null,
     onQuickActionHandled: () -> Unit = {},
     model: HospitalizationViewModel = viewModel(),
+    intake: AdmissionIntakeViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle(); LaunchedEffect(Unit) { model.load() }
+    val intakeState by intake.state.collectAsStateWithLifecycle()
+    // A confirmed admission reloads the list behind the guided flow.
+    val createdNotice = stringResource(R.string.ing_creado)
+    LaunchedEffect(intakeState.finished) { if (intakeState.finished) { model.load(silent = true); model.announce(createdNotice); intake.consumeFinished() } }
     // A dashboard asked to "assign a bed": open the bed suggestions of the first admission still waiting for one.
     LaunchedEffect(quickAction, state.loading, state.admissions) {
         if (quickAction == null || state.loading) return@LaunchedEffect
@@ -195,6 +202,8 @@ fun HospitalizationScreen(
     }
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
     val permissions = profile?.permissions.orEmpty()
+    val canAssignBed = "camas.asignar" in permissions
+    if (intakeState.open) { AdmissionIntakeScreen(canAssignBed, modifier, intake); return }
     state.selectedId?.let { id -> state.admissions.firstOrNull { it.id == id } }?.let { BedSuggestionDialog(it, state, model) }
     state.discharge?.let { form -> state.admissions.firstOrNull { it.id == form.admissionId }?.let { DischargeDialog(it, form, state, model) } }
     state.exitId?.let { id -> state.admissions.firstOrNull { it.id == id } }?.let { ExitDialog(it, state, model) }
@@ -202,6 +211,7 @@ fun HospitalizationScreen(
     PageList(modifier) {
         item { SectionIntro("Hospital / Admisiones", "Hospitalización", "Asigna cama, gestiona el alta y registra la salida física.") }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
+        if ("admision.crear" in permissions) item { PrimaryButton(stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, icon = Icons.Default.Add, enabled = !state.busy) }
         when {
             state.loading && state.admissions.isEmpty() -> item { LoadingState() }
             state.error != null && state.admissions.isEmpty() -> item { ErrorState(state.error, retry) }

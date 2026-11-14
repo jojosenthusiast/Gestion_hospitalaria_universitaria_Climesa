@@ -34,7 +34,7 @@ describe('Spec 112 · información pública sin sesión y sin datos personales',
     expect(before.status).toBe(200);
     const patientId = await t.patient({ name: 'Zorobabelina' });
     const record = (await t.one<{ expediente: string }>('SELECT expediente FROM pacientes.paciente WHERE id=$1', [patientId])).expediente;
-    const admission = await t.call('REC', 'POST', '/admisiones', { patientId, origin: 'emergencia', originId: randomUUID(), requestedCategory: 'semiprivada', isolation: false, attendingDoctorId: await t.staffOf('MED') });
+    const admission = await t.call('REC', 'POST', '/admisiones', await t.admissionBody(patientId, { requestedCategory: 'semiprivada', isolation: false }));
     expect(admission.status).toBe(201);
     const bed = await t.one<{ id: string; version: number; codigo: string; nivel: number }>("SELECT e.id,e.version,b.codigo,b.nivel FROM infra.v_estado_cama b JOIN infra.espacio e ON e.id=b.cama_id WHERE b.estado='libre' AND b.categoria='semiprivada' ORDER BY b.codigo LIMIT 1");
     expect((await t.call('REC', 'POST', `/admisiones/${admission.body.id}/cama`, { bedId: bed.id, version: bed.version })).status).toBe(201);
@@ -59,6 +59,7 @@ describe('Spec 112 · información pública sin sesión y sin datos personales',
   test('FR-112-02: médicos de turno con nombre, especialidad y área; sin teléfono, DUI ni ids', async () => {
     const staff = await t.staffOf('MED');
     await t.pg.query("UPDATE personal.persona SET telefono='7123-4567',dui='04512345-6',especialidad='Pediatría' WHERE id=$1", [staff]);
+    await t.pg.query('DELETE FROM personal.turno WHERE persona_id=$1', [staff]); // the admission helper left a short shift
     await t.shift('MED', new Date(now.valueOf() - hour), new Date(now.valueOf() + 4 * hour));
     const response = await anonymous('/publico/medicos-de-turno');
     expect(response.status).toBe(200);

@@ -17,7 +17,7 @@ describe('Fase 0 · inscripción vigente, consultas firmadas y lecturas auditada
   };
   const item = { medication: 'Acetaminofén 500 mg', dose: '1 tableta', route: 'oral', frequency: 'cada 8 horas', duration: '3 días' };
   const hospitalized = async () => {
-    const created = await t.call('REC', 'POST', '/admisiones', { patientId: await t.patient(), origin: 'emergencia', originId: randomUUID(), requestedCategory: 'vip', isolation: false, attendingDoctorId: await t.staffOf('MED') });
+    const created = await t.call('REC', 'POST', '/admisiones', await t.admissionBody(await t.patient(), { requestedCategory: 'vip', isolation: false }));
     const bed = await t.one<{ id: string; version: number }>("SELECT id,version FROM infra.espacio WHERE codigo='VIP-301-A'");
     expect((await t.call('REC', 'POST', `/admisiones/${created.body.id}/cama`, { bedId: bed.id, version: bed.version })).status).toBe(201);
     return created.body.id as string;

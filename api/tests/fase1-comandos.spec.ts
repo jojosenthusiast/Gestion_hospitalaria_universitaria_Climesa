@@ -136,7 +136,7 @@ describe('Fase 1 · comandos (CON-02, CON-07, API-08..11)', () => {
     });
 
     test('autorizar una admisión exige y compara la versión', async () => {
-      const created = await t.call('REC', 'POST', '/admisiones', { patientId: await t.patient(), origin: 'emergencia', originId: randomUUID(), requestedCategory: 'semiprivada', isolation: false, attendingDoctorId: doctorId });
+      const created = await t.call('REC', 'POST', '/admisiones', await t.admissionBody(await t.patient(), { requestedCategory: 'semiprivada', isolation: false, attendingDoctorId: doctorId }));
       const path = `/admisiones/${created.body.id}/autorizar`;
       const reason = 'Autorización de ingreso por emergencia';
       expect((await t.call('JOP', 'POST', path, { reason })).status).toBe(400);

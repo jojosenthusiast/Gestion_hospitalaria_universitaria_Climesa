@@ -1,18 +1,28 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 import { Text } from '../platform/dto';
 
-export const admissionOrigins = ['consulta', 'emergencia', 'ambulancia', 'programada'] as const;
+/** `programada` only survives in legacy rows: a new admission always links to its source record. */
+export const admissionOrigins = ['cita', 'consulta', 'emergencia', 'ambulancia'] as const;
+export const isolationTypes = ['contacto', 'gotitas', 'aerea', 'protector'] as const;
 export class AdmissionDto {
   @ApiProperty({ format: 'uuid' }) @IsUUID() patientId!: string;
   @ApiProperty({ enum: admissionOrigins }) @IsIn(admissionOrigins) origin!: string;
-  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() originId?: string;
+  @ApiProperty({ format: 'uuid', description: 'Registro de origen (cita, consulta, ticket de emergencia o servicio de ambulancia) del mismo paciente.' }) @IsUUID() originId!: string;
   @ApiProperty({ enum: ['vip', 'semiprivada'] }) @IsIn(['vip', 'semiprivada']) requestedCategory!: string;
   @ApiProperty() @IsBoolean() isolation!: boolean;
   @ApiProperty({ format: 'uuid' }) @IsUUID() attendingDoctorId!: string;
   @ApiPropertyOptional({ format: 'date-time' }) @IsOptional() @IsISO8601({ strict: true }) scheduledAt?: string;
   @Text(10, 500, true) reason?: string;
+  @Text(10, 500) motive!: string;
+  @ApiPropertyOptional({ enum: isolationTypes }) @IsOptional() @IsIn(isolationTypes) isolationType?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() unstable?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() postSurgical?: boolean;
+  @ApiPropertyOptional({ description: 'Por omisión, sí.' }) @IsOptional() @IsBoolean() visitorsAllowed?: boolean;
+  @ApiPropertyOptional({ minimum: 0, maximum: 4, description: 'Acompañantes permitidos; 0 si no se permiten visitas.' }) @IsOptional() @IsInt() @Min(0) @Max(4) visitorsMax?: number;
+  @ApiPropertyOptional({ format: 'uuid', description: 'Cama elegida: se asigna en el mismo comando (ingreso inmediato).' }) @IsOptional() @IsUUID() bedId?: string;
+  @ApiPropertyOptional({ minimum: 1 }) @IsOptional() @IsInt() @Min(1) bedVersion?: number;
 }
 export class BedAssignmentDto { @ApiProperty({ format: 'uuid' }) @IsUUID() bedId!: string; @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; @Text(10, 500, true) reason?: string; }
 export class BedSuggestionQuery { @ApiPropertyOptional({ enum: ['vip', 'semiprivada'] }) @IsOptional() @IsIn(['vip', 'semiprivada']) category?: string; }

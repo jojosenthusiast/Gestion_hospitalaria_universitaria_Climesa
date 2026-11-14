@@ -11,7 +11,7 @@ describe('Fase 0 · diagnóstico principal y asignación de camas (DAT-01, DAT-0
   afterAll(async () => { await t?.close(); });
 
   const admission = async (patientId: string, isolation = false, requestedCategory = 'semiprivada') => {
-    const created = await t.call('REC', 'POST', '/admisiones', { patientId, origin: 'emergencia', originId: randomUUID(), requestedCategory, isolation, attendingDoctorId: await t.staffOf('MED') });
+    const created = await t.call('REC', 'POST', '/admisiones', await t.admissionBody(patientId, { requestedCategory, isolation }));
     expect(created.status).toBe(201);
     return created.body.id as string;
   };

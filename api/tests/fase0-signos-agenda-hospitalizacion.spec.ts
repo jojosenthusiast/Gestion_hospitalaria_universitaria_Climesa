@@ -13,7 +13,7 @@ describe('Fase 0 · signos, franjas, salida, traslado, eventos y cancelación (F
   afterAll(async () => { await t?.close(); });
 
   const hospitalize = async (code: string, sex = 'femenino') => {
-    const created = await t.call('REC', 'POST', '/admisiones', { patientId: await t.patient({ sex }), origin: 'emergencia', originId: randomUUID(), requestedCategory: 'semiprivada', isolation: false, attendingDoctorId: await t.staffOf('MED') });
+    const created = await t.call('REC', 'POST', '/admisiones', await t.admissionBody(await t.patient({ sex }), { requestedCategory: 'semiprivada', isolation: false }));
     expect(created.status).toBe(201);
     const bed = await t.one<{ id: string; version: number }>('SELECT id,version FROM infra.espacio WHERE codigo=$1', [code]);
     const assigned = await t.call('REC', 'POST', `/admisiones/${created.body.id}/cama`, { bedId: bed.id, version: bed.version });

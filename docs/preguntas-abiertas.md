@@ -235,3 +235,15 @@ Cambios de producto autorizados por el dueño (prueba manual del 14-nov). Tocan 
 | Entrada con lote nuevo | ¿Se crea el lote antes de la entrada? | No es necesario: la entrada acepta `articleId` + `lotNumber` (+ `expiresAt`) y crea el lote si no existe; si existe con otro vencimiento responde 409. También se puede crear el lote aparte (JOP/ADM). |
 | Bajas | ¿Se borra un artículo o un lote? | Un artículo sin lotes ni historial se elimina; con historial solo se desactiva. Un lote nunca se borra: se da de baja y solo sin existencia (primero merma). La baja de bodegas es de Espacios (`infra.espacio`), no de Inventario. |
 | Consumo con paciente (Android) | ¿El consumo en Android debe ligar paciente? | Sigue sin ligar (como antes); la web ya ofrece el selector de pacientes para quien tiene `pacientes.buscar`. |
+## Ronda 2 · Hospitalización (rama `feat/r2-hospitalizacion`; observación 11)
+
+Cambios de producto autorizados por el dueño. Supuestos aplicados mientras se confirman:
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| Origen | ¿Qué pasa con el origen `programada`? | Ya no se acepta en ingresos nuevos: todo ingreso enlaza una cita, consulta, ticket de emergencia o servicio de ambulancia del mismo paciente. Las filas anteriores se conservan (`legado`) |
+| Motivo | ¿Cuánto debe medir el motivo? | De 10 a 500 caracteres, obligatorio en la API y en la base para filas nuevas |
+| Visitas | El edificio no modela asientos de acompañantes | Límite por categoría: semiprivada 1 acompañante (habitación compartida) y VIP hasta 3; sin visitas es 0. Sin tope por capacidad de habitación porque `capacidad` cuenta camas |
+| Cama a futuro | La ocupación se evalúa al instante, no por fecha | Un ingreso con fecha a más de 15 minutos queda `pendiente_cama` y la cama se asigna al llegar; solo el ingreso inmediato elige cama en el mismo comando |
+| Turno del médico | ¿Cuenta el turno `borrador`? | No: solo `publicado` o `en_curso` que cubra el instante del ingreso (el mismo criterio que `currentAreas`) |
+| Indicaciones | `POST /admisiones/indicaciones` | Hereda las mismas reglas de motivo y origen (siempre `consulta`); no exige turno porque lo firma el propio médico |

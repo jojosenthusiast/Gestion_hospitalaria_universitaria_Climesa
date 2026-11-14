@@ -16,10 +16,10 @@ insert into pacientes.paciente (id, expediente, nombres, primer_apellido, sexo, 
 values ('00000000-0000-0000-0000-0000000000a1', 'EXP-T1', 'Ana', 'Prueba', 'femenino', 'exacta', '1990-01-01'),
        ('00000000-0000-0000-0000-0000000000a2', 'EXP-T2', 'Berta', 'Prueba', 'femenino', 'exacta', '1985-01-01'),
        ('00000000-0000-0000-0000-0000000000a3', 'EXP-T3', 'Carlos', 'Prueba', 'masculino', 'exacta', '1980-01-01');
-insert into hospitalizacion.admision (id, paciente_id, origen, origen_id, categoria_pedida, sexo_paciente, medico_tratante_id)
-values ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000a1', 'emergencia', gen_random_uuid(), 'semiprivada', 'femenino', gen_random_uuid()),
-       ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a2', 'emergencia', gen_random_uuid(), 'semiprivada', 'femenino', gen_random_uuid()),
-       ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000a3', 'emergencia', gen_random_uuid(), 'vip', 'masculino', gen_random_uuid());
+insert into hospitalizacion.admision (id, paciente_id, origen, origen_id, categoria_pedida, sexo_paciente, medico_tratante_id, motivo)
+values ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000a1', 'emergencia', gen_random_uuid(), 'semiprivada', 'femenino', gen_random_uuid(), 'Ingreso de prueba'),
+       ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a2', 'emergencia', gen_random_uuid(), 'semiprivada', 'femenino', gen_random_uuid(), 'Ingreso de prueba'),
+       ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000a3', 'emergencia', gen_random_uuid(), 'vip', 'masculino', gen_random_uuid(), 'Ingreso de prueba');
 
 -- 1. Cama exclusiva (RN-02)
 insert into hospitalizacion.ocupacion_cama (admision_id, cama_id, habitacion_id, categoria, periodo)
@@ -48,8 +48,8 @@ from infra.espacio c where c.codigo = 'VIP-303-A';
 select pg_temp.espera_error($$insert into hospitalizacion.traslado (admision_id, ocupacion_origen_id, ocupacion_destino_id, motivo, realizado_por)
   values ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-0000000000c4', 'prueba', gen_random_uuid())$$, 'vip_no_se_traslada');
 -- 6. Admisión activa única (RN-10)
-select pg_temp.espera_error($$insert into hospitalizacion.admision (paciente_id, origen, origen_id, categoria_pedida, sexo_paciente, medico_tratante_id)
-  values ('00000000-0000-0000-0000-0000000000a1', 'consulta', gen_random_uuid(), 'vip', 'femenino', gen_random_uuid())$$, '23505');
+select pg_temp.espera_error($$insert into hospitalizacion.admision (paciente_id, origen, origen_id, categoria_pedida, sexo_paciente, medico_tratante_id, motivo)
+  values ('00000000-0000-0000-0000-0000000000a1', 'consulta', gen_random_uuid(), 'vip', 'femenino', gen_random_uuid(), 'Ingreso de prueba')$$, '23505');
 
 -- 7. DUI exclusivo
 insert into pacientes.identificador (paciente_id, tipo, emisor, valor_original, valor_normalizado, exclusivo)

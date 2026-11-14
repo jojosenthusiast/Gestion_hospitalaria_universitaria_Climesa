@@ -117,7 +117,7 @@ describe('Fase 0 · módulos clínicos (API-01, REQ-08)', () => {
 
   describe('asignación de camas (REQ-08, RN-05)', () => {
     const admit = async (options: { sex?: string; isolation?: boolean; category?: string } = {}) => {
-      const created = await t.call('REC', 'POST', '/admisiones', { patientId: await t.patient({ sex: options.sex ?? 'femenino' }), origin: 'emergencia', originId: randomUUID(), requestedCategory: options.category ?? 'semiprivada', isolation: options.isolation ?? false, attendingDoctorId: await t.staffOf('MED') });
+      const created = await t.call('REC', 'POST', '/admisiones', await t.admissionBody(await t.patient({ sex: options.sex ?? 'femenino' }), { requestedCategory: options.category ?? 'semiprivada', isolation: options.isolation ?? false }));
       expect(created.status).toBe(201);
       return created.body.id as string;
     };
