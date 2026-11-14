@@ -827,7 +827,7 @@ end $$;
 -- 11. Inventario: artículos, lotes (uno vencido), existencias (varias bajo el mínimo) y movimientos
 -- ---------------------------------------------------------------------------------------------------------
 create temp table idemo (n int primary key, cod text, nombre text, tipo text, unidad text, minimo numeric, lote text, vence date,
-  bodega text, entrada numeric, salida numeric, tipo_salida text, traslado numeric, ajuste numeric) on commit drop;
+  bodega text, entrada numeric, salida numeric, tipo_salida text, traslado numeric, ajuste numeric, merma numeric default 0) on commit drop;
 insert into idemo values
   (1,  'DEMO-PAR500', 'Paracetamol 500 mg tabletas',        'insumo',       'tableta', 200, 'DL-26-A', date '2027-08-31', 'BOD-CEN', 400, 280, 'consumo', 0, 0),
   (2,  'DEMO-AMOX',   'Amoxicilina 500 mg cápsulas',        'insumo',       'cápsula', 150, 'DL-26-A', date '2027-05-31', 'BOD-CEN', 800, 150, 'salida',  100, 0),
@@ -839,7 +839,16 @@ insert into idemo values
   (8,  'DEMO-CREA',   'Reactivo de creatinina',             'reactivo',     'kit',       4, 'DL-26-A', date '2027-04-30', 'BOD-LAB', 6,   4,   'consumo', 0, 0),
   (9,  'DEMO-HEMCTL', 'Control de hematología',             'reactivo',     'frasco',    3, 'DL-26-A', date '2027-01-31', 'BOD-LAB', 10,  2,   'consumo', 0, 0),
   (10, 'DEMO-TIRAS',  'Tiras reactivas de glucosa',         'reactivo',     'caja',     10, 'DL-26-A', date '2027-06-30', 'BOD-LAB', 12,  8,   'consumo', 0, 1),
-  (11, 'DEMO-VENDA',  'Venda elástica 10 cm',               'insumo',       'unidad',   40, 'DL-26-A', null,              'BOD-CEN', 90,  35,  'salida',  0, 0);
+  (11, 'DEMO-VENDA',  'Venda elástica 10 cm',               'insumo',       'unidad',   40, 'DL-26-A', null,              'BOD-CEN', 90,  35,  'salida',  0, 0),
+  -- Estados de la lista: segundo lote que vence pronto (FEFO), agotado, por vencer, artículo retirado y merma.
+  (12, 'DEMO-SUERO',  'Suero oral en sobres',               'insumo',       'sobre',    80, 'DL-26-B', current_date + 12, 'BOD-CEN', 60,  0,   'salida',  0, 0),
+  (13, 'DEMO-GUANTE', 'Guantes de examen',                  'insumo',       'caja',     20, 'DL-26-A', date '2027-10-31', 'BOD-CEN', 80,  20,  'consumo', 10, 0),
+  (14, 'DEMO-JER5',   'Jeringa de 5 ml',                    'insumo',       'unidad',  100, 'DL-26-A', date '2028-03-31', 'BOD-URG', 150, 150, 'consumo', 0, 0),
+  (15, 'DEMO-GLUCO',  'Solución de control de glucosa',     'reactivo',     'frasco',    3, 'DL-26-A', current_date + 20, 'BOD-LAB', 8,   2,   'consumo', 0, 0),
+  (16, 'DEMO-ALCOHOL','Alcohol en gel',                     'insumo',       'frasco',   30, 'DL-26-A', date '2027-06-30', 'BOD-CEN', 100, 40,  'salida',  20, 0),
+  (17, 'DEMO-TERMOM', 'Termómetro de mercurio (retirado)',  'equipo_menor', 'unidad',    0, 'DL-20',   null,              'BOD-URG', 5,   5,   'salida',  0, 0);
+-- La merma se registra aparte para no cambiar las columnas de las filas anteriores.
+update idemo set merma = 10 where n in (7, 11);
 
 insert into inventario.articulo (id, codigo, nombre, tipo, unidad, minimo)
 select distinct on (i.cod) pg_temp.did('0080', i.n), i.cod, i.nombre, i.tipo, i.unidad, i.minimo from idemo i order by i.cod, i.n
@@ -848,9 +857,11 @@ on conflict do nothing;
 insert into inventario.lote (id, articulo_id, numero, vence)
 select pg_temp.did('0081', i.n), a.id, i.lote, i.vence from idemo i join inventario.articulo a on a.codigo = i.cod
 on conflict do nothing;
+-- Un artículo retirado del catálogo: no se mueve y sale como «Inactivo» en la lista.
+update inventario.articulo set activo = false where codigo = 'DEMO-TERMOM';
 
 insert into inventario.existencia (lote_id, bodega_id, cantidad)
-select pg_temp.did('0081', i.n), pg_temp.espacio(i.bodega), i.entrada - i.salida - i.traslado - i.ajuste from idemo i
+select pg_temp.did('0081', i.n), pg_temp.espacio(i.bodega), i.entrada - i.salida - i.traslado - i.ajuste - i.merma from idemo i
 join inventario.lote l on l.id = pg_temp.did('0081', i.n)
 on conflict do nothing;
 insert into inventario.existencia (lote_id, bodega_id, cantidad)
@@ -870,7 +881,8 @@ cross join lateral (values
   (1, 'entrada', i.entrada, '[DEMO] Entrada inicial del lote: así se ve una compra recibida en la bodega', interval '20 days'),
   (2, i.tipo_salida, i.salida, case i.tipo_salida when 'consumo' then '[DEMO] Consumo con paciente: queda ligado a su expediente' else '[DEMO] Salida de la bodega para el servicio' end, interval '5 days'),
   (3, 'traslado', i.traslado, '[DEMO] Traslado entre bodegas: baja en una y sube en la otra', interval '3 days'),
-  (4, 'ajuste', i.ajuste, '[DEMO] Ajuste por conteo físico: resta lo que faltaba en el estante', interval '1 day')
+  (4, 'ajuste', i.ajuste, '[DEMO] Ajuste por conteo físico: resta lo que faltaba en el estante', interval '1 day'),
+  (5, 'merma', i.merma, '[DEMO] Merma: unidades dadas de baja por vencimiento o daño', interval '2 days')
 ) m(k, tipo, cant, motivo, hace)
 where m.cant > 0
 on conflict do nothing;

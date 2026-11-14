@@ -8439,7 +8439,7 @@
             "bearer": []
           }
         ],
-        "summary": "Registrar entrada, salida, ajuste, traslado o consumo",
+        "summary": "Registrar entrada, salida, ajuste, traslado, consumo o merma",
         "tags": [
           "inventory"
         ],
@@ -8447,6 +8447,75 @@
       }
     },
     "/api/v1/inventario/articulos": {
+      "get": {
+        "operationId": "InventoryController_articles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ArticleSummaryResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Artículos con resumen de existencia y estado, según lo que el rol puede ver",
+        "tags": [
+          "inventory"
+        ],
+        "x-permiso": "inventario.ver"
+      },
       "post": {
         "operationId": "InventoryController_create",
         "parameters": [
@@ -8548,6 +8617,91 @@
       }
     },
     "/api/v1/inventario/articulos/{id}": {
+      "get": {
+        "operationId": "InventoryController_article",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle del artículo: lotes con vencimiento, existencia por bodega e historial",
+        "tags": [
+          "inventory"
+        ],
+        "x-permiso": "inventario.ver"
+      },
       "put": {
         "operationId": "InventoryController_edit",
         "parameters": [
@@ -8660,6 +8814,520 @@
           }
         ],
         "summary": "Editar artículo de inventario",
+        "tags": [
+          "inventory"
+        ],
+        "x-permiso": "inventario.configurar"
+      },
+      "delete": {
+        "operationId": "InventoryController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDeletedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar un artículo creado por error; con lotes o historial solo se desactiva",
+        "tags": [
+          "inventory"
+        ],
+        "x-permiso": "inventario.configurar"
+      }
+    },
+    "/api/v1/inventario/bodegas": {
+      "get": {
+        "operationId": "InventoryController_warehouses",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WarehouseResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bodegas donde el rol puede mover existencias",
+        "tags": [
+          "inventory"
+        ],
+        "x-permiso": "inventario.ver"
+      }
+    },
+    "/api/v1/inventario/lotes": {
+      "get": {
+        "operationId": "InventoryController_lots",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "includeExpired",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailableLotResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lotes de un artículo con su cantidad en una bodega, el que vence primero marcado (FEFO)",
+        "tags": [
+          "inventory"
+        ],
+        "x-permiso": "inventario.ver"
+      }
+    },
+    "/api/v1/inventario/articulos/{id}/lotes": {
+      "post": {
+        "operationId": "InventoryController_createLot",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotCreatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear lote de un artículo",
+        "tags": [
+          "inventory"
+        ],
+        "x-permiso": "inventario.configurar"
+      }
+    },
+    "/api/v1/inventario/lotes/{id}": {
+      "put": {
+        "operationId": "InventoryController_editLot",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotCreatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar vencimiento, número o baja de un lote",
         "tags": [
           "inventory"
         ],
@@ -16633,7 +17301,8 @@
           "salida",
           "ajuste",
           "traslado",
-          "consumo"
+          "consumo",
+          "merma"
         ]
       },
       "MovementResponse": {
@@ -16710,6 +17379,402 @@
           "lotNumber"
         ]
       },
+      "EstadoStock": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "bajo_minimo",
+          "agotado",
+          "por_vencer",
+          "inactivo"
+        ]
+      },
+      "ArticleSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoArticulo"
+              }
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "minimum": {
+            "type": "number"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "available": {
+            "type": "number",
+            "description": "Existencia usable: sin lotes vencidos ni dados de baja"
+          },
+          "expired": {
+            "type": "number"
+          },
+          "expiringSoon": {
+            "type": "number",
+            "description": "Existencia que vence en los próximos 30 días"
+          },
+          "nextExpiry": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd",
+            "nullable": true
+          },
+          "lots": {
+            "type": "integer"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoStock"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "type",
+          "unit",
+          "minimum",
+          "active",
+          "version",
+          "available",
+          "expired",
+          "expiringSoon",
+          "nextExpiry",
+          "lots",
+          "status"
+        ]
+      },
+      "LotStockResponse": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouseCode": {
+            "type": "string"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "warehouseCode",
+          "warehouseName",
+          "quantity"
+        ]
+      },
+      "LotResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "total": {
+            "type": "number"
+          },
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotStockResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "expiresAt",
+          "active",
+          "version",
+          "expired",
+          "total",
+          "warehouses"
+        ]
+      },
+      "WarehouseStockResponse": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouseCode": {
+            "type": "string"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "warehouseCode",
+          "warehouseName",
+          "quantity"
+        ]
+      },
+      "ArticleMovementResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoMovimiento"
+              }
+            ]
+          },
+          "lotNumber": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Negativo en un ajuste que resta"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "originWarehouseCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "destinationWarehouseCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "authorName": {
+            "type": "string"
+          },
+          "registeredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "lotNumber",
+          "quantity",
+          "reason",
+          "originWarehouseCode",
+          "destinationWarehouseCode",
+          "authorName",
+          "registeredAt"
+        ]
+      },
+      "ArticleDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoArticulo"
+              }
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "minimum": {
+            "type": "number"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "available": {
+            "type": "number",
+            "description": "Existencia usable: sin lotes vencidos ni dados de baja"
+          },
+          "expired": {
+            "type": "number"
+          },
+          "expiringSoon": {
+            "type": "number",
+            "description": "Existencia que vence en los próximos 30 días"
+          },
+          "nextExpiry": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd",
+            "nullable": true
+          },
+          "lots": {
+            "type": "integer"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoStock"
+              }
+            ]
+          },
+          "lotList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotResponse"
+            }
+          },
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WarehouseStockResponse"
+            }
+          },
+          "movements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArticleMovementResponse"
+            }
+          },
+          "allowedMovements": {
+            "description": "Tipos de movimiento que el rol puede registrar sobre este artículo, según el contexto de inventario.mover",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "type",
+          "unit",
+          "minimum",
+          "active",
+          "version",
+          "available",
+          "expired",
+          "expiringSoon",
+          "nextExpiry",
+          "lots",
+          "status",
+          "lotList",
+          "warehouses",
+          "movements",
+          "allowedMovements"
+        ]
+      },
+      "WarehouseResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "AvailableLotResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd",
+            "nullable": true
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Cantidad del lote en la bodega consultada"
+          },
+          "fefo": {
+            "type": "boolean",
+            "description": "Verdadero en el lote que se debe usar primero (vence antes)"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "expiresAt",
+          "expired",
+          "quantity",
+          "fefo"
+        ]
+      },
       "MovementDto": {
         "type": "object",
         "properties": {
@@ -16720,12 +17785,27 @@
               "salida",
               "ajuste",
               "traslado",
-              "consumo"
+              "consumo",
+              "merma"
             ]
           },
           "lotId": {
             "type": "string",
+            "format": "uuid",
+            "description": "Lote existente; una entrada puede traer en su lugar articleId + lotNumber para registrar el lote nuevo"
+          },
+          "articleId": {
+            "type": "string",
             "format": "uuid"
+          },
+          "lotNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date"
           },
           "originWarehouseId": {
             "type": "string",
@@ -16751,7 +17831,6 @@
         },
         "required": [
           "type",
-          "lotId",
           "quantity",
           "reason"
         ]
@@ -16885,6 +17964,82 @@
           "unidad",
           "minimo",
           "activo",
+          "version"
+        ]
+      },
+      "ArticleDeletedResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "deleted"
+        ]
+      },
+      "LotDto": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date",
+            "description": "Vencimiento yyyy-MM-dd; sin fecha para lotes que no vencen"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "number"
+        ]
+      },
+      "LotCreatedResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "expiresAt",
+          "active",
           "version"
         ]
       },
