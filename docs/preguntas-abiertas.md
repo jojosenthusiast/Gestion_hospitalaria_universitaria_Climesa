@@ -34,6 +34,23 @@ Decisiones conservadoras tomadas mientras se confirman:
 | API-07 | ¿Las solicitudes creadas antes de alinear las franjas (inicios como 10:07:33) se pueden confirmar? | Sí: la alineación de 20 minutos se exige al crear o solicitar; al confirmar solo se exige que la jornada publicada cubra la cita y que no haya traslape |
 | SEG-02 | ¿Cómo se audita la lectura del catálogo de agenda (hasta 500 pacientes) sin inflar la auditoría? | El detalle se guarda una sola vez: el evento firmado lleva solo su SHA-256 (`detailHash`) y no una segunda copia. El catálogo conserva los identificadores (más `patientCount`) porque `privacidad.md` §3.9 da al paciente el derecho a ver quién consultó sus datos; un conteo con hash no lo permitiría. Las filas anteriores, con el detalle dentro del evento, se siguen verificando |
 
+## Privacidad (110) e inventario (111), noviembre 2026
+
+Decisiones conservadoras tomadas mientras se confirman:
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| 110 · `GET /accesos-excepcionales` | La fila de `endpoints.csv` pide `privacidad.aprobar_acceso` y su contexto dice "Solicitante ve los suyos". ¿Cómo entra el solicitante, que no tiene ese permiso? | El `x-permiso` sigue siendo `privacidad.aprobar_acceso` (como el catálogo); la guarda también admite `privacidad.solicitar_acceso` y el servicio le devuelve solo sus solicitudes |
+| 110 · escenario 2 | El Jefe de Operaciones con acceso aprobado debería ver el historial, pero `GET /pacientes/{id}/historial` no existe todavía y `GET /consultas/{id}/detalle` exige `expediente.ver` o `consulta.iniciar`, que JOP y ADM no tienen | El acceso excepcional vigente solo amplía la lectura de quien ya pasa la guarda (médico no tratante); abrirla a JOP y ADM requiere cambiar `endpoints.csv` |
+| 110 · romper el vidrio (FR-110-09) | ¿Quién es "médico de emergencia"? ¿Se exige turno en curso en el área de emergencia? | Lo puede abrir el personal con `expediente.ver` en contexto `relacion` (MED); no se comprueba el área del turno. Queda aprobado al instante, por revisar, y el delegado lo confirma o lo cierra con "negar" |
+| 110 · duración aprobada | ¿El delegado puede aprobar menos horas que las pedidas? | Sí (escenario 2 "aprueba por 2 h"), nunca más que lo pedido ni que la política `privacidad.acceso_excepcional_max_horas` |
+| 110 · negar | ¿Negar exige motivo? | Sí, de 10 a 500 caracteres (W30 "Negar con motivo"); queda en la auditoría |
+| 110 · W31 para ADM | ADM no tiene `pacientes.buscar`. ¿Cómo elige paciente? | Escribe el identificador del paciente; JOP lo busca por nombre, DUI o expediente |
+| 110 · "Quién vio mi expediente" | ¿Qué cuenta como acceso y qué motivo se muestra? | Toda operación exitosa de otra cuenta sobre el paciente, salvo la gestión del acceso excepcional y los rechazos; el motivo es "atención" o "acceso excepcional" (nunca el texto libre del personal) |
+| 110 · auditoría en vivo | No hay evento `auditoria.*` en `tiempo-real.md` | W32 se refresca con otros eventos, como antes; no se creó un evento nuevo |
+| 111 · ajuste (API-15) | ¿Cómo resta un ajuste si `movimiento.cantidad` es positiva? | El ajuste admite cantidad negativa en la API; el movimiento guarda la cantidad absoluta con bodega origen (resta) o destino (suma), y el historial la devuelve con signo |
+| 111 · alerta | ¿Quién recibe `inventario.bajo_minimo` sin escribir roles en código? | Los roles con `inventario.mover` salvo el contexto `consumo`, y salvo `reactivos` cuando el artículo no es reactivo (hoy: JOP siempre, LAB en reactivos). Se emite al cruzar el mínimo (también al subir el mínimo), no en cada movimiento posterior |
+
 ## Para producción CLIMESA (registro institucional INS01 a INS12 de P01)
 
 Siguen pendientes y no afectan al curso: habilitación y servicios (INS01, INS02), modalidades (INS03), organigrama (INS04), formatos de identidad y archivo (INS05), procedimientos de admisión y alta (INS06), catálogo y tarifas (INS07), pagadores (INS08), caja (INS09), régimen fiscal (INS10), sistemas actuales (INS11), continuidad (INS12). Detalle en `docs/investigacion/p01/`. El cuestionario y el mapa contable para la contadora están en `docs/climesa/`.

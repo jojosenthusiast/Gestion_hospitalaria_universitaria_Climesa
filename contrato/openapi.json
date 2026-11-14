@@ -1551,27 +1551,6 @@
         "x-permiso": "ambulancia.mantenimiento"
       }
     },
-    "/api/v1/auditoria": {
-      "get": {
-        "operationId": "OperationsController_audit",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Metadatos de auditoría; no contiene valores clínicos",
-        "tags": [
-          "operations"
-        ],
-        "x-permiso": "auditoria.ver"
-      }
-    },
     "/api/v1/eventos": {
       "get": {
         "operationId": "OperationsController_events",
@@ -3766,6 +3745,336 @@
         ],
         "x-permiso": "inventario.configurar"
       }
+    },
+    "/api/v1/accesos-excepcionales": {
+      "post": {
+        "operationId": "PrivacyController_request",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExceptionalAccessRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pedir acceso excepcional con motivo y duración (o de urgencia, pendiente de revisión)",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "privacidad.solicitar_acceso"
+      },
+      "get": {
+        "operationId": "PrivacyController_list",
+        "parameters": [
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pendiente",
+                "aprobado",
+                "negado"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Solicitudes de acceso excepcional; el solicitante ve solo las suyas",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "privacidad.aprobar_acceso"
+      }
+    },
+    "/api/v1/accesos-excepcionales/{id}/aprobar": {
+      "post": {
+        "operationId": "PrivacyController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExceptionalAccessApproveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aprobar un acceso excepcional (nunca el propio) o confirmar uno de urgencia",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "privacidad.aprobar_acceso"
+      }
+    },
+    "/api/v1/accesos-excepcionales/{id}/negar": {
+      "post": {
+        "operationId": "PrivacyController_deny",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExceptionalAccessDenyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Negar un acceso excepcional o cerrar uno de urgencia",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "privacidad.aprobar_acceso"
+      }
+    },
+    "/api/v1/auditoria": {
+      "get": {
+        "operationId": "PrivacyController_audit",
+        "parameters": [
+          {
+            "name": "persona",
+            "required": false,
+            "in": "query",
+            "description": "Id de la cuenta, o parte de su nombre o correo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paciente",
+            "required": false,
+            "in": "query",
+            "description": "Id del paciente o número de expediente",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accion",
+            "required": false,
+            "in": "query",
+            "description": "Acción exacta o prefijo (por ejemplo consulta.)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Metadatos de auditoría por persona, paciente, acción y fecha; no contiene valores clínicos",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "auditoria.ver"
+      }
+    },
+    "/api/v1/auditoria/verificacion": {
+      "post": {
+        "operationId": "PrivacyController_verify",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verificar la integridad de la cadena de hash de la auditoría",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "auditoria.ver"
+      }
+    },
+    "/api/v1/me/accesos": {
+      "get": {
+        "operationId": "PrivacyController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quién vio mi expediente: fecha, rol y motivo, sin nombres del personal",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "auditoria.mis_accesos"
+      }
     }
   },
   "info": {
@@ -5051,7 +5360,7 @@
           },
           "quantity": {
             "type": "number",
-            "minimum": 0
+            "description": "Mayor que cero; solo el ajuste admite negativos para restar (API-15)"
           },
           "reason": {
             "type": "string",
@@ -5118,6 +5427,69 @@
           "type",
           "unit",
           "minimum"
+        ]
+      },
+      "ExceptionalAccessRequestDto": {
+        "type": "object",
+        "properties": {
+          "pacienteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          },
+          "horas": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 24
+          },
+          "urgencia": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "pacienteId",
+          "motivo",
+          "horas"
+        ]
+      },
+      "ExceptionalAccessApproveDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "horas": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 24
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "ExceptionalAccessDenyDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "motivo"
         ]
       }
     }

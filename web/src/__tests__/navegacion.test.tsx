@@ -72,8 +72,8 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); window.l
 
 // FR-120-02 / escenario 1: cada rol con web ve únicamente el menú que sus permisos reales habilitan.
 const menuEsperado: Record<string, string[]> = {
-  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Perfil'],
-  JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
+  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Accesos excepcionales', 'Perfil'],
+  JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Accesos excepcionales', 'Perfil'],
   REC: ['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
   LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil'],
   DPD: ['Inicio', 'Usuarios', 'Auditoría', 'Accesos excepcionales', 'Perfil'],
@@ -145,7 +145,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 const menuCatalogo: Record<string, string[]> = {
   AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
   ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización'],
-  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
+  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio', 'Accesos excepcionales'],
   PAR: ['Pacientes', 'Ambulancia', 'Turnos'],
   PAC: ['Hospitalización', 'Fila del día', 'Citas'],
 };
@@ -173,7 +173,7 @@ describe('el menú depende solo del permiso (regla 8)', () => {
     simular({ ...perfil('ADM', permisos), roles: ['ADM', 'LAB'] });
     render(<App />);
     const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Laboratorio', 'Inventario', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Laboratorio', 'Inventario', 'Accesos excepcionales', 'Perfil']);
     expect(screen.queryByRole('combobox', { name: 'Rol de trabajo' })).toBeNull();
     expect(screen.getByText('Administración · Laboratorio')).toBeTruthy();
   });
@@ -286,11 +286,12 @@ describe('cliente de API generado (FR-120-01)', () => {
 });
 
 describe('sin marcadores de entregas futuras (WEB-03)', () => {
-  it('un módulo sin operaciones no promete una próxima entrega', async () => {
-    await entrar(perfil('DPD'), {}, '#/privacidad');
+  it('Accesos excepcionales ya opera: muestra la bandeja del delegado sin prometer entregas', async () => {
+    await entrar(perfil('DPD'), { '/accesos-excepcionales': () => json([]) }, '#/privacidad');
     expect(await screen.findByRole('heading', { name: /Accesos excepcionales/ })).toBeTruthy();
     expect(screen.queryByText(/Próxima entrega|siguiente entrega/i)).toBeNull();
-    expect(screen.getByText('Este módulo no tiene operaciones habilitadas.')).toBeTruthy();
+    expect(screen.queryByText('Este módulo no tiene operaciones habilitadas.')).toBeNull();
+    expect(await screen.findByText('No hay solicitudes en esta vista')).toBeTruthy();
   });
 });
 

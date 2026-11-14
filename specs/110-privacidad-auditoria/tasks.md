@@ -12,15 +12,18 @@
   - Cubre: FR-110-04, FR-110-05, FR-110-06
   - Depende de: T02
   - Hecho cuando: escenario 2 pasa con el reloj de prueba
-- [ ] T04 · S3 · R · Auditoría consultable y verificación de la cadena (W32)
+  - Avance (15-nov-2026): API `POST/GET /accesos-excepcionales`, `aprobar`, `negar` y migración `20261115004000_acceso_excepcional_invariantes.sql`; `api/tests/privacidad-accesos.spec.ts` cubre el escenario 2 con reloj de prueba para un médico no tratante en `GET /consultas/{id}/detalle`. Sin marcar: T02 no está hecha y el historial de JOP (`GET /pacientes/{id}/historial`) no existe; ver `docs/preguntas-abiertas.md`
+- [x] T04 · S3 · R · Auditoría consultable y verificación de la cadena (W32)
   - Cubre: FR-110-07
   - Depende de: 100-T02, 120-T03
   - Hecho cuando: el delegado detecta un registro alterado desde la web
   - Límite conocido (30-oct-2026): la pantalla web `#/auditoria` ya se sirve con la `version` del canal en vivo, pero ninguna mutación emite un evento de auditoría, así que solo se refresca cuando llega otro evento; ver `docs/arquitectura/tiempo-real.md`, sección Límites conocidos. No se implementaron eventos nuevos.
+  - Verificado: 15-nov-2026 `npm test -- --ci` en api/ (prueba "FR-110-07: el delegado filtra la auditoría y detecta un registro alterado": `GET /auditoria` con filtros persona, paciente, acción y fecha; `POST /auditoria/verificacion` devuelve `integra:false` y `primeraFallida` al alterar una fila) y `npm test` en web/ (`privacidad.test.tsx`: W32 filtra y muestra "La cadena está alterada en el registro 7")
 - [ ] T05 · S4 · R · Pantallas de accesos (W30, W31) y estado "sin permiso" con pedir acceso
   - Cubre: FR-110-04, FR-110-05
   - Depende de: T03
   - Hecho cuando: el flujo completo funciona entre web y móvil
+  - Avance (15-nov-2026): W30 (bandeja del delegado, aprobar y negar con motivo) y W31 (solicitud) en web, `web/src/__tests__/privacidad.test.tsx`. Falta el botón "pedir acceso" en el estado "sin permiso" y la parte móvil
 - [x] T06 · S2 · R · Matriz RBAC y política de campos generadas y verificadas
   - Cubre: FR-110-10
   - Depende de: ninguna
@@ -30,7 +33,9 @@
   - Cubre: FR-110-08
   - Depende de: T02
   - Hecho cuando: escenario 4 pasa en Android e iOS
+  - Avance (15-nov-2026): `GET /me/accesos` (escenario 4 en `api/tests/privacidad-accesos.spec.ts`) y pantalla A11 en Android (`MyAccessScreen`, `MyAccessRulesTest`). Falta I11 en iOS
 - [ ] T08 · S5 · E · Romper el vidrio en emergencia
   - Cubre: FR-110-09
   - Depende de: T03
   - Hecho cuando: el acceso inmediato queda pendiente de revisión del delegado
+  - Avance (15-nov-2026): `urgencia: true` en `POST /accesos-excepcionales` abre el acceso al instante en estado "por revisar" y avisa a `rol:DPD`; probado en `api/tests/privacidad-accesos.spec.ts`. Sin marcar porque T03 depende de T02

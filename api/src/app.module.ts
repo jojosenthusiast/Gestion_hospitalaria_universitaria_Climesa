@@ -12,6 +12,7 @@ import { AttentionModule } from './attention/attention.module';
 import { LaboratoryModule } from './laboratory/laboratory.module';
 import { HospitalizationModule } from './hospitalization/hospitalization.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { PrivacyModule } from './privacy/privacy.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { InventoryModule } from './inventory/inventory.module';
     LaboratoryModule,
     HospitalizationModule,
     InventoryModule,
+    PrivacyModule,
   ],
 })
 export class AppModule {}

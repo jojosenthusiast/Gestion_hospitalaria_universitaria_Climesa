@@ -55,8 +55,7 @@ export class OperationsController {
   @Get('ambulancia') @RequirePermission('ambulancia.ver_estado') @ApiOperation({summary:'Estado de la unidad y servicio activo'})
   ambulanceStatus(){return this.ambulance.status();}
   @Post('ambulancia/mantenimiento') @RequirePermission('ambulancia.mantenimiento') @ApiOperation({summary:'Entrar o salir de mantenimiento; salir exige paramédico con turno en curso'})
-  ambulanceMaintenance(@Req() r:ActorRequest,@Body() d:MaintenanceDto,@Headers('idempotency-key') k?:string){return this.ambulance.setMaintenance(r.actor,d,k);}  @Get('auditoria') @RequirePermission('auditoria.ver') @ApiOperation({summary:'Metadatos de auditoría; no contiene valores clínicos'})
-  audit(){return this.db.query('SELECT a.seq,a.registrado_en AS at,a.actor_rol AS role,u.nombre_mostrar AS actor,a.accion AS action,a.entidad AS entity,a.entidad_id AS "entityId",a.resultado AS result,a.motivo AS reason FROM plataforma.auditoria a LEFT JOIN acceso.usuario u ON u.id=a.actor_id ORDER BY a.seq DESC LIMIT 100');}
+  ambulanceMaintenance(@Req() r:ActorRequest,@Body() d:MaintenanceDto,@Headers('idempotency-key') k?:string){return this.ambulance.setMaintenance(r.actor,d,k);}
   @Get('eventos') @RequirePermission('sesion.perfil') @ApiOperation({summary:'Eventos delgados de canales autorizados para recuperar cambios tras reconexión'})
   async events(@Req() r:ActorRequest,@Query('after') after='0'){
     const cursor=/^\d{1,18}$/.test(after)?after:'0';
