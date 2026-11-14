@@ -130,7 +130,9 @@ describe('Fase 0 · revisión de la remediación (confirmación, firmado, fila, 
   });
 
   test('SEG-02: la auditoría guarda el detalle una sola vez y la cadena sigue verificable', async () => {
-    expect((await t.call('REC', 'GET', '/citas/catalogos')).status).toBe(200);
+    // Recepción ya no recibe pacientes del catálogo (los busca con /pacientes/selector): la lectura auditada es la del propio paciente.
+    await t.patient({ linkPac: true });
+    expect((await t.call('PAC', 'GET', '/citas/catalogos')).status).toBe(200);
     const row = (await t.pg.query<{ detalle: any }>("SELECT detalle FROM plataforma.auditoria WHERE accion='citas.catalogo_leer' ORDER BY seq DESC LIMIT 1")).rows[0];
     const event = JSON.parse(row.detalle.canonicalEvent);
     expect(event.detail).toBeUndefined();

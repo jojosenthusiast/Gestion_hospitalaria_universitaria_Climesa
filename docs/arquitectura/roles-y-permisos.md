@@ -141,6 +141,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | GET | `/api/v1/pacientes` | `pacientes.buscar` | Devuelve datos mínimos y motivo de coincidencia | R | 2 | · | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
+| GET | `/api/v1/pacientes/selector` | `pacientes.buscar` | Respuesta mínima (id, expediente, nombre, edad), paginada | R | 2 | · | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/pacientes/busquedas` | `pacientes.buscar` | Registra la búsqueda previa que exige el alta | R | 2 | · | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/pacientes` | `pacientes.registrar` | Exige búsqueda previa reciente | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/pacientes/provisionales` | `pacientes.registrar_provisional` |  | R | 4 | · | · | ✔ | · | ✔ | · | · | ✔ | · | · |
@@ -195,7 +196,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/citas/solicitudes/{id}/confirmar` | `citas.agendar` |  | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/citas/solicitudes/{id}/rechazar` | `citas.agendar` | Motivo | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/citas/{id}/cancelar` | `citas.cancelar` | PAC solo propias | R | 3 | · | · | ✔ | · | · | · | · | · | · | propio |
-| GET | `/api/v1/citas/catalogos` | `citas.agendar` o `citas.solicitar` | Pacientes y médicos según relación | R | 3 | · | · | ✔ | · | · | · | · | · | · | propio |
+| GET | `/api/v1/citas/catalogos` | `citas.agendar` o `citas.solicitar` | Médicos activos con turno del día; pacientes solo el propio de PAC (REC busca con /pacientes/selector) | R | 3 | · | · | ✔ | · | · | · | · | · | · | propio |
 | GET | `/api/v1/fila` | `fila.ver` | Filtra según relación | R | 3 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
 | POST | `/api/v1/fila` | `fila.emitir` | Número único por servicio y día | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/fila/{id}/llamar` | `fila.llamar` | Transición válida | R | 3 | · | · | · | ✔ | · | ✔ | · | · | · | · |

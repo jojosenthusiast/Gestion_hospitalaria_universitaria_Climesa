@@ -184,3 +184,15 @@ Cambios autorizados por la persona dueña del producto tras las pruebas manuales
 | 5 y 11 | ¿Cómo se asigna una cama desde el plano? | Con el endpoint existente `POST /admisiones/{id}/cama`, para admisiones en `pendiente_cama` y quien tenga `camas.asignar` y `admision.ver`; las reglas de asignación las valida la API (no se muestran sugerencias en el plano) |
 | 13 | Los pasos "Revisada por médico" y "Visible al paciente" | Se marcan juntos: el paciente ve los valores en el mismo momento en que el médico revisa (D-040). "Muestra tomada" y "En proceso" se distinguen porque el segundo exige al menos un valor capturado |
 | 13 | ¿Se puede completar una orden sin todos los valores? | No (la API ya lo rechaza con 409); la web deshabilita "Completar" y muestra cuántos valores faltan |
+
+## Ronda 1 · Recepción (rama `feat/r1-recepcion`; observaciones 1, 4, 8 y 16)
+
+Cambios de producto autorizados por el dueño (observaciones de la prueba manual del 14-nov). Quedan registrados porque tocan rutas y respuestas fuera del catálogo original.
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| Registro de pacientes | ¿La búsqueda previa debe parecerse a los datos del paciente nuevo? | No. La constancia (10 minutos, misma cuenta) solo prueba que se buscó; se gasta únicamente al registrar. El control de duplicados se hace al crear: mismo DUI responde 409 `dui_duplicado` con el paciente existente; mismo nombre normalizado y misma fecha de nacimiento responde 409 `posible_duplicado` con candidatos, salvo `confirmarNuevo: true` |
+| Selector de pacientes | `GET /pacientes/selector` no está en el catálogo original | Se agregó a `endpoints.csv` (permiso `pacientes.buscar`): `id`, `record`, `fullName` y `age` (solo si el rol ve la fecha de nacimiento), con `limit` máximo 20 y `offset`. Cada consulta queda auditada como una búsqueda más, con espera de 250 ms y mínimo 2 caracteres en los clientes |
+| Catálogo de citas | ¿Qué pasa con `patients` en `GET /citas/catalogos`? | Recepción ya no recibe pacientes (antes 500 filas): los busca con el selector. PAC conserva solo el propio. Con `?date=yyyy-MM-dd` cada médico trae `tieneTurno` y `motivo` |
+| Franjas del día | `GET /citas/disponibilidad` solo devolvía franjas libres | Se conserva `slots` (libres) y se agrega `franjas` con todas: `estado` `libre`, `ocupado`, `sin_turno` o `pasado` y `motivo` corto. Sin turno se devuelve la rejilla estándar 08:00 a 16:00 como `sin_turno` |
+| Datos ficticios de Vinculaciones | La observación 4 pide datos de ejemplo para la cola | No se agregaron semillas aquí: pertenecen al flujo de datos de demostración (observación 7); la pantalla ya explica el vacío |

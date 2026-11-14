@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Registrar paciente -->
+    <string name="rec_registrar_regla">Para evitar duplicados, busca primero si la persona ya existe. La búsqueda vale 10 minutos y, si no aparece, puedes registrarla aunque los datos no se parezcan a lo buscado.</string>
+    <string name="rec_registrar_sin_busqueda">Escribe el nombre, DUI o expediente de la persona (mínimo 2 caracteres) y toca Registrar paciente: buscamos primero y te copiamos lo escrito al formulario.</string>
+    <string name="rec_registrar_formulario_ayuda">Copiamos lo que buscaste. Si editas el formulario, la búsqueda sigue vigente.</string>
+    <string name="rec_duplicado_titulo">Ya existe alguien igual</string>
+    <string name="rec_duplicado_confirmar">Es otra persona: registrar de todos modos</string>
+    <string name="rec_dui_existente">Ese DUI ya tiene expediente: %1$s. Búscalo en la lista en vez de crear otro.</string>
+    <!-- Citas (A32) -->
+    <string name="rec_citas_eyebrow">Recepción / Agenda</string>
+    <string name="rec_citas_titulo">Citas</string>
+    <string name="rec_citas_detalle">Agenda citas para un paciente: búscalo, elige un médico con turno y toca una franja libre de 20 minutos.</string>
+    <string name="rec_citas_agendar">Agendar cita</string>
+    <string name="rec_citas_vacio">No hay citas en el rango actual</string>
+    <string name="rec_citas_vacio_detalle">Las solicitudes de pacientes y las citas que agendes aparecerán aquí.</string>
+    <string name="rec_agendar_paciente">Paciente</string>
+    <string name="rec_agendar_buscar">Nombre, DUI o expediente</string>
+    <string name="rec_agendar_buscar_ayuda">Escribe al menos 2 letras o números. No importan las tildes.</string>
+    <string name="rec_agendar_sin_resultados">No hay pacientes con ese nombre, DUI o expediente.</string>
+    <string name="rec_agendar_mas">Mostrar más resultados</string>
+    <string name="rec_agendar_cambiar">Cambiar</string>
+    <string name="rec_agendar_fecha">Fecha: %1$s</string>
+    <string name="rec_agendar_medico">Médico</string>
+    <string name="rec_agendar_medico_ayuda">Los médicos sin turno ese día aparecen apagados.</string>
+    <string name="rec_agendar_sin_turno">Sin turno</string>
+    <string name="rec_agendar_horario">Horario</string>
+    <string name="rec_agendar_elige_medico">Elige un médico para ver sus horarios del día.</string>
+    <string name="rec_agendar_sin_franjas">Este día no hay franjas para mostrar.</string>
+    <string name="rec_agendar_sin_libres">No quedan franjas libres este día. Prueba con otra fecha.</string>
+    <string name="rec_agendar_motivo">Motivo · opcional</string>
+    <string name="rec_agendar_confirmar">Confirmar cita</string>
+    <string name="rec_leyenda_libre">Libre</string>
+    <string name="rec_leyenda_ocupado">Ocupado</string>
+    <string name="rec_leyenda_sin_turno">Sin turno</string>
+    <string name="rec_leyenda_pasado">Ya pasó</string>
+    <string name="rec_franja_no_disponible">%1$s, no disponible: %2$s</string>
+    <!-- Vinculaciones (A33) -->
+    <string name="rec_vinc_eyebrow">Pacientes / Cuentas</string>
+    <string name="rec_vinc_titulo">Vinculaciones</string>
+    <string name="rec_vinc_que_es">¿Qué es una vinculación?</string>
+    <string name="rec_vinc_explicacion">Un paciente crea su propia cuenta en la app y pide unirla a su expediente médico para ver sus citas, resultados e historial. Antes de darle acceso, compara el DUI y la fecha de nacimiento que declaró con los del expediente.</string>
+    <string name="rec_vinc_paso1">1. Llega la solicitud. Aparece sola en esta lista.</string>
+    <string name="rec_vinc_paso2">2. Compara nombre, DUI y nacimiento con el expediente candidato.</string>
+    <string name="rec_vinc_paso3">3. Aprueba si coinciden; rechaza con un motivo si no.</string>
+    <string name="rec_vinc_vacio">No hay vinculaciones pendientes</string>
+    <string name="rec_vinc_vacio_detalle">Estás al día. Cuando un paciente pida unir su cuenta con su expediente, la solicitud aparecerá aquí sola.</string>
+    <string name="rec_vinc_resumen">%1$d por revisar · %2$d con expediente que coincide</string>
+    <string name="rec_vinc_aprobar">Aprobar</string>
+    <string name="rec_vinc_rechazar">Rechazar con motivo</string>
+    <string name="rec_vinc_buscar_antes">Buscar antes de crear</string>
+    <string name="rec_vinc_declarado">Dio: DUI %1$s · nace %2$s</string>
+    <string name="rec_vinc_candidato">Expediente: %1$s · %2$s</string>
+    <string name="rec_vinc_coincide">Coincide</string>
+    <string name="rec_vinc_revisar">Revisar</string>
+    <string name="rec_vinc_rechazo_titulo">Rechazar vinculación</string>
+    <string name="rec_vinc_rechazo_mensaje">Cuenta: %1$s. El paciente verá este motivo.</string>
+    <string name="rec_vinc_rechazo_motivo">Motivo del rechazo</string>
+</resources>

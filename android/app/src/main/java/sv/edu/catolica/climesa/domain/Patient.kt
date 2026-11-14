@@ -20,6 +20,23 @@ data class AuditEvent(val record: String, val action: String, val reason: String
     val at: String = Instant.now().toString(), val changes: Map<String,String> = emptyMap())
 data class Registry(val patients: List<Patient>, val audit: List<AuditEvent> = emptyList(), val nextSequence: Long = 6, val totalActive: Int? = null, val totalInactive: Int? = null)
 
+/** Datos extra del 409 de registro: `dui_duplicado` (paciente) y `posible_duplicado` (candidatos). */
+object PatientDuplicates {
+    private fun root(body: String?) = runCatching { org.json.JSONObject(body.orEmpty()) }.getOrNull()
+    fun similar(body: String?): List<String> {
+        val root = root(body) ?: return emptyList()
+        if (root.optString("codigo") != "posible_duplicado") return emptyList()
+        val rows = root.optJSONArray("candidatos") ?: return emptyList()
+        return (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }.map { "${it.optString("fullName")} · ${it.optString("record")}" }
+    }
+    fun existing(body: String?): String? {
+        val root = root(body) ?: return null
+        if (root.optString("codigo") != "dui_duplicado") return null
+        val p = root.optJSONObject("paciente") ?: return null
+        return "${p.optString("fullName")} · ${p.optString("record")}"
+    }
+}
+
 object PatientRules {
     fun normalize(s: String): String = Normalizer.normalize(s.lowercase(Locale.ROOT),Normalizer.Form.NFD)
         .replace(Regex("\\p{M}"),"").replace(Regex("[^a-z0-9]+")," ").trim()
@@ -28,6 +45,21 @@ object PatientRules {
         val n=digits(s)
         return n.length==9 && n.take(8).any { it!='0' } &&
             (10 - n.take(8).mapIndexed { i,c -> (c - '0') * (9 - i) }.sum() % 10) % 10 == n.last() - '0'
+    }
+    /**
+     * Rellena el formulario de registro con lo que se buscó, para no volver a escribirlo: un DUI va al campo DUI;
+     * un nombre se reparte entre nombres y apellidos; cualquier otra cosa (expediente, fecha) no se copia.
+     */
+    fun prefill(query: String): PatientDraft {
+        val text = query.trim()
+        if (Regex("[0-9]{8}-?[0-9]").matches(text)) return PatientDraft(dui = formatDui(text))
+        if (text.any { it.isDigit() }) return PatientDraft()
+        val words = text.split(Regex("\\s+")).filter(String::isNotBlank)
+        return when {
+            words.isEmpty() -> PatientDraft()
+            words.size == 1 -> PatientDraft(givenNames = words[0])
+            else -> { val n = if (words.size >= 4) 2 else 1; PatientDraft(givenNames = words.take(n).joinToString(" "), surnames = words.drop(n).joinToString(" ")) }
+        }
     }
     fun formatDui(s: String): String { val n=digits(s);return if(n.length==9) "${n.take(8)}-${n.last()}" else s }
     fun record(sequence: Long): String {

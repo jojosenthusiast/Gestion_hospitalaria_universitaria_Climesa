@@ -18,6 +18,8 @@ import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.AppointmentDoctor
 import sv.edu.catolica.climesa.domain.AppointmentSlot
 import sv.edu.catolica.climesa.domain.AppointmentWorkPeriod
+import sv.edu.catolica.climesa.domain.DaySlot
+import sv.edu.catolica.climesa.domain.ReceptionScheduling
 import sv.edu.catolica.climesa.domain.PatientAppointment
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 import java.time.LocalDate
@@ -31,6 +33,8 @@ data class PatientAppointmentsState(
     val selectedDate: LocalDate = LocalDate.now(ZoneId.of("America/El_Salvador")).plusDays(1),
     val workPeriods: List<AppointmentWorkPeriod> = emptyList(),
     val slots: List<AppointmentSlot> = emptyList(),
+    /** Todas las franjas del día con su estado (libre, ocupado, sin turno, ya pasó). */
+    val daySlots: List<DaySlot> = emptyList(),
     val selectedSlot: AppointmentSlot? = null,
     val saving: Boolean = false,
     val error: String? = null,
@@ -52,7 +56,7 @@ class PatientAppointmentsViewModel @Inject constructor(
             mutable.updateLoading(true)
             try {
                 val appointments = parseAppointments(api.request("/citas"))
-                val doctors = parseDoctors(api.request("/citas/catalogos"))
+                val doctors = parseDoctors(api.request("/citas/catalogos?date=${mutable.value.selectedDate}"))
                 mutable.value = mutable.value.copy(loading = false, appointments = appointments, doctors = doctors, error = null)
                 if (mutable.value.selectedDoctorId.isNotBlank()) loadAvailability()
             } catch (e: CancellationException) {
@@ -70,12 +74,13 @@ class PatientAppointmentsViewModel @Inject constructor(
     }
 
     fun selectDoctor(id: String) {
-        mutable.value = mutable.value.copy(selectedDoctorId = id, selectedSlot = null, workPeriods = emptyList(), slots = emptyList(), error = null)
+        mutable.value = mutable.value.copy(selectedDoctorId = id, selectedSlot = null, workPeriods = emptyList(), slots = emptyList(), daySlots = emptyList(), error = null)
         if (id.isNotBlank()) loadAvailability()
     }
 
     fun selectDate(date: LocalDate) {
-        mutable.value = mutable.value.copy(selectedDate = date, selectedSlot = null, workPeriods = emptyList(), slots = emptyList(), error = null)
+        mutable.value = mutable.value.copy(selectedDate = date, selectedSlot = null, workPeriods = emptyList(), slots = emptyList(), daySlots = emptyList(), error = null)
+        loadDoctors()
         if (mutable.value.selectedDoctorId.isNotBlank()) loadAvailability()
     }
 
@@ -93,7 +98,7 @@ class PatientAppointmentsViewModel @Inject constructor(
                     .put("start", slot.start)
                     .put("end", slot.end)
                     .apply { if (reason.isNotBlank()) put("reason", reason.trim()) })
-                mutable.value = mutable.value.copy(saving = false, selectedSlot = null, slots = emptyList(), notice = "Solicitud enviada. Recepción debe confirmarla.")
+                mutable.value = mutable.value.copy(saving = false, selectedSlot = null, slots = emptyList(), daySlots = emptyList(), notice = "Solicitud enviada. Recepción debe confirmarla.")
                 load()
             } catch (e: CancellationException) {
                 throw e
@@ -126,6 +131,15 @@ class PatientAppointmentsViewModel @Inject constructor(
 
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
 
+    /** Al cambiar de día se vuelve a pedir quién tiene turno ese día. */
+    private fun loadDoctors() {
+        val date = mutable.value.selectedDate
+        viewModelScope.launch {
+            try { mutable.value = mutable.value.copy(doctors = parseDoctors(api.request("/citas/catalogos?date=$date"))) }
+            catch (e: CancellationException) { throw e } catch (_: Exception) { /* la lista anterior sigue válida */ }
+        }
+    }
+
     private fun loadAvailability() {
         val current = mutable.value
         availabilityJob?.cancel()
@@ -139,11 +153,11 @@ class PatientAppointmentsViewModel @Inject constructor(
                 val slots = (0 until (rows?.length() ?: 0)).mapNotNull { i ->
                     rows?.optJSONObject(i)?.let { AppointmentSlot(it.optString("start"), it.optString("end")) }
                 }
-                mutable.value = mutable.value.copy(workPeriods = workPeriods, slots = slots, error = null)
+                mutable.value = mutable.value.copy(workPeriods = workPeriods, slots = slots, daySlots = ReceptionScheduling.daySlots(result), error = null)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                mutable.value = mutable.value.copy(workPeriods = emptyList(), slots = emptyList(), error = message(e))
+                mutable.value = mutable.value.copy(workPeriods = emptyList(), slots = emptyList(), daySlots = emptyList(), error = message(e))
             }
         }
     }
@@ -158,7 +172,8 @@ class PatientAppointmentsViewModel @Inject constructor(
     private fun parseDoctors(value: Any): List<AppointmentDoctor> {
         val doctors = (value as? JSONObject)?.optJSONArray("doctors") ?: return emptyList()
         return (0 until doctors.length()).mapNotNull { i -> doctors.optJSONObject(i)?.let { row ->
-            AppointmentDoctor(row.optString("id"), "${row.optString("givenNames")} ${row.optString("surnames")}".trim(), row.optString("specialty").takeIf(String::isNotBlank))
+            AppointmentDoctor(row.optString("id"), "${row.optString("givenNames")} ${row.optString("surnames")}".trim(), row.optString("specialty").takeIf(String::isNotBlank),
+                hasShift = row.isNull("tieneTurno") || !row.has("tieneTurno") || row.optBoolean("tieneTurno"), reason = row.optString("motivo").takeIf { !row.isNull("motivo") && it.isNotBlank() })
         } }
     }
 

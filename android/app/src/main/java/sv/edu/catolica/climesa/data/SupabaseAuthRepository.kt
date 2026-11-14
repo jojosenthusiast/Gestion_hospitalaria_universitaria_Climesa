@@ -143,4 +143,5 @@ class SupabaseAuthRepository(
     }
 }
 
-class AuthRequestException(message: String, val statusCode: Int? = null, val code: String? = null) : Exception(message)
+/** `body` conserva el problem+json de la API para leer datos extra del error (por ejemplo `candidatos` de `posible_duplicado`). */
+class AuthRequestException(message: String, val statusCode: Int? = null, val code: String? = null, val body: String? = null) : Exception(message)

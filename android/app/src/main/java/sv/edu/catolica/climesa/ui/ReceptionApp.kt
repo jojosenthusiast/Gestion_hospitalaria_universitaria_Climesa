@@ -87,6 +87,8 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
         when {
             state.formOpen -> PatientForm(state,model)
             state.selected!=null -> PatientDetail(state.selected!!,state,model)
+            page==AndroidSection.APPOINTMENTS -> ReceptionAppointmentsScreen(account.profile.channels,"citas.agendar" in account.profile.permissions)
+            page==AndroidSection.LINKING -> ReceptionLinkingScreen(account.profile.channels,"cuentas.verificar" in account.profile.permissions,{selectedName=AndroidSection.PATIENTS.name})
             page==AndroidSection.BEDS -> BedsScreen(account.profile)
             page==AndroidSection.QUEUE -> QueueScreen(account.profile)
             page==AndroidSection.HOSPITAL_INFO -> HospitalInfoScreen()
@@ -130,11 +132,12 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
 }
 @Composable private fun Patients(state:ReceptionState,model:ReceptionViewModel) {
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item { SectionIntro("Recepción / CLIMESA", "Pacientes", "Buscá antes de registrar.") }
+        item { SectionIntro("Recepción / CLIMESA", "Pacientes", stringResource(R.string.rec_registrar_regla)) }
         item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text("Nombre, DUI o expediente")},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,"Limpiar búsqueda")}}) }
         item { Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
             if(PatientAction.SEARCH in state.actions) ClimesaButton(if(state.searching) "Buscando…" else "Buscar",Icons.Default.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)
-            if(PatientAction.REGISTER in state.actions) ClimesaButton("Registrar paciente",Icons.Default.Add,model::newPatient,enabled=state.searchedQuery!=null,outlined=true)
+            if(PatientAction.REGISTER in state.actions) ClimesaButton(if(state.searching) "Buscando…" else "Registrar paciente",Icons.Default.Add,model::newPatient,enabled=!state.searching,outlined=true)
+            if(PatientAction.REGISTER in state.actions && state.searchedQuery==null && PatientRules.normalize(state.query).replace(" ","").length<2) Text(stringResource(R.string.rec_registrar_sin_busqueda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         } }
         item { LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(3) {i->val label=listOf("Activos","Inactivos","Todos")[i];FilterChip(selected=state.filter==i,onClick={model.filter(i)},label={Text(label)})}} }
         item { Text(if(state.searchedQuery==null) "${state.results.size} pacientes" else "${state.results.size} coincidencias",style=MaterialTheme.typography.labelLarge) }
@@ -173,6 +176,13 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text(if(state.editingId==null) "Nuevo paciente" else "Actualizar información",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
         Text("Los campos con * son obligatorios.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        if(state.editingId==null) Text(stringResource(R.string.rec_registrar_formulario_ayuda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
+        state.existing?.let { NoticeBanner(NoticeKind.INFO,stringResource(R.string.rec_dui_existente,it)) }
+        if(state.similar.isNotEmpty()) ClimesaCard { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.rec_duplicado_titulo),style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold)
+            state.similar.forEach { Text(it,style=MaterialTheme.typography.bodyMedium) }
+            ClimesaButton(stringResource(R.string.rec_duplicado_confirmar),Icons.Default.Add,{model.save(true)},enabled=!state.saving,outlined=true)
+        } }
         Text("01 / DATOS PERSONALES",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
         PatientField("Nombres *",d.givenNames,state.fields["givenNames"],enabled=!state.saving) {model.draft(d.copy(givenNames=it.take(80)))}
         PatientField("Apellidos *",d.surnames,state.fields["surnames"],enabled=!state.saving) {model.draft(d.copy(surnames=it.take(100)))}
@@ -182,7 +192,7 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
         Sex.entries.forEach {sex -> Row(verticalAlignment=Alignment.CenterVertically) {RadioButton(selected=d.sex==sex,onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving);TextButton(onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving) {Text(sex.label)}}}
         PatientField("Teléfono · opcional",d.phone,state.fields["phone"],"7000-0000",KeyboardType.Phone,!state.saving) {model.draft(d.copy(phone=it.take(9)))}
         if(state.editingId!=null) OutlinedTextField(state.reason,model::reason,modifier=Modifier.fillMaxWidth(),enabled=!state.saving,label={Text("Motivo de modificación *")},supportingText={Text("Mínimo 10 caracteres. Quedará en el historial.")})
-        Button(onClick=model::save,enabled=!state.saving,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text(if(state.saving) "Guardando…" else "Guardar paciente")}
+        Button(onClick={model.save()},enabled=!state.saving,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text(if(state.saving) "Guardando…" else "Guardar paciente")}
         Text("Revisá posibles duplicados antes de guardar.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
     }
