@@ -10,13 +10,17 @@ export function recordNumber(sequence: string | number): string {
   return `${body}-${check===10?'X':check}`;
 }
 export type Demographics = { givenNames: string; surnames: string; dui?: string | null; birth?: string | null; sex: string; phone?: string | null; email?: string | null; address?: string | null; provisional?: boolean; estimatedAge?: number; description?: string };
+/** Teléfono y correo: las mismas reglas para quien registra y para el propio paciente que edita su contacto. */
+export function validateContact(data: { phone?: string | null; email?: string | null }) {
+  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw new BadRequestException('Revisa el correo electrónico.');
+  if (data.phone && !/^[267]\d{3}-?\d{4}$/.test(data.phone)) throw new BadRequestException('El teléfono debe tener ocho dígitos.');
+}
 export function validateDemographics(data: Demographics, today: Date): Demographics {
   const name = /^[\p{L}\p{M} .’'-]+$/u;
   if (!data.provisional && (!name.test(data.givenNames) || data.givenNames.trim().length<2 || !name.test(data.surnames) || data.surnames.trim().length<2)) throw new BadRequestException('Escribe nombres y apellidos válidos, sin números.');
   if (!['femenino','masculino','indeterminado','no_registrado'].includes(data.sex)) throw new BadRequestException('Selecciona un sexo válido.');
   if (data.dui && (!/^\d{8}-?\d$/.test(data.dui) || !validDui(data.dui))) throw new BadRequestException('El DUI no tiene un dígito verificador válido.');
-  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw new BadRequestException('Revisa el correo electrónico.');
-  if (data.phone && !/^[267]\d{3}-?\d{4}$/.test(data.phone)) throw new BadRequestException('El teléfono debe tener ocho dígitos.');
+  validateContact(data);
   if (data.birth) {
     const parsed = new Date(data.birth+'T12:00:00Z');
     const min = new Date(today); min.setUTCFullYear(min.getUTCFullYear()-120);

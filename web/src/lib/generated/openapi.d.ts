@@ -139,7 +139,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** El paciente edita su teléfono, correo y dirección; versión optimista e historial */
+        patch: operations["MePatientController_update"];
         trace?: never;
     };
     "/api/v1/auth/me": {
@@ -1503,6 +1504,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/publico/hospital": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dirección, teléfono y coordenadas del hospital */
+        get: operations["PublicController_hospital"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/publico/medicos-de-turno": {
         parameters: {
             query?: never;
@@ -1947,6 +1965,12 @@ export interface components {
             id: string;
             version: number;
             state: components["schemas"]["EstadoPaciente"];
+        };
+        PatientSelfUpdateDto: {
+            version: number;
+            phone?: string;
+            email?: string;
+            address?: string;
         };
         SessionUserResponse: {
             /** Format: uuid */
@@ -3444,6 +3468,15 @@ export interface components {
             actualizadoEn: string;
             ocupacion: components["schemas"]["PublicOccupancyRowResponse"][];
         };
+        HospitalLocationResponse: {
+            nombre: string;
+            direccion: string;
+            municipio: string;
+            departamento: string;
+            telefono: string;
+            latitud: number;
+            longitud: number;
+        };
         DoctorOnDutyResponse: {
             nombre: string;
             especialidad: string;
@@ -4683,6 +4716,77 @@ export interface operations {
             };
             /** @description Sin permiso (`sin_permiso`) o regla de acceso */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    MePatientController_update: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientSelfUpdateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdVersionResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10838,6 +10942,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicOccupancyResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PublicController_hospital: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HospitalLocationResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */

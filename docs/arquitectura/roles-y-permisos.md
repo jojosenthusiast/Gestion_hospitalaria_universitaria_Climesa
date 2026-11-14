@@ -51,6 +51,7 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `pacientes.ver_nacimiento` | Ver la fecha de nacimiento exacta (rango de edad si el contexto es rango) | · | · | ✔ | ✔ | ✔ | ✔ | rango de edad | ✔ | · | propio |
 | `pacientes.ver_contacto` | Ver DUI teléfono correo y dirección del paciente | · | · | ✔ | · | · | ✔ | · | · | · | propio |
 | `pacientes.editar_demograficos` | Corregir datos personales con historial | · | · | ✔ | · | · | · | · | · | · | · |
+| `pacientes.editar_propios` | Editar su propio teléfono correo y dirección | · | · | · | · | · | · | · | · | · | propio |
 | `pacientes.gestionar_duplicados` | Revisar casos de posible duplicado | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `expediente.ver` | Ver historial clínico | · | · | · | · | relación | relación | · | · | · | propio revisado |
 | `personal.ver` | Ver personal de salud | ✔ | ✔ | · | · | · | · | · | · | · | · |
@@ -106,7 +107,7 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `ambulancia.reportar_prehospital` | Enviar datos del paciente antes de llegar | · | · | · | · | · | · | · | ✔ | · | · |
 | `ambulancia.recibir_prehospital` | Ver el reporte prehospital | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | `ambulancia.mantenimiento` | Poner y quitar mantenimiento | · | ✔ | · | · | · | · | · | · | · | · |
-| `ambulancia.ver_bitacora` | Ver bitácora filtrable | · | ✔ | ✔ | · | · | · | · | propio | ✔ | · |
+| `ambulancia.ver_bitacora` | Ver bitácora filtrable | · | ✔ | ✔ | · | · | ✔ | · | propio | ✔ | · |
 | `auditoria.ver` | Consultar y verificar auditoría | · | · | · | · | · | · | · | · | ✔ | · |
 | `auditoria.mis_accesos` | Ver quién consultó mi expediente | · | · | · | · | · | · | · | · | · | propio |
 | `inventario.ver` | Ver existencias | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
@@ -150,6 +151,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/pacientes/{id}/estado` | `pacientes.editar_demograficos` | Nunca borra | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/pacientes/casos-duplicado` | `pacientes.gestionar_duplicados` |  | E | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/me/paciente` | `pacientes.ver_ficha` | Propio | R | 2 | · | ✔ | ✔ | área | área | relación | orden | relación | · | propio |
+| PATCH | `/api/v1/me/paciente` | `pacientes.editar_propios` | Propio; solo teléfono correo y dirección; versión optimista | R | 2 | · | · | · | · | · | · | · | · | · | propio |
 
 ### Spec 103
 
@@ -264,7 +266,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.recibir_prehospital` |  | E | 4 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/ambulancia/ubicacion` | `ambulancia.operar` | Solo con servicio activo | E | 5 | · | · | · | · | · | · | · | ✔ | · | · |
 | POST | `/api/v1/ambulancia/mantenimiento` | `ambulancia.mantenimiento` | Solo sin servicio activo | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
-| GET | `/api/v1/ambulancia/bitacora` | `ambulancia.ver_bitacora` | Datos del paciente ocultos sin relación | R | 4 | · | ✔ | ✔ | · | · | · | · | propio | ✔ | · |
+| GET | `/api/v1/ambulancia/bitacora` | `ambulancia.ver_bitacora` | Datos del paciente ocultos sin relación | R | 4 | · | ✔ | ✔ | · | · | ✔ | · | propio | ✔ | · |
 
 ### Spec 110
 
@@ -292,6 +294,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | GET | `/api/v1/publico/ocupacion` | público, sin sesión | Solo agregados | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| GET | `/api/v1/publico/hospital` | público, sin sesión | Dirección teléfono y coordenadas del hospital | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | GET | `/api/v1/publico/medicos-de-turno` | público, sin sesión | Nombre, especialidad, área | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | GET | `/api/v1/publico/avisos` | público, sin sesión |  | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | GET | `/api/v1/publico/fila/{servicio}` | público, sin sesión | Sin nombres | E | 4 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |

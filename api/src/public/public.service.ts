@@ -38,6 +38,16 @@ export class PublicService {
     });
   }
 
+  /** Ubicación del hospital: política vigente `hospital.ubicacion`, lista blanca de campos públicos. */
+  hospital() {
+    return this.cache.get('hospital', async () => {
+      const row = (await this.db.query<{ valor: Record<string, unknown> }>('SELECT valor FROM plataforma.politica WHERE clave=$1 AND vigencia @> $2::timestamptz', ['hospital.ubicacion', this.clock.now()]))[0];
+      if (!row) throw new ProblemException('politica_no_vigente', 409, 'Falta la política vigente hospital.ubicacion.');
+      const v = row.valor;
+      return { nombre: String(v.nombre), direccion: String(v.direccion), municipio: String(v.municipio), departamento: String(v.departamento), telefono: String(v.telefono), latitud: Number(v.latitud), longitud: Number(v.longitud) };
+    });
+  }
+
   /** FR-112-02, RN-17: médicos con turno en curso, solo nombre, especialidad y área. */
   doctorsOnDuty() {
     return this.cache.get('medicos', async () => {

@@ -20,6 +20,7 @@ SALIDA_PANTALLAS = RAIZ / "docs" / "diseno" / "inventario-pantallas.md"
 SALIDA_SQL = RAIZ / "supabase" / "migrations" / "20261017000210_acceso_semilla.sql"
 SALIDA_CONTEXTOS = RAIZ / "supabase" / "migrations" / "20261029000100_acceso_contextos_ficha.sql"
 SALIDA_ATRIBUTOS = RAIZ / "supabase" / "migrations" / "20261030000100_permisos_atributos.sql"
+SALIDA_RONDA3 = RAIZ / "supabase" / "migrations" / "20261118007000_permisos_ronda3.sql"
 
 # Permisos que se agregaron al catálogo después de aplicada la semilla (regla 10 de AGENTS.md: la semilla no se edita). La semilla
 # no los emite; la migración de SALIDA_ATRIBUTOS los inserta. Son permisos de atributo: deciden qué campos o filas ve quien ya
@@ -30,6 +31,11 @@ PERMISOS_POSTERIORES = [
     "personal.ver_datos_personales",
     "turnos.ver_borradores",
 ]
+
+# Ronda 3 (permisos que exige el PDF del curso): permisos nuevos y asignaciones nuevas de permisos que ya existían. La semilla aplicada
+# no los emite (regla 10 de AGENTS.md); los inserta la migración de SALIDA_RONDA3, con el contexto que diga permisos.csv.
+PERMISOS_RONDA3 = ["pacientes.editar_propios"]
+ADICIONES_ROL = [("MED", "ambulancia.ver_bitacora")]
 
 # Permisos que se retiraron del catálogo (observación 12: módulo de acceso excepcional) después de aplicada la semilla. Ya no están en
 # permisos.csv ni en los documentos RBAC, pero la semilla (aplicada, regla 10 de AGENTS.md) los sigue emitiendo tal como estaban, en su
@@ -293,7 +299,7 @@ def generar_sql(roles, permisos):
         descripcion = DESCRIPCIONES_ROL_SEMILLA.get(r["codigo"], r["descripcion"])
         filas.append(f"  ({sql_txt(r['codigo'])}, {sql_txt(r['nombre'])}, {plats}, {sql_txt(descripcion)})")
     l.append(",\n".join(filas) + ";")
-    permisos = [p for p in permisos if p["permiso"] not in PERMISOS_POSTERIORES]
+    permisos = [p for p in permisos if p["permiso"] not in PERMISOS_POSTERIORES and p["permiso"] not in PERMISOS_RONDA3]
     # La semilla histórica sigue incluyendo los permisos retirados, en su posición original.
     con_retirados = []
     for p in permisos:
@@ -309,7 +315,7 @@ def generar_sql(roles, permisos):
     filas = []
     for p in permisos:
         for c in codigos:
-            if p[c]:
+            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL:
                 filas.append(f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(historico.get((c, p['permiso']), p[c]))})")
     l.append(",\n".join(filas) + ";")
     return "\n".join(l) + "\n"
@@ -350,6 +356,37 @@ def generar_sql_atributos(roles, permisos):
     return "\n".join(l) + "\n"
 
 
+def generar_sql_ronda3(roles, permisos):
+    codigos = [r["codigo"] for r in roles]
+    por_nombre = {p["permiso"]: p for p in permisos}
+    nuevos = [por_nombre[c] for c in PERMISOS_RONDA3]
+    sep = ",\n"
+    l = [
+        "-- Generado por tools/generar_docs.py desde PERMISOS_RONDA3, ADICIONES_ROL y permisos.csv. No editar a mano.",
+        "-- Ronda 3: permisos que exige el PDF del curso (paciente edita su contacto; médico consulta la bitácora de ambulancia).",
+        "-- Idempotente: no duplica permisos ni asignaciones que ya existan.",
+        "--",
+        "-- Pre-comprobación en producción (ninguna fila debe existir todavía):",
+        "--   select codigo from acceso.permiso where codigo = 'pacientes.editar_propios';",
+        "--   select rol_codigo, permiso_codigo from acceso.rol_permiso where rol_codigo = 'MED' and permiso_codigo = 'ambulancia.ver_bitacora';",
+        "--",
+        "-- Reversa:",
+        "--   delete from acceso.rol_permiso where permiso_codigo = 'pacientes.editar_propios' or (rol_codigo = 'MED' and permiso_codigo = 'ambulancia.ver_bitacora');",
+        "--   delete from acceso.permiso where codigo = 'pacientes.editar_propios';",
+        "",
+        "insert into acceso.permiso (codigo, descripcion) values",
+        sep.join(f"  ({sql_txt(p['permiso'])}, {sql_txt(p['descripcion'])})" for p in nuevos),
+        "on conflict (codigo) do nothing;",
+        "",
+        "insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values",
+    ]
+    filas = [f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(p[c])})" for p in nuevos for c in codigos if p[c]]
+    filas += [f"  ({sql_txt(r)}, {sql_txt(perm)}, {sql_txt(por_nombre[perm][r])})" for r, perm in ADICIONES_ROL]
+    l.append(sep.join(filas))
+    l.append("on conflict (rol_codigo, permiso_codigo) do nothing;")
+    return "\n".join(l) + "\n"
+
+
 def verificar_consistencia(permisos, endpoints, pantallas, roles):
     errores = []
     nombres = {p["permiso"] for p in permisos}
@@ -377,6 +414,14 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
     for codigo in PERMISOS_POSTERIORES:
         if codigo not in nombres:
             errores.append(f"PERMISOS_POSTERIORES menciona {codigo}, que no está en permisos.csv")
+    for codigo in PERMISOS_RONDA3:
+        if codigo not in nombres:
+            errores.append(f"PERMISOS_RONDA3 menciona {codigo}, que no está en permisos.csv")
+        if codigo in PERMISOS_POSTERIORES:
+            errores.append(f"PERMISOS_RONDA3: {codigo} también está en PERMISOS_POSTERIORES")
+    for r, perm in ADICIONES_ROL:
+        if not por_permiso.get(perm, {}).get(r):
+            errores.append(f"ADICIONES_ROL dice {r} {perm} y permisos.csv no se lo asigna")
     usados = {parte for e in endpoints for parte in partes_permiso(e["permiso"])}
     for p in permisos:
         if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante" and p["permiso"] not in PERMISOS_POSTERIORES:
@@ -482,6 +527,7 @@ def main():
         SALIDA_SQL: generar_sql(roles, permisos),
         SALIDA_CONTEXTOS: generar_sql_contextos(),
         SALIDA_ATRIBUTOS: generar_sql_atributos(roles, permisos),
+        SALIDA_RONDA3: generar_sql_ronda3(roles, permisos),
     }
     if "--verificar" in sys.argv:
         for ruta, contenido in salidas.items():

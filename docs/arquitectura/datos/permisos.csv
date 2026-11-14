@@ -13,6 +13,7 @@ pacientes.ver_ficha,Ver datos personales del paciente,,x,x,area,area,relacion,or
 pacientes.ver_nacimiento,Ver la fecha de nacimiento exacta (rango de edad si el contexto es rango),,,x,x,x,x,rango,x,,propio
 pacientes.ver_contacto,Ver DUI teléfono correo y dirección del paciente,,,x,,,x,,,,propio
 pacientes.editar_demograficos,Corregir datos personales con historial,,,x,,,,,,,
+pacientes.editar_propios,Editar su propio teléfono correo y dirección,,,,,,,,,,propio
 pacientes.gestionar_duplicados,Revisar casos de posible duplicado,,x,x,,,,,,,
 expediente.ver,Ver historial clínico,,,,,relacion,relacion,,,,propio_revisado
 personal.ver,Ver personal de salud,x,x,,,,,,,,
@@ -68,7 +69,7 @@ ambulancia.operar,Hitos del servicio y ubicación,,,,,,,,x,,
 ambulancia.reportar_prehospital,Enviar datos del paciente antes de llegar,,,,,,,,x,,
 ambulancia.recibir_prehospital,Ver el reporte prehospital,,x,x,,x,x,,,,
 ambulancia.mantenimiento,Poner y quitar mantenimiento,,x,,,,,,,,
-ambulancia.ver_bitacora,Ver bitácora filtrable,,x,x,,,,,propio,x,
+ambulancia.ver_bitacora,Ver bitácora filtrable,,x,x,,,x,,propio,x,
 auditoria.ver,Consultar y verificar auditoría,,,,,,,,,x,
 auditoria.mis_accesos,Ver quién consultó mi expediente,,,,,,,,,,propio
 inventario.ver,Ver existencias,,x,,,x,,x,,,

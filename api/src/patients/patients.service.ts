@@ -6,9 +6,9 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
 import { Clock } from '../platform/clock';
 import { channelsFor, patientAccount } from '../platform/channels';
-import { PatientCreateDto, PatientUpdateDto, PatientStateDto } from './patient-write.dto';
+import { PatientCreateDto, PatientUpdateDto, PatientSelfUpdateDto, PatientStateDto } from './patient-write.dto';
 import { ageOn, ageRange, fichaFields, searchShowsBirth } from './patient.privacy';
-import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateDemographics } from './patient.rules';
+import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateContact, validateDemographics } from './patient.rules';
 type Row = Record<string, any>;
 @Injectable()
 export class PatientsService {
@@ -182,6 +182,25 @@ export class PatientsService {
       if((previous?.replace('-','')??null)!==data.dui)changes.dui={before:previous,after:data.dui};
       await c.query('INSERT INTO pacientes.historial_demografico(paciente_id,version,actor_id,motivo,cambios) VALUES($1,$2,$3,$4,$5)',[id,row.version,actor.id,dto.reason,changes]);
       await this.commands.audit(c,actor,{action:'pacientes.editar',entity:'paciente',entityId:id,patientId:id,permission:'pacientes.editar_demograficos',detail:{fields:Object.keys(changes)}});
+      await this.commands.event(c,'paciente.actualizado','paciente',id,row.version,await this.patientChannels(c,id));
+      return {id,version:row.version};
+    });
+  }
+  /** Spec 102: el paciente corrige su propio contacto. El expediente sale de la sesión, nunca de la petición. */
+  async updateOwn(actor:Actor,dto:PatientSelfUpdateDto,key?:string) {
+    const id=actor.patientId;
+    if(!id)throw new ProblemException('sin_vinculacion',404,'Tu cuenta todavía no está vinculada a un expediente.');
+    if(dto.phone===undefined&&dto.email===undefined&&dto.address===undefined)throw new BadRequestException('Indica al menos un dato de contacto para cambiar.');
+    validateContact(dto);
+    return this.commands.run(actor,`pacientes.editar_propios:${id}`,key,dto,async c=>{
+      const old=(await c.query('SELECT * FROM pacientes.paciente WHERE id=$1 FOR UPDATE',[id])).rows[0];
+      if(!old)throw new NotFoundException('No se encontró el paciente.');
+      if(old.version!==dto.version)throw new VersionConflictException(old.version,'Tu ficha cambió. Vuelve a abrirla antes de guardar.');
+      const next={telefono:dto.phone===undefined?old.telefono:(dto.phone.replace(/-/g,'')||null),correo:dto.email===undefined?old.correo:(dto.email||null),direccion:dto.address===undefined?old.direccion:(dto.address||null)};
+      const row=(await c.query('UPDATE pacientes.paciente SET telefono=$2,correo=$3,direccion=$4,version=version+1 WHERE id=$1 RETURNING *',[id,next.telefono,next.correo,next.direccion])).rows[0];
+      const changes:Row={};for(const field of ['telefono','correo','direccion'])if(String(old[field]??'')!==String(row[field]??''))changes[field]={before:old[field],after:row[field]};
+      await c.query('INSERT INTO pacientes.historial_demografico(paciente_id,version,actor_id,motivo,cambios) VALUES($1,$2,$3,$4,$5)',[id,row.version,actor.id,'Actualización de contacto por el propio paciente',changes]);
+      await this.commands.audit(c,actor,{action:'pacientes.editar_propios',entity:'paciente',entityId:id,patientId:id,permission:'pacientes.editar_propios',detail:{fields:Object.keys(changes)}});
       await this.commands.event(c,'paciente.actualizado','paciente',id,row.version,await this.patientChannels(c,id));
       return {id,version:row.version};
     });
