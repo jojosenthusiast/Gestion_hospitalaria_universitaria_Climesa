@@ -38,7 +38,7 @@ import sv.edu.catolica.climesa.domain.LaboratoryOrder
 
 /**
  * A08 (own history, [own] = true) and A22 (clinician record). The patient needs a linked account (RN-39); the clinician
- * searches a patient and the API applies the care relationship or exceptional access.
+ * searches a patient and the API applies the care relationship.
  */
 @Composable
 fun ClinicalHistoryScreen(profile: AccessProfile, own: Boolean, modifier: Modifier = Modifier, model: ClinicalHistoryViewModel = viewModel()) {
@@ -72,7 +72,6 @@ fun ClinicalHistoryScreen(profile: AccessProfile, own: Boolean, modifier: Modifi
         else state.history?.let { history ->
             if (state.loading) item { RefreshHint() }
             item { SectionCard(history.patientName, eyebrow = stringResource(R.string.historial_expediente, history.record)) {
-                if (history.access == "acceso_excepcional") NoticeBanner(NoticeKind.WARNING, stringResource(R.string.historial_acceso_excepcional))
             } }
             item { Text(stringResource(R.string.historial_consultas), style = MaterialTheme.typography.titleLarge) }
             if (history.consultations.isEmpty()) item { EmptyState(stringResource(R.string.historial_sin_consultas)) }

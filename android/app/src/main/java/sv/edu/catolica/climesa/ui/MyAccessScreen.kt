@@ -62,6 +62,5 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
     SectionCard(entry.role) {
         Text(MyAccessRules.displayDate(entry.at), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.primaryText)
         Text(stringResource(R.string.mis_accesos_detalle, entry.dataKind, entry.reason), style = MaterialTheme.typography.bodySmall)
-        if (entry.exceptional) StatusPill(stringResource(R.string.mis_accesos_excepcional), StatusTone.DANGER)
     }
 }

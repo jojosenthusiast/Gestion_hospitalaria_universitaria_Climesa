@@ -7,7 +7,7 @@ import java.util.Locale
 import org.json.JSONArray
 
 /** One row of "Quién vio mi expediente" (A11, FR-110-08): role, date and reason, never the staff member's name. */
-data class AccessEntry(val at: String, val role: String, val dataKind: String, val reason: String, val exceptional: Boolean)
+data class AccessEntry(val at: String, val role: String, val dataKind: String, val reason: String)
 
 object MyAccessRules {
     private val zone = ZoneId.of("America/El_Salvador")
@@ -19,7 +19,7 @@ object MyAccessRules {
         return (0 until array.length()).mapNotNull { i ->
             val row = array.optJSONObject(i) ?: return@mapNotNull null
             val at = row.optString("fecha").takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            AccessEntry(at, row.optString("rol", "Personal del hospital"), row.optString("tipoDato"), row.optString("motivo"), row.optBoolean("accesoExcepcional", false))
+            AccessEntry(at, row.optString("rol", "Personal del hospital"), row.optString("tipoDato"), row.optString("motivo"))
         }
     }
 

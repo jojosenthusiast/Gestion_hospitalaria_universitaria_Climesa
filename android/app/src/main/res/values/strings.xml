@@ -119,7 +119,6 @@
     <string name="mis_accesos_descripcion">Fecha, rol y motivo de cada consulta a tu información. No mostramos nombres del personal.</string>
     <string name="mis_accesos_vacio">Nadie del personal ha consultado tu expediente todavía.</string>
     <string name="mis_accesos_detalle">%1$s · motivo: %2$s</string>
-    <string name="mis_accesos_excepcional">Acceso excepcional aprobado por el Delegado de protección de datos</string>
     <string name="mis_accesos_reintentar">Reintentar</string>
     <string name="mis_accesos_actualizar">Actualizar</string>
     <string name="vinculo_eyebrow">Cuenta / Expediente</string>
@@ -148,7 +147,6 @@
     <string name="historial_buscar_boton">Buscar paciente</string>
     <string name="historial_otro_paciente">Buscar otro paciente</string>
     <string name="historial_expediente">Exp. %1$s</string>
-    <string name="historial_acceso_excepcional">Acceso excepcional aprobado: esta lectura queda auditada con su motivo.</string>
     <string name="historial_consultas">Consultas</string>
     <string name="historial_sin_consultas">No hay consultas para mostrar.</string>
     <string name="historial_laboratorio">Exámenes de laboratorio</string>

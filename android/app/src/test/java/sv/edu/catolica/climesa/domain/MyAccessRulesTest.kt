@@ -9,13 +9,13 @@ import org.junit.Test
 class MyAccessRulesTest {
     @Test fun parsesRoleDateAndReasonWithoutNames() {
         val rows = JSONArray()
-            .put(JSONObject().put("fecha", "2026-11-14T16:32:00.000Z").put("rol", "Médico").put("tipoDato", "consulta").put("motivo", "atención").put("accesoExcepcional", false))
-            .put(JSONObject().put("fecha", "2026-11-14T17:00:00.000Z").put("rol", "Jefe de Operaciones").put("tipoDato", "consulta").put("motivo", "acceso excepcional").put("accesoExcepcional", true))
+            .put(JSONObject().put("fecha", "2026-11-14T16:32:00.000Z").put("rol", "Médico").put("tipoDato", "consulta").put("motivo", "atención"))
+            .put(JSONObject().put("fecha", "2026-11-14T17:00:00.000Z").put("rol", "Jefe de Operaciones").put("tipoDato", "consulta").put("motivo", "atención"))
             .put(JSONObject().put("rol", "Sin fecha"))
         val entries = MyAccessRules.parse(rows)
         assertEquals(listOf("Médico", "Jefe de Operaciones"), entries.map { it.role })
-        assertTrue(entries[1].exceptional)
         assertEquals("consulta", entries[0].dataKind)
+        assertEquals("atención", entries[1].reason)
     }
 
     @Test fun showsHospitalLocalTime() {

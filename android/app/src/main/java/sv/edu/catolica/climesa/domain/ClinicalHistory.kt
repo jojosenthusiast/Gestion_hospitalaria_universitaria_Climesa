@@ -7,7 +7,7 @@ data class HistoryDiagnosis(val code: String, val description: String, val princ
 data class HistoryMedication(val medication: String, val dose: String, val route: String, val frequency: String, val duration: String)
 data class HistoryConsultation(val id: String, val state: String, val date: String, val doctor: String, val reason: String, val plan: String, val diagnoses: List<HistoryDiagnosis>, val prescriptions: List<HistoryMedication>)
 data class HistoryAdmission(val id: String, val state: String, val date: String, val doctor: String)
-/** Response of `GET /pacientes/{id}/historial` (spec 106). `access`: propio, relacion or acceso_excepcional. */
+/** Response of `GET /pacientes/{id}/historial` (spec 106). `access`: propio or relacion. */
 data class ClinicalHistory(val patientName: String, val record: String, val access: String, val consultations: List<HistoryConsultation>, val laboratory: List<LaboratoryOrder>, val admissions: List<HistoryAdmission>)
 
 /** Pure parsing of the history so the A08/A22 ViewModel can be tested on the JVM. */
