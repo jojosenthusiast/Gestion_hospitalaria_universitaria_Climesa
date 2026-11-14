@@ -10,7 +10,7 @@ Cada pantalla trae: para quién es, qué muestra, qué se puede hacer, qué camb
 
 | Plataforma | Pantallas | Exigidas (R) | Extra (E) |
 |---|---|---|---|
-| Web | 54 | 33 | 21 |
+| Web | 52 | 31 | 21 |
 | Android | 42 | 35 | 7 |
 | iOS | 20 | 17 | 3 |
 
@@ -42,7 +42,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 | F06 Traslado | Recepción W13 → W15 traslado (no existe para VIP) → W12 tablero actualizado |
 | F07 Ambulancia | Paciente A09 pide (o recepción por teléfono en W18) → Despacho W18 confirma y despacha → Paramédico A70 acepta → A71 hitos → A72 reporte prehospital → Emergencia A54 y Médico A25 reciben → Recepción W14 admisión con origen ambulancia → W19 bitácora |
 | F08 Turnos | Jefe W16 planificador → W17 turno (traslape rechazado) → publicar con advertencias → Personal A26 o I26 → Pantalla pública W34 médicos de turno |
-| F09 Acceso excepcional | Jefe o Admin W31 pide (o Médico desde estado sin permiso en A22) → Delegado W30 aprueba → acceso temporal → Delegado W32 auditoría → Paciente A11 ve el acceso |
+| F09 Auditoría y transparencia | Cualquier lectura de datos de un paciente queda auditada → Delegado W32 busca y verifica la cadena → Paciente A11 ve quién consultó su expediente |
 | F10 Inventario | Enfermería A53 consumo → alerta en Jefe W03 y W22 → W23 entrada de reposición |
 | F11 Administración | Admin W05 usuarios → W06 invitar con roles → persona W02 activa su cuenta → Admin W07 y W08 personal e inscripciones → W09 edificio → W10 catálogo de laboratorio |
 | F12 Información pública | Jefe W25 publica aviso → W34 pantalla pública y A10 o I10 en las apps |
@@ -305,24 +305,6 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **En vivo:** En vivo
 - **Privacidad:** Solo número e iniciales
 - **Spec:** 105
-
-### W30 · Accesos excepcionales (R)
-
-- **Para:** DPD
-- **Propósito:** Aprobar o negar
-- **Muestra:** Solicitud: quién, paciente, motivo, duración
-- **Acciones:** Aprobar; negar
-- **En vivo:** Nuevas solicitudes en vivo
-- **Spec:** 110
-
-### W31 · Solicitar acceso excepcional (R)
-
-- **Para:** ADM; JOP
-- **Propósito:** Pedir ver datos clínicos
-- **Muestra:** Paciente, motivo, duración
-- **Acciones:** Enviar
-- **En vivo:** Aviso cuando se aprueba
-- **Spec:** 110
 
 ### W32 · Auditoría (R)
 
@@ -668,7 +650,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **Para:** MED
 - **Propósito:** Historial del paciente
 - **Muestra:** Consultas, diagnósticos, recetas, resultados, hospitalizaciones
-- **Acciones:** Pedir acceso excepcional si no es tratante
+- **Acciones:** 
 - **Privacidad:** Acceso auditado
 - **Spec:** 106
 
@@ -1041,7 +1023,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **Para:** MED
 - **Propósito:** Historial del paciente
 - **Muestra:** Consultas, diagnósticos, recetas, resultados, hospitalizaciones
-- **Acciones:** Pedir acceso excepcional si no es tratante
+- **Acciones:** 
 - **Privacidad:** Acceso auditado
 - **Spec:** 106
 
@@ -1094,13 +1076,13 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 | Rol | Web | Android | iOS |
 |---|---|---|---|
-| Administrador | W01, W03, W05, W06, W07, W08, W09, W10, W11, W31, W33, W35, W36 | no usa | no usa |
-| Jefe de Operaciones | W01, W03, W07, W09, W12, W13, W14, W15, W16, W17, W18, W19, W22, W23, W24, W25, W31, W33, W35, W36 | A01, A10, A12, A26 | no usa |
+| Administrador | W01, W03, W05, W06, W07, W08, W09, W10, W11, W33, W35, W36 | no usa | no usa |
+| Jefe de Operaciones | W01, W03, W07, W09, W12, W13, W14, W15, W16, W17, W18, W19, W22, W23, W24, W25, W33, W35, W36 | A01, A10, A12, A26 | no usa |
 | Recepcionista | W01, W04, W09, W12, W13, W14, W15, W18, W19, W26, W27, W28, W29, W35, W36 | A01, A10, A12, A26, A30, A31, A32, A33, A34, A35, A36 | no usa |
 | Asistente | no usa | A01, A10, A12, A26, A40, A41 | no usa |
 | Enfermero/a | no usa | A01, A10, A12, A26, A41, A50, A51, A52, A53, A54 | no usa |
 | Médico | no usa | A01, A10, A12, A20, A21, A22, A23, A24, A25, A26 | I01, I10, I12, I20, I21, I22, I23, I24, I25, I26 |
 | Laboratorista | W01, W04, W20, W21, W22, W23, W35, W36 | A01, A10, A12, A26, A60, A61, A62 | no usa |
 | Paramédico | no usa | A01, A10, A12, A26, A70, A71, A72, A73, A74 | no usa |
-| Delegado de protección de datos | W01, W04, W19, W30, W32, W33, W35, W36 | no usa | no usa |
+| Delegado de protección de datos | W01, W04, W19, W32, W33, W35, W36 | no usa | no usa |
 | Paciente | no usa | A01, A02, A03, A04, A05, A06, A07, A08, A09, A10, A11, A12, A13 | I01, I02, I03, I04, I05, I06, I07, I08, I09, I10, I11, I12, I13 |

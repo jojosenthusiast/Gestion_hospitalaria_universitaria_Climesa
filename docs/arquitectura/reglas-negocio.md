@@ -61,6 +61,6 @@ Una sola lista de las reglas que el sistema hace cumplir. Cada spec las referenc
 - **RN-37** Al bajar del mínimo se avisa en tiempo real. Lotes vencidos no se pueden usar.
 
 ## Cuentas y privacidad
-- **RN-38** Nadie se asigna roles a sí mismo ni aprueba su propio acceso excepcional.
+- **RN-38** Nadie se asigna roles a sí mismo.
 - **RN-39** La cuenta de paciente sin verificar no ve nada personal ni clínico (D-032). La verificación compara DUI y fecha de nacimiento con el expediente; si no hay expediente, recepción lo crea siguiendo "buscar antes de crear".
-- **RN-40** El acceso excepcional dura como máximo 24 h y vence solo (D-031).
+- **RN-40** (retirada) El acceso excepcional dejó de existir en la ronda 1; no hay lectura clínica sin relación de atención (D-031).

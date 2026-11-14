@@ -150,15 +150,10 @@ describe('vinculación de cuenta e historial clínico (REQ-03, REQ-05)', () => {
       expect(doctor.body.consultations.find((k: any) => k.id === signed).doctor.name).toContain('MED');
     });
 
-    test('un acceso excepcional aprobado y vigente abre el historial con motivo auditado y no ve borradores ajenos', async () => {
+    test('una fila heredada de acceso excepcional ya no abre el historial: se exige la relación de atención', async () => {
       await t.pg.query(`INSERT INTO acceso.acceso_excepcional(solicitante_id,paciente_id,motivo,horas,vigencia,estado,resuelto_por,resuelto_en)
         VALUES($1,$2,'Valoración de enfermería ficticia',2,tstzrange($3::timestamptz - interval '1 minute',$3::timestamptz + interval '1 hour'),'aprobado',$4,$3)`, [userId('ENF'), own, now, userId('DPD')]);
-      const nurse = await t.call('ENF', 'GET', `/pacientes/${own}/historial`);
-      expect(nurse.status).toBe(200);
-      expect(nurse.body.access).toBe('acceso_excepcional');
-      expect(nurse.body.consultations.map((k: any) => k.id)).toEqual([signed]);
-      const audit = await t.one<{ motivo: string }>("SELECT motivo FROM plataforma.auditoria WHERE accion='expediente.leer' AND actor_id=$1 ORDER BY seq DESC LIMIT 1", [userId('ENF')]);
-      expect(audit.motivo).toBe('acceso_excepcional');
+      expect((await t.call('ENF', 'GET', `/pacientes/${own}/historial`)).status).toBe(403);
     });
   });
 });

@@ -49,10 +49,6 @@
       "context": "x"
     },
     {
-      "code": "privacidad.solicitar_acceso",
-      "context": "x"
-    },
-    {
       "code": "inventario.configurar",
       "context": "x"
     },
@@ -164,10 +160,6 @@
     },
     {
       "code": "ambulancia.ver_bitacora",
-      "context": "x"
-    },
-    {
-      "code": "privacidad.solicitar_acceso",
       "context": "x"
     },
     {
@@ -529,10 +521,6 @@
     {
       "code": "ambulancia.recibir_prehospital",
       "context": "x"
-    },
-    {
-      "code": "privacidad.solicitar_acceso",
-      "context": "x"
     }
   ],
   "LAB": [
@@ -634,10 +622,6 @@
     },
     {
       "code": "ambulancia.ver_bitacora",
-      "context": "x"
-    },
-    {
-      "code": "privacidad.aprobar_acceso",
       "context": "x"
     },
     {

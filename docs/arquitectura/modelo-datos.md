@@ -12,7 +12,7 @@ Corte actual: 19 archivos en `supabase/migrations` (incluida la semilla de acces
 
 ```mermaid
 flowchart LR
-  acceso[acceso<br/>usuarios, roles, vinculación, accesos excepcionales]
+  acceso[acceso<br/>usuarios, roles, vinculación, accesos excepcionales históricos]
   pacientes[pacientes<br/>paciente, identificadores, historial]
   personal[personal<br/>personal, inscripciones, turnos]
   infra[infra<br/>espacios en árbol, camas, equipo]

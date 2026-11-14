@@ -67,14 +67,3 @@ public enum DischargeRules {
         return size == 0 || (10...500).contains(size) ? nil : "El motivo va de 10 a 500 caracteres."
     }
 }
-
-/// I22: pedir acceso excepcional (`ExceptionalAccessRequestDto`) cuando el médico no es tratante.
-public enum ExceptionalAccessRules {
-    public static func errors(reason: String, hours: Int) -> [String: String] {
-        var errors: [String: String] = [:]
-        let size = reason.trimmingCharacters(in: .whitespacesAndNewlines).count
-        if !(10...500).contains(size) { errors["motivo"] = "Explica el motivo (10 a 500 caracteres)." }
-        if !(1...24).contains(hours) { errors["horas"] = "La duración va de 1 a 24 horas." }
-        return errors
-    }
-}

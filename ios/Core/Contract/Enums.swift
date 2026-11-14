@@ -211,33 +211,17 @@ extension AmbulancePriority: Decodable { public init(from decoder: Decoder) thro
 
 /// `AccesoHistorial`
 public enum HistoryAccess: String, ContractEnum {
-    case propio, relacion, accesoExcepcional = "acceso_excepcional", desconocido
+    case propio, relacion, desconocido
     public static var fallback: HistoryAccess { .desconocido }
     public var label: String {
         switch self {
         case .propio: return "Tu expediente"
         case .relacion: return "Relación de atención"
-        case .accesoExcepcional: return "Acceso excepcional"
         case .desconocido: return "Acceso"
         }
     }
 }
 extension HistoryAccess: Decodable { public init(from decoder: Decoder) throws { self = try Self.decodeLenient(decoder) } }
-
-/// `EstadoAccesoExcepcional`
-public enum ExceptionalAccessState: String, ContractEnum {
-    case pendiente, aprobado, negado, desconocido
-    public static var fallback: ExceptionalAccessState { .desconocido }
-    public var label: String {
-        switch self {
-        case .pendiente: return "Pendiente de aprobación"
-        case .aprobado: return "Aprobado"
-        case .negado: return "Negado"
-        case .desconocido: return "Sin estado"
-        }
-    }
-}
-extension ExceptionalAccessState: Decodable { public init(from decoder: Decoder) throws { self = try Self.decodeLenient(decoder) } }
 
 /// Tipo de alta del cuerpo `DischargeDto.type`.
 public enum DischargeType: String, CaseIterable, Sendable {

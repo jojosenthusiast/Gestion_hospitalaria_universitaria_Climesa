@@ -16,7 +16,7 @@ Requisitos: REQ-PRV-04 (matriz por rol de endpoints y vistas), REQ-ROL-01 a 06. 
 | MED | Médico | iOS; Android | CUR REQ-ROL-02 | Consulta general, diagnósticos, recetas, órdenes y revisión de laboratorio, indicación de hospitalización, alta. Especialidad (alergista, emergenciólogo) es atributo. |
 | LAB | Laboratorista | Web; Android | D-043; R07 | Procesa órdenes de laboratorio: muestra, resultados con rangos, completar; reactivos de inventario. |
 | PAR | Paramédico | Android | D-042; R04 | Tripulación de la única ambulancia: estados del servicio, reporte prehospital, ubicación en vivo. Solo móvil. |
-| DPD | Delegado de protección de datos | Web | D-031; LPDP Art. 15-17 | Aprueba accesos excepcionales a datos clínicos, revisa auditoría y verifica su integridad. |
+| DPD | Delegado de protección de datos | Web | D-031; LPDP Art. 15-17 | Revisa la auditoría y verifica su integridad. |
 | PAC | Paciente | Android; iOS | CUR REQ-ROL-04; D-032 a D-034 | Ve su fila, citas, estado de laboratorio, resultados revisados e historial; pide citas y ambulancia. |
 
 ## Cómo leer las matrices
@@ -24,7 +24,7 @@ Requisitos: REQ-PRV-04 (matriz por rol de endpoints y vistas), REQ-ROL-01 a 06. 
 | Marca | Significado |
 |---|---|
 | ✔ | Permitido sin condición adicional |
-| relación | Solo con relación de atención activa con el paciente (consulta, admisión, servicio de ambulancia) o acceso excepcional aprobado (D-031) |
+| relación | Solo con relación de atención activa con el paciente (consulta, admisión, servicio de ambulancia) (D-031) |
 | propio | Solo sobre sí mismo (el paciente sobre su expediente, el médico sobre sus citas, el paramédico sobre sus servicios) |
 | propio revisado | El paciente ve sus resultados y su historial solo después de la revisión médica (D-040) |
 | área | Solo pacientes del área o planta donde la persona tiene turno en curso |
@@ -107,8 +107,6 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `ambulancia.recibir_prehospital` | Ver el reporte prehospital | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | `ambulancia.mantenimiento` | Poner y quitar mantenimiento | · | ✔ | · | · | · | · | · | · | · | · |
 | `ambulancia.ver_bitacora` | Ver bitácora filtrable | · | ✔ | ✔ | · | · | · | · | propio | ✔ | · |
-| `privacidad.solicitar_acceso` | Pedir acceso excepcional a datos clínicos | ✔ | ✔ | · | · | · | ✔ | · | · | · | · |
-| `privacidad.aprobar_acceso` | Aprobar o negar accesos excepcionales | · | · | · | · | · | · | · | · | ✔ | · |
 | `auditoria.ver` | Consultar y verificar auditoría | · | · | · | · | · | · | · | · | ✔ | · |
 | `auditoria.mis_accesos` | Ver quién consultó mi expediente | · | · | · | · | · | · | · | · | · | propio |
 | `inventario.ver` | Ver existencias | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
@@ -213,7 +211,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/consultas/{id}/diagnosticos` | `consulta.registrar` | CIE-10 | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/firmar` | `consulta.registrar` | Inscripción vigente en el acto | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/addendum` | `consulta.corregir` | Solo el autor; conserva original | E | 4 | · | · | · | · | · | autor | · | · | · | · |
-| GET | `/api/v1/pacientes/{id}/historial` | `expediente.ver` | Relación, acceso excepcional o propio revisado | R | 3 | · | · | · | · | relación | relación | · | · | · | propio revisado |
+| GET | `/api/v1/pacientes/{id}/historial` | `expediente.ver` | Relación o propio revisado | R | 3 | · | · | · | · | relación | relación | · | · | · | propio revisado |
 | GET | `/api/v1/consultas/agenda` | `consulta.iniciar` | Solo agenda propia | R | 3 | · | · | · | · | · | ✔ | · | · | · | · |
 | PATCH | `/api/v1/consultas/{id}` | `consulta.registrar` | Versión y autor | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | GET | `/api/v1/consultas/{id}/detalle` | `expediente.ver` o `consulta.iniciar` | Relación clínica y auditoría | R | 3 | · | · | · | · | relación | relación / ✔ | · | · | · | propio revisado |
@@ -269,10 +267,6 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| POST | `/api/v1/accesos-excepcionales` | `privacidad.solicitar_acceso` | Motivo y duración | R | 4 | ✔ | ✔ | · | · | · | ✔ | · | · | · | · |
-| POST | `/api/v1/accesos-excepcionales/{id}/aprobar` | `privacidad.aprobar_acceso` | Nunca el propio | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| POST | `/api/v1/accesos-excepcionales/{id}/negar` | `privacidad.aprobar_acceso` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| GET | `/api/v1/accesos-excepcionales` | `privacidad.aprobar_acceso` | Solicitante ve los suyos | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
 | GET | `/api/v1/auditoria` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
 | POST | `/api/v1/auditoria/verificacion` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
 | GET | `/api/v1/me/accesos` | `auditoria.mis_accesos` | Propio | E | 5 | · | · | · | · | · | · | · | · | · | propio |

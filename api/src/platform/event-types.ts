@@ -4,7 +4,6 @@
  * The human-readable catalog (channels, who reacts) is `docs/arquitectura/tiempo-real.md`.
  */
 export const EVENT_TYPES = [
-  'acceso.resuelto', 'acceso.solicitado',
   'admision.actualizada', 'admision.cama_asignada', 'admision.creada',
   'ambulancia.estado_cambiado', 'ambulancia.hito', 'ambulancia.prehospital', 'ambulancia.solicitud_creada', 'ambulancia.ubicacion',
   'aviso.publicado',

@@ -28,7 +28,7 @@ Las pestañas salen del perfil verificado de `/auth/me` (`TabPolicy` en `Core/Ac
 | Todos | I12 Perfil | `GET /auth/me`, cierre de sesión |
 | MED | I20 Mi día | `GET /consultas/agenda`, `GET /fila`, `POST /fila/{id}/llamar`, `GET /laboratorio/ordenes`, `GET /admisiones` |
 | MED | I21 Consulta | `POST /consultas`, `GET /consultas/{id}/detalle`, `PATCH /consultas/{id}`, `POST /consultas/{id}/diagnosticos`, `/receta`, `/firmar`, `GET /laboratorio/catalogo`, `POST /laboratorio/ordenes`, `POST /admisiones/indicaciones` |
-| MED | I22 Expediente (Pacientes) | `GET /pacientes?query=`, `GET /pacientes/{id}/historial`, `POST /accesos-excepcionales` |
+| MED | I22 Expediente (Pacientes) | `GET /pacientes?query=`, `GET /pacientes/{id}/historial` |
 | MED | I23 Resultados por revisar | `GET /laboratorio/ordenes`, `POST /laboratorio/ordenes/{id}/revisar` |
 | MED | I24 Mis hospitalizados (Mi día) | `GET /admisiones`, `POST /admisiones/{id}/alta` |
 | MED | I25 Llegada de ambulancia (Mi día) | `GET /ambulancia`, `GET /ambulancia/servicios/{id}/prehospital` |
@@ -39,7 +39,7 @@ Lo que la API todavía no ofrece (cuántos faltan exacto, seguimiento y cancelac
 ## Código
 
 - `Core/Contract`: modelos `Codable` escritos a mano según `contrato/openapi.json` (enums con nombre del contrato y etiqueta en español; un valor desconocido no rompe la lectura), cuerpos de escritura, `Problem` (problem+json: el cliente decide por `codigo`, muestra `detail` y el código de soporte `requestId`), fechas de `America/El_Salvador` y `SubmissionIntent`/`IntentBook` (`Idempotency-Key` por intención del usuario, regla de `docs/arquitectura/convenciones-api.md`).
-- `Core/Rules`: validaciones y reglas de presentación probadas (DUI, citas, fila, ambulancia, revisión de resultados, alta, acceso excepcional).
+- `Core/Rules`: validaciones y reglas de presentación probadas (DUI, citas, fila, ambulancia, revisión de resultados, alta).
 - `CLIMESA/Network.swift`: `AuthService` (Supabase Auth por REST, renovación del token) y `APIClient` (Bearer, `Idempotency-Key`, errores `APIFailure`). Un 401 borra la sesión y `AccountModel` vuelve al ingreso con "Tu sesión expiró". Cerrar sesión borra la sesión del Keychain y todo lo que estaba en memoria.
 - `CLIMESA/Support.swift`: `Loader` (lectura con carga y error) y `Submission` (escritura con su intención) como view models `@MainActor @Observable`.
 - `CLIMESA/PatientViews.swift`, `DoctorViews.swift`, `ConsultationView.swift`: pantallas. Toda escritura sobre un registro existente envía su `version`; tras un `version_conflicto` la pantalla vuelve a pedir el registro.

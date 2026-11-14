@@ -153,16 +153,6 @@ public struct PatientCandidate: Decodable, Sendable, Identifiable, Equatable {
     public let matchReason: String
 }
 
-/// `ExceptionalAccessResponse` de `POST /accesos-excepcionales`.
-public struct ExceptionalAccess: Decodable, Sendable, Equatable {
-    public let id: String
-    public let hours: Int
-    public let urgent: Bool
-    public let state: ExceptionalAccessState
-    public let createdAt: String
-    enum CodingKeys: String, CodingKey { case id, hours = "horas", urgent = "urgencia", state = "estado", createdAt = "creadoEn" }
-}
-
 /// `AmbulanceStatusResponse` de `GET /ambulancia` (lo que necesita I25).
 public struct AmbulanceStatus: Decodable, Sendable, Equatable {
     public struct UnitInfo: Decodable, Sendable, Equatable {

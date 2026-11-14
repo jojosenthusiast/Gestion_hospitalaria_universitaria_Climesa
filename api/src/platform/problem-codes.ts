@@ -17,11 +17,11 @@ export const PROBLEM_CODES = [
   'ticket_activo_existente', 'fila_max_llamados', 'consulta_ya_iniciada',
   // Accounts, privacy and patients.
   'cuenta_no_verificada', 'cuenta_ya_vinculada', 'expediente_ya_vinculado', 'paciente_ya_vinculado', 'sin_vinculacion', 'vinculacion_pendiente', 'vinculacion_resuelta',
-  'sin_expediente', 'acceso_pendiente_existente', 'acceso_ya_resuelto', 'aprobacion_propia',
+  'sin_expediente',
   // Inventory, public information and metrics.
   'existencia_insuficiente', 'aviso_con_datos_personales', 'indicador_desconocido',
   // Ambulance.
   'ambulancia_ya_despachada', 'estado_final_invalido', 'hito_fuera_de_orden', 'servicio_cerrado', 'servicio_finalizado', 'sin_paramedico_de_turno',
-  'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio', 'urgencia_no_permitida',
+  'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio',
 ] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];

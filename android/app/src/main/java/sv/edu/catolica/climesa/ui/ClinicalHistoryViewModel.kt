@@ -32,7 +32,7 @@ data class ClinicalHistoryState(
 
 /**
  * A08 · Mi historial (patient, own record) and A22 · Expediente (clinician). Both read `GET /pacientes/{id}/historial`;
- * the API decides what each one sees (signed consultations only for the patient, relationship or exceptional access for
+ * the API decides what each one sees (signed consultations only for the patient, relationship for
  * staff) and audits every read. Realtime events only trigger a refetch.
  */
 @HiltViewModel
