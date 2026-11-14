@@ -64,3 +64,28 @@ xcodebuild -project CLIMESA.xcodeproj -scheme CLIMESA -configuration Debug -sdk 
 Prueba de humo en simulador (`CLIMESAUITests`, XCUITest): arranca la app y comprueba que aparece el botón "Ingresar". Local: `xcodebuild test -project CLIMESA.xcodeproj -scheme CLIMESA -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO`.
 
 El workflow `.github/workflows/ios.yml` (macOS 15) comprueba que cada `.swift` esté en el proyecto, corre `swift test`, compila para simulador sin firma y corre esa prueba de UI en un simulador. Falta probar en simulador o dispositivo con una cuenta MED y otra PAC: sesión restaurada, rol sin iOS, API caída, 401, cierre de sesión, retorno tras cinco minutos y cada pantalla de la tabla. Instalar en un iPhone o publicar en TestFlight requiere firmar con una cuenta de Apple.
+
+## IPA sin firmar (sideloading)
+
+El job `ipa` de `.github/workflows/ios.yml` compila `CLIMESA-sin-firmar.ipa` en un runner macOS 15 de GitHub Actions. Corre en push a `main`, en PRs que tocan `ios/**` o el workflow, y a mano (Actions → iOS → Run workflow). El IPA no está firmado: lo firma tu cuenta de Apple al instalarlo. Requiere iOS 17 o posterior.
+
+### Descargar el IPA
+
+1. Abre la ejecución del workflow en la pestaña Actions y espera a que el job `ipa` termine en verde.
+2. En la sección Artifacts descarga `CLIMESA-ios-ipa`. GitHub lo guarda 14 días.
+3. Descomprime el ZIP descargado: adentro está `CLIMESA-sin-firmar.ipa`.
+
+### Instalar con Sideloadly en Windows (Apple ID gratuita)
+
+1. Instala Sideloadly desde sideloadly.io y conecta el iPhone con cable USB.
+2. En el iPhone activa el modo desarrollador: Ajustes → Privacidad y seguridad → Modo desarrollador. Reinicia si lo pide.
+3. En Sideloadly arrastra `CLIMESA-sin-firmar.ipa`, escribe tu Apple ID gratuita y pulsa Start. Sideloadly firma la app con tu cuenta.
+4. En el iPhone confía en el perfil: Ajustes → General → VPN y gestión de dispositivos → tu perfil de desarrollador → Confiar.
+
+La firma con Apple ID gratuita dura 7 días: al vencer, la app deja de abrir y hay que volver a instalarla con Sideloadly. Una Apple ID gratuita admite hasta 3 apps sideloaded a la vez.
+
+### Login de prueba (opcional)
+
+Para que la app muestre el selector de cuentas de prueba, define el secreto de repositorio `CLIMESA_DEMO_CREDENTIALS` (Settings → Secrets and variables → Actions → New repository secret). Su valor es el contenido completo del archivo `demo-credenciales.json` (cuentas ficticias). El job lo escribe en la raíz, ejecuta `sh ios/scripts/demo-login.sh` y nunca imprime su valor.
+
+Si el secreto está vacío o no existe, el job omite ese paso y el IPA se compila sin el selector. Si existe, el IPA incluye las credenciales de prueba: no lo compartas fuera del equipo. El login de prueba es temporal (ver `docs/operacion/login-de-prueba.md`).

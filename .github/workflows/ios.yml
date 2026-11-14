@@ -4,11 +4,13 @@ on:
     paths: ['ios/**', '.github/workflows/ios.yml']
   pull_request:
     paths: ['ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
 permissions:
   contents: read
 # Builds the monorepo ios/ project (CLIMESA.xcodeproj, shared scheme CLIMESA), tests the ClimesaCore package and
 # boots the app on an iOS simulator (CLIMESAUITests) to assert that the login screen appears.
 # No secrets: the project reads Configuration.plist and CLIMESA_API_BASE_URL; Config.xcconfig is not used by the build.
+# The ipa job (below) optionally reads the CLIMESA_DEMO_CREDENTIALS secret; the other jobs read no secrets.
 jobs:
   build:
     runs-on: macos-15
@@ -45,3 +47,37 @@ jobs:
         with:
           name: ui-test-results
           path: ${{ runner.temp }}/ui.xcresult
+  ipa:
+    # IPA sin firmar para sideloading: lo firma quien lo instala (Sideloadly + Apple ID gratuita). Ver ios/README.md, sección IPA.
+    needs: build
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Demo login (optional, only when CLIMESA_DEMO_CREDENTIALS is set)
+        env:
+          CLIMESA_DEMO_CREDENTIALS: ${{ secrets.CLIMESA_DEMO_CREDENTIALS }}
+        run: |
+          if [ -z "$CLIMESA_DEMO_CREDENTIALS" ]; then
+            echo "CLIMESA_DEMO_CREDENTIALS no definido: se omite el login de prueba."
+            exit 0
+          fi
+          printf '%s' "$CLIMESA_DEMO_CREDENTIALS" > demo-credenciales.json
+          sh ios/scripts/demo-login.sh
+      - name: Unsigned app build (device, Release)
+        working-directory: ios
+        run: xcodebuild -project CLIMESA.xcodeproj -scheme CLIMESA -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package IPA
+        working-directory: ios
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/CLIMESA.app Payload/
+          zip -qry CLIMESA-sin-firmar.ipa Payload
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: CLIMESA-ios-ipa
+          path: ios/CLIMESA-sin-firmar.ipa
+          retention-days: 14
+          if-no-files-found: error
