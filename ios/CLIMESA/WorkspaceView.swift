@@ -9,7 +9,7 @@ struct WorkspaceView:View {
     var body:some View {
         switch TabPolicy.decide(profile,preferredRole:account.role) {
         case .unsupportedRole:
-            UnsupportedRoleView()
+            UnsupportedRoleView(profile:profile)
         case let .tabs(role,tabs):
             RoleTabsView(profile:profile,role:role,tabs:tabs)
         }
@@ -18,13 +18,15 @@ struct WorkspaceView:View {
 
 /// Rol sin iOS (por ejemplo Recepción): solo puede salir.
 struct UnsupportedRoleView:View {
+    let profile:AccessProfile
     @EnvironmentObject private var account:AccountModel
     var body:some View {
         VStack(alignment:.leading,spacing:24) {
             BrandHeader()
             VStack(alignment:.leading,spacing:24) {
                 Text("unsupported.title").font(Brand.bold(34)).fixedSize(horizontal:false,vertical:true)
-                Text("unsupported.body").foregroundStyle(.secondary)
+                // Dónde sí puede ingresar, según las plataformas de sus roles en /auth/me (no una tabla fija en la app).
+                Text(verbatim:PlatformGate.message(platforms:profile.platforms,current:"ios",webURL:account.webURL)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
                 Button("common.logout",role:.destructive) { Task { await account.logout() } }.disabled(account.busy)
             }.padding(24)
             Spacer()

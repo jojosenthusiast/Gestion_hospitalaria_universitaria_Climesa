@@ -14,6 +14,14 @@ final class LoginDraft {
     @Published var notice:String?
     @Published var pending=false
     @Published var role="MED"
+    /// Correo recién registrado que aún debe abrir el enlace de confirmación (pantalla "Revisa tu correo").
+    @Published var confirmationEmail:String?
+    /// Correo cuyo ingreso Supabase rechazó con email_not_confirmed: el ingreso ofrece reenviar el correo.
+    @Published var unconfirmedEmail:String?
+    @Published var sendingEmail=false
+    /// Cuándo se puede pedir otro correo de confirmación (Supabase permite uno por minuto).
+    @Published var resendAvailableAt:Date?
+    var webURL:String { config?.web ?? AuthRedirects.defaultWebURL }
     private var revision=0
     let draft=LoginDraft()
     let auth:AuthService?
@@ -76,7 +84,7 @@ final class LoginDraft {
         profile=verified; if let first=verified.allowedIOSRoles.first { role=verified.allowedIOSRoles.contains(role) ? role : first }; pending=false; error=nil; notice=nil
     }
     func signIn(email:String,password:String) async {
-        guard !busy, let auth else { return }; let stamp=revision; busy=true; error=nil
+        guard !busy, let auth else { return }; let stamp=revision; busy=true; error=nil; notice=nil; unconfirmedEmail=nil
         var signedIn=false
         do {
             try await auth.signIn(email:email,password:password); signedIn=true
@@ -85,6 +93,7 @@ final class LoginDraft {
             try await verify()
         } catch {
             guard stamp==revision else { return }
+            if (error as? AuthFailure)?.isEmailNotConfirmed == true { unconfirmedEmail=email.trimmingCharacters(in:.whitespacesAndNewlines) }
             if let message=SessionFailure.visibleMessage(for:error) {
                 self.error=message
                 if SessionFailure.offersRetry(after:error,signedIn:signedIn) { pending=true }
@@ -92,6 +101,35 @@ final class LoginDraft {
         }
         if stamp==revision { busy=false }
     }
+    /// Reenvía el correo de confirmación, como máximo uno por minuto (ResendCooldown).
+    func resendConfirmation(email:String) async {
+        guard !sendingEmail, ResendCooldown.remainingSeconds(until:resendAvailableAt,now:Date())==0, let auth else { return }
+        sendingEmail=true; error=nil; notice=nil
+        do {
+            try await auth.resendSignupConfirmation(email:email)
+            resendAvailableAt=ResendCooldown.availableAt(sentAt:Date())
+            notice="Te enviamos un nuevo correo de confirmación a \(email.trimmingCharacters(in:.whitespacesAndNewlines))."
+        } catch {
+            if (error as? AuthFailure)?.code=="over_email_send_rate_limit" { resendAvailableAt=ResendCooldown.availableAt(sentAt:Date()) }
+            self.error=SessionFailure.visibleMessage(for:error)
+        }
+        sendingEmail=false
+    }
+    /// "¿Olvidaste tu contraseña?": el enlace del correo abre /restablecer en la web. Misma respuesta exista o no la cuenta.
+    func requestPasswordReset(email:String) async {
+        let trimmed=email.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard trimmed.range(of:#"^[^\s@]+@[^\s@]+$"#,options:.regularExpression) != nil else { error="Ingresa un correo válido."; notice=nil; return }
+        guard !sendingEmail, let auth else { return }
+        sendingEmail=true; error=nil; notice=nil
+        do {
+            try await auth.requestPasswordReset(email:trimmed)
+            notice="Si hay una cuenta con \(trimmed), te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam."
+        } catch { self.error=SessionFailure.visibleMessage(for:error) }
+        sendingEmail=false
+    }
+    /// "Ya confirmé, iniciar sesión": vuelve al ingreso con el correo ya escrito.
+    func finishConfirmation() { confirmationEmail=nil; unconfirmedEmail=nil; error=nil; notice=nil }
+    func clearEmailFlow() { unconfirmedEmail=nil; error=nil; notice=nil }
     func register(name:String,email:String,password:String,confirmation:String) async {
         let errors=RegistrationRules.errors(name:name,email:email,password:password,confirmation:confirmation)
         guard errors.isEmpty else { error=errors.joined(separator:" "); return }
@@ -101,7 +139,7 @@ final class LoginDraft {
             let signedIn=try await auth.signUp(name:name,email:email,password:password)
             guard stamp==revision else { return }
             if signedIn { savedSession=true; try await verify() }
-            else { notice="Revisa tu correo para confirmar tu cuenta. Después podrás ingresar." }
+            else { notice=nil; confirmationEmail=email.trimmingCharacters(in:.whitespacesAndNewlines); resendAvailableAt=ResendCooldown.availableAt(sentAt:Date()) }
         } catch {
             guard stamp==revision else { return }
             if let message=SessionFailure.visibleMessage(for:error) {

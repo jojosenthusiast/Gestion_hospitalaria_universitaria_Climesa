@@ -8,6 +8,8 @@ struct AppConfiguration {
     let supabase: URL
     let publicKey: String
     let api: URL
+    /// Web que abre los enlaces de los correos de Supabase (/confirmar-correo, /restablecer); `ClimesaWebURL` de Info.plist.
+    var web: String = AuthRedirects.defaultWebURL
     static func load() throws -> AppConfiguration {
         guard let url=Bundle.main.url(forResource:"Configuration",withExtension:"plist"), let bytes=try? Data(contentsOf:url), let values=try? PropertyListSerialization.propertyList(from:bytes,format:nil) as? [String:String],
               let auth=values["SupabaseURL"].flatMap({ URL(string:$0) }), let key=values["SupabasePublishableKey"], !key.isEmpty,
@@ -17,7 +19,9 @@ struct AppConfiguration {
         #else
         guard api.scheme=="https" else { throw ClientError.message("La versión de entrega requiere un servidor HTTPS.") }
         #endif
-        return AppConfiguration(supabase:auth,publicKey:key,api:api)
+        var config=AppConfiguration(supabase:auth,publicKey:key,api:api)
+        if let web=Bundle.main.object(forInfoDictionaryKey:"ClimesaWebURL") as? String, let url=URL(string:web), url.scheme=="https", url.host != nil { config.web=web }
+        return config
     }
 }
 actor AuthService {
@@ -33,7 +37,9 @@ actor AuthService {
         if let token { request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization") }
         request.httpBody=try JSONSerialization.data(withJSONObject:body)
         let (data,response)=try await transport.data(for:request)
-        guard let http=response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw ClientError.message("No se pudo autenticar. Revisa los datos y la activación de tu cuenta, o inténtalo más tarde.") }
+        guard let http=response as? HTTPURLResponse else { throw ClientError.message("No se pudo autenticar. Inténtalo más tarde.") }
+        // error_code de Supabase (por ejemplo email_not_confirmed) en español, para que la vista ofrezca reenviar el correo.
+        guard (200..<300).contains(http.statusCode) else { throw AuthErrors.failure(status:http.statusCode,data:data) }
         return data
     }
     private func parse(_ data: Data) throws -> AuthSession {
@@ -48,9 +54,18 @@ actor AuthService {
     }
     func signUp(name: String,email: String,password: String) async throws -> Bool {
         let stamp=revision
-        let data=try await send("/auth/v1/signup",["email":email.trimmingCharacters(in:.whitespacesAndNewlines),"password":password,"data":["nombre":name.trimmingCharacters(in:.whitespacesAndNewlines)]])
+        // Sin redirect_to Supabase usaría su Site URL y el enlace "Confirmar tu correo" no abriría nada.
+        let data=try await send(AuthRedirects.withRedirect("/auth/v1/signup",to:AuthRedirects.confirmEmail(webURL:config.web)),["email":email.trimmingCharacters(in:.whitespacesAndNewlines),"password":password,"data":["nombre":name.trimmingCharacters(in:.whitespacesAndNewlines)]])
         guard stamp==revision else { throw CancellationError() }
         if let session=try? parse(data) { try KeychainStore.save(session); return true }; return false
+    }
+    /// Reenvía el correo de confirmación del registro (Supabase /auth/v1/resend, tipo signup).
+    func resendSignupConfirmation(email: String) async throws {
+        _ = try await send(AuthRedirects.withRedirect("/auth/v1/resend",to:AuthRedirects.confirmEmail(webURL:config.web)),["type":"signup","email":email.trimmingCharacters(in:.whitespacesAndNewlines)])
+    }
+    /// Correo para restablecer la contraseña; su enlace abre la página /restablecer de la web.
+    func requestPasswordReset(email: String) async throws {
+        _ = try await send(AuthRedirects.withRedirect("/auth/v1/recover",to:AuthRedirects.resetPassword(webURL:config.web)),["email":email.trimmingCharacters(in:.whitespacesAndNewlines)])
     }
     func session() async throws -> AuthSession? {
         if let task=refreshTask { return try await task.value }
