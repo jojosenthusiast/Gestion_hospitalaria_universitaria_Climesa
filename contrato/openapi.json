@@ -14597,6 +14597,7 @@
           "result": {
             "nullable": true,
             "description": "null sin resultado o si el actor aún no puede ver valores",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/HistoryLabResultResponse"
@@ -14865,6 +14866,7 @@
           "result": {
             "nullable": true,
             "description": "null sin resultado o si el actor aún no puede ver valores",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/LabItemResultResponse"
@@ -16592,6 +16594,7 @@
           "candidate": {
             "nullable": true,
             "description": "Solo si un único expediente coincide",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/LinkCandidateResponse"
@@ -17146,6 +17149,7 @@
           },
           "ambulancia": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/AmbulanceSummaryResponse"
@@ -17462,6 +17466,7 @@
           },
           "lastLocation": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/LocationPointResponse"
@@ -17561,6 +17566,7 @@
           },
           "activeService": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ActiveServiceResponse"
