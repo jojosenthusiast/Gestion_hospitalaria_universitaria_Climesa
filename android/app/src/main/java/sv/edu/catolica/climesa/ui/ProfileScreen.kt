@@ -58,8 +58,10 @@ internal fun LazyListScope.profileItems(
     sections: List<AndroidSection>,
     onOpen: (AndroidSection) -> Unit,
     refresh: () -> Unit,
+    myData: @Composable (() -> Unit)? = null,
 ) {
     item { ProfileSummaryCard(account) }
+    if (myData != null) item { myData() }
     item { Text(stringResource(R.string.ui_accesos_principales), style = MaterialTheme.typography.titleLarge) }
     items(AndroidNavigationPolicy.compact(sections).primary.filter { it != AndroidSection.PROFILE }, key = { it.name }) { section ->
         DataRow(section.label, subtitle = stringResource(R.string.ui_abrir_modulo), leadingIcon = iconFor(section), onClick = { onOpen(section) })

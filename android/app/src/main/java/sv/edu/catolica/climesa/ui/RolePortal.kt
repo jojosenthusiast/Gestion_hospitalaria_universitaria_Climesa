@@ -126,7 +126,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         PageList(Modifier.padding(padding)){
             item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",page.label)}
             if(page==AndroidSection.PROFILE){
-                profileItems(account,sections,{selectedName=it.name},refresh)
+                profileItems(account,sections,{selectedName=it.name},refresh,myData=if("pacientes.editar_propios" in account.profile.permissions){{MyDataCard()}}else null)
             }else if(!page.ready){val maqueta=Maquetas.of(page);if(maqueta!=null)item{MaquetaContent(maqueta)}else item{PendingModule()}}
             else if(data.loading)item{LoadingState()}
             else if(data.error!=null)item{ErrorState(data.error,{model.load(path)})}
