@@ -1,9 +1,9 @@
 name: API
 on:
   push:
-    paths: ['api/**', 'contrato/**', '.github/workflows/api.yml']
+    paths: ['api/**', 'contrato/**', 'android/app/src/test/resources/contract/**', 'ios/Tests/CoreTests/Fixtures/contract/**', '.github/workflows/api.yml']
   pull_request:
-    paths: ['api/**', 'contrato/**', '.github/workflows/api.yml']
+    paths: ['api/**', 'contrato/**', 'android/app/src/test/resources/contract/**', 'ios/Tests/CoreTests/Fixtures/contract/**', '.github/workflows/api.yml']
 permissions:
   contents: read
 jobs:

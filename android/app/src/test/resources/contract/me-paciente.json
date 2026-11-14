@@ -1,0 +1,10 @@
+{
+  "operation": "PATCH /me/paciente",
+  "source": "MyDataViewModel.save",
+  "body": {
+    "version": 4,
+    "phone": "7000-0000",
+    "email": "paciente@example.test",
+    "address": "Colonia Ficticia, casa 1"
+  }
+}

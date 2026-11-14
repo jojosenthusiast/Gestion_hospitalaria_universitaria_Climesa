@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 import { Text } from '../platform/dto';
@@ -23,6 +23,14 @@ export class AdmissionDto {
   @ApiPropertyOptional({ minimum: 0, maximum: 4, description: 'Acompañantes permitidos; 0 si no se permiten visitas.' }) @IsOptional() @IsInt() @Min(0) @Max(4) visitorsMax?: number;
   @ApiPropertyOptional({ format: 'uuid', description: 'Cama elegida: se asigna en el mismo comando (ingreso inmediato).' }) @IsOptional() @IsUUID() bedId?: string;
   @ApiPropertyOptional({ minimum: 1 }) @IsOptional() @IsInt() @Min(1) bedVersion?: number;
+}
+/**
+ * Indication from a consultation (`admision.solicitar`): the doctor who indicates is the attending doctor, so
+ * `attendingDoctorId` may be omitted (it defaults to the actor's own staff id). `origin` must be `consulta` and
+ * `originId` a consultation of that patient led by that doctor.
+ */
+export class AdmissionIndicationDto extends OmitType(AdmissionDto, ['attendingDoctorId'] as const) {
+  @ApiPropertyOptional({ format: 'uuid', description: 'Por omisión, el médico que indica; si se envía, debe ser ese mismo médico.' }) @IsOptional() @IsUUID() attendingDoctorId?: string;
 }
 export class BedAssignmentDto { @ApiProperty({ format: 'uuid' }) @IsUUID() bedId!: string; @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; @Text(10, 500, true) reason?: string; }
 export class BedSuggestionQuery { @ApiPropertyOptional({ enum: ['vip', 'semiprivada'] }) @IsOptional() @IsIn(['vip', 'semiprivada']) category?: string; }

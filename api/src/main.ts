@@ -1,4 +1,4 @@
-import { RequestMethod, ValidationPipe } from '@nestjs/common';
+import { RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -7,6 +7,7 @@ import { AppModule } from './app.module';
 import { ApiErrorsFilter } from './platform/errors.filter';
 import { CommandService } from './platform/command.service';
 import { completeDocument } from './platform/openapi';
+import { validationPipe } from './platform/validation';
 import { assertProductionEnvironment } from './config/environment';
 import { registerSecurity, trustProxyOption } from './config/security';
 /** FR-100-15: el registro de solicitudes solo lleva método, ruta sin consulta e id; nunca cuerpos, encabezados ni cookies. */
@@ -25,7 +26,7 @@ export function configureApplication(app:NestFastifyApplication) {
   app.enableCors({origin:allowedWebOrigins,methods:['GET','POST','PATCH','PUT','DELETE','OPTIONS'],allowedHeaders:['Authorization','Content-Type','Idempotency-Key']});
   app.getHttpAdapter().getInstance().addHook('onSend',async(_request:unknown,reply:{header:(name:string,value:string)=>unknown},payload:unknown)=>{reply.header('Cache-Control','no-store');return payload;});
   app.enableShutdownHooks();
-  app.useGlobalPipes(new ValidationPipe({whitelist:true,transform:true,forbidNonWhitelisted:true,forbidUnknownValues:true}));
+  app.useGlobalPipes(validationPipe());
   app.useGlobalFilters(new ApiErrorsFilter(app.get(CommandService)));
   const document=SwaggerModule.createDocument(app,new DocumentBuilder().setTitle('SGHU-CLIMESA API').setDescription('API de SGHU-CLIMESA. Cada operación incluye x-permiso. Las escrituras requieren Idempotency-Key (una por intención) y, si cambian un registro existente, su `version` en el cuerpo; un conflicto responde 409 problem+json con `codigo`. JSON en camelCase (docs/arquitectura/convenciones-api.md).').setVersion('0.4.0').addBearerAuth().build());
   completeDocument(document);
