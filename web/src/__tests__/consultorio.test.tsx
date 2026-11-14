@@ -8,7 +8,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); localStorage.clear(); });
 
 const profile = (permissions: string[]): AccessProfile => ({
   id: 'med-1', user: { id: 'med-1' }, email: 'med@example.test', name: 'Medicina de prueba', roles: ['MED'], platforms: ['web'],
@@ -100,5 +100,69 @@ describe('W-consultorio · orden de laboratorio desde la consulta (REQ-04)', () 
     mount(['consulta.iniciar', 'laboratorio.ordenar'], { '/laboratorio/catalogo': [] });
     const dialog = await openConsultation();
     expect(await within(dialog).findByText('El catálogo de laboratorio no tiene exámenes activos.')).toBeTruthy();
+  });
+});
+
+const ticket = (extra: Record<string, unknown> = {}) => ({ id: 'tk-1', numero: 7, service: 'consulta_general', state: 'en_atencion', patientId: 'pac-2', patientName: 'Paciente Ficticio Dos', issuedAt: '2026-11-13T14:00:00Z', consultationId: null, consultationState: null, ...extra });
+const detail = { consultation: { id: 'cons-9', patientId: 'pac-2', appointmentId: null, reason: 'Dolor de cabeza', physicalExam: null, plan: null, state: 'abierta', version: 3, patientName: 'Paciente Ficticio Dos' }, vitalSigns: [], diagnoses: [], prescriptions: [] };
+
+describe('W-consultorio · retomar la consulta propia desde la fila', () => {
+  it('un número en atención con consulta propia muestra Retomar consulta y la abre sin volver a iniciarla', async () => {
+    const api = mount(['consulta.iniciar', 'fila.ver', 'consulta.registrar'], { '/fila': [ticket({ consultationId: 'cons-9', consultationState: 'abierta' })], '/consultas/cons-9/detalle': detail });
+    await userEvent.click(await screen.findByRole('button', { name: /Retomar consulta/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/Número de fila N.º 7/)).toBeTruthy();
+    expect((within(dialog).getByLabelText('Motivo de consulta') as HTMLInputElement).value).toBe('Dolor de cabeza');
+    expect(api.write).not.toHaveBeenCalled();
+  });
+
+  it('si al iniciar la API responde que ya estaba iniciada por este médico, abre esa consulta', async () => {
+    const write = vi.fn(async () => { throw new ApiError('La consulta ya fue iniciada para este número.', 409, 'consulta_ya_iniciada', undefined, { consultaId: 'cons-9' }); });
+    mount(['consulta.iniciar', 'fila.ver'], { '/fila': [ticket()], '/consultas/cons-9/detalle': detail }, write as unknown as Api['write']);
+    await userEvent.click(await screen.findByRole('button', { name: /Iniciar consulta/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/Número de fila N.º 7/)).toBeTruthy();
+    expect(write).toHaveBeenCalledWith('/consultas', { ticketId: 'tk-1' }, 'POST');
+  });
+
+  it('si la consulta es de otro médico muestra el conflicto y no abre nada', async () => {
+    const write = vi.fn(async () => { throw new ApiError('La consulta ya fue iniciada para este número.', 409, 'consulta_ya_iniciada'); });
+    mount(['consulta.iniciar', 'fila.ver'], { '/fila': [ticket()] }, write as unknown as Api['write']);
+    await userEvent.click(await screen.findByRole('button', { name: /Iniciar consulta/ }));
+    expect(await screen.findByText('La consulta ya fue iniciada para este número.')).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('W-consultorio · borrador local de la consulta', () => {
+  it('guarda lo escrito en este equipo por usuario y consulta, y lo recupera al volver', async () => {
+    mount(['consulta.iniciar', 'consulta.registrar']);
+    let dialog = await openConsultation();
+    await userEvent.type(within(dialog).getByLabelText('Examen físico'), 'Abdomen blando');
+    expect(await within(dialog).findByText('Borrador guardado en este equipo.')).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem('climesa:borrador:med-1:consulta:cons-1') ?? '{}').physicalExam).toBe('Abdomen blando');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    dialog = await openConsultation();
+    expect((within(dialog).getByLabelText('Examen físico') as HTMLTextAreaElement).value).toBe('Abdomen blando');
+    expect(within(dialog).getByText('Recuperamos lo que escribiste y aún no habías guardado.')).toBeTruthy();
+  });
+
+  it('otra cuenta en el mismo navegador no ve el borrador', async () => {
+    localStorage.setItem('climesa:borrador:otra-cuenta:consulta:cons-1', JSON.stringify({ physicalExam: 'Nota de otra cuenta' }));
+    mount(['consulta.iniciar', 'consulta.registrar']);
+    const dialog = await openConsultation();
+    expect((within(dialog).getByLabelText('Examen físico') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('al firmar con éxito borra el borrador local', async () => {
+    const write = vi.fn(async (path: string) => path.endsWith('/firmar') ? { id: 'cons-1', version: 4, state: 'firmada', signedAt: '2026-11-13T15:30:00Z' } : { id: 'cons-1', version: 3, state: 'abierta' });
+    mount(['consulta.iniciar', 'consulta.registrar'], {}, write as unknown as Api['write']);
+    const dialog = await openConsultation();
+    await userEvent.type(within(dialog).getByLabelText('Examen físico'), 'Sin hallazgos');
+    await waitFor(() => expect(localStorage.getItem('climesa:borrador:med-1:consulta:cons-1')).not.toBeNull());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Firmar consulta' }));
+    await waitFor(() => expect(write).toHaveBeenCalledWith('/consultas/cons-1/firmar', { version: 3 }, 'POST'));
+    await waitFor(() => expect(localStorage.getItem('climesa:borrador:med-1:consulta:cons-1')).toBeNull());
   });
 });
