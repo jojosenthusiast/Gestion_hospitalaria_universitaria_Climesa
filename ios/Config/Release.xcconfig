@@ -1,0 +1,4 @@
+// URL de la API para Release: la API desplegada (pública, HTTPS; la misma que usan web y Android).
+// No contiene claves. Config.xcconfig (local, no se sube) puede reemplazarla.
+CLIMESA_API_BASE_URL = https:/$()/sghu-api.onrender.com/api/v1
+#include? "../Config.xcconfig"

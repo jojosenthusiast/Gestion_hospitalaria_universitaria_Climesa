@@ -1,0 +1,4 @@
+// URL de la API para Debug (simulador con la API local). En xcconfig "//" inicia comentario: se escribe http:/$()/.
+// Para otro servidor, copia ../Config.xcconfig.example a ../Config.xcconfig (no se sube) y cambia el valor ahí.
+CLIMESA_API_BASE_URL = http:/$()/localhost:3000/api/v1
+#include? "../Config.xcconfig"
