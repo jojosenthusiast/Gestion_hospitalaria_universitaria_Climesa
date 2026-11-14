@@ -12,6 +12,7 @@ Lee antes `../AGENTS.md`. Spec base: `specs/122-cliente-ios/`. Roles en iOS: Mé
     AccountModel.swift     ingreso, registro, perfil de /auth/me, fábrica del tiempo real
     Network.swift          AuthService y APIClient (URLSession, async/await)
     KeychainStore.swift    sesión en Keychain
+    DesignSystem/          Theme.swift (tokens) y Components.swift (SectionCard, StatTile, StatusTag, estados...)
     Views.swift            marca, componentes, ingreso, raíz
     WorkspaceView.swift    pestañas por rol, rol sin iOS, banda de conexión
     LiveViewModel.swift    @MainActor @Observable: consume el flujo de tiempo real

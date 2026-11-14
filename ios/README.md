@@ -48,6 +48,12 @@ Lo que la API todavía no ofrece (cuántos faltan exacto, seguimiento y cancelac
 
 La UI usa DM Sans/IBM Plex Mono, azul cobalto, tinta oscura y superficies sin sombras. Los textos están en `CLIMESA/Resources/Localizable.xcstrings`.
 
+## Sistema de diseño (`CLIMESA/DesignSystem/`)
+
+Tokens portados de `web/src/styles.css` (claro y oscuro, dinámicos): `Theme` (colores y estados), `Spacing`, `Radius` y `Typo` (estilos de texto con Dynamic Type) en `Theme.swift`. `Brand.*` es un alias de `Theme` para las pantallas que aún no migran. La app sigue fijada en modo claro (`preferredColorScheme(.light)`) hasta que todas las pantallas usen estos componentes. Las etiquetas de estado salen de `Core/StatusCatalog.swift` (mismos códigos y tonos que `Tag` de web) y tienen prueba en `Tests/CoreTests`.
+
+Componentes (`Components.swift`): `SectionCard`, `StatTile`, `StatusTag`, `ListRow`, `FormField` (rótulo, ayuda y error), `ClimesaButton` / `ClimesaButtonStyle` (primario, secundario, destructivo, con `loading`), `EmptyStateView`, `LoadingStateView`, `ErrorStateView` ("Reintentar"), `ConflictBanner` ("Cerrar y recargar") y `LiveIndicator` ("En vivo"). Referencias de uso: `WorkspaceView` (barra, pestañas, Perfil, Turnos) y `HospitalInfoView` (I10). Los textos nuevos están en `Localizable.xcstrings` con prefijo `ds.`.
+
 ## Verificar en Mac
 
 ```sh
@@ -55,4 +61,6 @@ swift test
 xcodebuild -project CLIMESA.xcodeproj -scheme CLIMESA -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-El workflow `.github/workflows/ios.yml` (macOS 15) comprueba que cada `.swift` esté en el proyecto, corre `swift test` y compila para simulador sin firma. Falta probar en simulador o dispositivo con una cuenta MED y otra PAC: sesión restaurada, rol sin iOS, API caída, 401, cierre de sesión, retorno tras cinco minutos y cada pantalla de la tabla. Instalar en un iPhone o publicar en TestFlight requiere firmar con una cuenta de Apple.
+Prueba de humo en simulador (`CLIMESAUITests`, XCUITest): arranca la app y comprueba que aparece el botón "Ingresar". Local: `xcodebuild test -project CLIMESA.xcodeproj -scheme CLIMESA -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO`.
+
+El workflow `.github/workflows/ios.yml` (macOS 15) comprueba que cada `.swift` esté en el proyecto, corre `swift test`, compila para simulador sin firma y corre esa prueba de UI en un simulador. Falta probar en simulador o dispositivo con una cuenta MED y otra PAC: sesión restaurada, rol sin iOS, API caída, 401, cierre de sesión, retorno tras cinco minutos y cada pantalla de la tabla. Instalar en un iPhone o publicar en TestFlight requiere firmar con una cuenta de Apple.
