@@ -63,7 +63,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
             try {
                 api.request("/consultas", "POST", JSONObject().put("appointmentId", item.appointmentId).apply { if (reason.isNotBlank()) put("reason", reason.trim()) })
                 mutable.value = mutable.value.copy(saving = false, notice = "Consulta iniciada.")
-                load()
+                load(silent = true)
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
@@ -90,9 +90,11 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
             try {
                 val draft = api.request("/consultas/${item.consultationId}", "PATCH", JSONObject().put("version", item.version).put("reason", reason.trim()).put("physicalExam", physicalExam.trim()).put("plan", plan.trim())) as JSONObject
                 val nextVersion = draft.optInt("version", item.version + 1)
+                // The draft is already saved: keep its new version so a failed signature can be retried without a 409.
+                keepDraft(item, reason, physicalExam, plan, nextVersion)
                 api.request("/consultas/${item.consultationId}/firmar", "POST", JSONObject().put("version", nextVersion))
                 mutable.value = mutable.value.copy(saving = false, notice = "Consulta firmada y cita marcada como atendida.")
-                load(); onDone()
+                load(silent = true); onDone()
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
@@ -116,24 +118,26 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         }
     }
 
-    fun diagnosis(item: MedicalAppointment, code: String, note: String, principal: Boolean) {
+    /** [onDone] runs only after the API accepts the diagnosis, so the form keeps what was typed on failure. */
+    fun diagnosis(item: MedicalAppointment, code: String, note: String, principal: Boolean, onDone: () -> Unit = {}) {
         if (item.consultationId == null || code.trim().isBlank()) return
         val body = JSONObject().put("code", code.trim().uppercase()).put("principal", principal).apply { if (note.trim().isNotBlank()) put("note", note.trim()) }
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
-            try { api.request("/consultas/${item.consultationId}/diagnosticos", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Diagnóstico registrado.") }
+            try { api.request("/consultas/${item.consultationId}/diagnosticos", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Diagnóstico registrado."); onDone() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
     }
 
-    fun prescription(item: MedicalAppointment, medication: String, dose: String, route: String, frequency: String, duration: String, instructions: String) {
+    /** [onDone] runs only after the API accepts the prescription, so the form keeps what was typed on failure. */
+    fun prescription(item: MedicalAppointment, medication: String, dose: String, route: String, frequency: String, duration: String, instructions: String, onDone: () -> Unit = {}) {
         if (item.consultationId == null || listOf(medication, dose, route, frequency, duration).any { it.trim().isBlank() }) { mutable.value = mutable.value.copy(error = "Completa medicamento, dosis, vía, frecuencia y duración."); return }
         val itemBody = JSONObject().put("medication", medication.trim()).put("dose", dose.trim()).put("route", route.trim()).put("frequency", frequency.trim()).put("duration", duration.trim()).apply { if (instructions.trim().isNotBlank()) put("instructions", instructions.trim()) }
         val body = JSONObject().put("items", JSONArray().put(itemBody))
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
-            try { api.request("/consultas/${item.consultationId}/receta", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Receta emitida.") }
+            try { api.request("/consultas/${item.consultationId}/receta", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Receta emitida."); onDone() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
@@ -142,7 +146,13 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
 
     private fun replace(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, version: Int, notice: String) {
-        mutable.value = mutable.value.copy(saving = false, notice = notice, appointments = mutable.value.appointments.map { current -> if (current.consultationId == item.consultationId) current.copy(consultationReason = reason, physicalExam = physicalExam, plan = plan, version = version) else current })
+        keepDraft(item, reason, physicalExam, plan, version)
+        mutable.value = mutable.value.copy(saving = false, notice = notice)
+    }
+
+    /** Stores the saved draft and its server version locally, without touching the saving flag or messages. */
+    private fun keepDraft(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, version: Int) {
+        mutable.value = mutable.value.copy(appointments = mutable.value.appointments.map { current -> if (current.consultationId == item.consultationId) current.copy(consultationReason = reason, physicalExam = physicalExam, plan = plan, version = version) else current })
     }
 
     private fun parse(value: Any): List<MedicalAppointment> {

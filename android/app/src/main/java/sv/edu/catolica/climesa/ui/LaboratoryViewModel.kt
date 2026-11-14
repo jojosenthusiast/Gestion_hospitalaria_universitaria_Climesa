@@ -48,28 +48,31 @@ class LaboratoryViewModel @Inject constructor(private val api: ApiGateway, realt
         }
     }
 
-    fun sample(order: LaboratoryOrder, expediente: String, nombreCompleto: String) = mutate(
+    /** [onDone] runs only after the API accepts the sample, so the identity form survives a failure. */
+    fun sample(order: LaboratoryOrder, expediente: String, nombreCompleto: String, onDone: () -> Unit = {}) = mutate(
         "/laboratorio/ordenes/${order.id}/muestra",
         JSONObject().put("version", order.version).put("expediente", expediente.trim()).put("nombreCompleto", nombreCompleto.trim()),
-        "Muestra tomada."
+        "Muestra tomada.",
+        onDone,
     )
     fun complete(order: LaboratoryOrder) = mutate("/laboratorio/ordenes/${order.id}/completar", JSONObject().put("version", order.version), "Orden completada.")
     fun review(order: LaboratoryOrder) = mutate("/laboratorio/ordenes/${order.id}/revisar", JSONObject().put("version", order.version), "Resultados revisados y liberados.")
 
-    fun saveResult(order: LaboratoryOrder, item: LaboratoryItem, value: String, text: String) {
+    /** [onDone] runs only after the API accepts the result, so the captured value survives a failure. */
+    fun saveResult(order: LaboratoryOrder, item: LaboratoryItem, value: String, text: String, onDone: () -> Unit = {}) {
         val body = JSONObject().put("orderItemId", item.id)
         if (value.trim().isNotBlank()) body.put("value", value.trim().toDoubleOrNull() ?: run { mutable.value = mutable.value.copy(error = "El valor debe ser numérico."); return })
         else if (text.trim().isNotBlank()) body.put("text", text.trim())
         else { mutable.value = mutable.value.copy(error = "Captura un valor numérico o un texto."); return }
-        mutate("/laboratorio/ordenes/${order.id}/resultados", body, "Resultado guardado.")
+        mutate("/laboratorio/ordenes/${order.id}/resultados", body, "Resultado guardado.", onDone)
     }
 
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
 
-    private fun mutate(path: String, body: JSONObject, notice: String) {
+    private fun mutate(path: String, body: JSONObject, notice: String, onDone: () -> Unit = {}) {
         mutable.value = mutable.value.copy(busy = true, error = null, notice = null)
         viewModelScope.launch {
-            try { api.request(path, "POST", body); mutable.value = mutable.value.copy(busy = false, notice = notice); load() }
+            try { api.request(path, "POST", body); mutable.value = mutable.value.copy(busy = false, notice = notice); onDone(); load(silent = true) }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(busy = false, error = message(e)) }
         }
