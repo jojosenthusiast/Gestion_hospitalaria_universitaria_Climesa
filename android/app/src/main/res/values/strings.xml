@@ -82,5 +82,24 @@
     <string name="plan_desde">Desde (AAAA-MM-DD)</string>
     <string name="plan_hasta">Hasta (AAAA-MM-DD)</string>
     <string name="plan_cerrar_recargar">Cerrar y recargar</string>
-    <string name="turnos_vacio">No tienes turnos publicados.</string></resources>
+    <string name="turnos_vacio">No tienes turnos publicados.</string>
+    <string name="hosp_asignar_cama">Asignar cama</string>
+    <string name="hosp_firmar_alta">Firmar alta</string>
+    <string name="hosp_registrar_salida">Registrar salida</string>
+    <string name="hosp_motivo_asignacion">Motivo de la asignación (opcional)</string>
+    <string name="hosp_motivo_opcional_ayuda">Si lo escribes, de 10 a 500 caracteres. Quedará en el historial.</string>
+    <string name="hosp_motivo_ayuda">De 10 a 500 caracteres. Quedará en el historial.</string>
+    <string name="hosp_alta_tipo">Tipo de alta</string>
+    <string name="hosp_alta_resumen">Resumen del alta</string>
+    <string name="hosp_alta_resumen_ayuda">Mínimo 10 caracteres. Lo redacta quien firma el alta.</string>
+    <string name="hosp_alta_constancia">El paciente firmó la constancia de alta voluntaria.</string>
+    <string name="hosp_alta_pendientes">Pendientes y responsables</string>
+    <string name="hosp_alta_pendiente">Pendiente</string>
+    <string name="hosp_alta_responsable">Responsable</string>
+    <string name="hosp_alta_agregar">Agregar pendiente</string>
+    <string name="hosp_alta_quitar">Quitar pendiente</string>
+    <string name="hosp_salida_motivo">Motivo de la salida</string>
+    <string name="hosp_salida_detalle">Registra la salida física del paciente; la cama pasará a limpieza.</string>
+    <string name="hosp_guardando">Guardando…</string>
+    <string name="hosp_cancelar">Cancelar</string></resources>
 
