@@ -320,7 +320,7 @@ object RoleDashboard {
             }
             "PAR" -> {
                 ambulance?.let {
-                    kpis += DashboardKpi("Unidad ${it.unit.plate}".trim(), unitLabel(it.unit.state), unitTone(it.unit.state), target = target(AndroidSection.UNIT))
+                    kpis += DashboardKpi("Unidad ${it.unit.plate}".trim(), unitLabel(it.unit.state), unitTone(it.unit.state), target = target(AndroidSection.SERVICE))
                     kpis += DashboardKpi("Solicitudes pendientes", it.pendingRequests.size.toString(), if (it.pendingRequests.isNotEmpty()) DashboardTone.WARNING else DashboardTone.SUCCESS)
                     kpis += DashboardKpi("Servicio", if (it.activeService != null) "En curso" else "Sin servicio", if (it.activeService != null) DashboardTone.DANGER else DashboardTone.NEUTRAL, target = target(AndroidSection.SERVICE))
                     it.activeService?.takeIf { AndroidSection.SERVICE in sections }?.let { service ->

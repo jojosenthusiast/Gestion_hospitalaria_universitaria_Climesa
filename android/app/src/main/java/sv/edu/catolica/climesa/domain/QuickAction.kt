@@ -65,7 +65,7 @@ object QuickActions {
             Entry("Capturar resultado", AndroidSection.CAPTURE_RESULTS, QuickAction.CAPTURE_RESULT, "laboratorio.procesar"),
         ),
         "PAR" to listOf(
-            Entry("Ver unidad", AndroidSection.UNIT, null, "ambulancia.ver_estado"),
+            Entry("Ver unidad", AndroidSection.SERVICE, null, "ambulancia.ver_estado"),
             Entry("Servicio en curso", AndroidSection.SERVICE, null, "ambulancia.operar"),
         ),
         "PAC" to listOf(

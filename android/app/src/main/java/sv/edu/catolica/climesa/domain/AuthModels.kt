@@ -78,7 +78,7 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     BEDS("A35", "Tablero de camas", "camas.ver_tablero", true),
     DISPATCH("A36", "Despacho", "ambulancia.despachar", true),
     ASSISTANT_STATION("A40", "Mi consultorio", "fila.llamar", true),
-    VITAL_SIGNS("A41", "Signos vitales", "signos.registrar", false),
+    VITAL_SIGNS("A41", "Signos vitales", "signos.registrar", true),
     WARD("A50", "Mi planta", "admision.ver", true),
     INPATIENT_CARE("A51", "Paciente hospitalizado", "enfermeria.registrar", true),
     CLEANING("A52", "Limpieza de camas", "camas.registrar_limpieza", true),
@@ -111,8 +111,8 @@ object AndroidSections {
         "REC" to listOf(AndroidSection.HOME, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "AST" to careStation,
         "ENF" to careStation,
-        "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "PAR" to listOf(AndroidSection.HOME, AndroidSection.SERVICE, AndroidSection.UNIT, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "PAR" to listOf(AndroidSection.HOME, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "PAC" to listOf(AndroidSection.HOME, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.LINK_RECORD, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
     )
 
@@ -122,7 +122,7 @@ object AndroidSections {
         "AST" to listOf(AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.SUPPLIES),
         "ENF" to listOf(AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.SUPPLIES),
         "MED" to listOf(AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED),
-        "PAR" to listOf(AndroidSection.SERVICE, AndroidSection.UNIT, AndroidSection.PREHOSPITAL_REPORT),
+        "PAR" to listOf(AndroidSection.SERVICE, AndroidSection.LOG),
         "PAC" to listOf(AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS),
     )
 

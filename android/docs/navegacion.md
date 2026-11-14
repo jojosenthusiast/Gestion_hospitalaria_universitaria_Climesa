@@ -16,8 +16,8 @@ Una sola regla: **la barra inferior lleva lo que el rol hace todo el día; "Más
 |---|---|---|---|
 | Recepción | Fila, Pacientes, Citas | Vinculaciones, Admisión, Camas, Despacho, Mis turnos | Hospital; Perfil |
 | Asistente y Enfermería (estación de cuidado, un solo catálogo) | Signos, Consultorio, Planta (Asistente sin `admision.ver` ve Insumos o Turnos en su lugar) | Limpieza, Insumos, Llegada de ambulancia, Mis turnos | Hospital; Perfil |
-| Médico | Mi día, Resultados, Internados | Expediente, Llegada de ambulancia, Mis turnos | Hospital; Perfil |
-| Paramédico | Servicio, Unidad, Reporte | Paciente sin identidad, Mi bitácora, Mis turnos | Hospital; Perfil |
+| Médico | Mi día, Resultados, Internados | Expediente, Signos vitales (solo lectura), Llegada de ambulancia, Mis turnos | Hospital; Perfil |
+| Paramédico | Servicio, Bitácora, Mis turnos | (nada más) | Hospital; Perfil |
 | Paciente | Mi turno, Mis citas, Exámenes | Vincular expediente, Mi historial, Pedir ambulancia | Hospital, Quién vio mi expediente; Perfil |
 
 Sin Android (D-090): **Jefe de Operaciones** y **Laboratorio**. Si entran, ven "Tu rol no usa esta aplicación".
@@ -25,6 +25,7 @@ Sin Android (D-090): **Jefe de Operaciones** y **Laboratorio**. Si entran, ven "
 ## Decisiones de diseño
 
 - Asistente y Enfermería son el mismo rol del curso: comparten catálogo y se filtran por permiso. "Paciente hospitalizado" desaparece como entrada aparte porque abría la misma pantalla que "Mi planta"; "Limpieza" abre el tablero de camas con las acciones de limpieza.
+- Paramédico: unidad, reporte prehospital y paciente sin identidad viven dentro de la pantalla única del servicio (ParamedicScreen), no como destinos aparte.
 - Medicina tenía "Mi día" y "Consulta" apuntando a la misma pantalla; queda una sola entrada.
 - El Perfil ya no repite accesos directos: muestra la cuenta, "Mis datos" (paciente), apariencia y cerrar sesión. No hay botón "Actualizar acceso": los cambios de rol y permisos llegan por tiempo real.
 - Los textos de eyebrow con formato "A / B" ya no se pintan; el encabezado dice dónde estás.
