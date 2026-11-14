@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -39,22 +40,46 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import sv.edu.catolica.climesa.data.ApiClient
+import kotlinx.coroutines.Job
+import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.data.realtime.LiveSubscription
+import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
+import sv.edu.catolica.climesa.domain.AccessProfile
+import sv.edu.catolica.climesa.domain.InventoryEvents
+import sv.edu.catolica.climesa.domain.RealtimeSignal
 
 data class InventoryStock(val lotId: String, val code: String, val name: String, val warehouseId: String, val warehouse: String, val quantity: Double, val unit: String, val minimum: Double, val expires: String)
 data class InventoryState(val loading: Boolean = true, val busy: Boolean = false, val stock: List<InventoryStock> = emptyList(), val error: String? = null, val notice: String? = null)
 
 @HiltViewModel
-class InventoryViewModel @Inject constructor(private val api: ApiClient) : ViewModel() {
+class InventoryViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
     private val mutable = MutableStateFlow(InventoryState()); val state = mutable.asStateFlow()
-    fun load() { mutable.value = mutable.value.copy(loading = true, error = null); viewModelScope.launch { try { mutable.value = InventoryState(loading = false, stock = parse(api.request("/inventario/existencias"))) } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.value = mutable.value.copy(loading = false, error = e.message ?: "No se pudo cargar el inventario.") } } }
+    private val live = LiveSubscription(realtime)
+    private var loadJob: Job? = null
+    /** A [silent] reload (realtime invalidation) keeps the shown stock and messages, even if it fails. */
+    fun load(silent: Boolean = false) {
+        if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            try { val stock = parse(api.request("/inventario/existencias")); mutable.value = mutable.value.copy(loading = false, stock = stock) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = e.message ?: "No se pudo cargar el inventario.") }
+        }
+    }
+    /** Idempotent per channel list: reloads when an inventory event arrives or after a reconnection gap. */
+    fun startLive(channels: List<String>) {
+        live.start(viewModelScope, channels) { signal ->
+            if (signal is RealtimeSignal.Event && InventoryEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load(silent = true)
+        }
+    }
     fun move(stock: InventoryStock, quantity: String, reason: String, patientId: String?) { val value = quantity.trim().toDoubleOrNull(); if (value == null || value <= 0) { mutable.value = mutable.value.copy(error = "La cantidad debe ser mayor que cero."); return }; mutable.value = mutable.value.copy(busy = true, error = null, notice = null); viewModelScope.launch { try { api.request("/inventario/movimientos", "POST", JSONObject().put("type", "consumo").put("lotId", stock.lotId).put("originWarehouseId", stock.warehouseId).put("quantity", value).put("reason", reason.trim()).apply { if (!patientId.isNullOrBlank()) put("patientId", patientId.trim()) }); mutable.value = mutable.value.copy(busy = false, notice = "Consumo registrado."); load() } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.value = mutable.value.copy(busy = false, error = e.message ?: "No se pudo registrar el consumo.") } } }
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
     private fun parse(value: Any): List<InventoryStock> { val array = value as? JSONArray ?: return emptyList(); return (0 until array.length()).map { i -> val row = array.getJSONObject(i); InventoryStock(row.optString("lotId"), row.optString("codigo"), row.optString("nombre"), row.optString("warehouseId"), row.optString("warehouseCode", "Bodega"), row.optDouble("quantity", row.optDouble("disponible")), row.optString("unidad"), row.optDouble("minimo"), row.optString("expiresAt")) } }
 }
 
-@Composable fun InventoryScreen(modifier: Modifier = Modifier, model: InventoryViewModel = viewModel()) {
+@Composable fun InventoryScreen(modifier: Modifier = Modifier, profile: AccessProfile? = null, model: InventoryViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle(); var selectedLotId by rememberSaveable { mutableStateOf<String?>(null) }; LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
     val selected = selectedLotId?.let { lotId -> state.stock.firstOrNull { it.lotId == lotId } }
     if (selected != null) ConsumptionDialog(selected, state.busy, model) { selectedLotId = null }
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

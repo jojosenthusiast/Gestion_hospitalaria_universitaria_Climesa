@@ -9,7 +9,7 @@ import org.junit.Test
 
 class MaquetasTest {
     /** Permisos reales de un paciente (PAC) en `permisos.csv`, solo los que abren secciones de Android. */
-    private val paciente = listOf("sesion.perfil", "fila.ver", "citas.ver", "citas.solicitar", "resultados.ver", "ambulancia.solicitar", "pacientes.ver_ficha")
+    private val paciente = listOf("sesion.perfil", "fila.ver", "citas.ver", "resultados.ver", "expediente.ver", "ambulancia.solicitar", "auditoria.mis_accesos")
 
     @Test fun cadaSeccionSinPantallaTieneMaquetaNavegable() {
         AndroidSection.entries.filter { !it.ready }.forEach { section ->
@@ -36,19 +36,21 @@ class MaquetasTest {
     }
 
     @Test fun elPacienteVeElFlujoCompletoDeMaquetas() {
-        val visibles = AndroidSections.visible(paciente)
+        val visibles = AndroidSections.visible("PAC", paciente)
         listOf(
-            AndroidSection.QUEUE,
-            AndroidSection.APPOINTMENTS,
-            AndroidSection.APPOINTMENT_REQUEST,
+            AndroidSection.PATIENT_QUEUE,
+            AndroidSection.MY_APPOINTMENTS,
             AndroidSection.RESULTS,
+            AndroidSection.HISTORY,
             AndroidSection.AMBULANCE_REQUEST,
+            AndroidSection.HOSPITAL_INFO,
+            AndroidSection.MY_ACCESS,
         ).forEach { assertTrue("falta ${it.name}", it in visibles) }
         visibles.filter { !it.ready }.forEach { assertNotNull(Maquetas.of(it)) }
-        assertTrue(AndroidSections.hasAppScreens(paciente))
+        assertTrue(AndroidSections.hasAppScreens("PAC", paciente))
     }
 
     @Test fun laMaquetaDeAmbulanciaNoAparecePorRolSinPermiso() {
-        assertFalse(AndroidSection.AMBULANCE_REQUEST in AndroidSections.visible(listOf("sesion.perfil", "citas.ver")))
+        assertFalse(AndroidSection.AMBULANCE_REQUEST in AndroidSections.visible("PAC", listOf("sesion.perfil", "citas.ver")))
     }
 }

@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="login_brand">climesa</string>
+    <string name="login_brand_subtitle">Hospital universitario</string>
+    <string name="login_section">ACCESO A CLIMESA</string>
+    <string name="login_welcome">Hola de nuevo.</string>
+    <string name="login_prompt">Ingresa con tu cuenta institucional.</string>
+    <string name="login_email">Correo electrónico</string>
+    <string name="login_password">Contraseña</string>
+    <string name="login_show_password">Mostrar contraseña</string>
+    <string name="login_hide_password">Ocultar contraseña</string>
+    <string name="login_submit">Iniciar sesión</string>
+    <string name="login_checking">Verificando…</string>
+    <string name="login_first_time">¿Primera vez aquí?</string>
+    <string name="login_staff_help">El personal ingresa con una invitación del hospital.</string>
+    <string name="login_register_patient">Crear cuenta de paciente</string>
+    <string name="login_tagline">Tu espacio de trabajo.</string>
     <string name="camas_titulo">Camas.</string>
     <string name="camas_vacio">No hay camas disponibles en esta vista.</string>
     <string name="camas_reintentar">Volver a intentar</string>
@@ -66,5 +81,31 @@
     <string name="plan_publicar_detalle">Se publican los turnos en borrador del rango (máximo 31 días). Si quedan huecos de cobertura se publica igual y se te avisa.</string>
     <string name="plan_desde">Desde (AAAA-MM-DD)</string>
     <string name="plan_hasta">Hasta (AAAA-MM-DD)</string>
-    <string name="plan_cerrar_recargar">Cerrar y recargar</string></resources>
+    <string name="plan_cerrar_recargar">Cerrar y recargar</string>
+    <string name="turnos_vacio">No tienes turnos publicados.</string>
+    <string name="hosp_asignar_cama">Asignar cama</string>
+    <string name="hosp_firmar_alta">Firmar alta</string>
+    <string name="hosp_registrar_salida">Registrar salida</string>
+    <string name="hosp_motivo_asignacion">Motivo de la asignación (opcional)</string>
+    <string name="hosp_motivo_opcional_ayuda">Si lo escribes, de 10 a 500 caracteres. Quedará en el historial.</string>
+    <string name="hosp_motivo_ayuda">De 10 a 500 caracteres. Quedará en el historial.</string>
+    <string name="hosp_alta_tipo">Tipo de alta</string>
+    <string name="hosp_alta_resumen">Resumen del alta</string>
+    <string name="hosp_alta_resumen_ayuda">Mínimo 10 caracteres. Lo redacta quien firma el alta.</string>
+    <string name="hosp_alta_constancia">El paciente firmó la constancia de alta voluntaria.</string>
+    <string name="hosp_alta_pendientes">Pendientes y responsables</string>
+    <string name="hosp_alta_pendiente">Pendiente</string>
+    <string name="hosp_alta_responsable">Responsable</string>
+    <string name="hosp_alta_agregar">Agregar pendiente</string>
+    <string name="hosp_alta_quitar">Quitar pendiente</string>
+    <string name="hosp_salida_motivo">Motivo de la salida</string>
+    <string name="hosp_salida_detalle">Registra la salida física del paciente; la cama pasará a limpieza.</string>
+    <string name="hosp_guardando">Guardando…</string>
+    <string name="hosp_cancelar">Cancelar</string>
+    <string name="lab_orden_titulo">Orden de laboratorio</string>
+    <string name="lab_orden_cargando">Cargando catálogo de exámenes…</string>
+    <string name="lab_orden_sin_catalogo">No hay exámenes activos en el catálogo.</string>
+    <string name="lab_orden_panel">panel</string>
+    <string name="lab_orden_urgente">Prioridad urgente</string>
+    <string name="lab_orden_emitir">Ordenar exámenes</string></resources>
 

@@ -110,8 +110,8 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         if(page==AndroidSection.PLANNING){ShiftPlanningScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.STAFF){StaffScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.MY_APPOINTMENTS){PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD||page==AndroidSection.INPATIENT_CARE){HospitalizationScreen(Modifier.padding(padding));return@content}
-        if(page==AndroidSection.SUPPLIES){InventoryScreen(Modifier.padding(padding));return@content}
+        if(page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD||page==AndroidSection.INPATIENT_CARE){HospitalizationScreen(Modifier.padding(padding),account.profile);return@content}
+        if(page==AndroidSection.SUPPLIES){InventoryScreen(Modifier.padding(padding),account.profile);return@content}
         if(page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION){QueueScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.LAB||page==AndroidSection.SAMPLE||page==AndroidSection.CAPTURE_RESULTS||page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW){LaboratoryScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.MEDICAL_DAY||page==AndroidSection.CONSULTATIONS){ConsultationScreen(account.profile,Modifier.padding(padding));return@content}
@@ -141,20 +141,36 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
                 item{ClimesaCard {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(unit?.optString("plate").orEmpty(),style=MaterialTheme.typography.titleMedium);Text("${stringResource(R.string.unidad_estado)}: ${unitStates[unit?.optString("state")]?:unit?.optString("state").orEmpty()}",color=MaterialTheme.colorScheme.primary);Text("${stringResource(R.string.unidad_paramedico_turno)}: ${stringResource(if((data.data as? JSONObject)?.optBoolean("paramedicOnDuty")==true)R.string.unidad_si else R.string.unidad_no)}",style=MaterialTheme.typography.bodySmall);HorizontalDivider();if(service==null)Text(stringResource(R.string.unidad_sin_servicio)) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${service.optString("origin")} → ${service.optString("destination")}")}}}}
                 if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.optString("state")))item{MaintenanceControl(model,unit.optString("state"),unit.optInt("version"),(data.data as? JSONObject)?.optBoolean("paramedicOnDuty")==true)}
             }else if(page==AndroidSection.SHIFTS){
-                val rows=data.data as? JSONArray
-                if(rows==null||rows.length()==0)item{Text("No tienes turnos publicados.",style=MaterialTheme.typography.bodyMedium)}
-                else items((0 until rows.length()).toList()){i->
-                    val r=rows.getJSONObject(i)
-                    ClimesaCard {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-                        Text(r.optString("area"),style=MaterialTheme.typography.titleMedium)
-                        val format=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.of("America/El_Salvador"))
-                        Text(format.format(Instant.parse(r.getString("start")))+" — "+format.format(Instant.parse(r.getString("end"))),style=MaterialTheme.typography.bodyMedium)
-                        Text(StaffLabels.shiftState(r.optString("state")),style=MaterialTheme.typography.labelSmall)
-                    }}
-                }
+                val shifts=MyShifts.parse(data.data)
+                if(shifts.isEmpty())item{Text("No tienes turnos publicados.",style=MaterialTheme.typography.bodyMedium)}
+                else items(shifts){shift->MyShiftCard(shift)}
             }else item{PendingModule()}
         }
     }
+}
+/** A26 "Mis turnos" as a standalone screen, for scaffolds that do not use [RolePortal] (Recepción). */
+@Composable fun MyShiftsScreen(account:AuthenticatedAccount,role:String,modifier:Modifier=Modifier){
+    val model:RoleViewModel=viewModel(key="shifts-${account.session.userId}")
+    val data by model.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit){model.load("/turnos/mios")}
+    LaunchedEffect(account.profile.channels){model.start(account.profile.channels)}
+    LazyColumn(modifier.fillMaxSize(),contentPadding=PaddingValues(horizontal=18.dp,vertical=22.dp),verticalArrangement=Arrangement.spacedBy(20.dp)){
+        item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",AndroidSection.SHIFTS.label)}
+        if(data.loading)item{Box(Modifier.fillMaxWidth().height(200.dp),contentAlignment=Alignment.Center){CircularProgressIndicator()}}
+        else if(data.error!=null)item{ClimesaActionGroup {Text(data.error!!,color=MaterialTheme.colorScheme.error);ClimesaButton(stringResource(R.string.camas_reintentar),Icons.Default.Refresh,{model.load("/turnos/mios")})}}
+        else{
+            val shifts=MyShifts.parse(data.data)
+            if(shifts.isEmpty())item{Text(stringResource(R.string.turnos_vacio),style=MaterialTheme.typography.bodyMedium)}
+            else items(shifts){shift->MyShiftCard(shift)}
+        }
+    }
+}
+@Composable internal fun MyShiftCard(shift:MyShift){
+    ClimesaCard {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+        Text(shift.area,style=MaterialTheme.typography.titleMedium)
+        Text(shift.period,style=MaterialTheme.typography.bodyMedium)
+        Text(StaffLabels.shiftState(shift.state),style=MaterialTheme.typography.labelSmall)
+    }}
 }
 /** Entrar o salir de mantenimiento; el motivo y el diálogo sobreviven al giro de pantalla. */
 @Composable private fun MaintenanceControl(model:RoleViewModel,unitState:String,version:Int,paramedicOnDuty:Boolean){

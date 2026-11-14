@@ -14,9 +14,13 @@ internal fun apiErrorMessage(body:String):String?=runCatching {
 }.getOrNull()
 /** Código estable (`codigo`) del problem+json, por ejemplo `version_conflicto`. */
 internal fun apiErrorCode(body:String):String?=runCatching{JSONObject(body).optString("codigo").takeIf{it.isNotBlank()}}.getOrNull()
-class ApiClient(private val baseUrl:String,private val auth:SupabaseAuthRepository) {
+/** Port to the REST API, so ViewModels can be tested on the JVM with a fake. [ApiClient] is the real adapter. */
+interface ApiGateway {
+    suspend fun request(path:String,method:String="GET",body:JSONObject?=null):Any
+}
+class ApiClient(private val baseUrl:String,private val auth:SupabaseAuthRepository):ApiGateway {
     private val attempts=ConcurrentHashMap<String,String>()
-    suspend fun request(path:String,method:String="GET",body:JSONObject?=null):Any=withContext(Dispatchers.IO) {
+    override suspend fun request(path:String,method:String,body:JSONObject?):Any=withContext(Dispatchers.IO) {
         if(baseUrl.isBlank())throw AuthRequestException("Configura la dirección de la API de CLIMESA.")
         val session=auth.restoreSession()?:throw AuthRequestException("Ingresa nuevamente para continuar.",401)
         val signature=method+path+(body?.toString()?:"")

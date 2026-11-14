@@ -11,8 +11,8 @@ class RoleAccessTest {
     }
     @Test fun rejectsUnverifiedProfileAndWrongPlatform(){assertTrue(RoleAccess.allowed(profile(listOf("MED"),false),"android").isEmpty());assertTrue(RoleAccess.allowed(profile(listOf("MED"),platforms=listOf("ios")),"android").isEmpty())}
     @Test fun medicalAndPatientTabsDiffer(){
-        val medico=AndroidSections.visible(listOf("sesion.perfil","turnos.ver","consulta.iniciar"))
-        val paciente=AndroidSections.visible(listOf("sesion.perfil","citas.ver","resultados.ver"))
+        val medico=AndroidSections.visible("MED",listOf("sesion.perfil","turnos.ver","consulta.iniciar"))
+        val paciente=AndroidSections.visible("PAC",listOf("sesion.perfil","citas.ver","resultados.ver"))
         assertTrue(AndroidSection.SHIFTS in medico);assertFalse(AndroidSection.SHIFTS in paciente)
     }
     @Test fun registrationEnforcesConfirmationAndStrongPassword(){assertTrue(RegistrationRules.validate("Cuenta Ejemplo","ejemplo@example.test","Segura#2026","Segura#2026").isEmpty());assertEquals(4,RegistrationRules.validate("A","correo","123","456").size)}

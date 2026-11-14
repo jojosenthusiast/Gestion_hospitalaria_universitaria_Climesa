@@ -4,7 +4,7 @@ Aplicación Kotlin/Compose, MVVM y Hilt, conectada a Supabase Auth y a la API CL
 
 1. Abre `android/` en Android Studio, usando JDK 17 y SDK Platform 35. Dispositivo mínimo: Android 8 / API 26.
 2. Instala las dependencias mediante Gradle Sync.
-3. Inicia la API desde la computadora. En el emulador Debug se usa `http://10.0.2.2:3000/api/v1`; la web usa `http://localhost:3000/api/v1`.
+3. Inicia la API desde la computadora. En el emulador Debug se usa `http://10.0.2.2:3000/api/v1`; Release usa por defecto `https://sghu-api.onrender.com/api/v1`; la web usa `http://localhost:3000/api/v1`.
 4. Para un teléfono o Release define en `~/.gradle/gradle.properties`:
 
 ```properties

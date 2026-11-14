@@ -153,3 +153,28 @@ object PortalEvents {
         else -> false
     }
 }
+
+/** Queue screen: tickets publish `fila.actualizada` on entity `ticket_fila`. */
+object QueueEvents {
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, "ticket_fila", "fila")
+}
+
+/** Laboratory screen: orders publish `laboratorio.*` on entity `orden_laboratorio`. */
+object LaboratoryEvents {
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, "orden_laboratorio", "laboratorio")
+}
+
+/** Consultation agenda: consultations publish `consulta.*`; appointments publish `cita.*`. */
+object ConsultationEvents {
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, "consulta", "cita")
+}
+
+/** Hospitalization list: admissions publish `admision.*`. */
+object AdmissionEvents {
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, "admision", "alta")
+}
+
+/** Inventory screen: stock movements publish `inventario.actualizado` on entity `articulo`. */
+object InventoryEvents {
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, "articulo", "inventario")
+}

@@ -43,6 +43,7 @@ fun QueueScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Qu
     val canCall = "fila.llamar" in profile.permissions
     val canManage = "fila.gestionar" in profile.permissions
     LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     if (issueOpen) QueueIssueDialog(busy = state.busy, onClose = { issueOpen = false }, onSubmit = { service -> issueOpen = false; model.issue(service) })
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { SectionIntro("Atención / Llegada", "Fila del día", "El número se emite al llegar y avanza sin alterar la hora de la cita.") }
@@ -75,4 +76,3 @@ private fun QueueIssueDialog(busy: Boolean, onClose: () -> Unit, onSubmit: (Stri
     var service by rememberSaveable { mutableStateOf(QueueLabels.services.first().first) }
     AlertDialog(onDismissRequest = { if (!busy) onClose() }, title = { Text("Emitir número") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("Selecciona el servicio de llegada.") ; QueueLabels.services.forEach { (value, label) -> androidx.compose.material3.RadioButton(selected = service == value, onClick = { service = value }); Text(label, Modifier.padding(start = 8.dp)) } } }, confirmButton = { Button(onClick = { onSubmit(service) }, enabled = !busy) { Text(if (busy) "Guardando…" else "Emitir") } }, dismissButton = { TextButton(onClick = onClose, enabled = !busy) { Text("Cancelar") } })
 }
-

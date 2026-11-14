@@ -9,13 +9,19 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Publish
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,24 +70,22 @@ fun ShiftPlanningScreen(profile: AccessProfile, modifier: Modifier = Modifier, m
     val target = state.shifts.firstOrNull { it.id == targetId }
     fun open(next: PlanDialog, id: String?) { model.resetAction(); targetId = id; dialog = next }
 
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item {
-            Text("OPERACIONES / CLIMESA", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            Text(stringResource(R.string.plan_titulo) + ".", style = MaterialTheme.typography.displaySmall)
-        }
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item { SectionIntro("Operaciones / CLIMESA", stringResource(R.string.plan_titulo), "Cobertura y turnos del equipo.") }
         if (!state.canPlan && !state.canPublish) item { Text(stringResource(R.string.plan_solo_lectura), style = MaterialTheme.typography.bodySmall) }
         if (state.canPlan || state.canPublish) item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.canPlan) Button({ open(PlanDialog.FORM, null) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.plan_nuevo)) }
-                if (state.canPublish) OutlinedButton({ open(PlanDialog.PUBLISH, null) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.plan_publicar)) }
+            ClimesaActionGroup {
+                if (state.canPlan) ClimesaButton(stringResource(R.string.plan_nuevo), Icons.Default.Add, { open(PlanDialog.FORM, null) })
+                if (state.canPublish) ClimesaButton(stringResource(R.string.plan_publicar), Icons.Default.Publish, { open(PlanDialog.PUBLISH, null) }, outlined = true)
             }
         }
         state.summary?.let { summary ->
             item {
-                Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(0.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ClimesaCard {
+                    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(ShiftPlanning.summaryText(summary), style = MaterialTheme.typography.titleSmall)
-                        summary.gaps.forEach { Text(ShiftPlanning.gapText(it), style = MaterialTheme.typography.bodySmall) }
+                        summary.gaps.take(3).forEach { Text(ShiftPlanning.gapText(it), style = MaterialTheme.typography.bodySmall) }
+                        if (summary.gaps.size > 3) Text("${summary.gaps.size - 3} alertas adicionales", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         TextButton(model::dismissSummary) { Text(stringResource(R.string.plan_entendido)) }
                     }
                 }
@@ -115,17 +119,17 @@ fun ShiftPlanningScreen(profile: AccessProfile, modifier: Modifier = Modifier, m
 
 @Composable
 private fun ShiftCard(shift: PlannedShift, canPlan: Boolean, onEdit: () -> Unit, onCancel: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(0.dp)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(shift.person, style = MaterialTheme.typography.titleMedium)
+    ClimesaCard {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) { androidx.compose.material3.Icon(Icons.Default.Schedule, null, tint = MaterialTheme.colorScheme.primary); Text(shift.person, style = MaterialTheme.typography.titleMedium) }
             Text(shift.area, style = MaterialTheme.typography.bodySmall)
             Text("${ShiftPlanning.format(shift.start)} — ${ShiftPlanning.format(shift.end)}", style = MaterialTheme.typography.bodyMedium)
             Text("${ShiftPlanning.typeLabel(shift.type)} · ${ShiftPlanning.stateLabel(shift.state)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             if (canPlan && ShiftPlanning.cancellable(shift.state)) {
                 HorizontalDivider()
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onEdit) { Text(stringResource(R.string.plan_editar)) }
-                    TextButton(onCancel) { Text(stringResource(R.string.plan_cancelar_turno)) }
+                ClimesaActionGroup {
+                    ClimesaButton(stringResource(R.string.plan_editar), Icons.Default.Edit, onEdit, outlined = true)
+                    ClimesaButton(stringResource(R.string.plan_cancelar_turno), Icons.Default.Cancel, onCancel, outlined = true)
                 }
             }
         }
@@ -136,8 +140,11 @@ private fun ShiftCard(shift: PlannedShift, canPlan: Boolean, onEdit: () -> Unit,
 private fun Picker(label: String, options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton({ open = true }, Modifier.fillMaxWidth()) {
-            Text("$label: ${options.firstOrNull { it.first == selected }?.second ?: stringResource(R.string.plan_seleccionar)}", maxLines = 1)
+        OutlinedButton({ open = true }, Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(options.firstOrNull { it.first == selected }?.second ?: stringResource(R.string.plan_seleccionar), maxLines = 2)
+            }
         }
         DropdownMenu(open, { open = false }) {
             options.forEach { (code, text) -> DropdownMenuItem({ Text(text) }, { onSelect(code); open = false }) }
@@ -220,7 +227,7 @@ private fun PublishDialog(model: ShiftPlanningViewModel, state: PlanningState, o
         onDismissRequest = { if (!action.busy) onClose() },
         title = { Text(stringResource(R.string.plan_publicar)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.plan_publicar_detalle), style = MaterialTheme.typography.bodySmall)
                 action.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 OutlinedTextField(from, { from = it.take(10) }, label = { Text(stringResource(R.string.plan_desde)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
