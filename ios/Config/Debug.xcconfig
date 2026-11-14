@@ -1,6 +1,9 @@
 // URL de la API para Debug (simulador con la API local). En xcconfig "//" inicia comentario: se escribe http:/$()/.
 // Para otro servidor, copia ../Config.xcconfig.example a ../Config.xcconfig (no se sube) y cambia el valor ahí.
 CLIMESA_API_BASE_URL = http:/$()/localhost:3000/api/v1
+// Web que abre los enlaces de los correos de Supabase (/confirmar-correo, /restablecer): siempre la desplegada.
+// Un enlace de correo debe abrir en cualquier dispositivo, nunca en localhost.
+CLIMESA_WEB_URL = https:/$()/sghu-web.onrender.com
 // TEMPORAL (docs/operacion/login-de-prueba.md): selector de cuentas de prueba. NO en lo que se sube; lo activa
 // ios/DemoLogin.xcconfig (no se sube), generado con sh ios/scripts/demo-login.sh. Antes de la entrega: --off.
 CLIMESA_DEMO_LOGIN = NO

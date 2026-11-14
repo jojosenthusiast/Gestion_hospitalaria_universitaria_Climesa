@@ -1,6 +1,9 @@
 // URL de la API para Release: la API desplegada (pública, HTTPS; la misma que usan web y Android).
 // No contiene claves. Config.xcconfig (local, no se sube) puede reemplazarla.
 CLIMESA_API_BASE_URL = https:/$()/sghu-api.onrender.com/api/v1
+// Web que abre los enlaces de los correos de Supabase (/confirmar-correo, /restablecer): siempre la desplegada.
+// Un enlace de correo debe abrir en cualquier dispositivo, nunca en localhost.
+CLIMESA_WEB_URL = https:/$()/sghu-web.onrender.com
 // B-02: Release (IPA de entrega) nunca lleva el selector de cuentas de prueba ni sus contraseñas. Solo Debug incluye
 // ios/DemoLogin.xcconfig; aquí se fuerzan en vacío después de Config.xcconfig para que nada los vuelva a activar.
 #include? "../Config.xcconfig"
