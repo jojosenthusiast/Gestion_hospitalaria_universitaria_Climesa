@@ -60,7 +60,7 @@ export function registerSecurity(app: NestFastifyApplication, config: ConfigServ
   });
   const configured = config.get<string | number>('RATE_LIMIT_MAX');
   // The Jest suites drive hundreds of requests from one address per app; they opt in by setting RATE_LIMIT_MAX.
-  if (config.get('NODE_ENV') === 'test' && configured === undefined) return { rateLimitPerMinute: null };
+  if (config.get('NODE_ENV') === 'test' && (configured === undefined || configured === '')) return { rateLimitPerMinute: null };
   const max = rateLimitPerMinute(configured);
   void app.register(rateLimit, {
     global: true,
