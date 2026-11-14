@@ -3344,6 +3344,127 @@
           }
         }
       }
+    },
+    "auth.forgot": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Olvidaste tu contraseña?"
+          }
+        }
+      }
+    },
+    "auth.reset.headline": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recuperar contraseña"
+          }
+        }
+      }
+    },
+    "auth.reset.sub": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escribe el correo de tu cuenta. Te enviaremos un enlace para crear una contraseña nueva."
+          }
+        }
+      }
+    },
+    "auth.reset.submit": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar enlace"
+          }
+        }
+      }
+    },
+    "auth.reset.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver al ingreso"
+          }
+        }
+      }
+    },
+    "auth.check.headline": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revisa tu correo"
+          }
+        }
+      }
+    },
+    "auth.check.sent": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Te enviamos un enlace de confirmación a:"
+          }
+        }
+      }
+    },
+    "auth.check.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre el correo y toca «Confirmar tu correo». Después vuelve aquí e inicia sesión. Si no lo ves en unos minutos, revisa la carpeta de spam."
+          }
+        }
+      }
+    },
+    "auth.check.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya confirmé, iniciar sesión"
+          }
+        }
+      }
+    },
+    "auth.resend": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reenviar correo de confirmación"
+          }
+        }
+      }
+    },
+    "auth.resend.sending": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviando correo…"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

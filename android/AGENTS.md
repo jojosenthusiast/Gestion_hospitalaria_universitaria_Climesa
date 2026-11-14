@@ -41,4 +41,4 @@ cd android
 
 ## Variables (propiedades de Gradle `CLIMESA_*`)
 
-`app/build.gradle.kts` lee `CLIMESA_API_BASE_URL`, `CLIMESA_SUPABASE_URL` y `CLIMESA_SUPABASE_PUBLISHABLE_KEY` con `providers.gradleProperty` (por ejemplo en `~/.gradle/gradle.properties`) y las pasa a `BuildConfig` como `API_BASE_URL`, `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`. `android/local.properties` solo contiene `sdk.dir` (lo escribe Android Studio) y nunca se sube. Detalle en `README.md`.
+`app/build.gradle.kts` lee `CLIMESA_API_BASE_URL`, `CLIMESA_SUPABASE_URL` y `CLIMESA_SUPABASE_PUBLISHABLE_KEY` con `providers.gradleProperty` (por ejemplo en `~/.gradle/gradle.properties`) y las pasa a `BuildConfig` como `API_BASE_URL`, `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`. `CLIMESA_WEB_URL` (por defecto `https://sghu-web.onrender.com`) llega como `WEB_URL`: los correos de Supabase (confirmación de registro y restablecer contraseña) abren `<WEB_URL>/confirmar-correo` y `<WEB_URL>/restablecer`. `android/local.properties` solo contiene `sdk.dir` (lo escribe Android Studio) y nunca se sube. Detalle en `README.md`.
