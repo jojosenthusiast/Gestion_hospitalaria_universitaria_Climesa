@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Inventario (ronda 2): maestro-detalle, lotes y flujo guiado de movimientos. -->
+    <string name="inv_guardar">Guardar</string>
+    <string name="inv_vencimiento">Vencimiento (año-mes-día)</string>
+    <string name="inv_vacio_no_vence">Vacío si no vence.</string>
+    <string name="inv_registrar_movimiento">Registrar movimiento</string>
+    <string name="inv_numero_lote">Número de lote</string>
+    <string name="inv_nuevo_lote">Nuevo lote</string>
+    <string name="inv_nuevo_articulo">Nuevo artículo</string>
+    <string name="inv_motivo_cambio">Motivo del cambio</string>
+    <string name="inv_editar_articulo">Editar artículo</string>
+    <string name="inv_activo">Activo</string>
+    <string name="inv_volver">Volver a la lista</string>
+    <string name="inv_vencida">Vencida</string>
+    <string name="inv_va_a_bodega">Va a la bodega</string>
+    <string name="inv_unidad">Unidad</string>
+    <string name="inv_sin_lotes">Todavía no hay lotes.</string>
+    <string name="inv_sin_opciones">Sin opciones disponibles.</string>
+    <string name="inv_sin_movimientos">Sin movimientos.</string>
+    <string name="inv_sin_existencia_bodegas">Sin existencia en ninguna bodega.</string>
+    <string name="inv_lote_existente">Si el lote ya existe se suma a él.</string>
+    <string name="inv_quitar_filtros">Quitar filtros</string>
+    <string name="inv_prueba_otra">Prueba con otra palabra o quita los filtros.</string>
+    <string name="inv_por_vencer_30">Por vencer (30 días)</string>
+    <string name="inv_eyebrow">Operaciones / Recursos</string>
+    <string name="inv_buscar_hint">Nombre, código o categoría; sin tildes</string>
+    <string name="inv_nombre">Nombre</string>
+    <string name="inv_sin_articulos">No hay artículos registrados.</string>
+    <string name="inv_sin_coincidencias">Ningún artículo coincide.</string>
+    <string name="inv_minimo">Mínimo</string>
+    <string name="inv_motivo">Motivo</string>
+    <string name="inv_lotes_titulo">Lotes y vencimientos</string>
+    <string name="inv_lote_sugerido">Lote (vence primero: sugerido)</string>
+    <string name="inv_llega_a_bodega">Llega a la bodega</string>
+    <string name="inv_titulo">Inventario</string>
+    <string name="inv_inactivo">Inactivo</string>
+    <string name="inv_historial">Historial de movimientos</string>
+    <string name="inv_existencia">Existencia</string>
+    <string name="inv_existencia_bodega">Existencia por bodega</string>
+    <string name="inv_existencia_minima">Existencia mínima</string>
+    <string name="inv_eliminar">Eliminar artículo</string>
+    <string name="inv_editar_lote">Editar lote</string>
+    <string name="inv_dado_de_baja">Dado de baja</string>
+    <string name="inv_codigo">Código</string>
+    <string name="inv_cantidad">Cantidad</string>
+    <string name="inv_buscar">Buscar artículo</string>
+    <string name="inv_bodega_contaste">Bodega donde contaste</string>
+    <string name="inv_bodega_origen">Bodega de origen</string>
+    <string name="inv_descripcion">Artículos, lotes con vencimiento y movimientos trazables.</string>
+    <string name="inv_motivo_hint_auditoria">Al menos 10 letras; queda en la auditoría.</string>
+    <string name="inv_motivo_hint">Al menos 10 letras.</string>
+</resources>

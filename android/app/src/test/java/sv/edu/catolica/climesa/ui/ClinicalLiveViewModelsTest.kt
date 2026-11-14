@@ -113,6 +113,6 @@ class ClinicalLiveViewModelsTest {
         vm.load(); vm.startLive(listOf("rol:ENF")); runCurrent()
         bus.signals.tryEmit(event("inventario.actualizado", "articulo")); runCurrent()
         bus.signals.tryEmit(event("admision.creada", "admision")); runCurrent()
-        assertEquals(2, api.gets("/inventario/existencias"))
+        assertEquals(2, api.gets("/inventario/articulos"))
     }
 }
