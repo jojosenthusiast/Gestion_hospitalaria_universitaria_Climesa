@@ -1,6 +1,6 @@
 #!/bin/sh
 # TEMPORARY testing aid (docs/operacion/login-de-prueba.md). Generates the git-ignored ios/DemoLogin.xcconfig from
-# ../demo-credenciales.json, so Debug and Release builds show the test-account selector on the sign-in screen.
+# ../demo-credenciales.json, so Debug builds show the test-account selector (Release never includes it) on the sign-in screen.
 #   sh ios/scripts/demo-login.sh        enable (run on the Mac, then build in Xcode)
 #   sh ios/scripts/demo-login.sh --off  disable (delete the generated file; do this before final delivery)
 set -eu

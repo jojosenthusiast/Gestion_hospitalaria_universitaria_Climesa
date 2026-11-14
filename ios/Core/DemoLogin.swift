@@ -1,8 +1,8 @@
 import Foundation
 
 // TEMPORARY testing aid (docs/operacion/login-de-prueba.md): fictitious test accounts the sign-in form can be filled with.
-// The build carries them only when CLIMESA_DEMO_LOGIN = YES and the git-ignored ios/DemoLogin.xcconfig exists
-// (sh ios/scripts/demo-login.sh). Remove before final delivery with sh ios/scripts/demo-login.sh --off.
+// Only Debug builds carry them, and only when CLIMESA_DEMO_LOGIN = YES and the git-ignored ios/DemoLogin.xcconfig exists
+// (sh ios/scripts/demo-login.sh); Release never includes that file. Remove before final delivery with sh ios/scripts/demo-login.sh --off.
 public struct DemoAccount: Equatable, Sendable {
     public let role: String
     public let email: String
@@ -15,9 +15,14 @@ public enum DemoLogin {
     public static let credentialsKey = "ClimesaDemoCredentials"
 
     /// Reads the Info.plist values: `YES` plus the credentials JSON as hexadecimal text (hex survives xcconfig, where `//` starts a comment).
+    /// B-02: a Release build never offers the selector, whatever its Info.plist says (Release.xcconfig also forces it off).
     public static func accounts(info: [String: Any]?) -> [DemoAccount] {
+        #if DEBUG
         guard (info?[enabledKey] as? String) == "YES", let hex = info?[credentialsKey] as? String, let data = decodeHex(hex) else { return [] }
         return parse(data)
+        #else
+        return []
+        #endif
     }
 
     /// Reads `[{"rol","correo","contrasena"}]`; invalid JSON or incomplete entries give no account, never an error.
