@@ -56,7 +56,7 @@ struct RoleTabsView:View {
                             Text(LocalizedStringKey(tab.titleKey)).font(Typo.display).foregroundStyle(Theme.ink).fixedSize(horizontal:false,vertical:true).accessibilityAddTraits(.isHeader)
                             content(for:tab)
                         }.padding(24).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
-                    }.background(Theme.bg).navigationTitle(Text(verbatim:"climesa")).navigationBarTitleDisplayMode(.inline)
+                    }.safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(verbatim:"climesa")).navigationBarTitleDisplayMode(.inline)
                         .toolbarBackground(Theme.navy,for:.navigationBar).toolbarBackground(.visible,for:.navigationBar).toolbarColorScheme(.dark,for:.navigationBar)
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
                         .refreshable { await refresh(tab) }
@@ -64,7 +64,6 @@ struct RoleTabsView:View {
             }
         }
         .environment(live)
-        .safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }
         // Tiempo real: se suscribe al entrar y la conexión se cierra al cancelar la tarea. No hay temporizadores de datos.
         .task(id:profile.channels) {
             let service=await account.makeRealtime()
@@ -104,8 +103,6 @@ struct ConnectionBanner:View {
                 .font(Typo.tag).frame(maxWidth:.infinity).padding(8)
                 .background(state == .offline ? Theme.dangerSoft:Theme.warningSoft).foregroundStyle(state == .offline ? Theme.danger:Theme.warning)
                 .accessibilityAddTraits(.updatesFrequently)
-        } else {
-            LiveIndicator().frame(maxWidth:.infinity,alignment:.trailing).padding(.horizontal,Spacing.l).padding(.vertical,Spacing.xs).background(Theme.bg)
         }
     }
 }
