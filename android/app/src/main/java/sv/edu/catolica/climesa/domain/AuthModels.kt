@@ -36,12 +36,14 @@ object AuthRules {
 }
 
 object RoleAccess {
-    val androidRoles = listOf("JOP", "REC", "AST", "ENF", "MED", "LAB", "PAR", "PAC")
-    val iosRoles = listOf("MED", "PAC")
+    /**
+     * Roles of the account that can enter this app. The backend is the source of truth: the platform comes from
+     * `platforms` of `/auth/me` (`acceso.rol.plataformas`) and the permissions decide which sections exist. The role
+     * catalog of [AndroidSections] only says which roles have Android screens, in its display order.
+     */
     fun allowed(profile: AccessProfile, platform: String): List<String> {
-        if (!profile.verifiedByBackend || platform.lowercase() !in profile.platforms || "sesion.perfil" !in profile.permissions) return emptyList()
-        val catalog = if (platform == "android") androidRoles else if (platform == "ios") iosRoles else emptyList()
-        return catalog.filter { it in profile.roles }
+        if (!profile.verifiedByBackend || platform.lowercase() != "android" || "android" !in profile.platforms || "sesion.perfil" !in profile.permissions) return emptyList()
+        return AndroidSections.roles.filter { it in profile.roles && AndroidSections.hasAppScreens(it, profile.permissions) }
     }
     fun label(role: String) = mapOf("JOP" to "Jefe de Operaciones", "REC" to "Recepción", "AST" to "Asistencia", "ENF" to "Enfermería", "MED" to "Medicina", "LAB" to "Laboratorio", "PAR" to "Paramédico", "PAC" to "Paciente")[role] ?: role
 }
@@ -105,6 +107,9 @@ object AndroidSections {
         "PAR" to listOf(AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "PAC" to listOf(AndroidSection.HOME, AndroidSection.LINK_RECORD, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
     )
+
+    /** Roles with an Android catalog, in display order. */
+    val roles: List<String> get() = roleCatalog.keys.toList()
 
     /**
      * Permissions remain the security source of truth. The role catalog only prevents the UI from exposing a

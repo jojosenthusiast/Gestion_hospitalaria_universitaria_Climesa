@@ -5,8 +5,7 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.coroutineContext
 /** Mensaje de error del API: `detail` de application/problem+json, con respaldo al formato anterior `error.message`. */
 internal fun apiErrorMessage(body:String):String?=runCatching {
     val json=JSONObject(body)
@@ -18,16 +17,33 @@ internal fun apiErrorCode(body:String):String?=runCatching{JSONObject(body).optS
 interface ApiGateway {
     suspend fun request(path:String,method:String="GET",body:JSONObject?=null):Any
 }
-class ApiClient(private val baseUrl:String,private val auth:SupabaseAuthRepository):ApiGateway {
-    private val attempts=ConcurrentHashMap<String,String>()
+/**
+ * REST adapter. A 401 renews the session once and repeats the call ([authorizedCall]); if it fails again the session
+ * is closed through [SessionExpiry]. Writes carry the key of the user intent ([RequestIntent], set by
+ * [SubmissionIntent]) or, without one, the bounded per-request fallback of [IdempotencyKeys].
+ */
+class ApiClient(
+    private val baseUrl:String,
+    private val tokens:SessionTokens,
+    private val expiry:SessionExpiry,
+    private val keys:IdempotencyKeys=IdempotencyKeys(),
+):ApiGateway {
     override suspend fun request(path:String,method:String,body:JSONObject?):Any=withContext(Dispatchers.IO) {
         if(baseUrl.isBlank())throw AuthRequestException("Configura la dirección de la API de CLIMESA.")
-        val session=auth.restoreSession()?:throw AuthRequestException("Ingresa nuevamente para continuar.",401)
         val signature=method+path+(body?.toString()?:"")
-        val key=if(method!="GET")attempts.getOrPut(signature){UUID.randomUUID().toString()}else null
+        val intent=coroutineContext[RequestIntent]?.idempotencyKey
+        val key=if(method!="GET")intent?:keys.keyFor(signature) else null
+        var status:Int?=null
+        try {
+            authorizedCall(tokens,expiry){token->send(path,method,body,token,key).also{status=200}}
+        } catch(e:AuthRequestException){status=e.statusCode;throw e} finally {
+            if(key!=null&&intent==null)keys.settle(signature,status)
+        }
+    }
+    private fun send(path:String,method:String,body:JSONObject?,token:String,key:String?):Any {
         val c=(URL(baseUrl.trimEnd('/')+path).openConnection() as HttpURLConnection).apply {
             useCaches=false;requestMethod=method;connectTimeout=15000;readTimeout=20000
-            setRequestProperty("Accept","application/json");setRequestProperty("Authorization","Bearer ${session.accessToken}")
+            setRequestProperty("Accept","application/json");setRequestProperty("Authorization","Bearer $token")
             key?.let{setRequestProperty("Idempotency-Key",it)}
             if(body!=null){doOutput=true;setRequestProperty("Content-Type","application/json; charset=utf-8")}
         }
@@ -36,8 +52,7 @@ class ApiClient(private val baseUrl:String,private val auth:SupabaseAuthReposito
             val status=c.responseCode
             val text=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}.orEmpty()
             if(status !in 200..299){val message=apiErrorMessage(text);throw AuthRequestException(message?.takeIf{it.isNotBlank()}?:"No se pudo completar la operación (HTTP $status).",status,apiErrorCode(text))}
-            attempts.remove(signature)
-            if(text.isBlank())JSONObject()else JSONTokener(text).nextValue()
+            return if(text.isBlank())JSONObject()else JSONTokener(text).nextValue()
         } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("Sin conexión. Conservamos el formulario; vuelve a intentar.")} finally {c.disconnect()}
     }
 }

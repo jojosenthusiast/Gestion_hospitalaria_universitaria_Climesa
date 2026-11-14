@@ -132,19 +132,18 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
             else if(data.error!=null)item{ClimesaActionGroup {Text(data.error!!,color=MaterialTheme.colorScheme.error);ClimesaButton(stringResource(R.string.camas_reintentar),Icons.Default.Refresh,{model.load(path)})}}
             else if(page==AndroidSection.HOME){
                 item{Surface(color=BrandBlue,shape=MaterialTheme.shapes.large,tonalElevation=2.dp){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(account.profile.name.ifBlank{"Bienvenido a CLIMESA"},style=MaterialTheme.typography.titleLarge,color=Color.White);Text(RoleAccess.label(role),color=Color(0xFFD4D9FF),style=MaterialTheme.typography.bodySmall)}}}
-                val summary=data.data as? JSONObject
-                val beds=summary?.optJSONObject("beds")
-                if(beds!=null)item{ClimesaCard {Text("${beds.optInt("free")} de ${beds.optInt("total")} camas libres",Modifier.padding(18.dp),style=MaterialTheme.typography.titleMedium)}}
+                val beds=PortalParsers.bedSummary(data.data)
+                if(beds!=null)item{ClimesaCard {Text("${beds.free} de ${beds.total} camas libres",Modifier.padding(18.dp),style=MaterialTheme.typography.titleMedium)}}
                 items(sections.filter{it!=AndroidSection.HOME}){s->ClimesaClickableCard(onClick={selectedName=s.name}){Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Text(s.label,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);Icon(Icons.Default.ChevronRight,null,tint=MaterialTheme.colorScheme.primary)}}}
             }else if(page==AndroidSection.PATIENTS){
                 item{ClimesaActionGroup {OutlinedTextField(query,{query=it.take(100)},label={Text("Nombre, DUI o expediente")},modifier=Modifier.fillMaxWidth(),singleLine=true);ClimesaButton("Buscar paciente",Icons.Default.Search,{model.load("/pacientes?query="+URLEncoder.encode(query,"UTF-8")+"&limit=50")},enabled=query.trim().length>=2)}}
-                val rows=data.data as? JSONArray
-                if(rows==null||rows.length()==0)item{Text("No hay coincidencias. Ajusta la búsqueda.")}
-                else items((0 until rows.length()).toList()){i->val p=rows.getJSONObject(i);Column(verticalArrangement=Arrangement.spacedBy(8.dp)){Text(p.optString("fullName"),style=MaterialTheme.typography.titleMedium);Text("EXP. ${p.optString("record")}",style=MaterialTheme.typography.labelSmall);HorizontalDivider()}}
+                val rows=PortalParsers.patients(data.data)
+                if(rows.isEmpty())item{Text("No hay coincidencias. Ajusta la búsqueda.")}
+                else items(rows){p->Column(verticalArrangement=Arrangement.spacedBy(8.dp)){Text(p.fullName,style=MaterialTheme.typography.titleMedium);Text("EXP. ${p.record}",style=MaterialTheme.typography.labelSmall);HorizontalDivider()}}
             }else if(page==AndroidSection.UNIT){
-                val unit=(data.data as? JSONObject)?.optJSONObject("unit");val service=(data.data as? JSONObject)?.optJSONObject("activeService")
-                item{ClimesaCard {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(unit?.optString("plate").orEmpty(),style=MaterialTheme.typography.titleMedium);Text("${stringResource(R.string.unidad_estado)}: ${unitStates[unit?.optString("state")]?:unit?.optString("state").orEmpty()}",color=MaterialTheme.colorScheme.primary);Text("${stringResource(R.string.unidad_paramedico_turno)}: ${stringResource(if((data.data as? JSONObject)?.optBoolean("paramedicOnDuty")==true)R.string.unidad_si else R.string.unidad_no)}",style=MaterialTheme.typography.bodySmall);HorizontalDivider();if(service==null)Text(stringResource(R.string.unidad_sin_servicio)) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${service.optString("origin")} → ${service.optString("destination")}")}}}}
-                if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.optString("state")))item{MaintenanceControl(model,unit.optString("state"),unit.optInt("version"),(data.data as? JSONObject)?.optBoolean("paramedicOnDuty")==true)}
+                val unit=PortalParsers.unit(data.data)
+                item{ClimesaCard {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(unit?.plate.orEmpty(),style=MaterialTheme.typography.titleMedium);Text("${stringResource(R.string.unidad_estado)}: ${unitStates[unit?.state]?:unit?.state.orEmpty()}",color=MaterialTheme.colorScheme.primary);Text("${stringResource(R.string.unidad_paramedico_turno)}: ${stringResource(if(unit?.paramedicOnDuty==true)R.string.unidad_si else R.string.unidad_no)}",style=MaterialTheme.typography.bodySmall);HorizontalDivider();if(unit?.hasService!=true)Text(stringResource(R.string.unidad_sin_servicio)) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${unit.serviceOrigin.orEmpty()} → ${unit.serviceDestination.orEmpty()}")}}}}
+                if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.state))item{MaintenanceControl(model,unit.state,unit.version,unit.paramedicOnDuty)}
             }else if(page==AndroidSection.SHIFTS){
                 val shifts=MyShifts.parse(data.data)
                 if(shifts.isEmpty())item{Text("No tienes turnos publicados.",style=MaterialTheme.typography.bodyMedium)}

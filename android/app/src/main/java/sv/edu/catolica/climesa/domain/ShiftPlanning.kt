@@ -104,12 +104,13 @@ object ShiftPlanning {
         .put("staffId", shift.staffId).put("areaId", shift.areaId).put("start", shift.start).put("end", shift.end)
         .put("type", shift.type).put("state", "cancelado").put("version", shift.version).put("reason", reason.trim())
 
+    /** A malformed `start`/`end` from the API leaves those fields empty instead of crashing the screen. */
     fun formOf(shift: PlannedShift): ShiftForm {
-        val start = Instant.parse(shift.start).atZone(zone)
-        val end = Instant.parse(shift.end).atZone(zone)
+        val start = runCatching { Instant.parse(shift.start).atZone(zone) }.getOrNull()
+        val end = runCatching { Instant.parse(shift.end).atZone(zone) }.getOrNull()
         return ShiftForm(
-            shift.staffId, shift.areaId, start.toLocalDate().toString(), timeFormat.format(start),
-            end.toLocalDate().toString(), timeFormat.format(end), shift.type, shift.justification.orEmpty(),
+            shift.staffId, shift.areaId, start?.toLocalDate()?.toString().orEmpty(), start?.let(timeFormat::format).orEmpty(),
+            end?.toLocalDate()?.toString().orEmpty(), end?.let(timeFormat::format).orEmpty(), shift.type, shift.justification.orEmpty(),
         )
     }
 

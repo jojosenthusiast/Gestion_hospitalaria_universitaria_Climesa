@@ -62,7 +62,7 @@ class AndroidSectionsTest {
         )
         val principalScreens = mapOf("JOP" to "A34", "REC" to "A30", "AST" to "A40", "ENF" to "A50", "MED" to "A20", "LAB" to "A60", "PAR" to "A70", "PAC" to "A04")
 
-        assertEquals(RoleAccess.androidRoles.toSet(), expected.keys)
+        assertEquals(AndroidSections.roles.toSet(), expected.keys)
         expected.forEach { (role, sections) ->
             assertEquals("Catálogo incorrecto para $role", sections, AndroidSections.visible(role, permissions))
             assertEquals("Destino principal incorrecto para $role", principalScreens[role], sections.first().screenId)

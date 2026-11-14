@@ -22,3 +22,21 @@ jobs:
         with:
           name: CLIMESA-Android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      # Release: firmado solo si existen los secretos; sin ellos genera app-release-unsigned.apk.
+      - name: Release APK
+        working-directory: android
+        env:
+          CLIMESA_RELEASE_KEYSTORE_BASE64: ${{ secrets.CLIMESA_RELEASE_KEYSTORE_BASE64 }}
+          CLIMESA_RELEASE_STORE_PASSWORD: ${{ secrets.CLIMESA_RELEASE_STORE_PASSWORD }}
+          CLIMESA_RELEASE_KEY_ALIAS: ${{ secrets.CLIMESA_RELEASE_KEY_ALIAS }}
+          CLIMESA_RELEASE_KEY_PASSWORD: ${{ secrets.CLIMESA_RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$CLIMESA_RELEASE_KEYSTORE_BASE64" ]; then
+            echo "$CLIMESA_RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/climesa-release.jks"
+            export CLIMESA_RELEASE_STORE_FILE="$RUNNER_TEMP/climesa-release.jks"
+          fi
+          ./gradlew assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CLIMESA-Android-release
+          path: android/app/build/outputs/apk/release/*.apk

@@ -98,3 +98,14 @@ Decisiones conservadoras tomadas mientras se confirman:
 | FR-106-09 | ¿El historial del paciente incluye hospitalizaciones? | No (A08 pide consultas, diagnósticos y recetas); las ven solo el personal con relación o acceso excepcional |
 | W27 | ¿El nombre de la cuenta debe coincidir con el del expediente para aprobar? | Se muestra como dato de apoyo ("Coincide"/"Revisar"); la API solo exige DUI y fecha de nacimiento |
 | A22 | No hay rol web con `expediente.ver`; el diálogo de historial web solo aparece a quien lo tenga (hoy, nadie en la web por catálogo) | Se mantiene detrás del permiso; Android A22 es la vista del médico |
+
+## Remediación de la auditoría 2026-11-13 (fase 1, Android; rama fix/fase1-android)
+
+Decisiones conservadoras tomadas mientras se confirman:
+
+| Hallazgo | Pregunta | Opción aplicada |
+|---|---|---|
+| AND-13 | A05 "Mi turno en fila" (PAC) pide "cuántos faltan", pero no existe `GET /me/fila` en el contrato. ¿Se crea ese endpoint? | No se inventa la ruta (regla 11): A05 sigue sobre `GET /fila` con `fila.ver`, y la privacidad depende del filtro del servidor. A07 ya usa `GET /me/laboratorio` |
+| AND-12 | JOP ve en Android A34, A35 y A53, que `pantallas.csv` asigna solo a REC y ENF (para JOP el CSV solo da A10, A12 y A26). ¿JOP conserva esos destinos en Android? | Se mantienen (son los mismos flujos que JOP tiene en la web, W12 a W14 y W22, y ya se probaron con sus cuentas); falta registrar la decisión o actualizar el CSV. `PLANNING` y `STAFF` siguen fuera del catálogo |
+| AND-08 | ¿El APK de entrega se firma con un keystore institucional o del equipo? | El build lee la firma de propiedades de Gradle o variables de entorno (`CLIMESA_RELEASE_*`); sin ellas genera un APK sin firmar. Nadie sube el keystore al repositorio |
+| CON-07 | ¿Cuánto vive la intención de un formulario? | En Android, mientras viva el ViewModel de la cuenta: si el proceso muere, el reintento recibe una clave nueva. Termina con la respuesta 2xx o con `idempotencia_conflicto`; los formularios sin `SubmissionIntent` usan la clave por petición (método, ruta y cuerpo) hasta una respuesta definitiva |
