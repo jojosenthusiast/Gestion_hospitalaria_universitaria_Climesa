@@ -78,6 +78,20 @@ def celda(valor):
     return CONTEXTO.get(valor, valor) if valor else "·"
 
 
+def partes_permiso(permiso):
+    """`A OR B` en endpoints.csv: el endpoint admite cualquiera de los permisos."""
+    return [x.strip() for x in permiso.split(" OR ")]
+
+
+def celda_alternativas(partes, codigo):
+    """Un endpoint con `A OR B` admite al rol que tenga cualquiera de los permisos."""
+    valores = []
+    for p in partes:
+        if p[codigo] and celda(p[codigo]) not in valores:
+            valores.append(celda(p[codigo]))
+    return " / ".join(valores) if valores else "·"
+
+
 def esc(texto):
     return texto.replace("|", "\\|")
 
@@ -145,9 +159,9 @@ def generar_rbac(roles, permisos, endpoints):
                 valores = " | ".join("✔" for _ in codigos)
                 permiso = "público, sin sesión"
             else:
-                p = por_permiso[e["permiso"]]
-                valores = " | ".join(celda(p[c]) for c in codigos)
-                permiso = f"`{e['permiso']}`"
+                partes = [por_permiso[x] for x in partes_permiso(e["permiso"])]
+                valores = " | ".join(celda_alternativas(partes, c) for c in codigos)
+                permiso = " o ".join(f"`{x}`" for x in partes_permiso(e["permiso"]))
             lineas.append(
                 f"| {e['metodo']} | `{e['ruta']}` | {permiso} | {esc(e['contexto'])} | {e['nivel']} | {e['semana']} | {valores} |"
             )
@@ -315,8 +329,11 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
     errores = []
     nombres = {p["permiso"] for p in permisos}
     for e in endpoints:
-        if e["permiso"] != "(público)" and e["permiso"] not in nombres:
-            errores.append(f"Endpoint {e['metodo']} {e['ruta']} usa permiso inexistente {e['permiso']}")
+        if e["permiso"] == "(público)":
+            continue
+        for parte in partes_permiso(e["permiso"]):
+            if parte not in nombres:
+                errores.append(f"Endpoint {e['metodo']} {e['ruta']} usa permiso inexistente {parte}")
         if e["nivel"] not in ("R", "E", "F"):
             errores.append(f"Endpoint {e['ruta']} con nivel inválido {e['nivel']}")
     por_permiso = {p["permiso"]: p for p in permisos}
@@ -327,7 +344,7 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
     for codigo in PERMISOS_POSTERIORES:
         if codigo not in nombres:
             errores.append(f"PERMISOS_POSTERIORES menciona {codigo}, que no está en permisos.csv")
-    usados = {e["permiso"] for e in endpoints}
+    usados = {parte for e in endpoints for parte in partes_permiso(e["permiso"])}
     for p in permisos:
         if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante" and p["permiso"] not in PERMISOS_POSTERIORES:
             errores.append(f"Permiso {p['permiso']} sin endpoint")
