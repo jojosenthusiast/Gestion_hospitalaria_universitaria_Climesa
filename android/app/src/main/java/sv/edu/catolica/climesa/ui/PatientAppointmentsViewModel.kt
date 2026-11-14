@@ -23,14 +23,13 @@ import sv.edu.catolica.climesa.domain.ReceptionScheduling
 import sv.edu.catolica.climesa.domain.PatientAppointment
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 import java.time.LocalDate
-import java.time.ZoneId
 
 data class PatientAppointmentsState(
     val loading: Boolean = true,
     val appointments: List<PatientAppointment> = emptyList(),
     val doctors: List<AppointmentDoctor> = emptyList(),
     val selectedDoctorId: String = "",
-    val selectedDate: LocalDate = LocalDate.now(ZoneId.of("America/El_Salvador")).plusDays(1),
+    val selectedDate: LocalDate = ReceptionScheduling.today(),
     val workPeriods: List<AppointmentWorkPeriod> = emptyList(),
     val slots: List<AppointmentSlot> = emptyList(),
     /** Todas las franjas del día con su estado (libre, ocupado, sin turno, ya pasó). */

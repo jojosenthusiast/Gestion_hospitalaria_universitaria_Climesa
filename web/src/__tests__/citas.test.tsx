@@ -61,6 +61,22 @@ describe('W28 · agendar cita como Recepción (W-01)', () => {
     expect(paths.some(p => p.startsWith('/personal') || p === '/pacientes' || p.startsWith('/pacientes?'))).toBe(false);
   });
 
+  // Producción, 14/11/2026: el formulario abría en mañana; la cita "de hoy" quedaba para el día siguiente y el médico
+  // con turno hoy salía "Sin turno". La fecha inicial es hoy en El Salvador (UTC-6).
+  it('abre en la fecha de hoy de El Salvador y consulta médicos y franjas de hoy', async () => {
+    const api = mount();
+    const today = new Date(Date.now() - 6 * 3_600_000).toISOString().slice(0, 10);
+    await userEvent.click(await screen.findByRole('button', { name: /Agendar cita/ }));
+    const dialog = screen.getByRole('dialog');
+    expect((within(dialog).getByLabelText(/^Fecha/) as HTMLInputElement).value).toBe(today);
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Médico' }));
+    await userEvent.click(await within(dialog).findByRole('option', { name: /Médica Ficticia/ }));
+    await within(dialog).findByRole('button', { name: /no disponible: Ocupado/ });
+    const paths = api.request.mock.calls.map(([path]) => String(path));
+    expect(paths).toContain(`/citas/catalogos?date=${today}`);
+    expect(paths).toContain(`/citas/disponibilidad?doctorId=d-1&date=${today}`);
+  });
+
   it('muestra todas las franjas: las libres se eligen y las ocupadas salen apagadas con su motivo', async () => {
     const api = mount();
     await userEvent.click(await screen.findByRole('button', { name: /Agendar cita/ }));

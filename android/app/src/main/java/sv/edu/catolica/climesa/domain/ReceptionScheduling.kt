@@ -2,6 +2,9 @@ package sv.edu.catolica.climesa.domain
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneId
 
 /** Row of `GET /pacientes/selector`: lo mínimo para elegir a alguien en una lista con búsqueda. */
 data class PickerPatient(val id: String, val record: String, val name: String, val age: Int?) {
@@ -26,6 +29,9 @@ data class SchedulingDoctor(val id: String, val name: String, val specialty: Str
 data class ReceptionAppointment(val id: String, val patientName: String, val doctorName: String, val start: String, val end: String, val state: String, val version: Int)
 
 object ReceptionScheduling {
+    /** Día con que abre el formulario de cita: hoy en El Salvador. Abrir en mañana dejaba la cita "de hoy" para el día siguiente. */
+    fun today(clock: Clock = Clock.systemUTC()): LocalDate = LocalDate.now(clock.withZone(ZoneId.of("America/El_Salvador")))
+
     /** El selector busca desde dos caracteres, sin tener en cuenta tildes (la API normaliza igual). */
     const val MIN_QUERY = 2
     const val DEBOUNCE_MS = 250L

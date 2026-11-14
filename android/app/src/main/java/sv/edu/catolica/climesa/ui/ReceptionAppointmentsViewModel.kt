@@ -24,7 +24,6 @@ import sv.edu.catolica.climesa.domain.RealtimeSignal
 import sv.edu.catolica.climesa.domain.SchedulingDoctor
 import java.net.URLEncoder
 import java.time.LocalDate
-import java.time.ZoneId
 
 data class ReceptionAppointmentsState(
     val loading: Boolean = true,
@@ -35,7 +34,7 @@ data class ReceptionAppointmentsState(
     val hasMore: Boolean = false,
     val searching: Boolean = false,
     val patient: PickerPatient? = null,
-    val date: LocalDate = LocalDate.now(ZoneId.of("America/El_Salvador")).plusDays(1),
+    val date: LocalDate = ReceptionScheduling.today(),
     val doctors: List<SchedulingDoctor> = emptyList(),
     val doctor: SchedulingDoctor? = null,
     val slots: List<DaySlot> = emptyList(),

@@ -7,8 +7,21 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 class ReceptionSchedulingTest {
+    // Producción, 14/11/2026: agendar abría en mañana y la cita "de hoy" no quedaba hoy. Hoy es el día de El Salvador
+    // (UTC-6), aunque en UTC ya sea el día siguiente.
+    @Test fun schedulingStartsTodayInElSalvador() {
+        val lateEvening = Clock.fixed(Instant.parse("2026-11-15T05:30:00Z"), ZoneOffset.UTC)
+        assertEquals(LocalDate.parse("2026-11-14"), ReceptionScheduling.today(lateEvening))
+        val morning = Clock.fixed(Instant.parse("2026-11-14T14:00:00Z"), ZoneOffset.UTC)
+        assertEquals(LocalDate.parse("2026-11-14"), ReceptionScheduling.today(morning))
+    }
+
     @Test fun searchNeedsTwoCharactersIgnoringAccentsAndSpaces() {
         assertFalse(ReceptionScheduling.canSearch("m"))
         assertFalse(ReceptionScheduling.canSearch(" á "))

@@ -159,6 +159,25 @@ describe('turnos · asignar turno de punta a punta (obs. 9)', () => {
     expect([ruta, metodo]).toEqual(['/turnos', 'POST']);
     expect(cuerpo).toMatchObject({ staffId: 's-2', areaId: 'a-1', type: 'nocturno', start: '2026-11-21T01:00:00.000Z', end: '2026-11-21T13:00:00.000Z' });
   });
+
+  // Producción, 14/11/2026: «le doy asignar y no pasa nada». El botón apagado no decía qué faltaba y el rechazo de la
+  // API quedaba arriba del formulario, fuera de la vista.
+  it('dice qué falta para guardar y lleva a la vista el rechazo de la API', async () => {
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    montar(jefatura, [], async () => { throw new ApiError('La persona ya tiene un turno asignado para la jornada del 2026-11-20.', 409, 'personal_jornada_ocupada'); });
+    await userEvent.click(await screen.findByRole('button', { name: /Asignar turno/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Asignar turno' });
+    expect(within(dialogo).getByText(/Para guardar falta indicar el área, la fecha, la hora de inicio, la hora de fin, la persona/)).toBeTruthy();
+    await elegirArea(dialogo, 'emerg', /Emergencia/);
+    await horario(dialogo, '19:00', '07:00');
+    await userEvent.click(within(dialogo).getByRole('combobox', { name: 'Persona' }));
+    await userEvent.click(screen.getByRole('option', { name: /Rosa Enfermera/ }));
+    expect(within(dialogo).queryByText(/Para guardar falta/)).toBeNull();
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Asignar turno' }));
+    expect(await within(dialogo).findByText(/ya tiene un turno asignado/)).toBeTruthy();
+    expect(scrolled).toHaveBeenCalled();
+  });
 });
 
 describe('turnos · cancelar (PATCH /turnos/{id})', () => {

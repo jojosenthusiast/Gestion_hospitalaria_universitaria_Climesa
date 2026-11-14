@@ -11,7 +11,8 @@ import { Dialog, Empty, Heading, RemoteState, SaveButton, Select, Tag, WriteErro
 import './appointments.css';
 
 const localIso = (value: string) => new Date(`${value}-06:00`).toISOString();
-const localInput = (date = new Date(Date.now() + 86_400_000)) => {
+// La fecha inicial es hoy en El Salvador: abrir en mañana dejaba la cita "de hoy" para el día siguiente.
+const localInput = (date = new Date()) => {
   const local = new Date(date.valueOf() - 6 * 3_600_000);
   return local.toISOString().slice(0, 16);
 };
@@ -111,6 +112,7 @@ function AppointmentForm({ api, version, onClose, onSaved }: { api: Api; version
   const franjas = availability?.franjas ?? [];
   const selectedSlot = franjas.find(item => item.start === slot && item.estado === 'libre');
   const freeCount = franjas.filter(item => item.estado === 'libre').length;
+  const missing = [!patient && 'el paciente', !doctorId && 'el médico', !selectedSlot && 'una franja libre'].filter(Boolean).join(', ');
   async function save(e: FormEvent) { e.preventDefault(); if (!selectedSlot || !patient) return; if (await action.run('/citas', { patientId: patient.id, doctorId, start: selectedSlot.start, end: selectedSlot.end, reason: reason || undefined })) onSaved(); }
   return <Dialog title="Agendar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><p className="form-intro">Busca al paciente por nombre, DUI o expediente (sin importar tildes), elige un médico con turno y toca una franja libre de 20 minutos. La API vuelve a validar el horario al confirmar.</p><WriteError error={action.error} onReload={onSaved} />
     <div className="form-grid"><SearchPicker label="Paciente" value={patient} onChange={setPatient} search={patientPicker(api)} required emptyText="No hay pacientes con ese nombre, DUI o expediente." hint="Escribe al menos 2 letras o números." /><Field label="Fecha" type="date" value={date} onChange={value => setDate(value)} required /><SearchPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} required emptyText={catalogs.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint="Los médicos sin turno ese día aparecen apagados." /></div>
@@ -124,7 +126,7 @@ function AppointmentForm({ api, version, onClose, onSaved }: { api: Api; version
         {franjas.length > 0 && freeCount === 0 && <Notice kind="info">No quedan franjas libres este día. Prueba con otra fecha.</Notice>}</>}
     </section>
     <Field label="Motivo · opcional" value={reason} onChange={setReason} maxLength={500} />
-    {availabilityError && <Notice kind="error">{availabilityError}</Notice>}{selectedSlot && <Notice kind="info">Horario elegido: {timeOnly(selectedSlot.start)}–{timeOnly(selectedSlot.end)}. Si otra persona lo ocupa antes de confirmar, el sistema te pedirá seleccionar otro.</Notice>}<div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} disabled={!selectedSlot || !patient} label="Confirmar cita" /></div></form></Dialog>;
+    {availabilityError && <Notice kind="error">{availabilityError}</Notice>}{missing && <p className="form-hint" role="status">Para confirmar falta elegir {missing}.</p>}{selectedSlot && <Notice kind="info">Horario elegido: {timeOnly(selectedSlot.start)}–{timeOnly(selectedSlot.end)}. Si otra persona lo ocupa antes de confirmar, el sistema te pedirá seleccionar otro.</Notice>}<div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} disabled={!selectedSlot || !patient} label="Confirmar cita" /></div></form></Dialog>;
 }
 
 function AppointmentAction({ api, appointment, canManage, onClose, onSaved }: { api: Api; appointment: Appointment; canManage: boolean; onClose: () => void; onSaved: () => void }) {

@@ -38,9 +38,15 @@ export function RemoteState<T>({state,children}:{state:Remote<T>;children:(data:
 }
 export function Empty({title,description}:{title:string;description:string}){return <div className="empty-state" role="status"><span className="empty-state-icon"><Icon name="search" size={28}/></span><h2>{title}</h2><p>{description}</p></div>;}
 /** WEB-04: with `onReload`, a version conflict offers the common "Cerrar y recargar" action (design 04, state "Conflicto"). */
+/** Error de una escritura. Se desplaza a la vista al aparecer: en un formulario largo quedaba arriba, fuera de pantalla, y parecía que el botón no hacía nada. */
 export function WriteError({error,onReload,reloadLabel='Cerrar y recargar'}:{error:ApiError|null;onReload?:()=>void;reloadLabel?:string}){
- if(error&&onReload&&isVersionConflict(error))return <div className="conflict-notice"><Notice kind="error">{error.message} Alguien cambió este registro mientras lo tenías abierto; tus cambios no se guardaron.</Notice><button type="button" className="secondary-button" onClick={onReload}><Icon name="retry" size={18}/>{reloadLabel}</button></div>;
- return error?<Notice kind="error">{isVersionConflict(error)?`${error.message} Conservamos lo que escribiste; cierra y vuelve a abrir el registro para cargar su estado actual.`:error.message}</Notice>:null;}
+ const ref=useRef<HTMLDivElement>(null);
+ useEffect(()=>{if(error)ref.current?.scrollIntoView?.({block:'center',behavior:'smooth'});},[error]);
+ if(!error)return null;
+ return <div ref={ref} className="write-error"><WriteErrorBody error={error} onReload={onReload} reloadLabel={reloadLabel}/></div>;}
+function WriteErrorBody({error,onReload,reloadLabel}:{error:ApiError;onReload?:()=>void;reloadLabel:string}){
+ if(onReload&&isVersionConflict(error))return <div className="conflict-notice"><Notice kind="error">{error.message} Alguien cambió este registro mientras lo tenías abierto; tus cambios no se guardaron.</Notice><button type="button" className="secondary-button" onClick={onReload}><Icon name="retry" size={18}/>{reloadLabel}</button></div>;
+ return <Notice kind="error">{isVersionConflict(error)?`${error.message} Conservamos lo que escribiste; cierra y vuelve a abrir el registro para cargar su estado actual.`:error.message}</Notice>;}
 export function Dialog({title,onClose,busy=false,children}:{title:string;onClose:()=>void;busy?:boolean;children:ReactNode}){
  const ref=useRef<HTMLDialogElement>(null),titleId=useId();
  useEffect(()=>{const node=ref.current;node?.showModal();return()=>{node?.close();};},[]);
