@@ -35,6 +35,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.HorizontalDivider
+import sv.edu.catolica.climesa.R
 import androidx.compose.ui.unit.dp
 import sv.edu.catolica.climesa.domain.AndroidNavigationMode
 import sv.edu.catolica.climesa.domain.AndroidNavigationPolicy
@@ -123,11 +128,7 @@ private fun CompactRoleScaffold(
                         onClick = { onSelected(section) },
                         icon = { Icon(iconFor(section), contentDescription = null) },
                         label = { Text(compactLabel(section), maxLines = 2) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primary,
-                        ),
+                        colors = barItemColors(),
                     )
                 }
             }
@@ -152,6 +153,7 @@ private fun RailRoleScaffold(
             Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).safeDrawingPadding()) {
                 sections.forEach { section ->
                     NavigationRailItem(
+                        colors = railItemColors(),
                         selected = selected == section,
                         onClick = { onSelected(section) },
                         icon = { Icon(iconFor(section), contentDescription = null) },
@@ -187,10 +189,16 @@ private fun DrawerRoleScaffold(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
             ) {
                 Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).safeDrawingPadding().padding(horizontal = 12.dp, vertical = 20.dp)) {
-                    Text("CLIMESA", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-                    Text("Navegación", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 20.dp))
+                    Row(Modifier.padding(start = 12.dp, bottom = 20.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+                        BrandMark()
+                        Column {
+                            Text(stringResource(R.string.ui_marca), style = MaterialTheme.typography.titleLarge)
+                            Text(stringResource(R.string.ui_marca_subtitulo), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                     sections.forEach { section ->
                         NavigationDrawerItem(
+                            colors = drawerItemColors(),
                             label = { Text(section.label, maxLines = 2) },
                             selected = selected == section,
                             onClick = { onSelected(section) },
@@ -198,7 +206,7 @@ private fun DrawerRoleScaffold(
                         )
                     }
                     androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                    NavigationDrawerItem(label = { Text("Cerrar sesión") }, selected = false, onClick = onLogout, icon = { Icon(Icons.Default.Logout, contentDescription = null) })
+                    NavigationDrawerItem(label = { Text(stringResource(R.string.cerrar_sesion)) }, selected = false, onClick = onLogout, icon = { Icon(Icons.Default.Logout, contentDescription = null) })
                 }
             }
         },
@@ -222,9 +230,10 @@ private fun RoleMenuSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxHeight(0.82f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text("Más funciones", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
+            Text(stringResource(R.string.ui_mas_funciones), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
             sections.forEach { section ->
                 NavigationDrawerItem(
+                    colors = drawerItemColors(),
                     label = { Text(section.label, maxLines = 2) },
                     selected = selected == section,
                     onClick = { onSelected(section) },
@@ -232,7 +241,34 @@ private fun RoleMenuSheet(
                 )
             }
             androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-            NavigationDrawerItem(label = { Text("Cerrar sesión") }, selected = false, onClick = onLogout, icon = { Icon(Icons.Default.Logout, contentDescription = null) })
+            NavigationDrawerItem(label = { Text(stringResource(R.string.cerrar_sesion)) }, selected = false, onClick = onLogout, icon = { Icon(Icons.Default.Logout, contentDescription = null) })
         }
     }
 }
+
+// Selected section reads like the web nav: soft blue pill with the primary text colour.
+@Composable
+internal fun barItemColors() = NavigationBarItemDefaults.colors(
+    selectedIconColor = MaterialTheme.climesa.primaryText,
+    selectedTextColor = MaterialTheme.climesa.primaryText,
+    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
+
+@Composable
+internal fun railItemColors() = NavigationRailItemDefaults.colors(
+    selectedIconColor = MaterialTheme.climesa.primaryText,
+    selectedTextColor = MaterialTheme.climesa.primaryText,
+    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
+
+@Composable
+internal fun drawerItemColors() = NavigationDrawerItemDefaults.colors(
+    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+    selectedIconColor = MaterialTheme.climesa.primaryText,
+    selectedTextColor = MaterialTheme.climesa.primaryText,
+    unselectedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+)

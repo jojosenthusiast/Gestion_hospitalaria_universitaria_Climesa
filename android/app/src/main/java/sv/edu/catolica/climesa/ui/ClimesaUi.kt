@@ -34,8 +34,8 @@ internal fun ClimesaCard(
     Surface(
         modifier = modifier.fillMaxWidth().animateContentSize(),
         color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-        tonalElevation = 1.dp,
+        shape = MaterialTheme.shapes.medium,
+        border = cardBorder(),
         shadowElevation = 1.dp,
         content = content,
     )
@@ -51,8 +51,8 @@ internal fun ClimesaClickableCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().animateContentSize(),
         color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-        tonalElevation = 1.dp,
+        shape = MaterialTheme.shapes.medium,
+        border = cardBorder(),
         shadowElevation = 1.dp,
         content = content,
     )
@@ -66,7 +66,7 @@ internal fun SectionIntro(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Text(eyebrow.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        Text(eyebrow.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.climesa.primaryText)
         Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
         detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis) }
     }
@@ -81,29 +81,7 @@ internal fun ClimesaButton(
     enabled: Boolean = true,
     outlined: Boolean = false,
 ) {
-    val content: @Composable RowScope.() -> Unit = {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(text, modifier = Modifier.weight(1f), maxLines = 2, style = MaterialTheme.typography.labelLarge)
-    }
-    if (outlined) {
-        OutlinedButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-            content = content,
-        )
-    } else {
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
-            colors = ButtonDefaults.buttonColors(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-            content = content,
-        )
-    }
+    if (outlined) SecondaryButton(text, onClick, modifier, icon, enabled) else PrimaryButton(text, onClick, modifier, icon, enabled)
 }
 
 @Composable

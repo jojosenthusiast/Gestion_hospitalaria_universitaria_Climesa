@@ -64,6 +64,7 @@ internal fun AdaptiveTabScaffold(
                             primaryIndices.forEach { index ->
                                 val item = items[index]
                                 NavigationBarItem(
+                                    colors = barItemColors(),
                                     selected = selected == index,
                                     onClick = { onSelected(index) },
                                     icon = { Icon(item.icon, contentDescription = null) },
@@ -82,6 +83,7 @@ internal fun AdaptiveTabScaffold(
                         Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).safeDrawingPadding()) {
                             items.forEachIndexed { index, item ->
                                 NavigationRailItem(
+                                    colors = railItemColors(),
                                     selected = selected == index,
                                     onClick = { onSelected(index) },
                                     icon = { Icon(item.icon, contentDescription = null) },
@@ -113,6 +115,7 @@ internal fun AdaptiveTabScaffold(
                                     Text("Recepción", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 20.dp))
                                     items.forEachIndexed { index, item ->
                                         NavigationDrawerItem(
+                                            colors = drawerItemColors(),
                                             label = { Text(item.label, maxLines = 2) },
                                             selected = selected == index,
                                             onClick = { onSelected(index) },
@@ -150,6 +153,7 @@ internal fun AdaptiveTabScaffold(
                     overflowIndices.forEach { index ->
                         val item = items[index]
                         NavigationDrawerItem(
+                            colors = drawerItemColors(),
                             label = { Text(item.label, maxLines = 2) },
                             selected = selected == index,
                             onClick = { onSelected(index); menuOpen = false },
