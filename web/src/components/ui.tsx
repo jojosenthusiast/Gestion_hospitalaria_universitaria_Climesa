@@ -84,17 +84,29 @@ export function AuthLayout({ children, activation = false }: { children: ReactNo
 }
 
 export function LoginView({ email, password, setEmail, setPassword, busy, error, accepted, onSubmit, notice }: { email: string; password: string; setEmail: (s: string) => void; setPassword: (s: string) => void; busy: boolean; error: string | null; accepted: boolean; onSubmit: (e: FormEvent) => void; notice?:string }) {
+  // W-11: la validación del navegador sale en su idioma; aquí se valida con mensajes propios en español.
+  const [problems, setProblems] = useState<{ email?: string; password?: string }>({});
+  function submit(event: FormEvent) {
+    const found: { email?: string; password?: string } = {};
+    if (!email.trim()) found.email = 'Escribe tu correo electrónico.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) found.email = 'Escribe un correo electrónico válido, por ejemplo nombre@correo.com.';
+    if (!password) found.password = 'Escribe tu contraseña.';
+    setProblems(found);
+    if (found.email || found.password) { event.preventDefault(); return; }
+    onSubmit(event);
+  }
   return (
     <AuthLayout>
-      <form className="auth-form" onSubmit={onSubmit}>
+      <form className="auth-form" onSubmit={submit} noValidate>
         <div className="form-heading"><span className="eyebrow">Acceso a CLIMESA</span><h1>Hola de nuevo.</h1><p>Ingresa con tu cuenta institucional.</p></div>
         {accepted && <Notice kind="success">Contraseña creada. Tu cuenta está lista para ingresar.</Notice>}
         {notice && <Notice kind="info">{notice}</Notice>}
         {error && <Notice kind="error">{error}</Notice>}
         <div className="form-fields">
-          <Field required label="Correo electrónico" type="email" placeholder="nombre@correo.com" value={email} onChange={setEmail} autoComplete="email" disabled={busy} />
-          <Field required label="Contraseña" type="password" placeholder="Tu contraseña" value={password} onChange={setPassword} autoComplete="current-password" disabled={busy} />
+          <Field required label="Correo electrónico" type="email" placeholder="nombre@correo.com" value={email} onChange={setEmail} autoComplete="email" disabled={busy} aria-invalid={problems.email ? true : undefined} hint={problems.email} />
+          <Field required label="Contraseña" type="password" placeholder="Tu contraseña" value={password} onChange={setPassword} autoComplete="current-password" disabled={busy} aria-invalid={problems.password ? true : undefined} hint={problems.password} />
         </div>
+        {(problems.email || problems.password) && <p className="sr-only" role="alert">Revisa los campos marcados.</p>}
         <SubmitButton busy={busy}>Iniciar sesión</SubmitButton>
         <div className="auth-help"><span>¿Primera vez aquí?</span><p>El personal ingresa con una invitación del hospital.</p><a className="auth-link" href="/registro">Crear cuenta de paciente</a></div>
       </form>
