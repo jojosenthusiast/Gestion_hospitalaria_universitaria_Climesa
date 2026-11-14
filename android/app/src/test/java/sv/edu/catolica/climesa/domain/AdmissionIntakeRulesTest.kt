@@ -50,20 +50,29 @@ class AdmissionIntakeRulesTest {
     }
 
     @Test fun theBodyCarriesTheBedOnlyWhenImmediate() {
-        val body = AdmissionIntake.body(full.copy(unstable = true), true, now)
+        val body = AdmissionIntake.body(full.copy(unstable = true), true, now)!!
         assertEquals("cita", body.getString("origin")); assertEquals("c1", body.getString("originId"))
         assertEquals("Dolor abdominal con fiebre", body.getString("motive")); assertEquals("2026-11-20T14:30:00Z", body.getString("scheduledAt"))
         assertEquals("b1", body.getString("bedId")); assertEquals(3, body.getInt("bedVersion")); assertTrue(body.getBoolean("unstable"))
-        assertFalse(AdmissionIntake.body(full, false, now).has("bedId"))
-        assertFalse(AdmissionIntake.body(full.copy(at = "2026-11-22 08:30"), true, now).has("bedId"))
-        assertEquals(0, AdmissionIntake.body(full.copy(visitorsAllowed = false, visitorsMax = 0), true, now).getInt("visitorsMax"))
-        assertEquals("gotitas", AdmissionIntake.body(full.copy(isolation = true, isolationType = IsolationType.DROPLET), true, now).getString("isolationType"))
+        assertFalse(AdmissionIntake.body(full, false, now)!!.has("bedId"))
+        assertFalse(AdmissionIntake.body(full.copy(at = "2026-11-22 08:30"), true, now)!!.has("bedId"))
+        assertEquals(0, AdmissionIntake.body(full.copy(visitorsAllowed = false, visitorsMax = 0), true, now)!!.getInt("visitorsMax"))
+        assertEquals("gotitas", AdmissionIntake.body(full.copy(isolation = true, isolationType = IsolationType.DROPLET), true, now)!!.getString("isolationType"))
     }
 
     @Test fun theFeasibilityPathCarriesEveryCondition() {
-        val path = AdmissionIntake.feasibilityPath(full, true, now)
+        val path = AdmissionIntake.feasibilityPath(full, true, now)!!
         assertTrue(path.startsWith("/admisiones/factibilidad?patientId=p9&origin=cita&originId=c1&doctorId=d1"))
         assertTrue(path.contains("category=semiprivada")); assertTrue(path.contains("bedId=b1"))
+    }
+
+    @Test fun anIncompleteDraftNeverBuildsABodyAndSaysWhatIsMissing() {
+        assertNull(AdmissionIntake.body(full.copy(doctor = null), true, now))
+        assertEquals("Elige al médico tratante.", AdmissionIntake.missing(full.copy(doctor = null)))
+        assertNull(AdmissionIntake.body(full.copy(originRecord = null), true, now))
+        assertEquals("Elige el registro de origen del paciente.", AdmissionIntake.missing(full.copy(originRecord = null)))
+        assertNull(AdmissionIntake.feasibilityPath(full.copy(patient = null), true, now))
+        assertNull(AdmissionIntake.missing(full))
     }
 
     @Test fun parsesTheApiAnswersAndGroupsBedsByFloorAndRoom() {

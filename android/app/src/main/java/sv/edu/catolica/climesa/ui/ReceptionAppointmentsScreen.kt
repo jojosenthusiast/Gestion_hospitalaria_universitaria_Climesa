@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sv.edu.catolica.climesa.R
+import sv.edu.catolica.climesa.domain.AppointmentAction
+import sv.edu.catolica.climesa.domain.AppointmentActions
 import sv.edu.catolica.climesa.domain.PickerPatient
 import sv.edu.catolica.climesa.domain.QuickAction
 import sv.edu.catolica.climesa.domain.ReceptionAppointment
@@ -49,8 +53,12 @@ private val zone = ZoneId.of("America/El_Salvador")
 
 /** A32 Citas de Recepción: lista de citas y flujo para agendar con búsqueda de paciente, médicos con/sin turno y franjas del día. */
 @Composable
-fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, model: ReceptionAppointmentsViewModel = viewModel()) {
+fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, permissions: Collection<String> = emptyList(), model: ReceptionAppointmentsViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
+    val actionState by actions.state.collectAsStateWithLifecycle()
+    LaunchedEffect(actionState.done) { if (actionState.done != null) model.load() }
+    AppointmentActionDialog(actionState, actions)
+    val now = remember(state.appointments) { Instant.now() }
     var query by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels) }
     LaunchedEffect(quickAction) {
@@ -62,7 +70,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     PageList(modifier) {
         item { SectionIntro(stringResource(R.string.rec_citas_eyebrow), stringResource(R.string.rec_citas_titulo), stringResource(R.string.rec_citas_detalle)) }
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
-        state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        (actionState.done ?: state.notice)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         if (canSchedule) item { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = Icons.Default.Add) }
         when {
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
@@ -74,15 +82,55 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                 // Por día y, dentro del día, por hora: cada cita en una sola línea con su rango "08:00 – 08:20".
                 sv.edu.catolica.climesa.domain.AppointmentAgenda.groupByDay(visible) { it.start }.forEach { (day, rows) ->
                     item(key = "d-$day") { Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(day), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                    items(rows, key = { it.id }) { AppointmentRow(it) }
+                    items(rows, key = { it.id }) { row -> AppointmentRow(row, now, permissions) { action -> actions.open(row, action) } }
                 }
             }
         }
     }
 }
 
-@Composable private fun AppointmentRow(a: ReceptionAppointment) {
-    DataRow(a.patientName.ifBlank { "Paciente" }, subtitle = "${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(a.start, a.end)} · ${a.doctorName}", status = { StatusTag(a.state) })
+/** One appointment: its state (an unmanaged past request reads "Vencida") and only the actions the API accepts now (CITA-04). */
+@Composable private fun AppointmentRow(a: ReceptionAppointment, now: Instant, permissions: Collection<String>, onAction: (AppointmentAction) -> Unit) {
+    val shown = AppointmentActions.displayState(a, now)
+    Column {
+        DataRow(a.patientName.ifBlank { "Paciente" }, subtitle = "${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(a.start, a.end)} · ${a.doctorName}",
+            status = { if (shown == AppointmentActions.EXPIRED) StatusPill(stringResource(R.string.rec_cita_vencida), StatusTone.NEUTRAL) else StatusTag(a.state) })
+        val available = AppointmentActions.available(a, permissions, now)
+        if (available.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(bottom = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            available.forEach { action ->
+                if (action == AppointmentAction.CONFIRM) androidx.compose.material3.Button(onClick = { onAction(action) }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(action.label) }
+                else OutlinedButton(onClick = { onAction(action) }, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(action.label) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppointmentActionDialog(state: AppointmentActionState, model: AppointmentActionViewModel) {
+    val target = state.target ?: return
+    val action = state.action ?: return
+    val title = when (action) {
+        AppointmentAction.CONFIRM -> stringResource(R.string.rec_cita_confirmar_titulo)
+        AppointmentAction.REJECT -> stringResource(R.string.rec_cita_rechazar_titulo)
+        AppointmentAction.CANCEL -> stringResource(R.string.rec_cita_cancelar_titulo)
+    }
+    ConfirmDialog(
+        title = title,
+        confirmLabel = action.label,
+        onConfirm = model::submit,
+        onDismiss = model::close,
+        message = "${target.patientName.ifBlank { "Paciente" }} · ${formatInstant(target.start)} · ${target.doctorName}",
+        dismissLabel = stringResource(R.string.rec_cita_volver),
+        destructive = action != AppointmentAction.CONFIRM,
+        busy = state.busy,
+    ) {
+        state.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        if (action.needsReason) {
+            val length = state.reason.trim().length
+            FormField(stringResource(R.string.rec_cita_motivo), state.reason, model::reason, singleLine = false, enabled = !state.busy, error = state.reasonError,
+                hint = "$length/${AppointmentActions.REASON_MAX}" + if (length < AppointmentActions.REASON_MIN) " · " + stringResource(R.string.rec_cita_motivo_minimo, AppointmentActions.REASON_MIN) else " ✓")
+        }
+    }
 }
 
 @Composable

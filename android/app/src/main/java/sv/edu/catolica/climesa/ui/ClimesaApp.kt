@@ -91,6 +91,8 @@ private fun AuthLoadingScreen() {
             CircularProgressIndicator()
             Spacer(Modifier.height(12.dp))
             Text("Comprobando sesión…")
+            Spacer(Modifier.height(8.dp))
+            SlowServerHint(active = true, modifier = Modifier.padding(horizontal = 24.dp))
         }
     }
 }
@@ -194,6 +196,7 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                         }
                     }
+                    SlowServerHint(state.signingIn, Modifier.fillMaxWidth())
                     HorizontalDivider()
                     TextButton(onClick = onRegister, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.PersonAdd, contentDescription = null)

@@ -6,11 +6,8 @@ import org.json.JSONTokener
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.coroutines.coroutineContext
-/** Mensaje de error del API: `detail` de application/problem+json, con respaldo al formato anterior `error.message`. */
-internal fun apiErrorMessage(body:String):String?=runCatching {
-    val json=JSONObject(body)
-    json.optString("detail").takeIf{it.isNotBlank()}?:json.optJSONObject("error")?.optString("message")?.takeIf{it.isNotBlank()}
-}.getOrNull()
+/** Mensaje de error del API en español para la persona (MOV-03, [ApiProblems]): nunca texto crudo en inglés. */
+internal fun apiErrorMessage(body:String,status:Int?=null):String=ApiProblems.parse(body,status).message
 /** Código estable (`codigo`) del problem+json, por ejemplo `version_conflicto`. */
 internal fun apiErrorCode(body:String):String?=runCatching{JSONObject(body).optString("codigo").takeIf{it.isNotBlank()}}.getOrNull()
 /** Port to the REST API, so ViewModels can be tested on the JVM with a fake. [ApiClient] is the real adapter. */
@@ -35,14 +32,16 @@ class ApiClient(
         val key=if(method!="GET")intent?:keys.keyFor(signature) else null
         var status:Int?=null
         try {
-            authorizedCall(tokens,expiry){token->send(path,method,body,token,key).also{status=200}}
+            // Reads survive the API cold start (MA-OPS-01); writes rely on the person retrying with the same key.
+            val call=suspend{authorizedCall(tokens,expiry){token->send(path,method,body,token,key).also{status=200}}}
+            if(method=="GET")ColdStart.retrying{call()} else call()
         } catch(e:AuthRequestException){status=e.statusCode;throw e} finally {
             if(key!=null&&intent==null)keys.settle(signature,status)
         }
     }
     private fun send(path:String,method:String,body:JSONObject?,token:String,key:String?):Any {
         val c=(URL(baseUrl.trimEnd('/')+path).openConnection() as HttpURLConnection).apply {
-            useCaches=false;requestMethod=method;connectTimeout=15000;readTimeout=20000
+            useCaches=false;requestMethod=method;connectTimeout=ColdStart.CONNECT_TIMEOUT_MS;readTimeout=ColdStart.READ_TIMEOUT_MS
             setRequestProperty("Accept","application/json");setRequestProperty("Authorization","Bearer $token")
             key?.let{setRequestProperty("Idempotency-Key",it)}
             if(body!=null){doOutput=true;setRequestProperty("Content-Type","application/json; charset=utf-8")}
@@ -51,7 +50,7 @@ class ApiClient(
             body?.let { payload -> c.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) } }
             val status=c.responseCode
             val text=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}.orEmpty()
-            if(status !in 200..299){val message=apiErrorMessage(text);throw AuthRequestException(message?.takeIf{it.isNotBlank()}?:"No se pudo completar la operación (HTTP $status).",status,apiErrorCode(text),text)}
+            if(status !in 200..299)throw AuthRequestException(apiErrorMessage(text,status),status,apiErrorCode(text),text)
             return if(text.isBlank())JSONObject()else JSONTokener(text).nextValue()
         } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("Sin conexión. Conservamos el formulario; vuelve a intentar.")} finally {c.disconnect()}
     }

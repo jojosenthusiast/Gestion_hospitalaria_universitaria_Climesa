@@ -203,5 +203,6 @@
     <string name="aviso_urgente">Urgente</string>
     <string name="aviso_atencion">Atención</string>
     <string name="aviso_para">Para: %1$s</string>
+    <string name="servidor_activando">El servidor se está activando, puede tardar hasta un minuto.</string>
     <string name="portal_seccion_no_disponible">Esta sección no está disponible en la aplicación.</string>
 </resources>

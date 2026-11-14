@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.content.edit
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -28,11 +29,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val preferences = getSharedPreferences("appearance", MODE_PRIVATE)
         setContent {
-            var dark by rememberSaveable { mutableStateOf(preferences.getBoolean("dark", false)) }
+            // E-18: without an explicit choice the app follows the system dark mode; the toggle stores the person's choice.
+            var chosen by rememberSaveable { mutableStateOf(if (preferences.contains("dark")) preferences.getBoolean("dark", false) else null) }
+            val dark = chosen ?: isSystemInDarkTheme()
             ClimesaTheme(dark) {
                 val auth: AuthViewModel = viewModel()
                 ClimesaApp(auth, dark) { enabled ->
-                    dark = enabled
+                    chosen = enabled
                     preferences.edit { putBoolean("dark", enabled) }
                 }
             }
