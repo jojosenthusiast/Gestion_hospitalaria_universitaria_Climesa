@@ -15,6 +15,17 @@ import SwiftUI
     init() {
         do { let config=try AppConfiguration.load(); let auth=AuthService(config:config); self.config=config; self.auth=auth; self.api=APIClient(config:config,auth:auth) }
         catch { config=nil; auth=nil; api=nil; self.error=error.localizedDescription; loading=false }
+        // 401 en cualquier llamada: la sesión ya se borró del Keychain; se vuelve al ingreso sin datos en memoria.
+        if let api { Task { await api.setUnauthorizedHandler { [weak self] in await self?.sessionExpired() } } }
+    }
+    func sessionExpired() {
+        guard profile != nil || pending else { return }
+        revision+=1; profile=nil; pending=false; busy=false; loading=false; notice=nil
+        error="Tu sesión expiró. Vuelve a ingresar."
+    }
+    /// Al volver de segundo plano: con sesión abierta solo se verifica de nuevo el perfil (no se pierde lo que estaba en pantalla).
+    func resume() async {
+        if profile != nil { await refreshProfile() } else { await restore() }
     }
     /// Servicio de tiempo real con el token vigente de la sesión y la recuperación por /eventos tras una caída.
     func makeRealtime() -> (any RealtimeService)? {

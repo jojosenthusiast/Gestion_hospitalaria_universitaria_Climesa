@@ -11,7 +11,7 @@ import SwiftUI
                     if value == .background { leftAt=Date() }
                     else if value == .active, let since=leftAt {
                         leftAt=nil
-                        Task { if Date().timeIntervalSince(since)>300 { await account.logout() } else { await account.restore() } }
+                        Task { if Date().timeIntervalSince(since)>300 { await account.logout() } else { await account.resume() } }
                     }
                 }
         }

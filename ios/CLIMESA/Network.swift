@@ -62,28 +62,67 @@ actor AuthService {
     }
     func signOut() async { revision+=1; refreshTask?.cancel(); refreshTask=nil; let saved=try? KeychainStore.load(); KeychainStore.clear(); if let saved { _ = try? await send("/auth/v1/logout?scope=local",[:],token:saved.access_token) } }
 }
-/// application/problem+json (`detail`) con respaldo al formato anterior `error.message`.
-private struct APIErrorEnvelope:Decodable { struct Detail:Decodable { let message:String? }; let detail:String?; let error:Detail?; var text:String? { detail ?? error?.message } }
+/// Cliente de la API con Bearer. Los errores son `APIFailure` (problem+json en español, Core/Contract/Problem.swift).
+/// Un 401 cierra la sesión y avisa a `AccountModel`, que vuelve al ingreso con "Tu sesión expiró".
 actor APIClient {
     private let transport=URLSession(configuration:.ephemeral)
     private let config: AppConfiguration; private let auth: AuthService
+    private var onUnauthorized: (@Sendable () async -> Void)?
     init(config: AppConfiguration,auth: AuthService) { self.config=config; self.auth=auth }
-    func get<T:Decodable>(_ path: String, as type: T.Type) async throws -> T {
-        let data=try await getData(path)
-        return try JSONDecoder().decode(T.self,from:data)
+    func setUnauthorizedHandler(_ handler: @escaping @Sendable () async -> Void) { onUnauthorized=handler }
+    func get<T:Decodable>(_ path: String, as type: T.Type = T.self) async throws -> T {
+        try decode(await getData(path))
     }
     /// Respuesta cruda de un GET autenticado; la usa la recuperación de eventos de tiempo real.
     func getData(_ path: String) async throws -> Data {
-        guard let session=try await auth.session() else { throw ClientError.message("Inicia sesión para continuar.") }
-        guard let url=URL(string:config.api.absoluteString.trimmingCharacters(in:CharacterSet(charactersIn:"/"))+path) else { throw ClientError.message("Servidor inválido.") }
-        var request=URLRequest(url:url,cachePolicy:.reloadIgnoringLocalCacheData,timeoutInterval:20); request.setValue("Bearer \(session.access_token)",forHTTPHeaderField:"Authorization"); request.setValue("application/json",forHTTPHeaderField:"Accept")
-        let (data,response)=try await transport.data(for:request)
-        guard let http=response as? HTTPURLResponse else { throw ClientError.message("El servidor no respondió.") }
+        try await perform(method:"GET",path:path,body:nil,idempotencyKey:nil)
+    }
+    /// Escritura con `Idempotency-Key` de la intención del usuario (`SubmissionIntent`); nunca se calcula aquí.
+    func send<Body:Encodable,T:Decodable>(_ method: String, _ path: String, body: Body, key: String, as type: T.Type = T.self) async throws -> T {
+        try decode(await perform(method:method,path:path,body:try JSONBody.encode(body),idempotencyKey:key))
+    }
+    private func decode<T:Decodable>(_ data: Data) throws -> T {
+        do { return try JSONDecoder().decode(T.self,from:data) } catch { throw APIFailure.invalidResponse }
+    }
+    private func perform(method: String, path: String, body: Data?, idempotencyKey: String?) async throws -> Data {
+        let session: AuthSession
+        do {
+            guard let current=try await auth.session() else { await expire(); throw APIFailure.sessionExpired }
+            session=current
+        } catch let failure as APIFailure { throw failure }
+        catch is CancellationError { throw CancellationError() }
+        catch is URLError { throw APIFailure.transport }
+        catch { await expire(); throw APIFailure.sessionExpired }
+        guard let url=URL(string:config.api.absoluteString.trimmingCharacters(in:CharacterSet(charactersIn:"/"))+path) else { throw APIFailure.invalidResponse }
+        var request=URLRequest(url:url,cachePolicy:.reloadIgnoringLocalCacheData,timeoutInterval:20)
+        request.httpMethod=method
+        request.setValue("Bearer \(session.access_token)",forHTTPHeaderField:"Authorization")
+        request.setValue("application/json",forHTTPHeaderField:"Accept")
+        if let body { request.httpBody=body; request.setValue("application/json",forHTTPHeaderField:"Content-Type") }
+        if let idempotencyKey { request.setValue(idempotencyKey,forHTTPHeaderField:"Idempotency-Key") }
+        let data: Data; let response: URLResponse
+        do { (data,response)=try await transport.data(for:request) }
+        catch let error as URLError where error.code == .cancelled { throw CancellationError() }
+        catch is CancellationError { throw CancellationError() }
+        catch { throw APIFailure.transport }
+        guard let http=response as? HTTPURLResponse else { throw APIFailure.transport }
         guard (200..<300).contains(http.statusCode) else {
-            if http.statusCode==401 { await auth.signOut(); throw ClientError.message("Tu sesión no está activa. Vuelve a ingresar.") }
-            let message=(try? JSONDecoder().decode(APIErrorEnvelope.self,from:data))?.text
-            throw ClientError.message(message ?? "No se pudo consultar la información. Vuelve a intentar.")
+            let failure=APIFailure.from(status:http.statusCode,body:data)
+            if failure == .sessionExpired { await expire() }
+            throw failure
         }
         return data
+    }
+    private func expire() async {
+        await auth.signOut()
+        if let onUnauthorized { await onUnauthorized() }
+    }
+}
+
+/// Valor seguro para la parte de consulta de una URL.
+enum Query {
+    static func encode(_ value: String) -> String {
+        var allowed=CharacterSet.urlQueryAllowed; allowed.remove(charactersIn:"&=+?#")
+        return value.addingPercentEncoding(withAllowedCharacters:allowed) ?? ""
     }
 }

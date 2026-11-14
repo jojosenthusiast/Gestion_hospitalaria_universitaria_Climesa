@@ -61,6 +61,7 @@ struct RoleTabsView:View {
                 }.tabItem { Label(LocalizedStringKey(tab.titleKey),systemImage:tab.symbol) }.tag(tab)
             }
         }
+        .environment(live)
         .safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }
         // Tiempo real: se suscribe al entrar y la conexión se cierra al cancelar la tarea. No hay temporizadores de datos.
         .task(id:profile.channels) {
@@ -72,13 +73,19 @@ struct RoleTabsView:View {
     }
 
     @ViewBuilder private func content(for tab:AppTab)->some View {
+        // Cada pestaña muestra su pantalla del catálogo (pantallas.csv); las secciones extra salen de AppSection.
+        let go: (AppTab) -> Void = { target in if tabs.contains(target) { selection=target } }
         switch tab {
-        case .turnos:
-            ShiftsContent(model:shifts,live:live,role:role)
-        case .perfil,.mas:
-            ProfileContent(profile:profile)
-        default:
-            PlaceholderContent()
+        case .miDia: DoctorDayView(profile:profile,go:go)
+        case .pacientes: DoctorPatientsView()
+        case .resultados: ResultsReviewView()
+        case .turnos: ShiftsContent(model:shifts,live:live,role:role)
+        case .perfil: ProfileContent(profile:profile)
+        case .inicio: PatientHomeView(profile:profile,go:go)
+        case .fila: PatientQueueView()
+        case .citas: PatientAppointmentsView()
+        case .examenes: PatientExamsView(profile:profile)
+        case .mas: PatientMoreView(profile:profile,role:role)
         }
     }
 
