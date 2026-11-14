@@ -18,6 +18,22 @@ final class ProblemTests: XCTestCase {
         XCTAssertTrue(failure.message.hasPrefix("Otra persona cambió este registro."))
     }
 
+    func testConsultaYaIniciadaPorElMismoMedicoSeRetoma() {
+        let own = Data(#"{"type":"x","title":"Conflicto","status":409,"codigo":"consulta_ya_iniciada","detail":"La consulta ya fue iniciada para este número.","requestId":"req-15f","consultaId":"c-1"}"#.utf8)
+        XCTAssertEqual(APIFailure.from(status: 409, body: own).resumableConsultationId, "c-1")
+        let other = Data(#"{"type":"x","title":"Conflicto","status":409,"codigo":"consulta_ya_iniciada","detail":"La consulta ya fue iniciada para este número.","requestId":"req-15f"}"#.utf8)
+        XCTAssertNil(APIFailure.from(status: 409, body: other).resumableConsultationId)
+    }
+
+    func testRutaInexistenteMuestraUnMensajeAmableConElCodigoDeSoporte() {
+        let body = Data(#"{"type":"urn:sghu:error:no_encontrado","title":"No encontrado","status":404,"codigo":"no_encontrado","detail":"Cannot PATCH /api/v1/me/paciente","requestId":"req-10g"}"#.utf8)
+        let failure = APIFailure.from(status: 404, body: body)
+        XCTAssertTrue(failure.isRouteNotFound)
+        XCTAssertEqual(failure.message, "Esta función todavía no está disponible en el servidor. Vuelve a intentar más tarde. (código de soporte: req-10g)")
+        let missing = Data(#"{"type":"x","title":"No encontrado","status":404,"codigo":"no_encontrado","detail":"No se encontró la cita.","requestId":"r2"}"#.utf8)
+        XCTAssertFalse(APIFailure.from(status: 404, body: missing).isRouteNotFound)
+    }
+
     func testUn401EsSesionVencida() {
         XCTAssertEqual(APIFailure.from(status: 401, body: Data()), .sessionExpired)
         XCTAssertEqual(APIFailure.sessionExpired.message, "Tu sesión expiró. Vuelve a ingresar.")

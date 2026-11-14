@@ -8,11 +8,14 @@ public struct Problem: Decodable, Equatable, Sendable {
     public let field: String?
     public let requestId: String?
     public let currentVersion: Int?
+    /// Solo en `consulta_ya_iniciada` cuando la consulta existente es del médico que intentó iniciarla.
+    public let consultationId: String?
     enum CodingKeys: String, CodingKey {
-        case status, code = "codigo", detail, field = "campo", requestId, currentVersion = "versionActual"
+        case status, code = "codigo", detail, field = "campo", requestId, currentVersion = "versionActual", consultationId = "consultaId"
     }
-    public init(status: Int?, code: String?, detail: String?, field: String? = nil, requestId: String? = nil, currentVersion: Int? = nil) {
+    public init(status: Int?, code: String?, detail: String?, field: String? = nil, requestId: String? = nil, currentVersion: Int? = nil, consultationId: String? = nil) {
         self.status = status; self.code = code; self.detail = detail; self.field = field; self.requestId = requestId; self.currentVersion = currentVersion
+        self.consultationId = consultationId
     }
 
     /// Lee el cuerpo de un error; nil si no es un objeto problem+json.
@@ -44,6 +47,19 @@ public enum APIFailure: Error, Equatable, Sendable {
     public var isVersionConflict: Bool { code == "version_conflicto" }
     public var isForbidden: Bool { status == 403 || code == "sin_permiso" }
 
+    /// La consulta ya estaba iniciada por este médico (otro toque, la web): su id para retomarla en vez de fallar.
+    public var resumableConsultationId: String? {
+        guard code == "consulta_ya_iniciada", let id = problem?.consultationId, !id.isEmpty else { return nil }
+        return id
+    }
+
+    /// 404 de ruta inexistente (el servidor aún no tiene esa función): el `detail` es el texto técnico del framework,
+    /// por ejemplo "Cannot PATCH /api/v1/me/paciente", que no se debe mostrar.
+    public var isRouteNotFound: Bool {
+        guard status == 404, let detail = problem?.detail else { return false }
+        return detail.range(of: #"^Cannot [A-Z]+ /"#, options: .regularExpression) != nil
+    }
+
     /// El reintento puede tener éxito sin cambiar los datos (convenciones-api.md: red, 5xx, 408, 425, 429).
     public var isRetryable: Bool {
         switch self {
@@ -64,6 +80,7 @@ public enum APIFailure: Error, Equatable, Sendable {
             switch problem?.code {
             case "version_conflicto": text = "Otra persona cambió este registro. Se cargó la versión actual: revísala y vuelve a intentar."
             case "idempotencia_conflicto": text = "Esta acción ya se había enviado con otros datos. Vuelve a intentar."
+            case _ where isRouteNotFound: text = "Esta función todavía no está disponible en el servidor. Vuelve a intentar más tarde."
             default: text = problem?.detail.flatMap { $0.isEmpty ? nil : $0 } ?? APIFailure.fallback(status)
             }
             guard let id = problem?.requestId, !id.isEmpty else { return text }
