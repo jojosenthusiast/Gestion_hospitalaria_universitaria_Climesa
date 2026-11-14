@@ -181,4 +181,25 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   const cancel=await call('JOP','PATCH',`/turnos/${extra.id}`,{staffId:p.id,areaId,type:'diurno',start:local('2026-11-28','07:00'),end:local('2026-11-28','15:00'),version:2,state:'cancelado',reason:'Cancelación del refuerzo de prueba'});
   expect(cancel.status).toBe(200);
  });
+
+ // Producción, 14/11/2026: con dos semanas planificadas para todo el personal, GET /turnos devolvía solo los 300
+ // turnos más lejanos; el turno recién asignado para hoy no aparecía y el formulario no veía los conflictos del día.
+ test('el turno asignado para hoy aparece en la lista aunque haya más de 300 turnos planificados después',async()=>{
+  const previous=current;current=new Date('2026-12-01T14:00:00Z');
+  try{
+   await fixture.pg.exec(`INSERT INTO personal.persona(id,nombres,apellidos,tipo)
+     SELECT ('de399999-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'Persona','Volumen '||n,'limpieza' FROM generate_series(1,25) n;
+    INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado)
+     SELECT ('de399999-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'${emergencyId}',
+       tstzrange(timestamptz '2026-12-02 07:00-06' + d*interval '1 day',timestamptz '2026-12-02 15:00-06' + d*interval '1 day','[)'),'diurno','publicado'
+     FROM generate_series(1,25) n,generate_series(0,13) d;`);
+   const doctor=await person('medico');
+   const created=await shift(doctor.id,local('2026-12-01','09:00'),local('2026-12-01','15:00'));
+   expect(created.status).toBe(201);
+   const list=await call('JOP','GET','/turnos');
+   expect(list.status).toBe(200);
+   expect(list.body.length).toBeGreaterThan(300);
+   expect(list.body.map((s:any)=>s.id)).toContain(created.body.id);
+  }finally{current=previous;}
+ });
 });
