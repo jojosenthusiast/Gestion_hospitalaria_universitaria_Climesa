@@ -7,11 +7,10 @@ import { ActorRequest } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
-import { AmbulanceService } from './ambulance.service';
-import { BedBlockDto, BedTransitionDto, MaintenanceDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
+import { BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
 export class OperationsController {
-  constructor(private readonly people:PersonnelService,private readonly infra:InfrastructureService,private readonly db:DatabaseService,private readonly ambulance:AmbulanceService) {}
+  constructor(private readonly people:PersonnelService,private readonly infra:InfrastructureService,private readonly db:DatabaseService) {}
   @Get('inicio') @RequirePermission('sesion.perfil') @ApiOperation({summary:'Resumen permitido para la cuenta actual'})
   dashboard(@Req() r:ActorRequest){return this.infra.dashboard(r.actor);}
   @Get('personal') @RequirePermission('personal.ver') @ApiOperation({summary:'Directorio de personal con o sin cuenta'})
@@ -52,10 +51,6 @@ export class OperationsController {
   completeBedCleaning(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:BedTransitionDto,@Headers('idempotency-key') k?:string){return this.infra.completeBedCleaning(r.actor,id,d,k);}
   @Post('camas/:id/limpieza/verificar') @RequirePermission('camas.verificar_limpieza') @ApiOperation({summary:'Verificar la limpieza realizada por otra persona'})
   verifyBedCleaning(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:BedTransitionDto,@Headers('idempotency-key') k?:string){return this.infra.verifyBedCleaning(r.actor,id,d,k);}
-  @Get('ambulancia') @RequirePermission('ambulancia.ver_estado') @ApiOperation({summary:'Estado de la unidad y servicio activo'})
-  ambulanceStatus(){return this.ambulance.status();}
-  @Post('ambulancia/mantenimiento') @RequirePermission('ambulancia.mantenimiento') @ApiOperation({summary:'Entrar o salir de mantenimiento; salir exige paramédico con turno en curso'})
-  ambulanceMaintenance(@Req() r:ActorRequest,@Body() d:MaintenanceDto,@Headers('idempotency-key') k?:string){return this.ambulance.setMaintenance(r.actor,d,k);}
   @Get('eventos') @RequirePermission('sesion.perfil') @ApiOperation({summary:'Eventos delgados de canales autorizados para recuperar cambios tras reconexión'})
   async events(@Req() r:ActorRequest,@Query('after') after='0'){
     const cursor=/^\d{1,18}$/.test(after)?after:'0';

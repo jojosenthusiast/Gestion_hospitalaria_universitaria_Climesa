@@ -123,15 +123,18 @@ describe('Ambulancia · estado de la unidad y paramédico de turno (HU-109)',()=
  test('con un servicio activo el estado lo muestra sin datos del paciente y no se entra a mantenimiento',async()=>{
   const now=await unit();
   const crew=await person('paramedico');
-  await fixture.pg.query("UPDATE ambulancia.unidad SET estado='en_servicio'");
+  // La base solo acepta un servicio sobre una unidad Disponible (20261115001000): primero sale de mantenimiento.
+  const ready=await maintenance('JOP',false,now.version,'Fin del cambio de llantas');
+  expect(ready.status).toBe(201);
   const service=(await fixture.pg.query<any>("INSERT INTO ambulancia.servicio(unidad_id,tipo,prioridad,paciente_id,origen,destino,despachado_por) VALUES($1,'emergencia_domicilio','roja',gen_random_uuid(),'Calle ficticia 1','Hospital CLIMESA',$2) RETURNING id",[now.id,userId('REC')])).rows[0];
+  await fixture.pg.query("UPDATE ambulancia.unidad SET estado='en_servicio'");
   await fixture.pg.query("INSERT INTO ambulancia.tripulacion(servicio_id,persona_id,funcion) VALUES($1,$2,'paramedico')",[service.id,crew.id]);
   const seen=await call('JOP','GET','/ambulancia');
   expect(seen.body.unit.state).toBe('en_servicio');
   expect(seen.body.activeService).toMatchObject({id:service.id,type:'emergencia_domicilio',priority:'roja',origin:'Calle ficticia 1',destination:'Hospital CLIMESA'});
   expect(seen.body.activeService.crew).toEqual([{staffId:crew.id,role:'paramedico',name:expect.stringContaining('Persona')}]);
   expect(JSON.stringify(seen.body)).not.toContain('paciente');
-  const refused=await maintenance('JOP',true,now.version);
+  const refused=await maintenance('JOP',true,ready.body.version);
   expect(refused.status).toBe(409);expect(refused.body.codigo).toBe('unidad_en_servicio');
  });
 });
