@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 // El target Xcode compila Core/Access.swift directamente. El paquete Swift separa sus pruebas sin dependencias de UI.
 enum ClientError: LocalizedError {
     case message(String)
@@ -68,14 +69,26 @@ actor APIClient {
     private let transport=URLSession(configuration:.ephemeral)
     private let config: AppConfiguration; private let auth: AuthService
     private var onUnauthorized: (@Sendable () async -> Void)?
+    /// Última respuesta del servidor: sin respuestas recientes se asume dormido (ColdStartPolicy, MA-OPS-01).
+    private var lastSuccess: Date?
+    private var inFlight=0
+    private var slowTimer: Task<Void, Never>?
     init(config: AppConfiguration,auth: AuthService) { self.config=config; self.auth=auth }
     func setUnauthorizedHandler(_ handler: @escaping @Sendable () async -> Void) { onUnauthorized=handler }
     func get<T:Decodable>(_ path: String, as type: T.Type = T.self) async throws -> T {
         try decode(await getData(path))
     }
     /// Respuesta cruda de un GET autenticado; la usa la recuperación de eventos de tiempo real.
+    /// Una lectura que falla por red o 502-504 (servidor despertando) se reintenta con espera creciente.
     func getData(_ path: String) async throws -> Data {
-        try await perform(method:"GET",path:path,body:nil,idempotencyKey:nil)
+        var attempt=0
+        while true {
+            do { return try await perform(method:"GET",path:path,body:nil,idempotencyKey:nil) }
+            catch let failure as APIFailure where ColdStartPolicy.shouldRetry(method:"GET",failure:failure,attempt:attempt) {
+                try await Task.sleep(for:.seconds(ColdStartPolicy.delay(beforeRetry:attempt)))
+                attempt+=1
+            }
+        }
     }
     /// Escritura con `Idempotency-Key` de la intención del usuario (`SubmissionIntent`); nunca se calcula aquí.
     func send<Body:Encodable,T:Decodable>(_ method: String, _ path: String, body: Body, key: String, as type: T.Type = T.self) async throws -> T {
@@ -94,18 +107,20 @@ actor APIClient {
         catch is URLError { throw APIFailure.transport }
         catch { await expire(); throw APIFailure.sessionExpired }
         guard let url=URL(string:config.api.absoluteString.trimmingCharacters(in:CharacterSet(charactersIn:"/"))+path) else { throw APIFailure.invalidResponse }
-        var request=URLRequest(url:url,cachePolicy:.reloadIgnoringLocalCacheData,timeoutInterval:20)
+        var request=URLRequest(url:url,cachePolicy:.reloadIgnoringLocalCacheData,timeoutInterval:ColdStartPolicy.timeout(path:path,lastSuccess:lastSuccess,now:Date()))
         request.httpMethod=method
         request.setValue("Bearer \(session.access_token)",forHTTPHeaderField:"Authorization")
         request.setValue("application/json",forHTTPHeaderField:"Accept")
         if let body { request.httpBody=body; request.setValue("application/json",forHTTPHeaderField:"Content-Type") }
         if let idempotencyKey { request.setValue(idempotencyKey,forHTTPHeaderField:"Idempotency-Key") }
         let data: Data; let response: URLResponse
+        began(); defer { ended() }
         do { (data,response)=try await transport.data(for:request) }
         catch let error as URLError where error.code == .cancelled { throw CancellationError() }
         catch is CancellationError { throw CancellationError() }
         catch { throw APIFailure.transport }
         guard let http=response as? HTTPURLResponse else { throw APIFailure.transport }
+        if http.statusCode < 502 || http.statusCode > 504 { lastSuccess=Date() }
         guard (200..<300).contains(http.statusCode) else {
             let failure=APIFailure.from(status:http.statusCode,body:data)
             if failure == .sessionExpired { await expire() }
@@ -113,10 +128,32 @@ actor APIClient {
         }
         return data
     }
+    /// A los 5 s sin respuesta la app muestra "El servidor se está activando" (ServerWake); se quita al responder.
+    private func began() {
+        inFlight+=1
+        guard slowTimer == nil else { return }
+        slowTimer=Task {
+            try? await Task.sleep(for:.seconds(ColdStartPolicy.slowNoticeAfter))
+            guard !Task.isCancelled else { return }
+            await MainActor.run { ServerWake.shared.waking=true }
+        }
+    }
+    private func ended() {
+        inFlight=max(0,inFlight-1)
+        guard inFlight==0 else { return }
+        slowTimer?.cancel(); slowTimer=nil
+        Task { @MainActor in ServerWake.shared.waking=false }
+    }
     private func expire() async {
         await auth.signOut()
         if let onUnauthorized { await onUnauthorized() }
     }
+}
+
+/// Aviso global "El servidor se está activando" mientras una llamada tarda más de 5 s (MA-OPS-01).
+@MainActor @Observable final class ServerWake {
+    static let shared=ServerWake()
+    var waking=false
 }
 
 /// Valor seguro para la parte de consulta de una URL.

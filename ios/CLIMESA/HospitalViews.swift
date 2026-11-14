@@ -23,13 +23,15 @@ struct OccupancyBar: View {
     }
 }
 
+/// Cada parte se pide por separado; la que falla muestra su error con «Reintentar» (CH-02).
 struct HospitalInfo: Sendable {
-    var occupancy: PublicOccupancy?
-    var doctors: DoctorsOnDuty?
-    var notices: PublicNotices?
+    var occupancy: Part<PublicOccupancy>
+    var doctors: Part<DoctorsOnDuty>
+    var notices: Part<PublicNotices>
 }
 
-/// I10 · Información del hospital: ocupación total y por piso, médicos de turno y avisos (datos públicos).
+/// I10 · Información del hospital: ocupación total y por piso, médicos de turno (datos públicos) y los avisos
+/// vigentes para los roles de la persona, incluidos los públicos (`GET /me/avisos`).
 struct HospitalInfoView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
@@ -44,9 +46,11 @@ struct HospitalInfoView: View {
         .task(id: live.snapshot.version(.hospitalInfo)) { await load() }
     }
 
-    @ViewBuilder private func occupancySection(_ occupancy: PublicOccupancy?) -> some View {
+    @ViewBuilder private func occupancySection(_ part: Part<PublicOccupancy>) -> some View {
         SectionTitle("hospital.occupancy")
-        if let occupancy, !occupancy.rows.isEmpty {
+        if let error = part.error {
+            SectionCard { PartError(message: error, retry: load) }
+        } else if let occupancy = part.value, !occupancy.rows.isEmpty {
             let totals = OccupancyRules.totals(occupancy.rows)
             SectionCard(eyebrow: L.text("hospital.occupancy.total")) {
                 OccupancyBar(percent: OccupancyRules.percent(occupied: totals.occupied, beds: totals.beds))
@@ -71,9 +75,11 @@ struct HospitalInfoView: View {
         }
     }
 
-    @ViewBuilder private func doctorsSection(_ doctors: DoctorsOnDuty?) -> some View {
+    @ViewBuilder private func doctorsSection(_ part: Part<DoctorsOnDuty>) -> some View {
         SectionTitle("hospital.doctors")
-        if let list = doctors?.doctors, !list.isEmpty {
+        if let error = part.error {
+            SectionCard { PartError(message: error, retry: load) }
+        } else if let list = part.value?.doctors, !list.isEmpty {
             SectionCard {
                 ForEach(Array(list.enumerated()), id: \.offset) { index, doctor in
                     if index > 0 { Divider().overlay(Theme.line) }
@@ -86,9 +92,11 @@ struct HospitalInfoView: View {
         }
     }
 
-    @ViewBuilder private func noticesSection(_ notices: PublicNotices?) -> some View {
+    @ViewBuilder private func noticesSection(_ part: Part<PublicNotices>) -> some View {
         SectionTitle("home.notices")
-        if let list = notices?.notices, !list.isEmpty {
+        if let error = part.error {
+            SectionCard { PartError(message: error, retry: load) }
+        } else if let list = part.value?.notices, !list.isEmpty {
             ForEach(list) { notice in
                 SectionCard(title: notice.title) { Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink) }
             }
@@ -100,12 +108,10 @@ struct HospitalInfoView: View {
     private func load() async {
         await loader.load {
             let api = try account.client()
-            var info = HospitalInfo()
-            info.occupancy = try? await api.get("/publico/ocupacion", as: PublicOccupancy.self)
-            info.doctors = try? await api.get("/publico/medicos-de-turno", as: DoctorsOnDuty.self)
-            info.notices = try? await api.get("/publico/avisos", as: PublicNotices.self)
-            if info.occupancy == nil && info.doctors == nil && info.notices == nil { throw APIFailure.transport }
-            return info
+            let occupancy = try await Part<PublicOccupancy>.load { try await api.get("/publico/ocupacion", as: PublicOccupancy.self) }
+            let doctors = try await Part<DoctorsOnDuty>.load { try await api.get("/publico/medicos-de-turno", as: DoctorsOnDuty.self) }
+            let notices = try await Part<PublicNotices>.load { try await api.get("/me/avisos", as: PublicNotices.self) }
+            return HospitalInfo(occupancy: occupancy, doctors: doctors, notices: notices)
         }
     }
 }
@@ -267,16 +273,16 @@ private struct EditMyDataSheet: View {
         NavigationStack {
             ScreenFrame(title: "mydata.edit") {
                 SectionCard {
-                    FormField(label: L.text("mydata.phone"), text: $phone, error: errors["phone"]).keyboardType(.phonePad)
-                    FormField(label: L.text("mydata.email"), text: $email, error: errors["email"])
+                    FormField(label: L.text("mydata.phone"), text: $phone, error: error("phone")).keyboardType(.phonePad).textContentType(.telephoneNumber)
+                    FormField(label: L.text("mydata.email"), text: $email, error: error("email")).textContentType(.emailAddress)
                         .keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    PatientTextArea(label: L.text("mydata.address"), text: $address, lines: 1...4, error: errors["address"])
+                    PatientTextArea(label: L.text("mydata.address"), text: $address, lines: 1...4, error: error("address"))
                 }
                 if submission.lastFailure?.isVersionConflict == true {
                     ConflictBanner(message: L.text("mydata.conflict")) { Task { await reload(); dismiss() } }
                 } else if submission.lastFailure?.code == "sin_vinculacion" {
                     PatientNotice(text: L.text("mydata.unlinked"), failure: true)
-                } else {
+                } else if submission.fieldErrors.isEmpty {
                     SubmissionNotice(submission: submission)
                 }
                 ClimesaButton(title: L.text("mydata.save"), loading: submission.busy) { Task { await save() } }
@@ -284,6 +290,9 @@ private struct EditMyDataSheet: View {
             }
         }
     }
+
+    /// Error del campo: primero la revisión local; si la API rechazó el campo, su mensaje en español (MOV-03).
+    private func error(_ field: String) -> String? { errors[field] ?? submission.fieldErrors[field] }
 
     private func save() async {
         errors = PatientProfileRules.errors(phone: phone, email: email, address: address)

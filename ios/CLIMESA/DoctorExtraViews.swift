@@ -66,20 +66,24 @@ private struct DoctorPatientRoom: View {
     let patientId: String
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
-    @State private var room: Admission?
+    @State private var loader = Loader<[Admission]>()
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            if let room {
+            // CH-02: si la lectura falla se dice, en vez de parecer que el paciente no está hospitalizado.
+            if let error = loader.error {
+                SectionCard(title: L.text("room.eyebrow")) { PartError(message: error, retry: load) }
+            } else if let room = loader.value.flatMap({ RoomRules.current($0, patientId: patientId) }) {
                 RoomCard(admission: room)
                 Text("room.treating_only").font(Typo.caption).foregroundStyle(Theme.muted)
             }
         }
-        .task(id: live.snapshot.version(.admissions)) {
-            guard account.can("admision.ver") else { room = nil; return }
-            let admissions = try? await account.client().get("/admisiones", as: [Admission].self)
-            room = admissions.flatMap { RoomRules.current($0, patientId: patientId) }
-        }
+        .task(id: live.snapshot.version(.admissions)) { await load() }
+    }
+
+    private func load() async {
+        guard account.can("admision.ver") else { loader.clear(); return }
+        await loader.load { try await account.client().get("/admisiones", as: [Admission].self) }
     }
 }
 
@@ -167,9 +171,11 @@ struct AmbulanceOverviewView: View {
                 ForEach(AmbulanceFinalState.allCases, id: \.self) { Text(verbatim: $0.label).tag(Optional($0)) }
             }.pickerStyle(.menu)
             Toggle("ambulance.log.from", isOn: dayToggle(\.from)).tint(Theme.primary)
-            if query.from != nil { DatePicker("ambulance.log.from", selection: dayBinding(\.from), displayedComponents: .date).labelsHidden() }
+            if query.from != nil { DatePicker("ambulance.log.from", selection: dayBinding(\.from), displayedComponents: .date).labelsHidden()
+                .environment(\.timeZone, ClimesaDates.zone).environment(\.calendar, ClimesaDates.calendar) }
             Toggle("ambulance.log.to", isOn: dayToggle(\.to)).tint(Theme.primary)
-            if query.to != nil { DatePicker("ambulance.log.to", selection: dayBinding(\.to), displayedComponents: .date).labelsHidden() }
+            if query.to != nil { DatePicker("ambulance.log.to", selection: dayBinding(\.to), displayedComponents: .date).labelsHidden()
+                .environment(\.timeZone, ClimesaDates.zone).environment(\.calendar, ClimesaDates.calendar) }
             FieldError(text: query.rangeError)
             ClimesaButton(title: L.text("ambulance.log.apply"), loading: log.loading) { Task { await loadLog() } }.disabled(query.rangeError != nil)
         }

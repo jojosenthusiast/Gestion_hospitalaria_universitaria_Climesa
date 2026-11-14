@@ -6,6 +6,7 @@ import SwiftUI
     var body:some Scene {
         WindowGroup {
             RootView().environmentObject(account).tint(Theme.primaryText).preferredColorScheme(.light)
+                .safeAreaInset(edge:.bottom) { ServerWakeBanner() }
                 .task { await account.restore() }
                 .onChange(of:phase) { _,value in
                     if value == .background { leftAt=Date() }
