@@ -1,20 +1,24 @@
 # Guion de la defensa · CLIMESA
 
-Demostración en vivo del 21 de noviembre de 2026. Usa solo datos ficticios y las cuentas de demostración de cada rol (las credenciales se entregan por un canal privado del equipo; no están en el repositorio). El guion cubre lo que existe en la rama `fix/fase0-api`; los módulos en desarrollo se mencionan al final sin demostrarse como terminados.
+Demostración en vivo del 21 de noviembre de 2026. Usa solo datos ficticios y las cuentas de demostración de cada rol (las credenciales se entregan por un canal privado del equipo; no están en el repositorio). El guion cubre lo que existe en `main` (hasta el PR #68): flujo clínico, camas, turnos, ambulancia, vinculación de cuentas, acceso excepcional, página pública, métricas y la app iOS. Lo que sigue pendiente se dice al final.
 
 ## Preparación (el día anterior y 30 minutos antes)
 
 | Paso | Qué hacer | Comprobación |
 |---|---|---|
-| 1 | Desplegar la versión aprobada en Render (`sghu-api` y `sghu-web`, Manual Deploy) | `GET https://sghu-api.onrender.com/salud` responde 200 |
-| 2 | Confirmar que las migraciones `20261114000100…300` están aplicadas en Supabase | Iniciar y firmar una consulta de prueba no da error |
+| 1 | Desplegar `main` en Render (`sghu-api` y `sghu-web`, Manual Deploy) y sincronizar `render.yaml` (reescritura `/*` → `/index.html` y cabeceras) | `GET https://sghu-api.onrender.com/salud` responde 200 y `https://sghu-web.onrender.com/publico` abre sin 404 |
+| 2 | Confirmar que las migraciones hasta `20261116002000` están aplicadas en Supabase y, desde la medianoche del 14-nov, también `20261114000300` | Iniciar y firmar una consulta de prueba no da error; `GET /api/v1/publico/ocupacion` responde 200 |
 | 3 | Despertar la API 5 minutos antes (plan gratuito) | Abrir https://sghu-web.onrender.com e ingresar con cualquier cuenta |
 | 4 | Con JOP, asignar hoy un turno al médico de prueba en su consultorio | En **Turnos** aparece `En curso` o `Pendiente de iniciar` |
 | 5 | Preparar un paciente ficticio con cuenta PAC vinculada y una cita solicitada | En **Citas** (REC) aparece `Solicitada` |
-| 6 | Instalar el APK en el teléfono, apuntando a la API de producción (ver `ENTREGA_2026-11-21.md`, sección 6) | La app abre y el ingreso con PAC muestra **Mis citas** |
+| 6 | Instalar el APK en el teléfono, apuntando a la API de producción (ver `ENTREGA_2026-11-21.md`, sección 7) | La app abre y el ingreso con PAC muestra **Mis citas** |
 | 7 | Abrir dos navegadores (o una ventana normal y una privada) para la demostración de concurrencia | Ambas sesiones en la web de producción |
+| 8 | Si se fusionó el selector temporal de rol (`docs/operacion/login-de-prueba.md`), apagarlo | El ingreso pide correo y contraseña |
+| 9 | Preparar una segunda cuenta PAC sin expediente vinculado y un paciente ficticio del que se conozca el DUI | Aparece en **Pacientes** (REC) |
+| 10 | Tener un simulador o iPhone con la app iOS y cuentas MED y PAC (`ios/README.md`) | La app abre y el ingreso con MED muestra **Mi día** |
+| 11 | Dejar una solicitud de ambulancia creada por PAC o REC y a PAR con turno | En **Ambulancia** (JOP) aparece la solicitud |
 
-Pantallas en el proyector: web (izquierda) y teléfono Android duplicado con `scrcpy` u otra herramienta (derecha).
+Pantallas en el proyector: web (izquierda) y teléfono Android duplicado con `scrcpy` u otra herramienta (derecha); el simulador iOS se muestra en el bloque 9.
 
 ## Bloque 1 · Arquitectura (3 minutos)
 
@@ -42,7 +46,18 @@ Pantallas en el proyector: web (izquierda) y teléfono Android duplicado con `sc
 
 Punto para explicar: los pasos 12 a 14 demuestran la política de privacidad (D-040): el paciente ve el estado siempre y los valores solo tras la revisión médica.
 
-## Bloque 3 · Habitaciones y concurrencia (6 minutos)
+## Bloque 3 · Vinculación de cuenta con expediente (3 minutos)
+
+| # | Plataforma y rol | Acción | Resultado esperado |
+|---|---|---|---|
+| 1 | Android · PAC (segunda cuenta) | **Vincular expediente**: ingresar el DUI y la fecha de nacimiento del paciente ficticio | La solicitud queda pendiente; la cuenta aún no ve datos clínicos |
+| 2 | Web · REC | **Vinculaciones**: abrir la solicitud y **Aprobar** | La solicitud se resuelve |
+| 3 | Android · PAC | Volver a **Mi historial** | Aparece el historial sin cerrar la app (evento `vinculacion.resuelta`) |
+| 4 | Web · REC | Intentar aprobar otra vez la misma solicitud | La API responde 409 `vinculacion_resuelta` |
+
+Punto para explicar: el paciente declara DUI y fecha de nacimiento, pero nunca elige el expediente; la base permite una sola vinculación pendiente por cuenta; la aprobación la decide un humano, no el cliente.
+
+## Bloque 4 · Habitaciones y concurrencia (6 minutos)
 
 | # | Plataforma y rol | Acción | Resultado esperado |
 |---|---|---|---|
@@ -54,7 +69,7 @@ Punto para explicar: los pasos 12 a 14 demuestran la política de privacidad (D-
 
 Punto para explicar: la doble asignación la impide PostgreSQL con `EXCLUDE USING gist` (sección 6.3 del documento de arquitectura), no el cliente.
 
-## Bloque 4 · Turnos del personal (3 minutos)
+## Bloque 5 · Turnos del personal (3 minutos)
 
 | # | Plataforma y rol | Acción | Resultado esperado |
 |---|---|---|---|
@@ -62,17 +77,19 @@ Punto para explicar: la doble asignación la impide PostgreSQL con `EXCLUDE USIN
 | 2 | Web · JOP | Asignar un turno nocturno 18:00–07:00 a una persona y luego intentar asignarla el día en que termina | La API responde `personal_en_descanso` con la hora de disponibilidad |
 | 3 | Android · MED | **Mis turnos** | Ve su turno publicado |
 
-## Bloque 5 · Ambulancia (2 minutos)
+## Bloque 6 · Ambulancia (5 minutos)
 
 | # | Plataforma y rol | Acción | Resultado esperado |
 |---|---|---|---|
-| 1 | Web · JOP | **Ambulancia**: poner la unidad en mantenimiento | Estado `En Mantenimiento` |
-| 2 | Android · PAR | **Unidad** | El cambio llega sin recargar |
-| 3 | Web · JOP | Sacar la unidad de mantenimiento | Estado `Disponible` |
+| 1 | Android · PAC o web · REC | **Pedir ambulancia** con el motivo y la ubicación | La solicitud aparece en la web de JOP sin recargar |
+| 2 | Web · JOP | **Ambulancia**: despachar la solicitud a la unidad | La unidad pasa a `En Servicio`; un segundo despacho a la misma unidad se rechaza (`servicio_activo_unico`) |
+| 3 | Android · PAR | **Servicio**: registrar los hitos en orden (salida, en escena, trasladando, en hospital) y la ubicación | Cada hito llega a la web sin recargar; saltarse un hito se rechaza |
+| 4 | Android · PAR | **Reporte prehospital** | El reporte queda guardado |
+| 5 | Web · MED o Android · MED | **Llegada de ambulancia**: ver el reporte prehospital | El médico lo ve antes de que llegue el paciente |
+| 6 | Web · JOP y DPD | **Bitácora de ambulancia** | El servicio aparece con sus hitos y actores |
+| 7 | Web · JOP | Finalizar el servicio; poner la unidad en mantenimiento y sacarla | `Disponible` → `En Mantenimiento` → `Disponible` |
 
-Decir con claridad: solicitud, despacho, hitos y bitácora están **en desarrollo**. La base ya garantiza un solo servicio activo por unidad (`servicio_activo_unico`), pero todavía no hay endpoint para despachar.
-
-## Bloque 6 · Seguridad y privacidad (4 minutos)
+## Bloque 7 · Seguridad y privacidad (5 minutos)
 
 | # | Plataforma y rol | Acción | Resultado esperado |
 |---|---|---|---|
@@ -80,13 +97,38 @@ Decir con claridad: solicitud, despacho, hitos y bitácora están **en desarroll
 | 2 | Web · ADM | Escribir a mano la ruta de un módulo clínico (por ejemplo `#/consultas`) | "Sin permiso" |
 | 3 | Web · DPD | **Auditoría** | Ve quién, cuándo y qué tipo de dato, sin contenido clínico |
 | 4 | Web · REC | Abrir la ficha de un paciente | Ve datos personales; no ve diagnósticos ni resultados |
-| 5 | Documento | Mostrar la matriz RBAC (Anexo B) y `permisos.csv` | Explicar que el código pregunta permisos, no roles (`sin-roles-en-codigo.spec.ts`) |
+| 5 | Web · MED | **Pacientes**: abrir un paciente sin relación de atención y **Solicitar acceso excepcional** con motivo | La solicitud queda pendiente; el contenido clínico sigue oculto |
+| 6 | Web · DPD | **Accesos excepcionales**: aprobar la solicitud | MED ve el expediente; el acceso queda auditado |
+| 7 | Web · DPD | **Auditoría**: buscar por paciente y fecha y ejecutar la **verificación de la cadena** | Ve el acceso excepcional (sin contenido clínico); la cadena de hash resulta íntegra |
+| 8 | Android · PAC | **Quién vio mi expediente** | El paciente ve fecha, rol y motivo del acceso, sin el nombre del personal |
+| 9 | Documento | Mostrar la matriz RBAC (Anexo B) y `permisos.csv` | Explicar que el código pregunta permisos, no roles (`sin-roles-en-codigo.spec.ts`) |
 
-## Bloque 7 · Calidad y cierre (3 minutos)
+## Bloque 8 · Información pública y métricas (3 minutos)
+
+| # | Plataforma y rol | Acción | Resultado esperado |
+|---|---|---|---|
+| 1 | Navegador privado, sin sesión | Abrir `https://sghu-web.onrender.com/publico` | Ocupación por planta, médicos de turno y avisos, sin nombres ni camas |
+| 2 | Web · JOP | **Avisos**: publicar un aviso | El aviso aparece en la página pública sin recargar |
+| 3 | Web · JOP | **Métricas**: abrir el tablero | Ocupación y laboratorio por estado; se actualiza al ocupar una cama |
+| 4 | Web · JOP | **Inventario**: sacar un artículo hasta bajar de su mínimo | Aparece la alerta de mínimo (`inventario.bajo_minimo`) |
+
+Punto para explicar: `/publico/*` no requiere sesión, no lleva datos personales y tiene límite de tasa.
+
+## Bloque 9 · App iOS (3 minutos)
+
+| # | Plataforma y rol | Acción | Resultado esperado |
+|---|---|---|---|
+| 1 | iOS · MED | **Mi día**: ver la agenda y abrir una **Consulta** | Muestra la agenda y la consulta del día |
+| 2 | iOS · PAC | **Mi turno** y **Mis exámenes** | El turno cambia sin recargar; los valores de un examen aparecen solo tras la revisión |
+| 3 | iOS · PAC | **Pedir ambulancia** | La solicitud llega a la web de JOP |
+
+Decir con claridad: la app iOS compila y pasa sus pruebas en CI, pero no se ha probado en un iPhone; no hay IPA.
+
+## Bloque 10 · Calidad y cierre (3 minutos)
 
 1. Mostrar los workflows de `.github/workflows/` (uno por plataforma) y una ejecución de pruebas de la API.
 2. Mostrar MVVM en Android (`*Screen.kt` + `*ViewModel.kt` con `StateFlow` y corrutinas) y la estructura SwiftUI/MVVM de iOS.
-3. Limitaciones, dichas por el equipo antes de que pregunten: ambulancia incompleta, sin pantalla pública, módulo DPD e historial clínico en desarrollo, iOS sin compilar, Figma desactualizado (sección 15 del documento de arquitectura).
+3. Limitaciones, dichas por el equipo antes de que pregunten: despliegue manual en Render, iOS sin probar en dispositivo y sin IPA, sin notificaciones push, pantallas Android pendientes (Citas y Vinculaciones de recepción, Signos vitales, Limpieza), Figma desactualizado (sección 15 del documento de arquitectura).
 
 ## Plan B
 
@@ -96,3 +138,5 @@ Decir con claridad: solicitud, despacho, hitos y bitácora están **en desarroll
 | Una pantalla no se actualiza sola | Mostrar la banda de conexión; al reconectar, la web pide `GET /eventos?after=` una vez |
 | Falla el teléfono | Mostrar el mismo flujo de PAC con la API en la documentación interactiva (`/api/v1/docs`) o con el emulador |
 | No hay agenda para MED | Repetir el paso 4 de la preparación con JOP |
+| `/publico` da 404 | Falta sincronizar `render.yaml` en Render; mostrar la pantalla pública desde `npm run dev` local |
+| Falla el simulador iOS | Mostrar las pantallas de `ios/README.md` y el resultado de `ios.yml` en GitHub Actions |

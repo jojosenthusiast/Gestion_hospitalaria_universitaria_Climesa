@@ -1,6 +1,6 @@
 # CLIMESA — Sistema de Gestión Hospitalaria Universitaria
 
-Sistema hospitalario del proyecto final DAMA (entrega y defensa: 21 de noviembre de 2026). La entrega incluye API, web administrativa, app Android y el proyecto iOS (en desarrollo). Todos los datos son ficticios.
+Sistema hospitalario del proyecto final DAMA (entrega y defensa: 21 de noviembre de 2026). La entrega incluye API, web administrativa, app Android y app iOS (Médico y Paciente, compilada y probada en CI, sin probar aún en dispositivo). Todos los datos son ficticios.
 
 Documentos de la entrega final:
 
@@ -43,10 +43,10 @@ Cada componente tiene su propio workflow y solo se ejecuta cuando cambian sus ru
 | Plataforma | Stack real |
 |---|---|
 | API | Node.js 22, TypeScript 5.7, NestJS 11, Fastify, node-postgres |
-| Datos e identidad | PostgreSQL 17 / Supabase Auth y Realtime; 23 migraciones SQL, 11 esquemas de dominio, 66 tablas con RLS, 10 roles y 79 permisos |
+| Datos e identidad | PostgreSQL 17 / Supabase Auth y Realtime; 28 migraciones SQL, 11 esquemas de dominio (más `metricas`, solo vistas), 66 tablas con RLS, 10 roles, 79 permisos y 112 operaciones HTTP en el contrato |
 | Web | React 19, TypeScript, Vite 6, CSS responsive, tipos de API generados desde OpenAPI |
 | Android | Kotlin 2.1.20, Jetpack Compose (BOM 2025.04.01) Material 3, MVVM con `StateFlow` y corrutinas, Hilt 2.57.1, OkHttp 4.12 (HTTP y Realtime), Android Keystore; API 26+, SDK 35 |
-| iOS | SwiftUI, MVVM, URLSession con async/await y Keychain; proyecto Xcode, iOS 17+; núcleo como Swift Package. **En desarrollo**: no se ha compilado en este entorno |
+| iOS | SwiftUI, MVVM, URLSession con async/await y Keychain; proyecto Xcode, iOS 17+; núcleo como Swift Package. Pantallas de MED y PAC; compila y corre `swift test` en CI (macOS 15), **sin probar** en simulador o dispositivo |
 
 .NET se conserva únicamente en el material histórico. La decisión vigente es [ADR-024](docs/decisiones/ADR-024-backend-nodejs.md).
 
@@ -104,9 +104,9 @@ Detalles en [android/README.md](android/README.md) e [ios/README.md](ios/README.
 
 ## Base de datos y semilla
 
-El esquema vive en `supabase/migrations/*.sql` (hoy 23 archivos) y los datos ficticios en `supabase/seed.sql`. Hay tres caminos; elige el que corresponda.
+El esquema vive en `supabase/migrations/*.sql` (hoy 28 archivos) y los datos ficticios en `supabase/seed.sql`. Hay tres caminos; elige el que corresponda.
 
-**1. Entorno demo en la nube (el que usa el equipo).** El proyecto Supabase "Gestion hospitalaria universitaria (Climesa)" tiene la semilla y las migraciones aplicadas a mano. Las tres migraciones del 14-nov (`20261114000100…300`) deben aplicarse antes de desplegar la API que las usa (camino 2). Fuera de eso, solo apunta tus `.env` a ese proyecto.
+**1. Entorno demo en la nube (el que usa el equipo).** El proyecto Supabase "Gestion hospitalaria universitaria (Climesa)" tiene la semilla y las migraciones aplicadas a mano. Producción tiene aplicadas todas las migraciones hasta `20261116002000`; `20261114000300` se aplica pasada la medianoche local del 14-nov (camino 2). Fuera de eso, solo apunta tus `.env` a ese proyecto.
 
 **2. Cambiar la base de la nube.** **No uses `supabase db push`**: el remoto registró las migraciones con otras marcas de versión y `db push` las vería todas pendientes e intentaría recrear tablas existentes. Aplica solo la migración que falte, a mano, en el SQL Editor de Supabase y en orden de fecha. El procedimiento y los pendientes del remoto están en [docs/desarrollo/ges-15-supabase-remoto.md](docs/desarrollo/ges-15-supabase-remoto.md). No ejecutes la semilla sobre datos reales.
 
@@ -179,11 +179,11 @@ cd android
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-En Windows: `.\gradlew.bat testDebugUnitTest assembleDebug`. Release usa por defecto `https://sghu-api.onrender.com/api/v1`; para que un Debug en un teléfono use la API de producción, pon `CLIMESA_API_BASE_URL` en `~/.gradle/gradle.properties`. Los roles móviles son JOP, REC, AST, ENF, MED, LAB, PAR y PAC. Hay pantallas funcionales para pacientes y fila (REC), consultorio (AST), consulta y revisión de resultados (MED), laboratorio (LAB), hospitalización, tablero de camas, consumo de insumos, citas y resultados del paciente (PAC), estado de la ambulancia (PAR) y turnos. Las secciones de módulos en desarrollo (por ejemplo pedir ambulancia, historial o información pública) muestran su estado pendiente. Instalación del APK paso a paso: [docs/entrega/ENTREGA_2026-11-21.md](docs/entrega/ENTREGA_2026-11-21.md).
+En Windows: `.\gradlew.bat testDebugUnitTest assembleDebug`. Release usa por defecto `https://sghu-api.onrender.com/api/v1`; para que un Debug en un teléfono use la API de producción, pon `CLIMESA_API_BASE_URL` en `~/.gradle/gradle.properties`. Los roles móviles son JOP, REC, AST, ENF, MED, LAB, PAR y PAC. Hay pantallas funcionales para pacientes y fila (REC), consultorio (AST), consulta y revisión de resultados (MED), laboratorio (LAB), hospitalización, tablero de camas, consumo de insumos, citas y resultados del paciente (PAC), ambulancia (PAC pide; REC despacha; PAR registra hitos, reporte prehospital y bitácora), historial, información del hospital, "quién vio mi expediente", vinculación de cuenta (PAC) y turnos. Citas y Vinculaciones de recepción, Signos vitales y Limpieza de camas muestran "Próxima entrega". El release se firma con las variables `CLIMESA_RELEASE_*` (ver [android/README.md](android/README.md)). Instalación del APK paso a paso: [docs/entrega/ENTREGA_2026-11-21.md](docs/entrega/ENTREGA_2026-11-21.md).
 
 ## iOS
 
-El proyecto iOS está **en desarrollo**: solo Turnos y Perfil consultan la API y no se ha compilado en este entorno. En una Mac con Xcode 15+ abre `ios/CLIMESA.xcodeproj` y el esquema `CLIMESA`. Selecciona un simulador iPhone/iPad. Debug usa `http://localhost:3000/api/v1`; configura el backend en esa Mac o una URL HTTPS con `CLIMESA_API_BASE_URL` en Build Settings. Antes de Release define esa URL HTTPS y tu equipo de firma. Consulta [ios/README.md](ios/README.md).
+El proyecto iOS cubre Médico y Paciente (pantallas I01 a I12 e I20 a I26, `ios/README.md`) y se compila en CI, pero **no se ha probado** en simulador ni en un iPhone, y no se entrega IPA. En una Mac con Xcode 15+ abre `ios/CLIMESA.xcodeproj` y el esquema `CLIMESA`. Selecciona un simulador iPhone/iPad. Debug usa `http://localhost:3000/api/v1`; configura el backend en esa Mac o una URL HTTPS con `CLIMESA_API_BASE_URL` en Build Settings. Antes de Release define esa URL HTTPS y tu equipo de firma. Consulta [ios/README.md](ios/README.md).
 
 ```sh
 cd ios
@@ -205,7 +205,7 @@ python tools/progreso.py --verificar
 python tools/backlog.py --verificar
 ```
 
-Hay 33 archivos de prueba de API (`api/tests/`), 20 de web (`web/src`) y 26 de Android (`android/app/src/test`). Las pruebas de API ejecutan el pipeline HTTP y todas las migraciones sobre PostgreSQL WASM (PGlite); el verificador de identidad y el proveedor de invitaciones están simulados solo en tests. No sustituyen las pruebas de login, correo y concurrencia multisesión en Supabase. Se incluyen workflows de CI para API, web, PostgreSQL nativo, Android, iOS y documentación (`.github/workflows/`). El despliegue en Render no depende de que CI pase.
+Hay 43 archivos de prueba de API (`api/tests/`), 33 de web (`web/src`), 38 de Android (`android/app/src/test`) y 6 de iOS (`ios/Tests`). Las pruebas de API ejecutan el pipeline HTTP y todas las migraciones sobre PostgreSQL WASM (PGlite); el verificador de identidad y el proveedor de invitaciones están simulados solo en tests. No sustituyen las pruebas de login, correo y concurrencia multisesión en Supabase. Se incluyen workflows de CI para API, web, PostgreSQL nativo, Android, iOS y documentación (`.github/workflows/`). El despliegue en Render no depende de que CI pase.
 
 [API](api/README.md) · [Web](web/README.md) · [Android](android/README.md) · [iOS](ios/README.md) · [Despliegue y migraciones](deployment/README.md) · [Arquitectura](docs/arquitectura/arquitectura.md) · [Modelo ER](docs/arquitectura/modelo-datos.md) · [RBAC](docs/arquitectura/roles-y-permisos.md) · [Privacidad](docs/arquitectura/privacidad.md) · [Resumen de arquitectura para el avance](docs/arquitectura/avance-31-octubre.md) · [Pruebas manuales por pantalla](docs/pruebas/pruebas-manuales.md).
 
@@ -213,4 +213,4 @@ Hay 33 archivos de prueba de API (`api/tests/`), 20 de web (`web/src`) y 26 de A
 
 La sincronización de las nuevas vistas a Figma queda para la siguiente etapa, por instrucción del usuario. El [archivo anterior](https://www.figma.com/design/bHJjbgi64I0p0Bnw8nho8e) se conserva como referencia histórica y todavía no representa todos los módulos de este corte.
 
-Fila, citas, consulta, laboratorio, hospitalización e inventario tienen API y pantallas. Ambulancia (solicitud, despacho y bitácora), información pública, privacidad/DPD, historial clínico y vinculación de cuentas están en desarrollo; el estado por módulo está en la sección 4 del [Documento de Arquitectura](docs/entrega/documento-arquitectura.md). Los datos de prueba son ficticios. La APK 0.1 archivada en `instalar/anteriores/` es de la demo antigua y no representa esta fuente.
+Fila, citas, consulta, laboratorio, hospitalización e inventario tienen API y pantallas. Ambulancia (solicitud, despacho, hitos y bitácora), información pública y avisos, métricas, accesos excepcionales y auditoría, historial clínico y vinculación de cuentas también tienen API y pantallas. Quedan pendientes las notificaciones push, cuatro pantallas Android (ver arriba) y probar iOS en un dispositivo; el estado por módulo está en la sección 4 del [Documento de Arquitectura](docs/entrega/documento-arquitectura.md). Los datos de prueba son ficticios. La APK 0.1 archivada en `instalar/anteriores/` es de la demo antigua y no representa esta fuente.
