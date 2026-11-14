@@ -2607,6 +2607,50 @@
           }
         }
       }
+    },
+    "ds.medico.stat.waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "en espera"
+          }
+        }
+      }
+    },
+    "ds.medico.stat.hospitalized": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hospitalizados"
+          }
+        }
+      }
+    },
+    "ds.medico.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar"
+          }
+        }
+      }
+    },
+    "ds.medico.prehospital": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reporte prehospital"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
