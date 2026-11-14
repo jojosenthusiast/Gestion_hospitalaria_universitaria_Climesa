@@ -27,7 +27,8 @@ export class PatientsService {
   async search(actor:Actor, query:string|undefined, limit=50, state?:string) {
     return this.db.transaction(async c=>{
       const result=await this.candidates(c,query??'',limit,state);
-      await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query??'')),count:result.length}});
+      // SEG-09 (audit 02 M-2): the audit keeps which patients the search exposed, not only how many.
+      await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query??'')),count:result.length,patientIds:result.map(p=>p.id)}});
       return searchShowsBirth(actor)?result:result.map(({birth,...p})=>p);
     });
   }
@@ -36,7 +37,7 @@ export class PatientsService {
     return this.db.transaction(async c=>{
       const candidates=await this.candidates(c,query,50);
       const row=(await c.query('INSERT INTO pacientes.busqueda_registro(usuario_id,huella_criterios,resultados,vence_en,creado_en) VALUES($1,$2,$3,$4,$5) RETURNING token,vence_en',[actor.id,fingerprint(normalize(query)),candidates.length,new Date(this.clock.now().valueOf()+600000),this.clock.now()])).rows[0];
-      await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query)),count:candidates.length}});
+      await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query)),count:candidates.length,patientIds:candidates.map(p=>p.id)}});
       return {token:row.token,expiresAt:row.vence_en,candidates:searchShowsBirth(actor)?candidates:candidates.map(({birth,...p})=>p)};
     });
   }
