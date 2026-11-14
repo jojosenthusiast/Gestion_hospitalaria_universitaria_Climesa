@@ -34,15 +34,6 @@ object Maquetas {
             ),
             emptyList(),
         ),
-        AndroidSection.AMBULANCE_REQUEST to Maqueta(
-            "A09", "Pedir ambulancia", "Solicitud y seguimiento",
-            listOf(
-                MaquetaRow("Aviso", "Si hay riesgo de vida, llama al 911"),
-                MaquetaRow("Ubicación", "Colonia Ejemplo, calle principal 12"),
-                MaquetaRow("Estado", "Por confirmar"),
-            ),
-            listOf("Enviar solicitud", "Cancelar antes de confirmar"),
-        ),
         AndroidSection.CONSULTATIONS to Maqueta(
             "A21", "Consulta", "Atender al paciente",
             listOf(
@@ -60,23 +51,6 @@ object Maquetas {
                 MaquetaRow("Completadas hoy", "7 órdenes"),
             ),
             listOf("Tomar muestra", "Capturar resultado"),
-        ),
-        AndroidSection.SERVICE to Maqueta(
-            "A71", "Servicio en curso", "Avanzar cada hito con un botón grande",
-            listOf(
-                MaquetaRow("Hito actual", "En escena"),
-                MaquetaRow("Dirección", "Colonia Ejemplo, calle principal 12"),
-                MaquetaRow("Tiempo transcurrido", "00:14"),
-            ),
-            listOf("Avanzar hito", "Abrir mapa"),
-        ),
-        AndroidSection.LOG to Maqueta(
-            "A74", "Mi bitácora", "Servicios propios con tiempos",
-            listOf(
-                MaquetaRow("Servicio 1032", "Salida 07:40 · Finalizado 08:55"),
-                MaquetaRow("Servicio 1031", "Salida 05:10 · Finalizado 06:02"),
-            ),
-            emptyList(),
         ),
     )
 

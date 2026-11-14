@@ -23,14 +23,16 @@ class MaquetasTest {
 
     @Test fun laSeccionListaParaUsarNoTieneMaqueta() {
         assertNull(Maquetas.of(AndroidSection.UNIT))
+        assertNull(Maquetas.of(AndroidSection.AMBULANCE_REQUEST))
+        assertNull(Maquetas.of(AndroidSection.SERVICE))
         assertNull(Maquetas.of(AndroidSection.PROFILE))
     }
 
     @Test fun elRotuloEsMaquetaYElContenidoEsFicticio() {
         assertEquals("Maqueta", Maquetas.LABEL)
-        Maquetas.of(AndroidSection.AMBULANCE_REQUEST)!!.let { m ->
-            assertEquals("A09", m.screen)
-            assertTrue("Enviar solicitud" in m.actions)
+        Maquetas.of(AndroidSection.CONSULTATIONS)!!.let { m ->
+            assertEquals("A21", m.screen)
+            assertTrue("Firmar consulta" in m.actions)
             assertTrue(m.rows.all { it.value.isNotBlank() })
         }
     }
