@@ -1,8 +1,9 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, type AccessProfile, type Api, type Shift, type Space, type Staff } from '../lib/api';
+import { ApiError, type AccessProfile, type Api, type Shift, type Staff } from '../lib/api';
 import { ShiftsPage } from '../features/personnel';
+import type { ShiftCatalog } from '../features/shifts/rules';
 import { StaffFicha } from '../features/personnel-ficha';
 
 // jsdom no implementa <dialog>: lo abrimos con el atributo para que sus campos sean accesibles.
@@ -19,15 +20,29 @@ const perfil = (permisos: string[]): AccessProfile => ({
 const jefatura = perfil(['turnos.ver', 'turnos.planificar', 'turnos.publicar', 'personal.ver']);
 const soloLectura = perfil(['turnos.ver']);
 
-const area: Space = { id: 'a-1', parentId: null, type: 'area', code: 'EMG', name: 'Emergencia', active: true, version: 1, path: 'Emergencia', totalBeds: 0, freeBeds: 0 };
 const ana: Staff = { id: 's-1', givenNames: 'Ana', surnames: 'Ficticia Prueba', type: 'medico', areaId: 'a-1', area: 'Emergencia', active: true, version: 3 };
 const turno = (id: string, state: string, version = 2): Shift => ({
   id, staffId: 's-1', person: 'Ana Ficticia Prueba', areaId: 'a-1', area: 'Emergencia', start: '2026-11-10T14:00:00.000Z', end: '2026-11-10T22:00:00.000Z', type: 'diurno', state, version,
 });
 
+const catalogo: ShiftCatalog = {
+  roles: [{ code: 'medico', name: 'Médico' }, { code: 'enfermero', name: 'Enfermería' }, { code: 'laboratorista', name: 'Laboratorio' }],
+  areas: [
+    { id: 'a-1', parentId: 'h-1', type: 'area', code: 'EMG', name: 'Emergencia' },
+    { id: 'a-2', parentId: 'h-1', type: 'area', code: 'LAB', name: 'Laboratorio clínico' },
+    { id: 'a-3', parentId: 'h-1', type: 'consultorio', code: 'CON', name: 'Consulta externa' },
+  ],
+  staff: [
+    { id: 's-1', name: 'Ana Ficticia Prueba', type: 'medico', specialty: 'Medicina general', areaId: 'a-1', area: 'Emergencia', registrations: [{ validFrom: '2026-01-01', validTo: '2026-12-31' }] },
+    { id: 's-2', name: 'Rosa Enfermera Prueba', type: 'enfermero', specialty: null, areaId: 'a-1', area: 'Emergencia', registrations: [{ validFrom: '2026-01-01', validTo: '2026-12-31' }] },
+    { id: 's-3', name: 'Luis Laboratorio Prueba', type: 'laboratorista', specialty: null, areaId: 'a-2', area: 'Laboratorio clínico', registrations: [] },
+    { id: 's-4', name: 'Marta Sin Inscripción', type: 'medico', specialty: null, areaId: 'a-1', area: 'Emergencia', registrations: [] },
+  ],
+};
+
 function montar(perfilActual: AccessProfile, turnos: Shift[], escritura: (path: string, body: unknown, method?: string) => Promise<unknown> = async () => ({})) {
   const api = {
-    request: vi.fn(async (path: string) => (path === '/espacios' ? [area] : path === '/personal' ? [ana] : turnos)),
+    request: vi.fn(async (path: string) => (path === '/turnos/catalogo' ? catalogo : turnos)),
     write: vi.fn(escritura),
   };
   render(<ShiftsPage api={api as unknown as Api} profile={perfilActual} version={0} />);
@@ -61,13 +76,88 @@ describe('turnos · jornada automática', () => {
     expect(screen.queryByRole('button', { name: /Publicar planificación/ })).toBeNull();
     expect(api.write).not.toHaveBeenCalled();
   });
-  it('el formulario filtra el personal por rol y área antes de asignar', async () => {
-    montar(jefatura, []);
+});
+
+describe('turnos · asignar turno de punta a punta (obs. 9)', () => {
+  const abrir = async () => {
+    const api = montar(jefatura, []);
+    await userEvent.click(await screen.findByRole('button', { name: /Asignar turno/ }));
+    return { api, dialogo: await screen.findByRole('dialog', { name: 'Asignar turno' }) };
+  };
+  const elegirArea = async (dialogo: HTMLElement, texto: string, nombre: RegExp) => {
+    await userEvent.click(within(dialogo).getByRole('combobox', { name: 'Área' }));
+    await userEvent.type(within(dialogo).getByRole('combobox', { name: 'Área' }), texto);
+    await userEvent.click(await screen.findByRole('option', { name: nombre }));
+  };
+  const horario = async (dialogo: HTMLElement, inicio: string, fin: string) => {
+    fireEvent.change(within(dialogo).getByLabelText('Fecha de inicio'), { target: { value: '2026-11-20' } });
+    fireEvent.change(within(dialogo).getByLabelText('Hora de inicio'), { target: { value: inicio } });
+    fireEvent.change(within(dialogo).getByLabelText('Hora de fin'), { target: { value: fin } });
+  };
+
+  it('sigue el orden área, horario y personal; sin área no se puede buscar personal', async () => {
+    const { dialogo } = await abrir();
+    expect(within(dialogo).getByRole('combobox', { name: 'Persona' }).hasAttribute('disabled')).toBe(true);
+    expect(within(dialogo).queryByLabelText('Filtrar personal por área')).toBeNull();
+    await elegirArea(dialogo, 'emerg', /Emergencia/);
+    expect(within(dialogo).getByRole('combobox', { name: 'Persona' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('el personal elegible depende del área y del rol, y se busca sin tildes', async () => {
+    const { dialogo } = await abrir();
+    await elegirArea(dialogo, 'emerg', /Emergencia/);
+    await horario(dialogo, '07:00', '15:00');
+    const persona = within(dialogo).getByRole('combobox', { name: 'Persona' });
+    await userEvent.click(persona);
+    expect(within(screen.getByRole('listbox', { name: 'Persona' })).getAllByRole('option').map(o => o.textContent)).toEqual([expect.stringContaining('Ana Ficticia'), expect.stringContaining('Rosa Enfermera'), expect.stringContaining('Marta Sin')]);
+    expect(screen.queryByRole('option', { name: /Luis Laboratorio/ })).toBeNull();
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Enfermería/ }));
+    await userEvent.click(persona);
+    expect(within(screen.getByRole('listbox', { name: 'Persona' })).getAllByRole('option')).toHaveLength(1);
+    expect(screen.getByRole('option', { name: /Rosa Enfermera/ })).toBeTruthy();
+    await userEvent.click(within(dialogo).getByRole('checkbox', { name: /otras áreas/ }));
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Laboratorio/ }));
+    await userEvent.click(persona);
+    expect(screen.getByRole('option', { name: /Luis Laboratorio/ })).toBeTruthy();
+  });
+
+  it('muestra apagada a la persona sin inscripción vigente y la que ya tiene turno, con su motivo', async () => {
+    const api = { request: vi.fn(async (path: string) => (path === '/turnos/catalogo' ? catalogo : [turno('t-9', 'publicado')].map(t => ({ ...t, start: '2026-11-20T14:00:00.000Z', end: '2026-11-20T22:00:00.000Z' })))), write: vi.fn(async () => ({})) };
+    render(<ShiftsPage api={api as unknown as Api} profile={jefatura} version={0} />);
     await userEvent.click(await screen.findByRole('button', { name: /Asignar turno/ }));
     const dialogo = await screen.findByRole('dialog', { name: 'Asignar turno' });
-    expect(within(dialogo).getByLabelText('Filtrar personal por área')).toBeTruthy();
-    expect(within(dialogo).getByLabelText('Filtrar personal por rol')).toBeTruthy();
-    expect(within(dialogo).getByLabelText('Persona · disponibilidad')).toBeTruthy();
+    await elegirArea(dialogo, 'emerg', /Emergencia/);
+    await horario(dialogo, '09:00', '17:00');
+    await userEvent.click(within(dialogo).getByRole('combobox', { name: 'Persona' }));
+    const ana = screen.getByRole('option', { name: /Ana Ficticia/ });
+    expect(ana.getAttribute('aria-disabled')).toBe('true');
+    expect(ana.textContent).toMatch(/traslapa/);
+    expect(screen.getByRole('option', { name: /Marta Sin/ }).textContent).toMatch(/Sin inscripción profesional vigente/);
+    expect(screen.getByRole('option', { name: /Rosa Enfermera/ }).getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('avisa la regla de 4 a 24 horas y no deja guardar fuera de ella', async () => {
+    const { dialogo } = await abrir();
+    await elegirArea(dialogo, 'emerg', /Emergencia/);
+    await horario(dialogo, '07:00', '09:00');
+    expect((await within(dialogo).findByRole('alert')).textContent).toMatch(/de 4 a 12 horas/);
+    await userEvent.click(within(dialogo).getByRole('combobox', { name: 'Persona' }));
+    await userEvent.click(screen.getByRole('option', { name: /Rosa Enfermera/ }));
+    expect(within(dialogo).getByRole('button', { name: 'Asignar turno' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('envía el turno con zona horaria y tipo sugerido por el horario', async () => {
+    const { api, dialogo } = await abrir();
+    await elegirArea(dialogo, 'emerg', /Emergencia/);
+    await horario(dialogo, '19:00', '07:00');
+    expect(within(dialogo).getByRole('radio', { name: 'Nocturno' }).hasAttribute('checked') || (within(dialogo).getByRole('radio', { name: 'Nocturno' }) as HTMLInputElement).checked).toBe(true);
+    await userEvent.click(within(dialogo).getByRole('combobox', { name: 'Persona' }));
+    await userEvent.click(screen.getByRole('option', { name: /Rosa Enfermera/ }));
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Asignar turno' }));
+    expect(api.write).toHaveBeenCalledTimes(1);
+    const [ruta, cuerpo, metodo] = api.write.mock.calls[0];
+    expect([ruta, metodo]).toEqual(['/turnos', 'POST']);
+    expect(cuerpo).toMatchObject({ staffId: 's-2', areaId: 'a-1', type: 'nocturno', start: '2026-11-21T01:00:00.000Z', end: '2026-11-21T13:00:00.000Z' });
   });
 });
 
@@ -122,42 +212,53 @@ describe('ficha de personal · función legible', () => {
   });
 });
 
-describe('turnos · filtros por rol y área sin /personal ni /espacios (obs. 6)', () => {
+describe('turnos · filtros con todas las opciones reales (obs. 2)', () => {
   const fila = (id: string, person: string, staffType: string, areaId: string, area: string): Shift & { staffType: string } => ({ ...turno(id, 'publicado'), staffId: `s-${id}`, person, staffType, areaId, area });
-  const turnos = [fila('1', 'Ana Médica', 'medico', 'a-1', 'Emergencia'), fila('2', 'Luis Laboratorio', 'laboratorista', 'a-2', 'Laboratorio'), fila('3', 'Rosa Enfermera', 'enfermero', 'a-1', 'Emergencia')];
-  const montarSinCatalogos = () => {
-    // Una cuenta de solo lectura (LAB, REC, ENF…): ni /personal ni /espacios responden; todo sale de /turnos.
-    const api = { request: vi.fn(async (path: string) => { if (path === '/turnos') return turnos; throw new ApiError('Sin permiso', 403); }), write: vi.fn() };
+  // Una cuenta de solo lectura (LAB, REC, ENF…) ve solo dos turnos, pero el catálogo trae todas las opciones del sistema.
+  const turnos = [fila('1', 'Ana Ficticia Prueba', 'medico', 'a-1', 'Emergencia'), fila('2', 'Rosa Enfermera Prueba', 'enfermero', 'a-1', 'Emergencia')];
+  const montarLectura = () => {
+    const api = { request: vi.fn(async (path: string) => (path === '/turnos' ? turnos : path === '/turnos/catalogo' ? catalogo : (() => { throw new ApiError('Sin permiso', 403); })())), write: vi.fn() };
     render(<ShiftsPage api={api as unknown as Api} profile={soloLectura} version={0} />);
     return api;
   };
   const personas = () => screen.getAllByRole('row').slice(1).map(r => within(r).getAllByRole('cell')[0].textContent);
 
-  it('el filtro de rol lista todos los roles y filtra aunque la cuenta no lea /personal', async () => {
-    const api = montarSinCatalogos();
+  it('lista todos los roles y todas las áreas aunque solo se vean turnos de dos', async () => {
+    const api = montarLectura();
     await screen.findByRole('table');
-    const rol = screen.getByLabelText('Rol del personal') as HTMLSelectElement;
-    expect([...rol.options].map(o => o.textContent)).toEqual(['Todos los roles', 'Médico', 'Enfermería', 'Asistencia', 'Recepción', 'Laboratorio', 'Paramédico', 'Motorista', 'Limpieza', 'Administración', 'Otro']);
-    await userEvent.selectOptions(rol, 'enfermero');
-    expect(personas()).toHaveLength(1);
-    expect(personas()[0]).toContain('Rosa Enfermera');
+    await userEvent.click(screen.getByRole('button', { name: /Filtros/ }));
+    const roles = within(screen.getByRole('group', { name: 'Rol del personal' })).getAllByRole('button').map(b => b.textContent);
+    expect(roles).toEqual(['Médico', 'Enfermería', 'Laboratorio']);
+    const areas = within(screen.getByRole('group', { name: 'Área de trabajo' })).getAllByRole('button').map(b => b.textContent);
+    expect(areas).toEqual(['Emergencia', 'Laboratorio clínico', 'Consulta externa']);
+    expect(api.request).toHaveBeenCalledWith('/turnos/catalogo', expect.anything());
     expect(api.request).not.toHaveBeenCalledWith('/personal', expect.anything());
-    expect(api.request).not.toHaveBeenCalledWith('/espacios', expect.anything());
   });
 
-  it('el filtro de área sale de los turnos y se combina con el de rol y el de persona', async () => {
-    montarSinCatalogos();
+  it('busca a cualquier persona del personal, tenga o no turnos cargados, y los filtros se combinan', async () => {
+    montarLectura();
     await screen.findByRole('table');
-    const area = screen.getByLabelText('Área de trabajo') as HTMLSelectElement;
-    expect([...area.options].map(o => o.textContent)).toEqual(['Todas las áreas', 'Emergencia', 'Laboratorio']);
-    await userEvent.selectOptions(area, 'a-1');
+    await userEvent.click(screen.getByRole('button', { name: /Filtros/ }));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Área de trabajo' })).getByRole('button', { name: 'Emergencia' }));
     expect(personas()).toHaveLength(2);
-    await userEvent.selectOptions(screen.getByLabelText('Rol del personal'), 'medico');
+    await userEvent.click(within(screen.getByRole('group', { name: 'Rol del personal' })).getByRole('button', { name: 'Enfermería' }));
     expect(personas()).toHaveLength(1);
-    const persona = screen.getByLabelText('Persona') as HTMLSelectElement;
-    expect([...persona.options].map(o => o.textContent)).toEqual(['Todas las personas', 'Ana Médica']);
+    expect(personas()[0]).toContain('Rosa Enfermera');
     await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
-    expect(personas()).toHaveLength(3);
+    expect(personas()).toHaveLength(2);
+    await userEvent.type(screen.getByRole('combobox', { name: 'Buscar persona' }), 'luis');
+    expect(screen.getByRole('option', { name: /Luis Laboratorio/ })).toBeTruthy();
+    await userEvent.click(screen.getByRole('option', { name: /Luis Laboratorio/ }));
+    expect(screen.getByRole('button', { name: /Quitar filtro Persona: Luis/ })).toBeTruthy();
+    expect(screen.getByText(/Sin turnos en esta vista/)).toBeTruthy();
+  });
+
+  it('cada fila muestra chips de rol y de área', async () => {
+    montarLectura();
+    await screen.findByRole('table');
+    const fila1 = screen.getAllByRole('row')[1];
+    expect(fila1.querySelector('[data-identity="MED"]')).toBeTruthy();
+    expect(fila1.querySelector('[data-identity="emergencia"]')).toBeTruthy();
   });
 
   it('?accion=planificar abre el formulario de asignar turno y limpia el parámetro', async () => {
