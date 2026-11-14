@@ -19,93 +19,98 @@ struct DoctorDayView: View {
     @State private var calling = Submission()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Spacing.l) {
             LoadState(loader: loader, retry: load) { day in
                 summary(day)
                 if let tickets = day.tickets { queueSection(tickets) }
                 if let agenda = day.agenda { agendaSection(agenda) }
-                let sections = AppSection.visible(for: "MED", profile: profile)
-                if !sections.isEmpty {
-                    SectionTitle("day.more")
-                    ForEach(sections, id: \.self) { section in
-                        NavigationLink { PatientSectionView(section: section, profile: profile) } label: {
-                            HStack {
-                                Image(systemName: section.symbol).frame(width: 28)
-                                Text(LocalizedStringKey(section.titleKey)).font(Brand.body(17))
-                                Spacer()
-                                if section == .hospitalizados, let count = day.hospitalized { Text(verbatim: "\(count)").font(Brand.bold(17)) }
-                                Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                            }.padding(16).background(.white)
-                        }.buttonStyle(.plain)
-                    }
-                }
+                moreSection(day)
             }
         }
         .task(id: live.snapshot.version([.appointments, .consultations, .queue, .laboratory, .admissions])) { await load() }
     }
 
     @ViewBuilder private func summary(_ day: DoctorDay) -> some View {
-        HStack(spacing: 10) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: Spacing.m), GridItem(.flexible(), spacing: Spacing.m)], spacing: Spacing.m) {
             if let pending = day.pendingResults {
-                Button { go(.resultados) } label: {
-                    Card { Text(verbatim: "\(pending)").font(Brand.bold(30)); Text("day.results").font(Brand.body(13)) }
-                }.buttonStyle(.plain)
+                Button { go(.resultados) } label: { StatTile(value: "\(pending)", label: L.text("day.results")) }.buttonStyle(.plain)
             }
-            if let agenda = day.agenda {
-                Card { Text(verbatim: "\(agenda.count)").font(Brand.bold(30)); Text("day.appointments").font(Brand.body(13)) }
+            if let agenda = day.agenda { StatTile(value: "\(agenda.count)", label: L.text("day.appointments")) }
+            if let tickets = day.tickets {
+                StatTile(value: "\(tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count)", label: L.text("ds.medico.stat.waiting"))
             }
+            if let count = day.hospitalized { StatTile(value: "\(count)", label: L.text("ds.medico.stat.hospitalized")) }
         }
     }
 
     @ViewBuilder private func queueSection(_ tickets: [QueueTicket]) -> some View {
-        SectionTitle("day.queue")
         let waiting = tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count
-        Card {
-            Text(verbatim: String(format: L.text("day.queue.waiting"), waiting)).font(Brand.body(15))
+        SectionCard(title: L.text("day.queue")) {
+            Text(verbatim: String(format: L.text("day.queue.waiting"), waiting)).font(Typo.body).foregroundStyle(Theme.ink)
             if account.can("fila.llamar"), let next = QueueRules.nextToCall(tickets) {
-                PrimaryButton(title: "day.queue.callNext", busy: calling.busy) { Task { await call(next) } }
+                ClimesaButton(title: L.text("day.queue.callNext"), loading: calling.busy) { Task { await call(next) } }
             }
-            SubmissionNotice(submission: calling)
+            WriteNotice(submission: calling, reload: load)
         }
         let called = tickets.filter { $0.state == .llamado || $0.state == .enAtencion }.sorted { $0.number < $1.number }
         ForEach(called) { ticket in
-            Card {
-                HStack {
-                    Text(verbatim: "\(ticket.number)").font(Brand.bold(26))
-                    VStack(alignment: .leading) {
-                        Text(verbatim: ticket.patientName ?? ticket.service.label).font(Brand.body(15))
-                        Pill(text: ticket.state.label, tone: .warning)
-                    }
-                    Spacer()
+            SectionCard {
+                ListRow(title: ticket.patientName ?? ticket.service.label, subtitle: String(format: L.text("consultation.ticket"), ticket.number)) {
+                    MedicoTag(ticket.state.rawValue, label: ticket.state.label)
                 }
                 if account.can("consulta.iniciar") {
-                    NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text("day.attend").font(Brand.bold(15)) }
+                    NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text("day.attend") }
+                        .buttonStyle(ClimesaButtonStyle())
                 }
             }
         }
     }
 
     @ViewBuilder private func agendaSection(_ agenda: [AgendaEntry]) -> some View {
-        SectionTitle("day.agenda")
-        if agenda.isEmpty { EmptyNote("day.agenda.none") }
+        if agenda.isEmpty {
+            SectionCard(title: L.text("day.agenda")) { EmptyStateView(title: L.text("day.agenda.none")) }
+        } else {
+            Text("day.agenda").font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).accessibilityAddTraits(.isHeader)
+        }
         ForEach(agenda) { entry in
-            Card {
-                HStack {
-                    Text(verbatim: ClimesaDates.display(entry.start, .time)).font(Brand.bold(18))
-                    Spacer()
-                    Pill(text: entry.consultationState?.label ?? entry.appointmentState.label, tone: entry.consultationState == .firmada ? .good : .neutral)
+            SectionCard {
+                ListRow(title: entry.patientName ?? L.text("day.patient.unknown"), subtitle: entry.reason, meta: ClimesaDates.display(entry.start, .time)) {
+                    if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
+                    else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
                 }
-                Text(verbatim: entry.patientName ?? L.text("day.patient.unknown")).font(Brand.body(16))
-                if let reason = entry.reason, !reason.isEmpty { Text(verbatim: reason).font(Brand.body(13)).foregroundStyle(.secondary) }
-                HStack(spacing: 18) {
+                HStack(spacing: Spacing.m) {
                     if account.can("consulta.iniciar") && entry.appointmentState == .confirmada || entry.consultationId != nil {
-                        NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: { Text("day.consultation").font(Brand.bold(15)) }
+                        NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: { Text("day.consultation") }
+                            .buttonStyle(ClimesaButtonStyle())
                     }
                     if account.can("expediente.ver") {
                         NavigationLink {
                             ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: entry.patientId, canRequestAccess: account.can("privacidad.solicitar_acceso")) }
-                        } label: { Text("day.record").font(Brand.body(15)) }
+                        } label: { Text("day.record") }
+                            .buttonStyle(ClimesaButtonStyle(kind: .secondary))
                     }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func moreSection(_ day: DoctorDay) -> some View {
+        let sections = AppSection.visible(for: "MED", profile: profile)
+        if !sections.isEmpty {
+            SectionCard(title: L.text("day.more")) {
+                ForEach(Array(sections.enumerated()), id: \.element) { index, section in
+                    if index > 0 { Divider().overlay(Theme.line) }
+                    NavigationLink { PatientSectionView(section: section, profile: profile) } label: {
+                        HStack(spacing: Spacing.m) {
+                            Image(systemName: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
+                            ListRow(title: L.text(section.titleKey)) {
+                                HStack(spacing: Spacing.s) {
+                                    if section == .hospitalizados, let count = day.hospitalized { Text(verbatim: "\(count)").font(Typo.label).foregroundStyle(Theme.ink) }
+                                    Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                }
+                            }
+                        }
+                    }.buttonStyle(.plain)
                 }
             }
         }
@@ -147,22 +152,26 @@ struct DoctorPatientsView: View {
     @State private var loader = Loader<[PatientCandidate]>()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                TextField("patients.search", text: $query).textInputAutocapitalization(.words).autocorrectionDisabled().onSubmit { Task { await search() } }
-                Button { Task { await search() } } label: { Image(systemName: "magnifyingglass") }
-            }.padding(14).background(.white)
-            EmptyNote("patients.search.hint")
+        VStack(alignment: .leading, spacing: Spacing.l) {
+            SectionCard {
+                FormField(label: L.text("patients.search"), text: $query, hint: L.text("patients.search.hint"))
+                    .textInputAutocapitalization(.words).autocorrectionDisabled().submitLabel(.search)
+                    .onSubmit { Task { await search() } }
+                ClimesaButton(title: L.text("ds.medico.search"), loading: loader.loading) { Task { await search() } }
+            }
             LoadState(loader: loader, retry: search) { rows in
-                if rows.isEmpty { EmptyNote("patients.none") }
+                if rows.isEmpty { EmptyStateView(title: L.text("patients.none"), symbol: "magnifyingglass") }
                 ForEach(rows) { patient in
                     NavigationLink {
                         ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: patient.id, canRequestAccess: account.can("privacidad.solicitar_acceso")) }
                     } label: {
-                        Card {
-                            HStack { Text(verbatim: patient.fullName).font(Brand.bold(16)); Spacer(); Image(systemName: "chevron.right").foregroundStyle(.secondary) }
-                            Text(verbatim: patient.record).font(Brand.mono(12))
-                            if !patient.active { Pill(text: L.text("patients.inactive"), tone: .warning) }
+                        SectionCard {
+                            ListRow(title: patient.fullName, meta: patient.record) {
+                                HStack(spacing: Spacing.s) {
+                                    if !patient.active { StatusTag("inactivo", label: L.text("patients.inactive")) }
+                                    Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                }
+                            }
                         }
                     }.buttonStyle(.plain)
                 }
@@ -186,7 +195,7 @@ struct ResultsReviewView: View {
     var body: some View {
         LoadState(loader: loader, retry: load) { orders in
             let pending = ReviewRules.pending(orders)
-            if pending.isEmpty { EmptyNote("results.none") }
+            if pending.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
             ForEach(pending) { order in
                 NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
                     LabOrderRow(order: order, status: L.text("results.toReview"), critical: ReviewRules.isCritical(order))
@@ -208,17 +217,18 @@ private struct ReviewDetailView: View {
 
     var body: some View {
         ScreenFrame(title: "results.detail") {
-            if let name = order.patientName { Text(verbatim: name).font(Brand.bold(18)) }
-            if ReviewRules.isCritical(order) { Notice(text: L.text("results.critical.notice"), failure: true) }
+            if let name = order.patientName { Text(verbatim: name).font(Typo.heading).foregroundStyle(Theme.ink) }
+            if ReviewRules.isCritical(order) { MedicoAlert(text: L.text("results.critical.notice")) }
             LabOrderDetail(order: order, showValues: true)
-            SubmissionNotice(submission: submission)
+            WriteNotice(submission: submission, reload: reload)
             if account.can("laboratorio.revisar") {
-                PrimaryButton(title: "results.markReviewed", busy: submission.busy) { Task { await review() } }
+                ClimesaButton(title: L.text("results.markReviewed"), loading: submission.busy) { Task { await review() } }
             }
             if account.can("expediente.ver") {
                 NavigationLink {
                     ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: order.patientId, canRequestAccess: account.can("privacidad.solicitar_acceso")) }
-                } label: { Text("day.record").font(Brand.body(15)) }
+                } label: { Text("day.record") }
+                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
             }
         }
     }
@@ -242,18 +252,17 @@ struct HospitalizedView: View {
     var body: some View {
         LoadState(loader: loader, retry: load) { admissions in
             let current = DischargeRules.current(admissions)
-            if current.isEmpty { EmptyNote("hospitalized.none") }
+            if current.isEmpty { EmptyStateView(title: L.text("hospitalized.none"), symbol: "bed.double") }
             ForEach(current) { admission in
-                Card {
-                    HStack {
-                        Text(verbatim: admission.patientName ?? L.text("day.patient.unknown")).font(Brand.bold(16))
-                        Spacer()
-                        Pill(text: admission.state.label, tone: admission.state == .hospitalizado ? .good : .warning)
-                    }
-                    Text(verbatim: admission.bed.isEmpty ? L.text("hospitalized.noBed") : String(format: L.text("hospitalized.bed"), admission.bed)).font(Brand.body(14))
-                    Text(verbatim: admission.requestedCategory.label + (admission.isolation ? " · " + L.text("hospitalized.isolation") : "")).font(Brand.mono(11))
+                SectionCard {
+                    ListRow(
+                        title: admission.patientName ?? L.text("day.patient.unknown"),
+                        subtitle: admission.bed.isEmpty ? L.text("hospitalized.noBed") : String(format: L.text("hospitalized.bed"), admission.bed),
+                        meta: admission.requestedCategory.label + (admission.isolation ? " · " + L.text("hospitalized.isolation") : "")
+                    ) { MedicoTag(admission.state.rawValue, label: admission.state.label) }
                     if admission.state == .hospitalizado && account.can("alta.firmar") {
-                        NavigationLink { DischargeView(admission: admission, reload: load) } label: { Text("hospitalized.discharge").font(Brand.bold(15)) }
+                        NavigationLink { DischargeView(admission: admission, reload: load) } label: { Text("hospitalized.discharge") }
+                            .buttonStyle(ClimesaButtonStyle(kind: .secondary))
                     }
                 }
             }
@@ -284,29 +293,30 @@ private struct DischargeView: View {
 
     var body: some View {
         ScreenFrame(title: "hospitalized.discharge") {
-            Text(verbatim: admission.patientName ?? L.text("day.patient.unknown")).font(Brand.bold(18))
-            Card {
-                Picker("discharge.type", selection: $type) {
-                    ForEach(DischargeType.allCases, id: \.self) { Text(verbatim: $0.label).tag($0) }
-                }.pickerStyle(.segmented)
-                TextField("discharge.summary", text: $summary, axis: .vertical).lineLimit(3...8)
-                FieldError(text: errors["summary"])
+            Text(verbatim: admission.patientName ?? L.text("day.patient.unknown")).font(Typo.heading).foregroundStyle(Theme.ink)
+            SectionCard {
+                VStack(alignment: .leading, spacing: Spacing.s) {
+                    Text("discharge.type").font(Typo.label).foregroundStyle(Theme.ink)
+                    Picker("discharge.type", selection: $type) {
+                        ForEach(DischargeType.allCases, id: \.self) { Text(verbatim: $0.label).tag($0) }
+                    }.pickerStyle(.segmented)
+                }
+                MedicoTextArea(label: L.text("discharge.summary"), text: $summary, error: errors["summary"])
                 if type == .voluntaria {
-                    Toggle("discharge.consent", isOn: $consent)
+                    Toggle("discharge.consent", isOn: $consent).font(Typo.body).tint(Theme.primary)
                     FieldError(text: errors["voluntaryConsent"])
                 }
             }
-            SectionTitle("discharge.pending")
-            ForEach($pending) { $line in
-                Card {
-                    TextField("discharge.pending.description", text: $line.description)
-                    TextField("discharge.pending.responsible", text: $line.responsible)
+            SectionCard(title: L.text("discharge.pending")) {
+                ForEach($pending) { $line in
+                    FormField(label: L.text("discharge.pending.description"), text: $line.description)
+                    FormField(label: L.text("discharge.pending.responsible"), text: $line.responsible)
                 }
+                FieldError(text: errors["pending"])
+                ClimesaButton(title: L.text("discharge.pending.add"), kind: .secondary) { pending.append(PendingLine()) }
             }
-            FieldError(text: errors["pending"])
-            Button("discharge.pending.add") { pending.append(PendingLine()) }
-            SubmissionNotice(submission: submission)
-            PrimaryButton(title: "discharge.sign", busy: submission.busy) { Task { await sign() } }
+            WriteNotice(submission: submission, reload: reload)
+            ClimesaButton(title: L.text("discharge.sign"), loading: submission.busy) { Task { await sign() } }
         }
     }
 
@@ -338,18 +348,20 @@ struct AmbulanceArrivalView: View {
     var body: some View {
         LoadState(loader: loader, retry: load) { arrival in
             if let service = arrival.status.activeService {
-                Card {
-                    HStack { Text(verbatim: arrival.status.unit.plate).font(Brand.bold(18)); Spacer(); Pill(text: service.priority.label, tone: service.priority == .roja ? .danger : .warning) }
-                    Text(verbatim: "\(service.origin) → \(service.destination)").font(Brand.body(14))
-                    Text(verbatim: String(format: L.text("arrival.dispatched"), ClimesaDates.display(service.dispatchedAt, .time))).font(Brand.body(12)).foregroundStyle(.secondary)
+                SectionCard {
+                    ListRow(
+                        title: arrival.status.unit.plate,
+                        subtitle: "\(service.origin) → \(service.destination)",
+                        meta: String(format: L.text("arrival.dispatched"), ClimesaDates.display(service.dispatchedAt, .time))
+                    ) { MedicoTag(service.priority.rawValue, label: service.priority.label) }
                 }
                 if let view = arrival.prehospital {
-                    if !view.clinical { EmptyNote("arrival.noClinical") }
+                    if !view.clinical { Text("arrival.noClinical").font(Typo.small).foregroundStyle(Theme.muted) }
                     ForEach(view.reports) { report in PrehospitalReportCard(report: report) }
-                } else { EmptyNote("arrival.noReport") }
-                EmptyNote("arrival.receive.pending")
+                } else { Text("arrival.noReport").font(Typo.small).foregroundStyle(Theme.muted) }
+                Text("arrival.receive.pending").font(Typo.small).foregroundStyle(Theme.muted)
             } else {
-                EmptyNote("arrival.none")
+                EmptyStateView(title: L.text("arrival.none"), symbol: "cross.case")
             }
         }
         .task(id: live.snapshot.version(.ambulance)) { await load() }
@@ -371,13 +383,17 @@ struct AmbulanceArrivalView: View {
 private struct PrehospitalReportCard: View {
     let report: PrehospitalView.Report
     var body: some View {
-        Card {
-            HStack { Pill(text: report.priority.label, tone: report.priority == .roja ? .danger : .warning); Spacer(); Text(verbatim: ClimesaDates.display(report.capturedAt, .time)).font(Brand.mono(12)) }
-            if let eta = report.estimatedArrival { Text(verbatim: String(format: L.text("arrival.eta"), ClimesaDates.display(eta, .time))).font(Brand.bold(18)) }
-            if let reason = report.reason { Text(verbatim: reason).font(Brand.body(15)) }
+        SectionCard(title: L.text("ds.medico.prehospital")) {
+            HStack {
+                MedicoTag(report.priority.rawValue, label: report.priority.label)
+                Spacer()
+                Text(verbatim: ClimesaDates.display(report.capturedAt, .time)).font(Typo.mono).foregroundStyle(Theme.muted)
+            }
+            if let eta = report.estimatedArrival { Text(verbatim: String(format: L.text("arrival.eta"), ClimesaDates.display(eta, .time))).font(Typo.heading).foregroundStyle(Theme.ink) }
+            if let reason = report.reason { Text(verbatim: reason).font(Typo.body).foregroundStyle(Theme.ink) }
             if let signs = report.vitalSigns, !signs.isEmpty {
                 ForEach(signs.keys.sorted(), id: \.self) { key in
-                    HStack { Text(verbatim: key).font(Brand.mono(12)); Spacer(); Text(verbatim: signs[key]?.text ?? "").font(Brand.body(14)) }
+                    HStack { Text(verbatim: key).font(Typo.mono).foregroundStyle(Theme.muted); Spacer(); Text(verbatim: signs[key]?.text ?? "").font(Typo.body).foregroundStyle(Theme.ink) }
                 }
             }
         }
