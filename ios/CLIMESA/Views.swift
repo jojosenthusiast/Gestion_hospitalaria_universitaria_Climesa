@@ -39,6 +39,9 @@ struct AuthView:View {
     @EnvironmentObject private var account:AccountModel
     @State private var registering=false
     @State private var name=""; @State private var email=""; @State private var password=""; @State private var confirmation=""
+    // TEMPORARY testing aid (docs/operacion/login-de-prueba.md): empty unless the build was made with CLIMESA_DEMO_LOGIN = YES.
+    private let demoAccounts = DemoLogin.accounts(info: Bundle.main.infoDictionary)
+    @State private var demoRole:String?
     var body:some View {
         ScrollView {
             BrandHeader()
@@ -48,6 +51,14 @@ struct AuthView:View {
                 Text(LocalizedStringKey(registering ? "auth.sub.register":"auth.sub.login")).font(Brand.body()).foregroundStyle(.secondary)
                 if let error=account.error { Notice(text:error,failure:true) }
                 if let notice=account.notice { Notice(text:notice) }
+                if !registering && !demoAccounts.isEmpty {
+                    Notice(text:L.text("auth.demo.banner"))
+                    Menu {
+                        ForEach(demoAccounts,id:\.role) { demo in Button(demo.role) { demoRole=demo.role; email=demo.email; password=demo.password } }
+                    } label: {
+                        HStack { Text("auth.demo.selector").font(Brand.body(13)); Spacer(); Text(verbatim:demoRole ?? L.text("auth.demo.choose")).font(Brand.body(14)); Image(systemName:"chevron.down") }.padding(16).background(.white)
+                    }.accessibilityLabel(Text("auth.demo.selector"))
+                }
                 VStack(spacing:20) {
                     if registering { field("auth.name",value:$name,type:.name) }
                     VStack(alignment:.leading,spacing:10) { Text("auth.email").font(Brand.body(13)); TextField("auth.email.placeholder",text:$email).keyboardType(.emailAddress).textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled(); Divider() }
