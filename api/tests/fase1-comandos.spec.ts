@@ -115,6 +115,30 @@ describe('Fase 1 · comandos (CON-02, CON-07, API-08..11)', () => {
       expect(again.body.consultaId).toBe(started.body.id);
     });
 
+    test('la fila expone la consulta abierta solo al médico que la inició; otro médico recibe el 409 sin el id', async () => {
+      const issued = await ticket();
+      const called = await t.call('AST', 'POST', `/fila/${issued.id}/llamar`, { version: issued.version });
+      expect(called.status).toBe(201);
+      const before = (await t.call('MED', 'GET', '/fila')).body.find((row: { id: string }) => row.id === issued.id);
+      expect([before.consultationId, before.consultationState]).toEqual([null, null]);
+      const started = await t.call('MED', 'POST', '/consultas', { ticketId: issued.id });
+      expect(started.status).toBe(201);
+      const own = (await t.call('MED', 'GET', '/fila')).body.find((row: { id: string }) => row.id === issued.id);
+      expect([own.state, own.consultationId, own.consultationState]).toEqual(['en_atencion', started.body.id, 'abierta']);
+      const others = (await t.call('AST', 'GET', '/fila')).body.find((row: { id: string }) => row.id === issued.id);
+      expect([others.consultationId, others.consultationState]).toEqual([null, null]);
+
+      // Another professional's open consultation on a number: the doctor sees no id and the 409 carries none.
+      const foreign = await ticket();
+      await t.call('AST', 'POST', `/fila/${foreign.id}/llamar`, { version: foreign.version });
+      const patientId = (await t.one<{ paciente_id: string }>('SELECT paciente_id FROM atencion.ticket_fila WHERE id=$1', [foreign.id])).paciente_id;
+      await t.pg.query(`INSERT INTO atencion.consulta(paciente_id,medico_id,ticket_id,estado,iniciada_en) VALUES($1,$2,$3,'abierta',now())`, [patientId, await t.staffOf('AST'), foreign.id]);
+      const listed = (await t.call('MED', 'GET', '/fila')).body.find((row: { id: string }) => row.id === foreign.id);
+      expect([listed.consultationId, listed.consultationState]).toEqual([null, null]);
+      const blocked = await t.call('MED', 'POST', '/consultas', { ticketId: foreign.id });
+      expect([blocked.status, blocked.body.codigo, blocked.body.consultaId]).toEqual([409, 'consulta_ya_iniciada', undefined]);
+    });
+
     test('exige exactamente un origen: cita o número de fila', async () => {
       expect((await t.call('MED', 'POST', '/consultas', {})).status).toBe(400);
       expect((await t.call('MED', 'POST', '/consultas', { ticketId: randomUUID(), appointmentId: randomUUID() })).status).toBe(400);

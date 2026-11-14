@@ -297,6 +297,8 @@ export class QueueTicketResponse {
   @IntProp() llamados!: number;
   @IntProp() version!: number;
   @DateTimeProp() issuedAt!: string;
+  @UuidProp({ nullable: true, description: 'Consulta iniciada desde este número por quien consulta la fila; null si no hay o es de otro profesional' }) consultationId!: string | null;
+  @EnumProp(ESTADO_CONSULTA, 'EstadoConsulta', { nullable: true }) consultationState!: string | null;
 }
 
 export class QueueIssuedResponse {

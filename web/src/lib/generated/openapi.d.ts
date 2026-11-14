@@ -2811,6 +2811,12 @@ export interface components {
             version: number;
             /** Format: date-time */
             issuedAt: string;
+            /**
+             * Format: uuid
+             * @description Consulta iniciada desde este número por quien consulta la fila; null si no hay o es de otro profesional
+             */
+            consultationId: string | null;
+            consultationState: components["schemas"]["EstadoConsulta"] | null;
         };
         QueueIssueDto: {
             /** @enum {string} */
