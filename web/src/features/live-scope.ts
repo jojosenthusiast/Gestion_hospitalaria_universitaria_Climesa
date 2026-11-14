@@ -39,7 +39,11 @@ const rules: [RegExp, (match: RegExpMatchArray) => LiveScope][] = [
   [/^\/inventario(\/|\?|$)/, () => of('articulo')],
   [/^\/cuentas\/vinculaciones(\/|\?|$)/, () => of('vinculacion_paciente', 'paciente')],
   [/^\/me\/laboratorio(\?|$)/, () => of('orden_laboratorio')],
+  // The auditor reads the log on demand (each read is itself audited): it is refreshed by hand or on reconnection, never by other people's events.
+  [/^\/auditoria(\/|\?|$)/, () => []],
   [/^\/publico\/avisos(\?|$)/, () => of('aviso')],
+  [/^\/me\/avisos(\?|$)/, () => of('aviso')],
+  [/^\/avisos(\?|$)/, () => of('aviso')],
 ];
 
 export function liveScope(path: string): LiveScope {
