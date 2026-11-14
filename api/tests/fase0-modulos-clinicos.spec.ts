@@ -108,7 +108,11 @@ describe('Fase 0 · módulos clínicos (API-01, REQ-08)', () => {
     expect(completed.status).toBe(201);
     expect((await t.call('MED', 'POST', `/laboratorio/ordenes/${order.body.id}/revisar`, { version: completed.body.version })).status).toBe(201);
     const queue = await t.call('LAB', 'GET', '/laboratorio/ordenes');
-    expect(queue.body.find((row: any) => row.id === order.body.id).state).toBe('completado');
+    const row = queue.body.find((r: any) => r.id === order.body.id);
+    expect(row.state).toBe('completado');
+    // Ronda 2: la lista de trabajo trae expediente, médico y edad solo como rango (Laboratorio no ve la fecha exacta).
+    expect(row).toMatchObject({ patientRecord: record, doctorName: 'MED Prueba', patientAge: null });
+    expect(typeof row.patientSex).toBe('string');
   });
 
   describe('asignación de camas (REQ-08, RN-05)', () => {

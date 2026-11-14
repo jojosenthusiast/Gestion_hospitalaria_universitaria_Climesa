@@ -1,0 +1,111 @@
+/* Piezas comunes de las listas clínicas (ronda 2): barra, chips, lista maestro-detalle, pestañas. Prefijo cl- para no chocar con modules.css. */
+.cl-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.cl-toolbar-main, .cl-toolbar-trailing { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.cl-toolbar-main { flex: 1 1 320px; }
+.cl-search { position: relative; display: flex; align-items: center; gap: 8px; flex: 1 1 260px; max-width: 460px; min-height: 44px; padding: 0 12px; border: 1px solid var(--control-line); border-radius: var(--radius-control); background: var(--surface); color: var(--muted); }
+.cl-search:focus-within { outline: 3px solid var(--outline); outline-offset: 1px; border-color: var(--primary); }
+.cl-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: inherit; min-height: 40px; outline: none; }
+.cl-search-clear { display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 50%; }
+.cl-sort { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.cl-sort select { min-height: 44px; padding: 0 10px; border: 1px solid var(--control-line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; }
+.cl-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 8px; }
+.cl-filter-label { color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.cl-chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.cl-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.cl-chip small { padding: 0 6px; min-width: 20px; border-radius: 999px; background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 800; text-align: center; }
+.cl-chip:hover { border-color: var(--primary); }
+.cl-chip[aria-pressed='true'] { border-color: var(--primary); background: var(--soft); color: var(--primary-text); }
+.cl-chip[aria-pressed='true'] small { background: var(--primary); color: var(--on-primary); }
+.cl-chip-removable { min-height: 32px; border-style: dashed; }
+.cl-active-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 12px; }
+.cl-link-button { border: 0; background: transparent; color: var(--primary-text); font: inherit; font-size: 13px; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 6px; }
+.cl-count { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+
+/* Etapas y prioridades: una paleta para chips, bordes y filtros. */
+.cl-stage { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; border: 1.5px solid currentColor; }
+.cl-stage.tone-warning { color: var(--warning); background: var(--warning-soft); }
+.cl-stage.tone-info { color: var(--primary-text); background: var(--soft); }
+.cl-stage.tone-review { color: var(--state-reserved); background: var(--state-reserved-soft); }
+.cl-stage.tone-success { color: var(--success); background: var(--success-soft); }
+.cl-stage.tone-muted { color: var(--state-blocked); background: var(--state-blocked-soft); }
+.cl-stage.tone-danger { color: var(--danger); background: var(--danger-soft); }
+
+/* Maestro-detalle. */
+.cl-master-detail { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+.cl-master { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.cl-detail { position: sticky; top: 12px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); display: grid; gap: 14px; }
+.cl-detail h3 { margin: 0; font-size: 20px; }
+.cl-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px 16px; margin: 0; }
+.cl-facts dt { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+.cl-facts dd { margin: 2px 0 0; font-weight: 700; }
+@media (max-width: 960px) { .cl-master-detail { grid-template-columns: 1fr; } .cl-detail { position: static; } }
+
+/* Lista de trabajo de laboratorio. */
+.lw-row { display: grid; grid-template-columns: 92px minmax(0, 1.4fr) minmax(0, 1.2fr) auto; gap: 8px 14px; align-items: center; width: 100%; padding: 10px 14px; border: 1.5px solid var(--line); border-left-width: 6px; border-radius: var(--radius-card); background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.lw-row:hover { border-color: var(--primary); }
+.lw-row[aria-current='true'] { outline: 3px solid var(--outline); outline-offset: 1px; background: var(--soft); }
+.lw-row.tone-warning { border-left-color: var(--warning); }
+.lw-row.tone-info { border-left-color: var(--primary); }
+.lw-row.tone-review { border-left-color: var(--state-reserved); }
+.lw-row.tone-success { border-left-color: var(--success); }
+.lw-row.tone-muted { border-left-color: var(--state-blocked); }
+.lw-priority { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 800; color: var(--muted); }
+.lw-priority.is-urgent { color: var(--danger); }
+.lw-patient strong { display: block; }
+.lw-patient small, .lw-exams small, .lw-end small { display: block; color: var(--muted); font-size: 12px; }
+.lw-exams { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.lw-exam { padding: 1px 8px; border-radius: 6px; background: var(--bg); font-size: 12px; font-weight: 700; }
+.lw-end { display: grid; justify-items: end; gap: 4px; }
+.lw-elapsed { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.lw-elapsed.sla-ok { color: var(--success); }
+.lw-elapsed.sla-warn { color: var(--warning); }
+.lw-elapsed.sla-late { color: var(--danger); }
+.lw-elapsed.sla-none { color: var(--muted); }
+.lw-critical { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; background: var(--danger); color: var(--on-primary); font-size: 12px; font-weight: 800; }
+@media (max-width: 720px) { .lw-row { grid-template-columns: 1fr auto; } .lw-exams { grid-column: 1 / -1; } }
+
+.lw-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.lw-timeline { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.lw-timeline strong { color: var(--ink); }
+
+/* Fila del día como tablero. */
+.qb-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.qb-count { display: grid; gap: 2px; padding: 10px 14px; border: 1.5px solid var(--line); border-left-width: 6px; border-radius: var(--radius-card); background: var(--surface); }
+.qb-count strong { font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
+.qb-count span { color: var(--muted); font-size: 13px; font-weight: 700; }
+.qb-count.tone-warning { border-left-color: var(--warning); }
+.qb-count.tone-info { border-left-color: var(--primary); }
+.qb-count.tone-review { border-left-color: var(--state-reserved); }
+.qb-count.tone-success { border-left-color: var(--success); }
+.qb-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; align-items: start; }
+.qb-column { display: grid; gap: 8px; padding: 10px; border-radius: var(--radius-card); background: var(--bg); min-height: 120px; }
+.qb-column h3 { display: flex; justify-content: space-between; align-items: center; margin: 0; font-size: 14px; }
+.qb-column ul { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.qb-ticket { display: grid; gap: 6px; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); }
+.qb-ticket-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.qb-number { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.qb-wait { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.qb-wait.sla-ok { color: var(--success); } .qb-wait.sla-warn { color: var(--warning); } .qb-wait.sla-late { color: var(--danger); } .qb-wait.sla-none { color: var(--muted); }
+.qb-ticket small { color: var(--muted); }
+.qb-readonly { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius-control); background: var(--soft); color: var(--primary-text); font-weight: 700; }
+
+/* Pestañas de la ficha. */
+.cl-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 12px; }
+.cl-tab { min-height: 42px; padding: 8px 14px; border: 0; border-bottom: 3px solid transparent; margin-bottom: -2px; background: transparent; color: var(--muted); font: inherit; font-weight: 800; cursor: pointer; }
+.cl-tab[aria-selected='true'] { color: var(--primary-text); border-bottom-color: var(--primary); }
+.cl-tab small { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--bg); font-size: 12px; }
+.cl-list { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.cl-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); }
+.cl-list small { display: block; color: var(--muted); }
+.pf-field-error { color: var(--danger); font-size: 13px; font-weight: 700; margin: 2px 0 0; }
+
+/* Agenda de citas. */
+.ag-day { display: grid; gap: 8px; margin-bottom: 16px; }
+.ag-day h3 { margin: 0; font-size: 15px; text-transform: capitalize; }
+.ag-doctor { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.ag-doctor > header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ag-slot { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto auto; gap: 6px 12px; align-items: center; padding: 8px 10px; border-left: 5px solid var(--primary); border-radius: var(--radius-control); background: var(--bg); }
+.ag-slot.tone-warning { border-left-color: var(--warning); } .ag-slot.tone-success { border-left-color: var(--success); } .ag-slot.tone-muted { border-left-color: var(--state-blocked); } .ag-slot.tone-info { border-left-color: var(--primary); } .ag-slot.tone-danger { border-left-color: var(--danger); }
+.ag-time { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ag-time small { display: block; color: var(--muted); font-weight: 700; }
+@media (max-width: 720px) { .ag-slot { grid-template-columns: 1fr auto; } }

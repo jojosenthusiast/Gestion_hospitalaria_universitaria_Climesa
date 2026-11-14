@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
+import { ageOn, ageRange, fichaFields } from '../patients/patient.privacy';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
@@ -52,15 +53,22 @@ export class LaboratoryService {
       o.prioridad AS priority,o.estado AS state,o.creada_en AS "createdAt",o.muestra_tomada_en AS "sampleTakenAt",
       o.completada_en AS "completedAt",o.revisada_en AS "reviewedAt",o.version,
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
+      p.expediente AS "patientRecord",p.sexo AS "patientSex",p.nacimiento::text AS "birthRaw",m.nombres||' '||m.apellidos AS "doctorName",
       coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'result',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND o.medico_id=$3 OR $2::boolean AND o.revisada_en IS NOT NULL) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
-      FROM laboratorio.orden o JOIN pacientes.paciente p ON p.id=o.paciente_id
+      FROM laboratorio.orden o JOIN pacientes.paciente p ON p.id=o.paciente_id LEFT JOIN personal.persona m ON m.id=o.medico_id
       LEFT JOIN laboratorio.orden_item oi ON oi.orden_id=o.id LEFT JOIN laboratorio.examen e ON e.id=oi.examen_id LEFT JOIN laboratorio.resultado r ON r.orden_item_id=oi.id
       WHERE ($1::boolean AND o.estado IN ('pendiente','en_proceso','completado')) OR ($4::uuid IS NOT NULL AND o.paciente_id=$4) OR ($3::uuid IS NOT NULL AND o.medico_id=$3)
-      GROUP BY o.id,p.id ORDER BY o.creada_en DESC LIMIT 300`, [lab, !!patient, doctor, patient]);
+      GROUP BY o.id,p.id,m.id ORDER BY o.creada_en DESC LIMIT 300`, [lab, !!patient, doctor, patient]);
       for (const row of result.rows) await this.commands.audit(c, actor, { action: 'laboratorio.leer', entity: 'orden_laboratorio', entityId: row.id, patientId: row.patientId, permission: 'resultados.ver' });
       return result.rows;
     });
-    return rows;
+    // Ronda 2 (obs. 4): la edad respeta la privacidad de la ficha (exacta con fecha visible, por decenio con `rango`, nada sin permiso).
+    const today = this.clock.today();
+    return rows.map(({ birthRaw, ...row }) => {
+      const fields = fichaFields(actor, actor.patientId === row.patientId);
+      const age = birthRaw ? ageOn(String(birthRaw).slice(0, 10), today) : null;
+      return { ...row, patientAge: fields.birth ? age : null, patientAgeRange: fields.ageRange ? ageRange(age) : null };
+    });
   }
 
   async create(actor: Actor, dto: LabOrderDto, key?: string) {
