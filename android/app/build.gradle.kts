@@ -9,6 +9,9 @@ val climesaSupabasePublishableKey = providers.gradleProperty("CLIMESA_SUPABASE_P
 val climesaApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("http://10.0.2.2:3000/api/v1")
 // Release never ships with an empty API URL: it defaults to the deployed API unless CLIMESA_API_BASE_URL overrides it.
 val climesaReleaseApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("https://sghu-api.onrender.com/api/v1")
+// Web app that hosts the pages opened from the Supabase emails (/confirmar-correo, /restablecer). Debug and release use the
+// deployed web by default: a link in an email must open on any device, never on localhost.
+val climesaWebUrl = providers.gradleProperty("CLIMESA_WEB_URL").getOrElse("https://sghu-web.onrender.com")
 
 // TEMPORARY testing aid (docs/operacion/login-de-prueba.md): with -PCLIMESA_DEMO_LOGIN=true and the git-ignored
 // ../demo-credenciales.json present, the login offers the fictitious test accounts (debug and release). Flag false
@@ -42,6 +45,7 @@ android {
         buildConfigField("String", "SUPABASE_URL", buildConfigString(climesaSupabaseUrl))
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildConfigString(climesaSupabasePublishableKey))
         buildConfigField("String", "API_BASE_URL", buildConfigString(climesaApiBaseUrl))
+        buildConfigField("String", "WEB_URL", buildConfigString(climesaWebUrl))
         buildConfigField("boolean", "DEMO_LOGIN", (climesaDemoLogin && climesaDemoCredentials.isNotBlank()).toString())
         buildConfigField("String", "DEMO_CREDENTIALS", buildConfigString(climesaDemoCredentials.lines().joinToString("")))
     }

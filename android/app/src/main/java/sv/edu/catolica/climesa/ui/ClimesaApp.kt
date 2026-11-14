@@ -46,13 +46,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     val state by authModel.state.collectAsStateWithLifecycle()
     var registering by rememberSaveable { mutableStateOf(false) }
+    var resetting by rememberSaveable { mutableStateOf(false) }
     val sessionStores:SessionStoreHolder=viewModel()
     // Logout or expired session: clear the account's ViewModels (data, coroutines and realtime subscriptions).
     LaunchedEffect(state.account?.session?.userId){if(state.account==null)sessionStores.end()}
+    val backToLogin={registering=false;resetting=false;authModel.clearRegistration()}
     when {
         state.checkingSession -> AuthLoadingScreen()
         state.accessPending -> AccessPending(state.error,{authModel.retryAccess()},authModel::signOut)
-        state.account==null -> if(registering) RegistrationScreen(state,{registering=false;authModel.clearRegistration()},authModel::register) else LoginScreen(state,authModel.draft,authModel::signIn){registering=true;authModel.clearRegistration()}
+        state.account==null&&state.confirmationEmail!=null -> CheckEmailScreen(state,state.confirmationEmail!!,authModel::resendConfirmation){registering=false;authModel.confirmedSignIn(state.confirmationEmail!!)}
+        state.account==null&&resetting -> PasswordResetScreen(state,authModel.draft.email,authModel::requestPasswordReset,backToLogin)
+        state.account==null -> if(registering) RegistrationScreen(state,backToLogin,authModel::register) else LoginScreen(state,authModel.draft,authModel::signIn,authModel::resendConfirmation,{resetting=true;authModel.clearRegistration()}){registering=true;authModel.clearRegistration()}
         else -> SessionViewModelScope(sessionStores,state.account!!.session.userId){AuthorizedWorkspace(state.account!!,dark,setDark,state.signingOut,authModel::signOut)}
     }
 }
@@ -65,7 +69,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     val roles=if(destination==AndroidDestination.NOT_AVAILABLE||destination==AndroidDestination.PENDING_VERIFICATION)emptyList() else allowedRoles.filter { AndroidSections.hasAppScreens(it,account.profile.permissions) }
     var selectedRole by rememberSaveable(account.session.userId){mutableStateOf(roles.firstOrNull().orEmpty())}
     val role=selectedRole.takeIf{it in roles}?:roles.firstOrNull().orEmpty()
-    if(roles.isEmpty()){Surface{Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center){SectionIntro("Acceso / CLIMESA","Tu rol no usa esta aplicación");Spacer(Modifier.height(16.dp));Text("Ingresa desde la plataforma habilitada para tu cuenta.");Spacer(Modifier.height(24.dp));PrimaryButton(stringResource(R.string.cerrar_sesion),logout)}};return}
+    if(roles.isEmpty()){Surface{Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center){SectionIntro("Acceso / CLIMESA","Tu rol no usa esta aplicación");Spacer(Modifier.height(16.dp));Text(PlatformGate.message(account.profile.platforms,"android",BuildConfig.WEB_URL));Spacer(Modifier.height(24.dp));PrimaryButton(stringResource(R.string.cerrar_sesion),logout)}};return}
     Column(Modifier.fillMaxSize()){
         if(roles.size>1){var menu by remember{mutableStateOf(false)};Surface(color=BrandNavy){Box(Modifier.fillMaxWidth().safeDrawingPadding().padding(horizontal=20.dp)){TextButton(onClick={menu=true}){Text("${RoleAccess.label(role)}  ▾",color=Color.White)};DropdownMenu(expanded=menu,onDismissRequest={menu=false}){roles.forEach{r->DropdownMenuItem(text={Text(RoleAccess.label(r))},onClick={selectedRole=r;menu=false})}}}}}
         Box(Modifier.weight(1f)){if(role=="REC"){
@@ -96,7 +100,7 @@ private fun AuthLoadingScreen() {
 }
 
 @Composable
-private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, String) -> Unit, onRegister: () -> Unit) {
+private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, String) -> Unit, resend: (String) -> Unit, onForgot: () -> Unit, onRegister: () -> Unit) {
     // The draft lives in the ViewModel (memory only): going to the background, rotating or a brief loading screen keeps what was typed.
     var email by rememberSaveable { mutableStateOf(draft.email) }
     var password by remember { mutableStateOf(draft.password) }
@@ -151,6 +155,8 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
                             Text(it, Modifier.fillMaxWidth().padding(14.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
+                    state.unconfirmedEmail?.let { ResendConfirmationButton(state, it, resend) }
+                    state.emailNotice?.let { AuthInfoNotice(it) }
                     if (demoAccounts.isNotEmpty()) DemoAccountPicker(demoAccounts, enabled = !state.signingIn) { account -> email = account.email; password = account.password; draft.email = email; draft.password = password }
                     OutlinedTextField(
                         value = email,
@@ -194,6 +200,9 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                         }
                     }
+                    TextButton(onClick = { draft.email = email; onForgot() }, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth()) {
+                        Text("¿Olvidaste tu contraseña?")
+                    }
                     HorizontalDivider()
                     TextButton(onClick = onRegister, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.PersonAdd, contentDescription = null)
@@ -214,8 +223,7 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
         Surface(color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
             Text("CUENTA DE PACIENTE",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
             Text("Creá tu cuenta.",style=MaterialTheme.typography.headlineMedium)
-            if(state.registrationMessage!=null){Text(state.registrationMessage);Button(onClick=back,modifier=Modifier.fillMaxWidth()){Text("Volver al ingreso")}}
-            else{
+            run{
                 state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
                 OutlinedTextField(name,{name=it.take(120)},label={Text("Nombre completo")},modifier=Modifier.fillMaxWidth(),singleLine=true,isError=state.fieldErrors.containsKey("name"),supportingText={state.fieldErrors["name"]?.let{Text(it)}},enabled=!state.signingIn)
                 OutlinedTextField(email,{email=it.take(254)},label={Text("Correo electrónico")},modifier=Modifier.fillMaxWidth(),singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email),isError=state.fieldErrors.containsKey("email"),supportingText={state.fieldErrors["email"]?.let{Text(it)}},enabled=!state.signingIn)
@@ -223,6 +231,56 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
                 OutlinedTextField(confirmation,{confirmation=it},label={Text("Confirmar contraseña")},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),isError=state.fieldErrors.containsKey("confirmation"),supportingText={state.fieldErrors["confirmation"]?.let{Text(it)}},enabled=!state.signingIn)
                 ClimesaButton(if(state.signingIn)"Creando cuenta…"else"Crear cuenta de paciente",Icons.Default.PersonAdd,{register(name,email,password,confirmation)},enabled=!state.signingIn)
             }
+        }}
+    }}
+}
+
+/** Seconds left of [availableAt]; ticks once per second only while the wait lasts (a UI countdown, not a data refresh). */
+@Composable private fun rememberSecondsLeft(availableAt:Long):Long{
+    var now by remember{mutableLongStateOf(System.currentTimeMillis())}
+    LaunchedEffect(availableAt){now=System.currentTimeMillis();while(ResendCooldown.remainingSeconds(availableAt,now)>0){kotlinx.coroutines.delay(1000);now=System.currentTimeMillis()}}
+    return ResendCooldown.remainingSeconds(availableAt,now)
+}
+@Composable private fun AuthInfoNotice(text:String){
+    Surface(Modifier.fillMaxWidth().semantics{liveRegion=LiveRegionMode.Polite},color=MaterialTheme.colorScheme.secondaryContainer,shape=MaterialTheme.shapes.small){
+        Text(text,Modifier.padding(14.dp),color=MaterialTheme.colorScheme.onSecondaryContainer,style=MaterialTheme.typography.bodyMedium)
+    }
+}
+@Composable private fun ResendConfirmationButton(state:AuthUiState,email:String,resend:(String)->Unit){
+    val seconds=rememberSecondsLeft(state.resendAvailableAt)
+    OutlinedButton(onClick={resend(email)},enabled=!state.sendingEmail&&seconds==0L,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){
+        Icon(Icons.Default.Email,contentDescription=null);Spacer(Modifier.width(10.dp))
+        Text(when{state.sendingEmail->"Enviando correo…";seconds>0->"Reenviar correo en $seconds s";else->"Reenviar correo de confirmación"})
+    }
+}
+/** After a patient signs up: the account exists but Supabase waits for the link in the email before allowing sign-in. */
+@Composable private fun CheckEmailScreen(state:AuthUiState,email:String,resend:(String)->Unit,signIn:()->Unit){
+    Surface(color=BrandBlue){Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){
+        Surface(Modifier.widthIn(max=560.dp).fillMaxWidth(),color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+            Icon(Icons.Default.Email,contentDescription=null,Modifier.size(40.dp),tint=MaterialTheme.colorScheme.primary)
+            Text("Revisa tu correo",style=MaterialTheme.typography.headlineMedium)
+            Text("Te enviamos un enlace de confirmación a:",style=MaterialTheme.typography.bodyMedium)
+            Text(email,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+            Text("Abre el correo y toca \"Confirmar tu correo\". Después vuelve aquí e inicia sesión. Si no lo ves en unos minutos, revisa la carpeta de spam.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+            state.emailNotice?.let{AuthInfoNotice(it)}
+            ResendConfirmationButton(state,email,resend)
+            ClimesaButton("Ya confirmé, iniciar sesión",Icons.AutoMirrored.Filled.ArrowForward,signIn)
+        }}
+    }}
+}
+/** "¿Olvidaste tu contraseña?": asks for the address; the email link opens the web page that sets the new password. */
+@Composable private fun PasswordResetScreen(state:AuthUiState,initialEmail:String,send:(String)->Unit,back:()->Unit){
+    var email by rememberSaveable{mutableStateOf(initialEmail)}
+    Surface(color=BrandBlue){Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+        TextButton(onClick=back,enabled=!state.sendingEmail){Text("← Volver al ingreso",color=Color.White)}
+        Surface(color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+            Text("Recuperar contraseña",style=MaterialTheme.typography.headlineMedium)
+            Text("Escribe el correo de tu cuenta. Te enviaremos un enlace para crear una contraseña nueva.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
+            state.emailNotice?.let{AuthInfoNotice(it)}
+            OutlinedTextField(email,{email=it.trimStart().take(254)},label={Text("Correo electrónico")},modifier=Modifier.fillMaxWidth(),singleLine=true,leadingIcon={Icon(Icons.Default.Email,contentDescription=null)},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email,imeAction=ImeAction.Send),keyboardActions=KeyboardActions(onSend={send(email)}),isError=state.fieldErrors.containsKey("email"),supportingText=state.fieldErrors["email"]?.let{error->{Text(error)}},enabled=!state.sendingEmail)
+            ClimesaButton(if(state.sendingEmail)"Enviando…" else "Enviar enlace",Icons.Default.Email,{send(email)},enabled=!state.sendingEmail)
         }}
     }}
 }
