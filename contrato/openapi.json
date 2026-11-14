@@ -14894,6 +14894,30 @@
             "type": "string",
             "nullable": true
           },
+          "patientRecord": {
+            "type": "string",
+            "nullable": true,
+            "description": "Número de expediente"
+          },
+          "patientSex": {
+            "type": "string",
+            "nullable": true
+          },
+          "patientAge": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Edad exacta; solo con permiso de ver la fecha de nacimiento"
+          },
+          "patientAgeRange": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decenio de edad («30-39») para quien solo ve el rango"
+          },
+          "doctorName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Médico que ordenó los estudios"
+          },
           "items": {
             "type": "array",
             "items": {
@@ -14914,6 +14938,11 @@
           "reviewedAt",
           "version",
           "patientName",
+          "patientRecord",
+          "patientSex",
+          "patientAge",
+          "patientAgeRange",
+          "doctorName",
           "items"
         ]
       },
