@@ -194,12 +194,19 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/fila/tickets/{id}/estado` | `fila.gestionar` | Transiciones válidas | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | GET | `/api/v1/me/fila` | `fila.ver` | Propio | R | 3 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
 | GET | `/api/v1/citas` | `citas.ver` | MED y PAC solo propias | R | 3 | · | ✔ | ✔ | ✔ | · | propio | · | · | · | propio |
-| GET | `/api/v1/citas/disponibilidad` | `citas.ver` | PAC también | R | 3 | · | ✔ | ✔ | ✔ | · | propio | · | · | · | propio |
+| GET | `/api/v1/citas/disponibilidad` | `citas.agendar` o `citas.solicitar` | PAC y REC según permisos | R | 3 | · | · | ✔ | · | · | · | · | · | · | propio |
 | POST | `/api/v1/citas` | `citas.agendar` | Sin traslape por médico | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/citas/solicitudes` | `citas.solicitar` | Cuenta verificada | R | 4 | · | · | · | · | · | · | · | · | · | propio |
 | POST | `/api/v1/citas/solicitudes/{id}/confirmar` | `citas.agendar` |  | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/citas/solicitudes/{id}/rechazar` | `citas.agendar` | Motivo | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/citas/{id}/cancelar` | `citas.cancelar` | PAC solo propias | R | 3 | · | · | ✔ | · | · | · | · | · | · | propio |
+| GET | `/api/v1/citas/catalogos` | `citas.agendar` o `citas.solicitar` | Pacientes y médicos según relación | R | 3 | · | · | ✔ | · | · | · | · | · | · | propio |
+| GET | `/api/v1/fila` | `fila.ver` | Filtra según relación | R | 3 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
+| POST | `/api/v1/fila` | `fila.emitir` | Número único por servicio y día | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/fila/{id}/llamar` | `fila.llamar` | Transición válida | R | 3 | · | · | · | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/{id}/atender` | `fila.gestionar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/{id}/completar` | `fila.gestionar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/{id}/no-se-presento` | `fila.gestionar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 
 ### Spec 106
 
@@ -214,12 +221,16 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/consultas/{id}/firmar` | `consulta.registrar` | Inscripción vigente en el acto | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/addendum` | `consulta.corregir` | Solo el autor; conserva original | E | 4 | · | · | · | · | · | autor | · | · | · | · |
 | GET | `/api/v1/pacientes/{id}/historial` | `expediente.ver` | Relación, acceso excepcional o propio revisado | R | 3 | · | · | · | · | relación | relación | · | · | · | propio revisado |
+| GET | `/api/v1/consultas/agenda` | `consulta.iniciar` | Solo agenda propia | R | 3 | · | · | · | · | · | ✔ | · | · | · | · |
+| PATCH | `/api/v1/consultas/{id}` | `consulta.registrar` | Versión y autor | R | 3 | · | · | · | · | · | relación | · | · | · | · |
+| GET | `/api/v1/consultas/{id}/detalle` | `expediente.ver` o `consulta.iniciar` | Relación clínica y auditoría | R | 3 | · | · | · | · | relación | relación / ✔ | · | · | · | propio revisado |
+| POST | `/api/v1/consultas/{id}/receta` | `recetas.emitir` | Inscripción vigente | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 
 ### Spec 107
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/laboratorio/ordenes` | `laboratorio.ver_cola` |  | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
+| GET | `/api/v1/laboratorio/ordenes` | `laboratorio.ver_cola` o `resultados.ver` | Filtra por laboratorio médico o paciente y oculta valores no revisados | R | 3 | · | · | · | · | relación | relación | ✔ | · | · | propio revisado |
 | GET | `/api/v1/laboratorio/ordenes/{id}` | `resultados.ver` | Ver contexto | R | 3 | · | · | · | · | relación | relación | ✔ | · | · | propio revisado |
 | POST | `/api/v1/laboratorio/ordenes/{id}/muestra` | `laboratorio.procesar` | Pendiente a En Proceso | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
 | PUT | `/api/v1/laboratorio/ordenes/{id}/resultados` | `laboratorio.procesar` | Valida unidades y rangos | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
@@ -229,6 +240,9 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/me/laboratorio` | `resultados.ver` | Estado siempre; valores solo revisados | R | 3 | · | · | · | · | relación | relación | ✔ | · | · | propio revisado |
 | GET | `/api/v1/catalogo/examenes` | `laboratorio.ordenar` | LAB y ADM también | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | PUT | `/api/v1/catalogo/examenes/{id}` | `catalogo.configurar` | Versión con vigencia | R | 3 | ✔ | · | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/laboratorio/catalogo` | `laboratorio.ordenar` o `catalogo.configurar` | Catálogo activo | R | 3 | ✔ | · | · | · | · | relación | · | · | · | · |
+| POST | `/api/v1/laboratorio/ordenes` | `laboratorio.ordenar` | Consulta propia | R | 3 | · | · | · | · | · | relación | · | · | · | · |
+| POST | `/api/v1/laboratorio/ordenes/{id}/resultados` | `laboratorio.procesar` | Marca calculada en servidor | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
 
 ### Spec 108
 
@@ -277,6 +291,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | GET | `/api/v1/inventario/existencias` | `inventario.ver` |  | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| GET | `/api/v1/inventario/movimientos` | `inventario.ver` |  | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
 | POST | `/api/v1/inventario/movimientos` | `inventario.mover` | Sin existencia negativa | R | 4 | · | ✔ | · | · | consumo | · | reactivos | · | · | · |
 | PUT | `/api/v1/inventario/articulos/{id}` | `inventario.configurar` |  | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/inventario/articulos` | `inventario.configurar` |  | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
