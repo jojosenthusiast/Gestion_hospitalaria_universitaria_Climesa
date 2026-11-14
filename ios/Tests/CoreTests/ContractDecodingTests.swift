@@ -15,6 +15,16 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertEqual(tickets.first?.calls, 1)
     }
 
+    func testNumeroDeFilaConConsultaPropia() throws {
+        let own = try decode([QueueTicket].self, #"[{"id":"t1","service":"consulta_general","fecha":"2026-11-20","numero":3,"patientId":"p1","patientName":"Ana","state":"en_atencion","officeId":null,"llamados":1,"version":4,"issuedAt":"2026-11-20T14:00:00Z","consultationId":"c-1","consultationState":"abierta"}]"#)
+        XCTAssertEqual(own.first?.consultationId, "c-1")
+        XCTAssertEqual(own.first?.consultationState, .abierta)
+        let other = try decode([QueueTicket].self, #"[{"id":"t2","service":"consulta_general","fecha":"2026-11-20","numero":4,"patientId":"p2","patientName":null,"state":"en_atencion","officeId":null,"llamados":1,"version":2,"issuedAt":"2026-11-20T14:00:00Z","consultationId":null,"consultationState":null}]"#)
+        XCTAssertNil(other.first?.consultationId)
+        XCTAssertNil(other.first?.consultationState)
+        XCTAssertNil(try decode([QueueTicket].self, #"[{"id":"t3","service":"consulta_general","fecha":"2026-11-20","numero":5,"patientId":null,"patientName":null,"state":"llamado","officeId":null,"llamados":1,"version":1,"issuedAt":"2026-11-20T14:00:00Z"}]"#).first?.consultationId)
+    }
+
     func testUnEstadoNuevoNoRompeLaLectura() throws {
         let tickets = try decode([QueueTicket].self, #"[{"id":"t1","service":"otro_servicio","fecha":"2026-11-20","numero":1,"patientId":null,"patientName":null,"state":"estado_futuro","officeId":null,"llamados":0,"version":1,"issuedAt":"2026-11-20T14:00:00Z"}]"#)
         XCTAssertEqual(tickets.first?.state, .desconocido)

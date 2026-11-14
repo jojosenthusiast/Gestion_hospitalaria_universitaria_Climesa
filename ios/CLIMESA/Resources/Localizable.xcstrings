@@ -3344,6 +3344,50 @@
           }
         }
       }
+    },
+    "day.resume": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retomar consulta"
+          }
+        }
+      }
+    },
+    "consultation.draft.saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrador guardado en este dispositivo"
+          }
+        }
+      }
+    },
+    "consultation.draft.recovered": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrador recuperado: revisa y guarda"
+          }
+        }
+      }
+    },
+    "consultation.draft.unsaved": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tienes cambios sin guardar: no se pudo guardar el borrador en este dispositivo"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
