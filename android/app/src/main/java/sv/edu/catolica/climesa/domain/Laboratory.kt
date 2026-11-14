@@ -5,7 +5,11 @@ import org.json.JSONObject
 
 data class LaboratoryResult(val value: Double?, val text: String?, val mark: String, val version: Int)
 data class LaboratoryItem(val id: String, val code: String, val name: String, val result: LaboratoryResult?)
-data class LaboratoryOrder(val id: String, val patientName: String, val priority: String, val state: String, val version: Int, val items: List<LaboratoryItem>, val reviewed: Boolean)
+/** [age] is already worded for the role ("34 años" or the decade "30-39 años"); null when the role does not see it. */
+data class LaboratoryOrder(
+    val id: String, val patientName: String, val priority: String, val state: String, val version: Int, val items: List<LaboratoryItem>, val reviewed: Boolean,
+    val record: String? = null, val sex: String? = null, val age: String? = null, val doctorName: String? = null, val createdAtMillis: Long? = null,
+)
 
 object LaboratoryLabels {
     fun state(value: String) = mapOf("pendiente" to "Pendiente", "en_proceso" to "En proceso", "completado" to "Completado", "cancelado" to "Cancelado")[value] ?: value

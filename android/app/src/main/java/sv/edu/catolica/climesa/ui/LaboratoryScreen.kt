@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,6 +55,9 @@ import sv.edu.catolica.climesa.domain.LabStepStatus
 import sv.edu.catolica.climesa.domain.LaboratoryOrder
 import sv.edu.catolica.climesa.domain.QuickAction
 import sv.edu.catolica.climesa.domain.QuickActions
+import sv.edu.catolica.climesa.domain.LabStage
+import sv.edu.catolica.climesa.domain.LabWorklist
+import sv.edu.catolica.climesa.domain.elapsedText
 
 /**
  * Lab orders for the lab, the reviewing doctor and the patient. [section] picks the stage filter that opens first (sample,
@@ -74,6 +78,8 @@ fun LaboratoryScreen(
     var sampleOrderId by rememberSaveable { mutableStateOf<String?>(null) }
     var filterName by rememberSaveable(section) { mutableStateOf(LabFlow.defaultFilter(section).name) }
     val filter = LabFilter.entries.firstOrNull { it.name == filterName } ?: LabFilter.ALL
+    var query by rememberSaveable { mutableStateOf("") }
+    var urgentOnly by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(ownResults) { model.path = if (ownResults) "/me/laboratorio" else "/laboratorio/ordenes"; model.load() }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     LaunchedEffect(quickAction, state.loading, state.orders) {
@@ -99,30 +105,33 @@ fun LaboratoryScreen(
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                if (!ownResults) item {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        items(LabFilter.entries) { option -> FilterChip(filter == option, { filterName = option.name }, { Text("${option.label} (${state.orders.count(option::matches)})") }) }
-                    }
+                if (!ownResults) {
+                    item { LiveSearchField(query, { query = it }, stringResource(R.string.lab_buscar)) }
+                    item { ChipRow(LabFilter.entries.map { Triple(it, it.label, state.orders.count(it::matches)) }, filter) { filterName = it.name } }
+                    item { ChipRow(listOf(Triple(false, "Todas las prioridades", null), Triple(true, stringResource(R.string.lab_solo_urgentes), state.orders.count(LabWorklist::isUrgent))), urgentOnly) { urgentOnly = it } }
                 }
-                val visible = state.orders.filter(filter::matches)
+                // The clock is read when the list is drawn: each realtime event redraws it, no timers.
+                val now = System.currentTimeMillis()
+                val visible = LabWorklist.sorted(state.orders.filter { filter.matches(it) && (!urgentOnly || LabWorklist.isUrgent(it)) && LabWorklist.matches(it, query) })
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
-                items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, profile, ownResults, state.busy, model, { model.clearMessages(); selected = it }, { model.clearMessages(); sampleOrderId = order.id }) }
+                items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, profile, ownResults, state.busy, model, now, { model.clearMessages(); selected = it }, { model.clearMessages(); sampleOrderId = order.id }) }
             }
         }
     }
 }
 
 @Composable
-private fun LaboratoryOrderCard(order: LaboratoryOrder, profile: AccessProfile, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, openResult: (Pair<String, String>) -> Unit, openSample: () -> Unit) {
+private fun LaboratoryOrderCard(order: LaboratoryOrder, profile: AccessProfile, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, now: Long, openResult: (Pair<String, String>) -> Unit, openSample: () -> Unit) {
     val canProcess = "laboratorio.procesar" in profile.permissions
     val canValidate = "laboratorio.validar" in profile.permissions
     val canReview = "laboratorio.revisar" in profile.permissions
     val inReview = order.state == "completado" && !order.reviewed
     SectionCard(
         title = order.patientName,
-        eyebrow = stringResource(if (order.priority == "urgente") R.string.clin_prioridad_urgente else R.string.clin_prioridad_rutina),
-        action = { if (inReview) ClinicalStatusTag(StatusCatalogClinico.UNDER_REVIEW) else StatusTag(order.state) },
+        eyebrow = stringResource(if (order.priority == "urgente") R.string.lab_prioridad_urgente else R.string.lab_prioridad_rutina),
+        action = { LabStagePill(LabWorklist.stage(order)) },
     ) {
+        if (!ownView) LabWorkSummary(order, now)
         LabStepper(order, ownView)
         order.items.forEach { item ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -210,5 +219,28 @@ private fun LabStepper(order: LaboratoryOrder, ownView: Boolean) {
             style = MaterialTheme.typography.labelLarge,
         )
         Text(LabFlow.nextStep(order, ownView), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** One tone per stage, the same as the web list: pending amber, in process blue, to review purple, released green. */
+@Composable
+private fun LabStagePill(stage: LabStage) = StatusPill(
+    stage.label,
+    when (stage) { LabStage.PENDING -> StatusTone.WARNING; LabStage.IN_PROCESS -> StatusTone.PROCESS; LabStage.TO_REVIEW -> StatusTone.RESERVED; LabStage.RELEASED -> StatusTone.SUCCESS; LabStage.CANCELLED -> StatusTone.BLOCKED },
+)
+
+/** Identity (record, age, sex), ordering doctor, elapsed time with its goal colour and the critical-value flag. */
+@Composable
+private fun LabWorkSummary(order: LaboratoryOrder, now: Long) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(LabWorklist.identityLine(order).ifBlank { stringResource(R.string.lab_sin_datos_expediente) }, style = MaterialTheme.typography.bodyMedium)
+        order.doctorName?.let { Text(stringResource(R.string.lab_pidio, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+            if (LabWorklist.isUrgent(order)) { Icon(Icons.Default.Warning, null, Modifier.size(18.dp), tint = MaterialTheme.climesa.danger); Text(stringResource(R.string.lab_prioridad_urgente), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.danger) }
+            LabWorklist.elapsedMinutes(order, now)?.let { minutes ->
+                Text(stringResource(R.string.lab_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(LabWorklist.sla(order, now)))
+            }
+            if (LabWorklist.isCritical(order)) StatusPill(stringResource(R.string.lab_critico), StatusTone.DANGER)
+        }
     }
 }
