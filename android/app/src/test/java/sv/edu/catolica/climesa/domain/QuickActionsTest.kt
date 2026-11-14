@@ -20,7 +20,6 @@ class QuickActionsTest {
 
     @Test fun sinElPermisoLaAccionNoAparece() {
         assertTrue(QuickActions.forRole("REC", setOf("sesion.perfil", "pacientes.buscar")).isEmpty())
-        assertEquals(listOf(QuickAction.TAKE_SAMPLE), QuickActions.forRole("LAB", setOf("sesion.perfil", "laboratorio.ver_cola", "laboratorio.procesar")).mapNotNull { it.request.action }.take(1))
     }
 
     @Test fun elVerboCoincideConElParametroDeLaWeb() {

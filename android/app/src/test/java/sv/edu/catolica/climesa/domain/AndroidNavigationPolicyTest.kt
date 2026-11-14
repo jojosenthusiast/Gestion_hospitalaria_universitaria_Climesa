@@ -48,7 +48,7 @@ class AndroidNavigationPolicyTest {
         val perms = listOf("sesion.perfil", "turnos.ver", "fila.llamar")
         val nav = AndroidNavigationPolicy.compact("AST", AndroidSections.visible("AST", perms))
         assertEquals(listOf(AndroidSection.HOME, AndroidSection.ASSISTANT_STATION, AndroidSection.SHIFTS), nav.primary)
-        assertEquals(listOf(AndroidSection.PROFILE), nav.overflow)
+        assertEquals(listOf(AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE), nav.overflow)
     }
 
     @Test fun sinInicioCabenCuatroTareas() {

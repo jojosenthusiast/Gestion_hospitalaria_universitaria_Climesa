@@ -49,7 +49,7 @@ class AndroidSectionsTest {
         val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet()
         assertEquals(AndroidSections.visible("AST", permissions), AndroidSections.visible("ENF", permissions))
         val asistente = AndroidSections.visible("AST", listOf("sesion.perfil", "fila.llamar", "signos.registrar", "turnos.ver"))
-        assertEquals(listOf(AndroidSection.HOME, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.SHIFTS, AndroidSection.PROFILE), asistente)
+        assertEquals(listOf(AndroidSection.HOME, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE), asistente)
         // "Paciente hospitalizado" opens the same screen as "Mi planta": it is not a second entry.
         assertFalse(AndroidSection.INPATIENT_CARE in AndroidSections.visible("ENF", permissions))
     }
