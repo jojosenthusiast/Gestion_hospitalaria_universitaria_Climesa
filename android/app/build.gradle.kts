@@ -10,6 +10,18 @@ val climesaApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrEl
 // Release never ships with an empty API URL: it defaults to the deployed API unless CLIMESA_API_BASE_URL overrides it.
 val climesaReleaseApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("https://sghu-api.onrender.com/api/v1")
 
+// Release signing comes only from Gradle properties (~/.gradle/gradle.properties) or environment variables, never
+// from the repository. Without all four values the release APK is built unsigned (app-release-unsigned.apk).
+fun releaseSetting(name: String): String? =
+    (providers.gradleProperty(name).orNull ?: providers.environmentVariable(name).orNull)?.takeIf { it.isNotBlank() }
+val releaseSigning = listOf(
+    "CLIMESA_RELEASE_STORE_FILE", "CLIMESA_RELEASE_STORE_PASSWORD", "CLIMESA_RELEASE_KEY_ALIAS", "CLIMESA_RELEASE_KEY_PASSWORD",
+).associateWith(::releaseSetting)
+val releaseSigningReady = releaseSigning.values.all { it != null }
+if (!releaseSigningReady && releaseSigning.values.any { it != null }) {
+    logger.warn("CLIMESA: firma de release incompleta; faltan ${releaseSigning.filterValues { it == null }.keys}. Se genera un APK sin firmar.")
+}
+
 android {
     namespace = "sv.edu.catolica.climesa"
     compileSdk = 35
@@ -24,10 +36,22 @@ android {
         buildConfigField("String", "API_BASE_URL", buildConfigString(climesaApiBaseUrl))
     }
     buildFeatures { compose = true; buildConfig = true }
+    signingConfigs {
+        if (releaseSigningReady) create("release") {
+            storeFile = file(releaseSigning.getValue("CLIMESA_RELEASE_STORE_FILE")!!)
+            storePassword = releaseSigning.getValue("CLIMESA_RELEASE_STORE_PASSWORD")
+            keyAlias = releaseSigning.getValue("CLIMESA_RELEASE_KEY_ALIAS")
+            keyPassword = releaseSigning.getValue("CLIMESA_RELEASE_KEY_PASSWORD")
+        }
+    }
     buildTypes {
         release {
             buildConfigField("String", "API_BASE_URL", buildConfigString(climesaReleaseApiBaseUrl))
-            isMinifyEnabled = false
+            // R8 shrinks and optimizes; proguard-rules.pro keeps names readable (no obfuscation).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseSigningReady) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
