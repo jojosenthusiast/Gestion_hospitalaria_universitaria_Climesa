@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "path": "/api/v1/consultas/{id}/receta",
+  "body": {
+    "items": [
+      {
+        "medication": "Paracetamol",
+        "dose": "500 mg",
+        "route": "Oral",
+        "frequency": "Cada 8 horas",
+        "duration": "5 días",
+        "instructions": "Tomar con alimentos"
+      }
+    ]
+  }
+}

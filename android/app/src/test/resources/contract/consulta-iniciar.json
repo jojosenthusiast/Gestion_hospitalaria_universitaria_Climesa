@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/api/v1/consultas",
+  "body": {
+    "appointmentId": "55555555-5555-4555-8555-555555555555",
+    "reason": "Dolor de cabeza desde ayer"
+  }
+}

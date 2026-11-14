@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/api/v1/citas/{id}/cancelar",
+  "body": {
+    "version": 3,
+    "reason": "El paciente pidió reprogramar"
+  }
+}

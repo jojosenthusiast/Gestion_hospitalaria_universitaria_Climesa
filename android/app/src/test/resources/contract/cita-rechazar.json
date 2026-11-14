@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/api/v1/citas/solicitudes/{id}/rechazar",
+  "body": {
+    "version": 2,
+    "rejectionReason": "El médico no atiende ese día"
+  }
+}
