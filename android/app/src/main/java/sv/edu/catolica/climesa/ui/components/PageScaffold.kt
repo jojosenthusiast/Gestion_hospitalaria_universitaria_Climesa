@@ -16,9 +16,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AndroidSection
@@ -42,14 +41,14 @@ internal fun BrandMark(modifier: Modifier = Modifier) {
 }
 
 /**
- * Top bar of every signed-in screen: brand, a mono subtitle (role or section), then `actions`.
- * `navigationIcon` defaults to the menu button; pass a back button for detail screens.
+ * Top bar of every signed-in screen: the screen title and, when it helps, a context line (patient, unit, area). Never the
+ * role or the app name as a breadcrumb. Detail screens pass a back button as `navigationIcon`.
  */
 @Composable
 internal fun ClimesaTopBar(
-    subtitle: String,
+    title: String,
     modifier: Modifier = Modifier,
-    title: String = stringResource(R.string.ui_marca),
+    subtitle: String? = null,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable () -> Unit = {},
 ) {
@@ -57,12 +56,9 @@ internal fun ClimesaTopBar(
         modifier = modifier,
         navigationIcon = navigationIcon,
         title = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                BrandMark()
-                Column {
-                    Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                    Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .78f), maxLines = 1)
-                }
+            Column {
+                Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .82f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
         actions = { actions() },
@@ -76,39 +72,46 @@ internal fun ClimesaTopBar(
 }
 
 @Composable
-internal fun MenuButton(onClick: () -> Unit) =
-    IconButton(onClick = onClick) { Icon(Icons.Default.Menu, stringResource(R.string.ui_abrir_menu)) }
-
-@Composable
-internal fun ThemeToggleButton(dark: Boolean, setDark: (Boolean) -> Unit) =
-    IconButton(onClick = { setDark(!dark) }) { Icon(if (dark) Icons.Default.LightMode else Icons.Default.DarkMode, stringResource(R.string.ui_cambiar_apariencia)) }
+internal fun BackButton(onClick: () -> Unit, enabled: Boolean = true) =
+    IconButton(onClick = onClick, enabled = enabled) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.ui_volver)) }
 
 /**
- * Page scaffold for a role: [ClimesaTopBar] plus adaptive section navigation (bottom bar on phones, rail on tablets, permanent
- * drawer on wide screens, overflow sheet "Más funciones"). Sections already come filtered by permission; this only draws them.
- * `content` receives the inner padding: apply it to the root of the screen.
+ * Page scaffold for a role: [ClimesaTopBar] plus adaptive section navigation (bottom bar with core tasks and "Más" on phones,
+ * rail on tablets, permanent drawer on wide screens). Sections already come filtered by permission; this only draws them.
+ * `title` defaults to the selected section; pass `subtitle` for context (patient, unit). `content` receives the inner padding.
  */
 @Composable
 internal fun PortalScaffold(
-    roleLabel: String,
+    role: String,
     sections: List<AndroidSection>,
     selected: AndroidSection,
     onSelected: (AndroidSection) -> Unit,
     dark: Boolean,
     setDark: (Boolean) -> Unit,
     onLogout: () -> Unit,
+    title: String = selected.label,
+    subtitle: String? = null,
+    navigationIcon: @Composable () -> Unit = {},
+    showNavigation: Boolean = true,
+    snackbarHost: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     AdaptiveRoleScaffold(
+        role = role,
         sections = sections,
         selected = selected,
         onSelected = onSelected,
+        dark = dark,
+        setDark = setDark,
         onLogout = onLogout,
-        topBar = { openMenu ->
+        showNavigation = showNavigation,
+        snackbarHost = snackbarHost,
+        topBar = {
             ClimesaTopBar(
-                subtitle = roleLabel,
-                navigationIcon = { MenuButton(openMenu) },
-                actions = { HospitalClock(); ThemeToggleButton(dark, setDark) },
+                title = title,
+                subtitle = subtitle,
+                navigationIcon = navigationIcon,
+                actions = { HospitalClock() },
             )
         },
         content = content,

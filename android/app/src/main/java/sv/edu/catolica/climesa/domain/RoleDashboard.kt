@@ -287,8 +287,8 @@ object RoleDashboard {
                 data[DashboardSource.AGENDA]?.let { agenda ->
                     val list = rows(agenda)
                     val started = list.count { text(it, "consultationId") != null }
-                    kpis += DashboardKpi("Citas en mi agenda", list.size.toString(), DashboardTone.PROCESS, target = target(AndroidSection.CONSULTATIONS))
-                    kpis += DashboardKpi("Consultas iniciadas", started.toString(), DashboardTone.SUCCESS, "de ${list.size}", target = target(AndroidSection.CONSULTATIONS))
+                    kpis += DashboardKpi("Citas en mi agenda", list.size.toString(), DashboardTone.PROCESS, target = target(AndroidSection.MEDICAL_DAY))
+                    kpis += DashboardKpi("Consultas iniciadas", started.toString(), DashboardTone.SUCCESS, "de ${list.size}", target = target(AndroidSection.MEDICAL_DAY))
                 }
                 lab?.let {
                     kpis += DashboardKpi("Resultados por revisar", it.toReview.toString(), if (it.critical > 0) DashboardTone.DANGER else if (it.toReview > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.RESULT_REVIEW))

@@ -83,14 +83,14 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     var now by remember { mutableStateOf(Instant.now()) }
     val zone=remember { ZoneId.of("America/El_Salvador") }
     val timeFormatter=remember { DateTimeFormatter.ofPattern("HH:mm:ss",Locale("es","SV")).withZone(zone) }
-    val dateFormatter=remember { DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyyy",Locale("es","SV")).withZone(zone) }
+    val dateFormatter=remember { DateTimeFormatter.ofPattern("EEE d 'de' MMM",Locale("es","SV")).withZone(zone) }
     LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(1000)}}
     Column(horizontalAlignment=Alignment.End){
         Text(timeFormatter.format(now),style=MaterialTheme.typography.labelLarge.copy(fontFeatureSettings="tnum"),color=MaterialTheme.colorScheme.onPrimary)
         Text(dateFormatter.format(now).replaceFirstChar{it.uppercase(Locale("es","SV"))},style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),maxLines=1)
     }
 }
-@Composable fun RolePortal(account:AuthenticatedAccount,role:String,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit,refresh:()->Unit){
+@Composable fun RolePortal(account:AuthenticatedAccount,role:String,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit){
     val model:RoleViewModel=viewModel(key="role-${account.session.userId}")
     val data by model.state.collectAsStateWithLifecycle()
     var selectedName by rememberSaveable(role){mutableStateOf(AndroidSection.HOME.name)};var query by rememberSaveable{mutableStateOf("")}
@@ -106,27 +106,26 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     LaunchedEffect(role,page){model.load(path)}
     LaunchedEffect(account.profile.channels){model.start(account.profile.channels)}
     PortalScaffold(
-        roleLabel=RoleAccess.label(role),sections=sections,selected=page,onSelected={selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
+        role=role,sections=sections,selected=page,onSelected={selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
     ) content@{padding->
         if(page==AndroidSection.HOME){RoleDashboardScreen(account,role,onDashboardAction,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.BEDS){BedsScreen(account.profile,Modifier.padding(padding));return@content}
+        if(page==AndroidSection.BEDS||page==AndroidSection.CLEANING){BedsScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.PLANNING){ShiftPlanningScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.STAFF){StaffScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.MY_APPOINTMENTS){PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
-        if(page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD||page==AndroidSection.INPATIENT_CARE){HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
+        if(page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD){HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
         if(page==AndroidSection.SUPPLIES){InventoryScreen(Modifier.padding(padding),account.profile);return@content}
         if(page==AndroidSection.MY_ACCESS){MyAccessScreen(Modifier.padding(padding));return@content}
         if(page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION){QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
         if(page==AndroidSection.LAB||page==AndroidSection.SAMPLE||page==AndroidSection.CAPTURE_RESULTS||page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW){LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page,quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
         if(page==AndroidSection.LINK_RECORD){LinkRecordScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.HISTORY||page==AndroidSection.RECORD){ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding));return@content}
-        if(page==AndroidSection.MEDICAL_DAY||page==AndroidSection.CONSULTATIONS){ConsultationScreen(account.profile,Modifier.padding(padding));return@content}
+        if(page==AndroidSection.MEDICAL_DAY){ConsultationScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.HOSPITAL_INFO){HospitalInfoScreen(Modifier.padding(padding));return@content}
         if(page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)){AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding));return@content}
         PageList(Modifier.padding(padding)){
-            item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",page.label)}
             if(page==AndroidSection.PROFILE){
-                profileItems(account,sections,{selectedName=it.name},refresh,myData=if("pacientes.editar_propios" in account.profile.permissions){{MyDataCard()}}else null)
+                profileItems(account,dark,setDark,{if(!signingOut)logout()},myData=if("pacientes.editar_propios" in account.profile.permissions){{MyDataCard()}}else null)
             }else if(!page.ready){val maqueta=Maquetas.of(page);if(maqueta!=null)item{MaquetaContent(maqueta)}else item{PendingModule()}}
             else if(data.loading)item{LoadingState()}
             else if(data.error!=null)item{ErrorState(data.error,{model.load(path)})}
@@ -159,7 +158,6 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     LaunchedEffect(Unit){model.load("/turnos/mios")}
     LaunchedEffect(account.profile.channels){model.start(account.profile.channels)}
     PageList(modifier){
-        item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",AndroidSection.SHIFTS.label)}
         if(data.loading)item{LoadingState()}
         else if(data.error!=null)item{ErrorState(data.error,{model.load("/turnos/mios")})}
         else{

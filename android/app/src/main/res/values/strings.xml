@@ -233,8 +233,9 @@
     <string name="ui_confirmar">Confirmar</string>
     <string name="ui_cancelar">Cancelar</string>
     <string name="ui_un_momento">Un momento…</string>
-    <string name="ui_abrir_menu">Abrir menú</string>
-    <string name="ui_cambiar_apariencia">Cambiar apariencia</string>
+    <string name="ui_mas">Más</string>
+    <string name="ui_ajustes">Ajustes</string>
+    <string name="ui_volver">Volver</string>
     <string name="ui_mas_funciones">Más funciones</string>
     <string name="ui_navegacion">Navegación</string>
     <string name="ui_marca">climesa</string>
@@ -246,10 +247,9 @@
     <string name="ui_cuenta_autenticada">Cuenta autenticada</string>
     <string name="ui_accesos_principales">Accesos principales</string>
     <string name="ui_abrir_modulo">Abrir módulo</string>
-    <string name="ui_actualizar_acceso">Actualizar acceso</string>
     <string name="ui_modo_oscuro">Modo oscuro</string>
     <string name="ui_modo_oscuro_detalle">Se conserva en este dispositivo</string>
-    <string name="ui_cerrar_sesion_ayuda">Para cerrar sesión, abre el menú ☰ en la esquina superior izquierda.</string>
+    <string name="ui_cerrar_sesion_ayuda">Tu cuenta es personal. Cierra sesión cuando termines en un equipo compartido.</string>
     <string name="ui_camas_libres">camas libres</string>
     <string name="avisos_titulo">Avisos</string>
     <string name="avisos_mas">Y %1$d aviso(s) más. Se ven completos en la web.</string>

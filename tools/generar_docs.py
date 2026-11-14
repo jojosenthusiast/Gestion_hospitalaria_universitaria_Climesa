@@ -21,6 +21,7 @@ SALIDA_SQL = RAIZ / "supabase" / "migrations" / "20261017000210_acceso_semilla.s
 SALIDA_CONTEXTOS = RAIZ / "supabase" / "migrations" / "20261029000100_acceso_contextos_ficha.sql"
 SALIDA_ATRIBUTOS = RAIZ / "supabase" / "migrations" / "20261030000100_permisos_atributos.sql"
 SALIDA_RONDA3 = RAIZ / "supabase" / "migrations" / "20261118007000_permisos_ronda3.sql"
+SALIDA_PLATAFORMAS = RAIZ / "supabase" / "migrations" / "20261118008000_plataformas_sin_android.sql"
 
 # Permisos que se agregaron al catálogo después de aplicada la semilla (regla 10 de AGENTS.md: la semilla no se edita). La semilla
 # no los emite; la migración de SALIDA_ATRIBUTOS los inserta. Son permisos de atributo: deciden qué campos o filas ve quien ya
@@ -49,6 +50,11 @@ PERMISOS_RETIRADOS = [
 ]
 
 # Descripción de rol con que la semilla (aplicada) los insertó, cuando roles.csv ya la cambió. La semilla conserva el histórico.
+# Plataformas que tenía el rol cuando se aplicó la semilla (regla 10: no se edita). Ronda 3: Jefe de Operaciones y Laboratorio dejan Android
+# (PDF del curso y decisión del propietario); lo aplica la migración de SALIDA_PLATAFORMAS.
+PLATAFORMAS_SEMILLA = {"JOP": "Android; Web", "LAB": "Web; Android"}
+PLATAFORMAS_SIN_ANDROID = {"JOP": ["Web"], "LAB": ["Web"]}
+
 DESCRIPCIONES_ROL_SEMILLA = {
     "DPD": "Aprueba accesos excepcionales a datos clínicos, revisa auditoría y verifica su integridad.",
 }
@@ -66,7 +72,7 @@ FLUJOS = [
     ("F01 Cuenta del paciente", "A01 Ingreso → A02 Crear cuenta → A03 Vincular expediente → (recepción A33 o W27 aprueba) → A04 Inicio del paciente"),
     ("F02 Fila del día", "Recepción A31 o W29 emite → Paciente A05 sigue su número → Asistente A40 llama → Médico A20 Mi día → A21 Consulta → Paciente A08 Historial; pantalla pública W34 muestra el llamado"),
     ("F03 Cita pedida por el paciente", "Paciente A06 pide → Recepción W28 o A32 confirma → Paciente A06 ve confirmada → día de la cita: Médico A20 → A21"),
-    ("F04 Consulta y laboratorio", "Médico A21 ordena → Laboratorio W20 o A60 cola → A61 muestra → A62 o W21 captura y completa → Médico A23 revisa (crítico avisa antes) → Paciente A07 ve valores"),
+    ("F04 Consulta y laboratorio", "Médico A21 ordena → Laboratorio W20 cola → W21 captura y completa (Laboratorio no usa Android) → Médico A23 revisa (crítico avisa antes) → Paciente A07 ve valores"),
     ("F05 Admisión y alta", "Médico A24 indica hospitalización → Recepción W13 → W14 sugerencias y cama → Enfermería A50 y A51 → Médico A24 firma alta → salida → Enfermería A52 limpieza y verificación → Jefe W12 cama libre"),
     ("F06 Traslado", "Recepción W13 → W15 traslado (no existe para VIP) → W12 tablero actualizado"),
     ("F07 Ambulancia", "Paciente A09 pide (o recepción por teléfono en W18) → Despacho W18 confirma y despacha → Paramédico A70 acepta → A71 hitos → A72 reporte prehospital → Emergencia A54 y Médico A25 reciben → Recepción W14 admisión con origen ambulancia → W19 bitácora"),
@@ -295,7 +301,7 @@ def generar_sql(roles, permisos):
     ]
     filas = []
     for r in roles:
-        plats = "array[" + ", ".join(sql_txt(x.strip()) for x in r["plataformas"].split(";")) + "]"
+        plats = "array[" + ", ".join(sql_txt(x.strip()) for x in PLATAFORMAS_SEMILLA.get(r["codigo"], r["plataformas"]).split(";")) + "]"
         descripcion = DESCRIPCIONES_ROL_SEMILLA.get(r["codigo"], r["descripcion"])
         filas.append(f"  ({sql_txt(r['codigo'])}, {sql_txt(r['nombre'])}, {plats}, {sql_txt(descripcion)})")
     l.append(",\n".join(filas) + ";")
@@ -384,6 +390,27 @@ def generar_sql_ronda3(roles, permisos):
     filas += [f"  ({sql_txt(r)}, {sql_txt(perm)}, {sql_txt(por_nombre[perm][r])})" for r, perm in ADICIONES_ROL]
     l.append(sep.join(filas))
     l.append("on conflict (rol_codigo, permiso_codigo) do nothing;")
+    return "\n".join(l) + "\n"
+
+
+def generar_sql_plataformas(roles):
+    por_codigo = {r["codigo"]: r for r in roles}
+    l = [
+        "-- Generado por tools/generar_docs.py desde PLATAFORMAS_SIN_ANDROID y roles.csv. No editar a mano.",
+        "-- Ronda 3: Jefe de Operaciones y Laboratorio no usan Android (PDF del curso, decisión del propietario).",
+        "-- Idempotente: fija las plataformas actuales de cada rol; repetirla no cambia nada.",
+        "--",
+        "-- Pre-comprobación en producción (valores esperados antes: JOP {Android,Web}, LAB {Web,Android}):",
+        "--   select codigo, plataformas from acceso.rol where codigo in ('JOP', 'LAB');",
+        "--",
+        "-- Reversa:",
+        "--   update acceso.rol set plataformas = array['Android', 'Web'] where codigo = 'JOP';",
+        "--   update acceso.rol set plataformas = array['Web', 'Android'] where codigo = 'LAB';",
+        "",
+    ]
+    for codigo in PLATAFORMAS_SIN_ANDROID:
+        plats = "array[" + ", ".join(sql_txt(x.strip()) for x in por_codigo[codigo]["plataformas"].split(";")) + "]"
+        l.append(f"update acceso.rol set plataformas = {plats} where codigo = {sql_txt(codigo)};")
     return "\n".join(l) + "\n"
 
 
@@ -528,6 +555,7 @@ def main():
         SALIDA_CONTEXTOS: generar_sql_contextos(),
         SALIDA_ATRIBUTOS: generar_sql_atributos(roles, permisos),
         SALIDA_RONDA3: generar_sql_ronda3(roles, permisos),
+        SALIDA_PLATAFORMAS: generar_sql_plataformas(roles),
     }
     if "--verificar" in sys.argv:
         for ruta, contenido in salidas.items():

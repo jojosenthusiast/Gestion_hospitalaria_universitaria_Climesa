@@ -10,7 +10,7 @@ class AndroidSectionsTest {
 
     @Test fun paramedicoVeSoloSusDestinosCatalogados() {
         assertEquals(
-            listOf(AndroidSection.HOME, AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            listOf(AndroidSection.HOME, AndroidSection.SERVICE, AndroidSection.UNIT, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
             AndroidSections.visible("PAR", paramedico),
         )
     }
@@ -31,35 +31,46 @@ class AndroidSectionsTest {
     }
 
     @Test fun soloHospitalYPerfilSignificaQueElRolNoTieneFlujoOperativo() {
-        assertFalse(AndroidSections.hasAppScreens("JOP", listOf("sesion.perfil")))
-        assertTrue(AndroidSections.hasAppScreens("JOP", listOf("sesion.perfil", "turnos.ver")))
+        assertFalse(AndroidSections.hasAppScreens("MED", listOf("sesion.perfil")))
+        assertTrue(AndroidSections.hasAppScreens("MED", listOf("sesion.perfil", "consulta.iniciar")))
     }
 
-    @Test fun elJefeDeOperacionesSoloVeDestinosAndroidCatalogados() {
-        val jefe = AndroidSections.visible(
-            "JOP",
-            listOf("sesion.perfil", "camas.ver_tablero", "admision.crear", "inventario.mover", "turnos.ver", "turnos.ver_borradores", "turnos.planificar", "turnos.publicar"),
-        )
-        assertEquals(
-            listOf(AndroidSection.HOME, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.SUPPLIES, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            jefe,
-        )
-        assertFalse(AndroidSection.PLANNING in jefe)
-        assertFalse(AndroidSection.UNIT in jefe)
-        assertFalse(AndroidSection.STAFF in jefe)
+    @Test fun jefeDeOperacionesYLaboratorioNoUsanAndroid() {
+        val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet()
+        assertFalse("JOP" in AndroidSections.roles)
+        assertFalse("LAB" in AndroidSections.roles)
+        assertTrue(AndroidSections.visible("JOP", permissions).isEmpty())
+        assertTrue(AndroidSections.visible("LAB", permissions).isEmpty())
+        assertFalse(AndroidSections.hasAppScreens("JOP", permissions))
+        assertFalse(AndroidSections.hasAppScreens("LAB", permissions))
     }
 
-    @Test fun losOchoRolesQuedanLimitadosASuCatalogoDePantallas() {
+    @Test fun asistenteYEnfermeriaComparteUnSoloCatalogoFiltradoPorPermisos() {
+        val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet()
+        assertEquals(AndroidSections.visible("AST", permissions), AndroidSections.visible("ENF", permissions))
+        val asistente = AndroidSections.visible("AST", listOf("sesion.perfil", "fila.llamar", "signos.registrar", "turnos.ver"))
+        assertEquals(listOf(AndroidSection.HOME, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.SHIFTS, AndroidSection.PROFILE), asistente)
+        // "Paciente hospitalizado" opens the same screen as "Mi planta": it is not a second entry.
+        assertFalse(AndroidSection.INPATIENT_CARE in AndroidSections.visible("ENF", permissions))
+    }
+
+    @Test fun elMedicoTieneUnaSolaEntradaALaConsulta() {
+        val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet()
+        val medico = AndroidSections.visible("MED", permissions)
+        assertTrue(AndroidSection.MEDICAL_DAY in medico)
+        assertFalse(AndroidSection.CONSULTATIONS in medico)
+    }
+
+    @Test fun losRolesDeAndroidQuedanLimitadosASuCatalogoDePantallas() {
         val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet() + setOf("turnos.ver_borradores", "turnos.publicar")
+        val station = listOf(AndroidSection.HOME, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.CLEANING, AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE)
         val expected = mapOf(
-            "JOP" to listOf(AndroidSection.HOME, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.SUPPLIES, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "REC" to listOf(AndroidSection.HOME, AndroidSection.PATIENTS, AndroidSection.QUEUE, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "AST" to listOf(AndroidSection.HOME, AndroidSection.ASSISTANT_STATION, AndroidSection.VITAL_SIGNS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "ENF" to listOf(AndroidSection.HOME, AndroidSection.WARD, AndroidSection.VITAL_SIGNS, AndroidSection.INPATIENT_CARE, AndroidSection.CLEANING, AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.RECORD, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "LAB" to listOf(AndroidSection.HOME, AndroidSection.LAB, AndroidSection.SAMPLE, AndroidSection.CAPTURE_RESULTS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "PAR" to listOf(AndroidSection.HOME, AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "PAC" to listOf(AndroidSection.HOME, AndroidSection.LINK_RECORD, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
+            "REC" to listOf(AndroidSection.HOME, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "AST" to station,
+            "ENF" to station,
+            "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "PAR" to listOf(AndroidSection.HOME, AndroidSection.SERVICE, AndroidSection.UNIT, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "PAC" to listOf(AndroidSection.HOME, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.LINK_RECORD, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
         )
         // Every role lands on the dashboard ("Inicio", A04 in the catalog).
         val principalScreens = AndroidSections.roles.associateWith { "A04" }
@@ -75,11 +86,6 @@ class AndroidSectionsTest {
     @Test fun todosLosRolesAterrizanEnSuTableroDeInicio() {
         val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet()
         AndroidSections.roles.forEach { role -> assertEquals("Inicio de $role", AndroidSection.HOME, AndroidSections.visible(role, permissions).first()) }
-    }
-
-    @Test fun inicioPerfilYHospitalSolosNoSonUnFlujoOperativo() {
-        assertFalse(AndroidSections.hasAppScreens("LAB", listOf("sesion.perfil")))
-        assertTrue(AndroidSections.hasAppScreens("LAB", listOf("sesion.perfil", "laboratorio.ver_cola")))
     }
 
     @Test fun planificacionYPersonalSiguenFueraDeAndroidPorqueNoEstanCatalogados() {

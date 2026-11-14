@@ -37,7 +37,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 | F01 Cuenta del paciente | A01 Ingreso → A02 Crear cuenta → A03 Vincular expediente → (recepción A33 o W27 aprueba) → A04 Inicio del paciente |
 | F02 Fila del día | Recepción A31 o W29 emite → Paciente A05 sigue su número → Asistente A40 llama → Médico A20 Mi día → A21 Consulta → Paciente A08 Historial; pantalla pública W34 muestra el llamado |
 | F03 Cita pedida por el paciente | Paciente A06 pide → Recepción W28 o A32 confirma → Paciente A06 ve confirmada → día de la cita: Médico A20 → A21 |
-| F04 Consulta y laboratorio | Médico A21 ordena → Laboratorio W20 o A60 cola → A61 muestra → A62 o W21 captura y completa → Médico A23 revisa (crítico avisa antes) → Paciente A07 ve valores |
+| F04 Consulta y laboratorio | Médico A21 ordena → Laboratorio W20 cola → W21 captura y completa (Laboratorio no usa Android) → Médico A23 revisa (crítico avisa antes) → Paciente A07 ve valores |
 | F05 Admisión y alta | Médico A24 indica hospitalización → Recepción W13 → W14 sugerencias y cama → Enfermería A50 y A51 → Médico A24 firma alta → salida → Enfermería A52 limpieza y verificación → Jefe W12 cama libre |
 | F06 Traslado | Recepción W13 → W15 traslado (no existe para VIP) → W12 tablero actualizado |
 | F07 Ambulancia | Paciente A09 pide (o recepción por teléfono en W18) → Despacho W18 confirma y despacha → Paramédico A70 acepta → A71 hitos → A72 reporte prehospital → Emergencia A54 y Médico A25 reciben → Recepción W14 admisión con origen ambulancia → W19 bitácora |
@@ -815,7 +815,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 ### A60 · Cola de laboratorio (R)
 
-- **Para:** LAB
+- **Para:** Ninguno (retirada: Laboratorio usa solo web)
 - **Propósito:** Trabajo del día
 - **Muestra:** Órdenes por estado
 - **Acciones:** Tomar muestra; capturar; completar
@@ -824,7 +824,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 ### A61 · Toma de muestra (R)
 
-- **Para:** LAB
+- **Para:** Ninguno (retirada: Laboratorio usa solo web)
 - **Propósito:** Identificar paciente y registrar
 - **Muestra:** Paciente, exámenes, confirmación de identidad (dos datos)
 - **Acciones:** Confirmar muestra
@@ -832,7 +832,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 ### A62 · Captura de resultados (R)
 
-- **Para:** LAB
+- **Para:** Ninguno (retirada: Laboratorio usa solo web)
 - **Propósito:** Valores
 - **Muestra:** Igual a W21
 - **Acciones:** Guardar; completar
@@ -1077,12 +1077,12 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 | Rol | Web | Android | iOS |
 |---|---|---|---|
 | Administrador | W01, W03, W05, W06, W07, W08, W09, W10, W11, W33, W35, W36 | no usa | no usa |
-| Jefe de Operaciones | W01, W03, W07, W09, W12, W13, W14, W15, W16, W17, W18, W19, W22, W23, W24, W25, W33, W35, W36 | A01, A10, A12, A26 | no usa |
+| Jefe de Operaciones | W01, W03, W07, W09, W12, W13, W14, W15, W16, W17, W18, W19, W22, W23, W24, W25, W33, W35, W36 | no usa | no usa |
 | Recepcionista | W01, W04, W09, W12, W13, W14, W15, W18, W19, W26, W27, W28, W29, W35, W36 | A01, A10, A12, A26, A30, A31, A32, A33, A34, A35, A36 | no usa |
 | Asistente | no usa | A01, A10, A12, A26, A40, A41 | no usa |
 | Enfermero/a | no usa | A01, A10, A12, A26, A41, A50, A51, A52, A53, A54 | no usa |
 | Médico | no usa | A01, A10, A12, A20, A21, A22, A23, A24, A25, A26 | I01, I10, I12, I20, I21, I22, I23, I24, I25, I26 |
-| Laboratorista | W01, W04, W20, W21, W22, W23, W35, W36 | A01, A10, A12, A26, A60, A61, A62 | no usa |
+| Laboratorista | W01, W04, W20, W21, W22, W23, W35, W36 | no usa | no usa |
 | Paramédico | no usa | A01, A10, A12, A26, A70, A71, A72, A73, A74 | no usa |
 | Delegado de protección de datos | W01, W04, W19, W32, W33, W35, W36 | no usa | no usa |
 | Paciente | no usa | A01, A02, A03, A04, A05, A06, A07, A08, A09, A10, A11, A12, A13 | I01, I02, I03, I04, I05, I06, I07, I08, I09, I10, I11, I12, I13 |

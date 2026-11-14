@@ -6,9 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -19,8 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import sv.edu.catolica.climesa.R
-import sv.edu.catolica.climesa.domain.AndroidNavigationPolicy
-import sv.edu.catolica.climesa.domain.AndroidSection
 import sv.edu.catolica.climesa.domain.AuthenticatedAccount
 import sv.edu.catolica.climesa.domain.RoleAccess
 
@@ -52,23 +49,20 @@ internal fun AppearanceCard(dark: Boolean, setDark: (Boolean) -> Unit, modifier:
     }
 }
 
-/** Profile of any role: account summary, shortcuts to the role's main sections, and the refresh action. */
+/** Profile of any role: account summary, own data when allowed, appearance and sign-out. Navigation lives in the bar and "Más". */
 internal fun LazyListScope.profileItems(
     account: AuthenticatedAccount,
-    sections: List<AndroidSection>,
-    onOpen: (AndroidSection) -> Unit,
-    refresh: () -> Unit,
+    dark: Boolean,
+    setDark: (Boolean) -> Unit,
+    onLogout: () -> Unit,
     myData: @Composable (() -> Unit)? = null,
 ) {
     item { ProfileSummaryCard(account) }
     if (myData != null) item { myData() }
-    item { Text(stringResource(R.string.ui_accesos_principales), style = MaterialTheme.typography.titleLarge) }
-    items(AndroidNavigationPolicy.compact(sections).primary.filter { it != AndroidSection.PROFILE }, key = { it.name }) { section ->
-        DataRow(section.label, subtitle = stringResource(R.string.ui_abrir_modulo), leadingIcon = iconFor(section), onClick = { onOpen(section) })
-    }
+    item { AppearanceCard(dark, setDark) }
     item {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SecondaryButton(stringResource(R.string.ui_actualizar_acceso), refresh, icon = Icons.Default.Refresh)
+            SecondaryButton(stringResource(R.string.cerrar_sesion), onLogout, icon = Icons.Default.Logout)
             Text(stringResource(R.string.ui_cerrar_sesion_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

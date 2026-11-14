@@ -56,7 +56,7 @@ object QuickActions {
             Entry("Recibir ambulancia", AndroidSection.AMBULANCE_RECEPTION, null, "ambulancia.recibir_prehospital"),
         ),
         "MED" to listOf(
-            Entry("Ver mi consulta", AndroidSection.CONSULTATIONS, null, "consulta.iniciar"),
+            Entry("Ver mi consulta", AndroidSection.MEDICAL_DAY, null, "consulta.iniciar"),
             Entry("Revisar resultados", AndroidSection.RESULT_REVIEW, null, "laboratorio.revisar"),
             Entry("Mis hospitalizados", AndroidSection.HOSPITALIZED, null, "admision.ver"),
         ),

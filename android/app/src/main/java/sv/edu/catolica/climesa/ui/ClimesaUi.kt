@@ -66,7 +66,8 @@ internal fun SectionIntro(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Text(eyebrow.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.climesa.primaryText)
+        // "Rol / CLIMESA" style breadcrumbs repeat what the header already says; only a real label is shown.
+        if (eyebrow.isNotBlank() && !eyebrow.contains(" / ")) Text(eyebrow.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.climesa.primaryText)
         Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
         detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis) }
     }

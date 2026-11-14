@@ -14,34 +14,47 @@ import sv.edu.catolica.climesa.data.*
 import sv.edu.catolica.climesa.data.realtime.ProfileLiveRefresh
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.*
+/** What the user has typed in the login form. Kept in memory only (never on disk) so leaving the app or rotating does not lose it. */
+class LoginDraft(var email:String="",var password:String="")
 data class AuthUiState(val checkingSession:Boolean=true,val signingIn:Boolean=false,val signingOut:Boolean=false,val account:AuthenticatedAccount?=null,val fieldErrors:Map<String,String> = emptyMap(),val error:String?=null,val accessPending:Boolean=false,val registrationMessage:String?=null)
 @HiltViewModel
 class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,private val backend:BackendAccessRepository,realtime:RealtimeRepository,private val expiry:SessionExpiry):ViewModel() {
     private val mutableState=MutableStateFlow(AuthUiState());val state=mutableState.asStateFlow()
     private var pending:AuthSession?=null
+    val draft=LoginDraft()
+    private var accessJob:Job?=null
     /** Un evento `usuario` vuelve a leer `/auth/me` y, si cambian los canales, se vuelve a unir con la lista nueva. */
     private val liveProfile=ProfileLiveRefresh<AuthenticatedAccount>(realtime,
         load={auth.restoreSession()?.let{AuthenticatedAccount(it,backend.profile(it))}},
         channelsOf={it.profile.channels},
         apply={account->pending=account.session;mutableState.update{it.copy(account=account)}},
-        onLost={retryAccess()})
+        onLost={retryAccess(silent=true)})
     private var expiryWatch:Job?=null
     private fun track(account:AuthenticatedAccount?){if(account==null)liveProfile.stop() else {liveProfile.start(viewModelScope,account.profile.channels);watchExpiry()}}
     /** A 401 that survived one renewal (see `authorizedCall`) ends the session and shows the login with the reason. */
     private fun watchExpiry(){if(expiryWatch?.isActive==true)return;expiryWatch=viewModelScope.launch{expiry.expired.collect{message->if(mutableState.value.account!=null&&!mutableState.value.signingOut)expireSession(message)}}}
     private fun expireSession(message:String){
         liveProfile.stop()
-        auth.clearLocalSession();pending=null
+        auth.clearLocalSession();pending=null;draft.password=""
         mutableState.value=AuthUiState(checkingSession=false,error=message)
     }
     init { retryAccess() }
-    fun retryAccess(){viewModelScope.launch {
-        mutableState.update{it.copy(checkingSession=true,error=null)}
+    /**
+     * Verifies the session against `/auth/me`. `silent` is for returning from the background or a lost live channel: it never swaps the
+     * screen for the loading one, ignores a call while another is in flight, and keeps the current account when the answer is only a
+     * transient failure, so no "No pudimos verificar tu acceso" flashes while the user is signing in or working.
+     */
+    fun retryAccess(silent:Boolean=false){
+        val now=mutableState.value
+        if(accessJob?.isActive==true||now.signingIn||now.signingOut)return
+        if(silent&&now.account==null)return
+        accessJob=viewModelScope.launch {
+        if(!silent)mutableState.update{it.copy(checkingSession=true,error=null)}
         try {val session=auth.restoreSession();pending=session;val account=session?.let{AuthenticatedAccount(it,backend.profile(it))};mutableState.update{it.copy(checkingSession=false,account=account,accessPending=false)};track(account)}
-        catch(e:Exception){if(e is CancellationException)throw e;if(e is AuthRequestException&&(e.statusCode==400||e.statusCode==401)){expireSession(SessionExpiry.MESSAGE);return@launch};mutableState.update{it.copy(checkingSession=false,account=null,accessPending=pending!=null,error=e.message?:"No se pudo verificar la sesión.")}}
+        catch(e:Exception){if(e is CancellationException)throw e;if(e is AuthRequestException&&(e.statusCode==400||e.statusCode==401)){expireSession(SessionExpiry.MESSAGE);return@launch};if(silent&&mutableState.value.account!=null)return@launch;mutableState.update{it.copy(checkingSession=false,account=null,accessPending=pending!=null,error=e.message?:"No se pudo verificar la sesión.")}}
     }}
     fun signIn(email:String,password:String){val errors=AuthRules.validate(email,password);if(errors.isNotEmpty()){mutableState.update{it.copy(fieldErrors=errors,error=null)};return}
-        viewModelScope.launch{mutableState.update{it.copy(signingIn=true,error=null,fieldErrors=emptyMap())};try {val session=auth.signIn(email,password);pending=session;val account=AuthenticatedAccount(session,backend.profile(session));mutableState.update{it.copy(signingIn=false,account=account,accessPending=false)};track(account)}catch(e:Exception){if(e is CancellationException)throw e;mutableState.update{it.copy(signingIn=false,error=e.message?:"No se pudo iniciar sesión.",accessPending=pending!=null)}}}
+        viewModelScope.launch{mutableState.update{it.copy(signingIn=true,error=null,fieldErrors=emptyMap())};try {val session=auth.signIn(email,password);pending=session;val account=AuthenticatedAccount(session,backend.profile(session));draft.password="";mutableState.update{it.copy(signingIn=false,account=account,accessPending=false)};track(account)}catch(e:Exception){if(e is CancellationException)throw e;mutableState.update{it.copy(signingIn=false,error=e.message?:"No se pudo iniciar sesión.",accessPending=pending!=null)}}}
     }
     fun register(name:String,email:String,password:String,confirmation:String){val errors=RegistrationRules.validate(name,email,password,confirmation);if(errors.isNotEmpty()){mutableState.update{it.copy(fieldErrors=errors,error=null)};return}
         viewModelScope.launch{mutableState.update{it.copy(signingIn=true,error=null,fieldErrors=emptyMap())};try{val session=auth.signUp(name,email,password);pending=session;if(session!=null){val profile=backend.profile(session);val account=AuthenticatedAccount(session,profile);mutableState.update{it.copy(signingIn=false,account=account)};track(account)}else mutableState.update{it.copy(signingIn=false,registrationMessage="Revisa tu correo para confirmar la cuenta. Después podrás ingresar.")}}catch(e:Exception){if(e is CancellationException)throw e;mutableState.update{it.copy(signingIn=false,error="No se pudo crear la cuenta. Revisa los datos o intenta iniciar sesión.",accessPending=pending!=null)}}}
@@ -53,6 +66,6 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
         viewModelScope.coroutineContext.cancelChildren()
         mutableState.value=AuthUiState(checkingSession=true,signingOut=true)
         auth.clearLocalSession()
-        viewModelScope.launch { try { session?.let{auth.signOut(it)} } finally { auth.clearLocalSession();pending=null;mutableState.value=AuthUiState(checkingSession=false) } }
+        viewModelScope.launch { try { session?.let{auth.signOut(it)} } finally { auth.clearLocalSession();pending=null;draft.password="";mutableState.value=AuthUiState(checkingSession=false) } }
     }
 }

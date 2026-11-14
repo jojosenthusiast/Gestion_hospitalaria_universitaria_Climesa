@@ -3,6 +3,16 @@
 package sv.edu.catolica.climesa.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import sv.edu.catolica.climesa.domain.MoreEntry
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -47,6 +57,10 @@ import sv.edu.catolica.climesa.domain.AndroidSection
 
 private fun compactLabel(section: AndroidSection): String = when (section) {
     AndroidSection.QUEUE -> "Fila"
+    AndroidSection.PATIENTS -> "Pacientes"
+    AndroidSection.APPOINTMENTS -> "Citas"
+    AndroidSection.MY_APPOINTMENTS -> "Mis citas"
+    AndroidSection.PATIENT_QUEUE -> "Mi turno"
     AndroidSection.LINKING, AndroidSection.LINK_RECORD -> "Vincular"
     AndroidSection.ADMISSION -> "Admisión"
     AndroidSection.BEDS -> "Camas"
@@ -57,11 +71,14 @@ private fun compactLabel(section: AndroidSection): String = when (section) {
     AndroidSection.CLEANING -> "Limpieza"
     AndroidSection.SUPPLIES -> "Insumos"
     AndroidSection.AMBULANCE_RECEPTION, AndroidSection.AMBULANCE_ARRIVAL -> "Llegada"
+    AndroidSection.MEDICAL_DAY -> "Mi día"
     AndroidSection.RESULT_REVIEW -> "Resultados"
-    AndroidSection.RESULTS -> "Mis exámenes"
-    AndroidSection.HOSPITALIZED -> "Hospitalizados"
+    AndroidSection.RESULTS -> "Exámenes"
+    AndroidSection.HOSPITALIZED -> "Internados"
     AndroidSection.SAMPLE -> "Muestra"
     AndroidSection.CAPTURE_RESULTS -> "Captura"
+    AndroidSection.SERVICE -> "Servicio"
+    AndroidSection.UNIT -> "Unidad"
     AndroidSection.PREHOSPITAL_REPORT -> "Reporte"
     AndroidSection.UNIDENTIFIED_PATIENT -> "Paciente"
     else -> section.label
@@ -90,52 +107,74 @@ internal fun iconFor(section: AndroidSection): ImageVector = when (section) {
 
 @Composable
 internal fun AdaptiveRoleScaffold(
+    role: String,
     sections: List<AndroidSection>,
     selected: AndroidSection,
     onSelected: (AndroidSection) -> Unit,
-    topBar: @Composable (openMenu: () -> Unit) -> Unit,
+    dark: Boolean,
+    setDark: (Boolean) -> Unit,
+    topBar: @Composable () -> Unit,
     onLogout: () -> Unit,
+    showNavigation: Boolean = true,
+    snackbarHost: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
         when (AndroidNavigationPolicy.mode(maxWidth.value.toInt())) {
-            AndroidNavigationMode.BOTTOM_BAR -> CompactRoleScaffold(sections, selected, onSelected, topBar, onLogout, content)
-            AndroidNavigationMode.RAIL -> RailRoleScaffold(sections, selected, onSelected, topBar, onLogout, content)
-            AndroidNavigationMode.DRAWER -> DrawerRoleScaffold(sections, selected, onSelected, topBar, onLogout, content)
+            AndroidNavigationMode.BOTTOM_BAR -> CompactRoleScaffold(role, sections, selected, onSelected, dark, setDark, topBar, onLogout, showNavigation, snackbarHost, content)
+            AndroidNavigationMode.RAIL -> RailRoleScaffold(sections, selected, onSelected, topBar, onLogout, showNavigation, snackbarHost, content)
+            AndroidNavigationMode.DRAWER -> DrawerRoleScaffold(sections, selected, onSelected, topBar, onLogout, showNavigation, snackbarHost, content)
         }
     }
 }
 
+/**
+ * Phone navigation: Inicio plus the role's core tasks, and a fifth "Más" item that opens a grouped sheet with everything else.
+ * No hamburger: the top bar only carries the screen title and, on detail screens, the back arrow.
+ */
 @Composable
 private fun CompactRoleScaffold(
+    role: String,
     sections: List<AndroidSection>,
     selected: AndroidSection,
     onSelected: (AndroidSection) -> Unit,
-    topBar: @Composable (openMenu: () -> Unit) -> Unit,
+    dark: Boolean,
+    setDark: (Boolean) -> Unit,
+    topBar: @Composable () -> Unit,
     onLogout: () -> Unit,
+    showNavigation: Boolean,
+    snackbarHost: @Composable () -> Unit,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val partition = AndroidNavigationPolicy.compact(sections)
-    var menuOpen by rememberSaveable { mutableStateOf(false) }
+    val navigation = AndroidNavigationPolicy.compact(role, sections)
+    var moreOpen by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { topBar { menuOpen = true } },
+        topBar = topBar,
+        snackbarHost = snackbarHost,
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                partition.primary.forEach { section ->
+            if (showNavigation) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                navigation.primary.forEach { section ->
                     NavigationBarItem(
                         selected = selected == section,
                         onClick = { onSelected(section) },
                         icon = { Icon(iconFor(section), contentDescription = null) },
-                        label = { Text(compactLabel(section), maxLines = 2) },
+                        label = { Text(compactLabel(section), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         colors = barItemColors(),
                     )
                 }
+                NavigationBarItem(
+                    selected = selected !in navigation.primary,
+                    onClick = { moreOpen = true },
+                    icon = { Icon(Icons.Default.GridView, contentDescription = null) },
+                    label = { Text(stringResource(R.string.ui_mas), maxLines = 1) },
+                    colors = barItemColors(),
+                )
             }
         },
         content = content,
     )
-    if (menuOpen) RoleMenuSheet(partition.overflow, selected, { onSelected(it); menuOpen = false }, { menuOpen = false }, onLogout)
+    if (moreOpen) MoreSheet(navigation.more, selected, dark, setDark, { onSelected(it); moreOpen = false }, { moreOpen = false }, onLogout)
 }
 
 @Composable
@@ -143,13 +182,14 @@ private fun RailRoleScaffold(
     sections: List<AndroidSection>,
     selected: AndroidSection,
     onSelected: (AndroidSection) -> Unit,
-    topBar: @Composable (openMenu: () -> Unit) -> Unit,
+    topBar: @Composable () -> Unit,
     onLogout: () -> Unit,
+    showNavigation: Boolean,
+    snackbarHost: @Composable () -> Unit,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    var menuOpen by rememberSaveable { mutableStateOf(false) }
     Row(Modifier.fillMaxSize()) {
-        NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
+        if (showNavigation) NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).safeDrawingPadding()) {
                 sections.forEach { section ->
                     NavigationRailItem(
@@ -160,16 +200,22 @@ private fun RailRoleScaffold(
                         label = { Text(section.label, maxLines = 2) },
                     )
                 }
+                NavigationRailItem(
+                    selected = false,
+                    onClick = onLogout,
+                    icon = { Icon(Icons.Default.Logout, contentDescription = null) },
+                    label = { Text(stringResource(R.string.cerrar_sesion), maxLines = 2) },
+                )
             }
         }
         Scaffold(
             modifier = Modifier.weight(1f),
             containerColor = MaterialTheme.colorScheme.background,
-            topBar = { topBar { menuOpen = true } },
+            topBar = topBar,
+            snackbarHost = snackbarHost,
             content = content,
         )
     }
-    if (menuOpen) RoleMenuSheet(AndroidNavigationPolicy.compact(sections).overflow, selected, { onSelected(it); menuOpen = false }, { menuOpen = false }, onLogout)
 }
 
 @Composable
@@ -177,11 +223,16 @@ private fun DrawerRoleScaffold(
     sections: List<AndroidSection>,
     selected: AndroidSection,
     onSelected: (AndroidSection) -> Unit,
-    topBar: @Composable (openMenu: () -> Unit) -> Unit,
+    topBar: @Composable () -> Unit,
     onLogout: () -> Unit,
+    showNavigation: Boolean,
+    snackbarHost: @Composable () -> Unit,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    var menuOpen by rememberSaveable { mutableStateOf(false) }
+    val screen: @Composable () -> Unit = {
+        Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = topBar, snackbarHost = snackbarHost, content = content)
+    }
+    if (!showNavigation) { screen(); return }
     PermanentNavigationDrawer(
         drawerContent = {
             PermanentDrawerSheet(
@@ -189,7 +240,7 @@ private fun DrawerRoleScaffold(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
             ) {
                 Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).safeDrawingPadding().padding(horizontal = 12.dp, vertical = 20.dp)) {
-                    Row(Modifier.padding(start = 12.dp, bottom = 20.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.padding(start = 12.dp, bottom = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         BrandMark()
                         Column {
                             Text(stringResource(R.string.ui_marca), style = MaterialTheme.typography.titleLarge)
@@ -205,43 +256,59 @@ private fun DrawerRoleScaffold(
                             icon = { Icon(iconFor(section), contentDescription = null) },
                         )
                     }
-                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                     NavigationDrawerItem(label = { Text(stringResource(R.string.cerrar_sesion)) }, selected = false, onClick = onLogout, icon = { Icon(Icons.Default.Logout, contentDescription = null) })
                 }
             }
         },
-    ) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            topBar = { topBar { menuOpen = true } },
-            content = content,
-        )
-    }
-    if (menuOpen) RoleMenuSheet(AndroidNavigationPolicy.compact(sections).overflow, selected, { onSelected(it); menuOpen = false }, { menuOpen = false }, onLogout)
+        content = { screen() },
+    )
 }
 
+/** "Más": everything that is not in the bar, in labelled groups with 56dp rows, plus appearance and sign-out. */
 @Composable
-private fun RoleMenuSheet(
-    sections: List<AndroidSection>,
+private fun MoreSheet(
+    more: List<MoreEntry>,
     selected: AndroidSection,
+    dark: Boolean,
+    setDark: (Boolean) -> Unit,
     onSelected: (AndroidSection) -> Unit,
     onDismiss: () -> Unit,
     onLogout: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxHeight(0.82f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(stringResource(R.string.ui_mas_funciones), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
-            sections.forEach { section ->
-                NavigationDrawerItem(
-                    colors = drawerItemColors(),
-                    label = { Text(section.label, maxLines = 2) },
-                    selected = selected == section,
-                    onClick = { onSelected(section) },
-                    icon = { Icon(iconFor(section), contentDescription = null) },
-                )
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            more.forEach { entry ->
+                MoreHeading(entry.group.title)
+                entry.sections.forEach { section -> MoreRow(iconFor(section), section.label, selected == section) { onSelected(section) } }
             }
-            androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-            NavigationDrawerItem(label = { Text(stringResource(R.string.cerrar_sesion)) }, selected = false, onClick = onLogout, icon = { Icon(Icons.Default.Logout, contentDescription = null) })
+            MoreHeading(stringResource(R.string.ui_ajustes))
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Icon(Icons.Default.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.ui_modo_oscuro), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                Switch(dark, setDark)
+            }
+            MoreRow(Icons.Default.Logout, stringResource(R.string.cerrar_sesion), false, chevron = false, onClick = onLogout)
+        }
+    }
+}
+
+@Composable
+private fun MoreHeading(text: String) =
+    Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp))
+
+@Composable
+private fun MoreRow(icon: ImageVector, label: String, selected: Boolean, chevron: Boolean = true, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Icon(icon, contentDescription = null, tint = if (selected) MaterialTheme.climesa.primaryText else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = if (selected) MaterialTheme.climesa.primaryText else MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f), maxLines = 2)
+            if (chevron) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

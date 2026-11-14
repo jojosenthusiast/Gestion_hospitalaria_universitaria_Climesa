@@ -4,12 +4,13 @@ import org.junit.Test
 class RoleAccessTest {
     private val allSections = AndroidSection.entries.map(AndroidSection::permission)
     private fun profile(roles:List<String>,verified:Boolean=true,platforms:List<String> = listOf("android"),permissions:List<String> = allSections)=AccessProfile(roles=roles,permissions=permissions,verifiedByBackend=verified,platforms=platforms)
-    @Test fun exposesExactlyEightAndroidRoles(){
-        assertEquals(listOf("JOP","REC","AST","ENF","MED","LAB","PAR","PAC"),AndroidSections.roles)
-        assertEquals(8,RoleAccess.allowed(profile(AndroidSections.roles+"ADM"),"android").size)
+    @Test fun exposesExactlySixAndroidRoles(){
+        assertEquals(listOf("REC","AST","ENF","MED","PAR","PAC"),AndroidSections.roles)
+        assertEquals(6,RoleAccess.allowed(profile(AndroidSections.roles+"ADM"),"android").size)
     }
-    @Test fun operationsChiefUsesAndroid(){
-        assertEquals(listOf("JOP"),RoleAccess.allowed(profile(listOf("JOP"),permissions=listOf("sesion.perfil","turnos.ver")),"android"))
+    @Test fun operationsChiefAndLaboratoryDoNotUseAndroid(){
+        assertTrue(RoleAccess.allowed(profile(listOf("JOP"),permissions=listOf("sesion.perfil","turnos.ver")),"android").isEmpty())
+        assertTrue(RoleAccess.allowed(profile(listOf("LAB")),"android").isEmpty())
         assertEquals("Jefe de Operaciones",RoleAccess.label("JOP"))
     }
     @Test fun rejectsUnverifiedProfileAndWrongPlatform(){assertTrue(RoleAccess.allowed(profile(listOf("MED"),false),"android").isEmpty());assertTrue(RoleAccess.allowed(profile(listOf("MED"),platforms=listOf("ios")),"android").isEmpty())}
