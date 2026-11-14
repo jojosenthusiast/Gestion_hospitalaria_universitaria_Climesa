@@ -66,6 +66,18 @@ const TABLAS: Record<string, string> = {
 const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acceso.dispositivo_push', 'acceso.administrador_principal',
   'pacientes.busqueda_registro', 'plataforma.auditoria', 'plataforma.outbox', 'plataforma.inbox', 'plataforma.idempotencia'];
 
+const MINIMOS: Record<string, number> = {
+  'pacientes.paciente': 120, 'pacientes.identificador': 100, 'atencion.cita': 130, 'atencion.ticket_fila': 30, 'atencion.consulta': 70,
+  'atencion.diagnostico': 100, 'atencion.receta': 60, 'atencion.signos_vitales': 150, 'laboratorio.orden': 30, 'laboratorio.resultado': 80,
+  'hospitalizacion.admision': 20, 'hospitalizacion.ocupacion_cama': 18, 'hospitalizacion.nota_enfermeria': 30, 'ambulancia.solicitud': 15,
+  'ambulancia.servicio': 12, 'ambulancia.hito': 45, 'ambulancia.reporte_prehospital': 10, 'inventario.articulo': 40, 'inventario.lote': 40,
+  'inventario.movimiento': 90, 'publico.aviso': 14, 'personal.turno': 350, 'acceso.vinculacion_paciente': 10, 'acceso.invitacion': 8,
+};
+const verificarUmbrales = (conteo: Record<string, number>) => {
+  for (const [tabla, minimo] of Object.entries(MINIMOS)) expect({ tabla, ok: conteo[tabla] >= minimo }).toEqual({ tabla, ok: true });
+};
+const semillaAnterior = readFileSync(resolve(__dirname, 'fixtures/semilla-demo-anterior.sql'), 'utf8');
+
 describe('Datos de demostración (tools/demo)', () => {
   let t: TestApp;
   beforeAll(async () => { t = await createTestApp(new Date()); });
@@ -136,14 +148,7 @@ describe('Datos de demostración (tools/demo)', () => {
     await t.pg.exec(limpieza);
     await t.pg.exec(semilla);
     const conteo = await demo();
-    const minimos: Record<string, number> = {
-      'pacientes.paciente': 120, 'pacientes.identificador': 100, 'atencion.cita': 130, 'atencion.ticket_fila': 30, 'atencion.consulta': 70,
-      'atencion.diagnostico': 100, 'atencion.receta': 60, 'atencion.signos_vitales': 150, 'laboratorio.orden': 30, 'laboratorio.resultado': 80,
-      'hospitalizacion.admision': 20, 'hospitalizacion.ocupacion_cama': 18, 'hospitalizacion.nota_enfermeria': 30, 'ambulancia.solicitud': 15,
-      'ambulancia.servicio': 12, 'ambulancia.hito': 45, 'ambulancia.reporte_prehospital': 10, 'inventario.articulo': 40, 'inventario.lote': 40,
-      'inventario.movimiento': 90, 'publico.aviso': 14, 'personal.turno': 350, 'acceso.vinculacion_paciente': 10, 'acceso.invitacion': 8,
-    };
-    for (const [tabla, minimo] of Object.entries(minimos)) expect({ tabla, ok: conteo[tabla] >= minimo }).toEqual({ tabla, ok: true });
+    verificarUmbrales(conteo);
   });
 
   test('cada enumeración de estado aparece al menos una vez', async () => {
@@ -327,6 +332,39 @@ describe('Datos de demostración (tools/demo)', () => {
     await t.pg.exec(semilla);
     for (const [tabla, n] of Object.entries(await demo())) expect({ tabla, n: n > 0 }).toEqual({ tabla, n: true });
     await t.pg.exec(limpieza);
+    expect(await estadoGeneral()).toEqual(antes);
+  });
+
+  test('actualizar una base que ya tiene la semilla anterior: aplica sin fallar, es idempotente y limpia a cero', async () => {
+    await t.pg.exec(limpieza);
+    await t.pg.exec(semilla);
+    const nueva = await demo();
+    await t.pg.exec(limpieza);
+    await t.pg.exec(semillaAnterior);
+    const conAnterior = await demo();
+    expect(conAnterior['pacientes.paciente']).toBeGreaterThan(0);
+    await t.pg.exec(semilla);
+    const actualizada = await demo();
+    verificarUmbrales(actualizada);
+    // Ninguna fila de la semilla nueva se pierde por chocar con otra de la anterior, ni se pierde ninguna de la anterior.
+    // Las tablas sin id propio (tripulación, bitácora de la unidad...) conservan lo de los padres que ya existían: solo se compara contra lo anterior.
+    for (const [tabla, n] of Object.entries(conAnterior)) {
+      const esperado = TABLAS[tabla] === `id::text LIKE ${DEMO}` ? Math.max(n, nueva[tabla] - (tabla === 'atencion.signos_vitales' ? 3 : 0)) : n;
+      expect({ tabla, ok: actualizada[tabla] >= esperado }).toEqual({ tabla, ok: true });
+    }
+    const totalActualizada = await totales();
+    await t.pg.exec(semilla);
+    expect(await demo()).toEqual(actualizada);
+    expect(await totales()).toEqual(totalActualizada);
+    // Las consultas firmadas 8, 9 y 11 de la semilla anterior se quedan sin signos (una firmada no admite hijos y la semilla no salta invariantes).
+    // Coherencia tras la actualización: nada huérfano y cada ingreso vigente conserva su ocupación abierta única.
+    const huerfanos = async (sql: string) => (await t.pg.query<{ id: string }>(sql)).rows.map(r => r.id);
+    expect(await huerfanos(`SELECT c.id::text AS id FROM atencion.consulta c WHERE c.id::text LIKE ${DEMO} AND c.estado = 'firmada'
+      AND c.id NOT IN (SELECT consulta_id FROM atencion.diagnostico WHERE principal)`)).toEqual([]);
+    expect(await huerfanos(`SELECT a.id::text AS id FROM hospitalizacion.admision a LEFT JOIN hospitalizacion.ocupacion_cama o ON o.id::text LIKE ${DEMO} AND o.admision_id = a.id AND upper_inf(o.periodo)
+      WHERE a.id::text LIKE ${DEMO} GROUP BY a.id, a.estado HAVING count(o.id) <> (CASE WHEN a.estado IN ('hospitalizado', 'alta_firmada') THEN 1 ELSE 0 END)`)).toEqual([]);
+    await t.pg.exec(limpieza);
+    for (const [tabla, n] of Object.entries(await demo())) expect({ tabla, n }).toEqual({ tabla, n: 0 });
     expect(await estadoGeneral()).toEqual(antes);
   });
 

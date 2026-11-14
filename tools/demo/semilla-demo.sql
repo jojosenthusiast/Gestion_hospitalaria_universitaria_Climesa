@@ -211,7 +211,7 @@ on conflict do nothing;
 
 -- Inscripción profesional vigente (D-012) para todo el personal médico y de enfermería, sembrado o de cuenta.
 insert into personal.inscripcion (id, persona_id, junta, numero, vigencia)
-select pg_temp.did('0030', row_number() over (order by p.id)::int), p.id,
+select ('de300000-0031-4000-8000-' || substr(p.id::text, 25))::uuid, p.id,
        case p.tipo when 'medico' then 'JVPM' else 'JVPE' end,
        'DEMO-' || substr(p.id::text, 25, 12), daterange(date '2026-01-01', date '2028-12-31')
 from personal.persona p
@@ -888,11 +888,11 @@ begin
       from rdemo r where r.k = kk.n;
     end if;
     insert into atencion.signos_vitales (id, paciente_id, consulta_id, tomado_por, tomado_en, pa_sistolica, pa_diastolica, fc, fr, temperatura, sat_o2, peso_kg, talla_cm)
-    select pg_temp.did('0043', kk.n), pg_temp.did('0001', kk.pac), v_id, pg_temp.actor('AST'), v_inicio - interval '10 minutes',
+    select pg_temp.did('0043', 5000 + kk.n), pg_temp.did('0001', kk.pac), v_id, pg_temp.actor('AST'), v_inicio - interval '10 minutes',
            s.ps, s.pd, s.fc, s.fr, s.tt, s.sat, s.peso, s.talla
     from sdemo s where s.k = kk.n;
     insert into atencion.relacion_atencion (id, paciente_id, profesional_id, origen, origen_id, vigencia)
-    values (pg_temp.did('0045', kk.n), pg_temp.did('0001', kk.pac), v_med, 'consulta', v_id, tstzrange(v_inicio, v_inicio + interval '30 days'));
+    values (pg_temp.did('0045', 5000 + kk.n), pg_temp.did('0001', kk.pac), v_med, 'consulta', v_id, tstzrange(v_inicio, v_inicio + interval '30 days'));
     if kk.fin in ('firmada', 'error') then
       update atencion.consulta set estado = 'firmada', firmada_en = least(now(), v_inicio + interval '25 minutes'), version = 2 where id = v_id;
     end if;
@@ -1118,6 +1118,7 @@ declare
   v_unidad uuid;
   v_prev text;
   v_hay_activo boolean;
+  v_reabrir boolean;
   s record;
   v_serv uuid;
   v_base timestamptz;
@@ -1125,9 +1126,14 @@ declare
   k int;
 begin
   select id, estado into v_unidad, v_prev from ambulancia.unidad order by id limit 1;
-  v_hay_activo := exists (select 1 from ambulancia.servicio where finalizado_en is null);
+  -- El servicio activo de la semilla anterior no cuenta como "real": se aparta un momento (misma transacción) y se reabre al final.
+  v_hay_activo := exists (select 1 from ambulancia.servicio where finalizado_en is null and id <> pg_temp.did('0070', 6));
   if v_unidad is null or v_hay_activo then
-    return;   -- sin unidad, o ya hay un servicio activo (propio o real): no se siembran servicios
+    return;   -- sin unidad, o ya hay un servicio activo real: no se siembran servicios
+  end if;
+  v_reabrir := exists (select 1 from ambulancia.servicio where id = pg_temp.did('0070', 6) and finalizado_en is null);
+  if v_reabrir then
+    update ambulancia.servicio set finalizado_en = now(), estado_final = 'completado' where id = pg_temp.did('0070', 6);
   end if;
 
   for s in select * from (values
@@ -1194,6 +1200,10 @@ begin
     update ambulancia.servicio set finalizado_en = v_base + (cardinality(s.hit) * 12 + 5) * interval '1 minute', estado_final = s.fin, motivo_final = s.motivo
     where id = v_serv;
   end loop;
+
+  if v_reabrir then
+    update ambulancia.servicio set finalizado_en = null, estado_final = null, motivo_final = null where id = pg_temp.did('0070', 6);
+  end if;
 
   -- Servicio activo: la unidad pasa a En Servicio y se guarda su estado anterior para restaurarlo al limpiar.
   v_serv := pg_temp.did('0070', 6);
@@ -1294,7 +1304,7 @@ join hospitalizacion.admision ad on ad.id = pg_temp.did('0060', v.adm)
 on conflict do nothing;
 
 insert into atencion.signos_vitales (id, paciente_id, admision_id, tomado_por, tomado_en, pa_sistolica, pa_diastolica, fc, fr, temperatura, sat_o2, peso_kg, talla_cm)
-select pg_temp.did('0043', 9000 + v.n), pg_temp.did('0001', v.pac), pg_temp.did('0060', v.adm), pg_temp.actor('ENF'),
+select pg_temp.did('0043', 100 + v.n), pg_temp.did('0001', v.pac), pg_temp.did('0060', v.adm), pg_temp.actor('ENF'),
        least(now(), greatest(now() - v.hace, ad.creado_en + interval '5 minutes')),
        v.ps, v.pd, v.fc, v.fr, v.t, v.sat, v.peso, null
 from (values
@@ -1307,9 +1317,9 @@ join hospitalizacion.admision ad on ad.id = pg_temp.did('0060', v.adm)
 on conflict do nothing;
 
 insert into atencion.relacion_atencion (id, paciente_id, profesional_id, origen, origen_id, vigencia)
-select pg_temp.did('0045', 9100 + (row_number() over (order by a.id))::int), a.paciente_id, a.medico_tratante_id, 'admision', a.id,
+select pg_temp.did('0045', 100 + (row_number() over (order by a.id))::int), a.paciente_id, a.medico_tratante_id, 'admision', a.id,
        tstzrange(a.creado_en, a.creado_en + interval '30 days')
-from hospitalizacion.admision a where a.id::text like 'de300000-%' and a.id < pg_temp.did('0060', 100) and a.estado <> 'pendiente_cama'
+from hospitalizacion.admision a where a.id::text like 'de300000-%' and a.id < pg_temp.did('0060', 75) and a.estado <> 'pendiente_cama'
 on conflict do nothing;
 
 -- Camas: bloqueos, limpieza y equipo. Las camas ocupadas, la reservada y las libres salen de la vista infra.v_estado_cama.
