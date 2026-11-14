@@ -69,7 +69,8 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  if(!hasWebModule(profile))return <StatusView title="Tu rol no usa esta aplicación" detail="Tu cuenta no tiene módulos habilitados en la web. Ingresa desde la aplicación que corresponde a tu función." action="Cerrar sesión" onAction={onLogout}/>;
  const active=menu.find(m=>m.id===route);
  let content:ReactNode;
- if(!active)content=<><Heading eyebrow="Acceso restringido" title="Sin permiso" description="Esta sección no corresponde a los permisos de tu cuenta."/><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
+ if(!modules.some(m=>m.id===route))content=<><Heading eyebrow="CLIMESA" title="Página no encontrada" description="La dirección que abriste no corresponde a ninguna sección del sistema."/><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
+ else if(!active)content=<><Heading eyebrow="Acceso restringido" title="Sin permiso" description="Esta sección no corresponde a los permisos de tu cuenta."/><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
  else if(route==='inicio')content=<Dashboard api={api} profile={profile} version={version} menu={menu}/>;
  else if(route==='pacientes')content=<PatientsPage api={api} profile={profile} version={version}/>;
  else if(route==='personal')content=<PersonnelPage api={api} profile={profile} version={version}/>;
