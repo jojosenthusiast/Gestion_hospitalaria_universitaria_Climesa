@@ -10,7 +10,7 @@ class AndroidSectionsTest {
 
     @Test fun paramedicoVeSoloSusDestinosCatalogados() {
         assertEquals(
-            listOf(AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            listOf(AndroidSection.HOME, AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
             AndroidSections.visible("PAR", paramedico),
         )
     }
@@ -21,7 +21,8 @@ class AndroidSectionsTest {
         assertTrue(AndroidSection.CLEANING in enfermeria)
         assertFalse(AndroidSection.BEDS in enfermeria)
         assertFalse(AndroidSection.UNIT in enfermeria)
-        assertEquals(AndroidSection.WARD, enfermeria.first())
+        assertEquals(AndroidSection.HOME, enfermeria.first())
+        assertEquals(AndroidSection.WARD, enfermeria[1])
         assertEquals(AndroidSection.PROFILE, enfermeria.last())
     }
 
@@ -40,7 +41,7 @@ class AndroidSectionsTest {
             listOf("sesion.perfil", "camas.ver_tablero", "admision.crear", "inventario.mover", "turnos.ver", "turnos.ver_borradores", "turnos.planificar", "turnos.publicar"),
         )
         assertEquals(
-            listOf(AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.SUPPLIES, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            listOf(AndroidSection.HOME, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.SUPPLIES, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
             jefe,
         )
         assertFalse(AndroidSection.PLANNING in jefe)
@@ -51,22 +52,41 @@ class AndroidSectionsTest {
     @Test fun losOchoRolesQuedanLimitadosASuCatalogoDePantallas() {
         val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet() + setOf("turnos.ver_borradores", "turnos.publicar")
         val expected = mapOf(
-            "JOP" to listOf(AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.SUPPLIES, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "REC" to listOf(AndroidSection.PATIENTS, AndroidSection.QUEUE, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "AST" to listOf(AndroidSection.ASSISTANT_STATION, AndroidSection.VITAL_SIGNS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "ENF" to listOf(AndroidSection.WARD, AndroidSection.VITAL_SIGNS, AndroidSection.INPATIENT_CARE, AndroidSection.CLEANING, AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "MED" to listOf(AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.RECORD, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "LAB" to listOf(AndroidSection.LAB, AndroidSection.SAMPLE, AndroidSection.CAPTURE_RESULTS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "PAR" to listOf(AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "JOP" to listOf(AndroidSection.HOME, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.SUPPLIES, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "REC" to listOf(AndroidSection.HOME, AndroidSection.PATIENTS, AndroidSection.QUEUE, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "AST" to listOf(AndroidSection.HOME, AndroidSection.ASSISTANT_STATION, AndroidSection.VITAL_SIGNS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "ENF" to listOf(AndroidSection.HOME, AndroidSection.WARD, AndroidSection.VITAL_SIGNS, AndroidSection.INPATIENT_CARE, AndroidSection.CLEANING, AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.RECORD, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "LAB" to listOf(AndroidSection.HOME, AndroidSection.LAB, AndroidSection.SAMPLE, AndroidSection.CAPTURE_RESULTS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+            "PAR" to listOf(AndroidSection.HOME, AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
             "PAC" to listOf(AndroidSection.HOME, AndroidSection.LINK_RECORD, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
         )
-        val principalScreens = mapOf("JOP" to "A34", "REC" to "A30", "AST" to "A40", "ENF" to "A50", "MED" to "A20", "LAB" to "A60", "PAR" to "A70", "PAC" to "A04")
+        // Every role lands on the dashboard ("Inicio", A04 in the catalog).
+        val principalScreens = AndroidSections.roles.associateWith { "A04" }
 
         assertEquals(AndroidSections.roles.toSet(), expected.keys)
         expected.forEach { (role, sections) ->
             assertEquals("Catálogo incorrecto para $role", sections, AndroidSections.visible(role, permissions))
             assertEquals("Destino principal incorrecto para $role", principalScreens[role], sections.first().screenId)
             assertTrue("Destino sin código Axx para $role", sections.all { it.screenId.matches(Regex("A\\d{2}")) })
+        }
+    }
+
+    @Test fun todosLosRolesAterrizanEnSuTableroDeInicio() {
+        val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet()
+        AndroidSections.roles.forEach { role -> assertEquals("Inicio de $role", AndroidSection.HOME, AndroidSections.visible(role, permissions).first()) }
+    }
+
+    @Test fun inicioPerfilYHospitalSolosNoSonUnFlujoOperativo() {
+        assertFalse(AndroidSections.hasAppScreens("LAB", listOf("sesion.perfil")))
+        assertTrue(AndroidSections.hasAppScreens("LAB", listOf("sesion.perfil", "laboratorio.ver_cola")))
+    }
+
+    @Test fun planificacionYPersonalSiguenFueraDeAndroidPorqueNoEstanCatalogados() {
+        val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet()
+        AndroidSections.roles.forEach { role ->
+            assertFalse(AndroidSection.PLANNING in AndroidSections.visible(role, permissions))
+            assertFalse(AndroidSection.STAFF in AndroidSections.visible(role, permissions))
         }
     }
 

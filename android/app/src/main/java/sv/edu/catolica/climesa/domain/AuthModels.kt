@@ -98,13 +98,13 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
 
 object AndroidSections {
     private val roleCatalog = mapOf(
-        "JOP" to listOf(AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.SUPPLIES, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "REC" to listOf(AndroidSection.PATIENTS, AndroidSection.QUEUE, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "AST" to listOf(AndroidSection.ASSISTANT_STATION, AndroidSection.VITAL_SIGNS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "ENF" to listOf(AndroidSection.WARD, AndroidSection.VITAL_SIGNS, AndroidSection.INPATIENT_CARE, AndroidSection.CLEANING, AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "MED" to listOf(AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.RECORD, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "LAB" to listOf(AndroidSection.LAB, AndroidSection.SAMPLE, AndroidSection.CAPTURE_RESULTS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "PAR" to listOf(AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "JOP" to listOf(AndroidSection.HOME, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.SUPPLIES, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "REC" to listOf(AndroidSection.HOME, AndroidSection.PATIENTS, AndroidSection.QUEUE, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "AST" to listOf(AndroidSection.HOME, AndroidSection.ASSISTANT_STATION, AndroidSection.VITAL_SIGNS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "ENF" to listOf(AndroidSection.HOME, AndroidSection.WARD, AndroidSection.VITAL_SIGNS, AndroidSection.INPATIENT_CARE, AndroidSection.CLEANING, AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.RECORD, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "LAB" to listOf(AndroidSection.HOME, AndroidSection.LAB, AndroidSection.SAMPLE, AndroidSection.CAPTURE_RESULTS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "PAR" to listOf(AndroidSection.HOME, AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "PAC" to listOf(AndroidSection.HOME, AndroidSection.LINK_RECORD, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
     )
 
@@ -118,9 +118,9 @@ object AndroidSections {
     fun visible(role: String, permissions: Collection<String>): List<AndroidSection> =
         roleCatalog[role].orEmpty().filter { it.permission in permissions }
 
-    /** Without a destination beyond Home and Profile, the role has no operational Android flow. */
+    /** Without a destination beyond Home, Hospital and Profile, the role has no operational Android flow. */
     fun hasAppScreens(role: String, permissions: Collection<String>) =
-        visible(role, permissions).any { it != AndroidSection.HOSPITAL_INFO && it != AndroidSection.PROFILE }
+        visible(role, permissions).any { it != AndroidSection.HOME && it != AndroidSection.HOSPITAL_INFO && it != AndroidSection.PROFILE }
 }
 
 enum class AndroidNavigationMode { BOTTOM_BAR, RAIL, DRAWER }
@@ -138,11 +138,12 @@ object AndroidNavigationPolicy {
     }
 
     fun compact(sections: List<AndroidSection>): CompactNavigation {
-        // En móvil se reservan cuatro accesos: tres operativos y el perfil.
-        // Inicio, información institucional y el resto quedan en el menú lateral.
+        // En móvil se reservan cuatro accesos: el tablero de inicio (aterrizaje de todos los roles), dos operativos y el perfil.
+        // Sin Inicio caben tres operativos. Información institucional y el resto quedan en el menú "Más funciones".
+        val home = sections.firstOrNull { it == AndroidSection.HOME }
         val profile = sections.firstOrNull { it == AndroidSection.PROFILE }
         val operational = sections.filterNot { it == AndroidSection.HOME || it == AndroidSection.HOSPITAL_INFO || it == AndroidSection.PROFILE }
-        val primary = (operational.take(3) + listOfNotNull(profile)).distinct().take(4)
+        val primary = (listOfNotNull(home) + operational.take(if (home != null) 2 else 3) + listOfNotNull(profile)).distinct().take(4)
         return CompactNavigation(primary, sections.filterNot { it in primary })
     }
 }
