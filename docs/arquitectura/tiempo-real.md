@@ -2,7 +2,7 @@
 
 Requisitos: REQ-PLT-06 (nada de recargar), REQ-AMB-02 (ambulancia en tiempo real). Decisiones: D-027, D-060. ADR-0005.
 
-> Este catálogo incluye eventos planificados para S3–S5. En S1/S2 están implementados eventos de pacientes, personal, espacios, turnos y usuarios. Solo la web tiene suscripción e invalidación automática en este corte.
+> Catálogo regenerado desde el código (Fase 1, DAT-06). La lista de tipos vive en `api/src/platform/event-types.ts` y se publica en el contrato como `TipoEvento`.
 
 ## Cómo viaja un cambio
 
@@ -17,7 +17,7 @@ sequenceDiagram
   API->>DB: BEGIN; ocupación + outbox; COMMIT
   DB-->>RT: disparador realtime.send(canal, evento delgado)
   API-->>C1: 200 con el resultado
-  RT-->>C2: {tipo: "cama.ocupada", id, version}
+  RT-->>C2: EventoDelgado {seq, tipo: "cama.estado_cambiado", entidad, id, version, ocurrido}
   C2->>API: GET /camas/tablero (con su permiso)
   API-->>C2: estado actual filtrado por permiso
 ```
@@ -36,42 +36,81 @@ Reconexión en la web: no hay sondeo periódico. Al volver un canal a `SUBSCRIBE
 
 `seq` se asigna al insertar en `plataforma.outbox`, pero la fila solo se ve cuando la transacción hace commit. Si una transacción lenta obtiene un `seq` menor que otra que confirma antes, y un cliente ya avanzó su cursor más allá de ese `seq`, el evento tardío queda por debajo del cursor y esa consulta de recuperación no lo devuelve. No se corrige en el código. Los clientes lo mitigan porque, al reconectar, invalidan todas las vistas y vuelven a pedir su estado completo; el cursor solo acota cuántos eventos se leen, no es la fuente de verdad.
 
+## Evento delgado (esquema único)
+
+El broadcast en vivo y `GET /eventos` entregan la misma forma, publicada en el contrato como `EventoDelgado` (DAT-06, migración `20261116002000_fase1_contrato_api.sql`):
+
+| Campo | Tipo | Nota |
+|---|---|---|
+| `seq` | texto (entero de 64 bits) | Posición en `plataforma.outbox`. Sirve de cursor: el cliente la guarda también con los eventos en vivo. |
+| `tipo` | `TipoEvento` (enum del contrato) | Nombre del evento, tabla de abajo. También es el `event` del broadcast. |
+| `entidad` | texto | `cita`, `ticket_fila`, `cama`, ... o `publico` / `metricas` en los eventos agregados. |
+| `id` | texto | Id de la entidad (uuid) o una clave agregada en `publico` (`ocupacion`, `fila:<servicio>`, `medicos_de_turno`). |
+| `version` | entero | Versión de la entidad tras el cambio. |
+| `ocurrido` | fecha y hora ISO | Momento de inserción en el outbox. |
+
+`GET /eventos` agrega `type` y `entity`, alias obsoletos de `tipo` y `entidad` que se retiran cuando web y Android lean los nombres en español. Un cliente nuevo (iOS) usa solo `tipo` y `entidad`.
+
 ## Canales
 
-| Canal | Quién puede escuchar |
-|---|---|
-| `publico` | Cualquiera, incluida la pantalla pública sin sesión |
-| `rol:<codigo>` | Usuarios con ese rol |
-| `area:<espacio>` | Personal con turno en curso en esa área |
-| `usuario:<id>` | Solo ese usuario (incluye al paciente) |
-| `paciente:<id>` | Equipo con relación de atención con ese paciente |
-| `ambulancia` | REC, JOP, PAR, y MED y ENF de Emergencia |
+| Canal | Quién puede escuchar | Estado |
+|---|---|---|
+| `publico` | Cualquiera, incluida la pantalla pública sin sesión | Emitido (eventos agregados sin datos personales) |
+| `rol:<codigo>` | Usuarios con ese rol | Emitido; los roles se derivan de `acceso.rol_permiso` con `channelsFor` |
+| `usuario:<id>` | Solo ese usuario (incluye al paciente) | Emitido |
+| `ambulancia` | Lo concede `acceso.canales_de` a REC, JOP y PAR | Emitido |
+| `area:<espacio>` | Personal con turno en curso en esa área | Planificado; ningún evento lo usa todavía |
+| `paciente:<id>` | Equipo con relación de atención con ese paciente | Planificado; ningún evento lo usa todavía |
 
 ## Eventos
 
-| Evento | Canales | Quién reacciona | Push con app cerrada | Spec |
+Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato). `api/tests/contrato-api.spec.ts` falla si el código o una migración emiten un tipo que no está ahí, o si la lista tiene uno que nadie emite. Los canales `rol:*` salen de los permisos indicados.
+
+| Evento | Entidad | Emite | Canales (permiso → roles) | Spec |
 |---|---|---|---|---|
-| `cama.estado_cambiado` | `rol:REC`, `rol:JOP`, `area:<planta>`, `publico` (solo agregado) | Tablero de camas, árbol, pantalla pública | No | 104, 108 |
-| `cama.limpieza_pendiente` | `area:<planta>` | Enfermería de la planta | No | 104 |
-| `admision.creada` / `admision.cama_asignada` | `rol:REC`, `rol:JOP`, `paciente:<id>` | Admisiones, médico tratante | No | 108 |
-| `turno.publicado` / `turno.cambiado` | `usuario:<persona>`, `rol:JOP`, `publico` (médicos de turno) | Mis turnos, planificador, pantalla pública | Sí, si cambia un turno propio | 103 |
-| `fila.emitido` / `fila.llamado` / `fila.estado` | `rol:REC`, `area:<consultorio>`, `usuario:<paciente>`, `publico` (número) | Fila del día, mi turno, pantalla pública | Sí, al ser llamado | 105 |
-| `cita.confirmada` / `cita.cancelada` | `usuario:<paciente>`, `usuario:<medico>`, `rol:REC` | Mis citas, agenda | Sí | 105 |
-| `consulta.firmada` | `paciente:<id>`, `usuario:<paciente>` | Historial | No | 106 |
-| `lab.orden_creada` | `rol:LAB` | Cola de laboratorio | No | 107 |
-| `lab.estado_cambiado` | `rol:LAB`, `usuario:<medico>`, `usuario:<paciente>` | Cola, mis exámenes (solo estado) | No | 107 |
-| `lab.valor_critico` | `usuario:<medico>`, `area:<area del paciente>` | Resultados por revisar | Sí, al médico | 107 |
-| `lab.revisado` | `usuario:<paciente>` | Mis exámenes | Sí, "tienes un resultado revisado" | 107 |
-| `ambulancia.estado_cambiado` | `ambulancia`, `publico` no | Centro de despacho, app del paramédico | Sí, al paramédico de turno al despachar | 109 |
-| `ambulancia.solicitud_creada` | `ambulancia` | Despacho (con sonido) | Sí, a REC y JOP de turno | 109 |
-| `ambulancia.hito` | `ambulancia`, `usuario:<paciente solicitante>` | Despacho, seguimiento del paciente | Sí, al paciente: "la ambulancia va en camino" | 109 |
-| `ambulancia.prehospital` | `ambulancia`, `area:emergencia` | Recepción de ambulancia, médico de emergencia | Sí, a emergencia | 109 |
-| `ambulancia.ubicacion` | `ambulancia` | Mapa del despacho | No (alta frecuencia: cada 10 s, se descarta lo viejo) | 109 |
-| `vinculacion.solicitada` / `vinculacion.resuelta` | `rol:REC`, `usuario:<paciente>` | Bandeja de recepción, app del paciente | Sí, al paciente | 101 |
-| `acceso.solicitado` / `acceso.resuelto` | `rol:DPD`, `usuario:<solicitante>` | Bandeja del delegado | Sí | 110 |
-| `inventario.bajo_minimo` | `rol:JOP`, `rol:LAB` (reactivos) | Inventario, tablero | No | 111 |
-| `aviso.publicado` | `publico` | Pantalla pública, app del paciente | No | 112 |
-| `metricas.recalculadas` | `rol:ADM`, `rol:JOP` | Tablero | No | 113 |
+| `paciente.creado` / `paciente.actualizado` | `paciente` | Registro y edición de ficha | Permisos de pacientes y `usuario:<cuenta del paciente>` | 102 |
+| `caso_duplicado.abierto` | `caso_duplicado` | Registro con posible duplicado | `rol:REC` | 102 |
+| `usuario.actualizado` | `usuario` | Invitar, roles, desactivar | `rol:ADM`, `usuario:<id>` | 101 |
+| `personal.actualizado` | `personal` | Ficha e inscripción | `rol:ADM`, `rol:JOP` | 103 |
+| `turno.actualizado` / `turno.publicado` | `turno` | Planificar, publicar, cambio de estado por reloj | `rol:JOP`, `rol:ADM`, `usuario:<persona>` | 103 |
+| `turno.publicado` / `turno.cambiado` | `publico` | Derivado en la base (turnos de médicos) | `publico` | 112 |
+| `espacio.actualizado` | `espacio` | Crear o editar espacio | `camas.ver_tablero`, `espacios.ver` | 104 |
+| `cama.estado_cambiado` | `cama` | Bloqueo, limpieza, asignación, traslado, salida | `camas.ver_tablero` (y `espacios.ver` desde infraestructura) | 104, 108 |
+| `cama.estado_cambiado` | `publico` | Derivado en la base (ocupación agregada) | `publico` | 112 |
+| `cama.limpieza_pendiente` | `cama` | Solicitar limpieza | `camas.ver_tablero`, `espacios.ver` | 104 |
+| `cita.actualizada` | `cita` | Agendar, solicitar, confirmar, rechazar, cancelar, atender (al firmar) | `citas.ver` (sin `propio`), `usuario:<paciente>` | 105 |
+| `fila.actualizada` | `ticket_fila` | Emitir, llamar, atender, completar, ausencia, iniciar consulta desde la fila | `fila.ver`, `fila.llamar`, `fila.gestionar`, `usuario:<paciente>` | 105 |
+| `fila.llamado` / `fila.estado` | `publico` | Derivado en la base (número sin nombre) | `publico` | 112 |
+| `consulta.actualizada` | `consulta` | Iniciar, borrador, signos, diagnóstico, receta, firmar | `expediente.ver` y el permiso del paso; al firmar, `usuario:<paciente>` | 106 |
+| `laboratorio.actualizado` | `orden_laboratorio` | Ordenar, muestra, resultado, completar, cancelar | `laboratorio.ver_cola`, `resultados.ver` (el paciente solo al revisar) | 107 |
+| `laboratorio.critico` | `orden_laboratorio` | Resultado con marca crítica | `resultados.ver`, `laboratorio.ver_cola` (nunca el paciente) | 107 |
+| `admision.creada` / `admision.actualizada` / `admision.cama_asignada` | `admision` | Admisión, indicación, cama, autorizar, notas, alta, salida, traslado | `admision.ver`, `camas.asignar` o `camas.ver_tablero` | 108 |
+| `ambulancia.estado_cambiado` | `unidad` o `solicitud` | Mantenimiento, despacho, descarte, cierre | `ambulancia`, `ambulancia.despachar`, `usuario:<solicitante>` | 109 |
+| `ambulancia.solicitud_creada` | `solicitud` | Solicitud de paciente o recepción | `ambulancia`, `ambulancia.despachar`, `usuario:<paciente>` | 109 |
+| `ambulancia.hito` | `servicio` | Hito del servicio | `ambulancia`, `usuario:<paciente solicitante>` | 109 |
+| `ambulancia.prehospital` | `servicio` | Reporte prehospitalario | `ambulancia`, `ambulancia.recibir_prehospital` | 109 |
+| `ambulancia.ubicacion` | `servicio` | Ubicación en vivo | `ambulancia` | 109 |
+| `vinculacion.solicitada` / `vinculacion.resuelta` | `vinculacion_paciente` | Solicitud, aprobación o rechazo | `cuentas.verificar`, `usuario:<solicitante>` | 101 |
+| `acceso.solicitado` / `acceso.resuelto` | `acceso_excepcional` | Solicitud y resolución | Permiso aprobador, `usuario:<solicitante>` | 110 |
+| `inventario.actualizado` | `articulo` | Movimiento | `inventario.ver` | 111 |
+| `inventario.bajo_minimo` | `articulo` | Movimiento o mínimo que cruza el umbral | `inventario.mover` según tipo de artículo | 111 |
+| `aviso.publicado` | `aviso` | Publicar aviso | `publico` | 112 |
+| `metricas.recalculadas` | `metricas` | Derivado en la base cuando cambia un indicador | `metricas.ver` | 113 |
+
+### Eventos del catálogo anterior que no se emiten
+
+El catálogo original nombraba eventos finos por transición. La API emite un evento por entidad (`*.actualizada`) y el cliente decide qué volver a pedir por `entidad`, no por la transición. Equivalencias:
+
+| Nombre anterior | Se emite como |
+|---|---|
+| `cita.confirmada`, `cita.cancelada` | `cita.actualizada` |
+| `fila.emitido`, `fila.llamado`, `fila.estado` (con datos) | `fila.actualizada` (los nombres `fila.llamado` y `fila.estado` quedan solo para el canal `publico`) |
+| `consulta.firmada` | `consulta.actualizada` |
+| `lab.orden_creada`, `lab.estado_cambiado`, `lab.revisado` | `laboratorio.actualizado` |
+| `lab.valor_critico` | `laboratorio.critico` |
+| `turno.cambiado` (con datos) | `turno.actualizado` |
+
+Pendientes (no emitidos; su spec no está implementada): push con la app cerrada (`PUT /me/dispositivos`), y los canales `area:*` y `paciente:*`.
 
 ## Límites conocidos
 

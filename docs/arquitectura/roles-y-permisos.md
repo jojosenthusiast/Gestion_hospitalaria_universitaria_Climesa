@@ -188,10 +188,6 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| POST | `/api/v1/fila/tickets` | `fila.emitir` | Número único por servicio y día | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
-| GET | `/api/v1/fila/hoy` | `fila.ver` |  | R | 3 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
-| POST | `/api/v1/fila/tickets/{id}/llamar` | `fila.llamar` |  | R | 3 | · | · | · | ✔ | · | ✔ | · | · | · | · |
-| POST | `/api/v1/fila/tickets/{id}/estado` | `fila.gestionar` | Transiciones válidas | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | GET | `/api/v1/me/fila` | `fila.ver` | Propio | R | 3 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
 | GET | `/api/v1/citas` | `citas.ver` | MED y PAC solo propias | R | 3 | · | ✔ | ✔ | ✔ | · | propio | · | · | · | propio |
 | GET | `/api/v1/citas/disponibilidad` | `citas.agendar` o `citas.solicitar` | PAC y REC según permisos | R | 3 | · | · | ✔ | · | · | · | · | · | · | propio |
@@ -212,12 +208,9 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| POST | `/api/v1/consultas` | `consulta.iniciar` | Desde número llamado o cita | R | 3 | · | · | · | · | · | ✔ | · | · | · | · |
-| PUT | `/api/v1/consultas/{id}` | `consulta.registrar` | Autor; antes de firmar | R | 3 | · | · | · | · | · | relación | · | · | · | · |
+| POST | `/api/v1/consultas` | `consulta.iniciar` | Desde número llamado (ticketId) o cita confirmada (appointmentId), uno solo | R | 3 | · | · | · | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/signos` | `signos.registrar` |  | R | 3 | · | · | · | ✔ | ✔ | ✔ | · | ✔ | · | · |
 | POST | `/api/v1/consultas/{id}/diagnosticos` | `consulta.registrar` | CIE-10 | R | 3 | · | · | · | · | · | relación | · | · | · | · |
-| POST | `/api/v1/consultas/{id}/recetas` | `recetas.emitir` | Inscripción vigente | R | 3 | · | · | · | · | · | relación | · | · | · | · |
-| POST | `/api/v1/consultas/{id}/ordenes-laboratorio` | `laboratorio.ordenar` |  | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/firmar` | `consulta.registrar` | Inscripción vigente en el acto | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/addendum` | `consulta.corregir` | Solo el autor; conserva original | E | 4 | · | · | · | · | · | autor | · | · | · | · |
 | GET | `/api/v1/pacientes/{id}/historial` | `expediente.ver` | Relación, acceso excepcional o propio revisado | R | 3 | · | · | · | · | relación | relación | · | · | · | propio revisado |
@@ -233,12 +226,10 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/laboratorio/ordenes` | `laboratorio.ver_cola` o `resultados.ver` | Filtra por laboratorio médico o paciente y oculta valores no revisados | R | 3 | · | · | · | · | relación | relación | ✔ | · | · | propio revisado |
 | GET | `/api/v1/laboratorio/ordenes/{id}` | `resultados.ver` | Ver contexto | R | 3 | · | · | · | · | relación | relación | ✔ | · | · | propio revisado |
 | POST | `/api/v1/laboratorio/ordenes/{id}/muestra` | `laboratorio.procesar` | Pendiente a En Proceso | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
-| PUT | `/api/v1/laboratorio/ordenes/{id}/resultados` | `laboratorio.procesar` | Valida unidades y rangos | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/completar` | `laboratorio.validar` | Todos los exámenes con valor | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/cancelar` | `laboratorio.cancelar` | Motivo | R | 4 | · | · | · | · | · | autor | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/revisar` | `laboratorio.revisar` | Solo Completado | R | 4 | · | · | · | · | · | relación | · | · | · | · |
 | GET | `/api/v1/me/laboratorio` | `resultados.ver` | Estado siempre; valores solo revisados | R | 3 | · | · | · | · | relación | relación | ✔ | · | · | propio revisado |
-| GET | `/api/v1/catalogo/examenes` | `laboratorio.ordenar` | LAB y ADM también | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | PUT | `/api/v1/catalogo/examenes/{id}` | `catalogo.configurar` | Versión con vigencia | R | 3 | ✔ | · | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/laboratorio/catalogo` | `laboratorio.ordenar` o `catalogo.configurar` | Catálogo activo | R | 3 | ✔ | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes` | `laboratorio.ordenar` | Consulta propia | R | 3 | · | · | · | · | · | relación | · | · | · | · |
