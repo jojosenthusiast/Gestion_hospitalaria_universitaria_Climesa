@@ -111,34 +111,21 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
         confirmButton={TextButton(onClick={discard=false;model.closeForm()}) {Text("Salir")}},dismissButton={TextButton(onClick={discard=false}) {Text("Seguir editando")}})
 }
 @Composable private fun Home(state:ReceptionState,patients:()->Unit,select:(String)->Unit) {
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(0.dp)) {
-        item { Surface(color=BrandBlue,shape=RoundedCornerShape(0.dp)) {
-            Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-                Text("RECEPCIÓN / CLIMESA",style=MaterialTheme.typography.labelSmall,color=Color(0xFFD4D9FF))
-                Text("Tu jornada.",style=MaterialTheme.typography.displaySmall,color=Color.White)
-                Text("Pacientes y registro, en un mismo lugar.",style=MaterialTheme.typography.bodyMedium,color=Color(0xFFD4D9FF))
-                HorizontalDivider(color=Color(0x55FFFFFF))
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(32.dp)) {
-                    Metric("Activos",(state.registry.totalActive ?: state.registry.patients.count {it.active}),Modifier.weight(1f))
-                    Metric("Inactivos",(state.registry.totalInactive ?: state.registry.patients.count {!it.active}),Modifier.weight(1f))
-                }
+    PageList {
+        item { SectionCard(stringResource(R.string.recepcion_home_titulo),eyebrow=stringResource(R.string.recepcion_home_eyebrow)) {
+            Text(stringResource(R.string.recepcion_home_detalle),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(Spacing.sm)) {
+                StatTile((state.registry.totalActive ?: state.registry.patients.count {it.active}).toString(),stringResource(R.string.recepcion_stat_activos),Modifier.weight(1f))
+                StatTile((state.registry.totalInactive ?: state.registry.patients.count {!it.active}).toString(),stringResource(R.string.recepcion_stat_inactivos),Modifier.weight(1f))
             }
         } }
-        item { Button(onClick=patients,modifier=Modifier.fillMaxWidth().padding(24.dp).heightIn(min=54.dp),colors=ButtonDefaults.buttonColors(containerColor=BrandNavy),shape=MaterialTheme.shapes.small) {
-            Icon(Icons.Default.Search,null);Spacer(Modifier.width(12.dp));Text("Buscar paciente",Modifier.weight(1f));Text("→")
+        item { PrimaryButton(stringResource(R.string.recepcion_buscar_paciente),patients,icon=Icons.Default.Search) }
+        item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            Text(stringResource(R.string.recepcion_pacientes_recientes),style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
+            TextButton(onClick=patients) {Text(stringResource(R.string.recepcion_ver_todos))}
         } }
-        item { Row(Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-            Text("Pacientes recientes",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
-            TextButton(onClick=patients) {Text("Ver todos")}
-        } }
-        items(state.registry.patients.take(3),key={it.id}) { p -> Box(Modifier.padding(horizontal=24.dp)) {PatientRow(p) {select(p.id)}} }
-        item { Text("Busca un paciente para consultar o actualizar su ficha.",Modifier.padding(24.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
-}
-@Composable private fun Metric(label:String,value:Int,modifier:Modifier) {
-    Row(modifier,verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-        Text(value.toString().padStart(2,'0'),style=MaterialTheme.typography.headlineMedium,color=Color.White)
-        Text(label,style=MaterialTheme.typography.labelSmall,color=Color(0xFFD4D9FF))
+        items(state.registry.patients.take(3),key={it.id}) { p -> PatientRow(p) {select(p.id)} }
+        item { Text(stringResource(R.string.recepcion_home_ayuda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 @Composable private fun Patients(state:ReceptionState,model:ReceptionViewModel) {
