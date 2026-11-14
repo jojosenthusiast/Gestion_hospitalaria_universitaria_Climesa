@@ -2,9 +2,9 @@
   "method": "PATCH",
   "path": "/api/v1/me/paciente",
   "body": {
-    "version": 4,
-    "phone": "7000-0000",
-    "email": "paciente@example.test",
-    "address": "Colonia Ficticia, casa 1"
+    "version": 3,
+    "phone": "7000-2222",
+    "email": "nuevo@example.test",
+    "address": "Calle 2"
   }
 }
