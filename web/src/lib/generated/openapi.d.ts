@@ -4483,6 +4483,11 @@ export interface components {
              * @description Solo en `personal_en_descanso`.
              */
             disponibleDesde?: string;
+            /**
+             * Format: uuid
+             * @description Solo en `consulta_ya_iniciada` cuando la consulta existente es del médico que la intenta iniciar: retómala con este id.
+             */
+            consultaId?: string;
         };
         /**
          * @description Catálogo de eventos que la API emite (docs/arquitectura/tiempo-real.md).

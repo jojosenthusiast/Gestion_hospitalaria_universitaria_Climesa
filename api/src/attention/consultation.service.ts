@@ -45,13 +45,23 @@ export class ConsultationService {
     });
   }
 
+  /**
+   * A second start of the same appointment or queue number answers 409 `consulta_ya_iniciada`. When the existing
+   * consultation is the actor's own, the problem carries `consultaId` so the client resumes it instead of failing.
+   */
+  private async rejectStarted(c: PoolClient, actor: Actor, column: 'cita_id' | 'ticket_id', id: string, message: string) {
+    const existing = (await c.query(`SELECT id,medico_id FROM atencion.consulta WHERE ${column}=$1 AND estado<>'ingresada_por_error' FOR UPDATE`, [id])).rows[0] as Row | undefined;
+    if (!existing) return;
+    throw new ProblemException('consulta_ya_iniciada', 409, message, undefined, existing.medico_id === actor.staffId ? { consultaId: existing.id } : {});
+  }
+
   /** Locks the appointment and checks it belongs to the doctor and is confirmed. */
   private async fromAppointment(c: PoolClient, actor: Actor, id: string) {
     const appointment = (await c.query(`SELECT id,paciente_id,medico_id,estado FROM atencion.cita WHERE id=$1 FOR UPDATE`, [id])).rows[0] as Row | undefined;
     if (!appointment) throw new NotFoundException('No se encontró la cita.');
     if (appointment.medico_id !== actor.staffId) throw new ForbiddenException('Solo puedes iniciar consultas de tu propia agenda.');
     if (appointment.estado !== 'confirmada') throw new ProblemException('transicion_invalida', 409, 'La cita debe estar confirmada para iniciar la consulta.');
-    if ((await c.query(`SELECT 1 FROM atencion.consulta WHERE cita_id=$1 AND estado<>'ingresada_por_error' FOR UPDATE`, [id])).rowCount) throw new ProblemException('consulta_ya_iniciada', 409, 'La consulta ya fue iniciada para esta cita.');
+    await this.rejectStarted(c, actor, 'cita_id', id, 'La consulta ya fue iniciada para esta cita.');
     return { patientId: appointment.paciente_id as string, officeId: null as string | null };
   }
 
@@ -59,12 +69,12 @@ export class ConsultationService {
    * API-08, RN-22: a patient without an appointment is seen from the queue. The number must have a patient and be
    * called (`llamado`) or already in attention; a called number moves to `en_atencion` in the same transaction.
    */
-  private async fromTicket(c: PoolClient, id: string) {
+  private async fromTicket(c: PoolClient, actor: Actor, id: string) {
     const ticket = (await c.query(`SELECT id,paciente_id,estado,consultorio_id,version FROM atencion.ticket_fila WHERE id=$1 FOR UPDATE`, [id])).rows[0] as Row | undefined;
     if (!ticket) throw new NotFoundException('No se encontró el número de fila.');
     if (!ticket.paciente_id) throw new ProblemException('validacion', 400, 'El número de fila no tiene un paciente asociado.', 'ticketId');
     if (!['llamado', 'en_atencion'].includes(ticket.estado)) throw new ProblemException('transicion_invalida', 409, 'Llama el número antes de iniciar la consulta.');
-    if ((await c.query(`SELECT 1 FROM atencion.consulta WHERE ticket_id=$1 AND estado<>'ingresada_por_error' FOR UPDATE`, [id])).rowCount) throw new ProblemException('consulta_ya_iniciada', 409, 'La consulta ya fue iniciada para este número.');
+    await this.rejectStarted(c, actor, 'ticket_id', id, 'La consulta ya fue iniciada para este número.');
     if (ticket.estado === 'llamado') {
       const moved = (await c.query(`UPDATE atencion.ticket_fila SET estado='en_atencion',version=version+1 WHERE id=$1 RETURNING version`, [id])).rows[0];
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, moved.version, await channelsFor(c, ['fila.ver', 'fila.llamar', 'fila.gestionar'], { users: [await patientAccount(c, ticket.paciente_id)] }));
@@ -76,7 +86,7 @@ export class ConsultationService {
     this.requireDoctor(actor);
     if (!dto.appointmentId === !dto.ticketId) throw new ProblemException('validacion', 400, 'Indica la cita o el número de fila, no ambos.', dto.appointmentId ? 'ticketId' : 'appointmentId');
     return this.commands.run(actor, `consulta.iniciar:${dto.appointmentId ?? dto.ticketId}`, key, dto, async c => {
-      const origin = dto.appointmentId ? await this.fromAppointment(c, actor, dto.appointmentId) : await this.fromTicket(c, dto.ticketId!);
+      const origin = dto.appointmentId ? await this.fromAppointment(c, actor, dto.appointmentId) : await this.fromTicket(c, actor, dto.ticketId!);
       const row = (await c.query(`INSERT INTO atencion.consulta(paciente_id,medico_id,consultorio_id,cita_id,ticket_id,motivo,estado,iniciada_en)
         VALUES($1,$2,$3,$4,$5,$6,'abierta',$7) RETURNING id,version,estado`, [origin.patientId, actor.staffId, dto.officeId ?? origin.officeId, dto.appointmentId ?? null, dto.ticketId ?? null, dto.reason?.trim() || null, this.clock.now()])).rows[0];
       await c.query(`INSERT INTO atencion.relacion_atencion(paciente_id,profesional_id,origen,origen_id,vigencia)

@@ -111,6 +111,8 @@ describe('Fase 1 · comandos (CON-02, CON-07, API-08..11)', () => {
       expect((await t.one<{ n: number }>("SELECT count(*)::int AS n FROM atencion.relacion_atencion WHERE origen='consulta' AND origen_id=$1", [started.body.id])).n).toBe(1);
       const again = await t.call('MED', 'POST', '/consultas', { ticketId: issued.id });
       expect([again.status, again.body.codigo]).toEqual([409, 'consulta_ya_iniciada']);
+      // The doctor resumes the open consultation instead of failing (iOS reads `consultaId`).
+      expect(again.body.consultaId).toBe(started.body.id);
     });
 
     test('exige exactamente un origen: cita o número de fila', async () => {
