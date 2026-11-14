@@ -14,6 +14,8 @@ import { HospitalizationModule } from './hospitalization/hospitalization.module'
 import { InventoryModule } from './inventory/inventory.module';
 import { PrivacyModule } from './privacy/privacy.module';
 import { AccountsModule } from './accounts/accounts.module';
+import { PublicModule } from './public/public.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { AccountsModule } from './accounts/accounts.module';
     InventoryModule,
     PrivacyModule,
     AccountsModule,
+    PublicModule,
+    MetricsModule,
   ],
 })
 export class AppModule {}

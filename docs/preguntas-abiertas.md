@@ -51,6 +51,21 @@ Decisiones conservadoras tomadas mientras se confirman:
 | 111 · ajuste (API-15) | ¿Cómo resta un ajuste si `movimiento.cantidad` es positiva? | El ajuste admite cantidad negativa en la API; el movimiento guarda la cantidad absoluta con bodega origen (resta) o destino (suma), y el historial la devuelve con signo |
 | 111 · alerta | ¿Quién recibe `inventario.bajo_minimo` sin escribir roles en código? | Los roles con `inventario.mover` salvo el contexto `consumo`, y salvo `reactivos` cuando el artículo no es reactivo (hoy: JOP siempre, LAB en reactivos). Se emite al cruzar el mínimo (también al subir el mínimo), no en cada movimiento posterior |
 
+## Información pública y tablero (specs 112 y 113, rama feat/r-publico-metricas)
+
+Decisiones conservadoras tomadas mientras se confirman:
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| FR-112-03 / W25 | La pantalla W25 dice "Crear, retirar", pero `endpoints.csv` solo tiene `POST /avisos`. ¿Se agrega un endpoint para retirar un aviso antes de su vencimiento? | No se inventó la ruta: un aviso desaparece solo al vencer su vigencia. Para retirarlo antes hace falta una fila nueva en `endpoints.csv` |
+| FR-112-05 | ¿La advertencia de datos personales bloquea o solo advierte? | Advierte: `POST /avisos` responde 422 `aviso_con_datos_personales` con `datosPersonales` (`dui`, `expediente`, `telefono`) y publica si se reenvía con `confirmarDatosPersonales: true`; la auditoría guarda qué se confirmó |
+| FR-112-04 | Un aviso o un turno vence sin que ocurra ningún evento. ¿Cómo se entera la pantalla? | Las respuestas públicas traen `proximoCambio`; la web pública hace una sola recarga en ese instante (no es sondeo: no se repite si la API no anuncia otro). Android, por su regla de no usar temporizadores, lo refleja con el siguiente evento o al volver a abrir la sección |
+| tiempo-real.md | Los eventos de cama, fila y turno no llevaban el canal `publico`. ¿Se emiten desde cada módulo? | La migración `20261115002000_publico_metricas.sql` los deriva en la base al insertar en `plataforma.outbox`: un evento delgado con entidad `publico` (sin ids de camas, números ni personas) y `metricas.recalculadas` para los roles con `metricas.ver` |
+| tiempo-real.md | `metricas.recalculadas` figura para ADM y JOP, pero `permisos.csv` da `metricas.ver` también a DPD | Los canales salen del catálogo (regla 8): llega a ADM, JOP y DPD |
+| FR-112-06 | ¿Qué servicios muestra la pantalla pública y cuántos números? | Los cuatro servicios de la fila; los 20 últimos números en estado `llamado` del día (la web muestra 3 por servicio) |
+| FR-113-05 | Definición de cada indicador | Ocupación diaria: % de horas-cama ocupadas sobre las camas actuales; estancia promedio: días entre el inicio y el fin de la ocupación de admisiones egresadas, por día de egreso; laboratorio: minutos de creación a completado; ambulancia: minutos de la solicitud (o el despacho) al hito `en_escena`; cobertura: horas con algún hueco frente al mínimo vigente. Un día sin muestras devuelve `valor: null` |
+| Plan 112 | Límite de solicitudes por IP | 120 por minuto y por IP, en memoria del proceso (429 `demasiadas_solicitudes`). Con varias instancias de la API el límite es por instancia |
+
 ## Para producción CLIMESA (registro institucional INS01 a INS12 de P01)
 
 Siguen pendientes y no afectan al curso: habilitación y servicios (INS01, INS02), modalidades (INS03), organigrama (INS04), formatos de identidad y archivo (INS05), procedimientos de admisión y alta (INS06), catálogo y tarifas (INS07), pagadores (INS08), caja (INS09), régimen fiscal (INS10), sistemas actuales (INS11), continuidad (INS12). Detalle en `docs/investigacion/p01/`. El cuestionario y el mapa contable para la contadora están en `docs/climesa/`.

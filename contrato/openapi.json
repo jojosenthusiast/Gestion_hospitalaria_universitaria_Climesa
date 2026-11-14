@@ -4334,6 +4334,198 @@
         ],
         "x-permiso": "cuentas.verificar"
       }
+    },
+    "/api/v1/publico/ocupacion": {
+      "get": {
+        "operationId": "PublicController_occupancy",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Ocupación por planta y tipo, solo agregados",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "publico"
+      }
+    },
+    "/api/v1/publico/medicos-de-turno": {
+      "get": {
+        "operationId": "PublicController_doctors",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Médicos de turno: nombre, especialidad y área",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "publico"
+      }
+    },
+    "/api/v1/publico/avisos": {
+      "get": {
+        "operationId": "PublicController_notices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Avisos vigentes",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "publico"
+      }
+    },
+    "/api/v1/publico/fila/{servicio}": {
+      "get": {
+        "operationId": "PublicController_queue",
+        "parameters": [
+          {
+            "name": "servicio",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Números llamados hoy con su consultorio, sin nombres",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "publico"
+      }
+    },
+    "/api/v1/avisos": {
+      "post": {
+        "operationId": "NoticesController_publish",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publicar un aviso general con vigencia; advierte si parece llevar datos personales",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "avisos.publicar"
+      }
+    },
+    "/api/v1/metricas/tablero": {
+      "get": {
+        "operationId": "MetricsController_dashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tablero inicial: agregados sin datos personales",
+        "tags": [
+          "metricas"
+        ],
+        "x-permiso": "metricas.ver"
+      }
+    },
+    "/api/v1/metricas/{indicador}": {
+      "get": {
+        "operationId": "MetricsController_series",
+        "parameters": [
+          {
+            "name": "indicador",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "Primer día local, yyyy-MM-dd",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "Último día local, yyyy-MM-dd",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Serie diaria de un indicador (ocupacion_diaria, estancia_promedio, tiempo_laboratorio, tiempo_ambulancia, cobertura_turnos)",
+        "tags": [
+          "metricas"
+        ],
+        "x-permiso": "metricas.ver"
+      }
     }
   },
   "info": {
@@ -5798,6 +5990,40 @@
         "required": [
           "version",
           "reason"
+        ]
+      },
+      "NoticeDto": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "cuerpo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Inicio de la vigencia, con zona horaria"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fin de la vigencia, con zona horaria"
+          },
+          "confirmarDatosPersonales": {
+            "type": "boolean",
+            "description": "Publicar aunque el texto parezca contener un DUI, expediente o teléfono (FR-112-05)"
+          }
+        },
+        "required": [
+          "titulo",
+          "cuerpo",
+          "hasta"
         ]
       }
     }

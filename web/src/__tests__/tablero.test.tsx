@@ -1,8 +1,8 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, type AccessProfile, type Api, type Summary } from '../lib/api';
-import { Tablero } from '../features/tablero';
+import { ApiError, type AccessProfile, type Api } from '../lib/api';
+import { Tablero, type MetricsBoard } from '../features/tablero';
 
 afterEach(cleanup);
 
@@ -10,12 +10,20 @@ const perfil = (permisos: string[] = ['metricas.ver']): AccessProfile => ({
   id: 'jop-1', user: { id: 'jop-1' }, email: 'jop@example.test', name: 'Jefatura de prueba', roles: ['JOP'], platforms: ['web'],
   permissions: permisos.map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId: null,
 });
-const resumen: Summary = {
-  lastUpdate: '2026-10-29T15:30:00Z',
-  beds: { total: 17, free: 12, occupied: 3, cleaning: 2 },
-  patients: { total: 40, active: 38 },
-  shifts: { current: 4, draft: 1 },
-};
+const tablero = (cambios: Partial<MetricsBoard> = {}): MetricsBoard => ({
+  actualizadoEn: '2026-11-15T15:30:00Z', fecha: '2026-11-15',
+  camas: { total: 17, libres: 12, ocupadas: 3, limpieza: 2, bloqueadas: 0, reservadas: 0 },
+  ocupacionPorPlanta: [
+    { planta: 2, camas: 12, libres: 6, ocupadas: 4, limpieza: 2, bloqueadas: 0, reservadas: 0 },
+    { planta: 3, camas: 5, libres: 1, ocupadas: 4, limpieza: 0, bloqueadas: 0, reservadas: 0 },
+  ],
+  ambulancia: { estado: 'en_servicio', paramedicoDeTurno: true },
+  fila: { emitidos: 4, enEspera: 2, llamados: 1, enAtencion: 0, atendidos: 1, noSePresento: 0 },
+  laboratorio: { pendiente: 3, enProceso: 2, completadoHoy: 5, canceladoHoy: 0 },
+  cobertura: { huecos: 1, detalle: [{ area: 'Emergencia', rol: 'ENF', inicio: '2026-11-15T14:00:00Z', fin: '2026-11-15T22:00:00Z', requeridos: 2, actuales: 1 }] },
+  turnosEnCurso: 4, pacientesActivos: 38,
+  ...cambios,
+});
 
 function montar(respuesta: (path: string) => Promise<unknown>, opciones: { perfil?: AccessProfile; version?: number } = {}) {
   const api = { request: vi.fn((path: string) => respuesta(path)), write: vi.fn() };
@@ -24,92 +32,45 @@ function montar(respuesta: (path: string) => Promise<unknown>, opciones: { perfi
   return { api, cambiarVersion: (version: number) => resultado.rerender(vista(version)) };
 }
 const tarjeta = (nombre: string) => screen.getByRole('region', { name: nombre });
+const cifra = (region: HTMLElement, etiqueta: string) => within(region).getByText(etiqueta).previousElementSibling?.textContent;
 
-describe('W03 · tablero inicial con datos reales', () => {
-  it('muestra camas libres, ocupadas y en limpieza, turnos en curso y pacientes activos que entrega la API', async () => {
-    const { api } = montar(async () => resumen);
+describe('W03 · tablero inicial sobre GET /metricas/tablero', () => {
+  it('pide un solo agregado y muestra todas las tarjetas de FR-113-01', async () => {
+    const { api } = montar(async () => tablero());
     const camas = await screen.findByRole('region', { name: 'Camas' });
-    expect(api.request).toHaveBeenCalledWith('/inicio', expect.anything());
-    expect(within(camas).getByText('Libres').previousElementSibling?.textContent).toBe('12');
-    expect(within(camas).getByText('Ocupadas').previousElementSibling?.textContent).toBe('3');
-    expect(within(camas).getByText('En limpieza').previousElementSibling?.textContent).toBe('2');
+    expect(api.request).toHaveBeenCalledTimes(1);
+    expect(api.request).toHaveBeenCalledWith('/metricas/tablero', expect.anything());
+    expect(cifra(camas, 'Libres')).toBe('12');
+    expect(cifra(camas, 'En limpieza')).toBe('2');
     expect(within(camas).getByText('de 17 camas de hospitalización')).toBeTruthy();
-    expect(within(tarjeta('Turnos')).getByText('En curso ahora').previousElementSibling?.textContent).toBe('4');
-    expect(within(tarjeta('Pacientes')).getByText('Activos').previousElementSibling?.textContent).toBe('38');
+    expect(within(tarjeta('Ambulancia')).getByText('En servicio')).toBeTruthy();
+    expect(cifra(tarjeta('Números en fila'), 'En espera')).toBe('2');
+    expect(cifra(tarjeta('Órdenes de laboratorio'), 'Pendientes')).toBe('3');
+    expect(cifra(tarjeta('Turnos'), 'En curso ahora')).toBe('4');
+    expect(cifra(tarjeta('Pacientes'), 'Activos')).toBe('38');
+    const plantas = tarjeta('Ocupación por planta');
+    expect(within(plantas).getByText('6 no disponibles de 12')).toBeTruthy();
+    expect(within(plantas).getByRole('img', { name: 'Planta 3: 80% de camas no disponibles' })).toBeTruthy();
+    expect(within(tarjeta('Cobertura de turnos')).getByText('1 hueco de cobertura')).toBeTruthy();
+    expect(within(tarjeta('Cobertura de turnos')).getByText(/Emergencia · Enfermería/)).toBeTruthy();
     expect(screen.getByText(/Actualizado:/)).toBeTruthy();
   });
 
-  it('muestra personal activo, ocupación por planta y huecos de cobertura sin datos personales', async () => {
-    const { api } = montar(async (path) => {
-      if (path === '/inicio') return { ...resumen, staff: { total: 11, active: 9 } };
-      if (path === '/espacios') return [
-        { id: 'p-1', type: 'planta', name: 'Planta 1', level: 1, totalBeds: 12, freeBeds: 6 },
-        { id: 'p-2', type: 'planta', name: 'Planta 2', level: 2, totalBeds: 5, freeBeds: 1 },
-      ];
-      if (path.startsWith('/turnos/cobertura?')) return [{ areaId: 'a-1', area: 'Emergencia', role: 'ENF', start: '2026-11-05T14:00:00Z', end: '2026-11-05T22:00:00Z', required: 2, actual: 1 }];
-      throw new Error(`Ruta inesperada: ${path}`);
-    }, { perfil: perfil(['metricas.ver', 'espacios.ver', 'turnos.ver']) });
-
-    expect(within(await screen.findByRole('region', { name: 'Personal' })).getByText('Activas').previousElementSibling?.textContent).toBe('9');
-    const plantas = await screen.findByRole('region', { name: 'Ocupación por planta' });
-    expect(within(plantas).getByText('Planta 1')).toBeTruthy();
-    expect(within(plantas).getByText('6 no disponibles de 12')).toBeTruthy();
-    expect(within(plantas).getByRole('img', { name: 'Planta 1: 50% de camas no disponibles' })).toBeTruthy();
-    expect(within(plantas).getByText('Planta 2')).toBeTruthy();
-    expect(within(plantas).getByText('4 no disponibles de 5')).toBeTruthy();
-    const cobertura = await screen.findByRole('region', { name: 'Cobertura de turnos' });
-    expect(within(cobertura).getByText('1 hueco de cobertura')).toBeTruthy();
-    expect(within(cobertura).getByText(/Emergencia · ENF/)).toBeTruthy();
-    expect(api.request).toHaveBeenCalledWith('/espacios', expect.anything());
-    expect(api.request.mock.calls.some(([path]) => String(path).startsWith('/turnos/cobertura?'))).toBe(true);
-  });
-
-  it('no muestra marcadores de entregas futuras ni tarjetas sin datos permitidos', async () => {
-    const { api } = montar(async () => resumen);
-    await screen.findByRole('region', { name: 'Camas' });
-    expect(screen.queryByText(/semana/i)).toBeNull();
-    expect(screen.queryByText(/Próxima entrega/i)).toBeNull();
-    for (const nombre of ['Ambulancia', 'Números en fila', 'Órdenes de laboratorio']) expect(screen.queryByRole('region', { name: nombre })).toBeNull();
-    expect(api.request.mock.calls.map(([path]) => path)).not.toContain('/ambulancia');
-  });
-
-  it('con permiso muestra el estado real de la ambulancia y los números en fila del día', async () => {
-    const { api } = montar(async (path) => {
-      if (path === '/inicio') return resumen;
-      if (path === '/ambulancia') return { unit: { id: 'u-1', plate: 'P-000', state: 'en_servicio', version: 3 }, activeService: null, paramedicOnDuty: true };
-      if (path === '/fila') return [
-        { id: 't-1', state: 'en_espera' }, { id: 't-2', state: 'en_espera' }, { id: 't-3', state: 'llamado' }, { id: 't-4', state: 'completado' },
-      ];
-      throw new Error(`Ruta inesperada: ${path}`);
-    }, { perfil: perfil(['metricas.ver', 'ambulancia.ver_estado', 'fila.ver']) });
-    const ambulancia = await screen.findByRole('region', { name: 'Ambulancia' });
-    expect(within(ambulancia).getByText('En servicio')).toBeTruthy();
-    const fila = await screen.findByRole('region', { name: 'Números en fila' });
-    expect(within(fila).getByText('En espera').previousElementSibling?.textContent).toBe('2');
-    expect(within(fila).getByText('Llamados').previousElementSibling?.textContent).toBe('1');
-    expect(api.request).toHaveBeenCalledWith('/ambulancia', expect.anything());
-    expect(api.request).toHaveBeenCalledWith('/fila', expect.anything());
-  });
-
-  it('con la fila vacía lo dice en lugar de mostrar ceros sin contexto', async () => {
-    montar(async (path) => path === '/fila' ? [] : resumen, { perfil: perfil(['metricas.ver', 'fila.ver']) });
-    const fila = await screen.findByRole('region', { name: 'Números en fila' });
-    expect(within(fila).getByText('Todavía no se han emitido números hoy.')).toBeTruthy();
-  });
-
-  it('solo muestra las tarjetas cuyos datos entrega la API según el permiso de la cuenta', async () => {
-    montar(async () => ({ lastUpdate: resumen.lastUpdate, beds: resumen.beds }));
-    await screen.findByRole('region', { name: 'Camas' });
-    expect(screen.queryByRole('region', { name: 'Turnos' })).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Pacientes' })).toBeNull();
+  it('dice qué falta en lugar de mostrar ceros sin contexto', async () => {
+    montar(async () => tablero({ camas: { total: 0, libres: 0, ocupadas: 0, limpieza: 0, bloqueadas: 0, reservadas: 0 }, ocupacionPorPlanta: [], ambulancia: null, fila: { emitidos: 0, enEspera: 0, llamados: 0, enAtencion: 0, atendidos: 0, noSePresento: 0 }, cobertura: { huecos: 0, detalle: [] } }));
+    expect(within(await screen.findByRole('region', { name: 'Camas' })).getByText('Todavía no hay camas registradas.')).toBeTruthy();
+    expect(within(tarjeta('Ambulancia')).getByText('No hay una unidad registrada.')).toBeTruthy();
+    expect(within(tarjeta('Números en fila')).getByText('Todavía no se han emitido números hoy.')).toBeTruthy();
+    expect(within(tarjeta('Cobertura de turnos')).getByText('Cobertura completa para hoy.')).toBeTruthy();
   });
 
   it('en el tablero solo hay agregados: ningún nombre, DUI ni expediente', async () => {
-    montar(async () => resumen);
+    montar(async () => tablero());
     await screen.findByRole('region', { name: 'Camas' });
     const texto = document.body.textContent ?? '';
     expect(texto).not.toMatch(/\d{8}-\d/);
-    expect(texto).not.toMatch(/EXP-/);
+    expect(texto).not.toMatch(/\d{7}-[\dX]/);
+    expect(screen.queryByText(/semana/i)).toBeNull();
   });
 
   it('muestra el estado cargando mientras llega la respuesta', () => {
@@ -119,34 +80,26 @@ describe('W03 · tablero inicial con datos reales', () => {
 
   it('muestra el error en español y permite reintentar', async () => {
     let intento = 0;
-    const { api } = montar(async () => { if (++intento === 1) throw new ApiError('No se pudo cargar el tablero.', 500); return resumen; });
+    const { api } = montar(async () => { if (++intento === 1) throw new ApiError('No se pudo cargar el tablero.', 500); return tablero(); });
     expect(await screen.findByText('No se pudo cargar el tablero.')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Volver a intentar' }));
     expect(await screen.findByRole('region', { name: 'Camas' })).toBeTruthy();
     expect(api.request).toHaveBeenCalledTimes(2);
   });
 
-  it('sin camas registradas muestra el estado vacío con una explicación', async () => {
-    montar(async () => ({ lastUpdate: resumen.lastUpdate, beds: { total: 0, free: 0, occupied: 0, cleaning: 0 }, patients: resumen.patients }));
-    const camas = await screen.findByRole('region', { name: 'Camas' });
-    expect(within(camas).getByText('Todavía no hay camas registradas.')).toBeTruthy();
-    expect(within(camas).queryByText('Libres')).toBeNull();
-  });
-
   it('sin el permiso metricas.ver no pide datos y avisa que no hay acceso', () => {
-    const { api } = montar(async () => resumen, { perfil: perfil([]) });
+    const { api } = montar(async () => tablero(), { perfil: perfil([]) });
     expect(screen.getByText('Tu cuenta no tiene permiso para ver el tablero.')).toBeTruthy();
     expect(api.request).not.toHaveBeenCalled();
   });
 
-  it('al llegar un evento en vivo (cambia la versión) vuelve a pedir los datos y actualiza las cifras', async () => {
+  it('escenario 1: al llegar un evento en vivo (cambia la versión) vuelve a pedir y actualiza la ocupación', async () => {
     let libres = 12;
-    const { api, cambiarVersion } = montar(async () => ({ ...resumen, beds: { ...resumen.beds!, free: libres } }));
-    const camas = await screen.findByRole('region', { name: 'Camas' });
-    expect(within(camas).getByText('Libres').previousElementSibling?.textContent).toBe('12');
+    const { api, cambiarVersion } = montar(async () => tablero({ camas: { ...tablero().camas, libres } }));
+    expect(cifra(await screen.findByRole('region', { name: 'Camas' }), 'Libres')).toBe('12');
     libres = 11;
     cambiarVersion(1);
-    await waitFor(() => expect(within(tarjeta('Camas')).getByText('Libres').previousElementSibling?.textContent).toBe('11'));
+    await waitFor(() => expect(cifra(tarjeta('Camas'), 'Libres')).toBe('11'));
     expect(api.request).toHaveBeenCalledTimes(2);
   });
 });

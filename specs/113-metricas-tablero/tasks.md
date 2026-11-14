@@ -9,11 +9,14 @@
   - Cubre: FR-113-02, FR-113-04
   - Depende de: T01
   - Hecho cuando: escenario 1 pasa
+  - Avance: 15-nov-2026 tarjetas en vivo hechas: `metricas.recalculadas` se deriva en la base de cada evento de cama, fila, laboratorio, ambulancia, turno y paciente hacia los roles con `metricas.ver`; la API invalida su caché con la cabeza del outbox (`tests/publico-metricas.spec.ts`: tras bloquear una cama el tablero ya la cuenta) y la web vuelve a pedir `GET /metricas/tablero` al cambiar la versión (`tablero.test.tsx`). Falta para marcarla: bandejas por rol W04 (FR-113-04)
 - [ ] T03 · S4 · R · Completar tarjetas de laboratorio, fila y ambulancia
   - Cubre: FR-113-01
   - Depende de: T02, 107-T03, 105-T02, 109-T04
   - Hecho cuando: todas las tarjetas tienen datos reales y escenario 2 pasa
+  - Avance: 15-nov-2026 `GET /metricas/tablero` entrega camas, ocupación por planta, ambulancia, fila, órdenes de laboratorio por estado, huecos de cobertura, turnos en curso y pacientes activos; `tests/publico-metricas.spec.ts` comprueba las tarjetas y la ausencia de nombres, DUI y expediente (escenario 2); la web muestra todas las tarjetas (`tablero.test.tsx`). Se deja sin marcar porque depende de T02 (bandejas W04 pendientes)
 - [ ] T04 · S5 · E · Indicadores por rango de fechas (W33)
   - Cubre: FR-113-05
   - Depende de: T03
   - Hecho cuando: los cinco indicadores se calculan sobre datos de prueba con valores esperados
+  - Avance: 15-nov-2026 `GET /metricas/{indicador}` (ocupacion_diaria, estancia_promedio, tiempo_laboratorio, tiempo_ambulancia, cobertura_turnos) y la web W33 (`metricas.test.tsx`). `tests/publico-metricas.spec.ts` comprueba el valor esperado de tiempo_laboratorio (90 min) y la forma de los cinco; faltan los valores esperados de los otros cuatro

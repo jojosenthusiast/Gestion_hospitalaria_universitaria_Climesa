@@ -37,8 +37,7 @@ const infraestructura=['GET /api/v1/health','GET /salud'];
  * Filas de endpoints.csv planificadas para la semana 2 o antes cuyo controlador aún no existe. Son pendientes
  * explícitos de su tarea, no desvíos: al implementarse, la entrada sobra y la prueba obliga a quitarla.
  */
-const pendientesSemana2=[
- 'GET /api/v1/metricas/tablero',// 113: tablero de métricas
+const pendientesSemana2:string[]=[
 ];jest.setTimeout(120000);
 describe('110-T06 · matriz RBAC: CSV ↔ base ↔ OpenAPI',()=>{
  let app:NestFastifyApplication,fixture:Awaited<ReturnType<typeof createDatabase>>,operaciones:Record<string,string>;

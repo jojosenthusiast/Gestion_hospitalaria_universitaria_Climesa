@@ -87,6 +87,7 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
             state.selected!=null -> PatientDetail(state.selected!!,state,model)
             page==AndroidSection.BEDS -> BedsScreen(account.profile)
             page==AndroidSection.QUEUE -> QueueScreen(account.profile)
+            page==AndroidSection.HOSPITAL_INFO -> HospitalInfoScreen()
             page==AndroidSection.ADMISSION -> HospitalizationScreen(profile=account.profile)
             page==AndroidSection.SHIFTS -> MyShiftsScreen(account,"REC")
             page==AndroidSection.PROFILE -> Profile(state,dark,setDark,account){selectedName=it.name}
