@@ -1,0 +1,11 @@
+/* Laboratorio (obs. 13): avance por pasos de cada orden y quién actúa ahora. */
+.lab-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.lab-steps li { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; background: var(--surface); }
+.lab-steps li.is-done { border-color: var(--success); background: var(--success-soft); color: var(--success); }
+.lab-steps li.is-now { border-style: dashed; border-color: var(--primary); background: var(--soft); color: var(--primary-text); }
+.lab-step-n { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; font-size: 10px; }
+.lab-steps-row td { padding-top: 0; border-top: 0; }
+.lab-next { display: block; margin-top: 4px; max-width: 34ch; white-space: normal; }
+.lab-cancelled { margin: 0; color: var(--muted); }
+.lab-requirement { margin: 0 0 8px; padding: 8px 12px; border-radius: var(--radius-control); background: var(--warning-soft); color: var(--warning); font-weight: 600; }
+.lab-requirement.is-ready { background: var(--success-soft); color: var(--success); }
