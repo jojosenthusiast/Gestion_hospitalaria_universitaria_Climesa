@@ -45,11 +45,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     val state by authModel.state.collectAsStateWithLifecycle()
     var registering by rememberSaveable { mutableStateOf(false) }
+    val sessionStores:SessionStoreHolder=viewModel()
+    // Logout or expired session: clear the account's ViewModels (data, coroutines and realtime subscriptions).
+    LaunchedEffect(state.account?.session?.userId){if(state.account==null)sessionStores.end()}
     when {
         state.checkingSession -> AuthLoadingScreen()
         state.accessPending -> AccessPending(state.error,authModel::retryAccess,authModel::signOut)
         state.account==null -> if(registering) RegistrationScreen(state,{registering=false;authModel.clearRegistration()},authModel::register) else LoginScreen(state,authModel::signIn){registering=true;authModel.clearRegistration()}
-        else -> AuthorizedWorkspace(state.account!!,dark,setDark,state.signingOut,authModel::signOut,authModel::retryAccess)
+        else -> SessionViewModelScope(sessionStores,state.account!!.session.userId){AuthorizedWorkspace(state.account!!,dark,setDark,state.signingOut,authModel::signOut,authModel::retryAccess)}
     }
 }
 @Composable private fun AccessPending(error:String?,retry:()->Unit,logout:()->Unit){
