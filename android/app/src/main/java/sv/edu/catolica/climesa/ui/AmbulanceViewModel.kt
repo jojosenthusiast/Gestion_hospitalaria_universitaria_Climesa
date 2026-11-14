@@ -51,7 +51,7 @@ data class AmbulanceUiState(
     val notice: String? = null,
 )
 
-enum class AmbulanceMode { STATUS, LOG, ARRIVAL, REQUEST }
+enum class AmbulanceMode { STATUS, LOG, ARRIVAL, REQUEST, PARAMEDIC }
 
 @HiltViewModel
 class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
@@ -79,11 +79,19 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
                     AmbulanceMode.STATUS -> mutable.value = mutable.value.copy(loading = false, status = AmbulanceParser.status(api.request("/ambulancia")))
                     AmbulanceMode.LOG -> mutable.value = mutable.value.copy(loading = false, log = AmbulanceParser.log(api.request(AmbulanceRules.logPath(mutable.value.logFilters))))
                     AmbulanceMode.ARRIVAL -> loadArrival()
+                    AmbulanceMode.PARAMEDIC -> loadParamedic()
                     AmbulanceMode.REQUEST -> Unit
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) else mutable.value = mutable.value.copy(loading = false) }
         }
+    }
+
+    /** Pantalla "Servicio activo": estado de la unidad y, aparte, los últimos servicios; si la bitácora falla, el estado se muestra igual. */
+    private suspend fun loadParamedic() {
+        mutable.value = mutable.value.copy(loading = false, status = AmbulanceParser.status(api.request("/ambulancia")))
+        val recent = runCatching { AmbulanceParser.log(api.request(AmbulanceRules.logPath(LogFilters()))) }.getOrNull()
+        if (recent != null) mutable.value = mutable.value.copy(log = recent)
     }
 
     /** MED tiene `ambulancia.ver_estado` y encuentra el servicio activo; ENF lo conoce por el evento `ambulancia.prehospital`. */
@@ -145,11 +153,11 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     }
 
     /** A71 / FR-109-07: el hito siguiente; finalizar antes del hospital exige estado final y motivo. */
-    fun advance(service: AmbulanceService, type: String, finalState: String? = null, reason: String = "") {
+    fun advance(service: AmbulanceService, type: String, finalState: String? = null, reason: String = "", notice: String = "Hito registrado.") {
         if (type == "finalizado" && AmbulanceRules.finishNeedsReason(service) && (finalState == null || reason.trim().length < 5)) {
             mutable.value = mutable.value.copy(formError = "Para terminar sin traslado elige el estado final y escribe el motivo."); return
         }
-        write(notice = "Hito registrado.") { api.request("/ambulancia/servicios/${service.id}/hitos", "POST", AmbulanceRules.milestoneBody(type, finalState, reason)) }
+        write(notice = notice) { api.request("/ambulancia/servicios/${service.id}/hitos", "POST", AmbulanceRules.milestoneBody(type, finalState, reason)) }
     }
 
     /** A74: búsqueda y filtros de la bitácora; cada cambio vuelve a pedir con la consulta nueva. */
@@ -157,6 +165,13 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         mutable.value = mutable.value.copy(logFilters = filters)
         if (mode == AmbulanceMode.LOG) load()
     }
+
+    /** `POST /ambulancia/ubicacion`: un punto del teléfono; la API lo rechaza si no hay servicio activo. */
+    fun sendLocation(latitude: Double, longitude: Double, capturedAt: Instant = Instant.now()) {
+        write(notice = "Ubicación enviada a despacho.") { api.request("/ambulancia/ubicacion", "POST", AmbulanceRules.locationBody(latitude, longitude, capturedAt)) }
+    }
+
+    fun reportLocationUnavailable() { mutable.value = mutable.value.copy(formError = "No se pudo obtener tu ubicación. Activa el GPS e inténtalo de nuevo.") }
 
     fun updatePrehospital(form: PrehospitalForm) { mutable.value = mutable.value.copy(prehospital = form, formError = null) }
 

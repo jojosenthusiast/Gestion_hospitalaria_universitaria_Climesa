@@ -57,6 +57,7 @@ import sv.edu.catolica.climesa.domain.AmbulanceService
 import sv.edu.catolica.climesa.domain.AmbulanceLogEntry
 import sv.edu.catolica.climesa.domain.AndroidSection
 import sv.edu.catolica.climesa.domain.LogFilters
+import sv.edu.catolica.climesa.domain.ParamedicRules
 
 /** Secciones de Android de la spec 109 que resuelve [AmbulanceScreen]. A70 (Unidad) sigue en [RolePortal]. */
 val ambulanceSections = setOf(
@@ -70,6 +71,7 @@ val ambulanceSections = setOf(
  */
 @Composable
 fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: String, modifier: Modifier = Modifier) {
+    if (ParamedicRules.handles(section, profile.permissions)) { ParamedicScreen(section, profile, accountId, modifier); return }
     val model: AmbulanceViewModel = viewModel(key = "ambulance-$accountId")
     val state by model.state.collectAsStateWithLifecycle()
     val readsStatus = "ambulancia.ver_estado" in profile.permissions
@@ -92,9 +94,6 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         else when (section) {
             AndroidSection.AMBULANCE_REQUEST -> requestContent(state, model)
             AndroidSection.DISPATCH -> dispatchContent(state, model)
-            AndroidSection.SERVICE -> serviceContent(state, model)
-            AndroidSection.PREHOSPITAL_REPORT -> prehospitalContent(state, model)
-            AndroidSection.UNIDENTIFIED_PATIENT -> item { UnidentifiedForm(state, model) }
             AndroidSection.LOG -> logContent(state, model)
             else -> arrivalContent(state)
         }
@@ -209,7 +208,7 @@ private fun ReasonDialog(title: String, busy: Boolean, onClose: () -> Unit, onCo
 }
 
 @Composable
-private fun Choices(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+internal fun Choices(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { options.forEach { (value, label) -> FilterChip(selected = selected == value, onClick = { onSelect(value) }, label = { Text(label) }) } }
 }
 
@@ -229,92 +228,15 @@ private fun ServiceSummary(service: AmbulanceService) {
     }
 }
 
-/** A71: hitos con botones grandes; finalizar antes del hospital pide estado final y motivo. */
-private fun LazyListScope.serviceContent(state: AmbulanceUiState, model: AmbulanceViewModel) {
-    unitHeader(state)
-    val service = state.status?.activeService
-    if (service == null) { item { EmptyState(stringResource(R.string.unidad_sin_servicio)) }; return }
-    item { ServiceSummary(service) }
-    item { OpenMap(service.origin) }
-    items(service.nextMilestones) { next -> MilestoneButton(service, next, state.busy, model) }
-}
-
 @Composable
-private fun OpenMap(address: String) {
+internal fun OpenMap(address: String) {
     val uri = LocalUriHandler.current
     SecondaryButton(stringResource(R.string.amb_abrir_mapa), { runCatching { uri.openUri("geo:0,0?q=" + URLEncoder.encode(address, "UTF-8")) } }, icon = Icons.Default.Map)
 }
 
 @Composable
-private fun MilestoneButton(service: AmbulanceService, next: String, busy: Boolean, model: AmbulanceViewModel) {
-    var finishing by rememberSaveable(service.id, next) { mutableStateOf(false) }
-    val early = next == "finalizado" && AmbulanceRules.finishNeedsReason(service)
-    PrimaryButton(if (early) stringResource(R.string.amb_terminar_sin_traslado) else AmbulanceLabels.milestone(next), { if (early) finishing = true else model.advance(service, next) }, Modifier.heightIn(min = 64.dp), enabled = !busy)
-    if (finishing) {
-        var finalState by rememberSaveable { mutableStateOf(AmbulanceLabels.earlyFinalStates.first().first) }
-        var reason by rememberSaveable { mutableStateOf("") }
-        ConfirmDialog(
-            title = stringResource(R.string.amb_terminar_sin_traslado), confirmLabel = stringResource(R.string.amb_finalizar), onConfirm = { finishing = false; model.advance(service, "finalizado", finalState, reason) }, onDismiss = { finishing = false }, busy = busy, destructive = true,
-            body = {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Choices(AmbulanceLabels.earlyFinalStates, finalState) { finalState = it }
-                    FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, singleLine = false)
-                }
-            },
-        )
-    }
-}
-
-/** A72: motivo, signos, prioridad y hora estimada; muestra si quedó en cola sin señal. */
-private fun LazyListScope.prehospitalContent(state: AmbulanceUiState, model: AmbulanceViewModel) {
-    val service = state.status?.activeService
-    state.queued?.let { item { Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_en_cola)); SecondaryButton(stringResource(R.string.camas_reintentar), { model.retryQueued() }, icon = Icons.Default.Refresh, enabled = !state.busy) } } }
-    if (service == null) { item { EmptyState(stringResource(R.string.unidad_sin_servicio)) }; return }
-    state.provisional?.let { item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_provisional_vinculara, it.record)) } }
-    item { PrehospitalFormView(state, model, service.id) }
-}
-
-@Composable
-private fun PrehospitalFormView(state: AmbulanceUiState, model: AmbulanceViewModel, serviceId: String) {
-    val form = state.prehospital
-    SectionCard(stringResource(R.string.amb_enviar_reporte)) {
-        FormField(stringResource(R.string.amb_motivo), form.reason, { model.updatePrehospital(form.copy(reason = it.take(500))) }, singleLine = false)
-        Choices(AmbulanceLabels.priorities, form.priority) { model.updatePrehospital(form.copy(priority = it)) }
-        NumberField(stringResource(R.string.amb_eta), form.etaMinutes) { model.updatePrehospital(form.copy(etaMinutes = it)) }
-        NumberField(stringResource(R.string.amb_fc), form.heartRate) { model.updatePrehospital(form.copy(heartRate = it)) }
-        NumberField(stringResource(R.string.amb_pas), form.systolic) { model.updatePrehospital(form.copy(systolic = it)) }
-        NumberField(stringResource(R.string.amb_pad), form.diastolic) { model.updatePrehospital(form.copy(diastolic = it)) }
-        NumberField(stringResource(R.string.amb_spo2), form.oxygenSaturation) { model.updatePrehospital(form.copy(oxygenSaturation = it)) }
-        NumberField(stringResource(R.string.amb_temperatura), form.temperature, decimal = true) { model.updatePrehospital(form.copy(temperature = it)) }
-        NumberField(stringResource(R.string.amb_glasgow), form.glasgow) { model.updatePrehospital(form.copy(glasgow = it)) }
-        PrimaryButton(stringResource(R.string.amb_enviar_reporte), { model.sendPrehospital(serviceId) }, icon = Icons.Default.Send, enabled = state.queued == null, loading = state.busy)
-    }
-}
-
-@Composable
-private fun NumberField(label: String, value: String, decimal: Boolean = false, onChange: (String) -> Unit) {
+internal fun NumberField(label: String, value: String, decimal: Boolean = false, onChange: (String) -> Unit) {
     FormField(label, value, { onChange(it.filter { c -> c.isDigit() || (decimal && (c == '.' || c == ',')) }.take(6)) }, keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number))
-}
-
-/** A73: sexo, edad estimada y señas; no inventa nombre ni fecha de nacimiento. */
-@Composable
-private fun UnidentifiedForm(state: AmbulanceUiState, model: AmbulanceViewModel) {
-    var sex by rememberSaveable { mutableStateOf("no_registrado") }
-    var age by rememberSaveable { mutableStateOf("") }
-    var description by rememberSaveable { mutableStateOf("") }
-    val provisional = state.provisional
-    if (provisional != null) {
-        SectionCard(stringResource(R.string.amb_provisional_creado), action = { StatusTag("provisional") }) {
-            Text(stringResource(R.string.amb_provisional_vinculara, provisional.record), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
-    SectionCard(stringResource(R.string.amb_crear_provisional)) {
-        Choices(listOf("femenino" to "Femenino", "masculino" to "Masculino", "indeterminado" to "Indeterminado", "no_registrado" to "No registrado"), sex) { sex = it }
-        NumberField(stringResource(R.string.amb_edad_estimada), age) { age = it.take(3) }
-        FormField(stringResource(R.string.amb_senas), description, { description = it.take(500) }, singleLine = false)
-        PrimaryButton(stringResource(R.string.amb_crear_provisional), { model.registerUnidentified(sex, age, description) }, icon = Icons.Default.PersonAdd, loading = state.busy)
-    }
 }
 
 /** A74: servicios con su historia en una frase; búsqueda compacta y filtros en un panel plegable con chips (obs. 8 y 16). */
@@ -380,4 +302,4 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState) {
 }
 
 private val timeFormat = java.time.format.DateTimeFormatter.ofPattern("d MMM HH:mm", java.util.Locale("es", "SV")).withZone(java.time.ZoneId.of("America/El_Salvador"))
-private fun localTime(iso: String) = runCatching { timeFormat.format(java.time.Instant.parse(iso)) }.getOrDefault(iso)
+internal fun localTime(iso: String) = runCatching { timeFormat.format(java.time.Instant.parse(iso)) }.getOrDefault(iso)

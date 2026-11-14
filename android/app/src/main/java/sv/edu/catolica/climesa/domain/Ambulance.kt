@@ -18,7 +18,10 @@ data class AmbulanceService(
     val crew: List<AmbulanceCrewMember>,
     val milestones: List<AmbulanceMilestone>,
     val nextMilestones: List<String>,
+    val lastLocation: AmbulanceLocation? = null,
 )
+/** Último punto GPS que la tripulación envió a `POST /ambulancia/ubicacion`. */
+data class AmbulanceLocation(val latitude: Double, val longitude: Double, val capturedAt: String)
 /** Quién pidió (paciente o quien llamó), su expediente si lo tiene y desde cuándo espera (obs. 7). */
 data class AmbulanceRequestRow(
     val id: String, val channel: String, val address: String, val municipality: String, val reason: String, val contactPhone: String, val createdAt: String, val version: Int,
@@ -100,6 +103,10 @@ object AmbulanceRules {
             if (type == "finalizado" && finalState != null) put("finalState", finalState)
             if (reason.isNotBlank()) put("reason", reason.trim())
         }
+
+    /** Cuerpo de `POST /ambulancia/ubicacion`; solo la API decide si hay servicio activo. */
+    fun locationBody(latitude: Double, longitude: Double, capturedAt: java.time.Instant): JSONObject =
+        JSONObject().put("latitude", latitude).put("longitude", longitude).put("capturedAt", capturedAt.toString())
 
     /** Ruta de la bitácora con solo los filtros llenos; la API busca sin acentos en origen, destino, municipio y tripulación. */
     fun logPath(filters: LogFilters): String {
@@ -183,6 +190,7 @@ object AmbulanceParser {
                 objects(s.optJSONArray("crew")).map { AmbulanceCrewMember(it.text("staffId"), it.text("role"), it.text("name")) },
                 objects(s.optJSONArray("milestones")).map { AmbulanceMilestone(it.text("type"), it.text("occurredAt")) },
                 strings(s.optJSONArray("nextMilestones")),
+                s.optJSONObject("lastLocation")?.let { AmbulanceLocation(it.optDouble("latitude"), it.optDouble("longitude"), it.text("capturedAt")) },
             )
         }
         val pending = objects(root.optJSONArray("pendingRequests")).map {
