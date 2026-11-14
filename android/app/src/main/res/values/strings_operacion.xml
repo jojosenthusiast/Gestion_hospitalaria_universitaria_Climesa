@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="op_camas_detalle">Estado de camas en tiempo real.</string>
+    <string name="op_camas_motivo_ayuda">Queda registrado en el historial de la cama.</string>
+    <string name="op_camas_libres">Libres</string>
+    <string name="op_camas_ocupadas">Ocupadas</string>
+    <string name="op_camas_total">Total</string>
+    <string name="op_fila_llamados">Llamados: %1$d</string>
+    <string name="op_fila_servicio_llegada">Selecciona el servicio de llegada.</string>
+    <string name="op_inventario_lote">Lote %1$s</string>
+    <string name="op_inventario_vence">vence %1$s</string>
+    <string name="op_inventario_disponible">Disponible: %1$s %2$s</string>
+    <string name="op_inventario_alertas">Alertas</string>
+    <string name="op_inventario_existencias">Existencias</string>
+    <string name="op_personal_filtro">Filtro</string>
+    <string name="op_personal_datos">Datos de la ficha</string>
+    <string name="op_personal_contacto">Contacto</string>
+    <string name="op_personal_motivo_ayuda">Mínimo %1$d caracteres. Queda en el historial.</string>
+    <string name="op_amb_unidad">Unidad</string>
+    <string name="op_amb_hitos">Hitos del servicio</string>
+    <string name="op_turnos_resumen">Resumen de cobertura</string>
+</resources>

@@ -3,34 +3,22 @@ package sv.edu.catolica.climesa.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -95,12 +83,41 @@ class InventoryViewModel @Inject constructor(private val api: ApiGateway, realti
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
     val selected = state.consumptionLotId?.let { lotId -> state.stock.firstOrNull { it.lotId == lotId } }
     if (selected != null) ConsumptionDialog(selected, state.busy, state.error, model)
-    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    PageList(modifier) {
         item { SectionIntro("Operaciones / Recursos", "Inventario", "Consulta existencias y registra consumo de insumos o reactivos.") }
-        state.error?.let { item { ClimesaActionGroup { Text(it, color = MaterialTheme.colorScheme.error); ClimesaButton("Reintentar", Icons.Default.Refresh, { model.clearMessages(); model.load() }, outlined = true) } } }
-        state.notice?.let { item { InlineStatus(it, Icons.Default.Check) } }
-        if (state.lowStock.isNotEmpty()) item { ClimesaCard { Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error); Text(stringResource(R.string.inventario_alertas_titulo), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error) }; state.lowStock.forEach { Text(stringResource(R.string.inventario_alerta_articulo, it.code, it.name, it.minimum.toString(), it.unit), style = MaterialTheme.typography.bodyMedium) } } } }
-        if (state.loading) item { CircularProgressIndicator() } else if (state.stock.isEmpty()) item { ClimesaCard { Text("No hay existencias registradas.", Modifier.padding(18.dp)) } } else items(state.stock, key = { it.lotId + it.warehouseId }) { row -> ClimesaCard { Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { Text("${row.code} · ${row.name}", style = MaterialTheme.typography.titleMedium); Text("${row.quantity} ${row.unit} · ${row.warehouse}", color = MaterialTheme.colorScheme.primary); Text("Lote ${row.lotId.take(8)}${if (row.expires.isBlank()) "" else " · vence ${row.expires}"}", style = MaterialTheme.typography.bodySmall); if (row.belowMinimum) Text(stringResource(R.string.inventario_bajo_minimo), color = MaterialTheme.colorScheme.error); Button(onClick = { model.openConsumption(row.lotId) }, enabled = !state.busy) { Icon(Icons.Default.Add, null); Text("Registrar consumo") } } } }
+        if (state.error != null && state.stock.isNotEmpty()) item { NoticeBanner(NoticeKind.ERROR, state.error!!) }
+        state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
+        if (state.lowStock.isNotEmpty()) item {
+            SectionCard(stringResource(R.string.inventario_alertas_titulo), eyebrow = stringResource(R.string.op_inventario_alertas)) {
+                state.lowStock.forEach { Text(stringResource(R.string.inventario_alerta_articulo, it.code, it.name, it.minimum.toString(), it.unit), style = MaterialTheme.typography.bodyMedium) }
+            }
+        }
+        when {
+            state.loading -> item { LoadingState() }
+            state.error != null && state.stock.isEmpty() -> item { ErrorState(state.error, onRetry = { model.clearMessages(); model.load() }) }
+            state.stock.isEmpty() -> item { EmptyState("No hay existencias registradas.") }
+            else -> items(state.stock, key = { it.lotId + it.warehouseId }) { row ->
+                SectionCard("${row.code} · ${row.name}", eyebrow = row.warehouse, action = { if (row.belowMinimum) OperacionStatusTag("bajo_minimo", label = stringResource(R.string.inventario_bajo_minimo)) }) {
+                    StatTile(row.quantity.toString(), "Disponible", Modifier.fillMaxWidth(), suffix = row.unit)
+                    Text(stringResource(R.string.op_inventario_lote, row.lotId.take(8)) + if (row.expires.isBlank()) "" else " · " + stringResource(R.string.op_inventario_vence, row.expires), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    PrimaryButton("Registrar consumo", { model.openConsumption(row.lotId) }, icon = Icons.Default.Add, enabled = !state.busy)
+                }
+            }
+        }
     }
 }
-@Composable private fun ConsumptionDialog(stock: InventoryStock, busy: Boolean, error: String?, model: InventoryViewModel) { var quantity by rememberSaveable(stock.lotId) { mutableStateOf("") }; var reason by rememberSaveable(stock.lotId) { mutableStateOf("") }; AlertDialog(onDismissRequest = { if (!busy) model.closeConsumption() }, title = { Text("Registrar consumo") }, text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Disponible: ${stock.quantity} ${stock.unit}", style = MaterialTheme.typography.bodySmall); OutlinedTextField(quantity, { quantity = it }, label = { Text("Cantidad") }, modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !busy); OutlinedTextField(reason, { reason = it }, label = { Text("Motivo") }, modifier = Modifier.fillMaxWidth(), minLines = 2, enabled = !busy); error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } } }, confirmButton = { Button(onClick = { model.move(stock, quantity, reason, null) }, enabled = !busy && quantity.isNotBlank() && reason.trim().length >= 5) { Text(if (busy) "Guardando…" else "Confirmar") } }, dismissButton = { TextButton(onClick = { model.closeConsumption() }, enabled = !busy) { Text("Cancelar") } }) }
+@Composable private fun ConsumptionDialog(stock: InventoryStock, busy: Boolean, error: String?, model: InventoryViewModel) {
+    var quantity by rememberSaveable(stock.lotId) { mutableStateOf("") }; var reason by rememberSaveable(stock.lotId) { mutableStateOf("") }
+    ConfirmDialog(
+        title = "Registrar consumo", confirmLabel = "Confirmar", onConfirm = { model.move(stock, quantity, reason, null) }, onDismiss = { model.closeConsumption() }, busy = busy,
+        confirmEnabled = quantity.isNotBlank() && reason.trim().length >= 5,
+        message = stringResource(R.string.op_inventario_disponible, stock.quantity.toString(), stock.unit),
+        body = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                FormField("Cantidad", quantity, { quantity = it }, enabled = !busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                FormField("Motivo", reason, { reason = it }, enabled = !busy, singleLine = false)
+                error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+            }
+        },
+    )
+}

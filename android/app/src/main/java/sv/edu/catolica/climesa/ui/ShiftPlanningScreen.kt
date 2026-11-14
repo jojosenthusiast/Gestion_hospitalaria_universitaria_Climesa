@@ -70,24 +70,21 @@ fun ShiftPlanningScreen(profile: AccessProfile, modifier: Modifier = Modifier, m
     val target = state.shifts.firstOrNull { it.id == targetId }
     fun open(next: PlanDialog, id: String?) { model.resetAction(); targetId = id; dialog = next }
 
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    PageList(modifier) {
         item { SectionIntro("Operaciones / CLIMESA", stringResource(R.string.plan_titulo), "Cobertura y turnos del equipo.") }
-        if (!state.canPlan && !state.canPublish) item { Text(stringResource(R.string.plan_solo_lectura), style = MaterialTheme.typography.bodySmall) }
+        if (!state.canPlan && !state.canPublish) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.plan_solo_lectura)) }
         if (state.canPlan || state.canPublish) item {
             ClimesaActionGroup {
-                if (state.canPlan) ClimesaButton(stringResource(R.string.plan_nuevo), Icons.Default.Add, { open(PlanDialog.FORM, null) })
-                if (state.canPublish) ClimesaButton(stringResource(R.string.plan_publicar), Icons.Default.Publish, { open(PlanDialog.PUBLISH, null) }, outlined = true)
+                if (state.canPlan) PrimaryButton(stringResource(R.string.plan_nuevo), { open(PlanDialog.FORM, null) }, icon = Icons.Default.Add)
+                if (state.canPublish) SecondaryButton(stringResource(R.string.plan_publicar), { open(PlanDialog.PUBLISH, null) }, icon = Icons.Default.Publish)
             }
         }
         state.summary?.let { summary ->
             item {
-                ClimesaCard {
-                    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(ShiftPlanning.summaryText(summary), style = MaterialTheme.typography.titleSmall)
-                        summary.gaps.take(3).forEach { Text(ShiftPlanning.gapText(it), style = MaterialTheme.typography.bodySmall) }
-                        if (summary.gaps.size > 3) Text("${summary.gaps.size - 3} alertas adicionales", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(model::dismissSummary) { Text(stringResource(R.string.plan_entendido)) }
-                    }
+                SectionCard(stringResource(R.string.op_turnos_resumen), action = { TextButton(model::dismissSummary) { Text(stringResource(R.string.plan_entendido)) } }) {
+                    Text(ShiftPlanning.summaryText(summary), style = MaterialTheme.typography.titleSmall)
+                    summary.gaps.take(3).forEach { NoticeBanner(NoticeKind.WARNING, ShiftPlanning.gapText(it)) }
+                    if (summary.gaps.size > 3) Text("${summary.gaps.size - 3} alertas adicionales", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -97,12 +94,9 @@ fun ShiftPlanningScreen(profile: AccessProfile, modifier: Modifier = Modifier, m
             }
         }
         when {
-            state.loading -> item { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-            state.error != null -> item {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                Button({ model.load() }) { Text(stringResource(R.string.camas_reintentar)) }
-            }
-            state.visibleShifts.isEmpty() -> item { Text(stringResource(R.string.plan_vacio), style = MaterialTheme.typography.bodyMedium) }
+            state.loading -> item { LoadingState() }
+            state.error != null -> item { ErrorState(state.error, onRetry = { model.load() }) }
+            state.visibleShifts.isEmpty() -> item { EmptyState(stringResource(R.string.plan_vacio)) }
             else -> items(state.visibleShifts, key = { it.id }) { shift ->
                 ShiftCard(shift, state.canPlan, { open(PlanDialog.FORM, shift.id) }, { open(PlanDialog.CANCEL, shift.id) })
             }
@@ -119,18 +113,12 @@ fun ShiftPlanningScreen(profile: AccessProfile, modifier: Modifier = Modifier, m
 
 @Composable
 private fun ShiftCard(shift: PlannedShift, canPlan: Boolean, onEdit: () -> Unit, onCancel: () -> Unit) {
-    ClimesaCard {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) { androidx.compose.material3.Icon(Icons.Default.Schedule, null, tint = MaterialTheme.colorScheme.primary); Text(shift.person, style = MaterialTheme.typography.titleMedium) }
-            Text(shift.area, style = MaterialTheme.typography.bodySmall)
-            Text("${ShiftPlanning.format(shift.start)} — ${ShiftPlanning.format(shift.end)}", style = MaterialTheme.typography.bodyMedium)
-            Text("${ShiftPlanning.typeLabel(shift.type)} · ${ShiftPlanning.stateLabel(shift.state)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            if (canPlan && ShiftPlanning.cancellable(shift.state)) {
-                HorizontalDivider()
-                ClimesaActionGroup {
-                    ClimesaButton(stringResource(R.string.plan_editar), Icons.Default.Edit, onEdit, outlined = true)
-                    ClimesaButton(stringResource(R.string.plan_cancelar_turno), Icons.Default.Cancel, onCancel, outlined = true)
-                }
+    SectionCard(shift.person, eyebrow = ShiftPlanning.typeLabel(shift.type), action = { StatusTag(shift.state, label = ShiftPlanning.stateLabel(shift.state)) }) {
+        DataRow(shift.area, subtitle = "${ShiftPlanning.format(shift.start)} — ${ShiftPlanning.format(shift.end)}", leadingIcon = Icons.Default.Schedule)
+        if (canPlan && ShiftPlanning.cancellable(shift.state)) {
+            ClimesaActionGroup {
+                SecondaryButton(stringResource(R.string.plan_editar), onEdit, icon = Icons.Default.Edit)
+                SecondaryButton(stringResource(R.string.plan_cancelar_turno), onCancel, icon = Icons.Default.Cancel)
             }
         }
     }
@@ -171,17 +159,17 @@ private fun ShiftFormDialog(model: ShiftPlanningViewModel, state: PlanningState,
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.plan_horario), style = MaterialTheme.typography.bodySmall)
-                action.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                action.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
                 if (!action.conflict) {
                     Picker(stringResource(R.string.plan_persona), state.people.map { it.id to it.label }, staff) { staff = it }
                     Picker(stringResource(R.string.plan_area), state.areas.map { it.id to it.label }, area) { area = it }
-                    OutlinedTextField(startDate, { startDate = it.take(10) }, label = { Text(stringResource(R.string.plan_inicio_fecha)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(startTime, { startTime = it.take(5) }, label = { Text(stringResource(R.string.plan_inicio_hora)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(endDate, { endDate = it.take(10) }, label = { Text(stringResource(R.string.plan_fin_fecha)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(endTime, { endTime = it.take(5) }, label = { Text(stringResource(R.string.plan_fin_hora)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    FormField(stringResource(R.string.plan_inicio_fecha), startDate, { startDate = it.take(10) })
+                    FormField(stringResource(R.string.plan_inicio_hora), startTime, { startTime = it.take(5) })
+                    FormField(stringResource(R.string.plan_fin_fecha), endDate, { endDate = it.take(10) })
+                    FormField(stringResource(R.string.plan_fin_hora), endTime, { endTime = it.take(5) })
                     Picker(stringResource(R.string.plan_tipo), shiftTypes, type) { type = it }
-                    OutlinedTextField(note, { note = it.take(ShiftPlanning.MAX_NOTE) }, label = { Text(stringResource(R.string.plan_observacion)) }, modifier = Modifier.fillMaxWidth())
-                    if (shift != null) OutlinedTextField(reason, { reason = it.take(500) }, label = { Text(stringResource(R.string.plan_motivo_cambio)) }, modifier = Modifier.fillMaxWidth())
+                    FormField(stringResource(R.string.plan_observacion), note, { note = it.take(ShiftPlanning.MAX_NOTE) }, singleLine = false)
+                    if (shift != null) FormField(stringResource(R.string.plan_motivo_cambio), reason, { reason = it.take(500) }, singleLine = false)
                 }
             }
         },
@@ -205,8 +193,8 @@ private fun CancelDialog(model: ShiftPlanningViewModel, state: PlanningState, sh
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("${shift.person} · ${shift.area}\n${ShiftPlanning.format(shift.start)} — ${ShiftPlanning.format(shift.end)}", style = MaterialTheme.typography.bodySmall)
-                action.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                if (!action.conflict) OutlinedTextField(reason, { reason = it.take(500) }, label = { Text(stringResource(R.string.plan_motivo_cancelacion)) }, modifier = Modifier.fillMaxWidth())
+                action.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+                if (!action.conflict) FormField(stringResource(R.string.plan_motivo_cancelacion), reason, { reason = it.take(500) }, singleLine = false)
             }
         },
         confirmButton = {
@@ -229,9 +217,9 @@ private fun PublishDialog(model: ShiftPlanningViewModel, state: PlanningState, o
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.plan_publicar_detalle), style = MaterialTheme.typography.bodySmall)
-                action.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                OutlinedTextField(from, { from = it.take(10) }, label = { Text(stringResource(R.string.plan_desde)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(to, { to = it.take(10) }, label = { Text(stringResource(R.string.plan_hasta)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                action.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+                FormField(stringResource(R.string.plan_desde), from, { from = it.take(10) })
+                FormField(stringResource(R.string.plan_hasta), to, { to = it.take(10) })
                 Picker(stringResource(R.string.plan_area), listOf("" to stringResource(R.string.plan_area_todas)) + state.areas.map { it.id to it.label }, area) { area = it }
             }
         },
