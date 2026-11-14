@@ -409,3 +409,13 @@
   .module-nav.shell-sidebar, .module-nav.shell-sidebar a, .floor-meter > span { transition: none; }
   .module-nav.shell-sidebar a:hover, .board-card:hover { transform: none; }
 }
+
+/* Lista de casillas dentro de un formulario (catálogo de laboratorio, pendientes de alta). */
+.choice-list { margin: 0 0 12px; padding: 0; border: 0; display: grid; gap: 8px; min-width: 0; }
+.choice-list legend { margin-bottom: 8px; padding: 0; color: var(--muted); font-size: 14px; font-weight: 700; }
+.choice-list small { color: var(--muted); }
+.history-list { margin: 0 0 16px; padding: 0; list-style: none; display: grid; gap: 12px; }
+.history-list > li { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.history-list ul { margin: 6px 0 0; padding-left: 18px; }
+.history-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.history-item-head small { display: block; color: var(--muted); }

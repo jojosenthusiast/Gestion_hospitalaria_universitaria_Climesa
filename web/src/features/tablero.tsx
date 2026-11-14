@@ -1,20 +1,19 @@
 import type { ReactNode } from 'react';
 import { can, type AccessProfile, type Api, type CoverageGap, type Space, type Summary } from '../lib/api';
 import { Notice } from '../components/ui';
+import type { AmbulanceStatus } from './ambulance';
 import { RemoteState, formatDateTime, useData } from './common';
 
-// 113-T01 (FR-113-06): los módulos que aún no existen muestran en qué semana llegan, nunca un cero.
-// La semana es la de 113-T03, que completa estas tarjetas con datos reales.
-const pendientes = [
-  { titulo: 'Ambulancia', semana: 4 },
-  { titulo: 'Números en fila', semana: 4 },
-  { titulo: 'Órdenes de laboratorio', semana: 4 },
-];
+// WEB-03: el tablero solo muestra tarjetas con datos reales que la cuenta puede leer; nunca marcadores
+// de entregas futuras. Órdenes de laboratorio no tiene un agregado en la API y la cola completa exige
+// `laboratorio.ver_cola`, que ADM y JOP no tienen, así que esa tarjeta no se muestra.
+type QueueState = { state: string };
+const ambulanceStates: Record<string, string> = { disponible: 'Disponible', en_servicio: 'En servicio', en_mantenimiento: 'En mantenimiento' };
 
 const Cifra = ({ valor, etiqueta }: { valor: number; etiqueta: string }) => <div><strong>{valor}</strong><span>{etiqueta}</span></div>;
 const Tarjeta = ({ titulo, children, className = '' }: { titulo: string; children: ReactNode; className?: string }) => <section className={`board-card ${className}`.trim()} aria-label={titulo}><h2>{titulo}</h2>{children}</section>;
 
-function Tarjetas({ resumen }: { resumen: Summary }) {
+function Tarjetas({ resumen, extra }: { resumen: Summary; extra?: ReactNode }) {
   const { beds, shifts, patients, staff } = resumen;
   return <>
     <div className="board-grid board-grid-main">
@@ -26,10 +25,26 @@ function Tarjetas({ resumen }: { resumen: Summary }) {
       {staff && <Tarjeta titulo="Personal"><div className="board-figures"><Cifra valor={staff.active} etiqueta="Activas" /></div><p className="board-note">de {staff.total} personas registradas</p></Tarjeta>}
       {shifts && <Tarjeta titulo="Turnos"><div className="board-figures"><Cifra valor={shifts.current} etiqueta="En curso ahora" /></div></Tarjeta>}
       {patients && <Tarjeta titulo="Pacientes"><div className="board-figures"><Cifra valor={patients.active} etiqueta="Activos" /></div></Tarjeta>}
-      {pendientes.map(p => <Tarjeta titulo={p.titulo} className="board-card-pending" key={p.titulo}><p className="board-pending">Disponible en la semana {p.semana}</p></Tarjeta>)}
+      {extra}
     </div>
     <p className="updated-at">Actualizado: {formatDateTime(resumen.lastUpdate)}</p>
   </>;
+}
+
+function Ambulancia({ estado }: { estado: AmbulanceStatus }) {
+  return <Tarjeta titulo="Ambulancia">
+    <p><span className={`status-tag status-${estado.unit.state}`}>{ambulanceStates[estado.unit.state] ?? estado.unit.state}</span></p>
+    <p className="board-note">{estado.paramedicOnDuty ? 'Paramédico de turno' : 'Sin paramédico con turno en curso'}</p>
+  </Tarjeta>;
+}
+
+function Fila({ numeros }: { numeros: QueueState[] }) {
+  const count = (state: string) => numeros.filter(n => n.state === state).length;
+  return <Tarjeta titulo="Números en fila">
+    {numeros.length === 0
+      ? <p className="muted">Todavía no se han emitido números hoy.</p>
+      : <><div className="board-figures"><Cifra valor={count('en_espera')} etiqueta="En espera" /><Cifra valor={count('llamado')} etiqueta="Llamados" /><Cifra valor={count('en_atencion')} etiqueta="En atención" /></div><p className="board-note">de {numeros.length} números emitidos hoy</p></>}
+  </Tarjeta>;
 }
 
 function fechaLocal(): string {
@@ -72,14 +87,18 @@ export function Tablero({ api, profile, version }: { api: Api; profile: AccessPr
   const data = useData<Summary>(api, '/inicio', version, permitido);
   const espacios = useData<Space[]>(api, '/espacios', version, espaciosPermitidos);
   const cobertura = useData<CoverageGap[]>(api, `/turnos/cobertura?from=${fecha}&to=${fecha}`, version, coberturaPermitida);
+  const ambulancia = useData<AmbulanceStatus>(api, '/ambulancia', version, permitido && can(profile, 'ambulancia.ver_estado'));
+  const fila = useData<QueueState[]>(api, '/fila', version, permitido && can(profile, 'fila.ver'));
   if (!permitido) return <div className="module-state"><Notice kind="info">Tu cuenta no tiene permiso para ver el tablero.</Notice></div>;
   return <RemoteState state={data}>{resumen => <>
-    <Tarjetas resumen={resumen} />
+    <Tarjetas resumen={resumen} extra={<>{ambulancia.data && <Ambulancia estado={ambulancia.data} />}{fila.data && <Fila numeros={fila.data} />}</>} />
     {(espacios.data || cobertura.data) && <div className="board-grid board-grid-detail">
       {espacios.data && <OcupacionPorPlanta espacios={espacios.data} />}
       {cobertura.data && <CoberturaTurnos huecos={cobertura.data} />}
     </div>}
     {espacios.error && <Notice kind="info">No se pudo cargar la ocupación por planta.</Notice>}
     {cobertura.error && <Notice kind="info">No se pudo cargar la cobertura de turnos.</Notice>}
+    {ambulancia.error && <Notice kind="info">No se pudo cargar el estado de la ambulancia.</Notice>}
+    {fila.error && <Notice kind="info">No se pudo cargar la fila del día.</Notice>}
   </>}</RemoteState>;
 }

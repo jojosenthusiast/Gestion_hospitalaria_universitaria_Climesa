@@ -144,10 +144,10 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 // verían exactamente lo que el catálogo les da si una cuenta suya tuviera la web habilitada.
 const menuCatalogo: Record<string, string[]> = {
   AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
-  ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario'],
-  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Fila del día', 'Citas', 'Mi consultorio'],
+  ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización'],
+  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
   PAR: ['Pacientes', 'Ambulancia', 'Turnos'],
-  PAC: ['Fila del día', 'Citas'],
+  PAC: ['Hospitalización', 'Fila del día', 'Citas'],
 };
 
 describe('el menú depende solo del permiso (regla 8)', () => {
@@ -282,5 +282,22 @@ describe('cliente de API generado (FR-120-01)', () => {
     for (const ruta of ['/api/v1/auth/me', '/api/v1/pacientes', '/api/v1/usuarios']) {
       expect(clienteGenerado, ruta).toContain(`"${ruta}"`);
     }
+  });
+});
+
+describe('sin marcadores de entregas futuras (WEB-03)', () => {
+  it('un módulo sin operaciones no promete una próxima entrega', async () => {
+    await entrar(perfil('DPD'), {}, '#/privacidad');
+    expect(await screen.findByRole('heading', { name: /Accesos excepcionales/ })).toBeTruthy();
+    expect(screen.queryByText(/Próxima entrega|siguiente entrega/i)).toBeNull();
+    expect(screen.getByText('Este módulo no tiene operaciones habilitadas.')).toBeTruthy();
+  });
+});
+
+describe('módulos abiertos por un segundo permiso', () => {
+  it('quien puede emitir órdenes de laboratorio (laboratorio.ordenar) ve el módulo Laboratorio', async () => {
+    const nav = await entrar(perfil('MED'));
+    expect(within(nav).getByRole('link', { name: 'Laboratorio' })).toBeTruthy();
+    expect(within(nav).getByRole('link', { name: 'Mi consultorio' })).toBeTruthy();
   });
 });

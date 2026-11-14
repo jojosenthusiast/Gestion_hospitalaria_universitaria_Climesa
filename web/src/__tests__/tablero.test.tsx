@@ -64,14 +64,37 @@ describe('W03 · tablero inicial con datos reales', () => {
     expect(api.request.mock.calls.some(([path]) => String(path).startsWith('/turnos/cobertura?'))).toBe(true);
   });
 
-  it('las tarjetas de módulos sin construir dicen en qué semana llegan, no cero', async () => {
-    montar(async () => resumen);
+  it('no muestra marcadores de entregas futuras ni tarjetas sin datos permitidos', async () => {
+    const { api } = montar(async () => resumen);
     await screen.findByRole('region', { name: 'Camas' });
-    for (const nombre of ['Ambulancia', 'Números en fila', 'Órdenes de laboratorio']) {
-      const marcador = tarjeta(nombre);
-      expect(within(marcador).getByText('Disponible en la semana 4')).toBeTruthy();
-      expect(within(marcador).queryByText('0')).toBeNull();
-    }
+    expect(screen.queryByText(/semana/i)).toBeNull();
+    expect(screen.queryByText(/Próxima entrega/i)).toBeNull();
+    for (const nombre of ['Ambulancia', 'Números en fila', 'Órdenes de laboratorio']) expect(screen.queryByRole('region', { name: nombre })).toBeNull();
+    expect(api.request.mock.calls.map(([path]) => path)).not.toContain('/ambulancia');
+  });
+
+  it('con permiso muestra el estado real de la ambulancia y los números en fila del día', async () => {
+    const { api } = montar(async (path) => {
+      if (path === '/inicio') return resumen;
+      if (path === '/ambulancia') return { unit: { id: 'u-1', plate: 'P-000', state: 'en_servicio', version: 3 }, activeService: null, paramedicOnDuty: true };
+      if (path === '/fila') return [
+        { id: 't-1', state: 'en_espera' }, { id: 't-2', state: 'en_espera' }, { id: 't-3', state: 'llamado' }, { id: 't-4', state: 'completado' },
+      ];
+      throw new Error(`Ruta inesperada: ${path}`);
+    }, { perfil: perfil(['metricas.ver', 'ambulancia.ver_estado', 'fila.ver']) });
+    const ambulancia = await screen.findByRole('region', { name: 'Ambulancia' });
+    expect(within(ambulancia).getByText('En servicio')).toBeTruthy();
+    const fila = await screen.findByRole('region', { name: 'Números en fila' });
+    expect(within(fila).getByText('En espera').previousElementSibling?.textContent).toBe('2');
+    expect(within(fila).getByText('Llamados').previousElementSibling?.textContent).toBe('1');
+    expect(api.request).toHaveBeenCalledWith('/ambulancia', expect.anything());
+    expect(api.request).toHaveBeenCalledWith('/fila', expect.anything());
+  });
+
+  it('con la fila vacía lo dice en lugar de mostrar ceros sin contexto', async () => {
+    montar(async (path) => path === '/fila' ? [] : resumen, { perfil: perfil(['metricas.ver', 'fila.ver']) });
+    const fila = await screen.findByRole('region', { name: 'Números en fila' });
+    expect(within(fila).getByText('Todavía no se han emitido números hoy.')).toBeTruthy();
   });
 
   it('solo muestra las tarjetas cuyos datos entrega la API según el permiso de la cuenta', async () => {

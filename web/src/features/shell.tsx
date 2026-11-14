@@ -14,8 +14,8 @@ import { QueuePage } from './queue';
 import { LaboratoryPage } from './laboratory';
 import { InventoryPage } from './inventory';
 import { HospitalizationPage } from './hospitalization';
-/** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión. */
-export type Module={id:string;label:string;permission?:string;future?:boolean};
+/** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión; `alsoPermissions` abre el mismo módulo a otros permisos. */
+export type Module={id:string;label:string;permission?:string;alsoPermissions?:string[];future?:boolean};
 export const modules:Module[]=[
  {id:'inicio',label:'Inicio'},
  {id:'pacientes',label:'Pacientes',permission:'pacientes.buscar'},
@@ -26,9 +26,9 @@ export const modules:Module[]=[
  {id:'turnos',label:'Turnos',permission:'turnos.ver'},
  {id:'usuarios',label:'Usuarios',permission:'usuarios.ver'},
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver'},
- {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola'},
+ {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola',alsoPermissions:['laboratorio.ordenar']},
  {id:'inventario',label:'Inventario',permission:'inventario.ver'},
- {id:'hospitalizacion',label:'Hospitalización',permission:'admision.crear'},
+ {id:'hospitalizacion',label:'Hospitalización',permission:'admision.ver',alsoPermissions:['admision.crear']},
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
  {id:'citas',label:'Citas',permission:'citas.ver'},
  {id:'consultas',label:'Mi consultorio',permission:'consulta.iniciar'},
@@ -37,7 +37,7 @@ export const modules:Module[]=[
 ];
 const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',privacidad:'privacy',perfil:'user'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
-export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||can(profile,m.permission));
+export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
 export const hasWebModule=(profile:AccessProfile)=>visibleModules(profile).some(m=>m.permission);
 const readRoute=()=>location.hash.replace(/^#\/?/,'').split('?')[0]||'inicio';
@@ -69,7 +69,8 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  if(!hasWebModule(profile))return <StatusView title="Tu rol no usa esta aplicación" detail="Tu cuenta no tiene módulos habilitados en la web. Ingresa desde la aplicación que corresponde a tu función." action="Cerrar sesión" onAction={onLogout}/>;
  const active=menu.find(m=>m.id===route);
  let content:ReactNode;
- if(!active)content=<><Heading eyebrow="Acceso restringido" title="Sin permiso" description="Esta sección no corresponde a los permisos de tu cuenta."/><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
+ if(!modules.some(m=>m.id===route))content=<><Heading eyebrow="CLIMESA" title="Página no encontrada" description="La dirección que abriste no corresponde a ninguna sección del sistema."/><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
+ else if(!active)content=<><Heading eyebrow="Acceso restringido" title="Sin permiso" description="Esta sección no corresponde a los permisos de tu cuenta."/><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
  else if(route==='inicio')content=<Dashboard api={api} profile={profile} version={version} menu={menu}/>;
  else if(route==='pacientes')content=<PatientsPage api={api} profile={profile} version={version}/>;
  else if(route==='personal')content=<PersonnelPage api={api} profile={profile} version={version}/>;
@@ -86,7 +87,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  else if(route==='hospitalizacion')content=<HospitalizationPage api={api} profile={profile} version={version}/>;
  else if(route==='auditoria')content=<AuditPage api={api} version={version}/>;
  else if(route==='perfil')content=<ProfilePage profile={profile} onLogout={onLogout}/>;
- else content=<><Heading eyebrow={`Próxima entrega / ${active.label}`} title={active.label} description="Espacio de trabajo del módulo."/><div className="future-module"><span className="eyebrow">Próxima entrega</span><h2>Este módulo todavía no está habilitado.</h2><p>Su acceso y navegación ya están definidos según tus permisos. Las operaciones se habilitarán en la siguiente entrega.</p><a href="#/inicio" className="row-action">Volver al inicio <Icon name="arrow" size={18}/></a></div></>;
+ else content=<><Heading eyebrow={`CLIMESA / ${active.label}`} title={active.label} description="Espacio de trabajo del módulo."/><div className="future-module" role="status"><span className="eyebrow">Sin operaciones disponibles</span><h2>Este módulo no tiene operaciones habilitadas.</h2><p>Tu cuenta tiene acceso a esta sección, pero el sistema todavía no ofrece sus operaciones. Mientras tanto, no hay datos que mostrar.</p><a href="#/inicio" className="row-action">Volver al inicio <Icon name="arrow" size={18}/></a></div></>;
  return <div className={`hospital-shell${navOpen?' nav-open':''}`}>
   <a href="#main-content" className="skip-link">Ir al contenido</a>
   <header className="hospital-header">
@@ -114,7 +115,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
 function Dashboard({api,profile,version,menu}:{api:Api;profile:AccessProfile;version:number;menu:Module[]}){
  const board=can(profile,'metricas.ver');
  const data=useData<Summary>(api,'/inicio',version,!board);
- return <><Heading eyebrow="CLIMESA / Inicio" title="Resumen del hospital" description={`Bienvenido${profile.name?', '+profile.name.split(' ')[0]:''}. Consulta la información de tu espacio de trabajo.`}/>{board?<Tablero api={api} profile={profile} version={version}/>:<RemoteState state={data}>{s=><><div className="number-strip">{s.beds&&<><div><strong>{s.beds.free}<small>/{s.beds.total}</small></strong><span>Camas libres</span></div><div><strong>{s.beds.occupied}</strong><span>Camas ocupadas</span></div></>}{s.patients&&<div><strong>{s.patients.active}</strong><span>Pacientes activos</span></div>}{s.staff&&<div><strong>{s.staff.active}</strong><span>Personas activas</span></div>}{s.users&&<div><strong>{s.users.active}</strong><span>Cuentas activas</span></div>}{s.shifts&&<div><strong>{s.shifts.draft}</strong><span>Turnos en borrador</span></div>}</div><p className="updated-at">Actualizado: {formatDateTime(s.lastUpdate)}</p></>}</RemoteState>}<section className="dashboard-links"><div><span className="eyebrow">Tu espacio de trabajo</span><h2>Accesos directos</h2></div><div>{menu.filter(m=>!m.future&&!['inicio','perfil'].includes(m.id)).map((m,i)=><a href={`#/${m.id}`} key={m.id}><span className="mono-data">{String(i+1).padStart(2,'0')}</span><span>{m.label}</span><Icon name="arrow" size={20}/></a>)}</div>{menu.filter(m=>!m.future&&!['inicio','perfil'].includes(m.id)).length===0&&<p className="muted">Tu cuenta está lista. Los módulos de atención se habilitarán en la siguiente entrega.</p>}</section><div className="dashboard-account"><Icon name="shield" size={24}/><div><h3>Acceso según tu función</h3><p>Las operaciones y los datos disponibles corresponden a los roles de tu cuenta.</p></div><a className="row-action" href="#/perfil">Ver mi cuenta <Icon name="arrow" size={16}/></a></div></>;
+ return <><Heading eyebrow="CLIMESA / Inicio" title="Resumen del hospital" description={`Bienvenido${profile.name?', '+profile.name.split(' ')[0]:''}. Consulta la información de tu espacio de trabajo.`}/>{board?<Tablero api={api} profile={profile} version={version}/>:<RemoteState state={data}>{s=><><div className="number-strip">{s.beds&&<><div><strong>{s.beds.free}<small>/{s.beds.total}</small></strong><span>Camas libres</span></div><div><strong>{s.beds.occupied}</strong><span>Camas ocupadas</span></div></>}{s.patients&&<div><strong>{s.patients.active}</strong><span>Pacientes activos</span></div>}{s.staff&&<div><strong>{s.staff.active}</strong><span>Personas activas</span></div>}{s.users&&<div><strong>{s.users.active}</strong><span>Cuentas activas</span></div>}{s.shifts&&<div><strong>{s.shifts.draft}</strong><span>Turnos en borrador</span></div>}</div><p className="updated-at">Actualizado: {formatDateTime(s.lastUpdate)}</p></>}</RemoteState>}<section className="dashboard-links"><div><span className="eyebrow">Tu espacio de trabajo</span><h2>Accesos directos</h2></div><div>{menu.filter(m=>!m.future&&!['inicio','perfil'].includes(m.id)).map((m,i)=><a href={`#/${m.id}`} key={m.id}><span className="mono-data">{String(i+1).padStart(2,'0')}</span><span>{m.label}</span><Icon name="arrow" size={20}/></a>)}</div>{menu.filter(m=>!m.future&&!['inicio','perfil'].includes(m.id)).length===0&&<p className="muted">Tu cuenta está lista, pero tu función no tiene módulos de trabajo en la web.</p>}</section><div className="dashboard-account"><Icon name="shield" size={24}/><div><h3>Acceso según tu función</h3><p>Las operaciones y los datos disponibles corresponden a los roles de tu cuenta.</p></div><a className="row-action" href="#/perfil">Ver mi cuenta <Icon name="arrow" size={16}/></a></div></>;
 }
 function ProfilePage({profile,onLogout}:{profile:AccessProfile;onLogout:()=>void}){return <><Heading eyebrow="CLIMESA / Cuenta personal" title="Mi cuenta" description="Tu identidad y acceso dentro del hospital."/><section className="profile-sheet"><div className="profile-identity"><span>{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><div><h2>{profile.name||'Cuenta de CLIMESA'}</h2><p>{profile.email}</p></div></div><dl className="detail-grid"><div><dt>Estado</dt><dd><Tag value="activo"/></dd></div><div><dt>Plataformas habilitadas</dt><dd>{profile.platforms.map(p=>({web:'Web',android:'Android',ios:'iOS'} as Record<string,string>)[p]??p).join(' · ')}</dd></div><div className="full-width"><dt>Roles asignados</dt><dd>{profile.roles.map(r=>roleNames[r]??r).join(' · ')}</dd></div></dl><div className="profile-security"><Icon name="lock" size={20}/><p>Tu contraseña es personal. El administrador gestiona tus roles, sin conocerla.</p></div><button className="secondary-button" onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></section></>;}
 function AuditPage({api,version}:{api:Api;version:number}){
