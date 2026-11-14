@@ -1,0 +1,55 @@
+/* Mapa del edificio (obs. 5 y 11): estados por color + forma + palabra; tokens de styles.css, con modo oscuro. */
+.building { display: grid; gap: 14px; }
+.building-toolbar { align-items: end; }
+.floor-switch button { display: grid; gap: 2px; text-align: left; line-height: 1.15; }
+.floor-switch button small { font-size: 12px; font-weight: 500; opacity: 0.85; }
+.state-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.legend-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--bed-line); background: var(--bed-fill); color: var(--bed-ink); font: inherit; font-weight: 600; cursor: pointer; }
+.legend-chip[aria-pressed="true"] { outline: 3px solid var(--outline); outline-offset: 2px; }
+.legend-chip strong { font-family: "Atkinson Hyperlegible Mono", monospace; }
+.building-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.floor-plan { display: grid; gap: 14px; }
+.plan-area { border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); padding: 12px; display: grid; gap: 10px; }
+.plan-area.is-selected, .plan-room.is-selected, .plan-tile.is-selected { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary) inset; }
+.plan-area > header, .plan-room > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.plan-area h3, .plan-room h3, .plan-side h3 { margin: 0; font-size: 16px; }
+.plan-area-title, .plan-room-title { display: inline-flex; align-items: baseline; gap: 8px; padding: 4px 6px; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; border-radius: var(--radius-control); }
+.plan-area-title span, .plan-room-title span { color: var(--muted); font-size: 13px; font-weight: 500; }
+.plan-area-title:hover, .plan-room-title:hover { background: var(--soft); }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.plan-room { border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px; display: grid; gap: 8px; background: var(--bg); }
+.plan-room.is-inactive, .plan-tile.is-inactive { opacity: 0.6; }
+.plan-beds { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan-tile { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--bg); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.plan-tile small { display: block; color: var(--muted); font-size: 12.5px; }
+.plan-tile:hover { border-color: var(--primary); }
+/* Cama: el estado es forma + color + palabra (libre contorno liso, ocupada rellena, reservada punteada, limpieza con puntos, bloqueada rayada). */
+.bed-state-libre { --bed-line: var(--success); --bed-fill: var(--success-soft); --bed-ink: var(--success); }
+.bed-state-ocupada { --bed-line: var(--ink); --bed-fill: var(--ink); --bed-ink: var(--surface); }
+.bed-state-reservada { --bed-line: var(--state-reserved); --bed-fill: var(--state-reserved-soft); --bed-ink: var(--state-reserved); }
+.bed-state-limpieza { --bed-line: var(--warning); --bed-fill: var(--warning-soft); --bed-ink: var(--warning); }
+.bed-state-bloqueada { --bed-line: var(--state-blocked); --bed-fill: var(--state-blocked-soft); --bed-ink: var(--state-blocked); }
+.bed-state-desconocida { --bed-line: var(--control-line); --bed-fill: var(--surface); --bed-ink: var(--ink); }
+.bed-glyph { display: grid; justify-items: center; gap: 2px; min-width: 64px; min-height: 64px; padding: 6px 8px; border-radius: var(--radius-card); border: 2px solid var(--bed-line); background: var(--bed-fill); color: var(--bed-ink); font: inherit; cursor: pointer; }
+.bed-glyph strong { font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 14px; }
+.bed-glyph small { font-size: 11.5px; font-weight: 600; }
+.bed-glyph.is-selected { outline: 3px solid var(--outline); outline-offset: 2px; }
+.bed-glyph.bed-state-reservada { border-style: dashed; }
+.bed-glyph.bed-state-limpieza { background-image: radial-gradient(currentColor 1px, transparent 1.4px); background-size: 8px 8px; }
+.bed-glyph.bed-state-bloqueada, .legend-chip.bed-state-bloqueada { background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgb(74 88 101 / 0.22) 6px 9px); }
+.bed-glyph-mark { width: 18px; height: 10px; border-radius: 3px 3px 2px 2px; border: 2px solid currentColor; border-top-width: 5px; display: inline-block; }
+.bed-state-ocupada .bed-glyph-mark { background: currentColor; }
+.legend-chip.bed-state-reservada { border-style: dashed; }
+.plan-side { position: sticky; top: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); padding: 14px; min-height: 160px; }
+.plan-side-empty { display: grid; gap: 6px; justify-items: start; color: var(--muted); }
+.plan-side-body { display: grid; gap: 12px; }
+.plan-counts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.plan-counts div { padding: 6px 10px; border-radius: var(--radius-control); background: var(--bg); }
+.plan-counts dt { font-size: 12px; color: var(--muted); }
+.plan-counts dd { margin: 0; font-family: "Atkinson Hyperlegible Mono", monospace; font-weight: 700; }
+.plan-children { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.plan-children button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); font: inherit; cursor: pointer; text-align: left; }
+.plan-children small { display: block; color: var(--muted); }
+.plan-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.space-guide { margin: 0 0 12px; }
+@media (max-width: 900px) { .building-split { grid-template-columns: 1fr; } .plan-side { position: static; } }
