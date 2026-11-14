@@ -5,6 +5,7 @@ import { IntentApi } from './features/intent';
 import { LiveContext } from './features/live-scope';
 import { SessionExpiryWarning,useIdleSession } from './features/session';
 import { supabase } from './lib/supabase';
+import { demoAccounts } from './lib/demoLogin';
 import { useLive } from './lib/live';
 import { ActivationView,LoginView,RegistrationView,StatusView } from './components/ui';
 import { HospitalShell } from './features/shell';
@@ -29,7 +30,7 @@ export default function App(){
 function Login({notice,onAttempt}:{notice?:string;onAttempt:()=>void}){
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
  async function submit(e:FormEvent){e.preventDefault();onAttempt();setBusy(true);setError(null);try{const {error}=await supabase!.auth.signInWithPassword({email:email.trim(),password});if(error)setError('Correo o contraseña incorrectos, o la cuenta todavía no está activa.');}catch{setError('No se pudo conectar. Revisa tu conexión e intenta de nuevo.');}finally{setBusy(false);}}
- return <LoginView {...{email,password,setEmail,setPassword,busy,error,notice}} accepted={new URLSearchParams(location.search).get('invitacion')==='aceptada'} onSubmit={submit}/>;
+ return <LoginView {...{email,password,setEmail,setPassword,busy,error,notice,demoAccounts}} accepted={new URLSearchParams(location.search).get('invitacion')==='aceptada'} onSubmit={submit}/>;
 }
 function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
  // WEB-10: one client per session. The token is read on every request, so a renewed token does not
