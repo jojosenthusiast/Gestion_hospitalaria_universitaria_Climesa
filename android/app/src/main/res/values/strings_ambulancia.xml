@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Ambulancia, ronda 2: solicitante, mantenimiento y bitácora. -->
-    <string name="amb_solicitante">Quién pidió</string>
     <string name="amb_expediente">Expediente</string>
     <string name="amb_donde">Dónde está</string>
     <string name="amb_no_despachable">No se puede despachar ahora</string>
@@ -12,7 +11,6 @@
     <string name="amb_filtros">Filtros</string>
     <string name="amb_filtros_n">Filtros (%1$d)</string>
     <string name="amb_quitar_filtros">Quitar filtros</string>
-    <string name="amb_filtros_activos">Filtros activos</string>
     <string name="amb_todas">Todas</string>
     <string name="amb_estado_final">Estado final</string>
     <string name="amb_tipo">Tipo</string>
