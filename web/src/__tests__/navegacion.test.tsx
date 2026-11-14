@@ -74,7 +74,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); window.l
 const menuEsperado: Record<string, string[]> = {
   ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Accesos excepcionales', 'Perfil'],
   JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Accesos excepcionales', 'Perfil'],
-  REC: ['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
+  REC: ['Inicio', 'Pacientes', 'Vinculaciones', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
   LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil'],
   DPD: ['Inicio', 'Usuarios', 'Auditoría', 'Accesos excepcionales', 'Perfil'],
 };
@@ -122,7 +122,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
     // Un REC al que la API no le concede fila.ver ni citas.ver no ve esas entradas.
     const sinAgenda = permisosDe('REC').filter((p) => !['fila.ver', 'citas.ver'].includes(p.code));
     const nav = await entrar(perfil('REC', sinAgenda));
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Hospitalización', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Vinculaciones', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Hospitalización', 'Perfil']);
   });
 
   it('un laboratorista sin laboratorio.ver_cola ni inventario.ver no ve esos módulos', async () => {

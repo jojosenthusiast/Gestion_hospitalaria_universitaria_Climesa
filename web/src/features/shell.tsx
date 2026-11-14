@@ -15,11 +15,13 @@ import { LaboratoryPage } from './laboratory';
 import { InventoryPage } from './inventory';
 import { HospitalizationPage } from './hospitalization';
 import { AuditPage,ExceptionalAccessPage } from './privacy';
+import { AccountLinksPage } from './account-links';
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión; `alsoPermissions` abre el mismo módulo a otros permisos. */
 export type Module={id:string;label:string;permission?:string;alsoPermissions?:string[];future?:boolean};
 export const modules:Module[]=[
  {id:'inicio',label:'Inicio'},
  {id:'pacientes',label:'Pacientes',permission:'pacientes.buscar'},
+ {id:'vinculaciones',label:'Vinculaciones',permission:'cuentas.verificar'},
  {id:'personal',label:'Personal',permission:'personal.ver'},
  {id:'camas',label:'Camas',permission:'camas.ver_tablero'},
  {id:'espacios',label:'Edificio',permission:'espacios.ver'},
@@ -36,7 +38,7 @@ export const modules:Module[]=[
  {id:'privacidad',label:'Accesos excepcionales',permission:'privacidad.aprobar_acceso',alsoPermissions:['privacidad.solicitar_acceso']},
  {id:'perfil',label:'Perfil'},
 ];
-const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',privacidad:'privacy',perfil:'user'};
+const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',vinculaciones:'shield',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',privacidad:'privacy',perfil:'user'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
 export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
@@ -80,6 +82,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  else if(route==='camas')content=<BedsPage api={api} profile={profile} version={version}/>;
  else if(route==='ambulancia')content=<AmbulancePage api={api} profile={profile} version={version}/>;
  else if(route==='usuarios')content=<UsersPage api={api} profile={profile} version={version}/>;
+ else if(route==='vinculaciones')content=<AccountLinksPage api={api} profile={profile} version={version}/>;
  else if(route==='citas')content=<AppointmentsPage api={api} profile={profile} version={version}/>;
  else if(route==='consultas')content=<ConsultationsPage api={api} profile={profile} version={version}/>;
  else if(route==='fila')content=<QueuePage api={api} profile={profile} version={version}/>;

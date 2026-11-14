@@ -23,17 +23,21 @@ const agenda = [
   row({ appointmentId: 'cita-2', consultationId: 'cons-2', consultationState: 'abierta', appointmentState: 'confirmada', start: '2026-11-13T15:00:00Z' }),
   row({ appointmentId: 'cita-3', patientId: 'pac-2', patientName: 'Paciente Ficticio Dos', consultationId: 'cons-3', consultationState: 'firmada' }),
 ];
-const detail = {
-  consultation: { id: 'cons-1' },
-  vitalSigns: [{ id: 'sv-1', takenAt: '2026-11-10T15:05:00Z', systolic: 120, diastolic: 80, heartRate: 72, temperature: 36.6, oxygenSaturation: 98 }],
-  diagnoses: [{ id: 'd-1', code: 'R51', principal: true, note: 'Cefalea tensional' }],
-  prescriptions: [{ id: 'r-1', issuedAt: '2026-11-10T15:25:00Z', items: [{ id: 'ri-1', medication: 'Acetaminofén', dose: '500 mg', route: 'Oral', frequency: 'Cada 8 horas', duration: '3 días' }] }],
+const history = {
+  patient: { id: 'pac-1', record: '000412-7', fullName: 'Paciente Ficticio Uno' }, access: 'relacion',
+  consultations: [
+    { id: 'cons-9', state: 'firmada', startedAt: '2026-11-01T15:00:00Z', signedAt: '2026-11-01T15:30:00Z', reason: 'Control de presión', plan: 'Dieta', doctor: { id: 'staff-otro', name: 'Otra Médica Ficticia', specialty: 'Medicina interna' },
+      diagnoses: [{ code: 'I10', description: 'Hipertensión esencial', principal: true }], prescriptions: [] },
+    { id: 'cons-1', state: 'firmada', startedAt: '2026-11-10T15:00:00Z', signedAt: '2026-11-10T15:30:00Z', reason: 'Dolor de cabeza', plan: 'Reposo', doctor: { id: 'staff-med-1', name: 'Medicina de prueba', specialty: null },
+      diagnoses: [{ code: 'R51', description: 'Cefalea', principal: true, note: 'Cefalea tensional' }],
+      prescriptions: [{ id: 'r-1', issuedAt: '2026-11-10T15:25:00Z', items: [{ medication: 'Acetaminofén', dose: '500 mg', route: 'Oral', frequency: 'Cada 8 horas', duration: '3 días' }] }] },
+  ],
+  laboratory: [
+    { id: 'o-1', state: 'completado', createdAt: '2026-11-10T15:26:00Z', reviewedAt: '2026-11-11T10:00:00Z', items: [{ id: 'i-1', code: 'GLU', name: 'Glucosa en ayunas', unit: 'mg/dL', result: { value: 92, text: null, mark: 'normal' } }] },
+    { id: 'o-2', state: 'en_proceso', createdAt: '2026-11-12T15:26:00Z', reviewedAt: null, items: [{ id: 'i-2', code: 'CRE', name: 'Creatinina sérica', result: null }] },
+  ],
+  admissions: [{ id: 'a-1', state: 'egresado', origin: 'consulta', createdAt: '2026-10-01T12:00:00Z', doctor: { id: 'staff-otro', name: 'Otra Médica Ficticia' } }],
 };
-const orders = [
-  { id: 'o-1', patientId: 'pac-1', patientName: 'Paciente Ficticio Uno', priority: 'rutina', state: 'completado', version: 3, createdAt: '2026-11-10T15:26:00Z', reviewedAt: '2026-11-11T10:00:00Z', items: [{ id: 'i-1', code: 'GLU', name: 'Glucosa en ayunas', result: { value: 92, text: null, mark: 'normal', version: 1 } }] },
-  { id: 'o-2', patientId: 'pac-1', patientName: 'Paciente Ficticio Uno', priority: 'rutina', state: 'en_proceso', version: 2, createdAt: '2026-11-12T15:26:00Z', reviewedAt: null, items: [{ id: 'i-2', code: 'CRE', name: 'Creatinina sérica', result: null }] },
-  { id: 'o-3', patientId: 'pac-2', patientName: 'Paciente Ficticio Dos', priority: 'rutina', state: 'completado', version: 3, createdAt: '2026-11-10T15:26:00Z', reviewedAt: '2026-11-11T10:00:00Z', items: [{ id: 'i-3', code: 'COL', name: 'Colesterol total', result: { value: 180, text: null, mark: 'normal', version: 1 } }] },
-];
 
 function mount(permissions: string[], routes: Record<string, unknown> = {}) {
   const api = {
@@ -54,42 +58,40 @@ async function openHistory(patient = 'Paciente Ficticio Uno') {
   return screen.getByRole('dialog');
 }
 
-describe('historial clínico mínimo (REQ-03)', () => {
-  it('muestra solo las consultas firmadas del paciente y, al abrir una, sus diagnósticos, recetas y signos', async () => {
-    const api = mount(['consulta.iniciar', 'expediente.ver'], { '/consultas/cons-1/detalle': detail });
+describe('historial clínico (REQ-03, FR-106-09)', () => {
+  it('pide el historial del paciente a la API y muestra consultas de todos los médicos con diagnósticos y recetas', async () => {
+    const api = mount(['consulta.iniciar', 'expediente.ver'], { '/pacientes/pac-1/historial': history });
     const dialog = await openHistory();
-    expect(within(dialog).getByText('Dolor de cabeza')).toBeTruthy();
-    expect(within(dialog).queryByText(/cons-2|cons-3/)).toBeNull();
-    expect(within(dialog).getAllByRole('button', { name: /Ver detalle/ })).toHaveLength(1);
-    await userEvent.click(within(dialog).getByRole('button', { name: /Ver detalle/ }));
-    expect(await within(dialog).findByText(/R51/)).toBeTruthy();
+    expect(await within(dialog).findByText('Dolor de cabeza')).toBeTruthy();
+    expect(within(dialog).getByText('Control de presión')).toBeTruthy();
+    expect(within(dialog).getByText(/Otra Médica Ficticia · Medicina interna/)).toBeTruthy();
+    expect(within(dialog).getByText(/Hipertensión esencial/)).toBeTruthy();
     expect(within(dialog).getByText(/Cefalea tensional/)).toBeTruthy();
     expect(within(dialog).getByText(/Acetaminofén/)).toBeTruthy();
-    expect(within(dialog).getByText(/120\/80/)).toBeTruthy();
-    expect(api.request).toHaveBeenCalledWith('/consultas/cons-1/detalle', expect.anything());
+    expect(within(dialog).getByText(/000412-7/)).toBeTruthy();
+    expect(api.request).toHaveBeenCalledWith('/pacientes/pac-1/historial', expect.anything());
     expect(api.request.mock.calls.map(([path]) => path)).not.toContain('/laboratorio/ordenes');
   });
 
-  it('con resultados.ver agrega solo los resultados liberados del mismo paciente', async () => {
-    mount(['consulta.iniciar', 'expediente.ver', 'resultados.ver'], { '/laboratorio/ordenes': orders });
+  it('muestra el estado de cada orden y el valor solo cuando la API lo entrega, más las hospitalizaciones', async () => {
+    mount(['consulta.iniciar', 'expediente.ver'], { '/pacientes/pac-1/historial': history });
     const dialog = await openHistory();
-    const lab = await within(dialog).findByRole('region', { name: 'Resultados de laboratorio liberados' });
-    expect(within(lab).getByText(/Glucosa en ayunas/)).toBeTruthy();
-    expect(within(lab).getByText(/92/)).toBeTruthy();
-    expect(within(lab).queryByText(/Creatinina/)).toBeNull();
-    expect(within(lab).queryByText(/Colesterol/)).toBeNull();
+    const lab = await within(dialog).findByRole('region', { name: 'Resultados de laboratorio' });
+    expect(within(lab).getByText(/92 mg\/dL/)).toBeTruthy();
+    expect(within(lab).getByText(/Creatinina sérica/).parentElement!.textContent).toContain('Sin valor disponible');
+    expect(within(dialog).getByRole('region', { name: 'Hospitalizaciones' })).toBeTruthy();
   });
 
-  it('sin resultados liberados muestra el estado vacío de esa sección', async () => {
-    mount(['consulta.iniciar', 'expediente.ver', 'resultados.ver'], { '/laboratorio/ordenes': [] });
+  it('sin consultas ni órdenes muestra los estados vacíos', async () => {
+    mount(['consulta.iniciar', 'expediente.ver'], { '/pacientes/pac-2/historial': { ...history, patient: { id: 'pac-2', record: '000208-5', fullName: 'Paciente Ficticio Dos' }, consultations: [], laboratory: [], admissions: [] } });
     const dialog = await openHistory('Paciente Ficticio Dos');
-    expect(await within(dialog).findByText('Sin resultados liberados')).toBeTruthy();
+    expect(await within(dialog).findByText('Sin consultas')).toBeTruthy();
+    expect(within(dialog).getByText('Sin órdenes de laboratorio')).toBeTruthy();
   });
 
-  it('si falla el detalle muestra el error de la API y permite reintentar', async () => {
-    mount(['consulta.iniciar', 'expediente.ver'], { '/consultas/cons-1/detalle': new ApiError('No tienes relación de atención con este paciente.', 403) });
+  it('si la API niega el acceso muestra el error y permite reintentar', async () => {
+    mount(['consulta.iniciar', 'expediente.ver'], { '/pacientes/pac-1/historial': new ApiError('El historial requiere una relación de atención.', 403) });
     const dialog = await openHistory();
-    await userEvent.click(within(dialog).getByRole('button', { name: /Ver detalle/ }));
     expect(await within(dialog).findByText(/no tiene permiso/i)).toBeTruthy();
     expect(within(dialog).getByRole('button', { name: 'Volver a intentar' })).toBeTruthy();
   });
