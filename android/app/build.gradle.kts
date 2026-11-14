@@ -11,11 +11,17 @@ val climesaApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrEl
 val climesaReleaseApiBaseUrl = providers.gradleProperty("CLIMESA_API_BASE_URL").getOrElse("https://sghu-api.onrender.com/api/v1")
 
 // TEMPORARY testing aid (docs/operacion/login-de-prueba.md): with -PCLIMESA_DEMO_LOGIN=true and the git-ignored
-// ../demo-credenciales.json present, the login offers the fictitious test accounts (debug and release). Flag false
-// (default) or file missing: DEMO_CREDENTIALS is empty, so the APK carries no credential. Turn off before delivery.
+// ../demo-credenciales.json present, the debug login offers the fictitious test accounts. Flag false (default) or file
+// missing: DEMO_CREDENTIALS is empty, so the APK carries no credential. B-02: a release build never embeds them; asking
+// for one with the flag on fails the build instead of shipping the accounts.
 val climesaDemoLogin = providers.gradleProperty("CLIMESA_DEMO_LOGIN").map { it.toBoolean() }.getOrElse(false)
 val climesaDemoCredentialsFile = rootProject.layout.projectDirectory.file("../demo-credenciales.json")
 val climesaDemoCredentials = if (climesaDemoLogin) providers.fileContents(climesaDemoCredentialsFile).asText.orNull.orEmpty() else ""
+gradle.taskGraph.whenReady {
+    if (climesaDemoLogin && allTasks.any { it.project == project && it.name.contains("Release") }) {
+        throw GradleException("CLIMESA: CLIMESA_DEMO_LOGIN=true solo se permite en debug; un build release nunca incluye las cuentas de prueba.")
+    }
+}
 if (climesaDemoLogin && climesaDemoCredentials.isBlank()) logger.warn("CLIMESA: CLIMESA_DEMO_LOGIN=true pero no existe ../demo-credenciales.json; el ingreso no mostrará cuentas de prueba.")
 
 // Release signing comes only from Gradle properties (~/.gradle/gradle.properties) or environment variables, never
@@ -57,6 +63,8 @@ android {
     buildTypes {
         release {
             buildConfigField("String", "API_BASE_URL", buildConfigString(climesaReleaseApiBaseUrl))
+            buildConfigField("boolean", "DEMO_LOGIN", "false")
+            buildConfigField("String", "DEMO_CREDENTIALS", "\"\"")
             // R8 shrinks and optimizes; proguard-rules.pro keeps names readable (no obfuscation).
             isMinifyEnabled = true
             isShrinkResources = true
