@@ -91,7 +91,6 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `ambulancia.prehospital` | `servicio` | Reporte prehospitalario | `ambulancia`, `ambulancia.recibir_prehospital` | 109 |
 | `ambulancia.ubicacion` | `servicio` | Ubicación en vivo | `ambulancia` | 109 |
 | `vinculacion.solicitada` / `vinculacion.resuelta` | `vinculacion_paciente` | Solicitud, aprobación o rechazo | `cuentas.verificar`, `usuario:<solicitante>` | 101 |
-| `acceso.solicitado` / `acceso.resuelto` | `acceso_excepcional` | Solicitud y resolución | Permiso aprobador, `usuario:<solicitante>` | 110 |
 | `inventario.actualizado` | `articulo` | Movimiento | `inventario.ver` | 111 |
 | `inventario.bajo_minimo` | `articulo` | Movimiento o mínimo que cruza el umbral | `inventario.mover` según tipo de artículo | 111 |
 | `aviso.publicado` | `aviso` | Publicar aviso | `publico` | 112 |

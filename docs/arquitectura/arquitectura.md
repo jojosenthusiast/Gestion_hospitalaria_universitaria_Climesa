@@ -39,7 +39,7 @@ flowchart TB
 - `users`: invitaciones, directorio de cuentas, roles y estado.
 - `accounts`: vinculación de cuentas PAC con su expediente.
 - `ambulance`: solicitud, despacho, hitos, prehospital y bitácora.
-- `privacy`: accesos excepcionales, auditoría (búsqueda y verificación de la cadena) y "quién vio mi expediente".
+- `privacy`: auditoría (búsqueda y verificación de la cadena) y "quién vio mi expediente".
 - `public` y `metrics`: información pública, avisos y métricas.
 - `patients`: búsqueda fonética, constancia previa al registro, identificadores, historial y privacidad.
 - `operations`: personal, turnos, espacios, camas, resumen y recuperación de eventos.

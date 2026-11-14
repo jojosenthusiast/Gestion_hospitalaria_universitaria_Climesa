@@ -97,11 +97,10 @@ Punto para explicar: la doble asignación la impide PostgreSQL con `EXCLUDE USIN
 | 2 | Web · ADM | Escribir a mano la ruta de un módulo clínico (por ejemplo `#/consultas`) | "Sin permiso" |
 | 3 | Web · DPD | **Auditoría** | Ve quién, cuándo y qué tipo de dato, sin contenido clínico |
 | 4 | Web · REC | Abrir la ficha de un paciente | Ve datos personales; no ve diagnósticos ni resultados |
-| 5 | Web · MED | **Pacientes**: abrir un paciente sin relación de atención y **Solicitar acceso excepcional** con motivo | La solicitud queda pendiente; el contenido clínico sigue oculto |
-| 6 | Web · DPD | **Accesos excepcionales**: aprobar la solicitud | MED ve el expediente; el acceso queda auditado |
-| 7 | Web · DPD | **Auditoría**: buscar por paciente y fecha y ejecutar la **verificación de la cadena** | Ve el acceso excepcional (sin contenido clínico); la cadena de hash resulta íntegra |
-| 8 | Android · PAC | **Quién vio mi expediente** | El paciente ve fecha, rol y motivo del acceso, sin el nombre del personal |
-| 9 | Documento | Mostrar la matriz RBAC (Anexo B) y `permisos.csv` | Explicar que el código pregunta permisos, no roles (`sin-roles-en-codigo.spec.ts`) |
+| 5 | Web · MED | **Pacientes**: abrir un paciente sin relación de atención | La API responde 403; el contenido clínico sigue oculto |
+| 6 | Web · DPD | **Auditoría**: buscar por paciente y fecha y ejecutar la **verificación de la cadena** | Ve el intento denegado (sin contenido clínico); la cadena de hash resulta íntegra |
+| 7 | Android · PAC | **Quién vio mi expediente** | El paciente ve fecha, rol y motivo del acceso, sin el nombre del personal |
+| 8 | Documento | Mostrar la matriz RBAC (Anexo B) y `permisos.csv` | Explicar que el código pregunta permisos, no roles (`sin-roles-en-codigo.spec.ts`) |
 
 ## Bloque 8 · Información pública y métricas (3 minutos)
 

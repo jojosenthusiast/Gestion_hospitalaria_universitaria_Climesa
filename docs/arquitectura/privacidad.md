@@ -2,7 +2,7 @@
 
 Requisitos: REQ-PRV-01 a REQ-PRV-05 (documento del curso, sección 1.4 y entregable "Política de privacidad de datos"). Decisiones: D-009, D-014, D-031, D-032, D-040, D-056. Base legal: Ley para la Protección de Datos Personales (LPDP, Decreto 144 de 2024) Art. 4 g (datos de salud son sensibles), Art. 15-17 (delegado), Art. 20 (plazo de solicitudes), Art. 25 (brecha en 72 h); Norma Técnica del Expediente Clínico (Acuerdo 1616 de 2024, reforma 2026) Art. 41-43, 50, 55-57; Ley de Deberes y Derechos de los Pacientes Art. 20 (confidencialidad).
 
-> Corte S1/S2: están implementados el filtrado de fichas y ocupantes, auditoría, cierre web a 15 min y cierre móvil al volver tras 5 min en segundo plano. Las solicitudes de vinculación, accesos excepcionales, avisos de brecha y datos clínicos completos pertenecen a entregas posteriores. Las referencias normativas son las del documento base; esta revisión comprueba controles técnicos.
+> Corte S1/S2: están implementados el filtrado de fichas y ocupantes, auditoría, cierre web a 15 min y cierre móvil al volver tras 5 min en segundo plano. Las solicitudes de vinculación, avisos de brecha y datos clínicos completos pertenecen a entregas posteriores. Las referencias normativas son las del documento base; esta revisión comprueba controles técnicos.
 
 ## 1. Clases de información
 
@@ -11,7 +11,7 @@ Requisitos: REQ-PRV-01 a REQ-PRV-05 (documento del curso, sección 1.4 y entrega
 | **Pública** | Cualquiera, sin sesión | Ocupación general por planta y tipo (números, no camas), médicos de turno (nombre, especialidad, área), avisos generales, números de fila llamados (sin nombres) |
 | **Interna** | Personal con sesión según permiso | Estado de cada cama sin ocupante, estado de la ambulancia, turnos del personal, inventario, métricas agregadas |
 | **Personal** | Paciente dueño, personal que lo atiende o lo registra, administración autorizada | Nombre, DUI, fecha de nacimiento, teléfono, dirección, cama asignada, citas |
-| **Clínica (sensible)** | Paciente dueño (lo revisado), médico tratante, enfermería del área, laboratorio en lo que procesa, acceso excepcional aprobado | Consultas, diagnósticos, recetas, signos vitales, órdenes y resultados de laboratorio, reporte prehospital, notas de enfermería, alta |
+| **Clínica (sensible)** | Paciente dueño (lo revisado), médico tratante, enfermería del área, laboratorio en lo que procesa | Consultas, diagnósticos, recetas, signos vitales, órdenes y resultados de laboratorio, reporte prehospital, notas de enfermería, alta |
 
 "Administración autorizada" (texto del curso) se implementa así (D-031): Administrador y Jefe de Operaciones ven datos personales necesarios para operar (cama asignada, admisión) pero **nunca** lo clínico por su rol. Para ver algo clínico piden acceso excepcional con motivo y duración; lo aprueba el Delegado de protección de datos (nunca el mismo que lo pide); vence solo; todo queda auditado.
 
@@ -47,7 +47,7 @@ Delegado de protección de datos: ve metadatos de auditoría (quién, cuándo, q
 1. La API filtra campos según permiso y contexto antes de responder; ningún cliente recibe un campo para luego ocultarlo en pantalla.
 2. Los mensajes de tiempo real nunca llevan datos personales ni clínicos (ADR-0005).
 3. Las notificaciones push dicen "Tienes un resultado revisado", nunca el resultado.
-4. Toda lectura de datos personales o clínicos genera auditoría con motivo implícito (relación de atención) o explícito (acceso excepcional).
+4. Toda lectura de datos personales o clínicos genera auditoría con motivo implícito (relación de atención). El módulo de acceso excepcional (solicitar, aprobar, negar y urgencia) se retiró en la ronda 1 (observación 12): sin relación de atención no hay lectura clínica. Las filas de auditoría `acceso_excepcional.*` anteriores se conservan y se muestran como histórico.
 5. Las búsquedas de pacientes se auditan guardando un hash del texto buscado, no el texto.
 6. Sesión del personal con cierre por inactividad (15 min en web; 5 min en móvil en segundo plano con datos clínicos en pantalla).
 7. Los clientes no guardan datos clínicos en disco, salvo la cola cifrada del paramédico sin conexión, que se borra al enviarse.

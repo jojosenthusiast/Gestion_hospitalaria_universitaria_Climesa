@@ -9,6 +9,7 @@
   - Depende de: T01, 106-T02, 103-T06
   - Hecho cuando: escenario 1 pasa
 - [ ] T03 · S4 · R · Accesos excepcionales con aprobación del delegado y vencimiento
+  - Retirado (ronda 1, observación 12, 14-nov-2026): el dueño del producto quitó el módulo de acceso excepcional (solicitar, aprobar, negar y urgencia) en API, web, Android e iOS; no es requisito del curso. Sin relación de atención no hay lectura clínica. Migración `20261117002000_retiro_acceso_excepcional.sql` (la tabla `acceso.acceso_excepcional` se conserva como histórico). FR-110-04, FR-110-05, FR-110-06 y FR-110-09 quedan sin implementar a propósito; `spec.md` no se modifica sin una decisión registrada en `docs/decisiones/registro-decisiones.md`.
   - Cubre: FR-110-04, FR-110-05, FR-110-06
   - Depende de: T02
   - Hecho cuando: escenario 2 pasa con el reloj de prueba
@@ -35,6 +36,7 @@
   - Hecho cuando: escenario 4 pasa en Android e iOS
   - Avance (15-nov-2026): `GET /me/accesos` (escenario 4 en `api/tests/privacidad-accesos.spec.ts`) y pantalla A11 en Android (`MyAccessScreen`, `MyAccessRulesTest`). Falta I11 en iOS
 - [ ] T08 · S5 · E · Romper el vidrio en emergencia
+  - Retirado: ver la nota de T03 (ronda 1, observación 12).
   - Cubre: FR-110-09
   - Depende de: T03
   - Hecho cuando: el acceso inmediato queda pendiente de revisión del delegado

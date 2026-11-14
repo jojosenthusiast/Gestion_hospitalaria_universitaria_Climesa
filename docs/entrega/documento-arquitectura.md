@@ -42,7 +42,7 @@ El curso pide un ecosistema multiplataforma para un hospital universitario: app 
 | Información pública frente a privada | Política de la sección 8; `GET /publico/*` sin sesión y la pantalla pública de la web (`/publico`, `web/src/features/public-screen.tsx`) |
 | Una sola ambulancia con estados Disponible, En Servicio, En Mantenimiento | `ambulancia.unidad.estado` con esos tres valores; la semilla crea una única unidad. Solicitud, despacho, hitos, reporte prehospital y bitácora en `/ambulancia/*` (sección 4) |
 
-Roles del sistema (10): ADM (administración técnica), JOP (jefatura de operaciones), REC (recepción), AST (asistencia), ENF (enfermería), MED (médico), LAB (laboratorio), PAR (paramédico), DPD (delegado de protección de datos) y PAC (paciente). El catálogo está en `docs/arquitectura/datos/permisos.csv` (79 permisos).
+Roles del sistema (10): ADM (administración técnica), JOP (jefatura de operaciones), REC (recepción), AST (asistencia), ENF (enfermería), MED (médico), LAB (laboratorio), PAR (paramédico), DPD (delegado de protección de datos) y PAC (paciente). El catálogo está en `docs/arquitectura/datos/permisos.csv` (77 permisos).
 
 ## 2. Diseño UX/UI (Figma y sistema de diseño)
 
@@ -115,7 +115,7 @@ flowchart LR
   S --> P["PolicyRegistry y Clock"]
 ```
 
-Carpetas de `api/src`: `auth`, `users`, `accounts` (vinculación de cuentas), `patients`, `operations` (personal, turnos, espacios, camas, inicio y eventos), `attention` (citas, fila, consulta, expediente e historial clínico), `laboratory`, `hospitalization`, `inventory`, `ambulance`, `privacy` (accesos excepcionales, auditoría, "quién vio mi expediente"), `public` (información pública y avisos), `metrics`, `health`, `config` (cabeceras de seguridad y límite de tasa), `platform` y `supabase`. La arquitectura de módulos se comprueba con `api/tests/architecture.spec.ts`.
+Carpetas de `api/src`: `auth`, `users`, `accounts` (vinculación de cuentas), `patients`, `operations` (personal, turnos, espacios, camas, inicio y eventos), `attention` (citas, fila, consulta, expediente e historial clínico), `laboratory`, `hospitalization`, `inventory`, `ambulance`, `privacy` (auditoría, "quién vio mi expediente"), `public` (información pública y avisos), `metrics`, `health`, `config` (cabeceras de seguridad y límite de tasa), `platform` y `supabase`. La arquitectura de módulos se comprueba con `api/tests/architecture.spec.ts`.
 
 ## 4. Módulos y estado por módulo
 
@@ -140,7 +140,6 @@ Estados: **Implementado** (API y al menos un cliente), **Parcial** (existe una p
 | Ambulancia (solicitud, despacho, hitos, ubicación, reporte prehospital, bitácora) | `/ambulancia/solicitudes`, `/servicios`, `/ubicacion`, `/bitacora` | Ambulancia y Bitácora de ambulancia | Pedir ambulancia (PAC), Despacho (REC), Servicio, Reporte prehospital, Paciente sin identidad, Mi bitácora (PAR), recepción (ENF, MED) | Pedir ambulancia (I09), Llegada de ambulancia (I25) | Implementado |
 | Información pública (ocupación, médicos de turno, fila, avisos) | `/publico/*` sin sesión y con límite de tasa; `POST /avisos` | Pantalla `/publico`; Avisos (JOP) | Hospital (A10) | Información del hospital (I10) | Implementado |
 | Métricas | `/metricas/tablero`, `/metricas/{indicador}` | Métricas (ADM, JOP, DPD) | — | — | Implementado (solo web) |
-| Privacidad: accesos excepcionales | `/accesos-excepcionales/*` (solicitud, aprobación, negación) | Accesos excepcionales (DPD aprueba; ADM, JOP y MED solicitan) | — | Expediente (MED, I22) | Implementado |
 | Auditoría (búsqueda y verificación de la cadena de hash) | `GET /auditoria` (persona, paciente, acción, fechas), `POST /auditoria/verificacion` | Auditoría (DPD) | — | — | Implementado |
 | "Quién vio mi expediente" | `GET /me/accesos` | — | A11 | I11 | Implementado |
 | Historial clínico completo | `GET /pacientes/{id}/historial` | Historial (`clinical-history.tsx`) | Mi historial (PAC), Expediente (MED) | Mi historial (I08), Expediente (I22) | Implementado |
@@ -200,7 +199,7 @@ La base tiene **11 esquemas de dominio** y **66 tablas**, definidas en 28 archiv
 | `inventario` | `articulo`, `lote`, `existencia`, `movimiento` |
 | `publico` | `aviso` |
 
-Una tabla sigue sin API: `atencion.addendum`. Una consulta firmada no se edita y no hay endpoint de corrección por addendum. El resto de las tablas de ambulancia, accesos excepcionales y avisos ya tienen endpoints (sección 4).
+Una tabla sigue sin API: `atencion.addendum`. Una consulta firmada no se edita y no hay endpoint de corrección por addendum. El resto de las tablas de ambulancia y avisos ya tienen endpoints (sección 4). `acceso.acceso_excepcional` conserva las solicitudes históricas del módulo retirado en la ronda 1 y ya no tiene API.
 
 ### 6.2 Diagrama entidad-relación (entidades pedidas por el curso)
 
@@ -280,7 +279,7 @@ Las reglas concurrentes no dependen del cliente (`AGENTS.md`, regla 5):
 | Un número de fila activo por paciente, servicio y día | Índice único (`20261114000300_ticket_activo_unico.sql`) |
 | Un servicio activo por ambulancia | Índice único parcial `servicio_activo_unico` donde `finalizado_en is null` (`20261017000900_ambulancia.sql`) |
 | Hitos de ambulancia en orden | Validación de la secuencia `salida → en_escena → trasladando → en_hospital → finalizado` (`20261017000900_ambulancia.sql`; despacho en `20261115001000_ambulancia_despacho.sql`) |
-| Una vinculación pendiente por cuenta; un acceso excepcional por solicitud y vigencia | Restricciones de `20261115003000_vinculacion_invariantes.sql` y `20261115004000_acceso_excepcional_invariantes.sql` |
+| Una vinculación pendiente por cuenta | Restricciones de `20261115003000_vinculacion_invariantes.sql` |
 | Auditoría inmutable | El rol de la API solo tiene `INSERT` y `SELECT` sobre la auditoría; cada fila guarda el hash de la anterior |
 
 Las pruebas `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` comprueban estas reglas sobre PostgreSQL nativo.
@@ -322,7 +321,6 @@ Resumen de qué puede ver (V) y modificar (M) cada rol, según `docs/arquitectur
 | Ambulancia: estado | · | V | V | · | · | V | · | V | · | · |
 | Ambulancia: mantenimiento | · | M | · | · | · | · | · | · | · | · |
 | Auditoría (metadatos, búsqueda, verificación de cadena) | · | · | · | · | · | · | · | · | V | · |
-| Acceso excepcional a expedientes | M (solicita) | M (solicita) | · | · | · | M (solicita) | · | · | M (aprueba o niega) | · |
 | Vinculación de cuenta con expediente | · | · | M (aprueba) | · | · | · | · | · | · | M (solicita, propio) |
 | "Quién vio mi expediente" | · | · | · | · | · | · | · | · | · | V (propio) |
 | Ambulancia: solicitud | · | · | M | · | · | · | · | · | · | M |
@@ -350,7 +348,7 @@ Documento completo: `docs/arquitectura/privacidad.md` (base: LPDP de El Salvador
 | **Personal** | Paciente dueño, personal que lo atiende o registra, administración autorizada | Nombre, DUI, fecha de nacimiento, teléfono, dirección, cama asignada, citas |
 | **Clínica (sensible)** | Paciente dueño (lo revisado o firmado), médico tratante, enfermería del área, laboratorio en lo que procesa | Consultas, diagnósticos, recetas, signos vitales, órdenes y resultados, notas de enfermería, alta |
 
-"Administración autorizada" (D-031): ADM y JOP ven los datos personales necesarios para operar (cama asignada, admisión), **nunca** lo clínico por su rol. El acceso excepcional lo solicita ADM, JOP o MED con un motivo y lo aprueba o niega el DPD (`POST /accesos-excepcionales`, `/aprobar`, `/negar`); el acceso queda auditado y el paciente lo ve en "Quién vio mi expediente" (`GET /me/accesos`: fecha, rol y motivo, sin nombres del personal).
+"Administración autorizada" (D-031): ADM y JOP ven los datos personales necesarios para operar (cama asignada, admisión), **nunca** lo clínico por su rol. Sin relación de atención no hay lectura clínica (el módulo de acceso excepcional se retiró en la ronda 1); toda lectura queda auditada y el paciente la ve en "Quién vio mi expediente" (`GET /me/accesos`: fecha, rol y motivo, sin nombres del personal).
 
 ### 8.2 Campos públicos y privados del expediente
 
@@ -470,7 +468,7 @@ El despliegue no está conectado a CI: no hay un gate que impida desplegar un co
 
 | Componente | Pruebas en esta rama | Herramienta |
 |---|---|---|
-| API | 43 archivos `*.spec.ts` en `api/tests/` (pipeline HTTP, RBAC, privacidad, tiempo real, módulos clínicos, ambulancia, público, métricas, vinculación, acceso excepcional) | Jest sobre PostgreSQL WASM (PGlite) con todas las migraciones |
+| API | 43 archivos `*.spec.ts` en `api/tests/` (pipeline HTTP, RBAC, privacidad, tiempo real, módulos clínicos, ambulancia, público, métricas, vinculación) | Jest sobre PostgreSQL WASM (PGlite) con todas las migraciones |
 | Web | 33 archivos de prueba en `web/src` | Vitest |
 | Android | 38 archivos de prueba en `android/app/src/test` | JUnit (`testDebugUnitTest`) |
 | iOS | 6 archivos en `ios/Tests` (contrato, reglas, tiempo real); el workflow `ios.yml` ejecuta `swift test` y compila para simulador | XCTest (no ejecutado en este entorno) |
@@ -514,7 +512,7 @@ Archivos: `docs/decisiones/adr/ADR-0001-…` a `ADR-0008-…` y `docs/decisiones
 
 ## Anexo A. Endpoints y permiso requerido
 
-Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 112 operaciones bajo `/api/v1`. Cuando se listan varios permisos, basta con tener uno. "Sin sesión" son `/health`, `/salud` y `/publico/*`. Toda escritura exige `Idempotency-Key` y, si cambia un registro existente, su `version`. Los errores son `application/problem+json`. La documentación interactiva está en `/api/v1/docs`.
+Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 108 operaciones bajo `/api/v1`. Cuando se listan varios permisos, basta con tener uno. "Sin sesión" son `/health`, `/salud` y `/publico/*`. Toda escritura exige `Idempotency-Key` y, si cambia un registro existente, su `version`. Los errores son `application/problem+json`. La documentación interactiva está en `/api/v1/docs`.
 
 | Método | Ruta (`/api/v1`) | Permiso requerido | Qué hace |
 |---|---|---|---|
@@ -577,7 +575,7 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 | POST | `/consultas/{id}/signos` | `signos.registrar` | Registrar signos vitales de una consulta |
 | POST | `/consultas/{id}/diagnosticos` | `consulta.registrar` | Registrar un diagnóstico CIE-10 |
 | POST | `/consultas/{id}/receta` | `recetas.emitir` | Emitir una receta con sus indicaciones |
-| GET | `/pacientes/{id}/historial` | `expediente.ver` | Historial clínico: relación, acceso excepcional o propio revisado |
+| GET | `/pacientes/{id}/historial` | `expediente.ver` | Historial clínico: relación o propio revisado |
 | GET | `/laboratorio/catalogo` | `laboratorio.ordenar` o `catalogo.configurar` | Catálogo activo de exámenes y paneles |
 | GET | `/laboratorio/ordenes` | `laboratorio.ver_cola` o `resultados.ver` | Cola de laboratorio o resultados permitidos |
 | POST | `/laboratorio/ordenes` | `laboratorio.ordenar` | Crear una orden de laboratorio desde una consulta |
@@ -602,10 +600,6 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 | POST | `/inventario/movimientos` | `inventario.mover` | Registrar entrada, salida, ajuste, traslado o consumo |
 | POST | `/inventario/articulos` | `inventario.configurar` | Crear artículo de inventario |
 | PUT | `/inventario/articulos/{id}` | `inventario.configurar` | Editar artículo de inventario |
-| POST | `/accesos-excepcionales` | `privacidad.solicitar_acceso` | Pedir acceso excepcional con motivo y duración (o de urgencia, pendiente de revisión) |
-| GET | `/accesos-excepcionales` | `privacidad.aprobar_acceso` | Solicitudes de acceso excepcional; el solicitante ve solo las suyas |
-| POST | `/accesos-excepcionales/{id}/aprobar` | `privacidad.aprobar_acceso` | Aprobar un acceso excepcional (nunca el propio) o confirmar uno de urgencia |
-| POST | `/accesos-excepcionales/{id}/negar` | `privacidad.aprobar_acceso` | Negar un acceso excepcional o cerrar uno de urgencia |
 | GET | `/auditoria` | `auditoria.ver` | Metadatos de auditoría por persona, paciente, acción y fecha; no contiene valores clínicos |
 | POST | `/auditoria/verificacion` | `auditoria.ver` | Verificar la integridad de la cadena de hash de la auditoría |
 | GET | `/me/accesos` | `auditoria.mis_accesos` | Quién vio mi expediente: fecha, rol y motivo, sin nombres del personal |
@@ -633,7 +627,7 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 
 ## Anexo B. Matriz completa de permisos por rol
 
-Copia de `docs/arquitectura/datos/permisos.csv` (79 permisos, 10 roles). `✔` = permitido sin restricción adicional; `·` = no permitido; una palabra indica el contexto que la API exige además del permiso: `propio` (solo lo del propio usuario o paciente), `propio_revisado` (lo propio, solo después de la revisión o firma del médico), `relacion` (relación de atención con el paciente), `area` (turno en curso en el área del paciente), `orden` (paciente con orden de laboratorio), `rango` (solo para calcular rangos de referencia), `autor` (solo lo que creó la misma persona), `consumo` y `reactivos` (solo esos movimientos de inventario).
+Copia de `docs/arquitectura/datos/permisos.csv` (77 permisos, 10 roles). `✔` = permitido sin restricción adicional; `·` = no permitido; una palabra indica el contexto que la API exige además del permiso: `propio` (solo lo del propio usuario o paciente), `propio_revisado` (lo propio, solo después de la revisión o firma del médico), `relacion` (relación de atención con el paciente), `area` (turno en curso en el área del paciente), `orden` (paciente con orden de laboratorio), `rango` (solo para calcular rangos de referencia), `autor` (solo lo que creó la misma persona), `consumo` y `reactivos` (solo esos movimientos de inventario).
 
 Ocho permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo y filtran campos dentro de otros endpoints (`pacientes.ver_nacimiento`, `pacientes.ver_contacto`, `personal.ver_datos_personales`, `turnos.ver_borradores`, `camas.ver_ocupante`); los otros tres no tienen endpoint (`recursos.gestionar`, `recursos.configurar`, `consulta.corregir`).
 
@@ -709,8 +703,6 @@ Ocho permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo
 | `ambulancia.recibir_prehospital` | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | `ambulancia.mantenimiento` | · | ✔ | · | · | · | · | · | · | · | · |
 | `ambulancia.ver_bitacora` | · | ✔ | ✔ | · | · | · | · | propio | ✔ | · |
-| `privacidad.solicitar_acceso` | ✔ | ✔ | · | · | · | ✔ | · | · | · | · |
-| `privacidad.aprobar_acceso` | · | · | · | · | · | · | · | · | ✔ | · |
 | `auditoria.ver` | · | · | · | · | · | · | · | · | ✔ | · |
 | `auditoria.mis_accesos` | · | · | · | · | · | · | · | · | · | propio |
 | `inventario.ver` | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
