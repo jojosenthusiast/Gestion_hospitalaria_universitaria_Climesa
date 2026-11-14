@@ -20,7 +20,7 @@ class BackendAccessRepository(private val apiBaseUrl:String) {
             fun strings(key:String)=json.optJSONArray(key)?.let{a->(0 until a.length()).map(a::getString)}?:emptyList()
             val permissions=json.optJSONArray("permissions")?.let{a->(0 until a.length()).map{a.getJSONObject(it).getString("code")}}?:emptyList()
             if(strings("roles").isEmpty()||"sesion.perfil" !in permissions)throw AuthRequestException("La cuenta no tiene permisos vigentes.",403)
-            AccessProfile(roles=strings("roles"),permissions=permissions,verifiedByBackend=true,platforms=strings("platforms"),channels=strings("channels"),name=json.optString("name"))
+            AccessProfile(roles=strings("roles"),permissions=permissions,verifiedByBackend=true,platforms=strings("platforms"),channels=strings("channels"),name=json.optString("name"),patientId=json.optString("patientId").takeIf{!json.isNull("patientId")&&it.isNotBlank()})
         } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("No se pudo verificar el acceso. Revisa la conexión e intenta de nuevo.")} finally {c.disconnect()}
     }
 }

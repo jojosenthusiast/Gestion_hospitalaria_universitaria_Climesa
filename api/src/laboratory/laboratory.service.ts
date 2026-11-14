@@ -5,7 +5,7 @@ import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException, VersionConflictException } from '../platform/problem';
 import { LabCancelDto, LabOrderDto, LabPriority, LabResultDto, LabSampleDto, LabVersionDto } from './laboratory.dto';
 import { classifyLabValue, matchesDoubleIdentification } from './laboratory.rules';
 
@@ -34,6 +34,19 @@ export class LaboratoryService {
     const patient = contextsOf(actor, 'resultados.ver').includes('propio_revisado') && actor.patientId;
     const doctor = actor.staffId && contextsOf(actor, 'resultados.ver').includes('relacion') ? actor.staffId : null;
     if (!lab && !patient && !doctor) throw new ForbiddenException('No tienes permiso para consultar órdenes de laboratorio.');
+    return this.orders(actor, lab, patient || null, doctor);
+  }
+
+  /**
+   * GET /me/laboratorio (FR-107-10, FR-107-11): only the authenticated patient's orders. The state is always visible;
+   * values only once the treating doctor reviewed the order (D-040). An unlinked account has no orders (RN-39).
+   */
+  async mine(actor: Actor) {
+    if (!actor.patientId || !contextsOf(actor, 'resultados.ver').includes('propio_revisado')) throw new ProblemException('sin_vinculacion', 404, 'Tu cuenta todavía no está vinculada a un expediente.');
+    return this.orders(actor, false, actor.patientId, null);
+  }
+
+  private async orders(actor: Actor, lab: boolean, patient: string | null, doctor: string | null) {
     const rows = await this.db.transaction(async c => {
       const result = await c.query(`SELECT o.id,o.consulta_id AS "consultationId",o.paciente_id AS "patientId",o.medico_id AS "doctorId",
       o.prioridad AS priority,o.estado AS state,o.creada_en AS "createdAt",o.muestra_tomada_en AS "sampleTakenAt",
@@ -43,7 +56,7 @@ export class LaboratoryService {
       FROM laboratorio.orden o JOIN pacientes.paciente p ON p.id=o.paciente_id
       LEFT JOIN laboratorio.orden_item oi ON oi.orden_id=o.id LEFT JOIN laboratorio.examen e ON e.id=oi.examen_id LEFT JOIN laboratorio.resultado r ON r.orden_item_id=oi.id
       WHERE ($1::boolean AND o.estado IN ('pendiente','en_proceso','completado')) OR ($4::uuid IS NOT NULL AND o.paciente_id=$4) OR ($3::uuid IS NOT NULL AND o.medico_id=$3)
-      GROUP BY o.id,p.id ORDER BY o.creada_en DESC LIMIT 300`, [lab, !!patient, doctor, patient || null]);
+      GROUP BY o.id,p.id ORDER BY o.creada_en DESC LIMIT 300`, [lab, !!patient, doctor, patient]);
       for (const row of result.rows) await this.commands.audit(c, actor, { action: 'laboratorio.leer', entity: 'orden_laboratorio', entityId: row.id, patientId: row.patientId, permission: 'resultados.ver' });
       return result.rows;
     });

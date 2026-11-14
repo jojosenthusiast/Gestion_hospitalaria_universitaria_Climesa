@@ -9,6 +9,8 @@ data class LaboratoryOrder(val id: String, val patientName: String, val priority
 
 object LaboratoryLabels {
     fun state(value: String) = mapOf("pendiente" to "Pendiente", "en_proceso" to "En proceso", "completado" to "Completado", "cancelado" to "Cancelado")[value] ?: value
+    /** Value (or text) followed by its mark, for the result rows. */
+    fun valueAndMark(result: LaboratoryResult) = listOfNotNull(result.text ?: result.value?.toString(), mark(result.mark)).joinToString(" · ")
     fun mark(value: String) = mapOf("normal" to "Normal", "alto" to "Alto", "bajo" to "Bajo", "critico_alto" to "Crítico alto", "critico_bajo" to "Crítico bajo", "sin_rango" to "Sin rango")[value] ?: value
 }
 

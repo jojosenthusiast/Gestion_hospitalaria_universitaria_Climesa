@@ -137,9 +137,12 @@ object PatientEvents {
     }
 }
 
-/** Se vuelve a leer `/auth/me` y se vuelven a unir los canales cuando cambia la cuenta. */
+/**
+ * Se vuelve a leer `/auth/me` y se vuelven a unir los canales cuando cambia la cuenta. Resolver la vinculación
+ * (`vinculacion.resuelta`) cambia el expediente enlazado (`patientId`), así que también refresca el perfil.
+ */
 object ProfileEvents {
-    fun matches(event: EventoDominio) = LiveEntities.matches(event, "usuario")
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, "usuario") || event.type == "vinculacion.resuelta"
 }
 
 /** Qué eventos refrescan cada pantalla del portal por rol, según la ruta que carga. */

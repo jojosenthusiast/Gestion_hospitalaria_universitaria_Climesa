@@ -34,6 +34,7 @@
   - Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11
   - Depende de: T05, 102-T03
   - Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
+  - Avance 13-nov-2026: API `POST /cuentas/vinculacion`, `GET /cuentas/vinculaciones`, `POST /cuentas/vinculaciones/{id}/aprobar|rechazar` con idempotencia, versión, auditoría y eventos `vinculacion.solicitada`/`vinculacion.resuelta` a `rol:REC` y `usuario:<cuenta>`; migración `20261115003000_vinculacion_invariantes.sql` (vinculación resuelta inmutable y completa). `api/tests/paciente-vinculacion-historial.spec.ts`: sin vincular `/me/paciente` da 404 `sin_vinculacion`, la aprobación enlaza la cuenta (`/auth/me` trae `patientId`), versión vieja 409, sin expediente 409 `sin_expediente`, rechazo exige motivo; web W27 (`web/src/__tests__/vinculaciones.test.tsx`) y Android A03 (`PatientRecordViewModelsTest`, cambia sola con `vinculacion.resuelta`). **Sigue abierta**: falta iOS, la prueba de punta a punta en la nube y mostrar el motivo del rechazo al paciente (ver `docs/preguntas-abiertas.md`).
 - [ ] T08 · S5 · E · Vigencia de inscripción en el perfil
   - Cubre: FR-101-16
   - Depende de: 103-T05
