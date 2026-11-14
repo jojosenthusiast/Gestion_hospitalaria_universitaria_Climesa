@@ -1,6 +1,7 @@
-import { useCallback,useEffect,useMemo,useState,type FormEvent } from 'react';
+import { useCallback,useEffect,useMemo,useRef,useState,type FormEvent } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { HttpApi,type AccessProfile } from './lib/api';
+import type { AccessProfile } from './lib/api';
+import { IntentApi } from './features/intent';
 import { supabase } from './lib/supabase';
 import { useLive } from './lib/live';
 import { ActivationView,LoginView,RegistrationView,StatusView } from './components/ui';
@@ -25,7 +26,10 @@ function Login({notice,onAttempt}:{notice?:string;onAttempt:()=>void}){
  return <LoginView {...{email,password,setEmail,setPassword,busy,error,notice}} accepted={new URLSearchParams(location.search).get('invitacion')==='aceptada'} onSubmit={submit}/>;
 }
 function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
- const api=useMemo(()=>new HttpApi(async()=>{const {data}=await supabase!.auth.getSession();return data.session?.access_token??session.access_token;},()=>void supabase?.auth.signOut({scope:'local'})),[session.access_token]);
+ // WEB-10: one client per session. The token is read on every request, so a renewed token does not
+ // recreate the client: pending intent keys survive and the views do not all reload on renewal.
+ const token=useRef(session.access_token);token.current=session.access_token;
+ const api=useMemo(()=>new IntentApi(async()=>{const {data}=await supabase!.auth.getSession();return data.session?.access_token??token.current;},()=>void supabase?.auth.signOut({scope:'local'})),[]);
  const [profile,setProfile]=useState<AccessProfile|null>(null),[error,setError]=useState<string|null>(null),[loading,setLoading]=useState(true);
  const load=useCallback(()=>{setLoading(true);setError(null);void api.request<AccessProfile>('/auth/me').then(setProfile).catch(e=>setError(e instanceof Error?e.message:'No se pudo verificar el acceso.')).finally(()=>setLoading(false));},[api]);
  useEffect(load,[load]);
@@ -34,7 +38,7 @@ function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
  if(!profile.platforms.includes('web'))return <StatusView title="Tu rol no usa esta aplicación" detail={`Tu cuenta está habilitada para ${profile.platforms.map(p=>p==='ios'?'iOS':'Android').join(' e ')}. Ingresa desde la aplicación correspondiente.`} action="Cerrar sesión" onAction={()=>void supabase?.auth.signOut({scope:'local'})}/>;
  return <LivePortal {...{api,profile,session,onExpired}} refreshProfile={load}/>;
 }
-function LivePortal({api,profile,session,onExpired,refreshProfile}:{api:HttpApi;profile:AccessProfile;session:Session;onExpired:()=>void;refreshProfile:()=>void}){
+function LivePortal({api,profile,session,onExpired,refreshProfile}:{api:IntentApi;profile:AccessProfile;session:Session;onExpired:()=>void;refreshProfile:()=>void}){
  const live=useLive(api,profile,session.access_token,refreshProfile);
  useEffect(()=>{let last=Date.now();const active=()=>{last=Date.now();};const events=['pointerdown','keydown','scroll'] as const;for(const e of events)window.addEventListener(e,active,{passive:true});const timer=setInterval(()=>{if(Date.now()-last>15*60*1000)onExpired();},30000);return()=>{clearInterval(timer);for(const e of events)window.removeEventListener(e,active);};},[onExpired]);
  return <HospitalShell api={api} profile={profile} version={live.version} connection={live.status} onLogout={()=>void supabase?.auth.signOut({scope:'local'})}/>;

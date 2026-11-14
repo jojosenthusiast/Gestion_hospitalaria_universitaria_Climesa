@@ -1,6 +1,7 @@
 import { useEffect,useId,useRef,useState,type ReactNode } from 'react';
 import { ApiError,type Api } from '../lib/api';
 import { Icon,Notice } from '../components/ui';
+import { newIntentKey,withIntentKey } from './intent';
 export type Remote<T>={data:T|null;loading:boolean;error:ApiError|null;refresh:()=>void};
 export function useData<T>(api:Api,path:string,version=0,enabled=true):Remote<T>{
  const [data,setData]=useState<T|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState<ApiError|null>(null),[tick,setTick]=useState(0);
@@ -9,7 +10,18 @@ export function useData<T>(api:Api,path:string,version=0,enabled=true):Remote<T>
 }
 export function useAction(api:Api){
  const [busy,setBusy]=useState(false),[error,setError]=useState<ApiError|null>(null);
- async function run<T>(path:string,body:unknown,method='POST'):Promise<T|undefined>{setBusy(true);setError(null);try{return await api.write<T>(path,body,method);}catch(e){setError(e instanceof ApiError?e:new ApiError('No se pudo guardar.'));return undefined;}finally{setBusy(false);}}
+ // WEB-10: one Idempotency-Key per intent (this form or dialog sending this operation). A retry
+ // after a failure reuses it, even if the person corrected the data: a failed write leaves nothing
+ // stored in the API, and a write whose answer was lost must not run twice. After a success the
+ // next send is a new intent; another form (another `useAction`) never shares the key.
+ const intents=useRef(new Map<string,string>());
+ async function run<T>(path:string,body:unknown,method='POST'):Promise<T|undefined>{
+  const operation=`${method} ${path}`,key=intents.current.get(operation)??newIntentKey();intents.current.set(operation,key);
+  setBusy(true);setError(null);
+  try{const result=await withIntentKey(key,()=>api.write<T>(path,body,method));intents.current.delete(operation);return result;}
+  catch(e){setError(e instanceof ApiError?e:new ApiError('No se pudo guardar.'));return undefined;}
+  finally{setBusy(false);}
+ }
  return {busy,error,run};
 }
 export function Heading({eyebrow,title,description,actions}:{eyebrow:string;title:string;description:string;actions?:ReactNode}){return <header className="module-heading reveal"><div><span className="eyebrow">{eyebrow}</span><h1>{title}<span>.</span></h1><p>{description}</p></div>{actions&&<div className="heading-actions">{actions}</div>}</header>;}
