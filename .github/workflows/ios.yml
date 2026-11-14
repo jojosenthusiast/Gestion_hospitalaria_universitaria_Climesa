@@ -6,7 +6,8 @@ on:
     paths: ['ios/**', '.github/workflows/ios.yml']
 permissions:
   contents: read
-# Builds the monorepo ios/ project (CLIMESA.xcodeproj, shared scheme CLIMESA) and tests the ClimesaCore package.
+# Builds the monorepo ios/ project (CLIMESA.xcodeproj, shared scheme CLIMESA), tests the ClimesaCore package and
+# boots the app on an iOS simulator (CLIMESAUITests) to assert that the login screen appears.
 # No secrets: the project reads Configuration.plist and CLIMESA_API_BASE_URL; Config.xcconfig is not used by the build.
 jobs:
   build:
@@ -31,3 +32,16 @@ jobs:
         run: swift test
       - name: App build (simulator, unsigned)
         run: xcodebuild -project CLIMESA.xcodeproj -scheme CLIMESA -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      # Ad-hoc signing (no team, no secrets): an unsigned simulator build has no keychain entitlement and the app would show the session-recovery error instead of login.
+      - name: UI test (boots the app on an iOS simulator, asserts the login screen)
+        run: |
+          DEVICE=$(xcrun simctl list devices available | grep -m1 -E '^ +iPhone [0-9]+ \(' | sed -E 's/^ +(.*) \([0-9A-F-]{36}\).*/\1/')
+          echo "Simulator: $DEVICE"
+          test -n "$DEVICE"
+          xcodebuild test -project CLIMESA.xcodeproj -scheme CLIMESA -configuration Debug -sdk iphonesimulator -destination "platform=iOS Simulator,name=$DEVICE" -resultBundlePath "$RUNNER_TEMP/ui.xcresult" CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES
+      - name: Upload UI test result bundle
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-results
+          path: ${{ runner.temp }}/ui.xcresult

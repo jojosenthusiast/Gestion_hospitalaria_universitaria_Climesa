@@ -741,27 +741,24 @@ struct HospitalInfoView: View {
             SectionTitle("hospital.occupancy")
             if let rows = info.occupancy?.rows, !rows.isEmpty {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    Card {
-                        Text(verbatim: row.floor.map { String(format: L.text("hospital.floor"), $0) } ?? row.category.label).font(Brand.bold(16))
-                        Text(verbatim: String(format: L.text("hospital.beds"), row.free, row.beds)).font(Brand.body(14))
-                        Text(verbatim: row.category.label).font(Brand.mono(11))
-                    }
+                    StatTile(value: String(row.free), label: String(format: L.text("hospital.beds"), row.free, row.beds),
+                             title: row.floor.map { String(format: L.text("hospital.floor"), $0) } ?? row.category.label)
                 }
-            } else { EmptyNote("hospital.unavailable") }
+            } else { EmptyStateView(title: L.text("hospital.unavailable"), symbol: "building.2") }
             SectionTitle("hospital.doctors")
             if let doctors = info.doctors?.doctors, !doctors.isEmpty {
-                ForEach(Array(doctors.enumerated()), id: \.offset) { _, doctor in
-                    Card {
-                        Text(verbatim: doctor.name).font(Brand.bold(16))
-                        Text(verbatim: [doctor.specialty, doctor.area].compactMap { $0 }.joined(separator: " · ")).font(Brand.body(14))
-                        if let until = doctor.until { Text(verbatim: String(format: L.text("hospital.until"), ClimesaDates.display(until, .time))).font(Brand.body(12)).foregroundStyle(.secondary) }
+                SectionCard {
+                    ForEach(Array(doctors.enumerated()), id: \.offset) { index, doctor in
+                        if index > 0 { Divider().overlay(Theme.line) }
+                        ListRow(title: doctor.name, subtitle: [doctor.specialty, doctor.area].compactMap { $0 }.joined(separator: " · "),
+                                meta: doctor.until.map { String(format: L.text("hospital.until"), ClimesaDates.display($0, .time)) })
                     }
                 }
-            } else { EmptyNote("hospital.doctors.none") }
+            } else { EmptyStateView(title: L.text("hospital.doctors.none"), symbol: "stethoscope") }
             SectionTitle("home.notices")
             if let notices = info.notices?.notices, !notices.isEmpty {
-                ForEach(notices) { notice in Card { Text(verbatim: notice.title).font(Brand.bold(16)); Text(verbatim: notice.body).font(Brand.body(14)) } }
-            } else { EmptyNote("hospital.notices.none") }
+                ForEach(notices) { notice in SectionCard(title: notice.title) { Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink) } }
+            } else { EmptyStateView(title: L.text("hospital.notices.none"), symbol: "bell") }
         }
         .task(id: live.snapshot.version(.hospitalInfo)) { await load() }
     }

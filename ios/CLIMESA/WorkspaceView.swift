@@ -52,11 +52,13 @@ struct RoleTabsView:View {
                 NavigationStack {
                     ScrollView {
                         VStack(alignment:.leading,spacing:25) {
-                            Text(verbatim:"\(L.text(RolePolicy.labelKey(role)).uppercased()) / CLIMESA").font(Brand.mono()).foregroundStyle(Brand.blue)
-                            Text(LocalizedStringKey(tab.titleKey)).font(Brand.bold(39)).fixedSize(horizontal:false,vertical:true)
+                            Text(verbatim:"\(L.text(RolePolicy.labelKey(role)).uppercased()) / CLIMESA").font(Typo.eyebrow).foregroundStyle(Theme.primaryText)
+                            Text(LocalizedStringKey(tab.titleKey)).font(Typo.display).foregroundStyle(Theme.ink).fixedSize(horizontal:false,vertical:true).accessibilityAddTraits(.isHeader)
                             content(for:tab)
                         }.padding(24).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
-                    }.background(Brand.paper).navigationTitle(Text(verbatim:"climesa")).navigationBarTitleDisplayMode(.inline)
+                    }.background(Theme.bg).navigationTitle(Text(verbatim:"climesa")).navigationBarTitleDisplayMode(.inline)
+                        .toolbarBackground(Theme.navy,for:.navigationBar).toolbarBackground(.visible,for:.navigationBar).toolbarColorScheme(.dark,for:.navigationBar)
+                        .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
                         .refreshable { await refresh(tab) }
                 }.tabItem { Label(LocalizedStringKey(tab.titleKey),systemImage:tab.symbol) }.tag(tab)
             }
@@ -99,9 +101,11 @@ struct ConnectionBanner:View {
     var body:some View {
         if state != .live {
             Text(LocalizedStringKey(state == .offline ? "live.offline":"live.reconnecting"))
-                .font(Brand.body(13)).frame(maxWidth:.infinity).padding(8)
-                .background(state == .offline ? Color.red.opacity(0.12):Brand.lime).foregroundStyle(Brand.ink)
+                .font(Typo.tag).frame(maxWidth:.infinity).padding(8)
+                .background(state == .offline ? Theme.dangerSoft:Theme.warningSoft).foregroundStyle(state == .offline ? Theme.danger:Theme.warning)
                 .accessibilityAddTraits(.updatesFrequently)
+        } else {
+            LiveIndicator().frame(maxWidth:.infinity,alignment:.trailing).padding(.horizontal,Spacing.l).padding(.vertical,Spacing.xs).background(Theme.bg)
         }
     }
 }
@@ -125,16 +129,15 @@ struct ShiftsContent:View {
     let role:String
     var body:some View {
         VStack(alignment:.leading,spacing:25) {
-            if model.loading && model.shifts.isEmpty { ProgressView("shifts.loading") }
-            else if let error=model.error { Notice(text:error,failure:true); Button("common.retry") { Task { await model.load(api:account.api) } } }
-            else if model.shifts.isEmpty { Text("shifts.empty").foregroundStyle(.secondary) }
+            if model.loading && model.shifts.isEmpty { LoadingStateView(message:L.text("shifts.loading")) }
+            else if let error=model.error { ErrorStateView(message:error) { Task { await model.load(api:account.api) } } }
+            else if model.shifts.isEmpty { EmptyStateView(title:L.text("shifts.empty"),symbol:"calendar") }
             ForEach(model.shifts) { shift in
-                VStack(alignment:.leading,spacing:12) {
-                    Text(verbatim:shift.area).font(Brand.bold(22))
-                    Text(verbatim:Shift.display(shift.start))
-                    Text(verbatim:String(format:L.text("shifts.until"),Shift.display(shift.end)))
-                    Text("shifts.published").font(Brand.mono()).padding(7).background(Brand.lime)
-                }.padding(22).frame(maxWidth:.infinity,alignment:.leading).background(.white)
+                SectionCard(title:shift.area) {
+                    Text(verbatim:Shift.display(shift.start)).font(Typo.body).foregroundStyle(Theme.ink)
+                    Text(verbatim:String(format:L.text("shifts.until"),Shift.display(shift.end))).font(Typo.small).foregroundStyle(Theme.muted)
+                    StatusTag("publicado",label:L.text("shifts.published"))
+                }
             }
         }
         // Se pide al entrar y de nuevo cada vez que un evento de turnos (o una reconexión) sube el contador.
@@ -147,18 +150,24 @@ struct ProfileContent:View {
     @EnvironmentObject private var account:AccountModel
     var body:some View {
         VStack(alignment:.leading,spacing:25) {
-            VStack(alignment:.leading,spacing:17) {
-                Text(verbatim:profile.name.isEmpty ? L.text("profile.welcome"):profile.name).font(Brand.bold(25))
-                Text(verbatim:profile.email)
-                Divider()
-                Text(verbatim:String(format:L.text("profile.roles"),profile.roles.joined(separator:", "))).font(Brand.mono())
-                Text("auth.footer").font(Brand.body(14))
-            }.padding(22).frame(maxWidth:.infinity,alignment:.leading).background(.white)
+            SectionCard {
+                HStack(spacing:Spacing.m) {
+                    Text(verbatim:String((profile.name.isEmpty ? profile.email:profile.name).prefix(1)).uppercased()).font(Typo.heading)
+                        .foregroundStyle(Theme.primaryText).frame(width:48,height:48).background(Theme.soft,in:Circle()).accessibilityHidden(true)
+                    VStack(alignment:.leading,spacing:2) {
+                        Text(verbatim:profile.name.isEmpty ? L.text("profile.welcome"):profile.name).font(Typo.heading).foregroundStyle(Theme.ink)
+                        Text(verbatim:profile.email).font(Typo.small).foregroundStyle(Theme.muted)
+                    }
+                }
+                Divider().overlay(Theme.line)
+                Text(verbatim:String(format:L.text("profile.roles"),profile.roles.joined(separator:", "))).font(Typo.mono).foregroundStyle(Theme.ink)
+                Text("auth.footer").font(Typo.small).foregroundStyle(Theme.muted)
+            }
             if profile.allowedIOSRoles.count>1 {
                 Picker("profile.work_role",selection:$account.role) { ForEach(profile.allowedIOSRoles,id:\.self) { Text(LocalizedStringKey(RolePolicy.labelKey($0))).tag($0) } }.pickerStyle(.segmented)
             }
-            PrimaryButton(title:"profile.refresh") { Task { await account.refreshProfile() } }
-            Button("common.logout",role:.destructive) { Task { await account.logout() } }.frame(maxWidth:.infinity).disabled(account.busy)
+            ClimesaButton(title:L.text("profile.refresh")) { Task { await account.refreshProfile() } }
+            ClimesaButton(title:L.text("common.logout"),kind:.destructive,loading:account.busy) { Task { await account.logout() } }
         }
     }
 }

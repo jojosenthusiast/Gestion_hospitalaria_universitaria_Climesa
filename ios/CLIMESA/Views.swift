@@ -7,10 +7,11 @@ enum L {
     static func text(_ key: String) -> String { NSLocalizedString(key, comment: "") }
 }
 enum Brand {
-    static let blue=Color(red:46/255,green:73/255,blue:230/255)
-    static let ink=Color(red:23/255,green:27/255,blue:45/255)
-    static let paper=Color(red:246/255,green:245/255,blue:241/255)
-    static let lime=Color(red:220/255,green:237/255,blue:131/255)
+    // Alias de los tokens de DesignSystem/Theme.swift (paleta de web): las pantallas sin migrar heredan la paleta.
+    static let blue=Theme.primary
+    static let ink=Theme.ink
+    static let paper=Theme.bg
+    static let lime=Theme.accent
     static func body(_ size:CGFloat=16)->Font { .custom("DMSans-Regular",size:size,relativeTo:.body) }
     static func bold(_ size:CGFloat)->Font { .custom("DMSans-Bold",size:size,relativeTo:.title) }
     static func mono(_ size:CGFloat=11)->Font { .custom("IBMPlexMono-Regular",size:size,relativeTo:.caption) }

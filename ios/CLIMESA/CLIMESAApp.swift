@@ -5,7 +5,7 @@ import SwiftUI
     @State private var leftAt:Date?
     var body:some Scene {
         WindowGroup {
-            RootView().environmentObject(account).tint(Brand.blue).preferredColorScheme(.light)
+            RootView().environmentObject(account).tint(Theme.primaryText).preferredColorScheme(.light)
                 .task { await account.restore() }
                 .onChange(of:phase) { _,value in
                     if value == .background { leftAt=Date() }

@@ -68,16 +68,13 @@ final class Submission {
 
 struct Card<Content: View>: View {
     @ViewBuilder let content: () -> Content
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) { content() }
-            .padding(18).frame(maxWidth: .infinity, alignment: .leading).background(.white)
-    }
+    var body: some View { SectionCard(content: content) }
 }
 
 struct SectionTitle: View {
     let key: LocalizedStringKey
     init(_ key: LocalizedStringKey) { self.key = key }
-    var body: some View { Text(key).font(Brand.mono(12)).foregroundStyle(Brand.blue).textCase(.uppercase).padding(.top, 6) }
+    var body: some View { Text(key).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).padding(.top, 6).accessibilityAddTraits(.isHeader) }
 }
 
 enum PillTone { case neutral, good, warning, danger }
@@ -86,15 +83,17 @@ struct Pill: View {
     let text: String
     var tone: PillTone = .neutral
     var body: some View {
-        Text(verbatim: text).font(Brand.mono(11)).padding(.horizontal, 8).padding(.vertical, 4)
-            .background(background).foregroundStyle(tone == .danger ? Color.white : Brand.ink)
+        let colors = Theme.colors(for: statusTone)
+        Text(verbatim: text).font(Typo.tag).padding(.horizontal, 9).padding(.vertical, 5)
+            .background(colors.background, in: Capsule()).foregroundStyle(colors.foreground)
+            .overlay(Capsule().stroke(colors.foreground.opacity(0.24), lineWidth: 1))
     }
-    private var background: Color {
+    private var statusTone: StatusTone {
         switch tone {
-        case .neutral: return Brand.paper
-        case .good: return Brand.lime
-        case .warning: return Color.orange.opacity(0.25)
-        case .danger: return Color.red
+        case .neutral: return .neutral
+        case .good: return .success
+        case .warning: return .warning
+        case .danger: return .danger
         }
     }
 }
@@ -102,14 +101,14 @@ struct Pill: View {
 struct FieldError: View {
     let text: String?
     var body: some View {
-        if let text { Text(verbatim: text).font(Brand.body(12)).foregroundStyle(.red) }
+        if let text { Text(verbatim: text).font(Typo.caption).foregroundStyle(Theme.danger) }
     }
 }
 
 struct EmptyNote: View {
     let key: LocalizedStringKey
     init(_ key: LocalizedStringKey) { self.key = key }
-    var body: some View { Text(key).font(Brand.body(14)).foregroundStyle(.secondary) }
+    var body: some View { Text(key).font(Typo.small).foregroundStyle(Theme.muted) }
 }
 
 /// Estado de una lectura: cargando, error con reintento, o el contenido.
@@ -119,12 +118,9 @@ struct LoadState<Value: Sendable, Content: View>: View {
     @ViewBuilder let content: (Value) -> Content
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let error = loader.error {
-                Notice(text: error, failure: true)
-                Button("common.retry") { Task { await retry() } }
-            }
+            if let error = loader.error { ErrorStateView(message: error) { Task { await retry() } } }
             if let value = loader.value { content(value) }
-            else if loader.loading { ProgressView("common.loading") }
+            else if loader.loading { LoadingStateView() }
         }
     }
 }
@@ -145,10 +141,10 @@ struct ScreenFrame<Content: View>: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text(title).font(Brand.bold(30)).fixedSize(horizontal: false, vertical: true)
+                Text(title).font(Typo.title).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 content()
             }.padding(24).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
-        }.background(Brand.paper).navigationBarTitleDisplayMode(.inline)
+        }.background(Theme.bg).navigationBarTitleDisplayMode(.inline)
     }
 }
 
