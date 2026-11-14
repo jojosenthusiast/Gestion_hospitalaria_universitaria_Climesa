@@ -54,7 +54,29 @@ data class AmbulanceUiState(
 enum class AmbulanceMode { STATUS, LOG, ARRIVAL, REQUEST, PARAMEDIC }
 
 @HiltViewModel
-class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
+class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository, private val drafts: sv.edu.catolica.climesa.data.DraftStore = sv.edu.catolica.climesa.data.NoDraftStore) : ViewModel() {
+    private var userId: String? = null
+
+    /**
+     * Signed-in user. The prehospital report being typed and a report queued without signal are kept as local drafts,
+     * so a killed app neither loses the form nor the pending report; both come back here.
+     */
+    fun bindUser(id: String) {
+        if (userId == id) return
+        userId = id; drafts.retainOnly(id)
+        val queued = drafts.load(id, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_QUEUE)?.let { runCatching { QueuedPrehospital(it.getString("serviceId"), it.getString("body")) }.getOrNull() }
+        if (queued != null && mutable.value.queued == null) mutable.value = mutable.value.copy(queued = queued, notice = "Hay un reporte prehospital en cola: se enviará al reintentar.")
+        restoredForm = drafts.load(id, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_FORM)
+    }
+    private var restoredForm: JSONObject? = null
+
+    /** Restores the saved prehospital form of [serviceId] once, when the sheet opens with an empty form. */
+    fun restorePrehospital(serviceId: String) {
+        val form = sv.edu.catolica.climesa.domain.FormDrafts.prehospital(restoredForm, serviceId) ?: return
+        restoredForm = null
+        if (sv.edu.catolica.climesa.domain.FormDrafts.isEmpty(mutable.value.prehospital)) mutable.value = mutable.value.copy(prehospital = form)
+    }
+
     private val mutable = MutableStateFlow(AmbulanceUiState())
     val state = mutable.asStateFlow()
     private val live = LiveSubscription(realtime)
@@ -173,7 +195,12 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
 
     fun reportLocationUnavailable() { mutable.value = mutable.value.copy(formError = "No se pudo obtener tu ubicación. Activa el GPS e inténtalo de nuevo.") }
 
-    fun updatePrehospital(form: PrehospitalForm) { mutable.value = mutable.value.copy(prehospital = form, formError = null) }
+    fun updatePrehospital(form: PrehospitalForm, serviceId: String? = null) {
+        mutable.value = mutable.value.copy(prehospital = form, formError = null)
+        val user = userId ?: return
+        if (serviceId == null || sv.edu.catolica.climesa.domain.FormDrafts.isEmpty(form)) drafts.clear(user, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_FORM)
+        else drafts.save(user, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_FORM, sv.edu.catolica.climesa.domain.FormDrafts.prehospital(serviceId, form))
+    }
 
     /** A72 / FR-109-10: sin señal el reporte queda en cola con el mismo cuerpo; se reenvía al reconectar o con "Reintentar". */
     fun sendPrehospital(serviceId: String, capturedAt: Instant = Instant.now()) {
@@ -189,10 +216,12 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         viewModelScope.launch {
             try {
                 api.request("/ambulancia/servicios/${item.serviceId}/prehospital", "POST", JSONObject(item.body))
+                userId?.let { drafts.clear(it, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_QUEUE); drafts.clear(it, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_FORM) }
                 mutable.value = mutable.value.copy(busy = false, queued = null, prehospital = PrehospitalForm(), provisional = null, notice = "Reporte enviado a emergencia.")
                 load()
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
+                if (isOffline(e)) userId?.let { drafts.save(it, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_QUEUE, JSONObject().put("serviceId", item.serviceId).put("body", item.body)) }
                 mutable.value = if (isOffline(e)) mutable.value.copy(busy = false, queued = item, notice = "Sin señal: el reporte quedó en cola y se enviará al volver la conexión.")
                 else mutable.value.copy(busy = false, queued = null, formError = message(e))
             }

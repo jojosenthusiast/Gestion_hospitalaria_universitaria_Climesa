@@ -53,7 +53,19 @@ data class VitalSignsState(
  * new row (nothing is edited), sent with the idempotency key of the form intent. A failed reload never clears what is shown.
  */
 @HiltViewModel
-class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
+class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository, private val drafts: sv.edu.catolica.climesa.data.DraftStore = sv.edu.catolica.climesa.data.NoDraftStore) : ViewModel() {
+    private var userId: String? = null
+
+    /** Signed-in user: the unsaved measures of each patient are kept as that user's local draft. */
+    fun bindUser(id: String) { if (userId != id) { userId = id; drafts.retainOnly(id) } }
+
+    private fun keepDraft(form: VitalsForm) {
+        val user = userId ?: return
+        val patient = mutable.value.patientId ?: return
+        if (sv.edu.catolica.climesa.domain.FormDrafts.isEmpty(form)) drafts.clear(user, sv.edu.catolica.climesa.domain.FormDrafts.vitalsKey(patient))
+        else drafts.save(user, sv.edu.catolica.climesa.domain.FormDrafts.vitalsKey(patient), sv.edu.catolica.climesa.domain.FormDrafts.vitals(form))
+    }
+
     private val mutable = MutableStateFlow(VitalSignsState())
     val state = mutable.asStateFlow()
     private val live = LiveSubscription(realtime)
@@ -97,8 +109,10 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
 
     fun open(candidate: VitalsCandidate) {
         if (candidate.patientId != mutable.value.patientId) intent.reset()
+        // Measures typed for this patient and not saved (app closed, screen left) come back from the local draft.
+        val restored = userId?.let { sv.edu.catolica.climesa.domain.FormDrafts.vitals(drafts.load(it, sv.edu.catolica.climesa.domain.FormDrafts.vitalsKey(candidate.patientId))) }
         mutable.value = mutable.value.copy(patientId = candidate.patientId, patientHint = candidate, history = null, error = null, loading = true,
-            form = VitalsForm(), formError = null, notice = null, conflict = false)
+            form = restored ?: VitalsForm(), formError = null, notice = if (restored != null) "Recuperamos los signos que no habías guardado." else null, conflict = false)
         loadHistory(silent = false)
     }
 
@@ -127,9 +141,10 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
 
     fun edit(measure: VitalMeasure, text: String) {
         mutable.value = mutable.value.copy(form = mutable.value.form.with(measure, VitalsRules.sanitize(measure, text)), formError = null, notice = null)
+        keepDraft(mutable.value.form)
     }
 
-    fun editNote(text: String) { mutable.value = mutable.value.copy(form = mutable.value.form.copy(note = text.take(VitalsRules.NOTE_MAX)), formError = null, notice = null) }
+    fun editNote(text: String) { mutable.value = mutable.value.copy(form = mutable.value.form.copy(note = text.take(VitalsRules.NOTE_MAX)), formError = null, notice = null); keepDraft(mutable.value.form) }
 
     fun save() {
         val current = mutable.value
@@ -140,6 +155,7 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
         viewModelScope.launch {
             try {
                 intent.send { api.request("/pacientes/${history.patientId}/signos", "POST", VitalsRules.body(current.form, history.admissionId)) }
+                userId?.let { drafts.clear(it, sv.edu.catolica.climesa.domain.FormDrafts.vitalsKey(history.patientId)) }
                 mutable.value = mutable.value.copy(saving = false, form = VitalsForm(), notice = "Signos guardados.")
                 loadHistory(silent = true)
             } catch (e: CancellationException) { throw e }

@@ -59,7 +59,8 @@ struct DoctorDayView: View {
                     MedicoTag(ticket.state.rawValue, label: ticket.state.label)
                 }
                 if account.can("consulta.iniciar") {
-                    NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text("day.attend") }
+                    // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
+                    NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
                         .buttonStyle(ClimesaButtonStyle())
                 }
             }

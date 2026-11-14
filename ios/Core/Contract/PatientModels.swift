@@ -16,8 +16,12 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     public let calls: Int
     public let version: Int
     public let issuedAt: String
+    /// Consulta iniciada desde este número por el médico que lee la fila; `nil` si no hay o es de otro profesional.
+    public let consultationId: String?
+    public let consultationState: ConsultationState?
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
+        case consultationId, consultationState
     }
 }
 

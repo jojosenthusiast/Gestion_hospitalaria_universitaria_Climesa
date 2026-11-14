@@ -120,9 +120,9 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         if(page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW){LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page);return@content}
         if(page==AndroidSection.LINK_RECORD){LinkRecordScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.HISTORY||page==AndroidSection.RECORD){ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding));return@content}
-        if(page==AndroidSection.MEDICAL_DAY){ConsultationScreen(account.profile,Modifier.padding(padding));return@content}
+        if(page==AndroidSection.MEDICAL_DAY){ConsultationScreen(account.profile,Modifier.padding(padding),userId=account.session.userId);return@content}
         if(page==AndroidSection.HOSPITAL_INFO){HospitalInfoScreen(Modifier.padding(padding));return@content}
-        if(page==AndroidSection.VITAL_SIGNS){VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=role=="MED");return@content}
+        if(page==AndroidSection.VITAL_SIGNS){VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=role=="MED",userId=account.session.userId);return@content}
         if(page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)){AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding));return@content}
         PageList(Modifier.padding(padding)){
             if(page==AndroidSection.PROFILE){

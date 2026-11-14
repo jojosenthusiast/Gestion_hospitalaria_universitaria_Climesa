@@ -111,7 +111,8 @@ final class LoginDraft {
         }
         if stamp==revision { busy=false }
     }
-    func logout() async { draft.clear(); revision+=1; busy=true; loading=true; profile=nil; pending=false; notice=nil; error=nil; await auth?.signOut(); busy=false; loading=false }
+    /// Cerrar sesión borra también los borradores clínicos guardados en el dispositivo (DraftStore).
+    func logout() async { draft.clear(); DraftStore.shared.clearAll(); revision+=1; busy=true; loading=true; profile=nil; pending=false; notice=nil; error=nil; await auth?.signOut(); busy=false; loading=false }
 }
 struct Shift:Decodable,Identifiable {
     let id:String; let area:String; let start:String; let end:String; let state:String

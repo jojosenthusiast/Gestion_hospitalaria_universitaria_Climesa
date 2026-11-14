@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="borrador_guardado">Borrador guardado en este equipo.</string>
+    <string name="borrador_recuperado">Recuperamos lo que escribiste y aún no habías guardado.</string>
+    <string name="borrador_sin_guardar">Tienes cambios sin guardar: no se pudo guardar el borrador en este equipo.</string>
+    <string name="borrador_salir_titulo">Tienes cambios sin guardar</string>
+    <string name="borrador_salir_mensaje">Si sales ahora se perderá lo que escribiste.</string>
+    <string name="borrador_salir">Salir sin guardar</string>
+    <string name="borrador_seguir">Seguir editando</string>
+    <string name="clin_fila_titulo">Fila del día: llamados y en atención</string>
+    <string name="clin_fila_numero">N.º %1$d</string>
+    <string name="clin_fila_iniciar">Iniciar consulta</string>
+    <string name="clin_fila_retomar">Retomar consulta</string>
+    <string name="clin_fila_ver">Ver consulta</string>
+    <string name="clin_fila_abriendo">Abriendo…</string>
+</resources>

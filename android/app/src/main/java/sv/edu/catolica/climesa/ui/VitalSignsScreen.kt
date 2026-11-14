@@ -110,8 +110,9 @@ private fun levelTone(level: VitalLevel) = when (level) {
  * latest take, the capture form (hidden when [readOnly]), the trend per measure and the history.
  */
 @Composable
-fun VitalSignsScreen(profile: AccessProfile, modifier: Modifier = Modifier, readOnly: Boolean = false, model: VitalSignsViewModel = viewModel()) {
+fun VitalSignsScreen(profile: AccessProfile, modifier: Modifier = Modifier, readOnly: Boolean = false, userId: String? = null, model: VitalSignsViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
+    LaunchedEffect(userId) { userId?.let(model::bindUser) }
     LaunchedEffect(profile.permissions) { model.loadSources(profile.permissions) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     BackHandler(enabled = state.patientId != null) { model.close() }

@@ -22,6 +22,29 @@ private struct PrescriptionDraft: Identifiable {
     }
 }
 
+/// Borrador local de la consulta (lo escrito y aún no guardado en la API), por cuenta y consulta en `DraftStore`.
+/// Sobrevive a salir de la pantalla o a que el sistema cierre la app; se borra al firmar o al cerrar sesión.
+struct ConsultationDraft: Codable, Equatable {
+    struct Line: Codable, Equatable {
+        var medication = "", dose = "", route = "", frequency = "", duration = "", instructions = ""
+        var isBlank: Bool { [medication, dose, route, frequency, duration, instructions].allSatisfy { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
+    }
+    var reason = ""
+    var exam = ""
+    var plan = ""
+    var code = ""
+    var note = ""
+    var principal = true
+    var lines: [Line] = []
+
+    /// Hay algo que la API todavía no tiene: notas distintas de lo guardado, o diagnóstico o receta a medio escribir.
+    func differs(from saved: ConsultationDraft) -> Bool {
+        reason != saved.reason || exam != saved.exam || plan != saved.plan
+            || !code.trimmingCharacters(in: .whitespaces).isEmpty || !note.trimmingCharacters(in: .whitespaces).isEmpty
+            || lines.contains { !$0.isBlank }
+    }
+}
+
 /// I21 · Consulta: signos (de asistente), motivo, examen, diagnósticos CIE-10, receta, órdenes de laboratorio,
 /// indicación de hospitalización; guardar y firmar. La API decide las transiciones y exige la versión vigente.
 struct ConsultationView: View {
@@ -56,11 +79,20 @@ struct ConsultationView: View {
     @State private var isolation = false
     @State private var admissionReason = ""
     @State private var admissionError: String?
+    /// Notas tal como están en la API; el borrador local solo se guarda si lo escrito difiere.
+    @State private var savedNotes = ConsultationDraft()
+    @State private var draftRecovered = false
+    @State private var draftSaved = false
+    @State private var draftFailed = false
 
     init(origin: ConsultationOrigin, profile: AccessProfile) {
         self.origin = origin
         self.profile = profile
-        if case let .appointment(entry) = origin { _consultationId = State(initialValue: entry.consultationId) }
+        // Una consulta propia ya iniciada (desde la agenda o desde este número de fila) se retoma sin volver a iniciarla.
+        switch origin {
+        case let .appointment(entry): _consultationId = State(initialValue: entry.consultationId)
+        case let .ticket(ticket): _consultationId = State(initialValue: ticket.consultationId)
+        }
     }
 
     private var patientName: String {
@@ -85,6 +117,50 @@ struct ConsultationView: View {
             }
         }
         .task(id: "\(consultationId ?? "-")|\(live.snapshot.version(.consultations))") { await loadDetail() }
+        .onChange(of: currentDraft) { _, _ in persistDraft() }
+    }
+
+    // MARK: - Borrador local
+
+    private var draftKey: String? { consultationId.map { "consulta-\($0)" } }
+
+    private var currentDraft: ConsultationDraft {
+        ConsultationDraft(reason: reason, exam: exam, plan: plan, code: code, note: note, principal: principal,
+                          lines: lines.map { ConsultationDraft.Line(medication: $0.medication, dose: $0.dose, route: $0.route, frequency: $0.frequency, duration: $0.duration, instructions: $0.instructions) })
+    }
+
+    /// Guarda en el dispositivo lo que la API aún no tiene; si ya no hay nada pendiente, borra el borrador.
+    private func persistDraft() {
+        guard let key = draftKey, prefilledVersion != nil else { return }
+        let draft = currentDraft
+        if draft.differs(from: savedNotes) {
+            let ok = DraftStore.shared.save(draft, user: profile.id, key: key)
+            draftSaved = ok; draftFailed = !ok
+        } else {
+            DraftStore.shared.clear(user: profile.id, key: key)
+            draftSaved = false; draftFailed = false
+        }
+    }
+
+    private func applyDraft(_ draft: ConsultationDraft) {
+        reason = draft.reason; exam = draft.exam; plan = draft.plan
+        code = draft.code; note = draft.note; principal = draft.principal
+        let restored = draft.lines.map { line -> PrescriptionDraft in
+            var item = PrescriptionDraft()
+            item.medication = line.medication; item.dose = line.dose; item.route = line.route
+            item.frequency = line.frequency; item.duration = line.duration; item.instructions = line.instructions
+            return item
+        }
+        lines = restored.isEmpty ? [PrescriptionDraft()] : restored
+    }
+
+    @ViewBuilder private var draftStatus: some View {
+        if draftFailed {
+            Text("consultation.draft.unsaved").font(Typo.small).foregroundStyle(Theme.danger)
+        } else if draftSaved {
+            Label { Text(LocalizedStringKey(draftRecovered ? "consultation.draft.recovered" : "consultation.draft.saved")) } icon: { Image(systemName: "internaldrive") }
+                .font(Typo.caption).foregroundStyle(Theme.muted)
+        }
     }
 
     @ViewBuilder private func editor(_ value: ConsultationDetail) -> some View {
@@ -130,6 +206,7 @@ struct ConsultationView: View {
                 MedicoTextArea(label: L.text("consultation.reason"), text: $reason, error: draftErrors["reason"], lines: 2...5)
                 MedicoTextArea(label: L.text("consultation.exam"), text: $exam, error: draftErrors["physicalExam"])
                 MedicoTextArea(label: L.text("consultation.plan"), text: $plan, error: draftErrors["plan"], lines: 2...6)
+                draftStatus
                 WriteNotice(submission: saving, reload: loadDetail)
                 ClimesaButton(title: L.text("consultation.save"), kind: .secondary, loading: saving.busy) { Task { await save(value) } }
             } else {
@@ -246,8 +323,17 @@ struct ConsultationView: View {
         await detail.load { try await account.client().get("/consultas/\(id)/detalle", as: ConsultationDetail.self) }
         // El borrador se llena con lo guardado al abrir y cuando otra versión reemplaza la que se estaba editando.
         if let summary = detail.value?.consultation, prefilledVersion == nil || saving.lastFailure?.isVersionConflict == true {
+            let firstFill = prefilledVersion == nil
             reason = summary.reason ?? ""; exam = summary.physicalExam ?? ""; plan = summary.plan ?? ""
+            savedNotes = ConsultationDraft(reason: reason, exam: exam, plan: plan)
             prefilledVersion = summary.version
+            // Al volver a la consulta, lo escrito en el dispositivo y no guardado reemplaza lo de la API.
+            if firstFill, ConsultationRules.isEditable(summary.state), let key = draftKey,
+               let draft = DraftStore.shared.load(ConsultationDraft.self, user: profile.id, key: key) {
+                applyDraft(draft)
+                draftRecovered = true
+            }
+            persistDraft()
         }
     }
 
@@ -277,8 +363,14 @@ struct ConsultationView: View {
         draftErrors = ConsultationRules.draftErrors(reason: reason, physicalExam: exam, plan: plan)
         guard draftErrors.isEmpty, let id = consultationId else { return }
         let body = ConsultationUpdateBody(version: value.consultation.version, reason: reason, physicalExam: exam, plan: plan)
-        await saving.run(id, body: body, success: L.text("consultation.saved")) { key in
+        let ok = await saving.run(id, body: body, success: L.text("consultation.saved")) { key in
             _ = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
+        }
+        if ok {
+            // Las notas ya están en la API: el borrador local solo conserva el diagnóstico o la receta pendientes.
+            savedNotes = ConsultationDraft(reason: reason, exam: exam, plan: plan)
+            draftRecovered = false
+            persistDraft()
         }
         await loadDetail()
     }
@@ -329,8 +421,12 @@ struct ConsultationView: View {
     private func sign(_ value: ConsultationDetail) async {
         guard let id = consultationId else { return }
         let body = VersionBody(version: value.consultation.version)
-        await signing.run(id, body: body, success: L.text("consultation.signed")) { key in
+        let ok = await signing.run(id, body: body, success: L.text("consultation.signed")) { key in
             _ = try await account.client().send("POST", "/consultas/\(id)/firmar", body: body, key: key, as: ConsultationCommandResult.self)
+        }
+        if ok, let key = draftKey {
+            DraftStore.shared.clear(user: profile.id, key: key)
+            draftSaved = false; draftFailed = false; draftRecovered = false
         }
         await loadDetail()
     }
