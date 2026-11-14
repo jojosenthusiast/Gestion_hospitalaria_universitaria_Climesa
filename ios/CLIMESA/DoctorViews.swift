@@ -85,7 +85,7 @@ struct DoctorDayView: View {
                     }
                     if account.can("expediente.ver") {
                         NavigationLink {
-                            ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: entry.patientId) }
+                            PatientRecordScreen(patientId: entry.patientId)
                         } label: { Text("day.record") }
                             .buttonStyle(ClimesaButtonStyle(kind: .secondary))
                     }
@@ -95,7 +95,7 @@ struct DoctorDayView: View {
     }
 
     @ViewBuilder private func moreSection(_ day: DoctorDay) -> some View {
-        let sections = AppSection.visible(for: "MED", profile: profile)
+        let sections = AppSection.visible(for: "MED", profile: profile).filter { [.agenda, .hospitalizados, .llegadaAmbulancia].contains($0) }
         if !sections.isEmpty {
             SectionCard(title: L.text("day.more")) {
                 ForEach(Array(sections.enumerated()), id: \.element) { index, section in
@@ -158,12 +158,13 @@ struct DoctorPatientsView: View {
                     .textInputAutocapitalization(.words).autocorrectionDisabled().submitLabel(.search)
                     .onSubmit { Task { await search() } }
                 ClimesaButton(title: L.text("ds.medico.search"), loading: loader.loading) { Task { await search() } }
+                Text("patients.treating_only").font(Typo.caption).foregroundStyle(Theme.muted)
             }
             LoadState(loader: loader, retry: search) { rows in
                 if rows.isEmpty { EmptyStateView(title: L.text("patients.none"), symbol: "magnifyingglass") }
                 ForEach(rows) { patient in
                     NavigationLink {
-                        ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: patient.id) }
+                        PatientRecordScreen(patientId: patient.id)
                     } label: {
                         SectionCard {
                             ListRow(title: patient.fullName, meta: patient.record) {
@@ -226,7 +227,7 @@ private struct ReviewDetailView: View {
             }
             if account.can("expediente.ver") {
                 NavigationLink {
-                    ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: order.patientId) }
+                    PatientRecordScreen(patientId: order.patientId)
                 } label: { Text("day.record") }
                     .buttonStyle(ClimesaButtonStyle(kind: .secondary))
             }

@@ -144,7 +144,7 @@ struct ScreenFrame<Content: View>: View {
                 Text(title).font(Typo.title).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 content()
             }.padding(24).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
-        }.background(Theme.bg).navigationBarTitleDisplayMode(.inline)
+        }.background(Theme.bg).navigationTitle(title).navigationBarTitleDisplayMode(.inline)
     }
 }
 

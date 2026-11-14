@@ -1,5 +1,11 @@
 import Foundation
 import SwiftUI
+/// Borrador del formulario de ingreso mientras la app sigue abierta. Solo vive en memoria: la contraseña nunca se
+/// escribe en disco. Así, al salir un momento de la app y volver, no se pierde lo escrito.
+final class LoginDraft {
+    var name=""; var password=""; var confirmation=""
+    func clear() { name=""; password=""; confirmation="" }
+}
 @MainActor final class AccountModel: ObservableObject {
     @Published var loading=true
     @Published var busy=false
@@ -9,6 +15,7 @@ import SwiftUI
     @Published var pending=false
     @Published var role="MED"
     private var revision=0
+    let draft=LoginDraft()
     let auth:AuthService?
     let api:APIClient?
     private let config:AppConfiguration?
@@ -65,6 +72,7 @@ import SwiftUI
         let verified=try await api.get("/auth/me",as:AccessProfile.self)
         guard stamp==revision else { throw CancellationError() }
         // Un rol sin iOS (por ejemplo Recepción) no es un error: la pantalla muestra "Tu rol no usa esta aplicación".
+        draft.clear()
         profile=verified; if let first=verified.allowedIOSRoles.first { role=verified.allowedIOSRoles.contains(role) ? role : first }; pending=false; error=nil; notice=nil
     }
     func signIn(email:String,password:String) async {
@@ -103,7 +111,7 @@ import SwiftUI
         }
         if stamp==revision { busy=false }
     }
-    func logout() async { revision+=1; busy=true; loading=true; profile=nil; pending=false; notice=nil; error=nil; await auth?.signOut(); busy=false; loading=false }
+    func logout() async { draft.clear(); revision+=1; busy=true; loading=true; profile=nil; pending=false; notice=nil; error=nil; await auth?.signOut(); busy=false; loading=false }
 }
 struct Shift:Decodable,Identifiable {
     let id:String; let area:String; let start:String; let end:String; let state:String

@@ -20,6 +20,8 @@ Lee antes `../AGENTS.md`. Spec base: `specs/122-cliente-ios/`. Roles en iOS: Mé
     PatientViews.swift     I03 a I12 (Paciente)
     DoctorViews.swift      I20, I22 a I25 (Médico)
     ConsultationView.swift I21 (consulta)
+    HospitalViews.swift    Información del hospital (ocupación por piso, médicos, avisos), Ubicación, Mis datos, Mi habitación
+    DoctorExtraViews.swift Agenda del médico, expediente con habitación (403 = solo médico tratante), ambulancia con bitácora filtrable
     Resources/             Localizable.xcstrings, Configuration.plist, fuentes
   Core/                    Swift puro (Foundation), compilado por la app y por Package.swift
     Access.swift           perfil, pestañas por rol y permiso (TabPolicy), secciones (AppSection), registro
@@ -38,6 +40,7 @@ Lee antes `../AGENTS.md`. Spec base: `specs/122-cliente-ios/`. Roles en iOS: Mé
 - Asincronía con `async/await` y `Task`. Sin Combine nuevo ni callbacks.
 - Modelos `Codable` escritos a mano según `../contrato/openapi.json`; propiedades en inglés con `CodingKeys` hacia los nombres en español.
 - Repositorios y servicios detrás de un protocolo para poder probar sin red (`RealtimeService`, `RealtimeSocket`).
+- Encabezado: cada pantalla muestra su título (nunca rol ni "climesa"). El médico usa Mi día, Pacientes, Resultados, Turnos y Más (agenda, hospitalizados, ambulancia, hospital, ubicación, perfil); el paciente, Inicio, Fila, Citas, Exámenes y Más.
 - Pestañas: se deciden con `TabPolicy.decide` a partir del perfil de `/auth/me` (rol y permisos), no con metadatos del JWT. Las secciones de Más y Mi día salen de `AppSection.visible` con su permiso.
 - Escrituras: `Submission.run` con la intención del usuario (`SubmissionIntent`, `convenciones-api.md`); nunca una clave calculada de la petición. Toda escritura sobre un registro existente envía `version`.
 - Tiempo real: el view model consume el `AsyncStream` en `.task {}` y las vistas vuelven a pedir datos al subir el contador de su `LiveTopic` (`.task(id: live.snapshot.version(.queue))`). Prohibido refrescar con temporizadores; solo el latido del protocolo y la espera entre reconexiones usan reloj, y tras una caída hay una única consulta a `GET /eventos?after=`.

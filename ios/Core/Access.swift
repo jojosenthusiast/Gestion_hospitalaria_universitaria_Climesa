@@ -47,7 +47,7 @@ public enum RolePolicy {
     public static func labelKey(_ role: String) -> String { role == "MED" ? "role.MED" : "role.PAC" }
 }
 
-/// Pestañas de la app (spec 122, escenario 1). Médico: Mi día, Pacientes, Resultados, Turnos, Perfil.
+/// Pestañas de la app (spec 122, escenario 1). Médico: Mi día, Pacientes, Resultados, Turnos, Más (agenda, hospital, ambulancia, perfil).
 /// Paciente: Inicio, Fila, Citas, Exámenes, Más.
 public enum AppTab: String, Equatable, Hashable, Sendable, CaseIterable {
     case miDia, pacientes, resultados, turnos, perfil
@@ -95,7 +95,7 @@ public enum AccessDecision: Equatable, Sendable {
 
 public enum TabPolicy {
     public static func candidates(for role: String) -> [AppTab] {
-        role == "MED" ? [.miDia, .pacientes, .resultados, .turnos, .perfil] : [.inicio, .fila, .citas, .examenes, .mas]
+        role == "MED" ? [.miDia, .pacientes, .resultados, .turnos, .mas] : [.inicio, .fila, .citas, .examenes, .mas]
     }
 
     /// Decide con el perfil verificado de /auth/me. `preferredRole` solo aplica si la cuenta tiene ese rol en iOS.
@@ -115,8 +115,12 @@ public enum TabPolicy {
 public enum AppSection: String, CaseIterable, Hashable, Sendable {
     // Paciente (Más)
     case vinculacion, historial, ambulancia, hospital, accesos, perfil
-    // Médico (Mi día)
-    case hospitalizados, llegadaAmbulancia
+    // Paciente: sus datos y su habitación si está hospitalizado
+    case misDatos, miHabitacion
+    // Ambos: ubicación del hospital
+    case ubicacion
+    // Médico (Más)
+    case agenda, hospitalizados, ambulanciaEstado, llegadaAmbulancia
 
     public var titleKey: String { "section.\(rawValue)" }
 
@@ -130,6 +134,11 @@ public enum AppSection: String, CaseIterable, Hashable, Sendable {
         case .perfil: return "person.crop.circle"
         case .hospitalizados: return "bed.double"
         case .llegadaAmbulancia: return "light.beacon.max"
+        case .misDatos: return "person.text.rectangle"
+        case .miHabitacion: return "bed.double.fill"
+        case .ubicacion: return "map"
+        case .agenda: return "calendar.badge.clock"
+        case .ambulanciaEstado: return "cross.case"
         }
     }
 
@@ -140,18 +149,26 @@ public enum AppSection: String, CaseIterable, Hashable, Sendable {
         case .historial: return "expediente.ver"
         case .ambulancia: return "ambulancia.solicitar"
         case .accesos: return "auditoria.mis_accesos"
+        case .misDatos: return "pacientes.ver_ficha"
+        case .miHabitacion: return "admision.ver"
+        case .agenda: return "consulta.iniciar"
         case .hospitalizados: return "admision.ver"
+        case .ambulanciaEstado: return "ambulancia.ver_estado"
         case .llegadaAmbulancia: return "ambulancia.recibir_prehospital"
-        case .hospital, .perfil: return nil
+        case .hospital, .ubicacion, .perfil: return nil
         }
     }
 
     /// Secciones visibles para el rol de trabajo y los permisos del perfil.
     public static func visible(for role: String, profile: AccessProfile) -> [AppSection] {
-        let candidates: [AppSection] = role == "MED" ? [.hospitalizados, .llegadaAmbulancia] : [.vinculacion, .historial, .ambulancia, .hospital, .accesos, .perfil]
+        let candidates: [AppSection] = role == "MED"
+            ? [.agenda, .hospitalizados, .ambulanciaEstado, .llegadaAmbulancia, .hospital, .ubicacion, .perfil]
+            : [.vinculacion, .misDatos, .historial, .miHabitacion, .ambulancia, .hospital, .ubicacion, .accesos, .perfil]
         return candidates.filter { section in
             // La vinculación solo tiene sentido mientras la cuenta no tenga expediente.
             if section == .vinculacion && profile.patientId != nil { return false }
+            // Sus datos y su habitación existen solo con un expediente vinculado.
+            if (section == .misDatos || section == .miHabitacion) && profile.patientId == nil { return false }
             guard let code = section.requiredPermission else { return true }
             return profile.hasPermission(code)
         }

@@ -8,6 +8,7 @@ struct PatientHome: Sendable {
     var ticket: QueueTicket?
     var nextAppointment: Appointment?
     var labs: [LabOrder]?
+    var room: Admission?
     var notices: [PublicNotices.Notice]
 }
 
@@ -32,6 +33,7 @@ struct PatientHomeView: View {
                 HomeQueueCard(ticket: home.ticket) { go(.fila) }
                 HomeAppointmentCard(appointment: home.nextAppointment) { go(.citas) }
                 if let labs = home.labs { HomeLabCard(labs: labs) { go(.examenes) } }
+                if let room = home.room { RoomCard(admission: room) }
                 if !home.notices.isEmpty {
                     SectionTitle("home.notices")
                     ForEach(home.notices) { notice in
@@ -40,13 +42,13 @@ struct PatientHomeView: View {
                 }
             }
         }
-        .task(id: live.snapshot.version([.queue, .appointments, .laboratory, .hospitalInfo])) { await load() }
+        .task(id: live.snapshot.version([.queue, .appointments, .laboratory, .hospitalInfo, .admissions])) { await load() }
     }
 
     private func load() async {
         await loader.load {
             let api = try account.client()
-            var home = PatientHome(ticket: nil, nextAppointment: nil, labs: nil, notices: [])
+            var home = PatientHome(ticket: nil, nextAppointment: nil, labs: nil, room: nil, notices: [])
             if profile.hasPermission("fila.ver"), let tickets = try? await api.get("/fila", as: [QueueTicket].self) {
                 home.ticket = QueueRules.activeTicket(tickets)
             }
@@ -55,6 +57,9 @@ struct PatientHomeView: View {
             }
             if profile.patientId != nil, profile.hasPermission("resultados.ver") {
                 home.labs = try? await api.get("/me/laboratorio", as: [LabOrder].self)
+            }
+            if profile.patientId != nil, profile.hasPermission("admision.ver"), let admissions = try? await api.get("/admisiones", as: [Admission].self) {
+                home.room = RoomRules.current(admissions, patientId: profile.patientId)
             }
             home.notices = (try? await api.get("/publico/avisos", as: PublicNotices.self))?.notices ?? []
             return home
@@ -340,6 +345,7 @@ struct PatientExamsView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<[LabOrder]>()
+    @State private var filter: LabFilter = .all
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -347,8 +353,12 @@ struct PatientExamsView: View {
                 EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link")
             } else {
                 LoadState(loader: loader, retry: load) { orders in
-                    if orders.isEmpty { EmptyStateView(title: L.text("exams.none"), symbol: "testtube.2") }
-                    ForEach(orders) { order in
+                    Picker("exams.filter", selection: $filter) {
+                        ForEach(LabFilter.allCases, id: \.self) { Text(LocalizedStringKey($0.titleKey)).tag($0) }
+                    }.pickerStyle(.segmented)
+                    let shown = filter.apply(orders)
+                    if shown.isEmpty { EmptyStateView(title: L.text(orders.isEmpty ? "exams.none" : "exams.filter.none"), symbol: "testtube.2") }
+                    ForEach(shown) { order in
                         NavigationLink {
                             ScreenFrame(title: "exams.detail") { LabOrderDetail(order: order, showValues: PatientLabRules.showsValues(order)) }
                         } label: {
@@ -407,7 +417,7 @@ struct LabOrderDetail: View {
 }
 
 /// Más (paciente): secciones según permisos del catálogo.
-struct PatientMoreView: View {
+struct MoreView: View {
     let profile: AccessProfile
     let role: String
     var body: some View {
@@ -440,6 +450,11 @@ struct PatientSectionView: View {
                 else { EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link") }
             case .ambulancia: AmbulanceRequestView()
             case .hospital: HospitalInfoView()
+            case .ubicacion: LocationView()
+            case .misDatos: MyDataView(profile: profile)
+            case .miHabitacion: MyRoomView(profile: profile)
+            case .agenda: DoctorAgendaView(profile: profile)
+            case .ambulanciaEstado: AmbulanceOverviewView()
             case .accesos: MyAccessView()
             case .perfil: ProfileContent(profile: profile)
             case .hospitalizados: HospitalizedView()
@@ -520,13 +535,19 @@ struct LinkRecordView: View {
 /// Sin relación de atención, la API responde 403 y se muestra su mensaje.
 struct ClinicalHistoryView: View {
     let patientId: String
+    /// Quién mira: el paciente su propio historial o el médico el de un paciente (solo el tratante lo ve).
+    var viewerIsPatient = true
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<ClinicalHistory>()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            LoadState(loader: loader, retry: load) { history in HistoryContent(history: history) }
+            if let denied = RecordAccess.deniedMessage(for: loader.failure, viewerIsPatient: viewerIsPatient) {
+                EmptyStateView(title: L.text("history.forbidden.title"), message: denied, symbol: "lock.shield")
+            } else {
+                LoadState(loader: loader, retry: load) { history in HistoryContent(history: history) }
+            }
         }
         .task(id: live.snapshot.version([.consultations, .laboratory, .admissions, .access, .patient])) { await load() }
     }
@@ -686,58 +707,6 @@ struct AmbulanceRequestView: View {
             result = try await account.client().send("POST", "/ambulancia/solicitudes", body: body, key: key, as: AmbulanceRequestCreated.self)
         }
         if ok { created = result }
-    }
-}
-
-struct HospitalInfo: Sendable {
-    var occupancy: PublicOccupancy?
-    var doctors: DoctorsOnDuty?
-    var notices: PublicNotices?
-}
-
-/// I10 · Información del hospital: ocupación general, médicos de turno y avisos (datos públicos).
-struct HospitalInfoView: View {
-    @EnvironmentObject private var account: AccountModel
-    @Environment(LiveViewModel.self) private var live
-    @State private var loader = Loader<HospitalInfo>()
-
-    var body: some View {
-        LoadState(loader: loader, retry: load) { info in
-            SectionTitle("hospital.occupancy")
-            if let rows = info.occupancy?.rows, !rows.isEmpty {
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    StatTile(value: String(row.free), label: String(format: L.text("hospital.beds"), row.free, row.beds),
-                             title: row.floor.map { String(format: L.text("hospital.floor"), $0) } ?? row.category.label)
-                }
-            } else { EmptyStateView(title: L.text("hospital.unavailable"), symbol: "building.2") }
-            SectionTitle("hospital.doctors")
-            if let doctors = info.doctors?.doctors, !doctors.isEmpty {
-                SectionCard {
-                    ForEach(Array(doctors.enumerated()), id: \.offset) { index, doctor in
-                        if index > 0 { Divider().overlay(Theme.line) }
-                        ListRow(title: doctor.name, subtitle: [doctor.specialty, doctor.area].compactMap { $0 }.joined(separator: " · "),
-                                meta: doctor.until.map { String(format: L.text("hospital.until"), ClimesaDates.display($0, .time)) })
-                    }
-                }
-            } else { EmptyStateView(title: L.text("hospital.doctors.none"), symbol: "stethoscope") }
-            SectionTitle("home.notices")
-            if let notices = info.notices?.notices, !notices.isEmpty {
-                ForEach(notices) { notice in SectionCard(title: notice.title) { Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink) } }
-            } else { EmptyStateView(title: L.text("hospital.notices.none"), symbol: "bell") }
-        }
-        .task(id: live.snapshot.version(.hospitalInfo)) { await load() }
-    }
-
-    private func load() async {
-        await loader.load {
-            let api = try account.client()
-            var info = HospitalInfo()
-            info.occupancy = try? await api.get("/publico/ocupacion", as: PublicOccupancy.self)
-            info.doctors = try? await api.get("/publico/medicos-de-turno", as: DoctorsOnDuty.self)
-            info.notices = try? await api.get("/publico/avisos", as: PublicNotices.self)
-            if info.occupancy == nil && info.doctors == nil && info.notices == nil { throw APIFailure.transport }
-            return info
-        }
     }
 }
 
