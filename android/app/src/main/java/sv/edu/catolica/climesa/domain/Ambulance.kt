@@ -29,7 +29,8 @@ data class AmbulanceRequestRow(
 )
 /** Por qué no se puede despachar ahora y qué hacer; la calcula la API (RN-29, RN-30). */
 data class DispatchBlock(val code: String, val message: String, val action: String)
-data class AmbulanceStatus(val unit: AmbulanceUnit, val activeService: AmbulanceService?, val paramedicOnDuty: Boolean, val pendingRequests: List<AmbulanceRequestRow>, val dispatchBlock: DispatchBlock? = null)
+/** `driverOnDuty` (RN-30): an older API without the key counts as covered, so it never raises a false alarm. */
+data class AmbulanceStatus(val unit: AmbulanceUnit, val activeService: AmbulanceService?, val paramedicOnDuty: Boolean, val pendingRequests: List<AmbulanceRequestRow>, val dispatchBlock: DispatchBlock? = null, val driverOnDuty: Boolean = true)
 /** Servicio de la bitácora: sin nombre del paciente, solo su expediente enmascarado. */
 data class AmbulanceLogEntry(
     val id: String, val type: String, val priority: String, val origin: String, val destination: String, val dispatchedAt: String, val finalState: String?, val responseMinutes: Int?,
@@ -197,7 +198,7 @@ object AmbulanceParser {
             AmbulanceRequestRow(it.text("id"), it.text("channel"), it.text("address"), it.text("municipality"), it.text("reason"), it.text("contactPhone"), it.text("createdAt"), it.optInt("version", 1), it.text("requesterName"), it.text("callerName"), it.text("patientRecord"))
         }
         val block = root.optJSONObject("dispatchBlock")?.let { DispatchBlock(it.text("code"), it.text("message"), it.text("action")) }
-        return AmbulanceStatus(AmbulanceUnit(unit.text("id"), unit.text("plate"), unit.text("state"), unit.optInt("version", 1), unit.text("stateReason"), unit.text("stateSince")), service, root.optBoolean("paramedicOnDuty"), pending, block)
+        return AmbulanceStatus(AmbulanceUnit(unit.text("id"), unit.text("plate"), unit.text("state"), unit.optInt("version", 1), unit.text("stateReason"), unit.text("stateSince")), service, root.optBoolean("paramedicOnDuty"), pending, block, root.optBoolean("driverOnDuty", true))
     }
 
     fun log(value: Any?): List<AmbulanceLogEntry> = objects(value as? JSONArray).map {

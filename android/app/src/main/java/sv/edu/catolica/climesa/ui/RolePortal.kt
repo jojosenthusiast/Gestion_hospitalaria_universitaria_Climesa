@@ -140,10 +140,11 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
                 item{SectionCard(unit?.plate.orEmpty()){
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){Text(stringResource(R.string.unidad_estado),style=MaterialTheme.typography.labelSmall);StatusTag(unit?.state.orEmpty(),label=unitStates[unit?.state])}
                     LabeledValue(stringResource(R.string.unidad_paramedico_turno),stringResource(if(unit?.paramedicOnDuty==true)R.string.unidad_si else R.string.unidad_no))
+                    LabeledValue(stringResource(R.string.unidad_motorista_turno),stringResource(if(unit?.driverOnDuty!=false)R.string.unidad_si else R.string.unidad_no))
                     HorizontalDivider()
                     if(unit?.hasService!=true)Text(stringResource(R.string.unidad_sin_servicio),style=MaterialTheme.typography.bodyMedium) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${unit.serviceOrigin.orEmpty()} → ${unit.serviceDestination.orEmpty()}")}
                 }}
-                if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.state))item{MaintenanceControl(model,unit.state,unit.version,unit.paramedicOnDuty)}
+                if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.state))item{MaintenanceControl(model,unit.state,unit.version,unit.paramedicOnDuty,unit.driverOnDuty)}
             }else if(page==AndroidSection.SHIFTS){
                 val shifts=MyShifts.parse(data.data)
                 if(shifts.isEmpty())item{EmptyState("No tienes turnos publicados.")}
@@ -175,15 +176,15 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     }
 }
 /** Entrar o salir de mantenimiento; el motivo y el diálogo sobreviven al giro de pantalla. */
-@Composable private fun MaintenanceControl(model:RoleViewModel,unitState:String,version:Int,paramedicOnDuty:Boolean){
-    val leaving=unitState=="en_mantenimiento";val blocked=MaintenanceRules.leavingBlocked(unitState,paramedicOnDuty)
+@Composable private fun MaintenanceControl(model:RoleViewModel,unitState:String,version:Int,paramedicOnDuty:Boolean,driverOnDuty:Boolean){
+    val leaving=unitState=="en_mantenimiento";val blocked=MaintenanceRules.leavingBlocked(unitState,paramedicOnDuty,driverOnDuty)
     val state by model.maintenance.collectAsStateWithLifecycle()
     var open by rememberSaveable{mutableStateOf(false)};var reason by rememberSaveable{mutableStateOf("")}
     val title=stringResource(if(leaving)R.string.mantenimiento_sacar else R.string.mantenimiento_poner)
     LaunchedEffect(state.saved){if(state.saved){open=false;reason="";model.resetMaintenance()}}
     Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
         Text(stringResource(R.string.mantenimiento_titulo),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        if(blocked)Text(stringResource(R.string.mantenimiento_requiere_paramedico),style=MaterialTheme.typography.bodySmall)
+        if(blocked)Text(stringResource(when(MaintenanceRules.missingCrew(paramedicOnDuty,driverOnDuty)){"sin_motorista_de_turno"->R.string.mantenimiento_requiere_motorista;"sin_tripulacion_de_turno"->R.string.mantenimiento_requiere_tripulacion;else->R.string.mantenimiento_requiere_paramedico}),style=MaterialTheme.typography.bodySmall)
         SecondaryButton(title,{model.resetMaintenance();open=true},enabled=!blocked)
     }
     if(open){

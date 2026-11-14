@@ -30,6 +30,12 @@ class PortalParsersTest {
         assertNull(PortalParsers.unit(JSONObject()))
     }
 
+    @Test fun readsTheDriverOnDutyAndToleratesOldServers() {
+        val idle = JSONObject().put("unit", JSONObject().put("plate", "P-000-001").put("state", "disponible").put("version", 4)).put("paramedicOnDuty", true)
+        assertTrue(PortalParsers.unit(idle)!!.driverOnDuty)
+        assertFalse(PortalParsers.unit(JSONObject(idle.toString()).put("driverOnDuty", false))!!.driverOnDuty)
+    }
+
     @Test fun aShiftWithMalformedDatesOpensWithEmptyFieldsInsteadOfCrashing() {
         val shift = PlannedShift("t1", "p1", "Persona", "a1", "Área", "no-es-fecha", "", "ordinario", "borrador", null, 1)
         val form = ShiftPlanning.formOf(shift)

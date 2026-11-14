@@ -6,6 +6,8 @@
     <string name="par_titulo_libre">Sin servicio activo</string>
     <string name="par_turno_si">Paramédico con turno en curso</string>
     <string name="par_turno_no">Sin paramédico con turno en curso</string>
+    <string name="par_motorista_si">Motorista con turno en curso</string>
+    <string name="par_motorista_no">Sin motorista con turno en curso</string>
     <string name="par_bloqueo_titulo">La unidad no puede salir</string>
     <string name="par_origen">Origen</string>
     <string name="par_destino">Destino</string>

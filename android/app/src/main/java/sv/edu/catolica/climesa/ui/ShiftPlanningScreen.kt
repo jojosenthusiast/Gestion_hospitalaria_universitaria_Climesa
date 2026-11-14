@@ -101,6 +101,7 @@ fun ShiftPlanningScreen(profile: AccessProfile, modifier: Modifier = Modifier, m
             }
         }
         item { ShiftFilterPanel(state, model) }
+        if (!state.loading && state.error == null) item { CrewCoverageAlert(state.shifts, state.staffTypes) }
         when {
             state.loading -> item { LoadingState() }
             state.error != null -> item { ErrorState(state.error, onRetry = { model.load() }) }

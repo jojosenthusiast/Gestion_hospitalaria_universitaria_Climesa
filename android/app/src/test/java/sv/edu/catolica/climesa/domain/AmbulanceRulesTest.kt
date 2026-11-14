@@ -83,4 +83,11 @@ class AmbulanceRulesTest {
         assertTrue(parsed.pendingRequests.isEmpty())
         assertEquals(2, parsed.unit.version)
     }
+
+    @Test fun elMotoristaDeTurnoSeLeeYUnServidorViejoNoDaFalsaAlarma() {
+        val base = JSONObject().put("unit", JSONObject().put("id", "u1").put("plate", "P-1").put("state", "disponible").put("version", 2)).put("activeService", JSONObject.NULL).put("paramedicOnDuty", true)
+        assertTrue(AmbulanceParser.status(JSONObject(base.toString()))!!.driverOnDuty)
+        assertFalse(AmbulanceParser.status(JSONObject(base.toString()).put("driverOnDuty", false))!!.driverOnDuty)
+        assertTrue(AmbulanceParser.status(JSONObject(base.toString()).put("driverOnDuty", true))!!.driverOnDuty)
+    }
 }

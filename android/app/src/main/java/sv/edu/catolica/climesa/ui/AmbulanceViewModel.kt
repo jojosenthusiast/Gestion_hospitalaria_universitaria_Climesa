@@ -232,6 +232,8 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         return when (code) {
             "ambulancia_ya_despachada" -> "La ambulancia ya fue despachada."
             "sin_paramedico_de_turno" -> "No hay un paramédico con turno en curso."
+            "sin_motorista_de_turno" -> "No hay un motorista con turno en curso."
+            "sin_tripulacion_de_turno" -> "No hay paramédico ni motorista con turno en curso."
             "cuenta_no_verificada" -> "Tu cuenta aún no está vinculada a tu expediente; recepción debe verificarla."
             "hito_fuera_de_orden" -> "Ese hito no sigue al último registrado. Se actualizó el servicio."
             "version_conflicto" -> "La unidad o la solicitud cambió. Revisa el estado actual e intenta de nuevo."

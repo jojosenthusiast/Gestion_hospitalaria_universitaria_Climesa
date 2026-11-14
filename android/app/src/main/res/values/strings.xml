@@ -40,11 +40,14 @@
     <string name="unidad_servicio_activo">Servicio activo</string>
     <string name="unidad_sin_servicio">Sin servicio activo.</string>
     <string name="unidad_paramedico_turno">Paramédico de turno</string>
+    <string name="unidad_motorista_turno">Motorista de turno</string>
     <string name="unidad_si">Sí</string>
     <string name="mantenimiento_titulo">Mantenimiento</string>
     <string name="mantenimiento_poner">Poner en mantenimiento</string>
     <string name="mantenimiento_sacar">Sacar de mantenimiento</string>
     <string name="mantenimiento_requiere_paramedico">Para sacar la unidad de mantenimiento debe haber un paramédico con turno en curso.</string>
+    <string name="mantenimiento_requiere_motorista">Para sacar la unidad de mantenimiento debe haber un motorista con turno en curso.</string>
+    <string name="mantenimiento_requiere_tripulacion">Para sacar la unidad de mantenimiento debe haber un paramédico y un motorista con turno en curso.</string>
     <string name="mantenimiento_efecto_poner">La unidad no podrá despacharse mientras esté en mantenimiento.</string>
     <string name="mantenimiento_efecto_sacar">La unidad queda Disponible.</string>
     <string name="mantenimiento_motivo">Motivo (al menos 10 caracteres)</string>
@@ -187,6 +190,8 @@
     <string name="amb_enviar_solicitud">Pedir ambulancia</string>
     <string name="amb_paramedico_si">Paramédico con turno en curso</string>
     <string name="amb_paramedico_no">Sin paramédico con turno en curso</string>
+    <string name="amb_motorista_si">Motorista con turno en curso</string>
+    <string name="amb_motorista_no">Sin motorista con turno en curso</string>
     <string name="amb_solicitudes_titulo">Solicitudes por confirmar (%1$d)</string>
     <string name="amb_sin_solicitudes">No hay solicitudes por confirmar.</string>
     <string name="amb_despachar">Confirmar y despachar</string>
@@ -257,4 +262,9 @@
     <string name="aviso_urgente">Urgente</string>
     <string name="aviso_atencion">Atención</string>
     <string name="aviso_para">Para: %1$s</string>
+    <string name="cobertura_titulo">Tripulación de ambulancia incompleta</string>
+    <string name="cobertura_detalle">La unidad solo se despacha con paramédico y motorista de turno (RN-30). Tramos sin cubrir con turnos publicados o en curso:</string>
+    <string name="cobertura_sin_paramedico">Sin paramédico: %1$s a %2$s</string>
+    <string name="cobertura_sin_motorista">Sin motorista: %1$s a %2$s</string>
+    <string name="cobertura_mas">y %1$d tramos más</string>
 </resources>

@@ -58,6 +58,12 @@ object ParamedicRules {
         "sin_paramedico_de_turno" ->
             if (canPlanShifts) "Publica un turno de paramédico para esta unidad en Turnos."
             else "Pide a Jefatura de Operaciones que publique tu turno de paramédico."
+        "sin_motorista_de_turno" ->
+            if (canPlanShifts) "Publica un turno de motorista para esta unidad en Turnos; sin quien la conduzca no puede despacharse."
+            else "Falta el turno del motorista: avisa a la Jefatura de Operaciones."
+        "sin_tripulacion_de_turno" ->
+            if (canPlanShifts) "Publica un turno de paramédico y otro de motorista para esta unidad en Turnos."
+            else "Faltan los turnos del paramédico y del motorista: avisa a la Jefatura de Operaciones."
         "en_mantenimiento" -> "Jefatura de Operaciones debe sacar la unidad de mantenimiento."
         "en_servicio" -> "Termina el servicio en curso para liberar la unidad."
         else -> "Avisa a Jefatura de Operaciones."
