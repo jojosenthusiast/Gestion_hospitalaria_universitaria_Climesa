@@ -147,9 +147,9 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
     expect(window.location.hash).toBe('#/pacientes');
   });
 
-  it('una ruta con ?accion= de un módulo visible se conserva', async () => {
+  it('una ruta con ?accion= de un módulo visible se abre y el módulo borra la acción tras atenderla', async () => {
     await entrar(perfil('REC'), { '/pacientes': () => json([]) }, '#/pacientes?accion=registrar');
-    expect(window.location.hash).toBe('#/pacientes?accion=registrar');
+    expect(window.location.hash).toBe('#/pacientes');
   });
 
   it('al cerrar sesión se limpia la ruta: la siguiente cuenta no hereda una sección ajena', async () => {
