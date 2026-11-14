@@ -7,10 +7,11 @@ import { SessionExpiryWarning,useIdleSession } from './features/session';
 import { supabase } from './lib/supabase';
 import { demoAccounts } from './lib/demoLogin';
 import { useLive } from './lib/live';
-import { ActivationView,LoginView,RegistrationView,StatusView } from './components/ui';
+import { LoginView,RegistrationView,StatusView } from './components/ui';
 import { HospitalShell } from './features/shell';
 import { PublicScreen } from './features/public-screen';
 import { PasswordRecoveryView,strongPassword } from './features/password';
+import { ConfirmEmail,LANDING_PATHS,PlatformGuidanceScreen,SetPasswordLanding } from './features/auth-landing';
 import './modules.css';
 /** La ruta del hash pertenece a la sesión: al salir se limpia para que la siguiente cuenta no herede una sección ajena (obs. 15). */
 const resetRoute=()=>{if(location.hash)history.replaceState(null,'',location.pathname+location.search);};
@@ -21,11 +22,13 @@ export default function App(){
  // W34: la pantalla pública no usa sesión; sin Supabase solo pierde el tiempo real.
  if(location.pathname==='/publico')return <PublicScreen/>;
  if(!supabase)return <StatusView title="Configura tu conexión" detail="Copia web/.env.example como web/.env y configura la conexión de CLIMESA antes de iniciar el portal."/>;
- if(location.pathname==='/aceptar-invitacion')return <AcceptInvitation/>;
+ // E-mail landing pages (docs/operacion/correo-auth.md): every platform's Supabase links redirect to these web paths.
+ if(location.pathname===LANDING_PATHS.confirm)return <ConfirmEmail/>;
+ if(location.pathname===LANDING_PATHS.invite)return <SetPasswordLanding/>;
  if(location.pathname==='/registro')return <Register/>;
  // WEB-13: the recovery e-mail links to /restablecer (Supabase redirect URL, owner setting).
- if(location.pathname==='/recuperar')return <PasswordRecoveryView onRequest={async email=>{await supabase!.auth.resetPasswordForEmail(email,{redirectTo:`${location.origin}/restablecer`});}}/>;
- if(location.pathname==='/restablecer')return <AcceptInvitation reset/>;
+ if(location.pathname==='/recuperar')return <PasswordRecoveryView onRequest={async email=>{await supabase!.auth.resetPasswordForEmail(email,{redirectTo:`${location.origin}${LANDING_PATHS.reset}`});}}/>;
+ if(location.pathname===LANDING_PATHS.reset)return <SetPasswordLanding reset/>;
  if(!ready)return <StatusView title="Comprobando tu sesión" detail="Estamos preparando tu espacio de trabajo."/>;
  if(!session)return <Login notice={expired?'Tu sesión se cerró por inactividad. Ingresa nuevamente.':new URLSearchParams(location.search).get('contrasena')==='actualizada'?'Contraseña actualizada. Ingresa con tu nueva contraseña.':undefined} onAttempt={()=>setExpired(false)}/>;
  return <Portal session={session} onExpired={()=>{setExpired(true);void supabase?.auth.signOut({scope:'local'});}}/>;
@@ -45,7 +48,7 @@ function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
  useEffect(load,[load]);
  if(loading&&!profile)return <StatusView title="Validando tu acceso" detail="Consultando los permisos vigentes de tu cuenta."/>;
  if(error||!profile)return <div><StatusView title="No pudimos validar el acceso" detail={error??'Intenta nuevamente.'} action="Volver a intentar" onAction={load}/><button className="access-logout" onClick={()=>void supabase?.auth.signOut({scope:'local'})}>Cerrar sesión</button></div>;
- if(!profile.platforms.includes('web'))return <StatusView title="Tu rol no usa esta aplicación" detail={`Tu cuenta está habilitada para ${profile.platforms.map(p=>p==='ios'?'iOS':'Android').join(' e ')}. Ingresa desde la aplicación correspondiente.`} action="Cerrar sesión" onAction={()=>void supabase?.auth.signOut({scope:'local'})}/>;
+ if(!profile.platforms.includes('web'))return <PlatformGuidanceScreen profile={profile} title="Tu rol no usa esta aplicación" action={{label:'Cerrar sesión',onClick:()=>void supabase?.auth.signOut({scope:'local'})}}/>;
  return <LivePortal {...{api,profile,session,onExpired}} refreshProfile={load}/>;
 }
 function LivePortal({api,profile,session,onExpired,refreshProfile}:{api:IntentApi;profile:AccessProfile;session:Session;onExpired:()=>void;refreshProfile:()=>void}){
@@ -65,13 +68,6 @@ const changePassword=(email:string)=>async(current:string,next:string):Promise<s
 };
 function Register(){
  const [name,setName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[done,setDone]=useState(false);
- async function submit(e:FormEvent){e.preventDefault();if(!strongPassword(password))return setError('Usa al menos 8 caracteres, mayúscula, minúscula, número y símbolo.');if(password!==confirmation)return setError('Las contraseñas no coinciden.');setBusy(true);setError(null);try{const result=await supabase!.auth.signUp({email:email.trim(),password,options:{data:{nombre:name.trim()},emailRedirectTo:location.origin}});if(result.error)setError('No se pudo crear la cuenta. Revisa los datos o intenta iniciar sesión.');else{if(result.data.session)await supabase!.auth.signOut({scope:'local'});setDone(true);}}catch{setError('No se pudo conectar. Intenta nuevamente.');}finally{setBusy(false);}}
+ async function submit(e:FormEvent){e.preventDefault();if(!strongPassword(password))return setError('Usa al menos 8 caracteres, mayúscula, minúscula, número y símbolo.');if(password!==confirmation)return setError('Las contraseñas no coinciden.');setBusy(true);setError(null);try{const result=await supabase!.auth.signUp({email:email.trim(),password,options:{data:{nombre:name.trim()},emailRedirectTo:`${location.origin}${LANDING_PATHS.confirm}`}});if(result.error)setError('No se pudo crear la cuenta. Revisa los datos o intenta iniciar sesión.');else{if(result.data.session)await supabase!.auth.signOut({scope:'local'});setDone(true);}}catch{setError('No se pudo conectar. Intenta nuevamente.');}finally{setBusy(false);}}
  return <RegistrationView {...{name,email,password,confirmation,setName,setEmail,setPassword,setConfirmation,busy,error,done}} onSubmit={submit}/>;
-}
-/** W02 (invitation) and, with `reset`, W01 password recovery (WEB-13): both arrive with a Supabase link session. */
-function AcceptInvitation({reset=false}:{reset?:boolean}){
- const [session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(false),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(new URLSearchParams(location.search).get('error_description'));
- useEffect(()=>{void supabase!.auth.getSession().then(({data})=>{setSession(data.session);setReady(true);});const {data}=supabase!.auth.onAuthStateChange((_event,next)=>{setSession(next);setReady(true);});return()=>data.subscription.unsubscribe();},[]);
- async function submit(e:FormEvent){e.preventDefault();if(!strongPassword(password))return setError('Usa al menos 8 caracteres, mayúscula, minúscula, número y símbolo.');if(password!==confirmation)return setError('Las contraseñas no coinciden.');setBusy(true);setError(null);try{const {error}=await supabase!.auth.updateUser({password});if(error){setError(error.code==='same_password'?'La nueva contraseña debe ser distinta de la anterior.':reset?'No se pudo guardar la contraseña. Pide un enlace nuevo.':'No se pudo activar la cuenta. Revisa el enlace de invitación.');return;}await supabase!.auth.signOut({scope:'local'});location.assign(reset?'/?contrasena=actualizada':'/?invitacion=aceptada');}finally{setBusy(false);}}
- return <ActivationView {...{ready,password,confirmation,setPassword,setConfirmation,busy,error}} mode={reset?'reset':'activation'} email={session?.user.email} onSubmit={submit}/>;
 }
