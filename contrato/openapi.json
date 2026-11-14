@@ -10682,6 +10682,15 @@
         "operationId": "AmbulanceController_log",
         "parameters": [
           {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Texto libre sin acentos: origen, destino, municipio o tripulación",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "minResponseMinutes",
             "required": false,
             "in": "query",
@@ -10808,7 +10817,7 @@
             "bearer": []
           }
         ],
-        "summary": "Bitácora filtrable (D-056); sin datos del paciente",
+        "summary": "Bitácora filtrable (D-056); sin datos del paciente (solo el expediente enmascarado)",
         "tags": [
           "ambulancia"
         ],
@@ -17054,13 +17063,26 @@
           },
           "version": {
             "type": "integer"
+          },
+          "stateReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo del último cambio a este estado"
+          },
+          "stateSince": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Desde cuándo está en este estado"
           }
         },
         "required": [
           "id",
           "plate",
           "state",
-          "version"
+          "version",
+          "stateReason",
+          "stateSince"
         ]
       },
       "TipoServicioAmbulancia": {
@@ -17253,6 +17275,38 @@
           "lastLocation"
         ]
       },
+      "MotivoBloqueoDespacho": {
+        "type": "string",
+        "enum": [
+          "en_servicio",
+          "en_mantenimiento",
+          "sin_paramedico_de_turno"
+        ]
+      },
+      "DispatchBlockResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MotivoBloqueoDespacho"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "description": "Qué hacer para poder despachar"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "action"
+        ]
+      },
       "CanalSolicitudAmbulancia": {
         "type": "string",
         "enum": [
@@ -17304,6 +17358,21 @@
           },
           "registeredPatient": {
             "type": "boolean"
+          },
+          "requesterName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Quién pidió: paciente (nombre o alias provisional) o la persona que llamó"
+          },
+          "callerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre de quien llamó, si recepción lo anotó"
+          },
+          "patientRecord": {
+            "type": "string",
+            "nullable": true,
+            "description": "Expediente del paciente registrado"
           }
         },
         "required": [
@@ -17317,7 +17386,10 @@
           "contactPhone",
           "createdAt",
           "version",
-          "registeredPatient"
+          "registeredPatient",
+          "requesterName",
+          "callerName",
+          "patientRecord"
         ]
       },
       "AmbulanceStatusResponse": {
@@ -17338,6 +17410,16 @@
           "paramedicOnDuty": {
             "type": "boolean"
           },
+          "dispatchBlock": {
+            "nullable": true,
+            "description": "Por qué no se puede despachar ahora; null si se puede",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DispatchBlockResponse"
+              }
+            ]
+          },
           "pendingRequests": {
             "description": "Solo con ambulancia.despachar",
             "type": "array",
@@ -17349,7 +17431,8 @@
         "required": [
           "unit",
           "activeService",
-          "paramedicOnDuty"
+          "paramedicOnDuty",
+          "dispatchBlock"
         ]
       },
       "MaintenanceDto": {
@@ -17426,6 +17509,11 @@
             "type": "string",
             "minLength": 5,
             "maxLength": 500
+          },
+          "callerName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
           },
           "contactPhone": {
             "type": "string",
@@ -18017,6 +18105,17 @@
           "responseMinutes": {
             "type": "number",
             "nullable": true
+          },
+          "milestones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MilestoneEntryResponse"
+            }
+          },
+          "patientRef": {
+            "type": "string",
+            "nullable": true,
+            "description": "Expediente enmascarado del paciente; nunca el nombre"
           }
         },
         "required": [
@@ -18030,7 +18129,9 @@
           "finishedAt",
           "finalState",
           "crew",
-          "responseMinutes"
+          "responseMinutes",
+          "milestones",
+          "patientRef"
         ]
       },
       "CodigoProblema": {

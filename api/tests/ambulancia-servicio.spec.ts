@@ -207,7 +207,7 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     const all = await t.call('JOP', 'GET', '/ambulancia/bitacora');
     expect(all.status).toBe(200);
     expect(all.body).toHaveLength(3);
-    expect(JSON.stringify(all.body)).not.toMatch(/paciente|patient|NN-/i);
+    expect(JSON.stringify(all.body)).not.toMatch(/paciente|patientId|patientName|NN-/i);
     const completed = await t.call('JOP', 'GET', '/ambulancia/bitacora?finalState=completado');
     expect(completed.body).toHaveLength(1);
     expect(completed.body[0]).toMatchObject({ priority: 'naranja', destination: 'Hospital CLIMESA, emergencia', responseMinutes: 20 });

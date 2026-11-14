@@ -1681,7 +1681,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Bitácora filtrable (D-056); sin datos del paciente */
+        /** Bitácora filtrable (D-056); sin datos del paciente (solo el expediente enmascarado) */
         get: operations["AmbulanceController_log"];
         put?: never;
         post?: never;
@@ -3450,6 +3450,13 @@ export interface components {
             plate: string;
             state: components["schemas"]["EstadoAmbulancia"];
             version: number;
+            /** @description Motivo del último cambio a este estado */
+            stateReason: string | null;
+            /**
+             * Format: date-time
+             * @description Desde cuándo está en este estado
+             */
+            stateSince: string | null;
         };
         /** @enum {string} */
         TipoServicioAmbulancia: "emergencia_domicilio" | "traslado_interhospitalario";
@@ -3496,6 +3503,14 @@ export interface components {
             lastLocation: components["schemas"]["LocationPointResponse"] | null;
         };
         /** @enum {string} */
+        MotivoBloqueoDespacho: "en_servicio" | "en_mantenimiento" | "sin_paramedico_de_turno";
+        DispatchBlockResponse: {
+            code: components["schemas"]["MotivoBloqueoDespacho"];
+            message: string;
+            /** @description Qué hacer para poder despachar */
+            action: string;
+        };
+        /** @enum {string} */
         CanalSolicitudAmbulancia: "app_paciente" | "telefono";
         PendingAmbulanceRequestResponse: {
             /** Format: uuid */
@@ -3511,11 +3526,19 @@ export interface components {
             createdAt: string;
             version: number;
             registeredPatient: boolean;
+            /** @description Quién pidió: paciente (nombre o alias provisional) o la persona que llamó */
+            requesterName: string | null;
+            /** @description Nombre de quien llamó, si recepción lo anotó */
+            callerName: string | null;
+            /** @description Expediente del paciente registrado */
+            patientRecord: string | null;
         };
         AmbulanceStatusResponse: {
             unit: components["schemas"]["AmbulanceUnitResponse"];
             activeService: components["schemas"]["ActiveServiceResponse"] | null;
             paramedicOnDuty: boolean;
+            /** @description Por qué no se puede despachar ahora; null si se puede */
+            dispatchBlock: components["schemas"]["DispatchBlockResponse"] | null;
             /** @description Solo con ambulancia.despachar */
             pendingRequests?: components["schemas"]["PendingAmbulanceRequestResponse"][];
         };
@@ -3537,6 +3560,7 @@ export interface components {
             latitude?: number;
             longitude?: number;
             reason: string;
+            callerName?: string;
             /** @example 7000-0000 */
             contactPhone: string;
             /**
@@ -3706,6 +3730,9 @@ export interface components {
             finalState: components["schemas"]["EstadoFinalServicio"] | null;
             crew: components["schemas"]["ServiceLogCrewResponse"][];
             responseMinutes: number | null;
+            milestones: components["schemas"]["MilestoneEntryResponse"][];
+            /** @description Expediente enmascarado del paciente; nunca el nombre */
+            patientRef: string | null;
         };
         /**
          * @description Código estable del error (snake_case).
@@ -11309,6 +11336,8 @@ export interface operations {
     AmbulanceController_log: {
         parameters: {
             query?: {
+                /** @description Texto libre sin acentos: origen, destino, municipio o tripulación */
+                q?: string;
                 minResponseMinutes?: number;
                 municipality?: string;
                 crewId?: string;

@@ -28,9 +28,9 @@ export class AmbulanceController {
   readPrehospital(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string){return this.ambulance.readPrehospital(r.actor,id);}
   @Post('ubicacion') @RequirePermission('ambulancia.operar') @ApiOperation({summary:'Ubicación en vivo de la tripulación; solo con servicio activo'}) @ApiCreatedResponse({ type: LocationRecordedResponse })
   location(@Req() r:ActorRequest,@Body() d:LocationDto,@Headers('idempotency-key') k?:string){return this.ambulance.location(r.actor,d,k);}
-  @Get('bitacora') @RequirePermission('ambulancia.ver_bitacora') @ApiOperation({summary:'Bitácora filtrable (D-056); sin datos del paciente'})
+  @Get('bitacora') @RequirePermission('ambulancia.ver_bitacora') @ApiOperation({summary:'Bitácora filtrable (D-056); sin datos del paciente (solo el expediente enmascarado)'})
   @ApiQuery({name:'from',type:String,required:false,description:'Primer día local, yyyy-MM-dd'}) @ApiQuery({name:'to',type:String,required:false,description:'Último día local, yyyy-MM-dd'})
   @ApiQuery({name:'type',type:String,required:false}) @ApiQuery({name:'finalState',type:String,required:false}) @ApiQuery({name:'priority',type:String,required:false})
-  @ApiQuery({name:'crewId',type:String,required:false}) @ApiQuery({name:'municipality',type:String,required:false}) @ApiQuery({name:'minResponseMinutes',type:Number,required:false}) @ApiOkResponse({ type: [ServiceLogEntryResponse] })
+  @ApiQuery({name:'crewId',type:String,required:false}) @ApiQuery({name:'municipality',type:String,required:false}) @ApiQuery({name:'minResponseMinutes',type:Number,required:false}) @ApiQuery({name:'q',type:String,required:false,description:'Texto libre sin acentos: origen, destino, municipio o tripulación'}) @ApiOkResponse({ type: [ServiceLogEntryResponse] })
   log(@Req() r:ActorRequest,@Query() q:LogFilters){return this.ambulance.log(r.actor,q);}
 }

@@ -739,6 +739,12 @@ from (values
 ) s(n, canal, pac, dir, lat, lon, mun, motivo, tel, estado, descarte, hace)
 on conflict do nothing;
 
+-- Nombre que dio quien llamó (ficticio); la solicitud de la app toma el del paciente.
+update ambulancia.solicitud set solicitante_nombre = case id
+    when pg_temp.did('0071', 2) then 'Marta Elena Quintanilla'
+    when pg_temp.did('0071', 4) then 'Rigoberto Alas Mejía' end
+  where id in (pg_temp.did('0071', 2), pg_temp.did('0071', 4)) and solicitante_nombre is null;
+
 do $$
 declare
   v_unidad uuid;

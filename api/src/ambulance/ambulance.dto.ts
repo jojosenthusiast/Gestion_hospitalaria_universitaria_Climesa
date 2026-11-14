@@ -16,6 +16,7 @@ export class AmbulanceRequestDto {
   @ApiPropertyOptional({minimum:-90,maximum:90}) @IsOptional() @IsNumber() @Min(-90) @Max(90) latitude?:number;
   @ApiPropertyOptional({minimum:-180,maximum:180}) @IsOptional() @IsNumber() @Min(-180) @Max(180) longitude?:number;
   @Text(5,500) reason!:string;
+  @Text(2,120,true) callerName?:string;
   @ApiProperty({example:'7000-0000'}) @Matches(/^[0-9+ -]{8,20}$/,{message:'contactPhone debe ser un teléfono de 8 a 20 dígitos.'}) contactPhone!:string;
   @ApiPropertyOptional({format:'uuid',description:'Solo recepción: paciente ya registrado que pide el servicio por teléfono'}) @IsOptional() @IsUUID() patientId?:string;
 }
