@@ -11,26 +11,31 @@
   - Hecho cuando: escenario 2 pasa
   - Verificado: 29-oct-2026, `npm test -- --ci` en api/ (17 suites, 202 pruebas, 5 nuevas en `ambulancia-estado.spec.ts` con el escenario 2) y `npm test` en web/ (5 archivos, 41 pruebas, `ambulancia.test.tsx`); `npx tsc --noEmit` limpio en ambas. `GET /ambulancia` y el cambio de estado emiten `ambulancia.estado_cambiado` y la tarjeta web (`#/ambulancia`, JOP y REC con `ambulancia.ver_estado`) se vuelve a pedir con la versión del canal en vivo. Alcance: solo el estado de la unidad; la evidencia de la operación con tripulación y de emergencia de punta a punta es delgada y queda en 109-T05 y 109-T06 (abiertas).
   - Avance 29-oct-2026: `api/tests/ambulancia-estado.spec.ts` cubre el escenario 2 (sin paramédico con turno en curso, salir de mantenimiento responde 409 `sin_paramedico_de_turno`; con uno de turno la unidad queda Disponible con `cambio_estado`, auditoría y evento). El cambio de estado usa `POST /ambulancia/mantenimiento` (`ambulancia.mantenimiento`, JOP). **Sin probar**: el evento en vivo de extremo a extremo con un teléfono Android; la web lo asume por la versión del canal `ambulancia` y no se abrió contra la nube.
-- [ ] T03 · S4 · R · Solicitudes del paciente y por teléfono, confirmación y despacho con bloqueo
+- [x] T03 · S4 · R · Solicitudes del paciente y por teléfono, confirmación y despacho con bloqueo
   - Cubre: FR-109-02, FR-109-03, FR-109-04, FR-109-05
   - Depende de: T02, 101-T07
   - Hecho cuando: escenario 1 pasa como prueba concurrente
-- [ ] T04 · S4 · R · Hitos, finalización y mantenimiento
+  - Verificado: 15-nov-2026, `npm test -- --ci` en api/ con `tests/ambulancia-servicio.spec.ts`: dos `POST /ambulancia/servicios` lanzados a la vez con `Promise.all` dejan un solo servicio activo y la unidad En Servicio; el otro recibe 409 `ambulancia_ya_despachada` ("La ambulancia ya fue despachada."). La base rechaza un segundo servicio activo insertado directo (`servicio_activo_unico`), una segunda unidad (`unidad_unica`, migración `20261115001000_ambulancia_despacho.sql`) y sacar la unidad de En Servicio con servicio activo. Solicitud del paciente verificado "por confirmar" con aviso del 911, rechazo sin cuenta verificada (`cuenta_no_verificada`), llamada de recepción, descarte con motivo y versión. PGlite serializa las transacciones; la carrera con dos sesiones nativas queda en `supabase/pruebas/02_concurrencia.sh` (caso 3).
+- [x] T04 · S4 · R · Hitos, finalización y mantenimiento
   - Cubre: FR-109-07, FR-109-08, FR-109-09, FR-109-12
   - Depende de: T03
   - Hecho cuando: un servicio completo vuelve la unidad a Disponible y mantenimiento con servicio activo se rechaza
+  - Verificado: 15-nov-2026, `tests/ambulancia-servicio.spec.ts`: hitos fuera de orden 409 `hito_fuera_de_orden`, solo la tripulación los registra (MED 403), reenvío con la misma clave sin duplicar, finalizar completado deja la unidad Disponible con evento; terminar sin traslado exige estado final y motivo; hitos después de finalizar 409 `servicio_finalizado`; mantenimiento con servicio activo 409 `unidad_en_servicio`; paciente provisional (FR-109-12) creado por PAR y vinculado al servicio con el reporte prehospital.
 - [ ] T05 · S4 · R · Centro de despacho web (W18) y app de la tripulación (A70, A71, A73)
   - Cubre: FR-109-01, FR-109-04, FR-109-07
   - Depende de: T04, 120-T03, 121-T03
   - Hecho cuando: un servicio se opera de punta a punta entre web y Android en vivo
+  - Avance 15-nov-2026: W18 web (solicitudes, despachar, descartar, llamada, hitos, prehospital) y A36, A70, A71, A73 en Android consumen la API con pruebas de componente y de ViewModel. **Sin probar**: el servicio de punta a punta entre web y un teléfono en vivo.
 - [ ] T06 · S4 · R · Seguimiento del paciente en Android e iOS (A09, I09)
   - Cubre: FR-109-16
   - Depende de: T03, 122-T03
   - Hecho cuando: escenario 4 pasa
-- [ ] T07 · S4 · R · Bitácora con filtros y privacidad (W19, A74)
+  - Avance 15-nov-2026: A09 envía la solicitud, muestra el aviso del 911 y lista los eventos de `usuario:<id>`. Bloqueado: no hay endpoint de lectura de la solicitud para el paciente (pregunta AMB-01).
+- [x] T07 · S4 · R · Bitácora con filtros y privacidad (W19, A74)
   - Cubre: FR-109-14, FR-109-15
   - Depende de: T04
   - Hecho cuando: escenario 5 pasa
+  - Verificado: 15-nov-2026, escenario 5 en `tests/ambulancia-servicio.spec.ts`: JOP, REC y DPD filtran por estado final, prioridad, tipo, fecha, tripulación y tiempo de respuesta, y el JSON no contiene datos del paciente; PAR (`propio`) ve solo sus servicios; ENF 403. W19 en web (`web/src/features/ambulance-log.tsx`, `ambulancia-despacho.test.tsx`) y A74 en Android (`AmbulanceScreen.kt`; `./gradlew testDebugUnitTest assembleDebug` correcto). Sin exportar CSV (extra).
 - [ ] T08 · S4 · R · Admisión con origen ambulancia
   - Cubre: FR-109-17
   - Depende de: T04, 108-T02
@@ -39,7 +44,9 @@
   - Cubre: FR-109-10, FR-109-11
   - Depende de: T04
   - Hecho cuando: escenario 3 pasa en modo avión
+  - Avance 15-nov-2026: `POST/GET /ambulancia/servicios/{id}/prehospital` con reenvío idempotente probado en API; A72 deja el reporte en cola sin señal y lo reenvía con el mismo cuerpo al reconectar (`AmbulanceViewModelTest`); A54 y A25 lo reciben por el evento. **Sin probar** en modo avión y la cola no es persistente cifrada (pregunta AMB-10).
 - [ ] T10 · S5 · E · Ubicación en vivo y mapa
   - Cubre: FR-109-13
   - Depende de: T05
   - Hecho cuando: el punto se mueve en el mapa web mientras el teléfono se desplaza
+  - Avance 15-nov-2026: `POST /ambulancia/ubicacion` (solo con servicio activo) y la última coordenada en W18 como texto. Sin mapa ni envío desde Android (pregunta AMB-11).
