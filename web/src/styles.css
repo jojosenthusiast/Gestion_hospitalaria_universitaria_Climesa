@@ -38,6 +38,8 @@
   --state-blocked-soft: #edf0f2;
   --state-process: #1f55a3;
   --state-process-soft: #e8eff9;
+  --urgent: #a3480a;
+  --urgent-soft: #fdebdd;
   --guide: #e6eefb;
   --outline: #0043b2;
   --radius-control: 6px;
@@ -80,6 +82,8 @@
     --state-blocked-soft: #222b36;
     --state-process: #8cb2f0;
     --state-process-soft: #18284a;
+    --urgent: #f0a36b;
+    --urgent-soft: #3a2314;
     --guide: #18284a;
     --outline: #8db3fa;
     --shadow-float: 0 18px 50px rgb(0 0 0 / 0.35);

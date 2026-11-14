@@ -32,7 +32,7 @@ function montar(respuesta: (path: string) => Promise<unknown>, opciones: { perfi
   return { api, cambiarVersion: (version: number) => resultado.rerender(vista(version)) };
 }
 const tarjeta = (nombre: string) => screen.getByRole('region', { name: nombre });
-const cifra = (region: HTMLElement, etiqueta: string) => within(region).getByText(etiqueta).previousElementSibling?.textContent;
+const cifra = (region: HTMLElement, etiqueta: string) => within(region).getByText(etiqueta, { selector: '.board-figures span' }).previousElementSibling?.textContent;
 
 describe('W03 · tablero inicial sobre GET /metricas/tablero', () => {
   it('pide un solo agregado y muestra todas las tarjetas de FR-113-01', async () => {
@@ -50,7 +50,7 @@ describe('W03 · tablero inicial sobre GET /metricas/tablero', () => {
     expect(cifra(tarjeta('Pacientes'), 'Activos')).toBe('38');
     const plantas = tarjeta('Ocupación por planta');
     expect(within(plantas).getByText('6 no disponibles de 12')).toBeTruthy();
-    expect(within(plantas).getByRole('img', { name: 'Planta 3: 80% de camas no disponibles' })).toBeTruthy();
+    expect(within(plantas).getByRole('img', { name: /^Planta 3: 80% de camas no disponibles/ })).toBeTruthy();
     expect(within(tarjeta('Cobertura de turnos')).getByText('1 hueco de cobertura')).toBeTruthy();
     expect(within(tarjeta('Cobertura de turnos')).getByText(/Emergencia · Enfermería/)).toBeTruthy();
     expect(screen.getByText(/Actualizado:/)).toBeTruthy();
