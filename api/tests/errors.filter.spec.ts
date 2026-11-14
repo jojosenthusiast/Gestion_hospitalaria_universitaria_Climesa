@@ -1,9 +1,10 @@
-import { Body, ConflictException, Controller, ForbiddenException, Get, LoggerService, Module, Post, ValidationPipe } from '@nestjs/common';
+import { Body, ConflictException, Controller, ForbiddenException, Get, LoggerService, Module, Post } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { IsInt, IsString } from 'class-validator';
 import { ApiErrorsFilter } from '../src/platform/errors.filter';
 import { VersionConflictException } from '../src/platform/problem';
+import { validationPipe } from '../src/platform/validation';
 import { requestLogging } from '../src/main';
 
 class EditDto { @IsString() nombre!: string; @IsInt() version!: number; }
@@ -24,7 +25,7 @@ const bootstrap = async (stream?: { write: (line: string) => void }, logger?: Lo
   const module = await Test.createTestingModule({ imports: [ProbeModule] }).compile();
   const adapter = new FastifyAdapter({ logger: stream ? { ...requestLogging, stream } : false });
   const app = module.createNestApplication<NestFastifyApplication>(adapter, { logger: false });
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true, forbidUnknownValues: true }));
+  app.useGlobalPipes(validationPipe());
   app.useGlobalFilters(new ApiErrorsFilter(undefined, logger));
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
