@@ -54,25 +54,38 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
     val selectedItem = state.appointments.firstOrNull { it.appointmentId == selected }
     selectedItem?.let { item -> ConsultationDialog(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, onClose = { selected = null }) }
-    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val retry = { model.clearMessages(); model.load() }
+    PageList(modifier) {
         item { SectionIntro("Medicina / Atención", "Mi consultorio", "Agenda propia y registro clínico conectado a cada cita confirmada.") }
-        state.error?.let { error -> item { ClimesaActionGroup { Text(error, color = MaterialTheme.colorScheme.error); ClimesaButton("Reintentar", Icons.Default.Refresh, { model.clearMessages(); model.load() }, outlined = true) } } }
-        state.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.CheckCircle) } }
-        if (state.loading) item { CircularProgressIndicator() }
-        else if (state.appointments.isEmpty()) item { ClimesaCard { Text("No tienes citas confirmadas en el rango actual.", Modifier.padding(18.dp)) } }
-        else items(state.appointments, key = { it.appointmentId }) { item -> MedicalAppointmentCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }) }
+        if (profile != null) item { LiveIndicator() }
+        state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        when {
+            state.loading && state.appointments.isEmpty() -> item { LoadingState() }
+            state.error != null && state.appointments.isEmpty() -> item { ErrorState(state.error, retry) }
+            state.appointments.isEmpty() -> item { EmptyState(stringResource(R.string.clin_consulta_sin_citas), detail = stringResource(R.string.clin_consulta_sin_citas_detalle)) }
+            else -> {
+                if (state.loading) item { RefreshHint() }
+                state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+                items(state.appointments, key = { it.appointmentId }) { item -> MedicalAppointmentCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }) }
+            }
+        }
     }
 }
 
 @Composable
 private fun MedicalAppointmentCard(item: MedicalAppointment, onOpen: () -> Unit) {
-    ClimesaCard { Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(item.patientName.ifBlank { "Paciente sin nombre" }, style = MaterialTheme.typography.titleMedium)
-        Text("${formatDateTime(item.start)} — ${formatTime(item.end)}", style = MaterialTheme.typography.bodyMedium)
-        Text("Cita: ${appointmentState(item.appointmentState)} · Consulta: ${consultationState(item.consultationState)}", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-        item.reason?.let { Text("Motivo informado: $it", style = MaterialTheme.typography.bodySmall) }
-        OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(if (item.consultationState == "firmada") Icons.Default.CheckCircle else Icons.Default.EditNote, null); Spacer(Modifier.padding(4.dp)); Text(if (item.consultationState == "firmada") "Ver consulta" else if (item.consultationId == null) "Iniciar consulta" else "Continuar consulta") }
-    } }
+    val details = listOfNotNull(
+        "${formatDateTime(item.start)} — ${formatTime(item.end)}",
+        item.reason?.let { stringResource(R.string.clin_consulta_motivo, it) },
+    ).joinToString("\n")
+    DataRow(
+        title = item.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) },
+        subtitle = details,
+        meta = stringResource(R.string.clin_consulta_cita_estado, appointmentState(item.appointmentState)),
+        leadingIcon = if (item.consultationState == "firmada") Icons.Default.CheckCircle else Icons.Default.EditNote,
+        status = { ClinicalStatusTag(item.consultationState ?: StatusCatalogClinico.NOT_STARTED) },
+        onClick = onOpen,
+    )
 }
 
 @Composable
@@ -98,34 +111,35 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
     var labExams by rememberSaveable(item.appointmentId) { mutableStateOf("") }
     var labUrgent by rememberSaveable(item.appointmentId) { mutableStateOf(false) }
     val signed = item.consultationState == "firmada"
-    AlertDialog(onDismissRequest = { if (!busy) onClose() }, title = { Text(if (signed) "Consulta firmada" else if (item.consultationId == null) "Iniciar consulta" else "Continuar consulta") }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Paciente: ${item.patientName}\nCita: ${formatDateTime(item.start)}", style = MaterialTheme.typography.bodySmall)
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        if (signed) Text("Este registro está firmado. Las correcciones futuras se harán mediante addendum.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-        OutlinedTextField(reason, { reason = it.take(2000) }, label = { Text("Motivo de consulta") }, enabled = !signed, modifier = Modifier.fillMaxWidth(), minLines = 2)
-        OutlinedTextField(physicalExam, { physicalExam = it.take(10000) }, label = { Text("Examen físico") }, enabled = !signed, modifier = Modifier.fillMaxWidth(), minLines = 3)
-        OutlinedTextField(plan, { plan = it.take(5000) }, label = { Text("Plan") }, enabled = !signed, modifier = Modifier.fillMaxWidth(), minLines = 3)
-        if (item.consultationId != null && profile?.permissions?.contains("signos.registrar") == true) {
-            Text("Signos vitales", style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(systolic, { systolic = it }, label = { Text("PA sis.") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(diastolic, { diastolic = it }, label = { Text("PA dia.") }, modifier = Modifier.weight(1f), singleLine = true) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(heartRate, { heartRate = it }, label = { Text("FC") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(temperature, { temperature = it }, label = { Text("Temp.") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(oxygenSaturation, { oxygenSaturation = it }, label = { Text("Sat. O₂") }, modifier = Modifier.weight(1f), singleLine = true) }
-            OutlinedButton(onClick = { model.signs(item, systolic, diastolic, heartRate, temperature, oxygenSaturation) }, enabled = !busy && listOf(systolic, diastolic, heartRate, temperature, oxygenSaturation).any { it.isNotBlank() }, modifier = Modifier.fillMaxWidth()) { Text("Registrar signos") }
+    val permissions = profile?.permissions.orEmpty()
+    AlertDialog(onDismissRequest = { if (!busy) onClose() }, shape = MaterialTheme.shapes.large, title = { Text(if (signed) "Consulta firmada" else if (item.consultationId == null) "Iniciar consulta" else "Continuar consulta", style = MaterialTheme.typography.titleLarge) }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) { LabeledValue("Paciente", item.patientName, Modifier.weight(1f)); LabeledValue("Cita", formatDateTime(item.start), Modifier.weight(1f)) }
+        error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        if (signed) NoticeBanner(NoticeKind.INFO, stringResource(R.string.clin_consulta_firmada_aviso))
+        FormField("Motivo de consulta", reason, { reason = it.take(2000) }, enabled = !signed, singleLine = false)
+        FormField("Examen físico", physicalExam, { physicalExam = it.take(10000) }, enabled = !signed, singleLine = false)
+        FormField("Plan", plan, { plan = it.take(5000) }, enabled = !signed, singleLine = false)
+        if (item.consultationId != null && "signos.registrar" in permissions) {
+            Text(stringResource(R.string.clin_consulta_signos), style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField("PA sis.", systolic, { systolic = it }, Modifier.weight(1f)); FormField("PA dia.", diastolic, { diastolic = it }, Modifier.weight(1f)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField("FC", heartRate, { heartRate = it }, Modifier.weight(1f)); FormField("Temp.", temperature, { temperature = it }, Modifier.weight(1f)); FormField("Sat. O₂", oxygenSaturation, { oxygenSaturation = it }, Modifier.weight(1f)) }
+            SecondaryButton("Registrar signos", { model.signs(item, systolic, diastolic, heartRate, temperature, oxygenSaturation) }, enabled = !busy && listOf(systolic, diastolic, heartRate, temperature, oxygenSaturation).any { it.isNotBlank() })
         }
-        if (item.consultationId != null && !signed && profile?.permissions?.contains("consulta.registrar") == true) {
-            Text("Diagnóstico CIE-10", style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(diagnosisCode, { diagnosisCode = it.take(20) }, label = { Text("Código") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(diagnosisNote, { diagnosisNote = it.take(2000) }, label = { Text("Nota") }, modifier = Modifier.weight(2f), singleLine = true) }
+        if (item.consultationId != null && !signed && "consulta.registrar" in permissions) {
+            Text(stringResource(R.string.clin_consulta_diagnostico), style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField("Código", diagnosisCode, { diagnosisCode = it.take(20) }, Modifier.weight(1f)); FormField("Nota", diagnosisNote, { diagnosisNote = it.take(2000) }, Modifier.weight(2f)) }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(diagnosisPrincipal, { diagnosisPrincipal = it }); Text("Principal") }
-            OutlinedButton(onClick = { model.diagnosis(item, diagnosisCode, diagnosisNote, diagnosisPrincipal) { diagnosisCode = ""; diagnosisNote = ""; diagnosisPrincipal = false } }, enabled = !busy && diagnosisCode.trim().isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Registrar diagnóstico") }
+            SecondaryButton("Registrar diagnóstico", { model.diagnosis(item, diagnosisCode, diagnosisNote, diagnosisPrincipal) { diagnosisCode = ""; diagnosisNote = ""; diagnosisPrincipal = false } }, enabled = !busy && diagnosisCode.trim().isNotBlank())
         }
-        if (item.consultationId != null && !signed && profile?.permissions?.contains("recetas.emitir") == true) {
-            Text("Emitir receta", style = MaterialTheme.typography.titleSmall)
-            OutlinedTextField(medication, { medication = it.take(200) }, label = { Text("Medicamento") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(dose, { dose = it.take(200) }, label = { Text("Dosis") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(route, { route = it.take(100) }, label = { Text("Vía") }, modifier = Modifier.weight(1f), singleLine = true) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(frequency, { frequency = it.take(200) }, label = { Text("Frecuencia") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(duration, { duration = it.take(100) }, label = { Text("Duración") }, modifier = Modifier.weight(1f), singleLine = true) }
-            OutlinedTextField(instructions, { instructions = it.take(1000) }, label = { Text("Indicaciones") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-            OutlinedButton(onClick = { model.prescription(item, medication, dose, route, frequency, duration, instructions) { medication = ""; dose = ""; route = ""; frequency = ""; duration = ""; instructions = "" } }, enabled = !busy && listOf(medication, dose, route, frequency, duration).all { it.trim().isNotBlank() }, modifier = Modifier.fillMaxWidth()) { Text("Emitir receta") }
+        if (item.consultationId != null && !signed && "recetas.emitir" in permissions) {
+            Text(stringResource(R.string.clin_consulta_receta), style = MaterialTheme.typography.titleSmall)
+            FormField("Medicamento", medication, { medication = it.take(200) })
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField("Dosis", dose, { dose = it.take(200) }, Modifier.weight(1f)); FormField("Vía", route, { route = it.take(100) }, Modifier.weight(1f)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField("Frecuencia", frequency, { frequency = it.take(200) }, Modifier.weight(1f)); FormField("Duración", duration, { duration = it.take(100) }, Modifier.weight(1f)) }
+            FormField("Indicaciones", instructions, { instructions = it.take(1000) }, singleLine = false)
+            SecondaryButton("Emitir receta", { model.prescription(item, medication, dose, route, frequency, duration, instructions) { medication = ""; dose = ""; route = ""; frequency = ""; duration = ""; instructions = "" } }, enabled = !busy && listOf(medication, dose, route, frequency, duration).all { it.trim().isNotBlank() })
         }
-        if (item.consultationId != null && profile?.permissions?.contains("laboratorio.ordenar") == true) {
+        if (item.consultationId != null && "laboratorio.ordenar" in permissions) {
             LaunchedEffect(item.consultationId) { model.loadLabCatalog() }
             val chosen = labExams.split(',').filter { it.isNotBlank() }.toSet()
             Text(stringResource(R.string.lab_orden_titulo), style = MaterialTheme.typography.titleSmall)
@@ -133,12 +147,11 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             val panelLabel = stringResource(R.string.lab_orden_panel)
             labCatalog.forEach { exam -> Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(exam.id in chosen, { checked -> labExams = (if (checked) chosen + exam.id else chosen - exam.id).joinToString(",") }, enabled = !busy); Text(if (exam.isPanel) "${exam.code} · ${exam.name} · $panelLabel" else "${exam.code} · ${exam.name}", style = MaterialTheme.typography.bodySmall) } }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(labUrgent, { labUrgent = it }, enabled = !busy); Text(stringResource(R.string.lab_orden_urgente)) }
-            OutlinedButton(onClick = { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lab_orden_emitir)) }
+            SecondaryButton(stringResource(R.string.lab_orden_emitir), { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty())
         }
-    } }, confirmButton = { if (!signed) Button(onClick = { if (item.consultationId == null) model.start(item, reason) else model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(if (busy) "Guardando…" else if (item.consultationId == null) "Iniciar consulta" else "Guardar borrador") } }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (!signed && item.consultationId != null) Button(onClick = { model.sign(item, reason, physicalExam, plan, onClose) }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) { Text("Firmar") }; TextButton(onClick = onClose, enabled = !busy) { Text("Cerrar") } } })
+    } }, confirmButton = { if (!signed) TextButton(onClick = { if (item.consultationId == null) model.start(item, reason) else model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(if (busy) stringResource(R.string.ui_un_momento) else if (item.consultationId == null) "Iniciar consulta" else "Guardar borrador", style = MaterialTheme.typography.labelLarge) } }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (!signed && item.consultationId != null) TextButton(onClick = { model.sign(item, reason, physicalExam, plan, onClose) }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) { Text("Firmar", style = MaterialTheme.typography.labelLarge) }; TextButton(onClick = onClose, enabled = !busy) { Text("Cerrar", style = MaterialTheme.typography.labelLarge) } } })
 }
 
 private fun appointmentState(value: String) = mapOf("confirmada" to "Confirmada", "atendida" to "Atendida")[value] ?: value
-private fun consultationState(value: String?) = mapOf(null to "Sin iniciar", "abierta" to "Abierta", "firmada" to "Firmada")[value] ?: value.orEmpty()
 private fun formatDateTime(value: String) = runCatching { appointmentFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
 private fun formatTime(value: String) = runCatching { DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
