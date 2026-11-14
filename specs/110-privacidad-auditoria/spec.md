@@ -17,12 +17,12 @@ La "correcta aplicación de la política de visibilidad pública contra datos m�
 | FR-110-01 | El sistema debe determinar el contexto de cada acceso a datos de un paciente: propio, relación de atención activa o área de turno en curso. | R | REQ-PRV-02; D-031 |
 | FR-110-02 | Cuando la API responde datos de un paciente, debe incluir solo los campos que la tabla de `privacidad.md` permite para ese permiso y contexto. | R | REQ-PRV-02, 03 |
 | FR-110-03 | Si alguien sin contexto válido pide datos clínicos, entonces el sistema debe responder 403 sin revelar si el dato existe y auditar el intento. | R | REQ-PRV-02 |
-| FR-110-04 | ~~Administrador, Jefe de Operaciones y médicos no tratantes deben poder pedir acceso excepcional a un paciente con motivo y duración de hasta 24 h.~~ Retirado (D-082). | - | D-031; RN-40 |
-| FR-110-05 | ~~Solo el Delegado de protección de datos debe aprobar o negar un acceso excepcional, nunca uno propio.~~ Retirado (D-082). | - | D-031; RN-38 |
-| FR-110-06 | ~~Cuando vence un acceso excepcional, el sistema debe dejar de concederlo sin intervención.~~ Retirado (D-082). | - | RN-40 |
+| FR-110-04 | ~~Administrador, Jefe de Operaciones y médicos no tratantes deben poder pedir acceso excepcional a un paciente con motivo y duración de hasta 24 h.~~ Retirado (D-082). | F | D-031; RN-40 |
+| FR-110-05 | ~~Solo el Delegado de protección de datos debe aprobar o negar un acceso excepcional, nunca uno propio.~~ Retirado (D-082). | F | D-031; RN-38 |
+| FR-110-06 | ~~Cuando vence un acceso excepcional, el sistema debe dejar de concederlo sin intervención.~~ Retirado (D-082). | F | RN-40 |
 | FR-110-07 | El delegado debe poder buscar auditoría por persona, paciente, acción y fecha, y verificar la integridad de la cadena. | R | D-009 |
 | FR-110-08 | El paciente debe poder ver quién consultó su expediente (fecha, rol y motivo), sin nombres del personal. | E | LPDP Art. 16 |
-| FR-110-09 | ~~En urgencia, un médico de emergencia debe poder abrir acceso inmediato ("romper el vidrio") que queda pendiente de revisión posterior del delegado.~~ Retirado (D-082). | - | legado 000 FR-031 |
+| FR-110-09 | ~~En urgencia, un médico de emergencia debe poder abrir acceso inmediato ("romper el vidrio") que queda pendiente de revisión posterior del delegado.~~ Retirado (D-082). | F | legado 000 FR-031 |
 | FR-110-10 | La matriz de control de acceso y la política de campos deben publicarse como documentos generados desde los mismos datos que usa el sistema. | R | entregable 2 del curso |
 
 ## Escenarios de aceptación

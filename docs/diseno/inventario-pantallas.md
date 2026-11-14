@@ -80,7 +80,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 - **Para:** REC; LAB; DPD
 - **Propósito:** Bandeja de lo que toca hacer
-- **Muestra:** REC: vinculaciones, solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: accesos por aprobar
+- **Muestra:** REC: vinculaciones, solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: cadena de auditoría por verificar
 - **Acciones:** Abrir cada pendiente
 - **En vivo:** Contadores en vivo
 - **Spec:** 113
@@ -263,10 +263,10 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 ### W25 · Avisos generales (R)
 
 - **Para:** JOP
-- **Propósito:** Publicar avisos públicos
-- **Muestra:** Lista con vigencia
-- **Acciones:** Crear, retirar
-- **Privacidad:** Son públicos: no poner datos personales
+- **Propósito:** Redactar avisos con vista previa y elegir a quién llegan
+- **Muestra:** Formulario con prioridad, audiencia (público y/o roles) y vigencia; lista de lo publicado con su estado
+- **Acciones:** Publicar
+- **Privacidad:** Nunca datos personales: la pantalla advierte; el aviso aparece en la pantalla pública y en el tablero de inicio de cada rol elegido
 - **Spec:** 112
 
 ### W26 · Pacientes (R)
@@ -310,8 +310,8 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 - **Para:** DPD
 - **Propósito:** Buscar y verificar
-- **Muestra:** Filtros por persona, paciente, acción, fecha; resultado de verificación de cadena
-- **Acciones:** Verificar integridad
+- **Muestra:** Búsqueda por persona; filtros plegables con chips (expediente, rol, acción, entidad, resultado, fechas); vistas rápidas; tabla ordenable y paginada; detalle con hashes; resultado de verificación de cadena
+- **Acciones:** Verificar integridad, abrir detalle, exportar CSV/Excel/PDF
 - **Spec:** 110
 
 ### W33 · Métricas (E)

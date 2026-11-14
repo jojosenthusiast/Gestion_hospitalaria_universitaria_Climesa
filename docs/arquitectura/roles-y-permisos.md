@@ -271,6 +271,9 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | GET | `/api/v1/auditoria` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
 | POST | `/api/v1/auditoria/verificacion` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/auditoria/registros` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/auditoria/registros/{seq}` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/auditoria/opciones` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
 | GET | `/api/v1/me/accesos` | `auditoria.mis_accesos` | Propio | E | 5 | · | · | · | · | · | · | · | · | · | propio |
 
 ### Spec 111
@@ -292,6 +295,8 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/publico/avisos` | público, sin sesión |  | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | GET | `/api/v1/publico/fila/{servicio}` | público, sin sesión | Sin nombres | E | 4 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | POST | `/api/v1/avisos` | `avisos.publicar` | Vigencia | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/avisos` | `avisos.publicar` |  | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/me/avisos` | `sesion.perfil` | Propio | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 
 ### Spec 113
 

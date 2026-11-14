@@ -40,10 +40,10 @@ Decisiones conservadoras tomadas mientras se confirman:
 
 | Tema | Pregunta | Opción aplicada |
 |---|---|---|
-| 110 · `GET /accesos-excepcionales` | La fila de `endpoints.csv` pide `privacidad.aprobar_acceso` y su contexto dice "Solicitante ve los suyos". ¿Cómo entra el solicitante, que no tiene ese permiso? | El `x-permiso` sigue siendo `privacidad.aprobar_acceso` (como el catálogo); la guarda también admite `privacidad.solicitar_acceso` y el servicio le devuelve solo sus solicitudes |
-| 110 · escenario 2 | El Jefe de Operaciones con acceso aprobado debería ver el historial, pero `GET /pacientes/{id}/historial` no existe todavía y `GET /consultas/{id}/detalle` exige `expediente.ver` o `consulta.iniciar`, que JOP y ADM no tienen | El acceso excepcional vigente solo amplía la lectura de quien ya pasa la guarda (médico no tratante); abrirla a JOP y ADM requiere cambiar `endpoints.csv` |
+| (Retirada por D-082) 110 · `GET /accesos-excepcionales` | La fila de `endpoints.csv` pide `privacidad.aprobar_acceso` y su contexto dice "Solicitante ve los suyos". ¿Cómo entra el solicitante, que no tiene ese permiso? | El `x-permiso` sigue siendo `privacidad.aprobar_acceso` (como el catálogo); la guarda también admite `privacidad.solicitar_acceso` y el servicio le devuelve solo sus solicitudes |
+| (Retirada por D-082) 110 · escenario 2 | El Jefe de Operaciones con acceso aprobado debería ver el historial, pero `GET /pacientes/{id}/historial` no existe todavía y `GET /consultas/{id}/detalle` exige `expediente.ver` o `consulta.iniciar`, que JOP y ADM no tienen | El acceso excepcional vigente solo amplía la lectura de quien ya pasa la guarda (médico no tratante); abrirla a JOP y ADM requiere cambiar `endpoints.csv` |
 | 110 · romper el vidrio (FR-110-09) | ¿Quién es "médico de emergencia"? ¿Se exige turno en curso en el área de emergencia? | Lo puede abrir el personal con `expediente.ver` en contexto `relacion` (MED); no se comprueba el área del turno. Queda aprobado al instante, por revisar, y el delegado lo confirma o lo cierra con "negar" |
-| 110 · duración aprobada | ¿El delegado puede aprobar menos horas que las pedidas? | Sí (escenario 2 "aprueba por 2 h"), nunca más que lo pedido ni que la política `privacidad.acceso_excepcional_max_horas` |
+| (Retirada por D-082) 110 · duración aprobada | ¿El delegado puede aprobar menos horas que las pedidas? | Sí (escenario 2 "aprueba por 2 h"), nunca más que lo pedido ni que la política `privacidad.acceso_excepcional_max_horas` |
 | 110 · negar | ¿Negar exige motivo? | Sí, de 10 a 500 caracteres (W30 "Negar con motivo"); queda en la auditoría |
 | 110 · W31 para ADM | ADM no tiene `pacientes.buscar`. ¿Cómo elige paciente? | Escribe el identificador del paciente; JOP lo busca por nombre, DUI o expediente |
 | 110 · "Quién vio mi expediente" | ¿Qué cuenta como acceso y qué motivo se muestra? | Toda operación exitosa de otra cuenta sobre el paciente, salvo la gestión del acceso excepcional y los rechazos; el motivo es "atención" o "acceso excepcional" (nunca el texto libre del personal) |
@@ -196,6 +196,7 @@ Cambios de producto autorizados por el dueño (observaciones de la prueba manual
 | Catálogo de citas | ¿Qué pasa con `patients` en `GET /citas/catalogos`? | Recepción ya no recibe pacientes (antes 500 filas): los busca con el selector. PAC conserva solo el propio. Con `?date=yyyy-MM-dd` cada médico trae `tieneTurno` y `motivo` |
 | Franjas del día | `GET /citas/disponibilidad` solo devolvía franjas libres | Se conserva `slots` (libres) y se agrega `franjas` con todas: `estado` `libre`, `ocupado`, `sin_turno` o `pasado` y `motivo` corto. Sin turno se devuelve la rejilla estándar 08:00 a 16:00 como `sin_turno` |
 | Datos ficticios de Vinculaciones | La observación 4 pide datos de ejemplo para la cola | No se agregaron semillas aquí: pertenecen al flujo de datos de demostración (observación 7); la pantalla ya explica el vacío |
+<<<<<<< HEAD
 
 ## Ronda 2 · Ambulancia (rama `feat/r2-ambulancia`; observaciones 7, 8 y 16)
 
@@ -207,3 +208,6 @@ Cambios de producto autorizados por el dueño. Quedan registrados porque agregan
 | Quién pidió | `GET /ambulancia` no traía el solicitante | `pendingRequests[]` agrega `requesterName` (paciente o quien llamó), `callerName` y `patientRecord`. Nueva columna opcional `ambulancia.solicitud.solicitante_nombre` y campo opcional `callerName` en `POST /ambulancia/solicitudes` (solo recepción). La consulta de solicitudes de pacientes registrados ya se audita. |
 | Paciente en la bitácora | La bitácora no muestra al paciente (D-056). El dueño pide «paciente Y» para DPD | Se muestra solo `patientRef`: el expediente enmascarado (últimos 3 caracteres), nunca nombre ni id. ¿Se debe ocultar también para DPD, o mostrar el nombre a quien tiene relación de atención? |
 | Búsqueda y hitos | `GET /ambulancia/bitacora` solo filtraba por columnas exactas | Se agrega `q` (texto libre sin acentos sobre origen, destino, municipio y tripulación) y `milestones[]` por servicio para contar la historia. |
+=======
+| Ronda 2 · avisos | `avisos.publicar` solo lo tiene el Jefe de Operaciones; la observación 14 dice «JOP/ADM según permisos». ¿Debe poder publicar también Administración? | No: se respeta `permisos.csv` (D-050, segregación de funciones). Si se quiere, es una fila nueva en `permisos.csv` y una migración. |
+>>>>>>> ba6ab32 (feat(android): show role notices on the dashboard; docs: audience, priority and retired exceptional access)

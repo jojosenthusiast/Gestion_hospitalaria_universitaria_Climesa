@@ -80,13 +80,17 @@ fun RoleDashboardScreen(
     onAction: (QuickActionRequest) -> Unit,
     modifier: Modifier = Modifier,
     model: DashboardViewModel = viewModel(key = "dashboard-${account.session.userId}-$role"),
+    noticesModel: NoticesViewModel = viewModel(key = "avisos-${account.session.userId}"),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(role, account.profile.permissions, account.profile.channels, account.profile.patientId) {
         model.start(role, account.profile.permissions, account.profile.channels, account.profile.patientId != null)
     }
+    LaunchedEffect(account.profile.channels) { noticesModel.start(account.profile.channels) }
+    val notices by noticesModel.notices.collectAsStateWithLifecycle()
     PageList(modifier) {
         item { DashboardHeader(account.profile.name, RoleAccess.label(role), stringResource(helpFor(role))) }
+        if (notices.isNotEmpty()) item { NoticesSection(notices) }
         val dashboard = state.model
         when {
             state.loading && dashboard == null -> item { LoadingState() }

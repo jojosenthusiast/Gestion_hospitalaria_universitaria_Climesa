@@ -15,3 +15,8 @@
   - Depende de: T02
   - Hecho cuando: un aviso con un DUI muestra advertencia
   - Verificado: 15-nov-2026 `npm test -- --ci` en api/: un aviso con DUI y teléfono responde 422 `aviso_con_datos_personales` con `datosPersonales: [dui, telefono]` y publica al confirmar; `npm test` en web/: `publico.test.tsx` muestra la advertencia y "Publicar de todos modos" (T02 sigue abierta solo por iOS)
+- [ ] T04 · S5 · R · Avisos con prioridad y audiencia por rol, visibles en el tablero de inicio (W25, W04, A04)
+  - Cubre: FR-112-08
+  - Depende de: T02
+  - Hecho cuando: un aviso solo para Medicina aparece en el inicio de Medicina y no en la pantalla pública ni en el de otros roles
+  - Avance: 14-nov-2026 migración `20261118005000_aviso_audiencia.sql`, `GET /me/avisos`, `GET /avisos` y `POST /avisos` con `prioridad`, `publico` y `roles` probados en `api/tests/avisos-audiencia.spec.ts`; web W25 con vista previa y panel en el inicio, Android en el inicio de cada rol. Se deja sin marcar hasta comprobarlo en la app desplegada

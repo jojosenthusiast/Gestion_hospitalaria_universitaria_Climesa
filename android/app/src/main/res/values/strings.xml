@@ -251,4 +251,10 @@
     <string name="ui_modo_oscuro_detalle">Se conserva en este dispositivo</string>
     <string name="ui_cerrar_sesion_ayuda">Para cerrar sesión, abre el menú ☰ en la esquina superior izquierda.</string>
     <string name="ui_camas_libres">camas libres</string>
+    <string name="avisos_titulo">Avisos</string>
+    <string name="avisos_mas">Y %1$d aviso(s) más. Se ven completos en la web.</string>
+    <string name="aviso_critico">Crítico</string>
+    <string name="aviso_urgente">Urgente</string>
+    <string name="aviso_atencion">Atención</string>
+    <string name="aviso_para">Para: %1$s</string>
 </resources>

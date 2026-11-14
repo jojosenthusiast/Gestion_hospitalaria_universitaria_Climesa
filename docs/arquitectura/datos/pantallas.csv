@@ -2,7 +2,7 @@ id,plataforma,roles,nombre,proposito,muestra,acciones,tiempo_real,privacidad,niv
 W01,Web,Todos los roles web,Ingreso,Entrar con correo y contraseña,"Logo, campos, enlace a recuperar",Ingresar; recuperar contraseña,,Mensaje de error genérico (no revela si el correo existe),R,101
 W02,Web,Personal invitado,Activar cuenta,Definir contraseña desde la invitación,"Nombre, rol asignado",Crear contraseña,,,R,101
 W03,Web,ADM; JOP,Tablero inicial,Vista del día al entrar (dashboard del avance),"Ocupación por planta (barras 2.ª y 3.ª), camas en limpieza, estado de la ambulancia, números en fila, órdenes de laboratorio por estado, huecos de cobertura de turnos",Ir al detalle de cada tarjeta,Todas las tarjetas se actualizan solas,"Solo agregados, sin nombres",R,113
-W04,Web,REC; LAB; DPD,Inicio de trabajo,Bandeja de lo que toca hacer,"REC: vinculaciones, solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: accesos por aprobar",Abrir cada pendiente,Contadores en vivo,,R,113
+W04,Web,REC; LAB; DPD,Inicio de trabajo,Bandeja de lo que toca hacer,"REC: vinculaciones, solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: cadena de auditoría por verificar",Abrir cada pendiente,Contadores en vivo,,R,113
 W05,Web,ADM,Usuarios,Gestionar cuentas,"Tabla: nombre, correo, roles, estado, último ingreso; filtros","Invitar, editar roles, desactivar",,No puede editar sus propios roles,R,101
 W06,Web,ADM,Invitar y editar roles,Alta de cuenta de personal,"Formulario: persona del personal, correo, roles (casillas)",Guardar; enviar invitación,,,R,101
 W07,Web,ADM; JOP,Personal de salud,CRUD de personal (avance),"Tabla: nombre, tipo (médico, enfermero, alergista...), especialidad, área, inscripción y vigencia, tiene cuenta","Crear, editar, inactivar",,Teléfono y DUI del personal solo ADM,R,103
@@ -23,12 +23,12 @@ W21,Web,LAB,Captura de resultados,Valores con rangos,"Exámenes de la orden, uni
 W22,Web,JOP; LAB,Inventario,Existencias y alertas,"Tabla por bodega: artículo, lote, vencimiento, existencia, mínimo; alertas",Registrar movimiento; editar mínimo,Alerta de mínimo en vivo,,R,111
 W23,Web,JOP; LAB,Movimiento de inventario,"Entrada, salida, ajuste o traslado","Artículo, lote, cantidad, motivo",Guardar,,,R,111
 W24,Web,JOP,Equipo médico,Equipo por espacio,"Equipo, espacio, estado operativo o mantenimiento",Cambiar estado,,,E,104
-W25,Web,JOP,Avisos generales,Publicar avisos públicos,Lista con vigencia,"Crear, retirar",,Son públicos: no poner datos personales,R,112
+W25,Web,JOP,Avisos generales,Redactar avisos con vista previa y elegir a quién llegan,"Formulario con prioridad, audiencia (público y/o roles) y vigencia; lista de lo publicado con su estado",Publicar,,Nunca datos personales: la pantalla advierte; el aviso aparece en la pantalla pública y en el tablero de inicio de cada rol elegido,R,112
 W26,Web,REC,Pacientes,Buscar y registrar,"Buscador (nombre, DUI, expediente) con motivo de coincidencia; ficha",Registrar solo tras buscar; editar con motivo,,Búsqueda auditada,R,102
 W27,Web,REC,Vinculaciones por verificar,Validar cuentas de pacientes,"Cuenta, datos que dio, candidato de expediente",Aprobar; rechazar con motivo,Nuevas entran solas,,R,101
 W28,Web,REC,Citas y solicitudes,Agenda y bandeja,Agenda por médico y día; solicitudes de pacientes,"Agendar, confirmar, rechazar, cancelar",En vivo,,R,105
 W29,Web,REC,Fila del día,Emitir y seguir números,"Por servicio: números, estado, consultorio",Emitir número; marcar no se presentó,En vivo,Solo número e iniciales,R,105
-W32,Web,DPD,Auditoría,Buscar y verificar,"Filtros por persona, paciente, acción, fecha; resultado de verificación de cadena",Verificar integridad,,,R,110
+W32,Web,DPD,Auditoría,Buscar y verificar,"Búsqueda por persona; filtros plegables con chips (expediente, rol, acción, entidad, resultado, fechas); vistas rápidas; tabla ordenable y paginada; detalle con hashes; resultado de verificación de cadena","Verificar integridad, abrir detalle, exportar CSV/Excel/PDF",,,R,110
 W33,Web,ADM; JOP; DPD,Métricas,Indicadores detallados,"Ocupación por día, estancia promedio, tiempos de laboratorio, tiempos de ambulancia, cobertura",Cambiar rango,,Agregados,E,113
 W34,Web,Público (sin ingreso),Pantalla pública,Televisor de sala de espera y página pública,"Ocupación general por planta, médicos de turno, avisos, números llamados por consultorio",Ninguna,En vivo,Nunca nombres de pacientes,R,112
 W35,Web,Todos,Perfil,Datos propios y sesión,"Nombre, roles, cambiar contraseña",Cerrar sesión,,,R,101
