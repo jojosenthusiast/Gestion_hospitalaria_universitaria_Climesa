@@ -8,7 +8,7 @@ import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
 import { BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
-import { BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftResponse, ShiftSavedResponse, SpaceResponse, StaffResponse } from './operations.responses';
+import { BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftResponse, ShiftSavedResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
 import { IdVersionResponse } from '../platform/responses';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
 export class OperationsController {
@@ -17,6 +17,8 @@ export class OperationsController {
   dashboard(@Req() r:ActorRequest){return this.infra.dashboard(r.actor);}
   @Get('personal') @RequirePermission('personal.ver') @ApiOperation({summary:'Directorio de personal con o sin cuenta'}) @ApiOkResponse({ type: [StaffResponse] })
   personnel(@Req() r:ActorRequest){return this.people.list(r.actor);}
+  @Get('personal/especialidades') @RequirePermission('personal.ver') @ApiOperation({summary:'Catálogo de especialidades por categoría (tipo de personal)'}) @ApiQuery({name:'categoria',required:false,enum:['medico','enfermero']}) @ApiOkResponse({ type: [SpecialtyResponse] })
+  specialties(@Query('categoria') categoria?:string){return this.people.specialties(categoria==='medico'||categoria==='enfermero'?categoria:undefined);}
   @Post('personal') @RequirePermission('personal.gestionar') @ApiOperation({summary:'Registrar personal'}) @ApiCreatedResponse({ type: IdVersionResponse })
   createStaff(@Req() r:ActorRequest,@Body() d:StaffDto,@Headers('idempotency-key') k?:string){return this.people.save(r.actor,null,d,k);}
   @Patch('personal/:id') @RequirePermission('personal.gestionar') @ApiOperation({summary:'Editar o inactivar personal con versión y motivo'}) @ApiOkResponse({ type: IdVersionResponse })

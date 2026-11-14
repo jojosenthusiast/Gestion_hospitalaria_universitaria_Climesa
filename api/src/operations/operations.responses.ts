@@ -44,6 +44,12 @@ export class StaffRegistrationResponse {
   @DateProp() validTo!: string;
 }
 
+export class SpecialtyResponse {
+  @StrProp() code!: string;
+  @StrProp() name!: string;
+  @EnumProp(['medico', 'enfermero'] as const, 'CategoriaEspecialidad') category!: string;
+}
+
 export class StaffResponse {
   @UuidProp() id!: string;
   @StrProp() givenNames!: string;
@@ -65,6 +71,7 @@ export class ShiftResponse {
   @UuidProp() id!: string;
   @UuidProp() staffId!: string;
   @StrProp() person!: string;
+  @EnumProp(TIPO_PERSONAL, 'TipoPersonal', { description: 'Función de la persona; permite filtrar por rol sin consultar /personal' }) staffType!: string;
   @UuidProp() areaId!: string;
   @StrProp() area!: string;
   @DateTimeProp() start!: string;

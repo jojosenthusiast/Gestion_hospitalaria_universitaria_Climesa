@@ -167,3 +167,20 @@ La app usa solo endpoints que ya existen en `contrato/openapi.json`. Donde la pa
 | I23 | Push de valor crítico (APNs, 122-T04) | Fuera de este corte: el crítico se marca en rojo y llega en vivo por `laboratorio.critico` solo con la app abierta |
 | I13 | "Mi cuenta" (cargos y factura) es de nivel F | No se implementa |
 | Config | Release apunta a `https://sghu-api.onrender.com/api/v1` (pública, la misma de web y Android) desde `ios/Config/Release.xcconfig` | Debug usa `http://localhost:3000/api/v1`; un `ios/Config.xcconfig` local (ignorado) puede cambiar ambas |
+
+## Ronda 1: administración y espacios (rama `feat/r1-admin-espacios`, 14-nov-2026)
+
+Cambios autorizados por la persona dueña del producto tras las pruebas manuales (observaciones 5, 6, 9, 11 y 13). Decisiones conservadoras mientras se confirman:
+
+| Observación | Pregunta | Opción aplicada |
+|---|---|---|
+| 9 | ¿Qué especialidades lleva el catálogo? No hay lista oficial | `personal.especialidad_catalogo` trae 19 especialidades médicas (incluida "Medicina general", por defecto) y 8 áreas de enfermería, sembradas en `20261117003000_especialidad_catalogo.sql`; se amplía con filas nuevas, sin cambiar código |
+| 9 | ¿Qué pasa con las especialidades de texto libre ya guardadas? | La columna `personal.persona.especialidad` sigue siendo texto y no se reescribe; la API solo valida el valor que cambia, y un valor histórico fuera del catálogo se conserva al editar |
+| 9 | ¿Los tipos de personal distintos de médico y enfermería llevan especialidad? | No: la API rechaza una especialidad para ellos (400) y la web oculta el campo |
+| 9 | Endpoint nuevo `GET /personal/especialidades` (permiso `personal.ver`) | Agregado a `endpoints.csv` con la autorización de esta ronda |
+| 9 | Usuarios y Personal pasan a un solo módulo "Personal". La ruta `#/usuarios` desaparece del menú | `shell.tsx`: se quitó la entrada "Usuarios" y `personal` también se muestra con `usuarios.ver` (el DPD solo lee cuentas). Un enlace viejo a `#/usuarios` ahora dice "Página no encontrada" |
+| 6 | "Rol" en el filtro de turnos: ¿rol de la cuenta o función del personal? | Función del personal (`staffType`, los 10 tipos), porque un turno pertenece a una persona del directorio y hay personal sin cuenta; el filtro lista siempre todos los tipos |
+| 5 y 11 | El ADM no tiene `camas.ver_tablero`: ¿ve el estado cama por cama en Edificio? | No: ve la estructura y las camas libres por nodo (que sí entrega `GET /espacios`); quien tiene `camas.ver_tablero` ve además el estado de cada cama |
+| 5 y 11 | ¿Cómo se asigna una cama desde el plano? | Con el endpoint existente `POST /admisiones/{id}/cama`, para admisiones en `pendiente_cama` y quien tenga `camas.asignar` y `admision.ver`; las reglas de asignación las valida la API (no se muestran sugerencias en el plano) |
+| 13 | Los pasos "Revisada por médico" y "Visible al paciente" | Se marcan juntos: el paciente ve los valores en el mismo momento en que el médico revisa (D-040). "Muestra tomada" y "En proceso" se distinguen porque el segundo exige al menos un valor capturado |
+| 13 | ¿Se puede completar una orden sin todos los valores? | No (la API ya lo rechaza con 409); la web deshabilita "Completar" y muestra cuántos valores faltan |

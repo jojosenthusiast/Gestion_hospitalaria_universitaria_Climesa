@@ -23,9 +23,13 @@ function mount(beds: Bed[], permissions: string[]) {
   return api;
 }
 
+/** El plano es el punto de entrada: se toca la cama y su panel lateral ofrece las acciones permitidas. */
+const abrir = async (code: string) => { await userEvent.click(await screen.findByRole('button', { name: new RegExp(`^Cama ${code}`) })); };
+
 describe('acciones de camas', () => {
   it('bloquea una cama libre con su versión y motivo', async () => {
     const api = mount([bed('bed-1', 'HAB-201-A', 'libre')], ['camas.ver_tablero', 'camas.bloquear']);
+    await abrir('HAB-201-A');
     await userEvent.click(await screen.findByRole('button', { name: 'Bloquear cama HAB-201-A' }));
     const form = await screen.findByRole('form', { name: 'Bloquear HAB-201-A' });
     await userEvent.type(within(form).getByLabelText('Motivo'), 'Mantenimiento preventivo');
@@ -40,15 +44,21 @@ describe('acciones de camas', () => {
       bed('bed-4', 'HAB-201-D', 'limpieza', { cleaningPending: true, cleaningCompleted: true, cleanedByCurrentUser: false }),
       bed('bed-5', 'HAB-201-E', 'limpieza', { cleaningPending: true, cleaningCompleted: true, cleanedByCurrentUser: true }),
     ], ['camas.ver_tablero', 'camas.registrar_limpieza', 'camas.verificar_limpieza']);
+    await abrir('HAB-201-B');
     expect(await screen.findByRole('button', { name: 'Solicitar limpieza cama HAB-201-B' })).toBeTruthy();
+    await abrir('HAB-201-C');
     expect(screen.getByRole('button', { name: 'Completar limpieza cama HAB-201-C' })).toBeTruthy();
+    await abrir('HAB-201-D');
     expect(screen.getByRole('button', { name: 'Verificar limpieza cama HAB-201-D' })).toBeTruthy();
+    await abrir('HAB-201-E');
     expect(screen.queryByRole('button', { name: 'Verificar limpieza cama HAB-201-E' })).toBeNull();
+    expect(screen.getByText('Tu registro está listo; otra persona debe verificarlo.')).toBeTruthy();
   });
 
   it('envía versión y motivo para solicitar, completar y verificar la limpieza', async () => {
     const permissions = ['camas.ver_tablero', 'camas.registrar_limpieza', 'camas.verificar_limpieza'];
     const requestedApi = mount([bed('bed-7', 'HAB-201-G', 'ocupada')], permissions);
+    await abrir('HAB-201-G');
     await userEvent.click(await screen.findByRole('button', { name: 'Solicitar limpieza cama HAB-201-G' }));
     let form = await screen.findByRole('form', { name: 'Solicitar limpieza HAB-201-G' });
     await userEvent.type(within(form).getByLabelText('Motivo'), 'Salida programada de hospitalización');
@@ -57,6 +67,7 @@ describe('acciones de camas', () => {
 
     cleanup();
     const completedApi = mount([bed('bed-8', 'HAB-201-H', 'limpieza', { cleaningPending: true })], permissions);
+    await abrir('HAB-201-H');
     await userEvent.click(await screen.findByRole('button', { name: 'Completar limpieza cama HAB-201-H' }));
     form = await screen.findByRole('form', { name: 'Completar limpieza HAB-201-H' });
     await userEvent.type(within(form).getByLabelText('Motivo'), 'Superficies desinfectadas');
@@ -65,6 +76,7 @@ describe('acciones de camas', () => {
 
     cleanup();
     const verifiedApi = mount([bed('bed-9', 'HAB-201-I', 'limpieza', { cleaningPending: true, cleaningCompleted: true })], permissions);
+    await abrir('HAB-201-I');
     await userEvent.click(await screen.findByRole('button', { name: 'Verificar limpieza cama HAB-201-I' }));
     form = await screen.findByRole('form', { name: 'Verificar limpieza HAB-201-I' });
     await userEvent.type(within(form).getByLabelText('Motivo'), 'Verificación independiente aprobada');
@@ -74,7 +86,7 @@ describe('acciones de camas', () => {
 
   it('no ofrece mutaciones sin el permiso correspondiente', async () => {
     mount([bed('bed-6', 'HAB-201-F', 'libre')], ['camas.ver_tablero']);
-    await screen.findByText('HAB-201-F');
+    await abrir('HAB-201-F');
     expect(screen.queryByRole('button', { name: /Bloquear cama/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Solicitar limpieza cama/ })).toBeNull();
   });

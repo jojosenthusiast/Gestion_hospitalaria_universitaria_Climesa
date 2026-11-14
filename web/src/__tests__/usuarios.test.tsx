@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api, type UserAccount } from '../lib/api';
-import { UsersPage } from '../features/users';
+import { PersonnelPage } from '../features/personnel';
 
 // WEB-12: Usuarios (W05/W06) — flujo feliz, conflicto 409 y permisos.
 beforeEach(() => {
@@ -19,16 +19,17 @@ const cuentas: UserAccount[] = [
 
 function montar(permissions: string[], write: Api['write'] = vi.fn(async () => ({})) as Api['write']) {
   const api = { request: vi.fn(async (path: string) => path === '/usuarios' ? cuentas : []), write: vi.fn(write) } as unknown as Api & { request: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn> };
-  render(<UsersPage api={api} profile={perfil(permissions)} version={0} />);
+  render(<PersonnelPage api={api} profile={perfil(permissions)} version={0} />);
   return api;
 }
 const usuarios = (api: { request: ReturnType<typeof vi.fn> }) => api.request.mock.calls.filter(([p]) => p === '/usuarios').length;
 
-describe('Usuarios (W05, W06)', () => {
+describe('Personal · cuentas de acceso (W05, W06)', () => {
   it('filtra por nombre, correo o rol', async () => {
     montar(['usuarios.ver']);
     await screen.findByText('Operaciones Ficticia');
-    await userEvent.type(screen.getByLabelText('Buscar cuenta'), 'dpd');
+    await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'todos');
+    await userEvent.type(screen.getByLabelText('Buscar en el directorio'), 'dpd');
     expect(screen.queryByText('Operaciones Ficticia')).toBeNull();
     expect(screen.getByText('Delegado Ficticio')).toBeTruthy();
   });
@@ -36,7 +37,7 @@ describe('Usuarios (W05, W06)', () => {
   it('desactiva una cuenta con motivo y versión, y recarga la lista', async () => {
     const api = montar(['usuarios.ver', 'usuarios.desactivar']);
     await screen.findByText('Operaciones Ficticia');
-    await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
+    await userEvent.click(screen.getByRole('button', { name: /Desactivar cuenta de Operaciones Ficticia/ }));
     const dialogo = await screen.findByRole('dialog', { name: 'Desactivar cuenta' });
     await userEvent.type(within(dialogo).getByLabelText('Motivo'), 'Fin del contrato de prueba');
     await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar cambio/ }));
@@ -48,13 +49,21 @@ describe('Usuarios (W05, W06)', () => {
     montar(['usuarios.ver']);
     await screen.findByText('Operaciones Ficticia');
     expect(screen.queryByRole('button', { name: /Invitar persona|Roles|Desactivar|Reactivar/ })).toBeNull();
-    expect(screen.getAllByText('Solo consulta').length).toBe(2);
+    expect(screen.getAllByText('Solo consulta').length).toBe(1);
+  });
+
+  it('?accion=invitar abre la invitación y limpia el parámetro', async () => {
+    location.hash = '#/personal?accion=invitar';
+    montar(['usuarios.ver', 'usuarios.invitar']);
+    expect(await screen.findByRole('dialog', { name: 'Invitar persona' })).toBeTruthy();
+    expect(location.hash).toBe('#/personal');
+    location.hash = '';
   });
 
   it('un 409 de versión al desactivar ofrece cerrar y recargar', async () => {
     const api = montar(['usuarios.ver', 'usuarios.desactivar'], vi.fn(async () => { throw new ApiError('La cuenta cambió.', 409, 'version_conflicto', 4); }) as Api['write']);
     await screen.findByText('Operaciones Ficticia');
-    await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
+    await userEvent.click(screen.getByRole('button', { name: /Desactivar cuenta de Operaciones Ficticia/ }));
     const dialogo = await screen.findByRole('dialog', { name: 'Desactivar cuenta' });
     await userEvent.type(within(dialogo).getByLabelText('Motivo'), 'Fin del contrato de prueba');
     await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar cambio/ }));

@@ -84,6 +84,21 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     const rows=await this.db.query(`SELECT p.id,p.nombres AS "givenNames",p.apellidos AS surnames,p.tipo AS type,p.especialidad AS specialty,p.area_id AS "areaId",e.nombre AS area,p.activo AS active,p.version,p.telefono AS phone,p.dui,COALESCE((SELECT json_agg(json_build_object('id',i.id,'board',i.junta,'number',i.numero,'validFrom',lower(i.vigencia)::text,'validTo',(upper(i.vigencia)-1)::text) ORDER BY lower(i.vigencia) DESC,i.numero) FROM personal.inscripcion i WHERE i.persona_id=p.id),'[]'::json) AS registrations FROM personal.persona p LEFT JOIN infra.espacio e ON e.id=p.area_id ORDER BY p.activo DESC,p.apellidos,p.nombres`);
     return hasPermission(actor,'personal.ver_datos_personales')?rows:rows.map(({dui,phone,...row})=>row);
   }
+  /** Obs. 9: catálogo de especialidades por categoría (tipo de personal). Solo hay catálogo para `medico` y `enfermero`. */
+  async specialties(category?:string){
+    return this.db.query(`SELECT codigo AS code,nombre AS name,categoria AS category FROM personal.especialidad_catalogo WHERE activo AND ($1::text IS NULL OR categoria=$1) ORDER BY categoria,orden,nombre`,[category||null]);
+  }
+  /** Valida la especialidad contra el catálogo de su categoría y devuelve el nombre canónico; un valor histórico sin cambios se conserva. */
+  private async checkedSpecialty(c:PoolClient,type:string,value:string|undefined,stored:string|null):Promise<string|null>{
+    const text=(value??'').trim();
+    if(type==='medico'&&!text)return 'Medicina general';
+    if(!text)return null;
+    if(stored&&text.toLocaleLowerCase('es')===stored.toLocaleLowerCase('es'))return stored;
+    if(type!=='medico'&&type!=='enfermero')throw new BadRequestException('Este tipo de personal no lleva especialidad.');
+    const hit=(await c.query('SELECT nombre FROM personal.especialidad_catalogo WHERE activo AND categoria=$1 AND lower(nombre)=lower($2)',[type,text])).rows[0];
+    if(!hit)throw new BadRequestException('Selecciona una especialidad del catálogo para este tipo de personal.');
+    return hit.nombre;
+  }
   private async area(c:PoolClient,id?:string){if(id&&!(await c.query("SELECT id FROM infra.espacio WHERE id=$1 AND activo AND tipo IN ('area','planta','consultorio','hospital')",[id])).rowCount)throw new BadRequestException('Selecciona un área activa.');}
   async save(actor:Actor,id:string|null,dto:StaffDto,key?:string) {
     if(!/^[\p{L}\p{M} .’'-]+$/u.test(dto.givenNames+dto.surnames))throw new BadRequestException('Los nombres y apellidos no pueden contener números.');
@@ -91,15 +106,16 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     if(dto.phone&&!/^[267]\d{3}-?\d{4}$/.test(dto.phone))throw new BadRequestException('Revisa el teléfono de ocho dígitos.');
     return this.commands.run(actor,`personal.gestionar:${id??'nuevo'}`,key,dto,async c=>{
       await this.area(c,dto.areaId);
-      let row;
+      let row,specialty:string|null=null;
       if(id){
         const old=(await c.query('SELECT * FROM personal.persona WHERE id=$1 FOR UPDATE',[id])).rows[0];
         if(!old)throw new NotFoundException('No se encontró la persona.');
+        specialty=await this.checkedSpecialty(c,dto.type,dto.specialty,old.especialidad);
         if(old.version!==dto.version)throw new VersionConflictException(old.version,'La ficha cambió; vuelve a abrirla.');
         if(!dto.reason||dto.reason.trim().length<10)throw new BadRequestException('Indica el motivo de la modificación.');
         if(dto.active===false&&(await c.query("SELECT id FROM personal.turno WHERE persona_id=$1 AND estado<>'cancelado' AND upper(periodo)>$2 LIMIT 1",[id,this.clock.now()])).rowCount)throw new ConflictException('Reasigna o cancela sus turnos pendientes antes de inactivar.');
-        row=(await c.query('UPDATE personal.persona SET nombres=$2,apellidos=$3,tipo=$4,especialidad=$5,area_id=$6,telefono=$7,dui=$8,activo=$9,version=version+1 WHERE id=$1 RETURNING id,version',[id,dto.givenNames.trim(),dto.surnames.trim(),dto.type,dto.specialty||null,dto.areaId||null,dto.phone||null,dto.dui?.replace('-','')||null,dto.active??true])).rows[0];
-      }else row=(await c.query('INSERT INTO personal.persona(nombres,apellidos,tipo,especialidad,area_id,telefono,dui) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,version',[dto.givenNames.trim(),dto.surnames.trim(),dto.type,dto.specialty||null,dto.areaId||null,dto.phone||null,dto.dui?.replace('-','')||null])).rows[0];
+        row=(await c.query('UPDATE personal.persona SET nombres=$2,apellidos=$3,tipo=$4,especialidad=$5,area_id=$6,telefono=$7,dui=$8,activo=$9,version=version+1 WHERE id=$1 RETURNING id,version',[id,dto.givenNames.trim(),dto.surnames.trim(),dto.type,specialty,dto.areaId||null,dto.phone||null,dto.dui?.replace('-','')||null,dto.active??true])).rows[0];
+      }else{specialty=await this.checkedSpecialty(c,dto.type,dto.specialty,null);row=(await c.query('INSERT INTO personal.persona(nombres,apellidos,tipo,especialidad,area_id,telefono,dui) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,version',[dto.givenNames.trim(),dto.surnames.trim(),dto.type,specialty,dto.areaId||null,dto.phone||null,dto.dui?.replace('-','')||null])).rows[0];}
       await this.commands.audit(c,actor,{action:id?'personal.editar':'personal.crear',entity:'personal',entityId:row.id,permission:'personal.gestionar',reason:dto.reason});
       await this.commands.event(c,'personal.actualizado','personal',row.id,row.version,['rol:ADM','rol:JOP']);
       return row;
@@ -123,7 +139,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   async shifts(actor:Actor,mine=false) {
     if(mine&&!actor.staffId)return [];
     await this.advanceStates();
-    return this.db.query(`SELECT t.id,t.persona_id AS "staffId",p.nombres||' '||p.apellidos AS person,t.area_id AS "areaId",e.nombre AS area,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.tipo AS type,t.estado AS state,t.justificacion AS justification,t.version
+    return this.db.query(`SELECT t.id,t.persona_id AS "staffId",p.nombres||' '||p.apellidos AS person,p.tipo AS "staffType",t.area_id AS "areaId",e.nombre AS area,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.tipo AS type,t.estado AS state,t.justificacion AS justification,t.version
       FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id JOIN infra.espacio e ON e.id=t.area_id
       WHERE ($1::uuid IS NULL OR t.persona_id=$1) AND ((NOT $2 AND $3) OR t.estado IN ('publicado','en_curso','completado')) ORDER BY lower(t.periodo) DESC LIMIT 300`,[mine?actor.staffId:null,mine,hasPermission(actor,'turnos.ver_borradores')]);
   }

@@ -1668,6 +1668,90 @@
         "x-permiso": "personal.gestionar"
       }
     },
+    "/api/v1/personal/especialidades": {
+      "get": {
+        "operationId": "OperationsController_specialties",
+        "parameters": [
+          {
+            "name": "categoria",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "medico",
+                "enfermero"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SpecialtyResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catálogo de especialidades por categoría (tipo de personal)",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "personal.ver"
+      }
+    },
     "/api/v1/personal/{id}": {
       "patch": {
         "operationId": "OperationsController_editStaff",
@@ -11827,6 +11911,36 @@
           "registrations"
         ]
       },
+      "CategoriaEspecialidad": {
+        "type": "string",
+        "enum": [
+          "medico",
+          "enfermero"
+        ]
+      },
+      "SpecialtyResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoriaEspecialidad"
+              }
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "category"
+        ]
+      },
       "StaffDto": {
         "type": "object",
         "properties": {
@@ -11971,6 +12085,14 @@
           "person": {
             "type": "string"
           },
+          "staffType": {
+            "description": "Función de la persona; permite filtrar por rol sin consultar /personal",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoPersonal"
+              }
+            ]
+          },
           "areaId": {
             "type": "string",
             "format": "uuid"
@@ -12012,6 +12134,7 @@
           "id",
           "staffId",
           "person",
+          "staffType",
           "areaId",
           "area",
           "start",

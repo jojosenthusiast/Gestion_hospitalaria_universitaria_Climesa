@@ -24,7 +24,7 @@ describe('ruta inexistente (W-09)', () => {
   });
 
   it('una ruta que existe pero no corresponde al permiso vuelve a Inicio en lugar de quedarse en "Sin permiso"', () => {
-    location.hash = '#/usuarios';
+    location.hash = '#/personal';
     render(<HospitalShell api={api} profile={profile} onLogout={() => undefined} />);
     expect(screen.queryByRole('heading', { name: /Sin permiso/ })).toBeNull();
     expect(location.hash).toBe('#/inicio');

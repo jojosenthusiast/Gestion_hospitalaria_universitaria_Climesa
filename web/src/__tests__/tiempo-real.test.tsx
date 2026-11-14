@@ -229,11 +229,11 @@ describe('escenario 2: pérdida y regreso de la red con el tablero de camas', ()
   it('sin red queda sin conexión; al volver hace una consulta, invalida y el tablero pide datos otra vez', async () => {
     const api = crearApi();
     render(<Tablero api={api} />);
-    await screen.findByText('HAB-201-A');
+    await screen.findByRole('button', { name: /^Cama HAB-201-A/ });
     await vaciar();
     act(() => canales()[0].estado('SUBSCRIBED'));
     await waitFor(() => expect(screen.getByTestId('conexion').textContent).toBe('live'));
-    await screen.findByText('HAB-201-A');
+    await screen.findByRole('button', { name: /^Cama HAB-201-A/ });
 
     enRed(false);
     act(() => { window.dispatchEvent(new Event('offline')); });

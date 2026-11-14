@@ -1,9 +1,13 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type AccessProfile, type Api, type Bed, type Space } from '../lib/api';
 import { BedsPage, SpacesPage } from '../features/spaces';
 
+beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
+});
 afterEach(cleanup);
 
 const perfil: AccessProfile = {
@@ -38,78 +42,118 @@ const espacios: Space[] = [
   }),
 ];
 
-function montar(pagina: 'camas' | 'espacios') {
-  const api = { request: vi.fn(async () => (pagina === 'camas' ? camas : espacios)), write: vi.fn(async () => ({ ok: true })) };
-  const props = { api: api as unknown as Api, profile: perfil, version: 0 };
+function montar(pagina: 'camas' | 'espacios', permisos: string[] = ['espacios.ver', 'camas.ver_tablero']) {
+  const api = {
+    request: vi.fn(async (path: string): Promise<unknown> => (path.startsWith('/camas') ? camas : path.startsWith('/espacios') ? espacios : [])),
+    write: vi.fn(async () => ({ ok: true })),
+  };
+  const props = { api: api as unknown as Api, profile: { ...perfil, permissions: permisos.map(code => ({ code, context: 'global' })) }, version: 0 };
   render(pagina === 'camas' ? <BedsPage {...props} /> : <SpacesPage {...props} />);
   return api;
 }
-const filasDeCama = () => document.querySelectorAll('.bed-row');
-const bloques = () => document.querySelectorAll('.room-block');
+const glifos = () => document.querySelectorAll('.bed-glyph');
+const habitacionesVisibles = () => document.querySelectorAll('.plan-room');
+const planta = (nombre: RegExp) => screen.getByRole('button', { name: nombre });
 
 describe('W12 · plano de camas por planta', () => {
-  it('muestra las 17 camas de hospitalización y reparte 12 en la planta 2 y 5 en la planta 3', async () => {
+  it('las plantas salen de los datos y cada una reparte sus camas', async () => {
     montar('camas');
     expect(await screen.findByText('Camas de hospitalización')).toBeTruthy();
     expect(screen.getByText('17')).toBeTruthy();
-    expect(bloques()).toHaveLength(6);
-    expect(filasDeCama()).toHaveLength(12);
-    expect(screen.getByText('HAB-201-A')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Planta 3 · VIP' }));
-    expect(bloques()).toHaveLength(5);
-    expect(filasDeCama()).toHaveLength(5);
-    expect(screen.getByText('VIP-301-A')).toBeTruthy();
+    expect(planta(/Planta 2/)).toBeTruthy();
+    expect(planta(/Planta 3/)).toBeTruthy();
+    expect(habitacionesVisibles()).toHaveLength(6);
+    expect(glifos()).toHaveLength(12);
+    await userEvent.click(planta(/Planta 3/));
+    expect(habitacionesVisibles()).toHaveLength(5);
+    expect(glifos()).toHaveLength(5);
+    expect(screen.getByRole('button', { name: /^Cama VIP-301-A/ })).toBeTruthy();
   });
 
-  it('muestra el estado de cada cama de la planta 2 dentro de su habitación', async () => {
+  it('muestra el estado de cada cama con su palabra, no solo con color', async () => {
     montar('camas');
-    await screen.findByText('HAB-201-A');
-    const hab201 = screen.getByRole('heading', { name: 'HAB-201' }).closest('article') as HTMLElement;
+    await screen.findByRole('button', { name: /^Cama HAB-201-A/ });
+    const hab201 = screen.getByRole('article', { name: 'Habitación HAB-201' });
     expect(within(hab201).getAllByText('Ocupada')).toHaveLength(2);
-    const hab202 = screen.getByRole('heading', { name: 'HAB-202' }).closest('article') as HTMLElement;
+    const hab202 = screen.getByRole('article', { name: 'Habitación HAB-202' });
     expect(within(hab202).getByText('Ocupada')).toBeTruthy();
     expect(within(hab202).getByText('Reservada')).toBeTruthy();
-    const hab203 = screen.getByRole('heading', { name: 'HAB-203' }).closest('article') as HTMLElement;
+    const hab203 = screen.getByRole('article', { name: 'Habitación HAB-203' });
     expect(within(hab203).getByText('Bloqueada')).toBeTruthy();
     expect(within(hab203).getByText('En limpieza')).toBeTruthy();
   });
 
-  it('cambia de planta y filtra por estado', async () => {
+  it('la leyenda cuenta las camas de la planta y filtra al tocarla', async () => {
     montar('camas');
-    await screen.findByText('HAB-201-A');
-    await userEvent.selectOptions(screen.getByLabelText('Estado de cama'), 'ocupada');
-    expect(filasDeCama()).toHaveLength(3);
+    await screen.findByRole('button', { name: /^Cama HAB-201-A/ });
+    const leyenda = screen.getByRole('list', { name: /Leyenda/ });
+    expect(within(leyenda).getByRole('button', { name: /Ocupada/ }).textContent).toContain('3');
+    await userEvent.click(within(leyenda).getByRole('button', { name: /Ocupada/ }));
+    expect(glifos()).toHaveLength(3);
     await userEvent.selectOptions(screen.getByLabelText('Estado de cama'), 'libre');
-    expect(filasDeCama()).toHaveLength(libres(2));
-    await userEvent.click(screen.getByRole('button', { name: 'Planta 3 · VIP' }));
-    expect(filasDeCama()).toHaveLength(5);
+    expect(glifos()).toHaveLength(libres(2));
+    await userEvent.click(planta(/Planta 3/));
     await userEvent.selectOptions(screen.getByLabelText('Estado de cama'), 'ocupada');
-    expect(screen.getByText('No hay camas con este estado')).toBeTruthy();
+    expect(screen.getByText('No hay espacios con este filtro')).toBeTruthy();
+  });
+
+  it('busca por código sin importar acentos ni mayúsculas', async () => {
+    montar('camas');
+    await screen.findByRole('button', { name: /^Cama HAB-201-A/ });
+    await userEvent.type(screen.getByLabelText('Buscar espacio o cama'), 'hab-204');
+    expect(habitacionesVisibles()).toHaveLength(1);
+    expect(glifos()).toHaveLength(2);
+  });
+
+  it('al tocar una cama libre con permiso, asigna una admisión que espera cama', async () => {
+    const api = montar('camas', ['camas.ver_tablero', 'camas.asignar', 'admision.ver']);
+    api.request.mockImplementation(async (path: string) => (path.startsWith('/camas') ? camas : [{ id: 'adm-1', patientName: 'Paciente Ficticio', requestedCategory: 'semiprivada', state: 'pendiente_cama', isolation: false }]));
+    await userEvent.click(await screen.findByRole('button', { name: /^Cama HAB-204-A/ }));
+    const formulario = await screen.findByRole('form', { name: 'Asignar cama HAB-204-A' });
+    await userEvent.selectOptions(within(formulario).getByLabelText('Admisión que espera cama'), 'adm-1');
+    await userEvent.click(within(formulario).getByRole('button', { name: 'Asignar esta cama' }));
+    expect(api.write).toHaveBeenCalledWith('/admisiones/adm-1/cama', { bedId: 'HAB-204-A', version: 1 }, 'POST');
   });
 });
 
-describe('W09 · árbol de espacios', () => {
-  it('lista plantas, habitaciones y camas con sus camas libres por nodo', async () => {
+describe('W09 · edificio', () => {
+  it('muestra plantas, habitaciones y camas con sus camas libres por nodo', async () => {
     montar('espacios');
-    const arbol = await screen.findByRole('list', { name: 'Árbol de espacios' });
-    const fila = (codigo: string) => within(arbol).getAllByRole('listitem').find(f => within(f).queryByText(codigo, { selector: '.mono-data' }))!;
-    expect(within(arbol).getAllByRole('listitem')).toHaveLength(espacios.length);
-    expect(within(fila('P2')).getByText(`${libres(2)}/12`)).toBeTruthy();
-    expect(within(fila('P3')).getByText(`${libres(3)}/5`)).toBeTruthy();
-    expect(within(fila('HAB-201')).getByText('0/2')).toBeTruthy();
-    expect(within(fila('HAB-203')).getByText('0/2')).toBeTruthy();
-    expect(within(fila('HAB-204')).getByText('2/2')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Planta 2/ })).toBeTruthy();
+    expect(planta(/Planta 2/).textContent).toContain(`${libres(2)}/12 libres`);
+    expect(planta(/Planta 3/).textContent).toContain(`${libres(3)}/5 libres`);
+    const hab204 = screen.getByRole('article', { name: 'Habitación HAB-204' });
+    expect(within(hab204).getByText('2/2 libres')).toBeTruthy();
+    expect(within(screen.getByRole('article', { name: 'Habitación HAB-201' })).getByText('0/2 libres')).toBeTruthy();
   });
 
-  it('en la vista por planta cambia entre la planta 2 con 12 camas y la planta 3 con 5', async () => {
+  it('al tocar una habitación abre su detalle y, con permiso, ofrece editar y agregar dentro', async () => {
+    montar('espacios', ['espacios.ver', 'espacios.configurar']);
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver habitación HAB-201' }));
+    const panel = screen.getByRole('complementary', { name: 'Detalle del espacio' });
+    expect(within(panel).getByText(/Capacidad configurada: 2 camas/)).toBeTruthy();
+    expect(within(panel).getByRole('button', { name: 'Editar habitación' })).toBeTruthy();
+    await userEvent.click(within(panel).getByRole('button', { name: /Agregar espacio dentro/ }));
+    expect(await screen.findByRole('dialog', { name: 'Agregar dentro de HAB-201' })).toBeTruthy();
+  });
+
+  it('sin espacios.configurar no ofrece crear ni editar', async () => {
     montar('espacios');
-    await screen.findByRole('list', { name: 'Árbol de espacios' });
-    await userEvent.click(screen.getByRole('button', { name: 'Por planta' }));
-    expect(bloques()).toHaveLength(6);
-    expect(document.querySelectorAll('.room-structure span')).toHaveLength(12);
-    await userEvent.click(screen.getByRole('button', { name: 'Planta 3' }));
-    expect(bloques()).toHaveLength(5);
-    expect(document.querySelectorAll('.room-structure span')).toHaveLength(5);
-    expect(screen.getByText('VIP-301-A')).toBeTruthy();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver habitación HAB-201' }));
+    expect(screen.queryByRole('button', { name: 'Crear espacio' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Editar habitación/ })).toBeNull();
+  });
+
+  it('explica en una línea qué es asignar espacios', async () => {
+    montar('espacios');
+    expect(await screen.findByText(/Asignar espacios es decidir dónde está cada cosa/)).toBeTruthy();
+  });
+
+  it('?accion=crear abre el formulario de crear espacio y limpia el parámetro', async () => {
+    location.hash = '#/espacios?accion=crear';
+    montar('espacios', ['espacios.ver', 'espacios.configurar']);
+    expect(await screen.findByRole('dialog', { name: 'Crear espacio' })).toBeTruthy();
+    expect(location.hash).toBe('#/espacios');
+    location.hash = '';
   });
 });

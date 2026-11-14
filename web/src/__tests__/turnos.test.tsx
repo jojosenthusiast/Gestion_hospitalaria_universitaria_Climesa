@@ -121,3 +121,50 @@ describe('ficha de personal · función legible', () => {
     expect((await screen.findByText('Función')).nextElementSibling!.textContent).toBe('nueva_funcion');
   });
 });
+
+describe('turnos · filtros por rol y área sin /personal ni /espacios (obs. 6)', () => {
+  const fila = (id: string, person: string, staffType: string, areaId: string, area: string): Shift & { staffType: string } => ({ ...turno(id, 'publicado'), staffId: `s-${id}`, person, staffType, areaId, area });
+  const turnos = [fila('1', 'Ana Médica', 'medico', 'a-1', 'Emergencia'), fila('2', 'Luis Laboratorio', 'laboratorista', 'a-2', 'Laboratorio'), fila('3', 'Rosa Enfermera', 'enfermero', 'a-1', 'Emergencia')];
+  const montarSinCatalogos = () => {
+    // Una cuenta de solo lectura (LAB, REC, ENF…): ni /personal ni /espacios responden; todo sale de /turnos.
+    const api = { request: vi.fn(async (path: string) => { if (path === '/turnos') return turnos; throw new ApiError('Sin permiso', 403); }), write: vi.fn() };
+    render(<ShiftsPage api={api as unknown as Api} profile={soloLectura} version={0} />);
+    return api;
+  };
+  const personas = () => screen.getAllByRole('row').slice(1).map(r => within(r).getAllByRole('cell')[0].textContent);
+
+  it('el filtro de rol lista todos los roles y filtra aunque la cuenta no lea /personal', async () => {
+    const api = montarSinCatalogos();
+    await screen.findByRole('table');
+    const rol = screen.getByLabelText('Rol del personal') as HTMLSelectElement;
+    expect([...rol.options].map(o => o.textContent)).toEqual(['Todos los roles', 'Médico', 'Enfermería', 'Asistencia', 'Recepción', 'Laboratorio', 'Paramédico', 'Motorista', 'Limpieza', 'Administración', 'Otro']);
+    await userEvent.selectOptions(rol, 'enfermero');
+    expect(personas()).toHaveLength(1);
+    expect(personas()[0]).toContain('Rosa Enfermera');
+    expect(api.request).not.toHaveBeenCalledWith('/personal', expect.anything());
+    expect(api.request).not.toHaveBeenCalledWith('/espacios', expect.anything());
+  });
+
+  it('el filtro de área sale de los turnos y se combina con el de rol y el de persona', async () => {
+    montarSinCatalogos();
+    await screen.findByRole('table');
+    const area = screen.getByLabelText('Área de trabajo') as HTMLSelectElement;
+    expect([...area.options].map(o => o.textContent)).toEqual(['Todas las áreas', 'Emergencia', 'Laboratorio']);
+    await userEvent.selectOptions(area, 'a-1');
+    expect(personas()).toHaveLength(2);
+    await userEvent.selectOptions(screen.getByLabelText('Rol del personal'), 'medico');
+    expect(personas()).toHaveLength(1);
+    const persona = screen.getByLabelText('Persona') as HTMLSelectElement;
+    expect([...persona.options].map(o => o.textContent)).toEqual(['Todas las personas', 'Ana Médica']);
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+    expect(personas()).toHaveLength(3);
+  });
+
+  it('?accion=planificar abre el formulario de asignar turno y limpia el parámetro', async () => {
+    location.hash = '#/turnos?accion=planificar';
+    montar(jefatura, []);
+    expect(await screen.findByRole('dialog', { name: 'Asignar turno' })).toBeTruthy();
+    expect(location.hash).toBe('#/turnos');
+    location.hash = '';
+  });
+});

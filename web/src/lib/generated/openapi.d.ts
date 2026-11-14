@@ -279,6 +279,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/personal/especialidades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catálogo de especialidades por categoría (tipo de personal) */
+        get: operations["OperationsController_specialties"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/personal/{id}": {
         parameters: {
             query?: never;
@@ -1979,6 +1996,13 @@ export interface components {
             dui?: string | null;
             registrations: components["schemas"]["StaffRegistrationResponse"][];
         };
+        /** @enum {string} */
+        CategoriaEspecialidad: "medico" | "enfermero";
+        SpecialtyResponse: {
+            code: string;
+            name: string;
+            category: components["schemas"]["CategoriaEspecialidad"];
+        };
         StaffDto: {
             givenNames: string;
             surnames: string;
@@ -2020,6 +2044,8 @@ export interface components {
             /** Format: uuid */
             staffId: string;
             person: string;
+            /** @description Función de la persona; permite filtrar por rol sin consultar /personal */
+            staffType: components["schemas"]["TipoPersonal"];
             /** Format: uuid */
             areaId: string;
             area: string;
@@ -4886,6 +4912,63 @@ export interface operations {
             };
             /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_specialties: {
+        parameters: {
+            query?: {
+                categoria?: "medico" | "enfermero";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

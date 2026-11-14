@@ -1,47 +1,83 @@
-import { useState,type FormEvent } from 'react';
-import { Field,Icon,Notice } from '../components/ui';
-import { can,type AccessProfile,type Api,type Bed,type BedBlockInput,type BedTransitionInput,type Space,type SpaceInput } from '../lib/api';
-import { Dialog,Empty,Heading,RemoteState,SaveButton,Select,Tag,WriteError,useAction,useData } from './common';
-const typeNames:Record<string,string>={hospital:'Hospital',planta:'Planta',area:'Área',habitacion:'Habitación',cama:'Cama',consultorio:'Consultorio',cubiculo:'Cubículo',bodega:'Bodega',bahia:'Bahía'};
-export function SpacesPage({api,profile,version}:{api:Api;profile:AccessProfile;version:number}){
- const data=useData<Space[]>(api,'/espacios',version),[edit,setEdit]=useState<Space|null>(null),[open,setOpen]=useState(false),[mode,setMode]=useState('arbol');
- const [floor,setFloor]=useState(2);
- const rows=data.data??[],rooms=rows.filter(s=>s.type==='habitacion'&&s.active&&s.level===floor);
- const ordered=rows.slice().sort((a,b)=>(a.path||a.name).localeCompare(b.path||b.name));
- return <><Heading eyebrow="Hospital / Edificio" title="Espacios" description="Un solo árbol para plantas, áreas, habitaciones y camas." actions={can(profile,'espacios.configurar')&&<button className="primary-button" onClick={()=>{setEdit(null);setOpen(true);}}><Icon name="plus" size={18}/>Crear espacio</button>}/><section className="data-workbench"><div className="table-toolbar"><div className="segmented-control" aria-label="Vista del edificio"><button aria-pressed={mode==='arbol'} onClick={()=>setMode('arbol')}>Árbol del edificio</button><button aria-pressed={mode==='planta'} onClick={()=>setMode('planta')}>Por planta</button></div>{mode==='planta'&&<div className="floor-switch" aria-label="Planta"><button aria-pressed={floor===2} onClick={()=>setFloor(2)}>Planta 2</button><button aria-pressed={floor===3} onClick={()=>setFloor(3)}>Planta 3</button></div>}</div><RemoteState state={data}>{()=>mode==='arbol'?<div className="space-tree" role="list" aria-label="Árbol de espacios">{ordered.map(s=><div role="listitem" className={`space-row ${!s.active?'space-inactive':''}`} key={s.id} style={{'--depth':Math.min((s.path?.split(' > ').length??1)-1,4)} as React.CSSProperties}><span className="space-node-mark" aria-hidden="true">{s.type==='cama'?'—':'+'}</span><div className="space-name"><span className="mono-data">{s.code}</span><strong>{s.name}</strong><small>{typeNames[s.type]}{!s.active?' · Inactivo':''}</small></div>{s.totalBeds>0&&<span className="space-count"><strong>{s.freeBeds}/{s.totalBeds}</strong> camas libres</span>}{can(profile,'espacios.configurar')&&<button className="row-action" aria-label={`Editar ${s.code}`} onClick={()=>{setEdit(s);setOpen(true);}}>Editar <Icon name="arrow" size={16}/></button>}</div>)}</div>:rooms.length?<div className="rooms-plan">{rooms.map(room=><article className="room-block" key={room.id}><header><div><span className="eyebrow">{room.category==='vip'?'VIP':'Semiprivada'}</span><h2>{room.code}</h2></div><span className="mono-data">{room.freeBeds}/{room.totalBeds} libres</span></header><p>{room.name}</p><div className="room-structure">{rows.filter(s=>s.parentId===room.id&&s.type==='cama'&&s.active).map(b=><span key={b.id}><Icon name="grid" size={18}/>{b.code}</span>)}</div>{can(profile,'espacios.configurar')&&<button className="row-action" onClick={()=>{setEdit(room);setOpen(true);}}>Configurar habitación <Icon name="arrow" size={16}/></button>}</article>)}</div>:<Empty title="Sin habitaciones en esta planta" description="Consulta el árbol para revisar la estructura del edificio."/>}</RemoteState></section>{open&&<SpaceForm api={api} space={edit} spaces={rows} onClose={()=>setOpen(false)} onSaved={()=>{setOpen(false);data.refresh();}}/>}</>;
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Field, Icon } from '../components/ui';
+import { can, type AccessProfile, type Api, type Bed, type Space, type SpaceInput } from '../lib/api';
+import { Dialog, Heading, RemoteState, SaveButton, Select, WriteError, useAction, useData } from './common';
+import { useQuickAction } from './personal/accion';
+import { BuildingBoard } from './spaces/BuildingBoard';
+import { spaceTypeNames, spacesFromBeds } from './spaces/building';
+
+/** Tipos de espacio que pueden contener a cada tipo: hospital → planta → área → habitación → cama. */
+const parentTypes: Record<string, string[]> = { planta: ['hospital'], area: ['planta'], habitacion: ['area', 'planta'], cama: ['habitacion'], consultorio: ['area', 'planta'], cubiculo: ['area', 'planta'], bodega: ['area', 'planta'], bahia: ['area', 'planta'] };
+
+/** Edificio (ADM y consulta): mapa interactivo por planta. La asignación de espacios es definir dónde está cada cosa; las camas se asignan a pacientes desde el plano. */
+export function SpacesPage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
+  const data = useData<Space[]>(api, '/espacios', version);
+  const beds = useData<Bed[]>(api, '/camas', version, can(profile, 'camas.ver_tablero'));
+  const [form, setForm] = useState<{ space: Space | null; parent?: Space } | null>(null);
+  const [quick, consumeQuick] = useQuickAction(), configure = can(profile, 'espacios.configurar');
+  useEffect(() => { if (!quick) return; if (quick === 'crear' && configure) setForm({ space: null }); consumeQuick(); }, [quick, configure, consumeQuick]);
+  const rows = data.data ?? [];
+  const refresh = () => { data.refresh(); beds.refresh(); };
+  return <>
+    <Heading eyebrow="Hospital / Edificio" title="Espacios" description="El mapa del hospital: plantas, áreas, habitaciones y camas en un solo lugar."
+      actions={configure && <button className="primary-button" onClick={() => setForm({ space: null })}><Icon name="plus" size={18} />Crear espacio</button>} />
+    <p className="form-intro space-guide">Asignar espacios es decidir dónde está cada cosa: cada planta contiene áreas, cada área sus habitaciones o consultorios y cada habitación sus camas. Con esa estructura, Recepción y Operaciones asignan camas a los pacientes. Toca una cama o un espacio del plano para ver su detalle{configure ? ' y editarlo' : ''}.</p>
+    <section className="data-workbench">
+      <RemoteState state={data}>{() => <BuildingBoard api={api} profile={profile} version={version} spaces={rows} beds={beds.data} focus="estructura" onRefresh={refresh} onEdit={(space, parent) => setForm({ space, parent })} />}</RemoteState>
+    </section>
+    {form && <SpaceForm api={api} space={form.space} parent={form.parent} spaces={rows} onClose={() => setForm(null)} onSaved={() => { setForm(null); refresh(); }} />}
+  </>;
 }
-function SpaceForm({api,space,spaces,onClose,onSaved}:{api:Api;space:Space|null;spaces:Space[];onClose:()=>void;onSaved:()=>void}){
- const [form,setForm]=useState<SpaceInput>({code:space?.code??'',name:space?.name??'',type:(space?.type??'habitacion') as SpaceInput['type'],parentId:space?.parentId??undefined,category:(space?.category??'semiprivada') as SpaceInput['category'],capacity:space?.capacity??2,level:space?.level??2,active:space?.active??true}),[reason,setReason]=useState('');
- const action=useAction(api),put=<K extends keyof SpaceInput>(k:K,v:SpaceInput[K])=>setForm(f=>({...f,[k]:v}));
- async function save(e:FormEvent){e.preventDefault();const body={...form,parentId:form.parentId||undefined,category:form.type==='habitacion'?form.category:undefined,capacity:form.type==='habitacion'?form.capacity:undefined,...(space?{version:space.version,reason}:{})};if(await action.run(space?`/espacios/${space.id}`:'/espacios',body,space?'PATCH':'POST'))onSaved();}
- return <Dialog title={space?'Editar espacio':'Crear espacio'} onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><WriteError error={action.error} onReload={onSaved}/><p className="form-intro">El árbol y la capacidad se verifican al guardar. Una cama ocupada, reservada o en limpieza conserva su ubicación.</p><div className="form-grid"><Field label="Código" value={form.code} onChange={v=>put('code',v)} required minLength={2} maxLength={40} autoFocus/><Field label="Nombre" value={form.name} onChange={v=>put('name',v)} required minLength={2} maxLength={120}/><Select label="Tipo de espacio" value={form.type} onChange={v=>put('type',v as SpaceInput['type'])} disabled={space?.type==='hospital'}>{Object.entries(typeNames).filter(([k])=>k!=='hospital'||space?.type==='hospital').map(([k,v])=><option key={k} value={k}>{v}</option>)}</Select>{form.type!=='hospital'&&<Select label="Dentro de" value={form.parentId??''} onChange={v=>put('parentId',v)} required><option value="">Selecciona un espacio padre</option>{spaces.filter(s=>s.id!==space?.id&&s.active&&s.type!=='cama'&&(form.type!=='cama'||s.type==='habitacion')).map(s=><option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}</Select>}<Field label="Número de planta" type="number" value={String(form.level??'')} onChange={v=>put('level',v?Number(v):undefined)}/>{form.type==='habitacion'&&<><Select label="Categoría" value={form.category??'semiprivada'} onChange={v=>put('category',v as SpaceInput['category'])}><option value="semiprivada">Semiprivada</option><option value="vip">VIP</option></Select><Field label="Capacidad de camas" type="number" value={String(form.capacity??'')} onChange={v=>put('capacity',v?Number(v):undefined)} required min="1"/></>}</div>{space&&<><label className="check-field"><input type="checkbox" checked={form.active??true} onChange={e=>put('active',e.target.checked)}/>Espacio activo</label><Field label="Motivo del cambio" value={reason} onChange={setReason} required minLength={10} maxLength={500}/></>}<div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} label={space?'Guardar espacio':'Crear espacio'}/></div></form></Dialog>;
+
+function SpaceForm({ api, space, parent, spaces, onClose, onSaved }: { api: Api; space: Space | null; parent?: Space; spaces: Space[]; onClose: () => void; onSaved: () => void }) {
+  const childTypes = parent ? Object.keys(parentTypes).filter(type => parentTypes[type].includes(parent.type)) : [];
+  const initialType = (space?.type ?? (childTypes.includes('habitacion') ? 'habitacion' : childTypes[0] ?? 'habitacion')) as SpaceInput['type'];
+  const [form, setForm] = useState<SpaceInput>({ code: space?.code ?? '', name: space?.name ?? '', type: initialType, parentId: space?.parentId ?? parent?.id ?? undefined, category: (space?.category ?? 'semiprivada') as SpaceInput['category'], capacity: space?.capacity ?? 2, level: space?.level ?? parent?.level ?? undefined, active: space?.active ?? true });
+  const [reason, setReason] = useState('');
+  const action = useAction(api), put = <K extends keyof SpaceInput>(k: K, v: SpaceInput[K]) => setForm(f => ({ ...f, [k]: v }));
+  const parents = useMemo(() => spaces.filter(s => s.id !== space?.id && s.active && (parentTypes[form.type] ?? []).includes(s.type)), [spaces, space?.id, form.type]);
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    const body = { ...form, parentId: form.parentId || undefined, category: form.type === 'habitacion' ? form.category : undefined, capacity: form.type === 'habitacion' ? form.capacity : undefined, ...(space ? { version: space.version, reason } : {}) };
+    if (await action.run(space ? `/espacios/${space.id}` : '/espacios', body, space ? 'PATCH' : 'POST')) onSaved();
+  }
+  return <Dialog title={space ? 'Editar espacio' : parent ? `Agregar dentro de ${parent.code}` : 'Crear espacio'} onClose={onClose} busy={action.busy}>
+    <form className="module-form" onSubmit={save}>
+      <WriteError error={action.error} onReload={onSaved} />
+      <p className="form-intro">Jerarquía: hospital → planta → área → habitación → cama. El árbol y la capacidad se verifican al guardar; una cama ocupada, reservada o en limpieza conserva su ubicación.</p>
+      <div className="form-grid">
+        <Field label="Código" value={form.code} onChange={v => put('code', v)} required minLength={2} maxLength={40} autoFocus hint="Letras, números y guiones; se guarda en mayúsculas." />
+        <Field label="Nombre" value={form.name} onChange={v => put('name', v)} required minLength={2} maxLength={120} />
+        <Select label="Tipo de espacio" value={form.type} onChange={v => put('type', v as SpaceInput['type'])} disabled={space?.type === 'hospital'}>{Object.entries(spaceTypeNames).filter(([k]) => k !== 'hospital' || space?.type === 'hospital').map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
+        {form.type !== 'hospital' && <Select label="Dentro de" value={form.parentId ?? ''} onChange={v => { put('parentId', v); const level = spaces.find(s => s.id === v)?.level; if (level != null && form.level == null) put('level', level); }} required>
+          <option value="">Selecciona dónde va</option>
+          {(parentTypes[form.type] ?? []).map(type => { const list = parents.filter(s => s.type === type); return list.length > 0 && <optgroup key={type} label={`${spaceTypeNames[type]}s`}>{list.map(s => <option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}</optgroup>; })}
+        </Select>}
+        <Field label="Número de planta" type="number" value={String(form.level ?? '')} onChange={v => put('level', v ? Number(v) : undefined)} hint="Opcional; se hereda del espacio donde va." />
+        {form.type === 'habitacion' && <>
+          <Select label="Categoría" value={form.category ?? 'semiprivada'} onChange={v => put('category', v as SpaceInput['category'])}><option value="semiprivada">Semiprivada</option><option value="vip">VIP</option></Select>
+          <Field label="Capacidad de camas" type="number" value={String(form.capacity ?? '')} onChange={v => put('capacity', v ? Number(v) : undefined)} required min="1" />
+        </>}
+      </div>
+      {space && <>
+        <label className="check-field"><input type="checkbox" checked={form.active ?? true} onChange={e => put('active', e.target.checked)} />Espacio activo</label>
+        <Field label="Motivo del cambio" value={reason} onChange={setReason} required minLength={10} maxLength={500} />
+      </>}
+      <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} label={space ? 'Guardar espacio' : 'Crear espacio'} /></div>
+    </form>
+  </Dialog>;
 }
-type BedActionKind='block'|'unblock'|'request'|'complete'|'verify';
-const bedActionText:Record<BedActionKind,string>={block:'Bloquear',unblock:'Retirar bloqueo',request:'Solicitar limpieza',complete:'Completar limpieza',verify:'Verificar limpieza'};
-const bedActionConfirm:Record<BedActionKind,string>={block:'Confirmar bloqueo',unblock:'Confirmar retiro',request:'Confirmar solicitud',complete:'Confirmar limpieza',verify:'Confirmar verificación'};
-const bedActionPath:Record<BedActionKind,string>={block:'bloquear',unblock:'desbloquear',request:'limpieza',complete:'limpieza/completar',verify:'limpieza/verificar'};
-const bedActionSuccess:Record<BedActionKind,string>={block:'Bloqueo registrado.',unblock:'Bloqueo retirado.',request:'Limpieza solicitada.',complete:'Limpieza registrada; queda pendiente de verificación.',verify:'Limpieza verificada. La cama está libre.'};
-export function BedsPage({api,profile,version}:{api:Api;profile:AccessProfile;version:number}){
- const data=useData<Bed[]>(api,'/camas',version),[floor,setFloor]=useState(2),[filter,setFilter]=useState('todos'),[selected,setSelected]=useState<{bedId:string;kind:BedActionKind}|null>(null),[reason,setReason]=useState(''),[feedback,setFeedback]=useState('');
- const action=useAction(api),all=data.data??[],visible=all.filter(b=>b.level===floor&&(filter==='todos'||b.state===filter)),rooms=[...new Set(visible.map(b=>b.room))];
- function availableActions(b:Bed):BedActionKind[]{
-  const result:BedActionKind[]=[];
-  if(b.state==='libre'&&can(profile,'camas.bloquear'))result.push('block');
-  if(b.state==='bloqueada'&&can(profile,'camas.bloquear'))result.push('unblock');
-  if((b.state==='libre'||b.state==='ocupada')&&b.cleaningPending!==true&&can(profile,'camas.registrar_limpieza'))result.push('request');
-  if(b.state==='limpieza'&&b.cleaningPending&& !b.cleaningCompleted&&can(profile,'camas.registrar_limpieza'))result.push('complete');
-  if(b.state==='limpieza'&&b.cleaningPending&&b.cleaningCompleted&&!b.cleanedByCurrentUser&&can(profile,'camas.verificar_limpieza'))result.push('verify');
-  return result;
- }
- async function submit(e:FormEvent,bed:Bed,kind:BedActionKind){
-  e.preventDefault();
-  const body:BedBlockInput|BedTransitionInput=kind==='block'?{version:bed.version,motivo:reason.trim()}:{version:bed.version,reason:reason.trim()};
-  const result=await action.run(`/camas/${bed.id}/${bedActionPath[kind]}`,body);
-  if(result){setSelected(null);setReason('');setFeedback(bedActionSuccess[kind]);data.refresh();}
- }
- function start(bedId:string,kind:BedActionKind){setSelected({bedId,kind});setReason('');setFeedback('');}
- return <><Heading eyebrow="Operaciones / Disponibilidad" title="Camas" description="Estado, bloqueo y ciclo de limpieza por planta y habitación."/><div className="number-strip"><div><strong>{all.length}</strong><span>Camas de hospitalización</span></div><div><strong>{all.filter(b=>b.state==='libre').length}</strong><span>Libres</span></div><div><strong>{all.filter(b=>b.state==='ocupada').length}</strong><span>Ocupadas</span></div></div><section className="data-workbench"><div className="table-toolbar"><div className="floor-switch" aria-label="Planta"><button aria-pressed={floor===2} onClick={()=>setFloor(2)}>Planta 2 · Semiprivadas</button><button aria-pressed={floor===3} onClick={()=>setFloor(3)}>Planta 3 · VIP</button></div><Select label="Estado de cama" value={filter} onChange={setFilter}><option value="todos">Todos los estados</option><option value="libre">Libres</option><option value="ocupada">Ocupadas</option><option value="reservada">Reservadas</option><option value="limpieza">En limpieza</option><option value="bloqueada">Bloqueadas</option></Select></div>{feedback&&<Notice kind="success">{feedback}</Notice>}<RemoteState state={data}>{()=>rooms.length?<div className="rooms-plan">{rooms.map(room=><article className="room-block" key={room}><header><div><span className="eyebrow">{floor===3?'VIP':'Semiprivada'}</span><h2>{room}</h2></div><span className="mono-data">{visible.filter(b=>b.room===room).length} camas</span></header><div className="bed-list">{visible.filter(b=>b.room===room).map(b=>{
-  const choices=availableActions(b),isSelected=selected?.bedId===b.id,kind=isSelected?selected.kind:null;
-  return <div key={b.id}><div className={`bed-row bed-${b.state}`}><div><strong>{b.code}</strong><span>{b.occupant??'Sin ocupante'}{b.occupantRestricted&&<small> · Identidad restringida</small>}</span></div><div className="row-actions"><Tag value={b.state}/>{choices.map(choice=><button className="row-action" type="button" key={choice} aria-label={`${bedActionText[choice]} cama ${b.code}`} onClick={()=>start(b.id,choice)}>{bedActionText[choice]}</button>)}</div></div>{b.state==='ocupada'&&b.cleaningPending&&<p className="refresh-hint">Limpieza solicitada; quedará disponible para completar al cerrar la ocupación.</p>}{b.state==='limpieza'&&b.cleaningPending&&b.cleaningCompleted&&b.cleanedByCurrentUser&&<p className="refresh-hint">Tu registro está listo; otra persona debe verificarlo.</p>}{b.state==='limpieza'&&b.cleaningPending&&b.cleaningCompleted&&!b.cleanedByCurrentUser&&!can(profile,'camas.verificar_limpieza')&&<p className="refresh-hint">Limpieza completada; espera la verificación de personal autorizado.</p>}{kind&&<form className="module-form" aria-label={`${bedActionText[kind]} ${b.code}`} onSubmit={e=>submit(e,b,kind)}><Field label="Motivo" value={reason} onChange={setReason} required minLength={kind==='block'?5:10} maxLength={500} autoFocus/><div className="dialog-actions"><button className="secondary-button" type="button" disabled={action.busy} onClick={()=>setSelected(null)}>Cancelar</button><SaveButton busy={action.busy} label={bedActionConfirm[kind]}/></div>{action.error&&<><Notice kind="error">{action.error.message}</Notice>{action.error.status===409&&<button className="row-action" type="button" onClick={()=>{data.refresh();setSelected(null);}}>Actualizar estado de la cama</button>}</>}</form>}</div>;
- })}</div></article>)}</div>:<Empty title="No hay camas con este estado" description="Cambia el filtro o consulta la otra planta."/>}</RemoteState></section></>;
+
+/** Camas (Operaciones y Recepción): el mismo plano por planta con el estado de cada cama, filtros y acciones por permiso. */
+export function BedsPage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
+  const data = useData<Bed[]>(api, '/camas', version);
+  const spaces = useMemo(() => spacesFromBeds(data.data ?? []), [data.data]);
+  const all = data.data ?? [];
+  return <>
+    <Heading eyebrow="Operaciones / Disponibilidad" title="Camas" description="Estado, asignación, bloqueo y limpieza de cada cama sobre el plano del hospital." />
+    <div className="number-strip"><div><strong>{all.length}</strong><span>Camas de hospitalización</span></div><div><strong>{all.filter(b => b.state === 'libre').length}</strong><span>Libres</span></div><div><strong>{all.filter(b => b.state === 'ocupada').length}</strong><span>Ocupadas</span></div></div>
+    <section className="data-workbench">
+      <RemoteState state={data}>{beds => <BuildingBoard api={api} profile={profile} version={version} spaces={spaces} beds={beds} focus="camas" onRefresh={data.refresh} />}</RemoteState>
+    </section>
+  </>;
 }
