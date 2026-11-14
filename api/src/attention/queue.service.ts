@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
 import { channelsFor, patientAccount } from '../platform/channels';
@@ -92,9 +92,9 @@ export class QueueService {
   async call(actor: Actor, id: string, dto: QueueTransitionDto, key?: string) {
     return this.commands.run(actor, `fila.llamar:${id}`, key, dto, async c => {
       const old = await this.ownTicket(c, actor, id);
-      if (!['en_espera', 'llamado'].includes(old.state)) throw new ConflictException('Solo se puede llamar un número en espera o ya llamado.');
+      if (!['en_espera', 'llamado'].includes(old.state)) throw new ProblemException('transicion_invalida', 409, 'Solo se puede llamar un número en espera o ya llamado.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
-      if (old.llamados >= 3) throw new ConflictException('Este número ya alcanzó el máximo de llamados.');
+      if (old.llamados >= 3) throw new ProblemException('fila_max_llamados', 409, 'Este número ya alcanzó el máximo de llamados.');
       const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [id, dto.officeId ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.llamar', entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.llamar', detail: { officeId: dto.officeId ?? null } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));
@@ -107,7 +107,7 @@ export class QueueService {
       const old = await this.ownTicket(c, actor, id);
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
       const allowed: Record<string, string[]> = { en_atencion: ['llamado'], atendido: ['en_atencion'], no_se_presento: ['en_espera', 'llamado'] };
-      if (!allowed[state].includes(old.state)) throw new ConflictException(`No se puede pasar de ${old.state} a ${state}.`);
+      if (!allowed[state].includes(old.state)) throw new ProblemException('transicion_invalida', 409, `No se puede pasar de ${old.state} a ${state}.`);
       const row = (await c.query(`UPDATE atencion.ticket_fila SET estado=$2,consultorio_id=COALESCE($3,consultorio_id),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state`, [id, state, dto.officeId ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: `fila.${state}`, entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.gestionar', reason: dto.reason, detail: { from: old.state, to: state } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));

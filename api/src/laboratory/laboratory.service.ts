@@ -88,7 +88,7 @@ export class LaboratoryService {
   }
 
   async sample(actor: Actor, id: string, dto: LabSampleDto, key?: string) {
-    return this.commands.run(actor, 'laboratorio.procesar', key, dto, async c => {
+    return this.commands.run(actor, `laboratorio.procesar:${id}:muestra`, key, dto, async c => {
       const old = await this.order(c, id, true);
       if (old.state !== 'pendiente') throw new ConflictException('Solo una orden pendiente puede pasar a toma de muestra.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargar la cola.');
@@ -105,9 +105,11 @@ export class LaboratoryService {
   }
 
   async result(actor: Actor, id: string, dto: LabResultDto, key?: string) {
-    return this.commands.run(actor, 'laboratorio.procesar', key, dto, async c => {
+    return this.commands.run(actor, `laboratorio.procesar:${id}:resultado:${dto.orderItemId}`, key, dto, async c => {
       const old = await this.order(c, id, true);
       if (old.state !== 'en_proceso') throw new ConflictException('La orden debe estar en proceso para capturar resultados.');
+      // API-10, N-18: two technicians cannot overwrite each other; every capture moves the order version.
+      if (dto.version !== undefined && old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
       const item = (await c.query(`SELECT oi.id,e.id AS "examId",e.tipo_resultado AS "resultType",e.unidad AS unit,p.sexo AS sex,
         CASE WHEN p.precision_nacimiento='exacta' THEN date_part('year',age((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,p.nacimiento))::int
              WHEN p.precision_nacimiento='estimada' THEN p.edad_estimada + date_part('year',age((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,p.edad_estimada_en))::int END AS age,
@@ -134,13 +136,14 @@ export class LaboratoryService {
         ON CONFLICT (orden_item_id) DO UPDATE SET valor=EXCLUDED.valor,texto=EXCLUDED.texto,marca=EXCLUDED.marca,rango_id=EXCLUDED.rango_id,capturado_por=EXCLUDED.capturado_por,capturado_en=now(),version=laboratorio.resultado.version+1
         RETURNING orden_item_id AS "orderItemId",valor,texto,marca,version`, [dto.orderItemId, value ?? null, dto.text ?? null, mark, range?.id ?? null, actor.staffId])).rows[0];
       await this.commands.audit(c, actor, { action: previous ? 'laboratorio.resultado_corregido' : 'laboratorio.resultado', entity: 'resultado_laboratorio', entityId: dto.orderItemId, patientId: old.patientId, permission: 'laboratorio.procesar', reason: dto.reason, detail: { mark, rangeId: range?.id ?? null } });
-      await this.commands.event(c, mark.startsWith('critico_') ? 'laboratorio.critico' : 'laboratorio.actualizado', 'orden_laboratorio', id, old.version, await channelsFor(c, ['resultados.ver', 'laboratorio.ver_cola']));
-      return row;
+      const order = (await c.query('UPDATE laboratorio.orden SET version=version+1 WHERE id=$1 RETURNING version', [id])).rows[0];
+      await this.commands.event(c, mark.startsWith('critico_') ? 'laboratorio.critico' : 'laboratorio.actualizado', 'orden_laboratorio', id, order.version, await channelsFor(c, ['resultados.ver', 'laboratorio.ver_cola']));
+      return { ...row, orderVersion: order.version };
     });
   }
 
   async complete(actor: Actor, id: string, dto: LabVersionDto, key?: string) {
-    return this.commands.run(actor, 'laboratorio.validar', key, dto, async c => {
+    return this.commands.run(actor, `laboratorio.validar:${id}`, key, dto, async c => {
       const old = await this.order(c, id, true);
       if (old.state !== 'en_proceso') throw new ConflictException('Solo una orden en proceso puede completarse.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargar la cola.');
@@ -154,7 +157,7 @@ export class LaboratoryService {
   }
 
   async review(actor: Actor, id: string, dto: LabVersionDto, key?: string) {
-    return this.commands.run(actor, 'laboratorio.revisar', key, dto, async c => {
+    return this.commands.run(actor, `laboratorio.revisar:${id}`, key, dto, async c => {
       const old = await this.order(c, id, true);
       if (old.doctorId !== actor.staffId) throw new ForbiddenException('Solo el médico responsable puede revisar esta orden.');
       if (old.state !== 'completado') throw new ConflictException('La orden debe estar completada antes de revisarla.');
@@ -168,7 +171,7 @@ export class LaboratoryService {
   }
 
   async cancel(actor: Actor, id: string, dto: LabCancelDto, key?: string) {
-    return this.commands.run(actor, 'laboratorio.cancelar', key, dto, async c => {
+    return this.commands.run(actor, `laboratorio.cancelar:${id}`, key, dto, async c => {
       const old = await this.order(c, id, true);
       if (!['pendiente', 'en_proceso'].includes(old.state)) throw new ConflictException('Solo se puede cancelar una orden pendiente o en proceso.');
       if (old.doctorId !== actor.staffId && !contextsOf(actor, 'laboratorio.cancelar').includes('x')) throw new ForbiddenException('No puedes cancelar esta orden.');

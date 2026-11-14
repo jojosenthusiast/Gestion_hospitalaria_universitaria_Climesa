@@ -2,8 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsISO8601, IsOptional, IsUUID, Min, IsInt } from 'class-validator';
 import { Text } from '../platform/dto';
 
+/** API-08, RN-22: a consultation starts from a confirmed appointment or from a called queue number; exactly one of them. */
 export class ConsultationStartDto {
-  @ApiProperty({ format: 'uuid' }) @IsUUID() appointmentId!: string;
+  @ApiPropertyOptional({ format: 'uuid', description: 'Cita confirmada del médico. Excluye `ticketId`.' }) @IsOptional() @IsUUID() appointmentId?: string;
+  @ApiPropertyOptional({ format: 'uuid', description: 'Número de fila llamado o en atención. Excluye `appointmentId`.' }) @IsOptional() @IsUUID() ticketId?: string;
   @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() officeId?: string;
   @Text(0, 2000, true) reason?: string;
 }

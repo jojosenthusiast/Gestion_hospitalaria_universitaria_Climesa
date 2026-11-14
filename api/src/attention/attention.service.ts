@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
 import { CommandService } from '../platform/command.service';
@@ -6,6 +6,7 @@ import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
+import { PolicyRegistry } from '../platform/policy.registry';
 import { AppointmentCancelDto, AppointmentCreateDto, AppointmentStatusDto, PatientAppointmentRequestDto } from './attention.dto';
 
 type AppointmentRow = Record<string, any>;
@@ -13,7 +14,7 @@ const SLOT_MS = 20 * 60_000;
 
 @Injectable()
 export class AttentionService {
-  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
+  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock, private readonly policies: PolicyRegistry) {}
 
   private instant(value: string, label: string) {
     if (!/(Z|[+-]\d\d:\d\d)$/.test(value)) throw new BadRequestException(`${label} debe incluir zona horaria.`);
@@ -54,7 +55,7 @@ export class AttentionService {
         AND periodo @> $2::timestamptz
         AND periodo @> ($3::timestamptz - interval '1 microsecond')
       LIMIT 1`, [doctorId, start, end])).rows[0];
-    if (!row) throw new ConflictException('El médico no tiene una jornada publicada para esa franja.');
+    if (!row) throw new ProblemException('medico_sin_jornada', 409, 'El médico no tiene una jornada publicada para esa franja.', 'start');
     if (requireAligned && (start.valueOf() - new Date(row.start).valueOf()) % SLOT_MS !== 0) throw new ProblemException('franja_desalineada', 400, 'La cita debe empezar en una franja de 20 minutos de la jornada del médico.', 'start');
   }
 
@@ -66,7 +67,7 @@ export class AttentionService {
         AND horario && tstzrange($2::timestamptz,$3::timestamptz,'[)')
         AND ($4::uuid IS NULL OR id<>$4::uuid)
       LIMIT 1`, [patientId, start, end, excludeId ?? null])).rows[0];
-    if (row) throw new ConflictException('El paciente ya tiene otra cita en ese horario.');
+    if (row) throw new ProblemException('paciente_con_cita', 409, 'El paciente ya tiene otra cita en ese horario.', 'start');
   }
 
   private async allowedToSee(actor: Actor, patientId?: string, doctorId?: string) {
@@ -195,13 +196,14 @@ export class AttentionService {
     });
   }
 
+  /** API-09: confirming or rejecting only applies to a pending request; the database trigger `atencion.validar_cita` backs it. */
   async changeStatus(actor: Actor, id: string, dto: AppointmentStatusDto, key?: string) {
-    return this.commands.run(actor, 'citas.agendar', key, dto, async c => {
+    return this.commands.run(actor, `citas.agendar:${id}:${dto.status}`, key, dto, async c => {
       const old = (await c.query('SELECT paciente_id,medico_id,lower(horario) AS start,upper(horario) AS "end",estado,version FROM atencion.cita WHERE id=$1 FOR UPDATE', [id])).rows[0] as AppointmentRow | undefined;
       if (!old) throw new NotFoundException('No se encontró la cita.');
-      if (old.version !== (dto.version ?? old.version)) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
+      if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
       if (dto.status === 'rechazada' && (dto.rejectionReason?.trim().length ?? 0) < 10) throw new BadRequestException('Indica el motivo del rechazo.');
-      if (!['solicitada', 'confirmada'].includes(old.estado)) throw new ConflictException('La cita ya no admite cambios de agenda.');
+      if (old.estado !== 'solicitada') throw new ProblemException('transicion_invalida', 409, 'Solo se puede confirmar o rechazar una solicitud pendiente; para una cita confirmada usa cancelar.');
       if (dto.status === 'confirmada') {
         await this.doctorHasShift(c, old.medico_id, new Date(old.start), new Date(old.end), false);
         await this.patientHasConflict(c, old.paciente_id, new Date(old.start), new Date(old.end), id);
@@ -214,15 +216,23 @@ export class AttentionService {
   }
 
   async cancel(actor: Actor, id: string, dto: AppointmentCancelDto, key?: string) {
-    return this.commands.run(actor, 'citas.cancelar', key, dto, async c => {
-      const old = (await c.query('SELECT paciente_id,estado,version FROM atencion.cita WHERE id=$1 FOR UPDATE', [id])).rows[0] as AppointmentRow | undefined;
+    return this.commands.run(actor, `citas.cancelar:${id}`, key, dto, async c => {
+      const old = (await c.query('SELECT paciente_id,estado,version,lower(horario) AS start FROM atencion.cita WHERE id=$1 FOR UPDATE', [id])).rows[0] as AppointmentRow | undefined;
       // F-06/H-09: ownership comes first, and a foreign or missing appointment answers the same, so neither
       // the version nor the existence of another patient's appointment leaks.
       const onlyOwn = !contextsOf(actor, 'citas.cancelar').some(context => context !== 'propio');
       if (onlyOwn && (!old || !actor.patientId || actor.patientId !== old.paciente_id)) throw new ForbiddenException('Solo puedes cancelar tus propias citas.');
       if (!old) throw new NotFoundException('No se encontró la cita.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
-      if (!['solicitada', 'confirmada'].includes(old.estado)) throw new ConflictException('Solo se pueden cancelar citas solicitadas o confirmadas.');
+      if (!['solicitada', 'confirmada'].includes(old.estado)) throw new ProblemException('transicion_invalida', 409, 'Solo se pueden cancelar citas solicitadas o confirmadas.');
+      const now = this.clock.now();
+      const start = new Date(old.start);
+      if (start <= now) throw new ProblemException('transicion_invalida', 409, 'La cita ya empezó o pasó; no se puede cancelar.');
+      // RN-21: the patient cancels up to N hours before (policy `citas.cancelacion_horas`); reception is not bound by it.
+      if (onlyOwn) {
+        const { horas } = await this.policies.value<{ horas: number }>(c, 'citas.cancelacion_horas', now);
+        if (start.valueOf() - now.valueOf() < horas * 3_600_000) throw new ProblemException('cancelacion_fuera_de_plazo', 409, `Solo puedes cancelar tu cita hasta ${horas} h antes; comunícate con recepción.`);
+      }
       const row = (await c.query("UPDATE atencion.cita SET estado='cancelada',version=version+1 WHERE id=$1 RETURNING version", [id])).rows[0];
       await this.commands.audit(c, actor, { action: 'citas.cancelar', entity: 'cita', entityId: id, permission: 'citas.cancelar', reason: dto.reason });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, old.paciente_id));

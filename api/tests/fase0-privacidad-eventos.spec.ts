@@ -56,7 +56,7 @@ describe('Fase 0 · fila y eventos sin datos ajenos para pacientes (SEG-01, SEG-
     expect(critical[0]).toContain('rol:MED');
     const before = await t.events('laboratorio.actualizado', order.body.id);
     for (const channels of before) expect(channels).not.toContain(pac());
-    const completed = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/completar`, { version: sample.body.version });
+    const completed = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/completar`, { version: sample.body.version + 1 /* API-10: the captured result moved it */ });
     expect(completed.status).toBe(201);
     const reviewed = await t.call('MED', 'POST', `/laboratorio/ordenes/${order.body.id}/revisar`, { version: completed.body.version });
     expect(reviewed.status).toBe(201);

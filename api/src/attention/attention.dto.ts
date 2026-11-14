@@ -20,12 +20,13 @@ export class PatientAppointmentRequestDto {
 export class AppointmentStatusDto {
   @ApiProperty({ enum: ['confirmada', 'rechazada', 'atendida', 'no_asistio'] })
   @IsIn(['confirmada', 'rechazada', 'atendida', 'no_asistio']) status!: string;
-  @ApiPropertyOptional({ minimum: 1 }) @IsOptional() @IsInt() @Min(1) version?: number;
+  @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
   @Text(0, 500, true) rejectionReason?: string;
 }
 
+/** API-10: the version is mandatory and compared on every transition. */
 export class AppointmentDecisionDto {
-  @ApiPropertyOptional({ minimum: 1 }) @IsOptional() @IsInt() @Min(1) version?: number;
+  @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
   @Text(0, 500, true) rejectionReason?: string;
 }
 

@@ -29,7 +29,8 @@ describe('Fase 0 · módulos clínicos (API-01, REQ-08)', () => {
   });
 
   test('citas: recepción agenda, el paciente solicita, recepción confirma o rechaza y el paciente cancela la suya', async () => {
-    const shiftStart = new Date(Math.ceil((now.valueOf() + 60 * MINUTE) / (20 * MINUTE)) * 20 * MINUTE);
+    // RN-21: the patient cancels up to 2 h before, so the slots start later than that.
+    const shiftStart = new Date(Math.ceil((now.valueOf() + 180 * MINUTE) / (20 * MINUTE)) * 20 * MINUTE);
     await t.shift('MED', shiftStart, new Date(shiftStart.valueOf() + 6 * 60 * MINUTE));
     const doctorId = await t.staffOf('MED');
     const slot = (n: number) => ({ start: new Date(shiftStart.valueOf() + n * 20 * MINUTE).toISOString(), end: new Date(shiftStart.valueOf() + (n + 1) * 20 * MINUTE).toISOString() });
@@ -102,7 +103,8 @@ describe('Fase 0 · módulos clínicos (API-01, REQ-08)', () => {
     const result = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/resultados`, { orderItemId: item.id, value: 13.2 });
     expect(result.status).toBe(201);
     expect(result.body.marca).toBe('normal');
-    const completed = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/completar`, { version: sample.body.version });
+    // API-10: every captured result moves the order version.
+    const completed = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/completar`, { version: result.body.orderVersion });
     expect(completed.status).toBe(201);
     expect((await t.call('MED', 'POST', `/laboratorio/ordenes/${order.body.id}/revisar`, { version: completed.body.version })).status).toBe(201);
     const queue = await t.call('LAB', 'GET', '/laboratorio/ordenes');

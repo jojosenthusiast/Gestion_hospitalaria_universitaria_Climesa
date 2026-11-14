@@ -6,7 +6,12 @@ import { ProblemException } from './problem';
 
 const CODES: Record<number, string> = { 400: 'validacion', 401: 'no_autenticado', 403: 'sin_permiso', 404: 'no_encontrado', 409: 'conflicto', 429: 'limite_excedido', 503: 'no_disponible' };
 const TITLES: Record<number, string> = { 400: 'Datos no válidos', 401: 'Sesión requerida', 403: 'Sin permiso', 404: 'No encontrado', 409: 'Conflicto', 429: 'Demasiadas solicitudes', 503: 'Servicio no disponible' };
-const SQL_CODES: Record<string, string> = { ultimo_administrador: 'ultimo_administrador', capacidad_excedida: 'capacidad_excedida', capacidad_menor_que_camas: 'capacidad_menor_que_camas', ciclo_en_arbol: 'ciclo_en_arbol', consulta_firmada: 'consulta_firmada' };
+const SQL_CODES: Record<string, string> = { ultimo_administrador: 'ultimo_administrador', capacidad_excedida: 'capacidad_excedida', capacidad_menor_que_camas: 'capacidad_menor_que_camas', ciclo_en_arbol: 'ciclo_en_arbol', consulta_firmada: 'consulta_firmada', transicion_invalida: 'transicion_invalida' };
+/** CON-02: exclusion constraints whose overlap has a business meaning of its own (otherwise `conflicto`). */
+const CONSTRAINT_CODES: Record<string, { codigo: string; message: string }> = {
+  cita_medico_id_horario_excl: { codigo: 'franja_ocupada', message: 'La franja ya no está disponible; vuelve a consultar la disponibilidad.' },
+  cita_paciente_sin_traslape: { codigo: 'paciente_con_cita', message: 'El paciente ya tiene otra cita en ese horario.' },
+};
 
 /** FR-100-11: todo error sale como `application/problem+json` con `codigo` estable, mensaje en español y `requestId`; nunca trazas ni SQL. */
 @Catch()
@@ -16,7 +21,7 @@ export class ApiErrorsFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const req = http.getRequest<FastifyRequest>();
     const reply = http.getResponse<FastifyReply>();
-    const sql = error as { code?: string; message?: string };
+    const sql = error as { code?: string; message?: string; constraint?: string };
     let status = error instanceof HttpException ? error.getStatus() : 500;
     let message = 'No se pudo completar la operación.';
     let codigo: string | undefined;
@@ -33,10 +38,14 @@ export class ApiErrorsFilter implements ExceptionFilter {
       if (status === 400 && Array.isArray(reason)) campo = /^(?:property )?(?!each\b)([A-Za-z_][\w.[\]]*) /.exec(reason[0])?.[1];
     } else if (['23505','23P01','40001','40P01'].includes(sql.code ?? '')) {
       status = 409; message = sql.code === '23P01' ? 'El horario o recurso se traslapa con otro registro.' : 'Los datos cambiaron o ya existe un registro con ese identificador. Actualiza e intenta de nuevo.';
+      const known = CONSTRAINT_CODES[sql.constraint ?? ''];
+      if (known) { codigo = known.codigo; message = known.message; }
     } else if (['23514','23503','22P02'].includes(sql.code ?? '')) {
       status = 400; message = 'Revisa los datos, referencias y restricciones del registro.';
     } else if (sql.code === 'P0001') {
-      status = 409; message = ({ ultimo_administrador: 'No puedes quitar ni desactivar al último administrador.', capacidad_excedida: 'La habitación ya tiene todas sus camas.', capacidad_menor_que_camas: 'La capacidad no puede quedar por debajo de las camas activas.', ciclo_en_arbol: 'Un espacio no puede ser descendiente de sí mismo.', consulta_firmada: 'La consulta ya está firmada; corrígela con un addendum.' } as Record<string,string>)[sql.message ?? ''] ?? 'La operación incumple una regla del sistema.';
+      // A trigger may append detail after the code (`transicion_invalida cancelada -> confirmada`).
+      sql.message = sql.message?.split(' ')[0];
+      status = 409; message = ({ ultimo_administrador: 'No puedes quitar ni desactivar al último administrador.', capacidad_excedida: 'La habitación ya tiene todas sus camas.', capacidad_menor_que_camas: 'La capacidad no puede quedar por debajo de las camas activas.', ciclo_en_arbol: 'Un espacio no puede ser descendiente de sí mismo.', consulta_firmada: 'La consulta ya está firmada; corrígela con un addendum.', transicion_invalida: 'El registro ya no admite ese cambio de estado.' } as Record<string,string>)[sql.message ?? ''] ?? 'La operación incumple una regla del sistema.';
       codigo = SQL_CODES[sql.message ?? ''];
     }
     codigo ??= CODES[status] ?? (status >= 500 ? 'error_interno' : 'error');
