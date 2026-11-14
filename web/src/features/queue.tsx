@@ -9,7 +9,7 @@ import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './li
 import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, serviceNames, sortColumn, waitLevel, waitMinutes, type BoardTicket, type Column } from './listas/queue-board';
 import './listas/lists.css';
 
-type QueueTicket = BoardTicket & { fecha: string; patientId?: string | null; officeId?: string | null; version: number };
+type QueueTicket = BoardTicket & { fecha: string; patientId?: string | null; officeId?: string | null; version: number; consultationId?: string | null; consultationState?: string | null };
 const services = Object.entries(serviceNames);
 const finalNames: Record<string, string> = { atendido: 'Atendido', no_se_presento: 'No se presentó' };
 const minutesText = (minutes: number) => minutes >= 60 ? `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min` : `${minutes} min`;
@@ -60,6 +60,7 @@ function Lane({ column, tickets, now, busy, call, manage, onTransition }: { colu
       <div className="row-actions">
         {call && ['en_espera', 'llamado'].includes(ticket.state) && <button className="row-action" disabled={busy} onClick={() => void onTransition(ticket, 'llamar')}>{ticket.state === 'llamado' ? 'Llamar de nuevo' : 'Llamar'} <Icon name="arrow" size={16} /></button>}
         {manage && ticket.state === 'llamado' && <button className="row-action" disabled={busy} onClick={() => void onTransition(ticket, 'atender')}>Iniciar atención</button>}
+        {ticket.state === 'en_atencion' && ticket.consultationId && ticket.consultationState === 'abierta' && <a className="row-action" href={`#/consultas?consulta=${ticket.consultationId}`}>Retomar consulta <Icon name="arrow" size={16} /></a>}
         {manage && ticket.state === 'en_atencion' && <button className="row-action" disabled={busy} onClick={() => void onTransition(ticket, 'completar')}>Completar</button>}
         {manage && ['en_espera', 'llamado'].includes(ticket.state) && <button className="row-action" disabled={busy} onClick={() => void onTransition(ticket, 'no-se-presento')}>No se presentó</button>}
       </div></li>)}</ul> : <p className="muted">Nadie por ahora.</p>}</section>;
