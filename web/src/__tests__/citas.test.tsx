@@ -81,9 +81,28 @@ describe('W28 · agendar cita como Recepción (W-01)', () => {
 
   it('el botón del modal de cancelación dice lo que hace', async () => {
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: 'Cancelar' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Cancelar la cita de Paciente Ficticio Uno/ }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('button', { name: /Cancelar cita/ })).toBeTruthy();
     expect(within(dialog).queryByRole('button', { name: /Guardar estado/ })).toBeNull();
+  });
+});
+
+describe('agenda de citas (obs. 12)', () => {
+  it('muestra el rango en una sola celda, agrupado por día y médico, sin filas de entrada y salida', async () => {
+    mount();
+    const dia = await screen.findByRole('region', { name: /viernes, 20 de noviembre|viernes 20 de noviembre/ });
+    expect(within(dia).getByText('Médica Ficticia', { exact: false })).toBeTruthy();
+    expect(within(dia).getByText('09:00 – 09:20')).toBeTruthy();
+    expect(within(dia).getByText('20 min')).toBeTruthy();
+  });
+
+  it('los chips de estado cuentan y filtran; «Quitar filtros» vuelve a las activas', async () => {
+    mount();
+    await screen.findByText('09:00 – 09:20');
+    await userEvent.click(screen.getByRole('button', { name: /^Canceladas/ }));
+    expect(await screen.findByText('Ninguna cita coincide con los filtros')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+    expect(await screen.findByText('09:00 – 09:20')).toBeTruthy();
   });
 });
