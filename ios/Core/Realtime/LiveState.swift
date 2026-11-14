@@ -31,6 +31,9 @@ public enum InvalidationRule {
         if type.hasPrefix("vinculacion.") { topics.insert(.link) }
         if type.hasPrefix("acceso.") { topics.insert(.access) }
         if type.hasPrefix("paciente.") { topics.insert(.patient) }
+        // Signos vitales fuera de consulta: los ven el expediente, la consulta abierta y los hospitalizados.
+        if type.hasPrefix("signos.") { topics.formUnion([.patient, .consultations, .admissions]) }
+        if type.hasPrefix("espacio.") { topics.formUnion([.admissions, .hospitalInfo]) }
         return topics
     }
 }
@@ -44,6 +47,8 @@ public struct LiveSnapshot: Equatable, Sendable {
     public var versions: [LiveTopic: Int]
     /// Último evento recibido (por ejemplo, para avisar "te llamaron" en I05).
     public var lastEvent: DomainEvent?
+    /// Canales que el servidor rechazó y que se dejaron fuera; el resto sigue en vivo.
+    public var droppedChannels: Set<String> = []
     public init(connection: ConnectionState = .reconnecting, version: Int = 0, shiftsVersion: Int = 0, profileVersion: Int = 0) {
         self.connection = connection; self.version = version; self.shiftsVersion = shiftsVersion; self.profileVersion = profileVersion
         self.versions = [:]; self.lastEvent = nil
@@ -62,6 +67,8 @@ public enum LiveReducer {
         switch signal {
         case .state(let state):
             next.connection = state
+        case .channelsDropped(let channels):
+            next.droppedChannels = channels
         case .resync:
             next.version += 1
             next.shiftsVersion += 1

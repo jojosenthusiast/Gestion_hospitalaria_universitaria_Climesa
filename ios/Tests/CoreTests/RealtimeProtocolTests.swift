@@ -69,6 +69,21 @@ final class RealtimeProtocolTests: XCTestCase {
         XCTAssertEqual(RealtimeProtocol.parse(#"{"topic":"realtime:rol:ENF","event":"phx_error","payload":{}}"#), .channelClosed(channel: "rol:ENF"))
     }
 
+    func testReconoceLaRespuestaAlLatidoPorSuReferencia() {
+        XCTAssertEqual(RealtimeProtocol.parse(#"{"topic":"phoenix","event":"phx_reply","payload":{"status":"ok","response":{}},"ref":"7"}"#), .heartbeatReply(ref: "7"))
+        XCTAssertEqual(RealtimeProtocol.parse(#"{"topic":"phoenix","event":"phx_reply","payload":{"status":"ok"},"ref":null}"#), .ignored)
+    }
+
+    func testRenovarElTokenUsaElEventoAccessTokenDelCanal() throws {
+        let texto = RealtimeProtocol.accessToken(channel: "rol:MED", ref: "4", accessToken: "token-2")
+        let objeto = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(texto.utf8)) as? [String: Any])
+        XCTAssertEqual(objeto["topic"] as? String, "realtime:rol:MED")
+        XCTAssertEqual(objeto["event"] as? String, "access_token")
+        XCTAssertEqual(objeto["ref"] as? String, "4")
+        XCTAssertNil(objeto["join_ref"])
+        XCTAssertEqual((objeto["payload"] as? [String: Any])?["access_token"] as? String, "token-2")
+    }
+
     func testIgnoraLatidosYTextoMalFormado() {
         XCTAssertEqual(RealtimeProtocol.parse(#"{"topic":"phoenix","event":"phx_reply","payload":{"status":"ok"}}"#), .ignored)
         XCTAssertEqual(RealtimeProtocol.parse("no es json"), .ignored)
@@ -80,6 +95,12 @@ final class RealtimeProtocolTests: XCTestCase {
         let recuperado = try XCTUnwrap(RealtimeProtocol.parseCatchUp(data: datos))
         XCTAssertEqual(recuperado.cursor, "42")
         XCTAssertEqual(recuperado.events, [DomainEvent(type: "cama.estado_cambiado", entity: "cama", id: "b1", version: 3)])
+    }
+
+    func testLaRecuperacionPrefiereLosNombresDelContrato() throws {
+        let datos = Data(#"{"cursor":"8","events":[{"seq":"8","tipo":"cita.actualizada","entidad":"cita","type":"viejo","entity":"viejo","id":"c1","version":4}]}"#.utf8)
+        let recuperado = try XCTUnwrap(RealtimeProtocol.parseCatchUp(data: datos))
+        XCTAssertEqual(recuperado.events, [DomainEvent(type: "cita.actualizada", entity: "cita", id: "c1", version: 4)])
     }
 
     func testLaRecuperacionAceptaCursorNumericoYSinEventos() throws {
@@ -115,6 +136,30 @@ final class LiveStateTests: XCTestCase {
         let usuario = DomainEvent(type: "usuario.actualizado", entity: "usuario", id: "u1", version: 2)
         XCTAssertEqual(LiveReducer.apply(.event(usuario), to: LiveSnapshot()).profileVersion, 1)
         XCTAssertEqual(LiveReducer.apply(.event(cama), to: LiveSnapshot()).profileVersion, 0)
+    }
+
+    func testCadaEventoVuelveAPedirLasPantallasQueLoMuestran() {
+        func topics(_ type: String, _ entity: String) -> Set<LiveTopic> {
+            InvalidationRule.topics(for: DomainEvent(type: type, entity: entity, id: "x", version: 1))
+        }
+        XCTAssertEqual(topics("cita.actualizada", "cita"), [.appointments])
+        XCTAssertEqual(topics("fila.actualizada", "ticket_fila"), [.queue])
+        XCTAssertEqual(topics("fila.llamado", "publico"), [.queue])
+        XCTAssertEqual(topics("consulta.actualizada", "consulta"), [.consultations])
+        XCTAssertEqual(topics("laboratorio.critico", "orden_laboratorio"), [.laboratory])
+        XCTAssertEqual(topics("turno.publicado", "turno"), [.shifts, .hospitalInfo])
+        XCTAssertEqual(topics("aviso.publicado", "aviso"), [.hospitalInfo])
+        XCTAssertEqual(topics("cama.estado_cambiado", "publico"), [.admissions, .hospitalInfo])
+        XCTAssertEqual(topics("ambulancia.hito", "servicio"), [.ambulance])
+        XCTAssertEqual(topics("signos.registrados", "paciente"), [.patient, .consultations, .admissions])
+        XCTAssertEqual(topics("espacio.actualizado", "espacio"), [.admissions, .hospitalInfo])
+        XCTAssertEqual(topics("inventario.actualizado", "articulo"), [])
+    }
+
+    func testUnCanalDejadoFueraSeGuardaSinInvalidarDatos() {
+        let next = LiveReducer.apply(.channelsDropped(["rol:MED"]), to: LiveSnapshot())
+        XCTAssertEqual(next.droppedChannels, ["rol:MED"])
+        XCTAssertEqual(next.version, 0)
     }
 
     func testElEstadoDeConexionNoInvalidaDatos() {
