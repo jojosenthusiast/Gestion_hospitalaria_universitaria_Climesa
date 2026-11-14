@@ -18,12 +18,12 @@ const perfil: AccessProfile = {
 };
 const paciente: Patient = {
   id: 'p1', record: 'EXP-000001', fullName: 'Ana Ficticia', givenNames: 'Ana', surnames: 'Ficticia', state: 'activo', active: true, sex: 'femenino',
-  birth: '1990-05-01', dui: '00000000-0', version: 3, matchReason: 'Documento',
+  birth: '1990-05-01', dui: '00000001-8', version: 3, matchReason: 'Documento',
   history: [{ version: 2, at: '2026-10-01T15:00:00Z', reason: 'Corrección de datos', changes: {
     nombres: { before: 'Anna', after: 'Ana' }, primer_apellido: { before: 'Ficticio', after: 'Ficticia' }, segundo_apellido: { before: null, after: 'Prueba' },
     sexo: { before: 'masculino', after: 'femenino' }, nacimiento: { before: null, after: '1990-05-01' }, precision_nacimiento: { before: 'estimada', after: 'exacta' },
     telefono: { before: null, after: '7000-0000' }, correo: { before: null, after: 'a@example.test' }, direccion: { before: null, after: 'Calle 1' },
-    dui: { before: null, after: '00000000-0' }, estado: { before: 'activo', after: 'inactivo' },
+    dui: { before: null, after: '00000001-8' }, estado: { before: 'activo', after: 'inactivo' },
   } }],
 };
 const recibo = (vence: number, candidates: Patient[] = [paciente]) => ({ token: 'tok-1', expiresAt: new Date(vence).toISOString(), candidates });
@@ -188,7 +188,7 @@ describe('edición y estado', () => {
     const inactivo = { ...paciente, active: false, state: 'inactivo' };
     const api2 = { request: vi.fn(async (path: string) => (path === '/pacientes/p1' ? inactivo : [inactivo])), write: vi.fn(async () => ({})) };
     render(<PatientsPage api={api2 as unknown as Api} profile={perfil} version={0} />);
-    await userEvent.selectOptions(screen.getByLabelText('Estado'), 'todos');
+    await userEvent.click(screen.getByRole('button', { name: /^Todos/ }));
     await userEvent.click(await screen.findByRole('button', { name: /Abrir ficha de Ana Ficticia/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Reactivar paciente' }));
     const reactivar = await screen.findByRole('dialog', { name: 'Reactivar paciente' });
@@ -200,6 +200,7 @@ describe('edición y estado', () => {
   it('el historial usa etiquetas en español para cada campo', async () => {
     montar();
     await userEvent.click(await screen.findByRole('button', { name: /Abrir ficha de Ana Ficticia/ }));
+    await userEvent.click(await screen.findByRole('tab', { name: 'Cambios' }));
     const historial = (await screen.findByText('Historial de cambios')).closest('section')!;
     for (const etiqueta of ['Nombres', 'Apellidos', 'Segundo apellido', 'Sexo', 'Nacimiento', 'Precisión del nacimiento', 'Teléfono', 'Correo', 'Dirección', 'DUI', 'Estado']) {
       expect(within(historial).getAllByText(etiqueta).length).toBeGreaterThan(0);

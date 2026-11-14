@@ -109,3 +109,12 @@
 .ag-time { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ag-time small { display: block; color: var(--muted); font-weight: 700; }
 @media (max-width: 720px) { .ag-slot { grid-template-columns: 1fr auto; } }
+
+/* Lista de pacientes. */
+.pt-row { display: grid; grid-template-columns: minmax(0, 1.5fr) auto minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; width: 100%; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: var(--radius-card); background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.pt-row:hover:not(:disabled) { border-color: var(--primary); }
+.pt-row:disabled { cursor: default; }
+.pt-row[aria-current='true'] { outline: 3px solid var(--outline); outline-offset: 1px; background: var(--soft); }
+.pt-name strong { display: block; }
+.pt-name small, .pt-meta { color: var(--muted); font-size: 13px; }
+@media (max-width: 720px) { .pt-row { grid-template-columns: 1fr auto; } }
