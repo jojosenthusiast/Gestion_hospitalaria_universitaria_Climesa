@@ -49,20 +49,23 @@ export function Notice({ kind, children }: { kind: 'success' | 'error' | 'info';
   return <div className={`notice ${kind}`} role={kind === 'error' ? 'alert' : 'status'} aria-live={kind === 'error' ? 'assertive' : 'polite'} aria-atomic="true"><span className="notice-icon"><Icon name={kind === 'success' ? 'check' : 'info'} /></span><span>{children}</span></div>;
 }
 
-export function Field({ label, value, onChange, hint, ...props }: { label: string; value: string; onChange: (value: string) => void; hint?: string } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+/** WEB-11: `error` marks the input `aria-invalid` and links the message with `aria-describedby`, so it is read with the field. */
+export function Field({ label, value, onChange, hint, error, ...props }: { label: string; value: string; onChange: (value: string) => void; hint?: string; error?: string } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   const [visible, setVisible] = useState(false);
-  const hintId = useId();
+  const hintId = useId(), errorId = useId(), ownId = useId(), inputId = props.id ?? ownId;
   const password = props.type === 'password';
-  const describedBy = [props['aria-describedby'], hint ? hintId : undefined].filter(Boolean).join(' ') || undefined;
+  const describedBy = [props['aria-describedby'], hint ? hintId : undefined, error ? errorId : undefined].filter(Boolean).join(' ') || undefined;
+  // The hint and the error sit outside the <label>: they describe the field, they are not its name.
   return (
-    <label className="field">
-      <span>{label}</span>
+    <div className="field">
+      <label htmlFor={inputId}>{label}</label>
       <span className="input-wrap">
-        <input {...props} aria-describedby={describedBy} type={password && visible ? 'text' : props.type} value={value} onChange={e => onChange(e.target.value)} />
+        <input {...props} id={inputId} aria-invalid={error ? true : props['aria-invalid']} aria-describedby={describedBy} type={password && visible ? 'text' : props.type} value={value} onChange={e => onChange(e.target.value)} />
         {password && <button type="button" className="password-toggle" aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={visible} onClick={() => setVisible(!visible)}><Icon name={visible ? 'eyeOff' : 'eye'} /></button>}
       </span>
       {hint && <small id={hintId}>{hint}</small>}
-    </label>
+      {error && <small id={errorId} className="field-error" role="alert">{error}</small>}
+    </div>
   );
 }
 
