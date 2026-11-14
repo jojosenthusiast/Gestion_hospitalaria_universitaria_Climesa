@@ -110,17 +110,28 @@ struct HospitalInfoView: View {
     }
 }
 
-/// Ubicación: nombre del hospital, botón para abrir Apple Maps y guía de pisos con datos públicos.
+/// Ubicación: nombre, dirección y teléfono (`GET /publico/hospital`), Apple Maps en las coordenadas y guía de pisos.
 struct LocationView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(\.openURL) private var openURL
     @State private var loader = Loader<PublicOccupancy>()
+    @State private var place = Loader<HospitalLocation>()
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
             SectionCard(eyebrow: L.text("location.eyebrow")) {
-                Text("location.name").font(Typo.heading).foregroundStyle(Theme.ink)
-                Text("location.address.note").font(Typo.small).foregroundStyle(Theme.muted)
+                if let hospital = place.value {
+                    Text(verbatim: hospital.name).font(Typo.heading).foregroundStyle(Theme.ink)
+                    DataLine(label: L.text("location.address"), value: hospital.address)
+                    DataLine(label: L.text("location.town"), value: "\(hospital.municipality), \(hospital.department)")
+                    DataLine(label: L.text("location.phone"), value: hospital.phone)
+                    if let call = HospitalLocationRules.callURL(hospital) {
+                        ClimesaButton(title: L.text("location.call"), kind: .secondary) { openURL(call) }
+                    }
+                } else {
+                    Text("location.name").font(Typo.heading).foregroundStyle(Theme.ink)
+                    Text("location.address.note").font(Typo.small).foregroundStyle(Theme.muted)
+                }
                 ClimesaButton(title: L.text("location.open_maps")) { openMaps() }
             }
             SectionTitle("location.floors")
@@ -136,15 +147,17 @@ struct LocationView: View {
                 }
             }
         }
-        .task { await load() }
+        .task {
+            await place.load { try await account.client().get("/publico/hospital", as: HospitalLocation.self) }
+            await load()
+        }
     }
 
     private func load() async { await loader.load { try await account.client().get("/publico/ocupacion", as: PublicOccupancy.self) } }
 
+    /// Coordenadas del hospital; si la consulta falló, búsqueda por nombre como antes.
     private func openMaps() {
-        guard var components = URLComponents(string: "https://maps.apple.com/") else { return }
-        components.queryItems = [URLQueryItem(name: "q", value: L.text("location.map_query"))]
-        if let url = components.url { openURL(url) }
+        if let url = HospitalLocationRules.mapsURL(place.value, fallbackQuery: L.text("location.map_query")) { openURL(url) }
     }
 }
 
@@ -185,7 +198,7 @@ struct RoomCard: View {
     }
 }
 
-/// Mis datos (paciente): ficha propia. Editar el contacto exige `pacientes.editar_demograficos`, que la API da a Recepción.
+/// Mis datos (paciente): ficha propia. Editar el contacto exige `pacientes.editar_propios`.
 struct MyDataView: View {
     let profile: AccessProfile
     @EnvironmentObject private var account: AccountModel
@@ -203,7 +216,7 @@ struct MyDataView: View {
                 DataLine(label: L.text("mydata.email"), value: patient.email)
                 DataLine(label: L.text("mydata.address"), value: patient.address)
             }
-            if account.can("pacientes.editar_demograficos") {
+            if account.can("pacientes.editar_propios") {
                 ClimesaButton(title: L.text("mydata.edit"), kind: .secondary) { editing = true }
             } else {
                 PatientNotice(text: L.text("mydata.readonly"))
@@ -240,7 +253,6 @@ private struct EditMyDataSheet: View {
     @State private var phone: String
     @State private var email: String
     @State private var address: String
-    @State private var reason = ""
     @State private var errors: [String: String] = [:]
 
     init(patient: PatientProfile, reload: @escaping () async -> Void) {
@@ -259,9 +271,14 @@ private struct EditMyDataSheet: View {
                     FormField(label: L.text("mydata.email"), text: $email, error: errors["email"])
                         .keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
                     PatientTextArea(label: L.text("mydata.address"), text: $address, lines: 1...4, error: errors["address"])
-                    PatientTextArea(label: L.text("mydata.reason"), text: $reason, lines: 2...4, error: errors["reason"])
                 }
-                WriteNotice(submission: submission, reload: reload)
+                if submission.lastFailure?.isVersionConflict == true {
+                    ConflictBanner(message: L.text("mydata.conflict")) { Task { await reload(); dismiss() } }
+                } else if submission.lastFailure?.code == "sin_vinculacion" {
+                    PatientNotice(text: L.text("mydata.unlinked"), failure: true)
+                } else {
+                    SubmissionNotice(submission: submission)
+                }
                 ClimesaButton(title: L.text("mydata.save"), loading: submission.busy) { Task { await save() } }
                 ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
@@ -269,11 +286,11 @@ private struct EditMyDataSheet: View {
     }
 
     private func save() async {
-        errors = PatientProfileRules.errors(phone: phone, email: email, address: address, reason: reason)
+        errors = PatientProfileRules.errors(phone: phone, email: email, address: address)
         guard errors.isEmpty else { return }
-        let body = PatientProfileRules.body(profile: patient, phone: phone, email: email, address: address, reason: reason)
+        let body = PatientProfileRules.body(version: patient.version, phone: phone, email: email, address: address)
         let ok = await submission.run(patient.id, body: body, success: L.text("mydata.saved")) { key in
-            _ = try await account.client().send("PATCH", "/pacientes/\(patient.id)", body: body, key: key, as: PatientUpdateResult.self)
+            _ = try await account.client().send("PATCH", "/me/paciente", body: body, key: key, as: PatientUpdateResult.self)
         }
         await reload()
         if ok { dismiss() }

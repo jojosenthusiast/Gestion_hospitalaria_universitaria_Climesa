@@ -2713,7 +2713,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La dirección exacta todavía no está publicada en la aplicación. Abre el mapa para buscar el hospital."
+            "value": "No pudimos cargar la dirección del hospital. Abre el mapa para buscarlo por nombre."
           }
         }
       }
@@ -2912,6 +2912,72 @@
           "stringUnit": {
             "state": "translated",
             "value": "Guardar cambios"
+          }
+        }
+      }
+    },
+    "mydata.conflict": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otra persona cambió tus datos. Se cargó la ficha actual: revísala y vuelve a intentar."
+          }
+        }
+      }
+    },
+    "mydata.unlinked": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vincula tu expediente primero para editar tus datos."
+          }
+        }
+      }
+    },
+    "location.address": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dirección"
+          }
+        }
+      }
+    },
+    "location.town": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Municipio"
+          }
+        }
+      }
+    },
+    "location.phone": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teléfono"
+          }
+        }
+      }
+    },
+    "location.call": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Llamar al hospital"
           }
         }
       }

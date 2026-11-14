@@ -65,24 +65,37 @@ final class HospitalRulesTests: XCTestCase {
         XCTAssertNil(RoomRules.waiting(list, patientId: "p1"))
     }
 
-    func testProfileRulesValidateContactAndReason() {
-        XCTAssertTrue(PatientProfileRules.errors(phone: "7777-7777", email: "ejemplo@example.test", address: "Calle ficticia", reason: "Cambio de número").isEmpty)
-        XCTAssertTrue(PatientProfileRules.errors(phone: "", email: "", address: "", reason: "Actualización de datos").isEmpty)
-        let errors = PatientProfileRules.errors(phone: "123", email: "no", address: String(repeating: "x", count: 501), reason: "corto")
-        XCTAssertEqual(Set(errors.keys), ["phone", "email", "address", "reason"])
+    func testProfileRulesValidateContactLikeTheAPI() {
+        XCTAssertTrue(PatientProfileRules.errors(phone: "7777-7777", email: "ejemplo@example.test", address: "Calle ficticia").isEmpty)
+        XCTAssertTrue(PatientProfileRules.errors(phone: "", email: "", address: "").isEmpty)
+        XCTAssertNotNil(PatientProfileRules.errors(phone: "5777-7777", email: "", address: "")["phone"])
+        let errors = PatientProfileRules.errors(phone: "123", email: "no", address: String(repeating: "x", count: 501))
+        XCTAssertEqual(Set(errors.keys), ["phone", "email", "address"])
     }
 
-    func testProfileBodyKeepsNamesAndOmitsEmptyContact() throws {
-        let profile = try decode(PatientProfile.self, #"{"id":"p1","record":"EXP-1","fullName":"Cuenta Ficticia","givenNames":"Cuenta","surnames":"Ficticia","sex":"femenino","version":3,"birth":"1990-01-01","dui":null,"phone":"7000-0000","email":null,"address":null}"#)
-        let body = PatientProfileRules.body(profile: profile, phone: " 7111-1111 ", email: "", address: "", reason: " Cambio de número ")
-        XCTAssertEqual(body.version, 3)
-        XCTAssertEqual(body.givenNames, "Cuenta")
-        XCTAssertEqual(body.phone, "7111-1111")
-        XCTAssertNil(body.email)
-        XCTAssertEqual(body.reason, "Cambio de número")
+    func testSelfUpdateBodySendsVersionAndClearsWithEmptyText() throws {
+        let body = PatientProfileRules.body(version: 3, phone: " 7111-1111 ", email: "", address: "Calle ficticia ")
+        XCTAssertEqual(body, PatientSelfUpdateBody(version: 3, phone: "7111-1111", email: "", address: "Calle ficticia"))
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any]
-        XCTAssertNil(json?["email"])
-        XCTAssertEqual(json?["sex"] as? String, "femenino")
+        XCTAssertEqual(Set(json?.keys.map { $0 } ?? []), ["version", "phone", "email", "address"])
+        XCTAssertEqual(json?["version"] as? Int, 3)
+        XCTAssertEqual(json?["email"] as? String, "")
+    }
+
+    func testHospitalLocationDecodesPublicContractAndBuildsLinks() throws {
+        let place = try decode(HospitalLocation.self, #"{"nombre":"Hospital Ficticio","direccion":"Calle de prueba 1","municipio":"San Salvador Centro","departamento":"San Salvador","telefono":"2222-3333","latitud":13.6929,"longitud":-89.2182}"#)
+        XCTAssertEqual(place.name, "Hospital Ficticio")
+        XCTAssertEqual(place.municipality, "San Salvador Centro")
+        XCTAssertEqual(place.latitude, 13.6929, accuracy: 0.0001)
+        XCTAssertEqual(HospitalLocationRules.callURL(place)?.absoluteString, "tel:22223333")
+        let maps = try XCTUnwrap(HospitalLocationRules.mapsURL(place, fallbackQuery: "Hospital CLIMESA")?.absoluteString)
+        XCTAssertTrue(maps.hasPrefix("https://maps.apple.com/?ll=13.6929,-89.2182"), maps)
+        XCTAssertTrue(maps.contains("q=Hospital%20Ficticio"), maps)
+    }
+
+    func testLocationFallsBackToNameSearchWithoutCoordinates() throws {
+        let url = try XCTUnwrap(HospitalLocationRules.mapsURL(nil, fallbackQuery: "Hospital CLIMESA")?.absoluteString)
+        XCTAssertEqual(url, "https://maps.apple.com/?q=Hospital%20CLIMESA")
     }
 
     func testAgendaGroupsByLocalDay() throws {
