@@ -1,10 +1,11 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
 import { channelsFor } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
+import { ProblemException } from '../platform/problem';
 import { DiagnosisDto, PrescriptionDto, VitalSignsDto } from './clinical-record.dto';
 
 type Row = Record<string, any>;
@@ -13,11 +14,12 @@ type Row = Record<string, any>;
 export class ClinicalRecordService {
   constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
 
-  private async consultation(c: PoolClient, actor: Actor, id: string) {
+  /** `lock` serializes clinical writes with the signature (DAT-04): both take the consultation row FOR UPDATE. */
+  private async consultation(c: PoolClient, actor: Actor, id: string, lock = false) {
     const row = (await c.query(`SELECT k.id,k.paciente_id AS "patientId",k.medico_id AS "doctorId",k.cita_id AS "appointmentId",
       k.motivo AS reason,k.examen_fisico AS "physicalExam",k.plan,k.estado AS state,k.version,
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName"
-      FROM atencion.consulta k JOIN pacientes.paciente p ON p.id=k.paciente_id WHERE k.id=$1`, [id])).rows[0] as Row | undefined;
+      FROM atencion.consulta k JOIN pacientes.paciente p ON p.id=k.paciente_id WHERE k.id=$1 ${lock ? 'FOR UPDATE OF k' : ''}`, [id])).rows[0] as Row | undefined;
     if (!row) throw new NotFoundException('No se encontró la consulta.');
     const ownPatient = actor.patientId && actor.patientId === row.patientId;
     const ownDoctor = actor.staffId && actor.staffId === row.doctorId;
@@ -42,7 +44,9 @@ export class ClinicalRecordService {
   async addVitalSigns(actor: Actor, id: string, dto: VitalSignsDto, key?: string) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
     return this.commands.run(actor, 'signos.registrar', key, dto, async c => {
-      const consultation = await this.consultation(c, actor, id);
+      const consultation = await this.consultation(c, actor, id, true);
+      // F-04: vital signs belong to the note; once signed they are rejected like any other change.
+      if (consultation.state !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y no admite signos nuevos.');
       const row = (await c.query(`INSERT INTO atencion.signos_vitales(paciente_id,consulta_id,admision_id,tomado_por,pa_sistolica,pa_diastolica,fc,fr,temperatura,sat_o2,peso_kg,talla_cm)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id,tomado_en AS "takenAt"`, [consultation.patientId,id,dto.admissionId ?? null,actor.staffId,dto.systolic ?? null,dto.diastolic ?? null,dto.heartRate ?? null,dto.respiratoryRate ?? null,dto.temperature ?? null,dto.oxygenSaturation ?? null,dto.weightKg ?? null,dto.heightCm ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: 'signos.registrar', entity: 'signos_vitales', entityId: row.id, patientId: consultation.patientId, permission: 'signos.registrar', detail: { consultationId: id } });
@@ -54,8 +58,8 @@ export class ClinicalRecordService {
   async addDiagnosis(actor: Actor, id: string, dto: DiagnosisDto, key?: string) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
     return this.commands.run(actor, 'consulta.registrar', key, dto, async c => {
-      const consultation = await this.consultation(c, actor, id);
-      if (consultation.state !== 'abierta') throw new ConflictException('La consulta ya está firmada y no admite diagnósticos nuevos.');
+      const consultation = await this.consultation(c, actor, id, true);
+      if (consultation.state !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y no admite diagnósticos nuevos.');
       const code = dto.code.trim().toUpperCase();
       const cie10 = (await c.query('SELECT codigo,descripcion FROM atencion.cie10 WHERE codigo=$1', [code])).rows[0] as Row | undefined;
       if (!cie10) throw new NotFoundException('El código CIE-10 no existe en el catálogo.');
@@ -71,8 +75,8 @@ export class ClinicalRecordService {
   async addPrescription(actor: Actor, id: string, dto: PrescriptionDto, key?: string) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
     return this.commands.run(actor, 'recetas.emitir', key, dto, async c => {
-      const consultation = await this.consultation(c, actor, id);
-      if (consultation.state !== 'abierta') throw new ConflictException('La consulta ya está firmada y no admite recetas nuevas.');
+      const consultation = await this.consultation(c, actor, id, true);
+      if (consultation.state !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y no admite recetas nuevas.');
       const prescription = (await c.query(`INSERT INTO atencion.receta(consulta_id) VALUES($1) RETURNING id,emitida_en AS "issuedAt"`, [id])).rows[0];
       const items: Row[] = [];
       for (const item of dto.items) {
