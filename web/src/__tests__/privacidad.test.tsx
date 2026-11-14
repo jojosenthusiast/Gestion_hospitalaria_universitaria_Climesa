@@ -70,11 +70,10 @@ describe('W31 · solicitar acceso excepcional', () => {
     expect(await screen.findByText(/Solicitud enviada/)).toBeTruthy();
   });
 
-  it('el módulo se abre con cualquiera de los dos permisos y no con otros', () => {
+  it('el menú ya no tiene el módulo de accesos excepcionales aunque la cuenta conserve esos permisos', () => {
     const ids = (codes: string[]) => visibleModules(profile(codes)).map(m => m.id);
-    expect(ids(['privacidad.solicitar_acceso'])).toContain('privacidad');
-    expect(ids(['privacidad.aprobar_acceso'])).toContain('privacidad');
-    expect(ids(['auditoria.ver'])).not.toContain('privacidad');
+    expect(ids(['privacidad.solicitar_acceso', 'privacidad.aprobar_acceso'])).not.toContain('privacidad');
+    expect(ids(['auditoria.ver'])).toContain('auditoria');
   });
 });
 

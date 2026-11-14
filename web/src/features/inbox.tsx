@@ -1,5 +1,5 @@
 import { Icon } from '../components/ui';
-import { can, type AccessProfile, type Api, type Appointment, type ExceptionalAccess } from '../lib/api';
+import { can, type AccessProfile, type Api, type Appointment } from '../lib/api';
 import type { AmbulanceStatus } from './ambulance';
 import type { LinkRequest } from './account-links';
 import { useData } from './common';
@@ -15,7 +15,6 @@ const items: Item[] = [
   { id: 'ambulancia', permission: 'ambulancia.ver_estado', label: 'Solicitudes de ambulancia por confirmar', href: '#/ambulancia', path: '/ambulancia', count: ((status: AmbulanceStatus) => status.pendingRequests?.length ?? -1) as Item['count'] },
   { id: 'admisiones', permission: 'admision.ver', label: 'Admisiones sin cama', href: '#/hospitalizacion', path: '/admisiones', count: ((rows: { state: string }[]) => rows.filter(r => r.state === 'pendiente_cama').length) as Item['count'] },
   { id: 'laboratorio', permission: 'laboratorio.ver_cola', label: 'Órdenes de laboratorio en cola', href: '#/laboratorio', path: '/laboratorio/ordenes', count: ((rows: { state: string }[]) => rows.filter(r => ['pendiente', 'en_proceso'].includes(r.state)).length) as Item['count'] },
-  { id: 'accesos', permission: 'privacidad.aprobar_acceso', label: 'Accesos excepcionales por aprobar', href: '#/privacidad', path: '/accesos-excepcionales?estado=pendiente', count: ((rows: ExceptionalAccess[]) => rows.length) as Item['count'] },
 ];
 
 export const inboxItems = (profile: AccessProfile) => items.filter(item => can(profile, item.permission));

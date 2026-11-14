@@ -84,12 +84,14 @@ describe('entrada de menú de la ambulancia', () => {
     expect(await screen.findByText('P-000-001')).toBeTruthy();
   });
 
-  it('sin el permiso no aparece y la ruta queda restringida', () => {
+  it('sin el permiso no aparece en el menú y la ruta vuelve a Inicio sin pedir datos', () => {
     const api = apiWith(free);
+    location.hash = '#/ambulancia';
     render(<HospitalShell api={api} profile={profile(['pacientes.buscar'])} onLogout={() => undefined} />);
     expect(screen.queryByRole('link', { name: 'Ambulancia' })).toBeNull();
-    expect(screen.getByText('Sin permiso')).toBeTruthy();
-    expect(api.request).not.toHaveBeenCalled();
+    expect(screen.queryByText('Sin permiso')).toBeNull();
+    expect(location.hash).toBe('#/inicio');
+    expect(api.request).not.toHaveBeenCalledWith('/ambulancia', expect.anything());
   });
 });
 describe('mantenimiento de la unidad (POST /ambulancia/mantenimiento)', () => {

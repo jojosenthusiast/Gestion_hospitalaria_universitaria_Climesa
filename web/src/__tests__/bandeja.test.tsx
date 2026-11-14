@@ -13,7 +13,6 @@ const respuestas: Record<string, unknown> = {
   '/ambulancia': { unit: { id: 'a', plate: 'P-0', state: 'disponible', version: 1 }, activeService: null, paramedicOnDuty: true, pendingRequests: [{ id: 'r-1' }] },
   '/admisiones': [{ state: 'pendiente_cama' }, { state: 'hospitalizado' }, { state: 'pendiente_cama' }],
   '/laboratorio/ordenes': [{ state: 'pendiente' }, { state: 'completado' }],
-  '/accesos-excepcionales?estado=pendiente': [{ id: 'x-1' }],
 };
 const montar = (permissions: string[]) => {
   const api = { request: vi.fn(async (path: string) => respuestas[path]), write: vi.fn() } as unknown as Api & { request: ReturnType<typeof vi.fn> };
@@ -32,10 +31,9 @@ describe('bandeja de inicio de trabajo (W04)', () => {
     expect(screen.queryByText(/laboratorio/)).toBeNull();
   });
 
-  it('Laboratorio ve su cola y Protección de datos los accesos por aprobar', async () => {
-    montar(['laboratorio.ver_cola', 'privacidad.aprobar_acceso']);
+  it('Laboratorio ve su cola', async () => {
+    montar(['laboratorio.ver_cola']);
     await vi.waitFor(async () => expect((await contador('Órdenes de laboratorio en cola')).textContent).toMatch(/^1/));
-    expect((await contador('Accesos excepcionales por aprobar')).textContent).toMatch(/^1/);
   });
 
   it('sin permisos de trabajo no muestra la bandeja ni pide datos', () => {

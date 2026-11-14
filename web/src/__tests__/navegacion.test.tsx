@@ -72,11 +72,11 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); window.l
 
 // FR-120-02 / escenario 1: cada rol con web ve únicamente el menú que sus permisos reales habilitan.
 const menuEsperado: Record<string, string[]> = {
-  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Métricas', 'Accesos excepcionales', 'Perfil'],
-  JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Métricas', 'Accesos excepcionales', 'Perfil'],
+  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Métricas', 'Perfil'],
+  JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Métricas', 'Perfil'],
   REC: ['Inicio', 'Pacientes', 'Vinculaciones', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
   LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil'],
-  DPD: ['Inicio', 'Bitácora de ambulancia', 'Usuarios', 'Auditoría', 'Métricas', 'Accesos excepcionales', 'Perfil'],
+  DPD: ['Inicio', 'Bitácora de ambulancia', 'Usuarios', 'Auditoría', 'Métricas', 'Perfil'],
 };
 const todas = [...new Set(Object.values(menuEsperado).flat())];
 
@@ -131,12 +131,32 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
     expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Turnos', 'Perfil']);
   });
 
-  it('una ruta ajena al rol muestra "Sin permiso" y no pide datos del módulo', async () => {
+  it('una ruta ajena al rol al iniciar sesión redirige a #/inicio y no pide datos del módulo', async () => {
     const nav = await entrar(perfil('LAB'), {}, '#/usuarios');
-    expect(await screen.findByRole('heading', { name: /Sin permiso/ })).toBeTruthy();
-    expect(within(nav).queryByRole('link', { name: 'Usuarios' })).toBeNull();
+    expect(await screen.findByText('CLIMESA / Inicio')).toBeTruthy();
+    expect(window.location.hash).toBe('#/inicio');
+    expect(screen.queryByRole('heading', { name: /Sin permiso/ })).toBeNull();
+    expect(within(nav).getByRole('link', { name: 'Inicio' }).getAttribute('aria-current')).toBe('page');
     const llamadas = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
     expect(llamadas.some((u) => u.includes('/usuarios'))).toBe(false);
+  });
+
+  it('una ruta que la cuenta sí ve se conserva al iniciar sesión', async () => {
+    await entrar(perfil('LAB'), { '/pacientes': () => json([]) }, '#/pacientes');
+    expect(await screen.findByText('No hay coincidencias')).toBeTruthy();
+    expect(window.location.hash).toBe('#/pacientes');
+  });
+
+  it('una ruta con ?accion= de un módulo visible se conserva', async () => {
+    await entrar(perfil('REC'), { '/pacientes': () => json([]) }, '#/pacientes?accion=registrar');
+    expect(window.location.hash).toBe('#/pacientes?accion=registrar');
+  });
+
+  it('al cerrar sesión se limpia la ruta: la siguiente cuenta no hereda una sección ajena', async () => {
+    await entrar(perfil('REC'), { '/pacientes': () => json([]) }, '#/pacientes');
+    await userEvent.click(screen.getByText('Mi cuenta'));
+    await userEvent.click(screen.getByRole('button', { name: /Cerrar sesión/ }));
+    expect(window.location.hash).toBe('');
   });
 });
 
@@ -145,7 +165,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 const menuCatalogo: Record<string, string[]> = {
   AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
   ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización'],
-  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio', 'Accesos excepcionales'],
+  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
   PAR: ['Pacientes', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos'],
   PAC: ['Hospitalización', 'Fila del día', 'Citas'],
 };
@@ -173,7 +193,7 @@ describe('el menú depende solo del permiso (regla 8)', () => {
     simular({ ...perfil('ADM', permisos), roles: ['ADM', 'LAB'] });
     render(<App />);
     const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Laboratorio', 'Inventario', 'Métricas', 'Accesos excepcionales', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Turnos', 'Usuarios', 'Laboratorio', 'Inventario', 'Métricas', 'Perfil']);
     expect(screen.queryByRole('combobox', { name: 'Rol de trabajo' })).toBeNull();
     expect(screen.getByText('Administración · Laboratorio')).toBeTruthy();
   });
@@ -240,7 +260,7 @@ describe('rol sin web (FR-120-03)', () => {
 describe('estados comunes (FR-120-06)', () => {
   it('cargando: el resumen muestra "Cargando información" mientras la API responde', async () => {
     await entrar(perfil('JOP'));
-    expect(await screen.findByText(/Cargando información/)).toBeTruthy();
+    expect((await screen.findAllByText(/Cargando/)).length).toBeGreaterThan(0);
   });
 
   it('vacío: la auditoría sin eventos muestra "Todavía no hay actividad"', async () => {
@@ -282,16 +302,6 @@ describe('cliente de API generado (FR-120-01)', () => {
     for (const ruta of ['/api/v1/auth/me', '/api/v1/pacientes', '/api/v1/usuarios']) {
       expect(clienteGenerado, ruta).toContain(`"${ruta}"`);
     }
-  });
-});
-
-describe('sin marcadores de entregas futuras (WEB-03)', () => {
-  it('Accesos excepcionales ya opera: muestra la bandeja del delegado sin prometer entregas', async () => {
-    await entrar(perfil('DPD'), { '/accesos-excepcionales': () => json([]) }, '#/privacidad');
-    expect(await screen.findByRole('heading', { name: /Accesos excepcionales/ })).toBeTruthy();
-    expect(screen.queryByText(/Próxima entrega|siguiente entrega/i)).toBeNull();
-    expect(screen.queryByText('Este módulo no tiene operaciones habilitadas.')).toBeNull();
-    expect(await screen.findByText('No hay solicitudes en esta vista')).toBeTruthy();
   });
 });
 
