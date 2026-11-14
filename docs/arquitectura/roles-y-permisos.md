@@ -240,8 +240,12 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| POST | `/api/v1/admisiones` | `admision.crear` | Origen: consulta, emergencia, ambulancia, programada | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/admisiones` | `admision.crear` | Origen cita, consulta, emergencia o ambulancia enlazado a un registro del paciente; motivo obligatorio; médico con turno; cama opcional para ingreso inmediato | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/admisiones` | `admision.ver` |  | R | 4 | · | ✔ | ✔ | · | área | relación | · | · | · | propio |
+| GET | `/api/v1/admisiones/origenes` | `admision.crear` | Registros recientes del paciente (cita, consulta, emergencia, ambulancia) | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
+| GET | `/api/v1/admisiones/medicos-disponibles` | `admision.crear` | Médicos con turno en el instante de ingreso; el resto con su motivo | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
+| GET | `/api/v1/admisiones/mapa-camas` | `admision.crear` | Camas por planta y habitación con compatibilidad (sexo, aislamiento, categoría) | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
+| GET | `/api/v1/admisiones/factibilidad` | `admision.crear` | Comprobación previa sin escribir | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/admisiones/{id}/sugerencias-cama` | `camas.asignar` | Algoritmo D-036 | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/admisiones/{id}/cama` | `camas.asignar` | Exclusión en base de datos | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/admisiones/{id}/autorizar` | `admision.autorizar` | Motivo | E | 4 | · | ✔ | · | · | · | · | · | · | · | · |
