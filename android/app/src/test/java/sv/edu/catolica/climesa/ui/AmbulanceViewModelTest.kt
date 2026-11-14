@@ -95,6 +95,29 @@ class AmbulanceViewModelTest {
         assertEquals("2026-11-15T14:25:00Z", JSONObject(sent[1]).getString("estimatedArrival"))
     }
 
+    @Test fun elReporteEnColaYElFormularioSobrevivenAQueSeCierreLaApp() = runTest(dispatcher) {
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("borradores").toFile())
+        val api = FakeGateway(); api.responses["/ambulancia"] = status(withService = true)
+        api.failures["/ambulancia/servicios/s1/prehospital"] = AuthRequestException("Sin conexión.")
+        val first = AmbulanceViewModel(api, AmbulanceBus(), store)
+        first.bindUser("par-1"); first.open(AmbulanceMode.STATUS); runCurrent()
+        first.updatePrehospital(PrehospitalForm(reason = "Dolor torácico", heartRate = "110"), "s1")
+        first.sendPrehospital("s1", Instant.parse("2026-11-15T14:10:00Z")); runCurrent()
+        assertNotNull(first.state.value.queued)
+
+        // Process death: a new ViewModel for the same user gets the queued report and the typed form back.
+        val again = AmbulanceViewModel(api, AmbulanceBus(), store)
+        again.bindUser("par-1")
+        assertEquals(first.state.value.queued, again.state.value.queued)
+        again.restorePrehospital("s1")
+        assertEquals("Dolor torácico", again.state.value.prehospital.reason)
+        api.failures.clear()
+        again.retryQueued(); runCurrent()
+        assertNull(again.state.value.queued)
+        assertNull(store.load("par-1", sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_QUEUE))
+        assertNull(store.load("par-1", sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_FORM))
+    }
+
     @Test fun elPacienteProvisionalSeVinculaEnElSiguienteReporte() = runTest(dispatcher) {
         val api = FakeGateway(); api.responses["/ambulancia"] = status(withService = true)
         api.responses["/pacientes/busquedas"] = JSONObject().put("token", "t1")
