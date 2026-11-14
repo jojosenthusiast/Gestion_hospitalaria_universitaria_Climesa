@@ -161,20 +161,24 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
 }
 @Composable private fun PatientDetail(p:Patient,state:ReceptionState,model:ReceptionViewModel) {
     var dialog by remember(p.id) {mutableStateOf(false)}
+    var tab by rememberSaveable(p.id) {mutableStateOf(0)}
+    val gaps=sv.edu.catolica.climesa.domain.PatientCompleteness.gaps(p)
     var reason by remember(p.id) {mutableStateOf("")}
     LaunchedEffect(p.version) {dialog=false;reason=""}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {Surface(color=BrandBlue,shape=MaterialTheme.shapes.large) {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("EXPEDIENTE ${p.record}",style=MaterialTheme.typography.labelSmall,color=Color(0xFFD4D9FF));Text(p.fullName,style=MaterialTheme.typography.titleLarge,color=Color.White);Text(if(p.active) "Activo" else "Inactivo",style=MaterialTheme.typography.bodySmall,color=StateFree)}}}
-        item {ClimesaCard {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
+        item {androidx.compose.material3.TabRow(selectedTabIndex=tab) {listOf(R.string.pac_ficha_datos,R.string.pac_ficha_cambios).forEachIndexed {i,id->androidx.compose.material3.Tab(selected=tab==i,onClick={tab=i},text={Text(stringResource(id))})}}}
+        if(tab==0) item {Text(if(gaps.isEmpty()) stringResource(R.string.pac_ficha_completa) else stringResource(R.string.pac_ficha_faltan,gaps.joinToString(", ")),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        if(tab==0) item {ClimesaCard {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
             Value("DUI",p.dui ?: "Sin documento registrado");Value("Nacimiento",p.birth?.toString() ?: "No registrado");Value("Sexo",p.sex.label);Value("Teléfono",p.phone.ifBlank {"No registrado"})
         }}}
-        item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) ClimesaButton("Editar datos",Icons.Default.Edit,{model.edit(p)})
+        if(tab==0) item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) ClimesaButton("Editar datos",Icons.Default.Edit,{model.edit(p)})
             if(PatientAction.CHANGE_STATUS in state.actions) ClimesaButton(if(p.active) "Inactivar paciente" else "Reactivar paciente",Icons.Default.ToggleOff,{dialog=true},enabled=!state.saving,outlined=true)}}
-        item {Text("Historial de actividad",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
+        if(tab==1) item {Text("Historial de actividad",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         val events=state.registry.audit.filter {it.record==p.record}.reversed()
-        if(events.isEmpty()) item {Text("Ficha de ejemplo. Todavía no tiene cambios.")}
-        items(events) {AuditRow(it)}
-        item {Text("Los cambios de esta ficha se conservan en el historial.",style=MaterialTheme.typography.bodySmall)}
+        if(tab==1&&events.isEmpty()) item {Text("Ficha de ejemplo. Todavía no tiene cambios.")}
+        if(tab==1) items(events) {AuditRow(it)}
+        if(tab==1) item {Text("Los cambios de esta ficha se conservan en el historial.",style=MaterialTheme.typography.bodySmall)}
     }
     if(dialog) AlertDialog(onDismissRequest={if(!state.saving)dialog=false},title={Text(if(p.active) "Inactivar paciente" else "Reactivar paciente")},
         text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("La ficha y su historial se conservan.");OutlinedTextField(reason,{reason=it.take(500)},label={Text("Motivo")},supportingText={Text("Mínimo 10 caracteres")})}},

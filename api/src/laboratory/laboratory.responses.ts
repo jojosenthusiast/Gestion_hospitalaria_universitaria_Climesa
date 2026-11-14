@@ -40,6 +40,11 @@ export class LabOrderResponse {
   @DateTimeProp({ nullable: true }) reviewedAt!: string | null;
   @IntProp() version!: number;
   @StrProp({ nullable: true }) patientName!: string | null;
+  @StrProp({ nullable: true, description: 'Número de expediente' }) patientRecord!: string | null;
+  @StrProp({ nullable: true }) patientSex!: string | null;
+  @IntProp({ nullable: true, description: 'Edad exacta; solo con permiso de ver la fecha de nacimiento' }) patientAge!: number | null;
+  @StrProp({ nullable: true, description: 'Decenio de edad («30-39») para quien solo ve el rango' }) patientAgeRange!: string | null;
+  @StrProp({ nullable: true, description: 'Médico que ordenó los estudios' }) doctorName!: string | null;
   @ClassArrayProp(LabOrderItemResponse) items!: LabOrderItemResponse[];
 }
 

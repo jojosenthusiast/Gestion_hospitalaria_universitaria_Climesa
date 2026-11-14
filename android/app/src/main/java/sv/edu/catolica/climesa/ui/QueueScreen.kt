@@ -30,6 +30,12 @@ import sv.edu.catolica.climesa.domain.QueueFlow
 import sv.edu.catolica.climesa.domain.QueueLabels
 import sv.edu.catolica.climesa.domain.QuickAction
 import sv.edu.catolica.climesa.domain.QueueTicket
+import sv.edu.catolica.climesa.domain.QueueBoard
+import sv.edu.catolica.climesa.domain.QueueColumn
+import sv.edu.catolica.climesa.domain.SlaLevel
+import sv.edu.catolica.climesa.domain.elapsedText
+import androidx.compose.ui.res.stringResource
+import sv.edu.catolica.climesa.R
 
 @Composable
 fun QueueScreen(
@@ -45,6 +51,9 @@ fun QueueScreen(
     val canIssue = "fila.emitir" in profile.permissions
     val canCall = "fila.llamar" in profile.permissions
     val canManage = "fila.gestionar" in profile.permissions
+    val readOnly = !canIssue && !canCall && !canManage
+    var service by rememberSaveable { mutableStateOf<String?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { model.load() }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     // A dashboard asked to "issue a number" or "call next": open the matching dialog once the day's queue is loaded.
@@ -74,24 +83,47 @@ fun QueueScreen(
             state.error != null && state.tickets.isEmpty() -> item { ErrorState(state.error, onRetry = { model.clearMessages(); model.load() }) }
             state.tickets.isEmpty() -> item { EmptyState("No hay números emitidos hoy.") }
             else -> {
+                if (readOnly) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.fila_solo_lectura)) }
+                // The clock is read when the board is drawn; every realtime event redraws it, no timers.
+                val now = System.currentTimeMillis()
+                val visible = QueueBoard.visible(state.tickets, service, query)
+                val summary = QueueBoard.summary(visible, now)
+                item { LiveSearchField(query, { query = it }, stringResource(R.string.fila_buscar)) }
+                item { ChipRow(listOf(Triple<String?, String, Int?>(null, stringResource(R.string.fila_todos), state.tickets.size)) + QueueLabels.services.map { (value, label) -> Triple<String?, String, Int?>(value, label, state.tickets.count { it.service == value }) }, service) { service = it } }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        StatTile(state.tickets.count { it.state == "en_espera" }.toString(), QueueLabels.state("en_espera"), Modifier.weight(1f))
-                        StatTile(state.tickets.count { it.state == "llamado" || it.state == "en_atencion" }.toString(), "En proceso", Modifier.weight(1f))
-                        StatTile(state.tickets.size.toString(), "Emitidos", Modifier.weight(1f))
+                        StatTile((summary.counts[QueueColumn.WAITING] ?: 0).toString(), QueueColumn.WAITING.label, Modifier.weight(1f))
+                        StatTile((summary.counts[QueueColumn.CALLED] ?: 0).toString(), QueueColumn.CALLED.label, Modifier.weight(1f))
                     }
                 }
-                items(state.tickets, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, canManage, state.busy, model) }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        StatTile((summary.counts[QueueColumn.IN_ATTENTION] ?: 0).toString(), QueueColumn.IN_ATTENTION.label, Modifier.weight(1f))
+                        StatTile((summary.counts[QueueColumn.CLOSED] ?: 0).toString(), QueueColumn.CLOSED.label, Modifier.weight(1f))
+                    }
+                }
+                item { Text(stringResource(R.string.fila_espera_promedio, elapsedText(summary.averageWait), elapsedText(summary.longestWait)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (visible.isEmpty()) item { EmptyState(stringResource(R.string.listas_sin_coincidencias), detail = stringResource(R.string.listas_sin_coincidencias_detalle)) }
+                QueueColumn.entries.forEach { column ->
+                    val inColumn = QueueBoard.sorted(visible.filter { QueueBoard.column(it) == column })
+                    if (inColumn.isNotEmpty()) {
+                        item(key = "h-${column.name}") { Text("${column.label} (${inColumn.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
+                        items(inColumn, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, canManage, state.busy, model, now) }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, busy: Boolean, model: QueueViewModel) {
+private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, busy: Boolean, model: QueueViewModel, now: Long) {
     SectionCard("N.º ${ticket.number}", eyebrow = QueueLabels.service(ticket.service), action = { OperacionStatusTag(ticket.state, label = QueueLabels.state(ticket.state)) }) {
         Text(ticket.patientName, style = MaterialTheme.typography.bodyLarge)
         Text("Llamados: ${ticket.calls}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        QueueBoard.waitMinutes(ticket, now)?.takeIf { QueueBoard.waitLevel(ticket, now) != SlaLevel.NONE }?.let { minutes ->
+            Text(stringResource(R.string.fila_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(QueueBoard.waitLevel(ticket, now)))
+        }
         if (canCall && ticket.state in listOf("en_espera", "llamado")) SecondaryButton(if (ticket.state == "llamado") "Llamar de nuevo" else "Llamar", { model.call(ticket) }, icon = Icons.Default.Phone, enabled = !busy)
         if (canManage && ticket.state == "llamado") PrimaryButton("Atender", { model.attend(ticket) }, enabled = !busy)
         if (canManage && ticket.state == "en_atencion") PrimaryButton("Completar", { model.complete(ticket) }, enabled = !busy)

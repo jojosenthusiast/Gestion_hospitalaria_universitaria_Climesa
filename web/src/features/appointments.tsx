@@ -1,5 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Field, Icon, Notice } from '../components/ui';
+import { ExportMenu } from '../components/export-menu';
+import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
+import { APPOINTMENT_STATE_TONE, addDays, dayKey, dayLabel, groupAgenda, minutesBetween, timeRange, weekOf } from './listas/schedule';
+import './listas/lists.css';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
 import { useQuickAction } from './personal/accion';
 import { can, type AccessProfile, type Api, type Appointment } from '../lib/api';
@@ -18,6 +22,11 @@ type CatalogDoctor = { id: string; givenNames: string; surnames: string; special
 type PickerPatient = { items: { id: string; record: string; fullName: string; age?: number | null }[]; hasMore: boolean };
 const timeOnly = (value: string) => new Intl.DateTimeFormat('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/El_Salvador' }).format(new Date(value));
 
+type Range = 'todas' | 'hoy' | 'semana' | 'dia';
+const todayKey = () => dayKey(new Date().toISOString());
+const STATE_FILTERS = [['activas', 'Activas'], ['solicitada', 'Solicitadas'], ['confirmada', 'Confirmadas'], ['atendida', 'Atendidas'], ['cancelada', 'Canceladas'], ['todas', 'Todas']] as const;
+const isLive = (state: string) => state === 'solicitada' || state === 'confirmada';
+
 export function AppointmentsPage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
   const data = useData<Appointment[]>(api, '/citas', version);
   const [create, setCreate] = useState(false);
@@ -25,12 +34,48 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   const [quick, consumeQuick] = useQuickAction(), canSchedule = can(profile, 'citas.agendar');
   useEffect(() => { if (quick === 'agendar' && canSchedule) setCreate(true); if (quick) consumeQuick(); }, [quick, canSchedule, consumeQuick]);
   const [selected, setSelected] = useState<Appointment | null>(null);
+  const [query, setQuery] = useState(''), [state, setState] = useState<string>('activas'), [range, setRange] = useState<Range>('todas'), [day, setDay] = useState(todayKey()), [doctor, setDoctor] = useState<PickerItem | null>(null);
   const reload = () => { setCreate(false); setSelected(null); data.refresh(); };
+  const all = data.data ?? [];
+  const window = range === 'hoy' ? { from: todayKey(), to: todayKey() } : range === 'semana' ? weekOf(day) : range === 'dia' ? { from: day, to: day } : null;
+  const rows = all.filter(a => (state === 'todas' || (state === 'activas' ? isLive(a.state) : a.state === state)) && (!doctor || a.doctorId === doctor.id)
+    && (!window || (dayKey(a.start) >= window.from && dayKey(a.start) <= window.to)) && matches(query, a.patientName, a.doctorName, a.reason));
+  const doctorItems: PickerItem[] = [...new Map(all.map(a => [a.doctorId, a.doctorName])).entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label, 'es'));
+  const stateName = (value: string) => STATE_FILTERS.find(([key]) => key === value)?.[1] ?? value;
+  const filters = [
+    ...(state !== 'activas' ? [{ key: 'estado', label: stateName(state), remove: () => setState('activas') }] : []),
+    ...(range !== 'todas' ? [{ key: 'rango', label: range === 'hoy' ? 'Hoy' : range === 'semana' ? `Semana del ${window?.from}` : `Día ${day}`, remove: () => setRange('todas') }] : []),
+    ...(doctor ? [{ key: 'medico', label: doctor.label, remove: () => setDoctor(null) }] : []),
+    ...(query.trim() ? [{ key: 'texto', label: `«${query.trim()}»`, remove: () => setQuery('') }] : []),
+  ];
+  const clear = () => { setState('activas'); setRange('todas'); setDoctor(null); setQuery(''); };
+  const agenda = groupAgenda(rows);
+  const exportTable = () => ({ filename: 'citas', title: 'Citas', subtitle: `${rows.length} citas`, columns: ['Fecha', 'Horario', 'Paciente', 'Médico', 'Estado', 'Motivo'], rows: rows.map(a => [dayLabel(dayKey(a.start)), timeRange(a.start, a.end), a.patientName, a.doctorName, stateName(a.state), a.reason ?? '']) });
   return <>
     <Heading eyebrow="Atención / Agenda" title="Citas" description="Agenda, solicitudes y cancelaciones con estados claros para cada participante."
       actions={can(profile, 'citas.agendar') && <button className="primary-button" onClick={() => setCreate(true)}><Icon name="plus" size={18} />Agendar cita</button>} />
-    <section className="data-workbench">
-      <RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Citas registradas</caption><thead><tr><th>Horario</th><th>Paciente</th><th>Médico</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td data-label="Horario"><strong>{formatDateTime(row.start)}</strong><small>{formatDateTime(row.end)}</small></td><td data-label="Paciente">{row.patientName}</td><td data-label="Médico">{row.doctorName}</td><td data-label="Estado"><Tag value={row.state} /></td><td data-label="Acción"><div className="row-actions">{can(profile, 'citas.cancelar') && ['solicitada', 'confirmada'].includes(row.state) && <button className="row-action" onClick={() => setSelected(row)}>Cancelar</button>}{can(profile, 'citas.agendar') && row.state === 'solicitada' && <button className="row-action" onClick={() => setSelected(row)}>Gestionar</button>}</div></td></tr>)}</tbody></table> : <Empty title="No hay citas en el rango actual" description="Las solicitudes o citas agendadas aparecerán aquí." />}</RemoteState>
+    <section className="data-workbench" aria-label="Agenda de citas">
+      <RemoteState state={data}>{() => <>
+        <ListToolbar trailing={<ExportMenu table={exportTable} disabled={!rows.length} />}>
+          <LiveSearch label="Buscar citas" placeholder="Paciente, médico o motivo" value={query} onChange={setQuery} />
+          <div className="cl-doctor-filter"><SearchPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} minChars={0} placeholder="Todos los médicos" emptyText="Ningún médico con citas coincide." /></div>
+        </ListToolbar>
+        <div className="cl-filter-row"><span className="cl-filter-label">Estado</span><ChipGroup label="Estado de la cita" value={state} onChange={setState} options={STATE_FILTERS.map(([value, label]) => ({ value, label, count: all.filter(a => value === 'todas' || (value === 'activas' ? isLive(a.state) : a.state === value)).length }))} />
+          <span className="cl-filter-label">Cuándo</span><ChipGroup label="Rango de fechas" value={range} onChange={setRange} options={[{ value: 'todas', label: 'Todas' }, { value: 'hoy', label: 'Hoy' }, { value: 'semana', label: 'Semana' }, { value: 'dia', label: 'Un día' }]} />
+          {(range === 'dia' || range === 'semana') && <span className="cl-day-nav"><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana anterior' : 'Día anterior'} onClick={() => setDay(addDays(day, range === 'semana' ? -7 : -1))}>‹</button><Field label="Fecha de referencia" type="date" value={day} onChange={value => value && setDay(value)} /><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana siguiente' : 'Día siguiente'} onClick={() => setDay(addDays(day, range === 'semana' ? 7 : 1))}>›</button></span>}
+        </div>
+        <ActiveFilters filters={filters} onClear={clear} />
+        {rows.length ? <>
+          <p className="cl-count" aria-live="polite">{rows.length} de {all.length} citas, agrupadas por día y por médico.</p>
+          {agenda.map(group => <section className="ag-day" key={group.day} aria-label={dayLabel(group.day)}><h3>{dayLabel(group.day)}</h3>
+            {group.doctors.map(d => <div className="ag-doctor" key={d.doctorId}><header><strong><Icon name="steth" size={16} /> {d.doctorName}</strong><small>{d.items.length} cita(s)</small></header>
+              {d.items.map(row => <div className={`ag-slot tone-${APPOINTMENT_STATE_TONE[row.state] ?? 'info'}`} key={row.id}>
+                <span className="ag-time">{timeRange(row.start, row.end)}<small>{minutesBetween(row.start, row.end)} min</small></span>
+                <span><strong>{row.patientName}</strong>{row.reason && <small className="muted"> · {row.reason}</small>}</span>
+                <Tag value={row.state} />
+                <div className="row-actions">{can(profile, 'citas.cancelar') && ['solicitada', 'confirmada'].includes(row.state) && <button className="row-action" aria-label={`Cancelar la cita de ${row.patientName}`} onClick={() => setSelected(row)}>Cancelar</button>}{can(profile, 'citas.agendar') && row.state === 'solicitada' && <button className="row-action" aria-label={`Gestionar la solicitud de ${row.patientName}`} onClick={() => setSelected(row)}>Gestionar</button>}</div></div>)}</div>)}</section>)}</>
+          : <Empty title={all.length ? 'Ninguna cita coincide con los filtros' : 'No hay citas en el rango actual'} description={all.length ? 'Quita algún filtro o cambia el rango.' : 'Las solicitudes o citas agendadas aparecerán aquí.'} />}
+      </>}</RemoteState>
     </section>
     {create && <AppointmentForm api={api} version={version} onClose={() => setCreate(false)} onSaved={reload} />}
     {selected && <AppointmentAction api={api} appointment={selected} canManage={can(profile, 'citas.agendar')} onClose={() => setSelected(null)} onSaved={reload} />}

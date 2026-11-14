@@ -102,7 +102,7 @@ fun PatientAppointmentsScreen(
 private fun AppointmentCard(appointment: PatientAppointment, onCancel: () -> Unit) {
     SectionCard(appointment.doctorName.ifBlank { "Médico asignado" }) {
         StatusPill(StatusCatalogPaciente.label(appointment.state), StatusCatalogPaciente.tone(appointment.state))
-        LabeledValue("Horario", "${formatAppointmentDateTime(appointment.start)} — ${formatTime(appointment.end)}")
+        LabeledValue("Horario", "${sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start))} · ${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end)}")
         appointment.reason?.let { LabeledValue("Motivo", it) }
         if (appointment.state == "solicitada" || appointment.state == "confirmada") {
             SecondaryButton("Cancelar", onCancel, icon = Icons.Default.Cancel)

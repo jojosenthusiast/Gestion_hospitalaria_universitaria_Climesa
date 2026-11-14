@@ -20,6 +20,7 @@ import sv.edu.catolica.climesa.domain.LaboratoryItem
 import sv.edu.catolica.climesa.domain.LaboratoryOrder
 import sv.edu.catolica.climesa.domain.LaboratoryResult
 import sv.edu.catolica.climesa.domain.RealtimeSignal
+import sv.edu.catolica.climesa.domain.parseMillis
 
 data class LaboratoryState(val loading: Boolean = true, val orders: List<LaboratoryOrder> = emptyList(), val busy: Boolean = false, val error: String? = null, val notice: String? = null)
 
@@ -87,7 +88,12 @@ class LaboratoryViewModel @Inject constructor(private val api: ApiGateway, realt
                 val result = item.optJSONObject("result")?.let { LaboratoryResult(if (it.isNull("value")) null else it.optDouble("value"), it.optString("text").takeIf(String::isNotBlank), it.optString("mark"), it.optInt("version", 1)) }
                 LaboratoryItem(item.optString("id"), item.optString("code"), item.optString("name"), result)
             } } } ?: emptyList()
-            LaboratoryOrder(row.optString("id"), row.optString("patientName").ifBlank { "Paciente" }, row.optString("priority"), row.optString("state"), row.optInt("version", 1), items, !row.isNull("reviewedAt"))
+            LaboratoryOrder(
+                row.optString("id"), row.optString("patientName").ifBlank { "Paciente" }, row.optString("priority"), row.optString("state"), row.optInt("version", 1), items, !row.isNull("reviewedAt"),
+                record = row.optString("patientRecord").ifBlank { null }, sex = row.optString("patientSex").ifBlank { null },
+                age = if (!row.isNull("patientAge")) "${row.optInt("patientAge")} años" else row.optString("patientAgeRange").takeIf(String::isNotBlank)?.let { "$it años" },
+                doctorName = row.optString("doctorName").ifBlank { null }, createdAtMillis = parseMillis(row.optString("createdAt")),
+            )
         } }
     }
 

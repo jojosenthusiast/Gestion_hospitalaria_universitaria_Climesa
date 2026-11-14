@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Comunes de las listas clínicas (ronda 2) -->
+    <string name="listas_buscar">Buscar</string>
+    <string name="listas_limpiar">Limpiar búsqueda</string>
+    <string name="listas_quitar_filtros">Quitar filtros</string>
+    <string name="listas_sin_coincidencias">Nada coincide con los filtros</string>
+    <string name="listas_sin_coincidencias_detalle">Quita algún filtro o cambia lo que buscas.</string>
+    <!-- Laboratorio -->
+    <string name="lab_buscar">Paciente, expediente, examen o médico</string>
+    <string name="lab_solo_urgentes">Solo urgentes</string>
+    <string name="lab_prioridad_urgente">Urgente</string>
+    <string name="lab_prioridad_rutina">Rutina</string>
+    <string name="lab_pidio">Pidió: %1$s</string>
+    <string name="lab_espera">%1$s</string>
+    <string name="lab_critico">Valor crítico</string>
+    <string name="lab_sin_datos_expediente">Sin datos del expediente</string>
+    <!-- Fila del día -->
+    <string name="fila_buscar">Número o paciente</string>
+    <string name="fila_solo_lectura">Vista de solo lectura: aquí sigues la fila; llamar y atender corresponde a Recepción, Asistencia y Medicina.</string>
+    <string name="fila_todos">Todos</string>
+    <string name="fila_nadie">Nadie por ahora.</string>
+    <string name="fila_espera_promedio">Espera promedio: %1$s · máxima %2$s</string>
+    <string name="fila_espera">Espera %1$s</string>
+    <!-- Citas -->
+    <string name="rec_citas_buscar">Paciente o médico</string>
+    <string name="citas_duracion">%1$d min</string>
+    <!-- Ficha del paciente -->
+    <string name="pac_ficha_datos">Datos</string>
+    <string name="pac_ficha_cambios">Cambios</string>
+    <string name="pac_ficha_faltan">Faltan datos: %1$s.</string>
+    <string name="pac_ficha_completa">Ficha completa para los datos que tu rol puede ver.</string>
+</resources>

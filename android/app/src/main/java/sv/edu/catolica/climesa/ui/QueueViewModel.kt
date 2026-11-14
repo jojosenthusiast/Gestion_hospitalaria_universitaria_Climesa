@@ -18,6 +18,7 @@ import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.QueueEvents
 import sv.edu.catolica.climesa.domain.QueueTicket
 import sv.edu.catolica.climesa.domain.RealtimeSignal
+import sv.edu.catolica.climesa.domain.parseMillis
 
 data class QueueState(val loading: Boolean = true, val tickets: List<QueueTicket> = emptyList(), val busy: Boolean = false, val error: String? = null, val notice: String? = null)
 
@@ -68,7 +69,7 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
 
     private fun parse(value: Any): List<QueueTicket> {
         val rows = value as? JSONArray ?: return emptyList()
-        return (0 until rows.length()).mapNotNull { index -> rows.optJSONObject(index)?.let { row -> QueueTicket(row.optString("id"), row.optString("service"), row.optInt("numero"), row.optString("patientName").ifBlank { "Paciente" }, row.optString("state"), row.optInt("llamados"), row.optInt("version", 1)) } }
+        return (0 until rows.length()).mapNotNull { index -> rows.optJSONObject(index)?.let { row -> QueueTicket(row.optString("id"), row.optString("service"), row.optInt("numero"), row.optString("patientName").ifBlank { "Paciente" }, row.optString("state"), row.optInt("llamados"), row.optInt("version", 1), parseMillis(row.optString("issuedAt"))) } }
     }
     private fun message(error: Exception) = if (error is AuthRequestException) error.message ?: "No se pudo completar la operación." else error.message ?: "No se pudo completar la operación."
 }

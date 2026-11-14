@@ -51,6 +51,7 @@ private val zone = ZoneId.of("America/El_Salvador")
 @Composable
 fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, model: ReceptionAppointmentsViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
+    var query by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels) }
     LaunchedEffect(quickAction) {
         if (quickAction == null) return@LaunchedEffect
@@ -66,13 +67,22 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
         when {
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
             state.appointments.isEmpty() -> item { EmptyState(stringResource(R.string.rec_citas_vacio), detail = stringResource(R.string.rec_citas_vacio_detalle), icon = Icons.Default.CalendarMonth) }
-            else -> items(state.appointments, key = { it.id }) { AppointmentRow(it) }
+            else -> {
+                val visible = state.appointments.filter { sv.edu.catolica.climesa.domain.matchesQuery(query, it.patientName, it.doctorName) }
+                item { LiveSearchField(query, { query = it }, stringResource(R.string.rec_citas_buscar)) }
+                if (visible.isEmpty()) item { EmptyState(stringResource(R.string.listas_sin_coincidencias), detail = stringResource(R.string.listas_sin_coincidencias_detalle)) }
+                // Por día y, dentro del día, por hora: cada cita en una sola línea con su rango "08:00 – 08:20".
+                sv.edu.catolica.climesa.domain.AppointmentAgenda.groupByDay(visible) { it.start }.forEach { (day, rows) ->
+                    item(key = "d-$day") { Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(day), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
+                    items(rows, key = { it.id }) { AppointmentRow(it) }
+                }
+            }
         }
     }
 }
 
 @Composable private fun AppointmentRow(a: ReceptionAppointment) {
-    DataRow(a.patientName.ifBlank { "Paciente" }, subtitle = "${a.doctorName} · ${formatInstant(a.start)}", status = { StatusTag(a.state) })
+    DataRow(a.patientName.ifBlank { "Paciente" }, subtitle = "${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(a.start, a.end)} · ${a.doctorName}", status = { StatusTag(a.state) })
 }
 
 @Composable

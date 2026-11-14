@@ -2822,6 +2822,15 @@ export interface components {
             reviewedAt: string | null;
             version: number;
             patientName: string | null;
+            /** @description Número de expediente */
+            patientRecord: string | null;
+            patientSex: string | null;
+            /** @description Edad exacta; solo con permiso de ver la fecha de nacimiento */
+            patientAge: number | null;
+            /** @description Decenio de edad («30-39») para quien solo ve el rango */
+            patientAgeRange: string | null;
+            /** @description Médico que ordenó los estudios */
+            doctorName: string | null;
             items: components["schemas"]["LabOrderItemResponse"][];
         };
         LabOrderDto: {

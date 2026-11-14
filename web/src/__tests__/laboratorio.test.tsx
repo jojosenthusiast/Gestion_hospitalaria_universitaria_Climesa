@@ -25,8 +25,8 @@ function montar(permissions: string[], state = 'en_proceso', write: Api['write']
 describe('Laboratorio (W20, W21)', () => {
   it('lista la orden con prioridad y fecha, sin mostrar su identificador interno', async () => {
     montar(['laboratorio.ver_cola']);
-    expect(await screen.findByText('Paciente Ficticio Dos')).toBeTruthy();
-    expect(screen.getByText('Urgente')).toBeTruthy();
+    expect((await screen.findAllByText('Paciente Ficticio Dos')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Urgente').length).toBeGreaterThan(0);
     expect(screen.queryByText(ORDER)).toBeNull();
   });
 
@@ -39,14 +39,13 @@ describe('Laboratorio (W20, W21)', () => {
 
   it('sin laboratorio.procesar no ofrece tomar muestra ni completar', async () => {
     montar(['laboratorio.ver_cola'], 'pendiente');
-    await screen.findByText('Paciente Ficticio Dos');
+    await screen.findAllByText('Paciente Ficticio Dos');
     expect(screen.queryByRole('button', { name: /Tomar muestra|Completar/ })).toBeNull();
   });
 
   it('un 409 de versión al completar ofrece recargar la orden', async () => {
     const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', vi.fn(async () => { throw new ApiError('La orden cambió.', 409, 'version_conflicto', 5); }) as Api['write']);
-    await userEvent.click(await screen.findByRole('button', { name: 'Gestionar' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Completar' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Completar' }));
     await userEvent.click(await screen.findByRole('button', { name: /Recargar la orden/ }));
     await vi.waitFor(() => expect(api.request).toHaveBeenCalledTimes(2));
   });
@@ -84,7 +83,6 @@ describe('Laboratorio (W20, W21)', () => {
     const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', undefined, orden('en_proceso', {}, false));
     const completar = await screen.findByRole('button', { name: 'Completar' }) as HTMLButtonElement;
     expect(completar.disabled).toBe(true);
-    await userEvent.click(screen.getByRole('button', { name: 'Gestionar' }));
     expect(screen.getByRole('status').textContent).toContain('0 de 1 capturados');
     expect(screen.getByText('Falta el valor')).toBeTruthy();
     expect(api.write).not.toHaveBeenCalled();
@@ -99,7 +97,7 @@ describe('Laboratorio (W20, W21)', () => {
     expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/cancelar`, { version: 4, reason: 'Duplicada por error' }, 'POST');
     cleanup();
     montar(['laboratorio.ver_cola'], 'pendiente');
-    await screen.findByText('Paciente Ficticio Dos');
+    await screen.findAllByText('Paciente Ficticio Dos');
     expect(screen.queryByRole('button', { name: 'Cancelar orden' })).toBeNull();
   });
 

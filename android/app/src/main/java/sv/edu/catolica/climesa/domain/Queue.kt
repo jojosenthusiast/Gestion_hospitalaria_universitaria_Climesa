@@ -8,6 +8,7 @@ data class QueueTicket(
     val state: String,
     val calls: Int,
     val version: Int,
+    val issuedAtMillis: Long? = null,
 )
 
 object QueueLabels {
