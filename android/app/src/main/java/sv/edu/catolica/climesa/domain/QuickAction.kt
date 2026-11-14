@@ -11,8 +11,6 @@ enum class QuickAction(val verb: String) {
     ISSUE_NUMBER("emitir"),
     CALL_NEXT("llamar"),
     ASSIGN_BED("cama"),
-    TAKE_SAMPLE("muestra"),
-    CAPTURE_RESULT("resultado"),
     DISPATCH("despachar"),
     REQUEST_AMBULANCE("solicitud"),
     ;
@@ -35,11 +33,6 @@ object QuickActions {
     private data class Entry(val label: String, val section: AndroidSection, val action: QuickAction?, val permission: String)
 
     private val catalog: Map<String, List<Entry>> = mapOf(
-        "JOP" to listOf(
-            Entry("Asignar cama", AndroidSection.ADMISSION, QuickAction.ASSIGN_BED, "camas.asignar"),
-            Entry("Ver camas", AndroidSection.BEDS, null, "camas.ver_tablero"),
-            Entry("Registrar consumo", AndroidSection.SUPPLIES, null, "inventario.mover"),
-        ),
         "REC" to listOf(
             Entry("Registrar paciente", AndroidSection.PATIENTS, QuickAction.REGISTER_PATIENT, "pacientes.registrar"),
             Entry("Agendar cita", AndroidSection.APPOINTMENTS, QuickAction.SCHEDULE_APPOINTMENT, "citas.agendar"),
@@ -59,10 +52,6 @@ object QuickActions {
             Entry("Ver mi consulta", AndroidSection.MEDICAL_DAY, null, "consulta.iniciar"),
             Entry("Revisar resultados", AndroidSection.RESULT_REVIEW, null, "laboratorio.revisar"),
             Entry("Mis hospitalizados", AndroidSection.HOSPITALIZED, null, "admision.ver"),
-        ),
-        "LAB" to listOf(
-            Entry("Tomar muestra", AndroidSection.SAMPLE, QuickAction.TAKE_SAMPLE, "laboratorio.procesar"),
-            Entry("Capturar resultado", AndroidSection.CAPTURE_RESULTS, QuickAction.CAPTURE_RESULT, "laboratorio.procesar"),
         ),
         "PAR" to listOf(
             Entry("Ver unidad", AndroidSection.SERVICE, null, "ambulancia.ver_estado"),
@@ -91,7 +80,6 @@ object QuickActions {
         QuickAction.ISSUE_NUMBER -> "fila.emitir"
         QuickAction.CALL_NEXT -> "fila.llamar"
         QuickAction.ASSIGN_BED -> "camas.asignar"
-        QuickAction.TAKE_SAMPLE, QuickAction.CAPTURE_RESULT -> "laboratorio.procesar"
         QuickAction.DISPATCH -> "ambulancia.despachar"
         QuickAction.REQUEST_AMBULANCE -> "ambulancia.solicitar"
     }

@@ -37,34 +37,34 @@ class DashboardViewModelTest {
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private val permissions = listOf("sesion.perfil", "laboratorio.ver_cola", "laboratorio.procesar", "turnos.ver", "inventario.ver")
-    private fun labOrders() = JSONArray().put(JSONObject().put("state", "pendiente").put("priority", "rutina"))
+    private val permissions = listOf("sesion.perfil", "consulta.iniciar", "laboratorio.ver_cola", "turnos.ver")
+    private fun labOrders() = JSONArray().put(JSONObject().put("state", "completado").put("priority", "rutina"))
 
     @Test fun readsOnlyTheSourcesThePermissionsAllowAndBuildsTheModel() = runTest(dispatcher) {
         val api = FakeGateway(); api.responses["/laboratorio/ordenes"] = labOrders()
         val vm = DashboardViewModel(api, DashboardBus())
-        vm.start("LAB", permissions, listOf("rol:LAB"), true); runCurrent()
+        vm.start("MED", permissions, listOf("rol:MED"), true); runCurrent()
         assertEquals(1, api.gets("/laboratorio/ordenes"))
         assertEquals(0, api.gets("/camas"))
         val model = vm.state.value.model
         assertNotNull(model)
-        assertEquals("1", model!!.kpis.first { it.label == "Solicitadas" }.value)
+        assertEquals("1", model!!.kpis.first { it.label == "Resultados por revisar" }.value)
         assertFalse(vm.state.value.loading)
     }
 
     @Test fun aFailingSourceIsReportedWithoutInventingZeros() = runTest(dispatcher) {
-        val api = FakeGateway(); api.responses["/laboratorio/ordenes"] = labOrders(); api.failures["/inventario/existencias"] = IllegalStateException("sin acceso")
+        val api = FakeGateway(); api.responses["/laboratorio/ordenes"] = labOrders(); api.failures["/consultas/agenda"] = IllegalStateException("sin acceso")
         val vm = DashboardViewModel(api, DashboardBus())
-        vm.start("LAB", permissions, listOf("rol:LAB"), true); runCurrent()
+        vm.start("MED", permissions, listOf("rol:MED"), true); runCurrent()
         val model = vm.state.value.model!!
-        assertEquals(setOf(DashboardSource.STOCK), model.unavailable)
-        assertTrue(model.kpis.none { it.label == "Reactivos bajo mínimo" })
+        assertEquals(setOf(DashboardSource.AGENDA), model.unavailable)
+        assertTrue(model.kpis.none { it.label == "Citas en mi agenda" })
     }
 
     @Test fun whenEverySourceFailsTheStateIsAnError() = runTest(dispatcher) {
         val api = FakeGateway(); api.failGets = true
         val vm = DashboardViewModel(api, DashboardBus())
-        vm.start("LAB", permissions, listOf("rol:LAB"), true); runCurrent()
+        vm.start("MED", permissions, listOf("rol:MED"), true); runCurrent()
         assertNull(vm.state.value.model)
         assertNotNull(vm.state.value.error)
     }
@@ -80,7 +80,7 @@ class DashboardViewModelTest {
     @Test fun realtimeEventsReloadSilentlyAndOnlyForRelevantEntities() = runTest(dispatcher) {
         val api = FakeGateway(); api.responses["/laboratorio/ordenes"] = labOrders(); val bus = DashboardBus()
         val vm = DashboardViewModel(api, bus)
-        vm.start("LAB", permissions, listOf("rol:LAB"), true); runCurrent()
+        vm.start("MED", permissions, listOf("rol:MED"), true); runCurrent()
         bus.signals.tryEmit(RealtimeSignal.Event(EventoDominio("paciente.actualizado", "paciente", "x", 1))); runCurrent(); advanceTimeBy(600)
         assertEquals(1, api.gets("/laboratorio/ordenes"))
         bus.signals.tryEmit(RealtimeSignal.Event(EventoDominio("laboratorio.orden_actualizada", "orden_laboratorio", "x", 2))); runCurrent(); advanceTimeBy(600); runCurrent()
@@ -91,8 +91,8 @@ class DashboardViewModelTest {
     @Test fun startingTwiceWithTheSameArgumentsDoesNotReadAgain() = runTest(dispatcher) {
         val api = FakeGateway(); api.responses["/laboratorio/ordenes"] = labOrders()
         val vm = DashboardViewModel(api, DashboardBus())
-        vm.start("LAB", permissions, listOf("rol:LAB"), true); runCurrent()
-        vm.start("LAB", permissions, listOf("rol:LAB"), true); runCurrent()
+        vm.start("MED", permissions, listOf("rol:MED"), true); runCurrent()
+        vm.start("MED", permissions, listOf("rol:MED"), true); runCurrent()
         assertEquals(1, api.gets("/laboratorio/ordenes"))
     }
 }

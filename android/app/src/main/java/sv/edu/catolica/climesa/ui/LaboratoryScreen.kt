@@ -25,8 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -46,22 +44,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sv.edu.catolica.climesa.domain.AccessProfile
-import sv.edu.catolica.climesa.domain.LaboratoryItem
 import sv.edu.catolica.climesa.domain.LaboratoryLabels
 import sv.edu.catolica.climesa.domain.AndroidSection
 import sv.edu.catolica.climesa.domain.LabFilter
 import sv.edu.catolica.climesa.domain.LabFlow
 import sv.edu.catolica.climesa.domain.LabStepStatus
 import sv.edu.catolica.climesa.domain.LaboratoryOrder
-import sv.edu.catolica.climesa.domain.QuickAction
-import sv.edu.catolica.climesa.domain.QuickActions
 import sv.edu.catolica.climesa.domain.LabStage
 import sv.edu.catolica.climesa.domain.LabWorklist
 import sv.edu.catolica.climesa.domain.elapsedText
 
 /**
- * Lab orders for the lab, the reviewing doctor and the patient. [section] picks the stage filter that opens first (sample,
- * capture, review); [quickAction] is a dashboard request ("take a sample", "capture a result") that opens the matching dialog once.
+ * Lab orders for the reviewing doctor and the patient. [section] picks the stage filter that opens first (review).
  */
 @Composable
 fun LaboratoryScreen(
@@ -69,31 +63,15 @@ fun LaboratoryScreen(
     modifier: Modifier = Modifier,
     ownResults: Boolean = false,
     section: AndroidSection? = null,
-    quickAction: QuickAction? = null,
-    onQuickActionHandled: () -> Unit = {},
     model: LaboratoryViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
-    var selected by rememberSaveable { mutableStateOf<Pair<String, String>?>(null) }
-    var sampleOrderId by rememberSaveable { mutableStateOf<String?>(null) }
     var filterName by rememberSaveable(section) { mutableStateOf(LabFlow.defaultFilter(section).name) }
     val filter = LabFilter.entries.firstOrNull { it.name == filterName } ?: LabFilter.ALL
     var query by rememberSaveable { mutableStateOf("") }
     var urgentOnly by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(ownResults) { model.path = if (ownResults) "/me/laboratorio" else "/laboratorio/ordenes"; model.load() }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
-    LaunchedEffect(quickAction, state.loading, state.orders) {
-        if (quickAction == null || state.loading) return@LaunchedEffect
-        val canProcess = QuickActions.allowed(QuickAction.TAKE_SAMPLE, profile.permissions)
-        if (quickAction == QuickAction.TAKE_SAMPLE && canProcess) LabFlow.nextToSample(state.orders)?.let { filterName = LabFilter.REQUESTED.name; sampleOrderId = it.id }
-        if (quickAction == QuickAction.CAPTURE_RESULT && canProcess) LabFlow.nextToCapture(state.orders)?.let { (order, item) -> filterName = LabFilter.IN_PROCESS.name; selected = order.id to item.id }
-        onQuickActionHandled()
-    }
-    val selectedOrder = selected?.let { key -> state.orders.firstOrNull { it.id == key.first } }
-    val selectedItem = selectedOrder?.items?.firstOrNull { it.id == selected?.second }
-    val sampleOrder = sampleOrderId?.let { id -> state.orders.firstOrNull { it.id == id } }
-    if (selectedOrder != null && selectedItem != null) LaboratoryResultDialog(selectedOrder, selectedItem, state.busy, state.error, model, { selected = null })
-    if (sampleOrder != null) LaboratorySampleDialog(sampleOrder, state.busy, state.error, model, { sampleOrderId = null })
     val retry = { model.clearMessages(); model.load() }
     PageList(modifier) {
         item { SectionIntro("Atención / Diagnóstico", "Laboratorio", stringResource(if (ownResults) R.string.lab_ayuda_paciente else R.string.lab_ayuda)) }
@@ -114,16 +92,14 @@ fun LaboratoryScreen(
                 val now = System.currentTimeMillis()
                 val visible = LabWorklist.sorted(state.orders.filter { filter.matches(it) && (!urgentOnly || LabWorklist.isUrgent(it)) && LabWorklist.matches(it, query) })
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
-                items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, profile, ownResults, state.busy, model, now, { model.clearMessages(); selected = it }, { model.clearMessages(); sampleOrderId = order.id }) }
+                items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, profile, ownResults, state.busy, model, now) }
             }
         }
     }
 }
 
 @Composable
-private fun LaboratoryOrderCard(order: LaboratoryOrder, profile: AccessProfile, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, now: Long, openResult: (Pair<String, String>) -> Unit, openSample: () -> Unit) {
-    val canProcess = "laboratorio.procesar" in profile.permissions
-    val canValidate = "laboratorio.validar" in profile.permissions
+private fun LaboratoryOrderCard(order: LaboratoryOrder, profile: AccessProfile, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, now: Long) {
     val canReview = "laboratorio.revisar" in profile.permissions
     val inReview = order.state == "completado" && !order.reviewed
     SectionCard(
@@ -141,50 +117,7 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, profile: AccessProfile, 
                 else Text(if (inReview) stringResource(R.string.lab_valor_en_revision) else stringResource(R.string.clin_lab_pendiente), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (canProcess && order.state == "pendiente") PrimaryButton("Tomar muestra", openSample, enabled = !busy)
-        if (canProcess && order.state == "en_proceso") order.items.filter { it.result == null }.forEach { item -> SecondaryButton(stringResource(R.string.clin_lab_resultado_de, item.code), { openResult(order.id to item.id) }, enabled = !busy) }
-        if (canValidate) LabFlow.completionBlocker(order)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        if (canValidate && order.state == "en_proceso") PrimaryButton("Completar", { model.complete(order) }, enabled = !busy && order.items.all { it.result != null }, loading = busy)
         if (canReview && inReview) PrimaryButton("Revisar", { model.review(order) }, enabled = !busy, loading = busy)
-    }
-}
-
-@Composable
-private fun LaboratorySampleDialog(order: LaboratoryOrder, busy: Boolean, error: String?, model: LaboratoryViewModel, onClose: () -> Unit) {
-    var expediente by rememberSaveable(order.id) { mutableStateOf("") }
-    var nombreCompleto by rememberSaveable(order.id) { mutableStateOf("") }
-    ConfirmDialog(
-        title = "Confirmar identidad",
-        confirmLabel = "Confirmar",
-        onConfirm = { model.sample(order, expediente, nombreCompleto, onClose) },
-        onDismiss = onClose,
-        message = "Confirma expediente y nombre completo antes de tomar la muestra. Al confirmar, la orden pasa a En proceso.",
-        busy = busy,
-        confirmEnabled = expediente.isNotBlank() && nombreCompleto.isNotBlank(),
-    ) {
-        error?.let { NoticeBanner(NoticeKind.ERROR, it) }
-        FormField("Número de expediente", expediente, { expediente = it })
-        FormField("Nombre completo", nombreCompleto, { nombreCompleto = it })
-    }
-}
-
-@Composable
-private fun LaboratoryResultDialog(order: LaboratoryOrder, item: LaboratoryItem, busy: Boolean, error: String?, model: LaboratoryViewModel, onClose: () -> Unit) {
-    var value by rememberSaveable(item.id) { mutableStateOf(item.result?.value?.toString().orEmpty()) }
-    var text by rememberSaveable(item.id) { mutableStateOf(item.result?.text.orEmpty()) }
-    ConfirmDialog(
-        title = stringResource(R.string.clin_lab_resultado_de, item.code),
-        confirmLabel = "Guardar",
-        onConfirm = { model.saveResult(order, item, value, text, onClose) },
-        onDismiss = onClose,
-        message = item.name,
-        busy = busy,
-        confirmEnabled = value.isNotBlank() || text.isNotBlank(),
-    ) {
-        error?.let { NoticeBanner(NoticeKind.ERROR, it) }
-        FormField("Valor numérico", value, { value = it })
-        FormField("Resultado textual", text, { text = it.take(5000) }, singleLine = false)
-        Text("La marca se calculará automáticamente según el rango vigente.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

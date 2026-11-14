@@ -106,17 +106,4 @@ class ConsultationViewModelTest {
         vm.orderLab(vm.state.value.appointments.single(), emptySet(), urgent = false); runCurrent()
         assertTrue(api.calls.none { it.first == "/laboratorio/ordenes" })
     }
-
-    @Test fun laboratorySampleDialogClosesOnlyAfterTheApiAccepts() = runTest(dispatcher) {
-        val api = FakeGateway()
-        api.failures["/laboratorio/ordenes/o1/muestra"] = AuthRequestException("La identidad no coincide.", 422)
-        val vm = LaboratoryViewModel(api, NoRealtime)
-        val order = LaboratoryOrder("o1", "Ana", "rutina", "pendiente", 2, listOf(LaboratoryItem("i1", "HB", "Hemoglobina", null)), false)
-        var closed = false
-        vm.sample(order, "EXP-1", "Ana Pérez") { closed = true }; runCurrent()
-        assertFalse(closed)
-        api.failures.clear()
-        vm.sample(order, "EXP-1", "Ana Pérez") { closed = true }; runCurrent()
-        assertTrue(closed)
-    }
 }

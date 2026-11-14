@@ -14,7 +14,5 @@ class AdaptiveNavigationLabelsTest {
 
     @Test
     fun laboratoryPrimaryLabelsAreCompact() {
-        assertEquals("Muestra", compactLabel(AndroidSection.SAMPLE))
-        assertEquals("Captura", compactLabel(AndroidSection.CAPTURE_RESULTS))
     }
 }

@@ -36,29 +36,13 @@ class LabFlowTest {
         assertTrue(LabFlow.nextStep(order("completado", reviewed = true), ownView = true).contains("puedes verlos"))
     }
 
-    @Test fun completarExigeTodosLosResultados() {
-        assertEquals("Para completar faltan 2 resultado(s) por capturar.", LabFlow.completionBlocker(order("en_proceso", items = arrayOf(item("1", false), item("2", false)))))
-        assertNull(LabFlow.completionBlocker(order("en_proceso", items = arrayOf(item("1", true)))))
-        assertNull(LabFlow.completionBlocker(order("pendiente", items = arrayOf(item("1", false)))))
-    }
-
-    @Test fun losFiltrosSeparanLasEtapasYCadaSeccionAbreEnLaSuya() {
+    @Test fun losFiltrosSeparanLasEtapasYLaRevisionAbreEnPorRevisar() {
         val orders = listOf(order("pendiente", id = "a"), order("en_proceso", id = "b"), order("completado", false, id = "c"), order("completado", true, id = "d"))
         assertEquals(listOf("a"), orders.filter(LabFilter.REQUESTED::matches).map { it.id })
         assertEquals(listOf("b"), orders.filter(LabFilter.IN_PROCESS::matches).map { it.id })
         assertEquals(listOf("c"), orders.filter(LabFilter.TO_REVIEW::matches).map { it.id })
         assertEquals(listOf("d"), orders.filter(LabFilter.RELEASED::matches).map { it.id })
-        assertEquals(LabFilter.REQUESTED, LabFlow.defaultFilter(AndroidSection.SAMPLE))
-        assertEquals(LabFilter.IN_PROCESS, LabFlow.defaultFilter(AndroidSection.CAPTURE_RESULTS))
         assertEquals(LabFilter.TO_REVIEW, LabFlow.defaultFilter(AndroidSection.RESULT_REVIEW))
-        assertEquals(LabFilter.ALL, LabFlow.defaultFilter(AndroidSection.LAB))
-    }
-
-    @Test fun laAccionRapidaTomaPrimeroLaUrgente() {
-        val orders = listOf(order("pendiente", id = "rutina"), order("pendiente", priority = "urgente", id = "urgente"))
-        assertEquals("urgente", LabFlow.nextToSample(orders)?.id)
-        assertNull(LabFlow.nextToSample(listOf(order("en_proceso"))))
-        val capture = LabFlow.nextToCapture(listOf(order("en_proceso", items = arrayOf(item("1", true), item("2", false)), id = "x")))
-        assertEquals("x" to "2", capture?.let { it.first.id to it.second.id })
+        assertEquals(LabFilter.ALL, LabFlow.defaultFilter(AndroidSection.RESULTS))
     }
 }
