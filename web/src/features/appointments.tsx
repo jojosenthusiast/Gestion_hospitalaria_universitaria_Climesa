@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Field, Icon, Notice } from '../components/ui';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
-import { useQuickAction } from '../components/use-quick-action';
+import { useQuickAction } from './personal/accion';
 import { can, type AccessProfile, type Api, type Appointment } from '../lib/api';
 import { Dialog, Empty, Heading, RemoteState, SaveButton, Select, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import './appointments.css';
@@ -22,7 +22,8 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   const data = useData<Appointment[]>(api, '/citas', version);
   const [create, setCreate] = useState(false);
   // Acción rápida del tablero: #/citas?accion=agendar abre el formulario.
-  useQuickAction('agendar', () => setCreate(true), can(profile, 'citas.agendar'));
+  const [quick, consumeQuick] = useQuickAction(), canSchedule = can(profile, 'citas.agendar');
+  useEffect(() => { if (quick === 'agendar' && canSchedule) setCreate(true); if (quick) consumeQuick(); }, [quick, canSchedule, consumeQuick]);
   const [selected, setSelected] = useState<Appointment | null>(null);
   const reload = () => { setCreate(false); setSelected(null); data.refresh(); };
   return <>

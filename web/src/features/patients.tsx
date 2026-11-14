@@ -1,6 +1,6 @@
 import { useEffect,useState,type FormEvent } from 'react';
 import { Field,Icon,Notice } from '../components/ui';
-import { useQuickAction } from '../components/use-quick-action';
+import { useQuickAction } from './personal/accion';
 import { can,type AccessProfile,type Api,type ApiError,type Patient,type PatientInput,type SearchReceipt } from '../lib/api';
 import { Dialog,Empty,Heading,RemoteState,SaveButton,Select,Tag,WriteError,formatDate,formatDateTime,isVersionConflict,useAction,useData } from './common';
 const sexNames:Record<string,string>={femenino:'Femenino',masculino:'Masculino',indeterminado:'Indeterminado',no_registrado:'No registrado'};
@@ -36,7 +36,8 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  const candidates=receipt?.candidates??initial.data??[],rows=candidates.filter(p=>filter==='todos'||(filter==='activo'?p.active:!p.active));
  const register=can(profile,'pacientes.registrar'),viewFicha=can(profile,'pacientes.ver_ficha');
  const expired=useExpired(receipt?.expiresAt),validReceipt=!!receipt&&!expired&&Date.parse(receipt.expiresAt)>Date.now();
- useQuickAction('registrar',()=>setCreating(true),register);
+ const [quick,consumeQuick]=useQuickAction();
+ useEffect(()=>{if(quick==='registrar'&&register)setCreating(true);if(quick)consumeQuick();},[quick,register,consumeQuick]);
  const done=()=>{setCreating(false);setEditing(null);setStatus(null);setReceipt(null);initial.refresh();};
  async function find(e:FormEvent){e.preventDefault();const result=await search.run<SearchReceipt>('/pacientes/busquedas',{query:query.trim()});if(result)setReceipt(result);}
  return <><Heading eyebrow="Pacientes / Registro compartido" title="Pacientes" description="Busca primero y registra solo si la persona no existe: así evitamos expedientes duplicados. Cada expediente conserva su identidad y sus cambios." actions={register&&<button className="primary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={18}/>Registrar paciente</button>}/>

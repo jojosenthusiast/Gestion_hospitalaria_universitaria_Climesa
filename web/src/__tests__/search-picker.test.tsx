@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SearchPicker, foldText, type PickerItem } from '../components/search-picker';
-import { useQuickAction } from '../components/use-quick-action';
 
 afterEach(() => { cleanup(); history.replaceState(null, '', '#/'); });
 
@@ -49,22 +48,5 @@ describe('SearchPicker', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Mostrar más/ }));
     await waitFor(() => expect(screen.getByRole('option', { name: /Dos/ })).toBeTruthy());
     expect(search).toHaveBeenLastCalledWith('un', 1);
-  });
-});
-
-describe('useQuickAction', () => {
-  function Probe({ onTrigger }: { onTrigger: () => void }) { useQuickAction('registrar', onTrigger); return null; }
-  it('atiende ?accion=registrar una vez y la borra del hash', () => {
-    history.replaceState(null, '', '#/pacientes?accion=registrar');
-    const hit = vi.fn();
-    render(<Probe onTrigger={hit} />);
-    expect(hit).toHaveBeenCalledTimes(1);
-    expect(location.hash).toBe('#/pacientes');
-  });
-  it('ignora otras acciones', () => {
-    history.replaceState(null, '', '#/pacientes?accion=agendar');
-    const hit = vi.fn();
-    render(<Probe onTrigger={hit} />);
-    expect(hit).not.toHaveBeenCalled();
   });
 });

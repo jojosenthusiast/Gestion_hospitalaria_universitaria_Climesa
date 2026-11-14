@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.PickerPatient
+import sv.edu.catolica.climesa.domain.QuickAction
 import sv.edu.catolica.climesa.domain.ReceptionAppointment
 import sv.edu.catolica.climesa.domain.SchedulingDoctor
 import java.time.Instant
@@ -48,9 +49,14 @@ private val zone = ZoneId.of("America/El_Salvador")
 
 /** A32 Citas de Recepción: lista de citas y flujo para agendar con búsqueda de paciente, médicos con/sin turno y franjas del día. */
 @Composable
-fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, model: ReceptionAppointmentsViewModel = viewModel()) {
+fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, model: ReceptionAppointmentsViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { model.load(); model.startLive(channels) }
+    LaunchedEffect(quickAction) {
+        if (quickAction == null) return@LaunchedEffect
+        if (quickAction == QuickAction.SCHEDULE_APPOINTMENT && canSchedule) model.openScheduling()
+        onQuickActionHandled()
+    }
     if (state.scheduling) { SchedulingForm(state, model, modifier); return }
     PageList(modifier) {
         item { SectionIntro(stringResource(R.string.rec_citas_eyebrow), stringResource(R.string.rec_citas_titulo), stringResource(R.string.rec_citas_detalle)) }

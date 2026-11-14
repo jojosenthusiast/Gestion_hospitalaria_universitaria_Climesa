@@ -39,6 +39,7 @@ import java.time.format.DateTimeFormatter
 import sv.edu.catolica.climesa.domain.AppointmentDoctor
 import sv.edu.catolica.climesa.domain.AppointmentSlot
 import sv.edu.catolica.climesa.domain.PatientAppointment
+import sv.edu.catolica.climesa.domain.QuickAction
 
 private val appointmentDateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 private val appointmentTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
@@ -49,12 +50,19 @@ fun PatientAppointmentsScreen(
     permissions: List<String>,
     channels: List<String>,
     modifier: Modifier = Modifier,
+    quickAction: QuickAction? = null,
+    onQuickActionHandled: () -> Unit = {},
     model: PatientAppointmentsViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     var requestOpen by rememberSaveable { mutableStateOf(false) }
     var cancelTarget by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels) }
+    LaunchedEffect(quickAction) {
+        if (quickAction == null) return@LaunchedEffect
+        if (quickAction == QuickAction.REQUEST_APPOINTMENT && "citas.solicitar" in permissions) requestOpen = true
+        onQuickActionHandled()
+    }
     val cancelAppointment = state.appointments.firstOrNull { it.id == cancelTarget }
 
     if (requestOpen) {

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import sv.edu.catolica.climesa.domain.*
 import sv.edu.catolica.climesa.R
+import sv.edu.catolica.climesa.ui.dashboard.RoleDashboardScreen
 import androidx.compose.ui.res.stringResource
 import java.time.Instant
 import java.time.ZoneId
@@ -47,20 +48,29 @@ private fun receptionNavigation(sections: List<AndroidSection>) = sections.map {
 
 private fun receptionSections(sections: List<AndroidSection>): List<AndroidSection> {
     val profile = sections.firstOrNull { it == AndroidSection.PROFILE }
-    val operational = sections.filterNot { it == AndroidSection.PROFILE || it == AndroidSection.HOSPITAL_INFO }
-    return (operational.take(3) + listOfNotNull(profile) + sections.filterNot { it in operational.take(3) || it == profile }).distinct()
+    val home = sections.firstOrNull { it == AndroidSection.HOME }
+    val operational = sections.filterNot { it == AndroidSection.PROFILE || it == AndroidSection.HOSPITAL_INFO || it == AndroidSection.HOME }
+    return (listOfNotNull(home) + operational.take(3) + listOfNotNull(profile) + sections.filterNot { it in operational.take(3) || it == profile }).distinct()
 }
 
 @Composable fun ReceptionApp(model:ReceptionViewModel,dark:Boolean,setDark:(Boolean)->Unit,account:AuthenticatedAccount,signingOut:Boolean,logout:()->Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val sections=AndroidSections.visible("REC",account.profile.permissions)
     val navSections = receptionSections(sections)
-    var selectedName by rememberSaveable { mutableStateOf(AndroidSection.PROFILE.name) }
+    var selectedName by rememberSaveable { mutableStateOf(AndroidSection.HOME.name) }
+    val inbox=rememberQuickActionInbox()
     val page=sections.firstOrNull { it.name==selectedName } ?: sections.firstOrNull() ?: return
     val tab=navSections.indexOf(page)
     var discard by remember { mutableStateOf(false) }
     val snack=remember { SnackbarHostState() }
     LaunchedEffect(sections) { if(sections.none { it.name==selectedName }) selectedName=sections.firstOrNull { it==AndroidSection.PROFILE }?.name?:sections.first().name }
+    LaunchedEffect(page) { inbox.dropUnless(page) }
+    val patientAction=inbox.actionFor(AndroidSection.PATIENTS)
+    LaunchedEffect(patientAction,state.loading) {
+        if(patientAction==null||state.loading)return@LaunchedEffect
+        if(patientAction==QuickAction.REGISTER_PATIENT&&QuickActions.allowed(patientAction,account.profile.permissions)&&state.query.trim().length>=2) model.newPatient()
+        inbox.consume(AndroidSection.PATIENTS)
+    }
     LaunchedEffect(state.message) { state.message?.let { snack.showSnackbar(it);model.clearMessage() } }
     fun back() { if(state.saving)return;if(state.formOpen) discard=true else model.select(null) }
     BackHandler(state.formOpen || state.selected!=null) { back() }
@@ -87,7 +97,8 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
         when {
             state.formOpen -> PatientForm(state,model)
             state.selected!=null -> PatientDetail(state.selected!!,state,model)
-            page==AndroidSection.APPOINTMENTS -> ReceptionAppointmentsScreen(account.profile.channels,"citas.agendar" in account.profile.permissions)
+            page==AndroidSection.HOME -> RoleDashboardScreen(account,"REC",{request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}})
+            page==AndroidSection.APPOINTMENTS -> ReceptionAppointmentsScreen(account.profile.channels,"citas.agendar" in account.profile.permissions,quickAction=inbox.actionFor(AndroidSection.APPOINTMENTS),onQuickActionHandled={inbox.consume(AndroidSection.APPOINTMENTS)})
             page==AndroidSection.LINKING -> ReceptionLinkingScreen(account.profile.channels,"cuentas.verificar" in account.profile.permissions,{selectedName=AndroidSection.PATIENTS.name})
             page==AndroidSection.BEDS -> BedsScreen(account.profile)
             page==AndroidSection.QUEUE -> QueueScreen(account.profile)
