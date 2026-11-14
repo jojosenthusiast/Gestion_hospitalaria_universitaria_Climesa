@@ -196,3 +196,14 @@ Cambios de producto autorizados por el dueño (observaciones de la prueba manual
 | Catálogo de citas | ¿Qué pasa con `patients` en `GET /citas/catalogos`? | Recepción ya no recibe pacientes (antes 500 filas): los busca con el selector. PAC conserva solo el propio. Con `?date=yyyy-MM-dd` cada médico trae `tieneTurno` y `motivo` |
 | Franjas del día | `GET /citas/disponibilidad` solo devolvía franjas libres | Se conserva `slots` (libres) y se agrega `franjas` con todas: `estado` `libre`, `ocupado`, `sin_turno` o `pasado` y `motivo` corto. Sin turno se devuelve la rejilla estándar 08:00 a 16:00 como `sin_turno` |
 | Datos ficticios de Vinculaciones | La observación 4 pide datos de ejemplo para la cola | No se agregaron semillas aquí: pertenecen al flujo de datos de demostración (observación 7); la pantalla ya explica el vacío |
+
+## Ronda 2 · Ambulancia (rama `feat/r2-ambulancia`; observaciones 7, 8 y 16)
+
+Cambios de producto autorizados por el dueño. Quedan registrados porque agregan campos fuera del catálogo original.
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| Salir de mantenimiento | La unidad no sale de mantenimiento sin paramédico con turno en curso (RN-30, D-054). ¿Se relaja? | No. La transición ya existía; lo que faltaba era explicarla. `GET /ambulancia` devuelve `dispatchBlock` (`code`, `message`, `action`) y `unit.stateReason`/`stateSince`; las pantallas dicen por qué no se despacha y qué hacer (publicar un turno de paramédico). |
+| Quién pidió | `GET /ambulancia` no traía el solicitante | `pendingRequests[]` agrega `requesterName` (paciente o quien llamó), `callerName` y `patientRecord`. Nueva columna opcional `ambulancia.solicitud.solicitante_nombre` y campo opcional `callerName` en `POST /ambulancia/solicitudes` (solo recepción). La consulta de solicitudes de pacientes registrados ya se audita. |
+| Paciente en la bitácora | La bitácora no muestra al paciente (D-056). El dueño pide «paciente Y» para DPD | Se muestra solo `patientRef`: el expediente enmascarado (últimos 3 caracteres), nunca nombre ni id. ¿Se debe ocultar también para DPD, o mostrar el nombre a quien tiene relación de atención? |
+| Búsqueda y hitos | `GET /ambulancia/bitacora` solo filtraba por columnas exactas | Se agrega `q` (texto libre sin acentos sobre origen, destino, municipio y tripulación) y `milestones[]` por servicio para contar la historia. |
