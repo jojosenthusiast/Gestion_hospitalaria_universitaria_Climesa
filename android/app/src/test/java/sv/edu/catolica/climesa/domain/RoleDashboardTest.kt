@@ -29,23 +29,6 @@ class RoleDashboardTest {
         assertTrue(RoleDashboard.sources("LAB", setOf("sesion.perfil")).isEmpty())
     }
 
-    @Test fun elJefeVeCamasYAdmisionesSinCamaConLaAccionDeAsignar() {
-        val model = RoleDashboard.build(
-            "JOP", everything,
-            mapOf(DashboardSource.BEDS to beds("libre", "libre", "ocupada", "limpieza", "bloqueada"), DashboardSource.ADMISSIONS to rows(row("state" to "pendiente_cama"), row("state" to "hospitalizado"))),
-            now = now,
-        )
-        val free = model.kpis.first { it.label == "Camas libres" }
-        assertEquals("2", free.value)
-        assertEquals("de 5", free.suffix)
-        assertEquals(DashboardTone.SUCCESS, free.tone)
-        assertEquals(DashboardTone.WARNING, model.kpis.first { it.label == "Admisiones sin cama" }.tone)
-        val donut = model.charts.single { it.kind == ChartKind.DONUT }
-        assertEquals(5, donut.total)
-        val assign = model.attention.single { it.request.action == QuickAction.ASSIGN_BED }
-        assertEquals(AndroidSection.ADMISSION, assign.request.section)
-    }
-
     @Test fun sinCamasLibresLaTarjetaSePintaDePeligro() {
         val model = RoleDashboard.build("JOP", everything, mapOf(DashboardSource.BEDS to beds("ocupada", "ocupada")), now = now)
         assertEquals(DashboardTone.DANGER, model.kpis.first { it.label == "Camas libres" }.tone)
@@ -56,23 +39,6 @@ class RoleDashboardTest {
         assertTrue(model.kpis.none { it.label == "En espera" })
         assertTrue(model.kpis.none { it.label == "Admisiones sin cama" })
         assertEquals(setOf(DashboardSource.QUEUE), model.unavailable)
-    }
-
-    @Test fun laboratorioPriorizaLasUrgentesYAbreMuestraYCaptura() {
-        val orders = rows(
-            row("state" to "pendiente", "priority" to "urgente"),
-            row("state" to "pendiente", "priority" to "rutina"),
-            row("state" to "en_proceso", "priority" to "rutina"),
-            row("state" to "completado", "priority" to "rutina", "reviewedAt" to null),
-            row("state" to "completado", "priority" to "rutina", "reviewedAt" to "2026-11-14T10:00:00Z"),
-        )
-        val model = RoleDashboard.build("LAB", everything, mapOf(DashboardSource.LAB to orders), now = now)
-        assertEquals("2", model.kpis.first { it.label == "Solicitadas" }.value)
-        assertEquals("1", model.kpis.first { it.label == "Urgentes abiertas" }.value)
-        assertEquals(DashboardTone.DANGER, model.kpis.first { it.label == "Urgentes abiertas" }.tone)
-        assertEquals("1", model.kpis.first { it.label == "Esperan revisión médica" }.value)
-        assertEquals(listOf(QuickAction.TAKE_SAMPLE, QuickAction.CAPTURE_RESULT), model.attention.mapNotNull { it.request.action })
-        assertEquals(listOf(2, 1, 1, 1), model.charts.single().slices.map { it.value })
     }
 
     @Test fun elMedicoVeLosResultadosCriticosPrimero() {

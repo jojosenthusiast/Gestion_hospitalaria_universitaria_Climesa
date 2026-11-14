@@ -14,7 +14,7 @@ Fuente visual: la web (`web/src/styles.css`, `web/src/modules.css`, `components/
 | Componente | Uso |
 |---|---|
 | `ClimesaTheme(dark)` | Ya envuelve la app en `MainActivity`. Claro y oscuro portados de la web. |
-| `PortalScaffold` | Barra superior + navegación adaptable por rol (barra inferior, riel o menú lateral permanente, hoja "Más funciones"). |
+| `PortalScaffold` | Barra superior + navegación adaptable por rol (barra inferior con las tareas núcleo del rol y "Más", riel o menú lateral permanente; ver `navegacion.md`). |
 | `ClimesaTopBar`, `MenuButton`, `ThemeToggleButton` | Barra superior propia (marca + subtítulo). Para pantallas de detalle, pasa `navigationIcon` con un botón Volver. |
 | `PageList` / `PageColumn` | Cuerpo estándar con margen de página y separación entre bloques. |
 | `SectionCard(title, eyebrow, action) { … }` | Bloque con título. |

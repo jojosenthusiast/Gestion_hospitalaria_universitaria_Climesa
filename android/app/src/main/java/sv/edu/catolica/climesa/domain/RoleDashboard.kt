@@ -287,8 +287,8 @@ object RoleDashboard {
                 data[DashboardSource.AGENDA]?.let { agenda ->
                     val list = rows(agenda)
                     val started = list.count { text(it, "consultationId") != null }
-                    kpis += DashboardKpi("Citas en mi agenda", list.size.toString(), DashboardTone.PROCESS, target = target(AndroidSection.CONSULTATIONS))
-                    kpis += DashboardKpi("Consultas iniciadas", started.toString(), DashboardTone.SUCCESS, "de ${list.size}", target = target(AndroidSection.CONSULTATIONS))
+                    kpis += DashboardKpi("Citas en mi agenda", list.size.toString(), DashboardTone.PROCESS, target = target(AndroidSection.MEDICAL_DAY))
+                    kpis += DashboardKpi("Consultas iniciadas", started.toString(), DashboardTone.SUCCESS, "de ${list.size}", target = target(AndroidSection.MEDICAL_DAY))
                 }
                 lab?.let {
                     kpis += DashboardKpi("Resultados por revisar", it.toReview.toString(), if (it.critical > 0) DashboardTone.DANGER else if (it.toReview > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.RESULT_REVIEW))
@@ -320,7 +320,7 @@ object RoleDashboard {
             }
             "PAR" -> {
                 ambulance?.let {
-                    kpis += DashboardKpi("Unidad ${it.unit.plate}".trim(), unitLabel(it.unit.state), unitTone(it.unit.state), target = target(AndroidSection.UNIT))
+                    kpis += DashboardKpi("Unidad ${it.unit.plate}".trim(), unitLabel(it.unit.state), unitTone(it.unit.state), target = target(AndroidSection.SERVICE))
                     kpis += DashboardKpi("Solicitudes pendientes", it.pendingRequests.size.toString(), if (it.pendingRequests.isNotEmpty()) DashboardTone.WARNING else DashboardTone.SUCCESS)
                     kpis += DashboardKpi("Servicio", if (it.activeService != null) "En curso" else "Sin servicio", if (it.activeService != null) DashboardTone.DANGER else DashboardTone.NEUTRAL, target = target(AndroidSection.SERVICE))
                     it.activeService?.takeIf { AndroidSection.SERVICE in sections }?.let { service ->

@@ -78,10 +78,10 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     BEDS("A35", "Tablero de camas", "camas.ver_tablero", true),
     DISPATCH("A36", "Despacho", "ambulancia.despachar", true),
     ASSISTANT_STATION("A40", "Mi consultorio", "fila.llamar", true),
-    VITAL_SIGNS("A41", "Signos vitales", "signos.registrar", false),
+    VITAL_SIGNS("A41", "Signos vitales", "signos.registrar", true),
     WARD("A50", "Mi planta", "admision.ver", true),
     INPATIENT_CARE("A51", "Paciente hospitalizado", "enfermeria.registrar", true),
-    CLEANING("A52", "Limpieza de camas", "camas.registrar_limpieza", false),
+    CLEANING("A52", "Limpieza de camas", "camas.registrar_limpieza", true),
     SUPPLIES("A53", "Consumo de insumos", "inventario.mover", true),
     AMBULANCE_RECEPTION("A54", "Recepción de ambulancia", "ambulancia.recibir_prehospital", true),
     LAB("A60", "Laboratorio", "laboratorio.ver_cola", true),
@@ -97,19 +97,40 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
 }
 
 object AndroidSections {
+    /**
+     * Asistente and Enfermería are the same person at the same station per the course PDF: one shared catalog, filtered by the
+     * permissions of each account. "Paciente hospitalizado" opens the same screen as "Mi planta", so it is not a second entry.
+     */
+    private val careStation = listOf(
+        AndroidSection.HOME, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.CLEANING,
+        AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE,
+    )
+
+    /** Jefe de Operaciones and Laboratorio use the web only (D-090): they have no Android catalog and see "Tu rol no usa esta aplicación". */
     private val roleCatalog = mapOf(
-        "JOP" to listOf(AndroidSection.HOME, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.SUPPLIES, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "REC" to listOf(AndroidSection.HOME, AndroidSection.PATIENTS, AndroidSection.QUEUE, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "AST" to listOf(AndroidSection.HOME, AndroidSection.ASSISTANT_STATION, AndroidSection.VITAL_SIGNS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "ENF" to listOf(AndroidSection.HOME, AndroidSection.WARD, AndroidSection.VITAL_SIGNS, AndroidSection.INPATIENT_CARE, AndroidSection.CLEANING, AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.RECORD, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "LAB" to listOf(AndroidSection.HOME, AndroidSection.LAB, AndroidSection.SAMPLE, AndroidSection.CAPTURE_RESULTS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "PAR" to listOf(AndroidSection.HOME, AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "PAC" to listOf(AndroidSection.HOME, AndroidSection.LINK_RECORD, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
+        "REC" to listOf(AndroidSection.HOME, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "AST" to careStation,
+        "ENF" to careStation,
+        "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "PAR" to listOf(AndroidSection.HOME, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "PAC" to listOf(AndroidSection.HOME, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.LINK_RECORD, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
+    )
+
+    /** The role's core tasks, in bar order (they are what its dashboard leads to). The bar takes the first visible ones after "Inicio". */
+    private val coreTasks = mapOf(
+        "REC" to listOf(AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS),
+        "AST" to listOf(AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.SUPPLIES),
+        "ENF" to listOf(AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.SUPPLIES),
+        "MED" to listOf(AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED),
+        "PAR" to listOf(AndroidSection.SERVICE, AndroidSection.LOG),
+        "PAC" to listOf(AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS),
     )
 
     /** Roles with an Android catalog, in display order. */
     val roles: List<String> get() = roleCatalog.keys.toList()
+
+    /** Core tasks of [role], in bar order, before permissions are applied. */
+    fun coreTasks(role: String): List<AndroidSection> = coreTasks[role].orEmpty()
 
     /**
      * Permissions remain the security source of truth. The role catalog only prevents the UI from exposing a
@@ -125,26 +146,52 @@ object AndroidSections {
 
 enum class AndroidNavigationMode { BOTTOM_BAR, RAIL, DRAWER }
 
+/** Groups of the "Más" sheet. Order is display order. */
+enum class MoreGroup(val title: String) {
+    TASKS("Más tareas"),
+    HOSPITAL("Hospital"),
+    ACCOUNT("Mi cuenta"),
+}
+
+data class MoreEntry(val group: MoreGroup, val sections: List<AndroidSection>)
+
+/** What the phone shows: the bar items and the grouped content of "Más". Every visible section is in exactly one of them. */
 data class CompactNavigation(
     val primary: List<AndroidSection>,
-    val overflow: List<AndroidSection>,
-)
+    val more: List<MoreEntry>,
+) {
+    val overflow: List<AndroidSection> get() = more.flatMap { it.sections }
+}
 
 object AndroidNavigationPolicy {
+    /** Home plus up to three core tasks; the fifth bar item is "Más". Material recommends at most five destinations. */
+    const val BAR_TASKS = 3
+
     fun mode(widthDp: Int) = when {
         widthDp >= 840 -> AndroidNavigationMode.DRAWER
         widthDp >= 600 -> AndroidNavigationMode.RAIL
         else -> AndroidNavigationMode.BOTTOM_BAR
     }
 
-    fun compact(sections: List<AndroidSection>): CompactNavigation {
-        // En móvil se reservan cuatro accesos: el tablero de inicio (aterrizaje de todos los roles), dos operativos y el perfil.
-        // Sin Inicio caben tres operativos. Información institucional y el resto quedan en el menú "Más funciones".
+    private fun group(section: AndroidSection) = when (section) {
+        AndroidSection.PROFILE -> MoreGroup.ACCOUNT
+        AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS -> MoreGroup.HOSPITAL
+        else -> MoreGroup.TASKS
+    }
+
+    /**
+     * Bar = Inicio + the role's core tasks (from its dashboard). The rest (other tasks, hospital information, account) goes to
+     * "Más", grouped and in catalog order, so nothing is duplicated and every catalogued section stays reachable.
+     */
+    fun compact(role: String, sections: List<AndroidSection>): CompactNavigation {
         val home = sections.firstOrNull { it == AndroidSection.HOME }
-        val profile = sections.firstOrNull { it == AndroidSection.PROFILE }
-        val operational = sections.filterNot { it == AndroidSection.HOME || it == AndroidSection.HOSPITAL_INFO || it == AndroidSection.PROFILE }
-        val primary = (listOfNotNull(home) + operational.take(if (home != null) 2 else 3) + listOfNotNull(profile)).distinct().take(4)
-        return CompactNavigation(primary, sections.filterNot { it in primary })
+        val operational = sections.filter { it != AndroidSection.HOME && group(it) == MoreGroup.TASKS }
+        val core = AndroidSections.coreTasks(role).filter { it in operational }
+        val tasks = (core + operational.filterNot { it in core }).take(if (home != null) BAR_TASKS else BAR_TASKS + 1)
+        val primary = listOfNotNull(home) + tasks
+        val rest = sections.filterNot { it in primary }
+        val more = MoreGroup.entries.mapNotNull { g -> rest.filter { group(it) == g }.takeIf { it.isNotEmpty() }?.let { MoreEntry(g, it) } }
+        return CompactNavigation(primary, more)
     }
 }
 object RegistrationRules {

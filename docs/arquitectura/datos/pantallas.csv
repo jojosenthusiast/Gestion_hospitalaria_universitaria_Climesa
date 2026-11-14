@@ -85,9 +85,9 @@ A51,Android,ENF,Paciente hospitalizado,Cuidado,"Signos, notas de enfermería, in
 A52,Android,ENF,Limpieza de camas,Liberar camas,Camas en limpieza; lista de verificación,Registrar limpieza; verificar la de otra persona,En vivo,,R,104
 A53,Android,ENF,Consumo de insumos,Registrar uso,"Artículo, cantidad, paciente opcional",Guardar,,,E,111
 A54,Android,ENF,Recepción de ambulancia,Prepararse para la llegada,"Reporte prehospital, hora estimada",Marcar recibido; pasar a admisión,En vivo,,E,109
-A60,Android,LAB,Cola de laboratorio,Trabajo del día,Órdenes por estado,Tomar muestra; capturar; completar,En vivo,,R,107
-A61,Android,LAB,Toma de muestra,Identificar paciente y registrar,"Paciente, exámenes, confirmación de identidad (dos datos)",Confirmar muestra,,,R,107
-A62,Android,LAB,Captura de resultados,Valores,Igual a W21,Guardar; completar,,,R,107
+A60,Android,Ninguno (retirada: Laboratorio usa solo web),Cola de laboratorio,Trabajo del día,Órdenes por estado,Tomar muestra; capturar; completar,En vivo,,R,107
+A61,Android,Ninguno (retirada: Laboratorio usa solo web),Toma de muestra,Identificar paciente y registrar,"Paciente, exámenes, confirmación de identidad (dos datos)",Confirmar muestra,,,R,107
+A62,Android,Ninguno (retirada: Laboratorio usa solo web),Captura de resultados,Valores,Igual a W21,Guardar; completar,,,R,107
 A70,Android,PAR,Unidad,Estado de la ambulancia,Estado grande y servicio asignado,Aceptar servicio,En vivo con sonido,,R,109
 A71,Android,PAR,Servicio en curso,Hitos con botones grandes,"Salida, en escena, trasladando, en hospital, finalizado; dirección; tiempo transcurrido",Avanzar hito; abrir mapa,Ubicación enviada en vivo (extra),,R,109
 A72,Android,PAR,Reporte prehospital,Avisar antes de llegar,"Motivo, signos, prioridad, hora estimada; indicador de enviado o en cola",Enviar (se guarda si no hay señal),,,E,109

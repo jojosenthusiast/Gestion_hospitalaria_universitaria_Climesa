@@ -18,6 +18,8 @@ class AccessRoutingTest {
 
     @Test fun webOnlyAdminIsNotGrantedAndroidOperations() {
         assertEquals(AndroidDestination.NOT_AVAILABLE, AccessProfile(listOf("ADM"), verifiedByBackend = true).androidDestination())
-        assertEquals(AndroidDestination.STAFF_PLACEHOLDER, AccessProfile(listOf("JOP"), verifiedByBackend = true).androidDestination())
+        assertEquals(AndroidDestination.NOT_AVAILABLE, AccessProfile(listOf("JOP"), verifiedByBackend = true).androidDestination())
+        assertEquals(AndroidDestination.NOT_AVAILABLE, AccessProfile(listOf("LAB"), verifiedByBackend = true).androidDestination())
+        assertEquals(AndroidDestination.STAFF_PLACEHOLDER, AccessProfile(listOf("ENF"), verifiedByBackend = true).androidDestination())
     }
 }

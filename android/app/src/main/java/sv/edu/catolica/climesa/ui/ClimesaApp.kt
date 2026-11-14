@@ -51,15 +51,15 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     LaunchedEffect(state.account?.session?.userId){if(state.account==null)sessionStores.end()}
     when {
         state.checkingSession -> AuthLoadingScreen()
-        state.accessPending -> AccessPending(state.error,authModel::retryAccess,authModel::signOut)
-        state.account==null -> if(registering) RegistrationScreen(state,{registering=false;authModel.clearRegistration()},authModel::register) else LoginScreen(state,authModel::signIn){registering=true;authModel.clearRegistration()}
-        else -> SessionViewModelScope(sessionStores,state.account!!.session.userId){AuthorizedWorkspace(state.account!!,dark,setDark,state.signingOut,authModel::signOut,authModel::retryAccess)}
+        state.accessPending -> AccessPending(state.error,{authModel.retryAccess()},authModel::signOut)
+        state.account==null -> if(registering) RegistrationScreen(state,{registering=false;authModel.clearRegistration()},authModel::register) else LoginScreen(state,authModel.draft,authModel::signIn){registering=true;authModel.clearRegistration()}
+        else -> SessionViewModelScope(sessionStores,state.account!!.session.userId){AuthorizedWorkspace(state.account!!,dark,setDark,state.signingOut,authModel::signOut)}
     }
 }
 @Composable private fun AccessPending(error:String?,retry:()->Unit,logout:()->Unit){
     Surface { Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){SectionIntro("Acceso / CLIMESA","No pudimos verificar tu acceso",error?:"Revisa tu conexión e intenta de nuevo.");Spacer(Modifier.height(24.dp));ClimesaButton("Volver a intentar",Icons.Default.Refresh,retry);Spacer(Modifier.height(10.dp));TextButton(onClick=logout){Text("Cerrar sesión")}} }
 }
-@Composable private fun AuthorizedWorkspace(account:AuthenticatedAccount,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit,refresh:()->Unit){
+@Composable private fun AuthorizedWorkspace(account:AuthenticatedAccount,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit){
     val destination=account.profile.androidDestination()
     val allowedRoles=RoleAccess.allowed(account.profile,"android")
     val roles=if(destination==AndroidDestination.NOT_AVAILABLE||destination==AndroidDestination.PENDING_VERIFICATION)emptyList() else allowedRoles.filter { AndroidSections.hasAppScreens(it,account.profile.permissions) }
@@ -74,7 +74,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
             LaunchedEffect(account.session.userId,account.profile.channels){reception.startLive(account.profile.channels)}
             LaunchedEffect(account.profile.permissions){reception.setPermissions(account.profile.permissions)}
             ReceptionApp(reception,dark,setDark,account,signingOut,logout)
-        }else RolePortal(account,role,dark,setDark,signingOut,logout,refresh)}
+        }else RolePortal(account,role,dark,setDark,signingOut,logout)}
     }
 }
 
@@ -96,9 +96,10 @@ private fun AuthLoadingScreen() {
 }
 
 @Composable
-private fun LoginScreen(state: AuthUiState, signIn: (String, String) -> Unit, onRegister: () -> Unit) {
-    var email by rememberSaveable { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, String) -> Unit, onRegister: () -> Unit) {
+    // The draft lives in the ViewModel (memory only): going to the background, rotating or a brief loading screen keeps what was typed.
+    var email by rememberSaveable { mutableStateOf(draft.email) }
+    var password by remember { mutableStateOf(draft.password) }
     var showPassword by rememberSaveable { mutableStateOf(false) }
     val passwordFocus = remember { FocusRequester() }
     val demoAccounts = remember { DemoLogin.accounts(BuildConfig.DEMO_LOGIN, BuildConfig.DEMO_CREDENTIALS) }
@@ -150,10 +151,10 @@ private fun LoginScreen(state: AuthUiState, signIn: (String, String) -> Unit, on
                             Text(it, Modifier.fillMaxWidth().padding(14.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                    if (demoAccounts.isNotEmpty()) DemoAccountPicker(demoAccounts, enabled = !state.signingIn) { account -> email = account.email; password = account.password }
+                    if (demoAccounts.isNotEmpty()) DemoAccountPicker(demoAccounts, enabled = !state.signingIn) { account -> email = account.email; password = account.password; draft.email = email; draft.password = password }
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it.trimStart().take(254) },
+                        onValueChange = { email = it.trimStart().take(254); draft.email = email },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !state.signingIn,
                         singleLine = true,
@@ -166,7 +167,7 @@ private fun LoginScreen(state: AuthUiState, signIn: (String, String) -> Unit, on
                     )
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = { password = it; draft.password = password },
                         modifier = Modifier.fillMaxWidth().focusRequester(passwordFocus),
                         enabled = !state.signingIn,
                         singleLine = true,

@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
         backgroundAt?.let { stopped ->
             backgroundAt = null
             val auth = ViewModelProvider(this)[AuthViewModel::class.java]
-            if (SystemClock.elapsedRealtime() - stopped > 300000) auth.signOut() else auth.retryAccess()
+            if (SystemClock.elapsedRealtime() - stopped > 300000) auth.signOut() else auth.retryAccess(silent = true)
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {

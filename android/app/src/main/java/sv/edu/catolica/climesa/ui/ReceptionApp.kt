@@ -35,32 +35,12 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private fun receptionIcon(section: AndroidSection) = when (section) {
-    AndroidSection.PATIENTS -> Icons.Default.Person
-    AndroidSection.BEDS -> Icons.Default.Bed
-    AndroidSection.APPOINTMENTS,
-    AndroidSection.SHIFTS,
-    -> Icons.Default.DateRange
-    AndroidSection.PROFILE -> Icons.Default.AccountCircle
-    else -> Icons.AutoMirrored.Filled.List
-}
-private fun receptionNavigation(sections: List<AndroidSection>) = sections.map { AdaptiveNavItem(it.label, receptionIcon(it)) }
-
-private fun receptionSections(sections: List<AndroidSection>): List<AndroidSection> {
-    val profile = sections.firstOrNull { it == AndroidSection.PROFILE }
-    val home = sections.firstOrNull { it == AndroidSection.HOME }
-    val operational = sections.filterNot { it == AndroidSection.PROFILE || it == AndroidSection.HOSPITAL_INFO || it == AndroidSection.HOME }
-    return (listOfNotNull(home) + operational.take(3) + listOfNotNull(profile) + sections.filterNot { it in operational.take(3) || it == profile }).distinct()
-}
-
 @Composable fun ReceptionApp(model:ReceptionViewModel,dark:Boolean,setDark:(Boolean)->Unit,account:AuthenticatedAccount,signingOut:Boolean,logout:()->Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val sections=AndroidSections.visible("REC",account.profile.permissions)
-    val navSections = receptionSections(sections)
     var selectedName by rememberSaveable { mutableStateOf(AndroidSection.HOME.name) }
     val inbox=rememberQuickActionInbox()
     val page=sections.firstOrNull { it.name==selectedName } ?: sections.firstOrNull() ?: return
-    val tab=navSections.indexOf(page)
     var discard by remember { mutableStateOf(false) }
     val snack=remember { SnackbarHostState() }
     LaunchedEffect(sections) { if(sections.none { it.name==selectedName }) selectedName=sections.firstOrNull { it==AndroidSection.PROFILE }?.name?:sections.first().name }
@@ -74,19 +54,14 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
     LaunchedEffect(state.message) { state.message?.let { snack.showSnackbar(it);model.clearMessage() } }
     fun back() { if(state.saving)return;if(state.formOpen) discard=true else model.select(null) }
     BackHandler(state.formOpen || state.selected!=null) { back() }
-    AdaptiveTabScaffold(
-        items=receptionNavigation(navSections),
-        selected=tab,
-        onSelected={selectedName=navSections[it].name},
-        showNavigation=!state.formOpen && state.selected==null,
+    PortalScaffold(
+        role="REC",sections=sections,selected=page,onSelected={selectedName=it.name},dark=dark,setDark=setDark,
         onLogout={if(!signingOut)logout()},
+        showNavigation=!state.formOpen && state.selected==null,
         snackbarHost={SnackbarHost(snack)},
-        topBar={openMenu->ClimesaTopBar(
-            title=if(state.formOpen){if(state.editingId==null)"Registrar paciente" else "Editar ficha"}else if(state.selected!=null)"Ficha del paciente" else stringResource(R.string.ui_marca),
-            subtitle=if(!state.formOpen&&state.selected==null)page.label else RoleAccess.label("REC"),
-            navigationIcon={if(state.formOpen||state.selected!=null)IconButton(onClick={back()},enabled=!state.saving){Icon(Icons.AutoMirrored.Filled.ArrowBack,"Volver")} else MenuButton(openMenu)},
-            actions={HospitalClock();ThemeToggleButton(dark,setDark)},
-        )},
+        title=if(state.formOpen){if(state.editingId==null)"Registrar paciente" else "Editar ficha"}else if(state.selected!=null)"Ficha del paciente" else page.label,
+        subtitle=if(state.formOpen)state.registry.patients.firstOrNull{it.id==state.editingId}?.fullName else state.selected?.fullName,
+        navigationIcon={if(state.formOpen||state.selected!=null)BackButton({back()},enabled=!state.saving)},
     ) { padding -> Column(Modifier.fillMaxSize().padding(padding)) {
         state.error?.takeIf { page==AndroidSection.PATIENTS }?.let { error -> Surface(color=MaterialTheme.colorScheme.errorContainer) {
             Row(Modifier.padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -106,7 +81,7 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
             page==AndroidSection.DISPATCH -> AmbulanceScreen(page,account.profile,account.session.userId)
             page==AndroidSection.ADMISSION -> HospitalizationScreen(profile=account.profile)
             page==AndroidSection.SHIFTS -> MyShiftsScreen(account,"REC")
-            page==AndroidSection.PROFILE -> Profile(state,dark,setDark,account){selectedName=it.name}
+            page==AndroidSection.PROFILE -> Profile(state,dark,setDark,account,{if(!signingOut)logout()})
             page!=AndroidSection.PATIENTS -> {
                 val mock=Maquetas.of(page)
                 if(mock!=null) Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) { MaquetaContent(mock) }
@@ -215,20 +190,15 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
 @Composable private fun PatientField(label:String,value:String,error:String?,hint:String="",keyboard:KeyboardType=KeyboardType.Text,enabled:Boolean=true,change:(String)->Unit) {
     FormField(label,value,change,error=error,hint=hint.ifBlank{null},enabled=enabled,keyboardOptions=KeyboardOptions(keyboardType=keyboard))
 }
-@Composable private fun Profile(state:ReceptionState,dark:Boolean,setDark:(Boolean)->Unit,account:AuthenticatedAccount,onNavigate:(AndroidSection)->Unit) {
+@Composable private fun Profile(state:ReceptionState,dark:Boolean,setDark:(Boolean)->Unit,account:AuthenticatedAccount,onLogout:()->Unit) {
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        item {SectionIntro(stringResource(R.string.ui_cuenta_eyebrow),stringResource(R.string.ui_cuenta_titulo))}
         item {ProfileSummaryCard(account)}
         account.profile.notice?.let {item {NoticeBanner(NoticeKind.WARNING,"La validación de permisos todavía no está disponible.")}}
         item {AppearanceCard(dark,setDark)}
-        item {Text("Accesos principales",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)}
-        items(listOf(AndroidSection.PATIENTS,AndroidSection.QUEUE,AndroidSection.APPOINTMENTS).filter{it in AndroidSections.visible("REC",account.profile.permissions)},key={it.name}){section->
-            DataRow(section.label,subtitle=stringResource(R.string.ui_abrir_modulo),leadingIcon=iconFor(section),onClick={onNavigate(section)})
-        }
         item {Text("Actividad reciente",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         if(state.registry.audit.isEmpty()) item {Text("Aquí aparecerán los registros y cambios.")}
         items(state.registry.audit.takeLast(20).reversed()) {AuditRow(it)}
-        item {HorizontalDivider();Spacer(Modifier.height(12.dp));Text("Hospital universitario CLIMESA");Text("Tu cuenta es personal. Cierra sesión desde el menú ☰.",style=MaterialTheme.typography.bodySmall)}
+        item {HorizontalDivider();Spacer(Modifier.height(12.dp));SecondaryButton(stringResource(R.string.cerrar_sesion),onLogout,icon=Icons.Default.Logout);Spacer(Modifier.height(8.dp));Text(stringResource(R.string.ui_cerrar_sesion_ayuda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
 }
 @Composable private fun AuditRow(a:AuditEvent) {ClimesaCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
