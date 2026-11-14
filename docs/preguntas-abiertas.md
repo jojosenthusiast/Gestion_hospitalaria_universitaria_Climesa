@@ -258,3 +258,11 @@ Decisión del dueño (2026-11-14): la ambulancia necesita paramédico **y** moto
 | Invariante en la base | RN-30 dependía del reloj de la API; la base no la garantizaba. | La base garantiza lo que no depende del reloj: la unidad no pasa a En Servicio sin paramédico y motorista en la tripulación del servicio (20261119002000). |
 | FR-109-06 | La spec solo nombra al paramédico. | No se edita `specs/109-ambulancia/spec.md` sin decisión registrada: queda pendiente que el equipo actualice FR-109-06 para incluir al motorista. |
 | Alerta de cobertura | ¿Dónde se ve que faltará tripulación? | Turnos (web y Android) muestra los tramos de los próximos 7 días sin paramédico o sin motorista con turno publicado o en curso. |
+
+## Retomar consulta y borradores locales (rama `fix/resume-consulta`)
+
+| Tema | Situación | Decisión conservadora |
+|---|---|---|
+| Retomar desde la fila | Web y Android solo pasaban el número a "en atención"; Mi consultorio listaba solo citas, y la consulta iniciada desde un número no se podía reabrir. | `GET /fila` agrega `consultationId` y `consultationState` solo cuando la consulta del número es de quien lee la fila; otro profesional ve `null` y recibe el 409 `consulta_ya_iniciada` sin el id. No se crea endpoint nuevo: se reabre con `GET /consultas/{id}/detalle`. |
+| Dónde vive el borrador | Lo escrito y no guardado en la API se perdía al salir o al cerrarse la app. | Se guarda solo en el dispositivo, por cuenta y registro: web `localStorage`, Android archivo privado en `noBackupFilesDir` (sin cifrar, fuera de copias de seguridad), iOS Application Support con protección de archivo. Se borra al guardar o firmar, al cerrar sesión y al entrar otra cuenta. ¿El equipo quiere cifrarlo en Android con el Keystore? |
+| Ingreso guiado (Android) | Es un asistente de varios pasos con paciente, médico, cama y categoría elegidos del servidor; su disponibilidad cambia. | No se guarda como borrador: restaurar una cama o un médico de hace horas podría ofrecer algo ya ocupado. Se mantiene en el ViewModel (sobrevive a girar y a volver atrás dentro de la sesión). |
