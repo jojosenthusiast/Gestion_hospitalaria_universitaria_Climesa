@@ -49,13 +49,21 @@ fun LaboratoryScreen(profile: AccessProfile, modifier: Modifier = Modifier, ownR
     val sampleOrder = sampleOrderId?.let { id -> state.orders.firstOrNull { it.id == id } }
     if (selectedOrder != null && selectedItem != null) LaboratoryResultDialog(selectedOrder, selectedItem, state.busy, state.error, model, { selected = null })
     if (sampleOrder != null) LaboratorySampleDialog(sampleOrder, state.busy, state.error, model, { sampleOrderId = null })
-    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    val retry = { model.clearMessages(); model.load() }
+    PageList(modifier) {
         item { SectionIntro("Atención / Diagnóstico", "Laboratorio", "Órdenes, muestras y resultados con estados trazables.") }
-        state.error?.let { error -> item { ClimesaActionGroup { Text(error, color = MaterialTheme.colorScheme.error); ClimesaButton("Reintentar", Icons.Default.Refresh, { model.clearMessages(); model.load() }, outlined = true) } } }
-        state.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.Check) } }
-        if (state.loading) item { CircularProgressIndicator() }
-        else if (state.orders.isEmpty()) item { ClimesaCard { Text("No hay órdenes de laboratorio disponibles.", Modifier.padding(18.dp)) } }
-        else items(state.orders, key = { it.id }) { order -> LaboratoryOrderCard(order, profile, state.busy, model, { model.clearMessages(); selected = it }, { model.clearMessages(); sampleOrderId = order.id }) }
+        item { LiveIndicator() }
+        state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        when {
+            state.loading && state.orders.isEmpty() -> item { LoadingState() }
+            state.error != null && state.orders.isEmpty() -> item { ErrorState(state.error, retry) }
+            state.orders.isEmpty() -> item { EmptyState(stringResource(R.string.clin_lab_sin_ordenes), detail = stringResource(R.string.clin_lab_sin_ordenes_detalle)) }
+            else -> {
+                if (state.loading) item { RefreshHint() }
+                state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+                items(state.orders, key = { it.id }) { order -> LaboratoryOrderCard(order, profile, state.busy, model, { model.clearMessages(); selected = it }, { model.clearMessages(); sampleOrderId = order.id }) }
+            }
+        }
     }
 }
 
@@ -64,46 +72,62 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, profile: AccessProfile, 
     val canProcess = "laboratorio.procesar" in profile.permissions
     val canValidate = "laboratorio.validar" in profile.permissions
     val canReview = "laboratorio.revisar" in profile.permissions
-    ClimesaCard { Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(order.patientName, style = MaterialTheme.typography.titleMedium)
-        Text("${if (order.priority == "urgente") "Urgente" else "Rutina"} · ${LaboratoryLabels.state(order.state)}", color = MaterialTheme.colorScheme.primary)
-        order.items.forEach { item -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${item.code} · ${item.name}", Modifier.weight(1f)); item.result?.let { result -> Text(LaboratoryLabels.valueAndMark(result), style = MaterialTheme.typography.bodySmall) } ?: Text(if (order.state == "completado" && !order.reviewed) stringResource(R.string.lab_valor_en_revision) else "Pendiente", style = MaterialTheme.typography.bodySmall) } }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (canProcess && order.state == "pendiente") OutlinedButton(onClick = openSample, enabled = !busy) { Text("Tomar muestra") }
-            if (canProcess && order.state == "en_proceso") order.items.filter { it.result == null }.forEach { item -> OutlinedButton(onClick = { openResult(order.id to item.id) }, enabled = !busy) { Text("Resultado ${item.code}") } }
-            if (canValidate && order.state == "en_proceso") Button(onClick = { model.complete(order) }, enabled = !busy && order.items.all { it.result != null }) { Text("Completar") }
-            if (canReview && order.state == "completado" && !order.reviewed) Button(onClick = { model.review(order) }, enabled = !busy) { Text("Revisar") }
+    val inReview = order.state == "completado" && !order.reviewed
+    SectionCard(
+        title = order.patientName,
+        eyebrow = stringResource(if (order.priority == "urgente") R.string.clin_prioridad_urgente else R.string.clin_prioridad_rutina),
+        action = { if (inReview) ClinicalStatusTag(StatusCatalogClinico.UNDER_REVIEW) else StatusTag(order.state) },
+    ) {
+        order.items.forEach { item ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text("${item.code} · ${item.name}", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                val result = item.result
+                if (result != null) LabMarkTag(result.mark, LaboratoryLabels.valueAndMark(result))
+                else Text(if (inReview) stringResource(R.string.lab_valor_en_revision) else stringResource(R.string.clin_lab_pendiente), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
-    } }
+        if (canProcess && order.state == "pendiente") PrimaryButton("Tomar muestra", openSample, enabled = !busy)
+        if (canProcess && order.state == "en_proceso") order.items.filter { it.result == null }.forEach { item -> SecondaryButton(stringResource(R.string.clin_lab_resultado_de, item.code), { openResult(order.id to item.id) }, enabled = !busy) }
+        if (canValidate && order.state == "en_proceso") PrimaryButton("Completar", { model.complete(order) }, enabled = !busy && order.items.all { it.result != null }, loading = busy)
+        if (canReview && inReview) PrimaryButton("Revisar", { model.review(order) }, enabled = !busy, loading = busy)
+    }
 }
 
 @Composable
 private fun LaboratorySampleDialog(order: LaboratoryOrder, busy: Boolean, error: String?, model: LaboratoryViewModel, onClose: () -> Unit) {
     var expediente by rememberSaveable(order.id) { mutableStateOf("") }
     var nombreCompleto by rememberSaveable(order.id) { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = { if (!busy) onClose() },
-        title = { Text("Confirmar identidad") },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Confirma expediente y nombre completo antes de tomar la muestra.", style = MaterialTheme.typography.bodySmall)
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-            OutlinedTextField(expediente, { expediente = it }, label = { Text("Número de expediente") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(nombreCompleto, { nombreCompleto = it }, label = { Text("Nombre completo") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        } },
-        confirmButton = { Button(onClick = { model.sample(order, expediente, nombreCompleto, onClose) }, enabled = !busy && expediente.isNotBlank() && nombreCompleto.isNotBlank()) { Text(if (busy) "Guardando…" else "Confirmar") } },
-        dismissButton = { TextButton(onClick = onClose, enabled = !busy) { Text("Cancelar") } }
-    )
+    ConfirmDialog(
+        title = "Confirmar identidad",
+        confirmLabel = "Confirmar",
+        onConfirm = { model.sample(order, expediente, nombreCompleto, onClose) },
+        onDismiss = onClose,
+        message = "Confirma expediente y nombre completo antes de tomar la muestra.",
+        busy = busy,
+        confirmEnabled = expediente.isNotBlank() && nombreCompleto.isNotBlank(),
+    ) {
+        error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        FormField("Número de expediente", expediente, { expediente = it })
+        FormField("Nombre completo", nombreCompleto, { nombreCompleto = it })
+    }
 }
 
 @Composable
 private fun LaboratoryResultDialog(order: LaboratoryOrder, item: LaboratoryItem, busy: Boolean, error: String?, model: LaboratoryViewModel, onClose: () -> Unit) {
     var value by rememberSaveable(item.id) { mutableStateOf(item.result?.value?.toString().orEmpty()) }
     var text by rememberSaveable(item.id) { mutableStateOf(item.result?.text.orEmpty()) }
-    AlertDialog(onDismissRequest = { if (!busy) onClose() }, title = { Text("Resultado ${item.code}") }, text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(item.name, style = MaterialTheme.typography.titleSmall)
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        OutlinedTextField(value, { value = it }, label = { Text("Valor numérico") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(text, { text = it.take(5000) }, label = { Text("Resultado textual") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-        Text("La marca se calculará automáticamente según el rango vigente.", style = MaterialTheme.typography.bodySmall)
-    } }, confirmButton = { Button(onClick = { model.saveResult(order, item, value, text, onClose) }, enabled = !busy && (value.isNotBlank() || text.isNotBlank())) { Text(if (busy) "Guardando…" else "Guardar") } }, dismissButton = { TextButton(onClick = onClose, enabled = !busy) { Text("Cancelar") } })
+    ConfirmDialog(
+        title = stringResource(R.string.clin_lab_resultado_de, item.code),
+        confirmLabel = "Guardar",
+        onConfirm = { model.saveResult(order, item, value, text, onClose) },
+        onDismiss = onClose,
+        message = item.name,
+        busy = busy,
+        confirmEnabled = value.isNotBlank() || text.isNotBlank(),
+    ) {
+        error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        FormField("Valor numérico", value, { value = it })
+        FormField("Resultado textual", text, { text = it.take(5000) }, singleLine = false)
+        Text("La marca se calculará automáticamente según el rango vigente.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }

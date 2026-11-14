@@ -184,61 +184,106 @@ fun HospitalizationScreen(modifier: Modifier = Modifier, profile: AccessProfile?
     state.selectedId?.let { id -> state.admissions.firstOrNull { it.id == id } }?.let { BedSuggestionDialog(it, state, model) }
     state.discharge?.let { form -> state.admissions.firstOrNull { it.id == form.admissionId }?.let { DischargeDialog(it, form, state, model) } }
     state.exitId?.let { id -> state.admissions.firstOrNull { it.id == id } }?.let { ExitDialog(it, state, model) }
-    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val retry = { model.clearMessages(); model.load() }
+    PageList(modifier) {
         item { SectionIntro("Hospital / Admisiones", "Hospitalización", "Asigna cama, gestiona el alta y registra la salida física.") }
-        state.error?.let { item { ClimesaActionGroup { Text(it, color = MaterialTheme.colorScheme.error); ClimesaButton("Reintentar", Icons.Default.Refresh, { model.clearMessages(); model.load() }, outlined = true) } } }
-        state.notice?.let { item { InlineStatus(it, Icons.Default.Check) } }
-        if (state.loading) item { CircularProgressIndicator() } else if (state.admissions.isEmpty()) item { ClimesaCard { Text("No hay admisiones activas.", Modifier.padding(18.dp)) } } else items(state.admissions, key = { it.id }) { row ->
-            val actions = HospitalizationRules.actions(row.state, permissions)
-            ClimesaCard { Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(row.patientName, style = MaterialTheme.typography.titleMedium); Text("${row.category} · ${row.state}", color = MaterialTheme.colorScheme.primary); Text(if (row.bed.isBlank()) "Sin cama asignada" else "Cama: ${row.bed}", style = MaterialTheme.typography.bodySmall); if (row.isolation) Text("Aislamiento activo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (AdmissionAction.ASSIGN_BED in actions) OutlinedButton(onClick = { model.open(row) }, enabled = !state.busy) { Icon(Icons.Default.Bed, null); Text(stringResource(R.string.hosp_asignar_cama)) }
-                    if (AdmissionAction.SIGN_DISCHARGE in actions) Button(onClick = { model.openDischarge(row) }, enabled = !state.busy) { Text(stringResource(R.string.hosp_firmar_alta)) }
-                    if (AdmissionAction.REGISTER_EXIT in actions) Button(onClick = { model.openExit(row) }, enabled = !state.busy) { Text(stringResource(R.string.hosp_registrar_salida)) }
-                }
-            } }
+        if (profile != null) item { LiveIndicator() }
+        state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
+        when {
+            state.loading && state.admissions.isEmpty() -> item { LoadingState() }
+            state.error != null && state.admissions.isEmpty() -> item { ErrorState(state.error, retry) }
+            state.admissions.isEmpty() -> item { EmptyState(stringResource(R.string.clin_hosp_sin_admisiones), detail = stringResource(R.string.clin_hosp_sin_admisiones_detalle), icon = Icons.Default.Bed) }
+            else -> {
+                if (state.loading) item { RefreshHint() }
+                state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+                items(state.admissions, key = { it.id }) { row -> AdmissionCard(row, HospitalizationRules.actions(row.state, permissions), state.busy, model) }
+            }
         }
+    }
+}
+
+@Composable
+private fun AdmissionCard(row: HospitalAdmission, actions: Set<AdmissionAction>, busy: Boolean, model: HospitalizationViewModel) {
+    SectionCard(title = row.patientName, eyebrow = row.category, action = { StatusTag(row.state) }) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+            LabeledValue("Cama", if (row.bed.isBlank()) stringResource(R.string.clin_hosp_sin_cama) else row.bed, Modifier.weight(1f))
+            if (row.isolation) StatusPill(stringResource(R.string.clin_hosp_aislamiento), StatusTone.DANGER)
+        }
+        if (AdmissionAction.ASSIGN_BED in actions) SecondaryButton(stringResource(R.string.hosp_asignar_cama), { model.open(row) }, icon = Icons.Default.Bed, enabled = !busy)
+        if (AdmissionAction.SIGN_DISCHARGE in actions) PrimaryButton(stringResource(R.string.hosp_firmar_alta), { model.openDischarge(row) }, enabled = !busy)
+        if (AdmissionAction.REGISTER_EXIT in actions) PrimaryButton(stringResource(R.string.hosp_registrar_salida), { model.openExit(row) }, enabled = !busy)
     }
 }
 
 @Composable private fun BedSuggestionDialog(admission: HospitalAdmission, state: HospitalizationState, model: HospitalizationViewModel) {
     var selected by rememberSaveable(admission.id) { mutableStateOf("") }; val suggestion = state.suggestions.firstOrNull { it.id == selected }
-    AlertDialog(onDismissRequest = { if (!state.busy) model.close() }, title = { Text("Seleccionar cama") }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        state.formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        if (state.suggestions.isEmpty()) Text("Buscando camas compatibles…") else state.suggestions.forEach { row -> OutlinedButton(onClick = { selected = row.id }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { Text("${if (row.id == selected) "✓ " else ""}${row.code} · ${row.room}"); Text("${row.category} · ${row.reason}", style = MaterialTheme.typography.bodySmall) } } }
-        OutlinedTextField(state.assignReason, model::onAssignReason, label = { Text(stringResource(R.string.hosp_motivo_asignacion)) }, supportingText = { Text(stringResource(R.string.hosp_motivo_opcional_ayuda)) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), minLines = 2)
-    } }, confirmButton = { Button(onClick = { if (suggestion != null) model.assign(admission, suggestion) }, enabled = suggestion != null && !state.busy) { Text(if (state.busy) stringResource(R.string.hosp_guardando) else "Confirmar cama") } }, dismissButton = { TextButton(onClick = model::close, enabled = !state.busy) { Text(stringResource(R.string.hosp_cancelar)) } })
+    ConfirmDialog(
+        title = stringResource(R.string.clin_hosp_seleccionar_cama),
+        confirmLabel = stringResource(R.string.clin_hosp_confirmar_cama),
+        onConfirm = { if (suggestion != null) model.assign(admission, suggestion) },
+        onDismiss = model::close,
+        busy = state.busy,
+        confirmEnabled = suggestion != null,
+    ) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
+            if (state.suggestions.isEmpty()) Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall) else state.suggestions.forEach { row ->
+                DataRow(
+                    title = "${row.code} · ${row.room}",
+                    subtitle = "${row.category} · ${row.reason}",
+                    leadingIcon = if (row.id == selected) Icons.Default.Check else Icons.Default.Bed,
+                    onClick = { selected = row.id },
+                )
+            }
+            FormField(stringResource(R.string.hosp_motivo_asignacion), state.assignReason, model::onAssignReason, hint = stringResource(R.string.hosp_motivo_opcional_ayuda), enabled = !state.busy, singleLine = false)
+        }
+    }
 }
 
 @Composable private fun DischargeDialog(admission: HospitalAdmission, form: DischargeForm, state: HospitalizationState, model: HospitalizationViewModel) {
-    AlertDialog(onDismissRequest = { if (!state.busy) model.closeDischarge() }, title = { Text(stringResource(R.string.hosp_firmar_alta)) }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
-        state.formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        Text(stringResource(R.string.hosp_alta_tipo), style = MaterialTheme.typography.labelLarge)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.take(2).forEach { type -> FilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.drop(2).forEach { type -> FilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
-        OutlinedTextField(form.summary, model::onSummary, label = { Text(stringResource(R.string.hosp_alta_resumen)) }, supportingText = { Text(stringResource(R.string.hosp_alta_resumen_ayuda)) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), minLines = 4)
-        if (form.type == DischargeType.VOLUNTARY) Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(form.voluntaryConsent, model::onVoluntaryConsent, enabled = !state.busy); Text(stringResource(R.string.hosp_alta_constancia), style = MaterialTheme.typography.bodySmall) }
-        Text(stringResource(R.string.hosp_alta_pendientes), style = MaterialTheme.typography.labelLarge)
-        form.pending.forEachIndexed { index, item ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    OutlinedTextField(item.description, { model.onPending(index, item.copy(description = it)) }, label = { Text(stringResource(R.string.hosp_alta_pendiente)) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    OutlinedTextField(item.responsible, { model.onPending(index, item.copy(responsible = it)) }, label = { Text(stringResource(R.string.hosp_alta_responsable)) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    ConfirmDialog(
+        title = stringResource(R.string.hosp_firmar_alta),
+        confirmLabel = stringResource(R.string.hosp_firmar_alta),
+        onConfirm = { model.signDischarge(admission) },
+        onDismiss = model::closeDischarge,
+        busy = state.busy,
+        confirmEnabled = form.summary.trim().length >= HospitalizationRules.SUMMARY_MIN,
+    ) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
+            state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
+            Text(stringResource(R.string.hosp_alta_tipo), style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.take(2).forEach { type -> FilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.drop(2).forEach { type -> FilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
+            FormField(stringResource(R.string.hosp_alta_resumen), form.summary, model::onSummary, hint = stringResource(R.string.hosp_alta_resumen_ayuda), enabled = !state.busy, singleLine = false)
+            if (form.type == DischargeType.VOLUNTARY) Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(form.voluntaryConsent, model::onVoluntaryConsent, enabled = !state.busy); Text(stringResource(R.string.hosp_alta_constancia), style = MaterialTheme.typography.bodySmall) }
+            Text(stringResource(R.string.hosp_alta_pendientes), style = MaterialTheme.typography.labelLarge)
+            form.pending.forEachIndexed { index, item ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        FormField(stringResource(R.string.hosp_alta_pendiente), item.description, { model.onPending(index, item.copy(description = it)) }, enabled = !state.busy)
+                        FormField(stringResource(R.string.hosp_alta_responsable), item.responsible, { model.onPending(index, item.copy(responsible = it)) }, enabled = !state.busy)
+                    }
+                    IconButton(onClick = { model.removePending(index) }, enabled = !state.busy) { Icon(Icons.Default.Close, stringResource(R.string.hosp_alta_quitar)) }
                 }
-                IconButton(onClick = { model.removePending(index) }, enabled = !state.busy) { Icon(Icons.Default.Close, stringResource(R.string.hosp_alta_quitar)) }
             }
+            TextButton(onClick = model::addPending, enabled = !state.busy) { Text(stringResource(R.string.hosp_alta_agregar)) }
         }
-        TextButton(onClick = model::addPending, enabled = !state.busy) { Text(stringResource(R.string.hosp_alta_agregar)) }
-    } }, confirmButton = { Button(onClick = { model.signDischarge(admission) }, enabled = !state.busy && form.summary.trim().length >= HospitalizationRules.SUMMARY_MIN) { Text(if (state.busy) stringResource(R.string.hosp_guardando) else stringResource(R.string.hosp_firmar_alta)) } }, dismissButton = { TextButton(onClick = model::closeDischarge, enabled = !state.busy) { Text(stringResource(R.string.hosp_cancelar)) } })
+    }
 }
 
 @Composable private fun ExitDialog(admission: HospitalAdmission, state: HospitalizationState, model: HospitalizationViewModel) {
-    AlertDialog(onDismissRequest = { if (!state.busy) model.closeExit() }, title = { Text(stringResource(R.string.hosp_registrar_salida)) }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    ConfirmDialog(
+        title = stringResource(R.string.hosp_registrar_salida),
+        confirmLabel = stringResource(R.string.hosp_registrar_salida),
+        onConfirm = { model.registerExit(admission) },
+        onDismiss = model::closeExit,
+        message = stringResource(R.string.hosp_salida_detalle),
+        busy = state.busy,
+        confirmEnabled = ChangeReason.error(state.exitReason) == null,
+    ) {
         Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
-        Text(stringResource(R.string.hosp_salida_detalle), style = MaterialTheme.typography.bodySmall)
-        state.formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        OutlinedTextField(state.exitReason, model::onExitReason, label = { Text(stringResource(R.string.hosp_salida_motivo)) }, supportingText = { Text(stringResource(R.string.hosp_motivo_ayuda)) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), minLines = 2)
-    } }, confirmButton = { Button(onClick = { model.registerExit(admission) }, enabled = !state.busy && ChangeReason.error(state.exitReason) == null) { Text(if (state.busy) stringResource(R.string.hosp_guardando) else stringResource(R.string.hosp_registrar_salida)) } }, dismissButton = { TextButton(onClick = model::closeExit, enabled = !state.busy) { Text(stringResource(R.string.hosp_cancelar)) } })
+        state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        FormField(stringResource(R.string.hosp_salida_motivo), state.exitReason, model::onExitReason, hint = stringResource(R.string.hosp_motivo_ayuda), enabled = !state.busy, singleLine = false)
+    }
 }
