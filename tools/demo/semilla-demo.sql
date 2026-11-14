@@ -902,29 +902,6 @@ begin
   end loop;
 end $$;
 
--- Actualización sobre la semilla anterior: sus consultas firmadas sin signos (8, 9 y 11) los reciben ahora. Una consulta
--- firmada ya no admite hijos (trigger signos_consulta_abierta), así que el trigger se apaga solo dentro de esta
--- transacción; sin permiso para hacerlo el bloque se omite con un aviso y el resto de la semilla sigue.
-do $$
-begin
-  if not exists (select 1 from sdemo s join atencion.consulta c on c.id = pg_temp.did('0006', s.k)
-                 where not exists (select 1 from atencion.signos_vitales v where v.consulta_id = c.id)) then
-    return;
-  end if;
-  begin
-    alter table atencion.signos_vitales disable trigger signos_consulta_abierta;
-    insert into atencion.signos_vitales (id, paciente_id, consulta_id, tomado_por, tomado_en, pa_sistolica, pa_diastolica, fc, fr, temperatura, sat_o2, peso_kg, talla_cm)
-    select pg_temp.did('0043', 5000 + s.k), c.paciente_id, c.id, pg_temp.actor('AST'), c.iniciada_en - interval '10 minutes',
-           s.ps, s.pd, s.fc, s.fr, s.tt, s.sat, s.peso, s.talla
-    from sdemo s join atencion.consulta c on c.id = pg_temp.did('0006', s.k)
-    where not exists (select 1 from atencion.signos_vitales v where v.consulta_id = c.id)
-    on conflict do nothing;
-    alter table atencion.signos_vitales enable trigger signos_consulta_abierta;
-  exception when insufficient_privilege then
-    raise notice 'Sin permiso para completar los signos de las consultas firmadas de la semilla anterior; se omiten.';
-  end;
-end $$;
-
 -- Una consulta firmada se corrige con addendum: guarda el original y el motivo.
 insert into atencion.addendum (id, consulta_id, autor_id, motivo, texto, original, creado_en)
 select pg_temp.did('0044', 1), c.id, pg_temp.actor('MED'),

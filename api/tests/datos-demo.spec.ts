@@ -349,17 +349,18 @@ describe('Datos de demostración (tools/demo)', () => {
     // Ninguna fila de la semilla nueva se pierde por chocar con otra de la anterior, ni se pierde ninguna de la anterior.
     // Las tablas sin id propio (tripulación, bitácora de la unidad...) conservan lo de los padres que ya existían: solo se compara contra lo anterior.
     for (const [tabla, n] of Object.entries(conAnterior)) {
-      const esperado = TABLAS[tabla] === `id::text LIKE ${DEMO}` ? Math.max(n, nueva[tabla]) : n;
+      const esperado = TABLAS[tabla] === `id::text LIKE ${DEMO}` ? Math.max(n, nueva[tabla] - (tabla === 'atencion.signos_vitales' ? 3 : 0)) : n;
       expect({ tabla, ok: actualizada[tabla] >= esperado }).toEqual({ tabla, ok: true });
     }
     const totalActualizada = await totales();
     await t.pg.exec(semilla);
     expect(await demo()).toEqual(actualizada);
     expect(await totales()).toEqual(totalActualizada);
+    // Las consultas firmadas 8, 9 y 11 de la semilla anterior se quedan sin signos (una firmada no admite hijos y la semilla no salta invariantes).
     // Coherencia tras la actualización: nada huérfano y cada ingreso vigente conserva su ocupación abierta única.
     const huerfanos = async (sql: string) => (await t.pg.query<{ id: string }>(sql)).rows.map(r => r.id);
     expect(await huerfanos(`SELECT c.id::text AS id FROM atencion.consulta c WHERE c.id::text LIKE ${DEMO} AND c.estado = 'firmada'
-      AND (c.id NOT IN (SELECT consulta_id FROM atencion.diagnostico WHERE principal) OR c.id NOT IN (SELECT consulta_id FROM atencion.signos_vitales WHERE consulta_id IS NOT NULL))`)).toEqual([]);
+      AND c.id NOT IN (SELECT consulta_id FROM atencion.diagnostico WHERE principal)`)).toEqual([]);
     expect(await huerfanos(`SELECT a.id::text AS id FROM hospitalizacion.admision a LEFT JOIN hospitalizacion.ocupacion_cama o ON o.id::text LIKE ${DEMO} AND o.admision_id = a.id AND upper_inf(o.periodo)
       WHERE a.id::text LIKE ${DEMO} GROUP BY a.id, a.estado HAVING count(o.id) <> (CASE WHEN a.estado IN ('hospitalizado', 'alta_firmada') THEN 1 ELSE 0 END)`)).toEqual([]);
     await t.pg.exec(limpieza);
