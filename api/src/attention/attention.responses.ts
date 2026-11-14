@@ -23,11 +23,22 @@ export class CatalogDoctorResponse {
   @UuidProp({ nullable: true }) areaId!: string | null;
   @StrProp({ nullable: true }) area!: string | null;
   @BoolProp() active!: boolean;
+  @BoolProp({ optional: true, nullable: true, description: 'Tiene turno publicado el día consultado; solo si se envía date' }) tieneTurno?: boolean | null;
+  @StrProp({ optional: true, nullable: true, description: 'Motivo corto cuando no tiene turno' }) motivo?: string | null;
 }
 
 export class AppointmentCatalogsResponse {
   @ClassArrayProp(CatalogPatientResponse) patients!: CatalogPatientResponse[];
   @ClassArrayProp(CatalogDoctorResponse) doctors!: CatalogDoctorResponse[];
+}
+
+export const ESTADO_FRANJA = ['libre', 'ocupado', 'sin_turno', 'pasado'] as const;
+
+export class SlotStateResponse {
+  @DateTimeProp() start!: string;
+  @DateTimeProp() end!: string;
+  @EnumProp(ESTADO_FRANJA, 'EstadoFranja') estado!: string;
+  @StrProp({ nullable: true, description: 'Motivo corto en español cuando no está libre' }) motivo!: string | null;
 }
 
 export class AvailabilityResponse {
@@ -36,6 +47,7 @@ export class AvailabilityResponse {
   @IntProp() durationMinutes!: number;
   @ClassArrayProp(PeriodResponse) workPeriods!: PeriodResponse[];
   @ClassArrayProp(PeriodResponse) slots!: PeriodResponse[];
+  @ClassArrayProp(SlotStateResponse, { description: 'Todas las franjas del día con su estado' }) franjas!: SlotStateResponse[];
 }
 
 export class AppointmentResponse {

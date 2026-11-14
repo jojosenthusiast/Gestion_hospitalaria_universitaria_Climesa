@@ -39,6 +39,19 @@ describe('W27 · vinculaciones por verificar (FR-101-08 a FR-101-11)', () => {
     expect(api.request).toHaveBeenCalledTimes(2);
   });
 
+  it('explica qué es una vinculación, sus pasos y sus estados', async () => {
+    mount(['cuentas.verificar']);
+    expect(await screen.findByRole('heading', { name: '¿Qué es una vinculación?' })).toBeTruthy();
+    expect(screen.getByText(/1\. Llega la solicitud/)).toBeTruthy();
+    expect(screen.getByRole('list', { name: 'Estados' })).toBeTruthy();
+    expect((await screen.findAllByRole('status')).some(n => /2 solicitudes esperan tu revisión/.test(n.textContent ?? ''))).toBe(true);
+  });
+
+  it('con la lista vacía orienta en vez de dejar la pantalla en blanco', async () => {
+    mount(['cuentas.verificar'], []);
+    expect(await screen.findByText(/Estás al día/)).toBeTruthy();
+  });
+
   it('sin expediente no ofrece aprobar y lleva a buscar antes de crear', async () => {
     mount(['cuentas.verificar']);
     const card = await screen.findByRole('listitem', { name: 'Solicitud de josue@example.test' });

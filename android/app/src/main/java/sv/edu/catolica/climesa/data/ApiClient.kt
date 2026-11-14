@@ -51,7 +51,7 @@ class ApiClient(
             body?.let { payload -> c.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) } }
             val status=c.responseCode
             val text=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}.orEmpty()
-            if(status !in 200..299){val message=apiErrorMessage(text);throw AuthRequestException(message?.takeIf{it.isNotBlank()}?:"No se pudo completar la operación (HTTP $status).",status,apiErrorCode(text))}
+            if(status !in 200..299){val message=apiErrorMessage(text);throw AuthRequestException(message?.takeIf{it.isNotBlank()}?:"No se pudo completar la operación (HTTP $status).",status,apiErrorCode(text),text)}
             return if(text.isBlank())JSONObject()else JSONTokener(text).nextValue()
         } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("Sin conexión. Conservamos el formulario; vuelve a intentar.")} finally {c.disconnect()}
     }

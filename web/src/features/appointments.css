@@ -1,0 +1,14 @@
+.slot-section { display: grid; gap: 8px; }
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.slot { display: grid; gap: 2px; padding: 8px 6px; border-radius: var(--radius-control); border: 2px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; text-align: center; }
+.slot strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+.slot small { font-size: 11px; font-weight: 700; }
+.slot-libre { border-color: var(--success); background: var(--success-soft); color: var(--success); cursor: pointer; }
+.slot-libre:hover { background: var(--success); color: var(--on-primary); }
+.slot-libre.is-selected { background: var(--success); color: var(--on-primary); outline: 3px solid var(--outline); outline-offset: 1px; }
+.slot-ocupado { border-style: solid; border-color: var(--ink); background: var(--disabled); color: var(--muted); cursor: not-allowed; }
+.slot-sin_turno { border-style: dashed; border-color: var(--state-blocked); background: var(--state-blocked-soft); color: var(--state-blocked); cursor: not-allowed; }
+.slot-pasado { border-style: dotted; border-color: var(--control-line); background: var(--disabled); color: var(--muted); opacity: 0.7; cursor: not-allowed; }
+.slot-legend { display: flex; flex-wrap: wrap; gap: 14px; list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--muted); }
+.slot-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.slot-key { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 2px solid var(--line); }

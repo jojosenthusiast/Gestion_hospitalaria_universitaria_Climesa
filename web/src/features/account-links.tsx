@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Field, Notice } from '../components/ui';
 import { can, type AccessProfile, type Api } from '../lib/api';
+import './account-links.css';
 import { Dialog, Empty, Heading, RemoteState, SaveButton, WriteError, formatDate, formatDateTime, useAction, useData } from './common';
 
 /** Row of `GET /cuentas/vinculaciones` (spec 101, W27). */
@@ -23,13 +24,33 @@ export function AccountLinksPage({ api, profile, version }: { api: Api; profile:
   const allowed = can(profile, 'cuentas.verificar');
   return <>
     <Heading eyebrow="Pacientes / Cuentas" title="Vinculaciones por verificar" description="Cuentas de pacientes que piden unirse a su expediente. Las nuevas aparecen solas." />
+    <LinkingGuide />
     <section className="data-workbench" aria-label="Solicitudes de vinculación">
       <RemoteState state={data}>{rows => rows.length
-        ? <ul className="history-list">{rows.map(row => <LinkRequestCard key={row.id} api={api} row={row} allowed={allowed} onReject={() => setRejecting(row)} onSaved={reload} />)}</ul>
-        : <Empty title="No hay vinculaciones pendientes" description="Cuando un paciente pida unir su cuenta con su expediente, aparecerá aquí." />}</RemoteState>
+        ? <><p className="link-summary" role="status"><strong>{rows.length}</strong> {rows.length === 1 ? 'solicitud espera' : 'solicitudes esperan'} tu revisión · <span>{rows.filter(r => r.candidate).length} con expediente que coincide</span> · <span>{rows.filter(r => !r.candidate).length} por revisar a mano</span></p><ul className="history-list">{rows.map(row => <LinkRequestCard key={row.id} api={api} row={row} allowed={allowed} onReject={() => setRejecting(row)} onSaved={reload} />)}</ul></>
+        : <Empty title="No hay vinculaciones pendientes" description="Estás al día. Cuando un paciente cree su cuenta en la app y pida unirla a su expediente, la solicitud aparecerá aquí sola, sin recargar." />}</RemoteState>
     </section>
     {rejecting && <RejectDialog api={api} row={rejecting} onClose={() => setRejecting(null)} onSaved={reload} />}
   </>;
+}
+
+/** Explica el módulo para quien lo abre por primera vez: qué es, cómo se resuelve y qué significa cada estado. */
+function LinkingGuide() {
+  return <section className="link-guide" aria-label="Qué es una vinculación">
+    <h2>¿Qué es una vinculación?</h2>
+    <p>Un paciente crea su propia cuenta en la app y pide <strong>unirla a su expediente médico</strong> para ver sus citas, resultados e historial. Antes de darle acceso, Recepción confirma que de verdad es esa persona: compara el <strong>DUI y la fecha de nacimiento</strong> que declaró con los del expediente.</p>
+    <ol className="link-steps">
+      <li><strong>1. Llega la solicitud.</strong><span>Aparece abajo por sí sola.</span></li>
+      <li><strong>2. Compara los datos.</strong><span>Nombre, DUI y nacimiento frente al expediente candidato.</span></li>
+      <li><strong>3. Decide.</strong><span>Aprueba si coinciden; rechaza con un motivo si no.</span></li>
+    </ol>
+    <ul className="link-states" aria-label="Estados">
+      <li><span className="status-tag status-normal">Coincide</span> El dato declarado es igual al del expediente.</li>
+      <li><span className="status-tag status-pendiente">Revisar</span> No hay coincidencia: verifica con el paciente o busca el expediente.</li>
+      <li><span className="status-tag status-aprobada">Aprobada</span> La cuenta ya ve su expediente.</li>
+      <li><span className="status-tag status-rechazada">Rechazada</span> El paciente lee tu motivo y puede volver a pedirlo.</li>
+    </ul>
+  </section>;
 }
 
 function LinkRequestCard({ api, row, allowed, onReject, onSaved }: { api: Api; row: LinkRequest; allowed: boolean; onReject: () => void; onSaved: () => void }) {

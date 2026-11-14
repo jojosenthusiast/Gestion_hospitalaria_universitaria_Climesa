@@ -29,9 +29,9 @@ class RemotePatientRepository(private val api:ApiClient):PatientRepository {
         return PatientDetails(person,events.sortedBy{it.version})
     }
     private fun body(d:PatientDraft)=JSONObject().put("givenNames",d.givenNames.trim()).put("surnames",d.surnames.trim()).put("dui",d.dui).put("birth",d.birth).put("sex",when(d.sex){Sex.FEMALE->"femenino";Sex.MALE->"masculino";Sex.INDETERMINATE->"indeterminado";Sex.UNKNOWN->"no_registrado"}).put("phone",d.phone)
-    override suspend fun save(draft:PatientDraft,id:String?,version:Int?,reason:String,token:String?,query:String):PatientDetails {
+    override suspend fun save(draft:PatientDraft,id:String?,version:Int?,reason:String,token:String?,query:String,confirmNew:Boolean):PatientDetails {
         val data=body(draft)
-        if(id==null){data.put("searchToken",token).put("searchQuery",query)}else data.put("version",version).put("reason",reason)
+        if(id==null){data.put("searchToken",token).put("searchQuery",query);if(confirmNew)data.put("confirmarNuevo",true)}else data.put("version",version).put("reason",reason)
         val r=api.request(if(id==null)"/pacientes" else "/pacientes/$id",if(id==null)"POST" else "PATCH",data) as JSONObject
         return detail(r.getString("id"))
     }

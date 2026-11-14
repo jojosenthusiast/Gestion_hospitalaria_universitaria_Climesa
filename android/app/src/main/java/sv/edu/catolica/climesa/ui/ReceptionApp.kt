@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import sv.edu.catolica.climesa.domain.*
 import sv.edu.catolica.climesa.R
+import sv.edu.catolica.climesa.ui.dashboard.RoleDashboardScreen
 import androidx.compose.ui.res.stringResource
 import java.time.Instant
 import java.time.ZoneId
@@ -47,20 +48,29 @@ private fun receptionNavigation(sections: List<AndroidSection>) = sections.map {
 
 private fun receptionSections(sections: List<AndroidSection>): List<AndroidSection> {
     val profile = sections.firstOrNull { it == AndroidSection.PROFILE }
-    val operational = sections.filterNot { it == AndroidSection.PROFILE || it == AndroidSection.HOSPITAL_INFO }
-    return (operational.take(3) + listOfNotNull(profile) + sections.filterNot { it in operational.take(3) || it == profile }).distinct()
+    val home = sections.firstOrNull { it == AndroidSection.HOME }
+    val operational = sections.filterNot { it == AndroidSection.PROFILE || it == AndroidSection.HOSPITAL_INFO || it == AndroidSection.HOME }
+    return (listOfNotNull(home) + operational.take(3) + listOfNotNull(profile) + sections.filterNot { it in operational.take(3) || it == profile }).distinct()
 }
 
 @Composable fun ReceptionApp(model:ReceptionViewModel,dark:Boolean,setDark:(Boolean)->Unit,account:AuthenticatedAccount,signingOut:Boolean,logout:()->Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val sections=AndroidSections.visible("REC",account.profile.permissions)
     val navSections = receptionSections(sections)
-    var selectedName by rememberSaveable { mutableStateOf(AndroidSection.PROFILE.name) }
+    var selectedName by rememberSaveable { mutableStateOf(AndroidSection.HOME.name) }
+    val inbox=rememberQuickActionInbox()
     val page=sections.firstOrNull { it.name==selectedName } ?: sections.firstOrNull() ?: return
     val tab=navSections.indexOf(page)
     var discard by remember { mutableStateOf(false) }
     val snack=remember { SnackbarHostState() }
     LaunchedEffect(sections) { if(sections.none { it.name==selectedName }) selectedName=sections.firstOrNull { it==AndroidSection.PROFILE }?.name?:sections.first().name }
+    LaunchedEffect(page) { inbox.dropUnless(page) }
+    val patientAction=inbox.actionFor(AndroidSection.PATIENTS)
+    LaunchedEffect(patientAction,state.loading) {
+        if(patientAction==null||state.loading)return@LaunchedEffect
+        if(patientAction==QuickAction.REGISTER_PATIENT&&QuickActions.allowed(patientAction,account.profile.permissions)&&state.query.trim().length>=2) model.newPatient()
+        inbox.consume(AndroidSection.PATIENTS)
+    }
     LaunchedEffect(state.message) { state.message?.let { snack.showSnackbar(it);model.clearMessage() } }
     fun back() { if(state.saving)return;if(state.formOpen) discard=true else model.select(null) }
     BackHandler(state.formOpen || state.selected!=null) { back() }
@@ -87,6 +97,9 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
         when {
             state.formOpen -> PatientForm(state,model)
             state.selected!=null -> PatientDetail(state.selected!!,state,model)
+            page==AndroidSection.HOME -> RoleDashboardScreen(account,"REC",{request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}})
+            page==AndroidSection.APPOINTMENTS -> ReceptionAppointmentsScreen(account.profile.channels,"citas.agendar" in account.profile.permissions,quickAction=inbox.actionFor(AndroidSection.APPOINTMENTS),onQuickActionHandled={inbox.consume(AndroidSection.APPOINTMENTS)})
+            page==AndroidSection.LINKING -> ReceptionLinkingScreen(account.profile.channels,"cuentas.verificar" in account.profile.permissions,{selectedName=AndroidSection.PATIENTS.name})
             page==AndroidSection.BEDS -> BedsScreen(account.profile)
             page==AndroidSection.QUEUE -> QueueScreen(account.profile)
             page==AndroidSection.HOSPITAL_INFO -> HospitalInfoScreen()
@@ -130,11 +143,12 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
 }
 @Composable private fun Patients(state:ReceptionState,model:ReceptionViewModel) {
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item { SectionIntro("Recepción / CLIMESA", "Pacientes", "Buscá antes de registrar.") }
+        item { SectionIntro("Recepción / CLIMESA", "Pacientes", stringResource(R.string.rec_registrar_regla)) }
         item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text("Nombre, DUI o expediente")},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,"Limpiar búsqueda")}}) }
         item { Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
             if(PatientAction.SEARCH in state.actions) ClimesaButton(if(state.searching) "Buscando…" else "Buscar",Icons.Default.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)
-            if(PatientAction.REGISTER in state.actions) ClimesaButton("Registrar paciente",Icons.Default.Add,model::newPatient,enabled=state.searchedQuery!=null,outlined=true)
+            if(PatientAction.REGISTER in state.actions) ClimesaButton(if(state.searching) "Buscando…" else "Registrar paciente",Icons.Default.Add,model::newPatient,enabled=!state.searching,outlined=true)
+            if(PatientAction.REGISTER in state.actions && state.searchedQuery==null && PatientRules.normalize(state.query).replace(" ","").length<2) Text(stringResource(R.string.rec_registrar_sin_busqueda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         } }
         item { LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(3) {i->val label=listOf("Activos","Inactivos","Todos")[i];FilterChip(selected=state.filter==i,onClick={model.filter(i)},label={Text(label)})}} }
         item { Text(if(state.searchedQuery==null) "${state.results.size} pacientes" else "${state.results.size} coincidencias",style=MaterialTheme.typography.labelLarge) }
@@ -173,6 +187,13 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text(if(state.editingId==null) "Nuevo paciente" else "Actualizar información",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
         Text("Los campos con * son obligatorios.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        if(state.editingId==null) Text(stringResource(R.string.rec_registrar_formulario_ayuda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
+        state.existing?.let { NoticeBanner(NoticeKind.INFO,stringResource(R.string.rec_dui_existente,it)) }
+        if(state.similar.isNotEmpty()) ClimesaCard { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.rec_duplicado_titulo),style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold)
+            state.similar.forEach { Text(it,style=MaterialTheme.typography.bodyMedium) }
+            ClimesaButton(stringResource(R.string.rec_duplicado_confirmar),Icons.Default.Add,{model.save(true)},enabled=!state.saving,outlined=true)
+        } }
         Text("01 / DATOS PERSONALES",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
         PatientField("Nombres *",d.givenNames,state.fields["givenNames"],enabled=!state.saving) {model.draft(d.copy(givenNames=it.take(80)))}
         PatientField("Apellidos *",d.surnames,state.fields["surnames"],enabled=!state.saving) {model.draft(d.copy(surnames=it.take(100)))}
@@ -182,7 +203,7 @@ private fun receptionSections(sections: List<AndroidSection>): List<AndroidSecti
         Sex.entries.forEach {sex -> Row(verticalAlignment=Alignment.CenterVertically) {RadioButton(selected=d.sex==sex,onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving);TextButton(onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving) {Text(sex.label)}}}
         PatientField("Teléfono · opcional",d.phone,state.fields["phone"],"7000-0000",KeyboardType.Phone,!state.saving) {model.draft(d.copy(phone=it.take(9)))}
         if(state.editingId!=null) OutlinedTextField(state.reason,model::reason,modifier=Modifier.fillMaxWidth(),enabled=!state.saving,label={Text("Motivo de modificación *")},supportingText={Text("Mínimo 10 caracteres. Quedará en el historial.")})
-        Button(onClick=model::save,enabled=!state.saving,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text(if(state.saving) "Guardando…" else "Guardar paciente")}
+        Button(onClick={model.save()},enabled=!state.saving,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text(if(state.saving) "Guardando…" else "Guardar paciente")}
         Text("Revisá posibles duplicados antes de guardar.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
     }

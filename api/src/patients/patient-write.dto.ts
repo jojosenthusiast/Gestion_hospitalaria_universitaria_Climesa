@@ -17,6 +17,7 @@ export class PatientWriteDto {
 export class PatientCreateDto extends PatientWriteDto {
   @ApiProperty({format:'uuid'}) @IsUUID() searchToken!: string;
   @Text(2,100) searchQuery!: string;
+  @ApiPropertyOptional({description:'Confirma que es un paciente nuevo aunque ya exista uno con el mismo nombre y fecha de nacimiento'}) @IsOptional() @IsBoolean() confirmarNuevo?: boolean;
 }
 export class PatientUpdateDto extends PatientWriteDto {
   @ApiProperty({minimum:1}) @IsInt() @Min(1) version!: number;

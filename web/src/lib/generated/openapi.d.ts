@@ -22,6 +22,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pacientes/selector": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Selector de pacientes: id, expediente, nombre y edad, paginado y sin tildes */
+        get: operations["PatientsController_picker"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pacientes/busquedas": {
         parameters: {
             query?: never;
@@ -577,7 +594,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Consultar pacientes y médicos disponibles para agendar */
+        /** Médicos activos (con date indica quién tiene turno ese día); a recepción ya no devuelve pacientes: se buscan con /pacientes/selector */
         get: operations["AttentionController_catalogs"];
         put?: never;
         post?: never;
@@ -594,7 +611,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Consultar franjas libres de un médico para una fecha */
+        /** Consultar las franjas del día de un médico con su estado (libre, ocupado, sin_turno, pasado) */
         get: operations["AttentionController_availability"];
         put?: never;
         post?: never;
@@ -1701,6 +1718,22 @@ export interface components {
             version: number;
             matchReason: string;
         };
+        PatientPickerItemResponse: {
+            /** Format: uuid */
+            id: string;
+            /** @description Número de expediente */
+            record: string;
+            fullName: string;
+            /** @description Edad en años; solo si el rol puede ver la fecha de nacimiento */
+            age?: number;
+        };
+        PatientPickerResponse: {
+            items: components["schemas"]["PatientPickerItemResponse"][];
+            offset: number;
+            limit: number;
+            /** @description Hay más resultados después de esta página */
+            hasMore: boolean;
+        };
         PatientSearchDto: {
             query: string;
         };
@@ -1787,6 +1820,8 @@ export interface components {
             /** Format: uuid */
             searchToken: string;
             searchQuery: string;
+            /** @description Confirma que es un paciente nuevo aunque ya exista uno con el mismo nombre y fecha de nacimiento */
+            confirmarNuevo?: boolean;
         };
         PatientCreatedResponse: {
             /** Format: uuid */
@@ -2280,6 +2315,10 @@ export interface components {
             areaId: string | null;
             area: string | null;
             active: boolean;
+            /** @description Tiene turno publicado el día consultado; solo si se envía date */
+            tieneTurno?: boolean | null;
+            /** @description Motivo corto cuando no tiene turno */
+            motivo?: string | null;
         };
         AppointmentCatalogsResponse: {
             patients: components["schemas"]["CatalogPatientResponse"][];
@@ -2290,6 +2329,17 @@ export interface components {
             start: string;
             /** Format: date-time */
             end: string;
+        };
+        /** @enum {string} */
+        EstadoFranja: "libre" | "ocupado" | "sin_turno" | "pasado";
+        SlotStateResponse: {
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            estado: components["schemas"]["EstadoFranja"];
+            /** @description Motivo corto en español cuando no está libre */
+            motivo: string | null;
         };
         AvailabilityResponse: {
             /** Format: uuid */
@@ -2302,6 +2352,8 @@ export interface components {
             durationMinutes: number;
             workPeriods: components["schemas"]["PeriodResponse"][];
             slots: components["schemas"]["PeriodResponse"][];
+            /** @description Todas las franjas del día con su estado */
+            franjas: components["schemas"]["SlotStateResponse"][];
         };
         /** @enum {string} */
         EstadoCita: "solicitada" | "confirmada" | "atendida" | "cancelada" | "rechazada" | "no_asistio";
@@ -3659,7 +3711,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "existencia_insuficiente" | "aviso_con_datos_personales" | "indicador_desconocido" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "existencia_insuficiente" | "aviso_con_datos_personales" | "indicador_desconocido" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -3723,6 +3775,7 @@ export interface operations {
             query?: {
                 query?: string;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -3847,6 +3900,65 @@ export interface operations {
             };
         };
     };
+    PatientsController_picker: {
+        parameters: {
+            query: {
+                query: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPickerResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     PatientsController_recordSearch: {
         parameters: {
             query?: never;
@@ -3920,6 +4032,7 @@ export interface operations {
             query?: {
                 query?: string;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -6283,7 +6396,10 @@ export interface operations {
     };
     AttentionController_catalogs: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Día local, yyyy-MM-dd */
+                date?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

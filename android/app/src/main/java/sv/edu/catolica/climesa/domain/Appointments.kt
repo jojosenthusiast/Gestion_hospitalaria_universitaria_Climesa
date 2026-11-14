@@ -14,6 +14,8 @@ data class AppointmentDoctor(
     val id: String,
     val name: String,
     val specialty: String?,
+    val hasShift: Boolean = true,
+    val reason: String? = null,
 )
 
 data class AppointmentSlot(

@@ -12,6 +12,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 101,PATCH,/api/v1/usuarios/{id}/roles,usuarios.asignar_roles,Nunca a sí mismo,R,2,Asignar roles
 101,PATCH,/api/v1/usuarios/{id}/estado,usuarios.desactivar,Nunca a sí mismo,R,2,Desactivar cuenta
 102,GET,/api/v1/pacientes,pacientes.buscar,Devuelve datos mínimos y motivo de coincidencia,R,2,"Búsqueda fonética por nombre, DUI o expediente"
+102,GET,/api/v1/pacientes/selector,pacientes.buscar,"Respuesta mínima (id, expediente, nombre, edad), paginada",R,2,Selector de pacientes con búsqueda mientras se escribe
 102,POST,/api/v1/pacientes/busquedas,pacientes.buscar,Registra la búsqueda previa que exige el alta,R,2,Búsqueda con datos sensibles en el cuerpo y no en la URL
 102,POST,/api/v1/pacientes,pacientes.registrar,Exige búsqueda previa reciente,R,2,Registrar paciente
 102,POST,/api/v1/pacientes/provisionales,pacientes.registrar_provisional,,R,4,Paciente sin identidad confirmada (NN)
@@ -45,7 +46,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 104,PUT,/api/v1/recursos/tipos/{id},recursos.configurar,,E,4,Tipos de equipo médico
 105,GET,/api/v1/me/fila,fila.ver,Propio,R,3,Mi número y cuántos faltan
 105,GET,/api/v1/citas,citas.ver,MED y PAC solo propias,R,3,"Citas por fecha, médico o paciente"
-105,GET,/api/v1/citas/disponibilidad,citas.agendar OR citas.solicitar,PAC y REC según permisos,R,3,Horarios libres por médico y fecha
+105,GET,/api/v1/citas/disponibilidad,citas.agendar OR citas.solicitar,PAC y REC según permisos,R,3,"Franjas del día por médico con su estado (libre, ocupado, sin_turno, pasado)"
 105,POST,/api/v1/citas,citas.agendar,Sin traslape por médico,R,3,Agendar cita
 105,POST,/api/v1/citas/solicitudes,citas.solicitar,Cuenta verificada,R,4,Paciente pide cita
 105,POST,/api/v1/citas/solicitudes/{id}/confirmar,citas.agendar,,R,4,Confirmar solicitud con horario
@@ -100,7 +101,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 113,GET,/api/v1/metricas/tablero,metricas.ver,Agregados sin datos personales,R,2,Tablero inicial
 113,GET,/api/v1/metricas/{indicador},metricas.ver,,E,5,Serie de un indicador
 111,POST,/api/v1/inventario/articulos,inventario.configurar,,R,4,Crear artículo
-105,GET,/api/v1/citas/catalogos,citas.agendar OR citas.solicitar,Pacientes y médicos según relación,R,3,Catálogos para agendar o solicitar citas
+105,GET,/api/v1/citas/catalogos,citas.agendar OR citas.solicitar,"Médicos activos con turno del día; pacientes solo el propio de PAC (REC busca con /pacientes/selector)",R,3,Catálogos para agendar o solicitar citas
 106,GET,/api/v1/consultas/agenda,consulta.iniciar,Solo agenda propia,R,3,Agenda de consultas del médico
 106,PATCH,/api/v1/consultas/{id},consulta.registrar,Versión y autor,R,3,Guardar borrador de consulta
 105,GET,/api/v1/fila,fila.ver,Filtra según relación,R,3,Fila del día

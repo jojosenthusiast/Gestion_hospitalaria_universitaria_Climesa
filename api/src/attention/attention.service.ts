@@ -81,26 +81,34 @@ export class AttentionService {
     return channelsFor(c, ['citas.ver'], { excludeContexts: ['propio'], users: [await patientAccount(c, patientId)] });
   }
 
-  async catalogs(actor: Actor) {
+  async catalogs(actor: Actor, date?: string) {
+    if (date !== undefined && date !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new BadRequestException('La fecha debe tener formato AAAA-MM-DD.');
     const canManagePatients = contextsOf(actor, 'citas.agendar').length > 0;
     const [patients, doctors] = await Promise.all([
-      this.db.transaction(async c => { const rows = (await c.query(`SELECT id, expediente AS record,
+      // Recepción busca pacientes con /pacientes/selector (escala a miles); aquí solo queda el propio paciente de una cuenta PAC.
+      canManagePatients ? Promise.resolve([] as any[]) : this.db.transaction(async c => { const rows = (await c.query(`SELECT id, expediente AS record,
         coalesce(nullif(concat_ws(' ',nombres,primer_apellido,segundo_apellido),''),alias_provisional) AS "fullName",
         (estado IN ('activo','provisional')) AS active
         FROM pacientes.paciente
-        WHERE estado IN ('activo','provisional') AND ($1::boolean OR id=$2::uuid)
+        WHERE estado IN ('activo','provisional') AND id=$1::uuid
         ORDER BY primer_apellido,nombres,id
-        LIMIT 500`, [canManagePatients, actor.patientId])).rows;
-        // SEG-02: the scheduling catalog lists patients, so its read is audited in aggregate. The identifiers stay
-        // (privacidad.md §3.9: the patient can see who consulted their data); the detail is stored only once.
-        await this.commands.audit(c, actor, { action: 'citas.catalogo_leer', entity: 'paciente', permission: canManagePatients ? 'citas.agendar' : 'citas.solicitar', detail: { patientCount: rows.length, patientIds: rows.map(row => row.id) } });
+        LIMIT 1`, [actor.patientId])).rows;
+        // SEG-02: the catalog read is audited; the identifiers stay (privacidad.md §3.9).
+        await this.commands.audit(c, actor, { action: 'citas.catalogo_leer', entity: 'paciente', permission: 'citas.solicitar', detail: { patientCount: rows.length, patientIds: rows.map(row => row.id) } });
         return rows;
       }),
-      this.db.query(`SELECT p.id,p.nombres AS "givenNames",p.apellidos AS surnames,p.tipo AS type,
-        p.especialidad AS specialty,p.area_id AS "areaId",e.nombre AS area,p.activo AS active
-        FROM personal.persona p LEFT JOIN infra.espacio e ON e.id=p.area_id
-        WHERE p.tipo='medico' AND p.activo
-        ORDER BY p.apellidos,p.nombres,p.id`),
+      (async () => {
+        const dayStart = date ? new Date(`${date}T00:00:00-06:00`) : null;
+        const dayEnd = dayStart ? new Date(dayStart.valueOf() + 86_400_000) : null;
+        const rows = await this.db.query(`SELECT p.id,p.nombres AS "givenNames",p.apellidos AS surnames,p.tipo AS type,
+          p.especialidad AS specialty,p.area_id AS "areaId",e.nombre AS area,p.activo AS active,
+          CASE WHEN $1::timestamptz IS NULL THEN NULL ELSE EXISTS(SELECT 1 FROM personal.turno t WHERE t.persona_id=p.id AND t.estado IN ('publicado','en_curso')
+            AND t.periodo && tstzrange($1::timestamptz,$2::timestamptz,'[)')) END AS "tieneTurno"
+          FROM personal.persona p LEFT JOIN infra.espacio e ON e.id=p.area_id
+          WHERE p.tipo='medico' AND p.activo
+          ORDER BY p.apellidos,p.nombres,p.id`, [dayStart, dayEnd]);
+        return rows.map((row: any) => ({ ...row, motivo: row.tieneTurno === false ? 'Sin turno ese día' : null }));
+      })(),
     ]);
     return { patients, doctors };
   }
@@ -155,7 +163,36 @@ export class AttentionService {
         end: new Date(shift.end).toISOString(),
       }))
       .filter(period => Number.isFinite(Date.parse(period.start)) && Number.isFinite(Date.parse(period.end)));
-    return { doctorId, date, durationMinutes, workPeriods, slots };
+    const franjas = this.dayGrid(shifts, occupied, dayStart.valueOf(), dayEnd.valueOf(), now, durationMinutes * 60_000);
+    return { doctorId, date, durationMinutes, workPeriods, slots, franjas };
+  }
+
+  /**
+   * Todas las franjas del día con su estado para pintar la rejilla: dentro de un turno son `libre`, `ocupado` o `pasado`;
+   * sin turno ese día se devuelve la rejilla estándar (08:00 a 16:00) como `sin_turno`.
+   */
+  private dayGrid(shifts: any[], occupied: number[][], dayStart: number, dayEnd: number, now: number, step: number) {
+    const out: Array<{ start: string; end: string; estado: string; motivo: string | null }> = [];
+    const push = (from: number, estado: string, motivo: string | null) => out.push({ start: new Date(from).toISOString(), end: new Date(from + step).toISOString(), estado, motivo });
+    if (!shifts.length) {
+      for (let cursor = dayStart + 8 * 3_600_000; cursor + step <= dayStart + 16 * 3_600_000; cursor += step) push(cursor, 'sin_turno', 'Médico sin turno');
+      return out;
+    }
+    const seen = new Set<number>();
+    for (const shift of shifts) {
+      const origin = new Date(shift.start).valueOf();
+      const from = origin + Math.ceil((Math.max(origin, dayStart) - origin) / step) * step;
+      const to = Math.min(new Date(shift.end).valueOf(), dayEnd);
+      for (let cursor = from; cursor + step <= to; cursor += step) {
+        if (seen.has(cursor)) continue;
+        seen.add(cursor);
+        const end = cursor + step;
+        if (occupied.some(([a, b]) => cursor < b && end > a)) push(cursor, 'ocupado', 'Ocupado');
+        else if (cursor < now) push(cursor, 'pasado', 'Ya pasó');
+        else push(cursor, 'libre', null);
+      }
+    }
+    return out.sort((a, b) => a.start.localeCompare(b.start));
   }
 
   async list(actor: Actor, from?: string, to?: string, patientId?: string, doctorId?: string) {

@@ -48,7 +48,9 @@ const registrar = () => screen.getByRole('button', { name: /Registrar paciente/ 
 async function llenarYEnviar() {
   await userEvent.click(registrar());
   const dialogo = await screen.findByRole('dialog', { name: 'Registrar paciente' });
+  await userEvent.clear(within(dialogo).getByLabelText('Nombres'));
   await userEvent.type(within(dialogo).getByLabelText('Nombres'), 'Luis');
+  await userEvent.clear(within(dialogo).getByLabelText('Apellidos'));
   await userEvent.type(within(dialogo).getByLabelText('Apellidos'), 'Prueba');
   await userEvent.click(within(dialogo).getByRole('button', { name: /Registrar paciente/ }));
   return dialogo;
@@ -67,12 +69,45 @@ describe('búsqueda antes de registrar', () => {
     expect(screen.getByText(/Posibles coincidencias/)).toBeTruthy();
   });
 
-  it('deshabilita "Registrar paciente" hasta tener una búsqueda vigente', async () => {
-    montar();
-    expect((registrar() as HTMLButtonElement).disabled).toBe(true);
-    await buscar();
-    await screen.findByText(/Puedes registrar/);
+  it('"Registrar paciente" siempre abre el formulario y pide buscar primero si no hay búsqueda vigente', async () => {
+    const api = montar();
     expect((registrar() as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.click(registrar());
+    const dialogo = await screen.findByRole('dialog', { name: 'Registrar paciente' });
+    expect(within(dialogo).getByText(/Antes de crear un expediente nuevo, busca/)).toBeTruthy();
+    expect(within(dialogo).queryByLabelText('Nombres')).toBeNull();
+    await userEvent.type(within(dialogo).getByLabelText(/Nombre, DUI o expediente/), 'Pedro Gomez');
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Buscar/ }));
+    expect(await within(dialogo).findByLabelText('Nombres')).toHaveProperty('value', 'Pedro');
+    expect(within(dialogo).getByLabelText('Apellidos')).toHaveProperty('value', 'Gomez');
+    expect(api.write).toHaveBeenCalledWith('/pacientes/busquedas', { query: 'Pedro Gomez' }, 'POST');
+  });
+
+  it('copia el DUI buscado al formulario y explica la regla en una línea', async () => {
+    montar();
+    await buscar('00000001-8');
+    await screen.findByText(/Puedes registrar/);
+    await userEvent.click(registrar());
+    const dialogo = await screen.findByRole('dialog', { name: 'Registrar paciente' });
+    expect(within(dialogo).getByLabelText(/DUI/)).toHaveProperty('value', '00000001-8');
+    expect(within(dialogo).getByText(/si la persona no está, completa los datos/)).toBeTruthy();
+  });
+
+  it('un posible duplicado lista a los candidatos y permite confirmar que es otra persona conservando la constancia', async () => {
+    let intentos = 0;
+    const api = montar({ escritura: async (_path, body) => {
+      intentos++;
+      if (!(body as { confirmarNuevo?: boolean }).confirmarNuevo) throw new ApiError('Ya hay un paciente con el mismo nombre y fecha de nacimiento.', 409, 'posible_duplicado', undefined, { candidatos: [{ id: 'p9', record: 'EXP-000009', fullName: 'Luis Prueba', birth: '1990-01-01' }] });
+      return { id: 'p2' };
+    } });
+    await buscar('Luis Prueba');
+    await screen.findByText(/Puedes registrar/);
+    const dialogo = await llenarYEnviar();
+    expect(await within(dialogo).findByText(/EXP-000009/)).toBeTruthy();
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Es otra persona/ }));
+    const llamadas = api.write.mock.calls.filter(([path]) => path === '/pacientes');
+    expect(intentos).toBe(2);
+    expect(llamadas[1][1]).toMatchObject({ confirmarNuevo: true, searchToken: 'tok-1' });
   });
 
   it('envía searchToken y searchQuery al registrar', async () => {
@@ -108,9 +143,7 @@ describe('búsqueda antes de registrar', () => {
     fireEvent.change(within(dialogo).getByLabelText('Apellidos'), { target: { value: 'Prueba' } });
     await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
     expect(within(dialogo).getByText('La búsqueda venció; vuelve a buscar.')).toBeTruthy();
-    const enviar = within(dialogo).getByRole('button', { name: /Registrar paciente/ }) as HTMLButtonElement;
-    expect(enviar.disabled).toBe(true);
-    fireEvent.submit(enviar.closest('form')!);
+    expect(within(dialogo).queryByRole('button', { name: /Registrar paciente/ })).toBeNull();
     await vaciar();
     expect(api.write.mock.calls.some(([path]) => path === '/pacientes')).toBe(false);
   });

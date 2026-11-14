@@ -49,7 +49,7 @@ describe('Pacientes · casos de posible duplicado (FR-102-09)',()=>{
  };
  const register=async(data:Record<string,unknown>,query:string,idempotency?:string)=>{
   const search=await call('REC','POST','/pacientes/busquedas',{query});
-  return call('REC','POST','/pacientes',{...data,searchToken:search.body.token,searchQuery:query},idempotency);
+  return call('REC','POST','/pacientes',{confirmarNuevo:true,...data,searchToken:search.body.token,searchQuery:query},idempotency);
  };
  const cases=(ids:string[])=>fixture.pg.query<any>('SELECT * FROM pacientes.caso_duplicado WHERE pacientes_ids && $1::uuid[]',[ids]).then(r=>r.rows);
  const base={sex:'femenino',phone:'7000-1234'};
@@ -103,7 +103,7 @@ describe('Pacientes · casos de posible duplicado (FR-102-09)',()=>{
   const first=await register({...base,givenNames:'Elena',surnames:'Cruz Alvarado',birth:'1968-06-30'},'Elena Cruz');
   const retryKey=randomUUID();
   const search=await call('REC','POST','/pacientes/busquedas',{query:'Elena Cruz'});
-  const body={...base,givenNames:'Elena',surnames:'Cruz Alvarado',birth:'1968-06-30',searchToken:search.body.token,searchQuery:'Elena Cruz'};
+  const body={confirmarNuevo:true,...base,givenNames:'Elena',surnames:'Cruz Alvarado',birth:'1968-06-30',searchToken:search.body.token,searchQuery:'Elena Cruz'};
   const second=await call('REC','POST','/pacientes',body,retryKey);
   const retry=await call('REC','POST','/pacientes',body,retryKey);
   expect(second.status).toBe(201);

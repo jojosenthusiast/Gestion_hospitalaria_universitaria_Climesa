@@ -39,6 +39,7 @@ import java.time.format.DateTimeFormatter
 import sv.edu.catolica.climesa.domain.AppointmentDoctor
 import sv.edu.catolica.climesa.domain.AppointmentSlot
 import sv.edu.catolica.climesa.domain.PatientAppointment
+import sv.edu.catolica.climesa.domain.QuickAction
 
 private val appointmentDateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 private val appointmentTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
@@ -49,12 +50,19 @@ fun PatientAppointmentsScreen(
     permissions: List<String>,
     channels: List<String>,
     modifier: Modifier = Modifier,
+    quickAction: QuickAction? = null,
+    onQuickActionHandled: () -> Unit = {},
     model: PatientAppointmentsViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     var requestOpen by rememberSaveable { mutableStateOf(false) }
     var cancelTarget by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels) }
+    LaunchedEffect(quickAction) {
+        if (quickAction == null) return@LaunchedEffect
+        if (quickAction == QuickAction.REQUEST_APPOINTMENT && "citas.solicitar" in permissions) requestOpen = true
+        onQuickActionHandled()
+    }
     val cancelAppointment = state.appointments.firstOrNull { it.id == cancelTarget }
 
     if (requestOpen) {
@@ -121,14 +129,17 @@ private fun AppointmentRequestDialog(state: PatientAppointmentsState, model: Pat
                 androidx.compose.material3.ExposedDropdownMenuBox(expanded = doctorMenu, onExpandedChange = { doctorMenu = !doctorMenu }) {
                     OutlinedTextField(value = selectedDoctor?.name ?: "Selecciona un médico", onValueChange = {}, readOnly = true, label = { Text("Médico") }, modifier = Modifier.menuAnchor().fillMaxWidth())
                     DropdownMenu(expanded = doctorMenu, onDismissRequest = { doctorMenu = false }) {
-                        state.doctors.forEach { doctor -> DropdownMenuItem(text = { Text(doctorLabel(doctor)) }, onClick = { model.selectDoctor(doctor.id); doctorMenu = false }) }
+                        state.doctors.forEach { doctor -> DropdownMenuItem(enabled = doctor.hasShift, text = { Text(doctorLabel(doctor) + if (doctor.hasShift) "" else " · " + (doctor.reason ?: "Sin turno")) }, onClick = { model.selectDoctor(doctor.id); doctorMenu = false }) }
                     }
                 }
                 OutlinedButton(onClick = { datePickerOpen = true }, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(Icons.Default.CalendarMonth, contentDescription = null); Spacer(Modifier.padding(4.dp)); Text("Fecha: ${state.selectedDate.format(appointmentDateFormatter)}") }
                 if (state.selectedDoctorId.isNotBlank()) {
                     if (state.workPeriods.isNotEmpty()) Text("Jornada publicada: ${state.workPeriods.joinToString(" · ") { "${formatTime(it.start)}–${formatTime(it.end)}" }}", style = MaterialTheme.typography.bodySmall)
-                    if (state.slots.isEmpty()) Text("No hay franjas publicadas para esta fecha.", style = MaterialTheme.typography.bodySmall)
-                    else { Text("Franjas disponibles de 20 minutos", style = MaterialTheme.typography.bodySmall); SlotPicker(state.slots, state.selectedSlot, model::selectSlot) }
+                    if (state.daySlots.isEmpty()) Text("No hay franjas publicadas para esta fecha.", style = MaterialTheme.typography.bodySmall)
+                    else {
+                        Text("Toca una franja libre de 20 minutos. Las apagadas no están disponibles y dicen por qué.", style = MaterialTheme.typography.bodySmall)
+                        DaySlotGrid(state.daySlots, state.daySlots.firstOrNull { it.start == state.selectedSlot?.start }, { model.selectSlot(AppointmentSlot(it.start, it.end)) })
+                    }
                 }
                 FormField("Motivo · opcional", reason, { reason = it.take(500) }, singleLine = false)
             }

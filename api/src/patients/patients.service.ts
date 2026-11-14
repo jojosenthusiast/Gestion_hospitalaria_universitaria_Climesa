@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException, VersionConflictException } from '../platform/problem';
 import { Actor, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
@@ -13,23 +13,33 @@ type Row = Record<string, any>;
 @Injectable()
 export class PatientsService {
   constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
-  private async candidates(c: PoolClient, query: string, limit: number, state?: string) {
+  private async candidates(c: PoolClient, query: string, limit: number, state?: string, offset = 0) {
     const words=normalize(query).split(' ').filter(Boolean).map(t=>`%${t}%`);
     const sounds=phonetic(query).split(' ').filter(Boolean).map(t=>`%${t}%`);
     const rows=(await c.query(`SELECT p.id,p.expediente,p.estado,p.nombres,p.primer_apellido,p.segundo_apellido,p.alias_provisional,p.sexo,p.nacimiento::text AS nacimiento,p.version,p.busqueda_normalizada,i.valor_original AS dui FROM pacientes.paciente p
       LEFT JOIN LATERAL (SELECT valor_original FROM pacientes.identificador WHERE paciente_id=p.id AND tipo='dui' AND estado IN ('sin_verificar','verificado') LIMIT 1) i ON true
       WHERE ($1::text[]='{}' OR p.busqueda_normalizada LIKE ALL($1) OR (p.fon_apellido||' '||p.fon_nombres) LIKE ALL($2)
         OR p.expediente ILIKE $3 OR regexp_replace(coalesce(i.valor_original,''),'[^0-9]','','g') LIKE $4 OR p.nacimiento::text=$5)
-      AND ($6::text IS NULL OR p.estado=$6) ORDER BY p.nombres,p.primer_apellido,p.id LIMIT $7`,[words,sounds,`%${query.trim()}%`,query.replace(/\D/g,'').length>=4?`%${query.replace(/\D/g,'')}%`:'!no-document!',query,state??null,limit])).rows;
+      AND ($6::text IS NULL OR p.estado=$6) ORDER BY p.nombres,p.primer_apellido,p.id LIMIT $7 OFFSET $8`,[words,sounds,`%${query.trim()}%`,query.replace(/\D/g,'').length>=4?`%${query.replace(/\D/g,'')}%`:'!no-document!',query,state??null,limit,offset])).rows;
     return rows.map(p=>({ id:p.id, record:p.expediente, fullName:this.name(p), givenNames:p.nombres??p.alias_provisional??'', surnames:[p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' '), state:p.estado, active:p.estado!=='inactivo', sex:p.sexo, birth:p.nacimiento, version:p.version, matchReason:matchReasons({query,fullName:this.name(p),record:p.expediente,dui:p.dui,birth:p.nacimiento}).join(', ') }));
   }
   private name(p:Row) { return [p.nombres,p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' ')||p.alias_provisional; }
-  async search(actor:Actor, query:string|undefined, limit=50, state?:string) {
+  async search(actor:Actor, query:string|undefined, limit=50, state?:string, offset=0) {
     return this.db.transaction(async c=>{
-      const result=await this.candidates(c,query??'',limit,state);
+      const result=await this.candidates(c,query??'',limit,state,offset);
       // SEG-09 (audit 02 M-2): the audit keeps which patients the search exposed, not only how many.
       await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query??'')),count:result.length,patientIds:result.map(p=>p.id)}});
       return searchShowsBirth(actor)?result:result.map(({birth,...p})=>p);
+    });
+  }
+  /** Selector de pacientes (Ronda 1, obs. 8): respuesta mínima y paginada para listas con búsqueda mientras se escribe. */
+  async picker(actor:Actor, query:string, limit=10, offset=0) {
+    return this.db.transaction(async c=>{
+      const rows=await this.candidates(c,query,limit+1,undefined,offset);
+      const page=rows.slice(0,limit);
+      await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query)),count:page.length,offset,patientIds:page.map(p=>p.id)}});
+      const showAge=searchShowsBirth(actor);
+      return {items:page.map(p=>({id:p.id,record:p.record,fullName:p.fullName,...(showAge&&p.birth?{age:this.age({nacimiento:p.birth})}:{})})),offset,limit,hasMore:rows.length>limit};
     });
   }
   async recordSearch(actor:Actor, query:string) {
@@ -101,8 +111,16 @@ export class PatientsService {
   }
   private async duplicate(c:PoolClient,dui:string|null|undefined,id?:string) {
     if(!dui)return;
-    const row=(await c.query(`SELECT p.expediente FROM pacientes.identificador i JOIN pacientes.paciente p ON p.id=i.paciente_id WHERE i.tipo='dui' AND i.valor_normalizado=$1 AND i.estado IN ('sin_verificar','verificado') AND ($2::uuid IS NULL OR p.id<>$2)`,[dui,id??null])).rows[0];
-    if(row)throw new ConflictException(`Ese DUI pertenece al expediente ${row.expediente}, incluso si está inactivo.`);
+    const row=(await c.query(`SELECT p.id,p.expediente,p.nombres,p.primer_apellido,p.segundo_apellido,p.alias_provisional FROM pacientes.identificador i JOIN pacientes.paciente p ON p.id=i.paciente_id WHERE i.tipo='dui' AND i.valor_normalizado=$1 AND i.estado IN ('sin_verificar','verificado') AND ($2::uuid IS NULL OR p.id<>$2)`,[dui,id??null])).rows[0];
+    if(row)throw new ProblemException('dui_duplicado',409,`Ese DUI pertenece al expediente ${row.expediente}, incluso si está inactivo. Abre ese expediente en vez de registrar uno nuevo.`,undefined,{paciente:{id:row.id,record:row.expediente,fullName:this.name(row)}});
+  }
+  /** Mismo nombre normalizado y misma fecha de nacimiento: avisa con los candidatos y exige `confirmarNuevo` para registrar otro. */
+  private async sameNameAndBirth(c:PoolClient,data:{givenNames:string;surnames:string;birth?:string|null}) {
+    if(!data.birth)return;
+    const wanted=normalize(`${data.givenNames} ${data.surnames}`);
+    const rows=(await c.query('SELECT id,expediente,nombres,primer_apellido,segundo_apellido,alias_provisional,nacimiento::text AS nacimiento FROM pacientes.paciente WHERE nacimiento=$1 ORDER BY id',[data.birth])).rows;
+    const same=rows.filter(p=>normalize(this.name(p))===wanted);
+    if(same.length)throw new ProblemException('posible_duplicado',409,'Ya hay un paciente con el mismo nombre y fecha de nacimiento. Revisa si es la misma persona; si es otra, confirma que es un paciente nuevo.',undefined,{candidatos:same.slice(0,10).map(p=>({id:p.id,record:p.expediente,fullName:this.name(p),birth:p.nacimiento}))});
   }
   /** Roles que leen pacientes según el catálogo (sin el acceso `propio` del paciente) más la cuenta del propio paciente. */
   private async patientChannels(c:PoolClient,patientId:string){return channelsFor(c,['pacientes.buscar','pacientes.ver_ficha'],{excludeContexts:['propio'],users:[await patientAccount(c,patientId)]});}
@@ -111,12 +129,13 @@ export class PatientsService {
     const permission=data.provisional?'pacientes.registrar_provisional':'pacientes.registrar';
     if(!hasPermission(actor,permission))throw new ForbiddenException('No tienes permiso para registrar este tipo de paciente.');
     return this.commands.run(actor,permission,key,dto,async c=>{
+      // La constancia prueba que esta cuenta buscó hace poco; no exige que los datos nuevos se parezcan al texto buscado.
+      // Si algo falla más abajo la transacción se revierte, y con ella este DELETE: la constancia solo se gasta al registrar.
       const token=(await c.query('DELETE FROM pacientes.busqueda_registro WHERE token=$1 AND usuario_id=$2 AND vence_en>$3 RETURNING *',[dto.searchToken,actor.id,this.clock.now()])).rows[0];
-      if(!token||token.huella_criterios!==fingerprint(normalize(dto.searchQuery)))throw new BadRequestException('La búsqueda no corresponde a esta cuenta, cambió o venció. Busca otra vez.');
+      if(!token||token.huella_criterios!==fingerprint(normalize(dto.searchQuery)))throw new BadRequestException('La búsqueda previa no es válida o venció (dura 10 minutos). Busca otra vez antes de registrar.');
       const text=normalize(`${data.givenNames} ${data.surnames} ${data.dui??''} ${data.birth??''}`);
-      const sound=phonetic(text);
-      if(!data.provisional&&!normalize(dto.searchQuery).split(' ').every(t=>text.includes(t)||sound.includes(phonetic(t))))throw new BadRequestException('La búsqueda previa debe corresponder a los datos que vas a registrar.');
       await this.duplicate(c,data.dui);
+      if(!data.provisional&&!dto.confirmarNuevo)await this.sameNameAndBirth(c,data);
       const seq=(await c.query("SELECT nextval('pacientes.expediente_seq') AS n")).rows[0].n;
       const alias=data.provisional?(await c.query("SELECT 'NN-'||extract(year from $1::timestamptz)::int||'-'||lpad(nextval('pacientes.provisional_seq')::text,4,'0') AS alias",[this.clock.now()])).rows[0].alias:null;
       const row=(await c.query(`INSERT INTO pacientes.paciente(expediente,estado,nombres,primer_apellido,sexo,nacimiento,precision_nacimiento,telefono,correo,direccion,creado_por,busqueda_normalizada,fon_apellido,fon_nombres,alias_provisional,edad_estimada,edad_estimada_en,senas)

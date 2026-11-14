@@ -10,10 +10,10 @@ import { AppointmentCatalogsResponse, AppointmentCommandResponse, AppointmentRes
 export class AttentionController {
   constructor(private readonly attention: AttentionService) {}
 
-  @Get('catalogos') @RequirePermission('citas.agendar', 'citas.solicitar') @ApiOperation({ summary: 'Consultar pacientes y médicos disponibles para agendar' }) @ApiOkResponse({ type: AppointmentCatalogsResponse })
-  catalogs(@Req() r: ActorRequest) { return this.attention.catalogs(r.actor); }
+  @Get('catalogos') @RequirePermission('citas.agendar', 'citas.solicitar') @ApiOperation({ summary: 'Médicos activos (con date indica quién tiene turno ese día); a recepción ya no devuelve pacientes: se buscan con /pacientes/selector' }) @ApiQuery({ name: 'date', type: String, required: false, description: 'Día local, yyyy-MM-dd' }) @ApiOkResponse({ type: AppointmentCatalogsResponse })
+  catalogs(@Req() r: ActorRequest, @Query('date') date?: string) { return this.attention.catalogs(r.actor, date); }
 
-  @Get('disponibilidad') @RequirePermission('citas.agendar', 'citas.solicitar') @ApiOperation({ summary: 'Consultar franjas libres de un médico para una fecha' })
+  @Get('disponibilidad') @RequirePermission('citas.agendar', 'citas.solicitar') @ApiOperation({ summary: 'Consultar las franjas del día de un médico con su estado (libre, ocupado, sin_turno, pasado)' })
   @ApiQuery({ name: 'doctorId', type: String, format: 'uuid', required: true }) @ApiQuery({ name: 'date', type: String, required: true, description: 'Día local, yyyy-MM-dd' }) @ApiOkResponse({ type: AvailabilityResponse })
   availability(@Req() r: ActorRequest, @Query('doctorId') doctorId?: string, @Query('date') date?: string) {
     return this.attention.availability(r.actor, doctorId ?? '', date ?? '');
