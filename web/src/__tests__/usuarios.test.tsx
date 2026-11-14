@@ -45,6 +45,17 @@ describe('Personal · cuentas de acceso (W05, W06)', () => {
     await vi.waitFor(() => expect(usuarios(api)).toBe(2));
   });
 
+  it('Protección de datos (solo usuarios.ver) ve una lista de cuentas en solo lectura, sin columnas vacías de personal (obs. 17)', async () => {
+    montar(['usuarios.ver']);
+    await screen.findByText('Operaciones Ficticia');
+    expect(screen.getByText('Protección de datos / Cuentas')).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: 'Roles' })).toBeTruthy();
+    expect(screen.queryByRole('columnheader', { name: 'Área' })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Estado' })).toBeNull();
+    expect(screen.queryByText('Solo cuenta')).toBeNull();
+    expect(screen.getAllByText('Solo consulta').length).toBeGreaterThan(0);
+  });
+
   it('solo con usuarios.ver es de consulta: sin invitar, roles ni desactivar', async () => {
     montar(['usuarios.ver']);
     await screen.findByText('Operaciones Ficticia');

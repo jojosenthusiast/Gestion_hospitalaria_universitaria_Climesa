@@ -228,7 +228,7 @@
     <string name="ui_actualizando">Actualizando información…</string>
     <string name="ui_error_titulo">No pudimos cargar esta información</string>
     <string name="ui_sin_acceso_titulo">No tienes acceso a esta información</string>
-    <string name="ui_sin_acceso_detalle">Tu cuenta no tiene permiso para consultar esta sección. Si la necesitas para atender a alguien, pide el acceso con un motivo y vuelve a intentar.</string>
+    <string name="ui_sin_acceso_detalle">Tu cuenta no tiene permiso para consultar esta sección. Si la necesitas para tu trabajo, pide a un administrador que revise los permisos de tu cuenta y vuelve a intentar.</string>
     <string name="ui_conflicto_detalle">Alguien cambió este registro mientras lo tenías abierto; tus cambios no se guardaron.</string>
     <string name="ui_confirmar">Confirmar</string>
     <string name="ui_cancelar">Cancelar</string>
@@ -251,4 +251,10 @@
     <string name="ui_modo_oscuro_detalle">Se conserva en este dispositivo</string>
     <string name="ui_cerrar_sesion_ayuda">Para cerrar sesión, abre el menú ☰ en la esquina superior izquierda.</string>
     <string name="ui_camas_libres">camas libres</string>
+    <string name="avisos_titulo">Avisos</string>
+    <string name="avisos_mas">Y %1$d aviso(s) más. Se ven completos en la web.</string>
+    <string name="aviso_critico">Crítico</string>
+    <string name="aviso_urgente">Urgente</string>
+    <string name="aviso_atencion">Atención</string>
+    <string name="aviso_para">Para: %1$s</string>
 </resources>

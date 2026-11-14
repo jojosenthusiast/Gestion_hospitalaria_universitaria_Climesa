@@ -13,7 +13,7 @@ Requisitos: REQ-PRV-01 a REQ-PRV-05 (documento del curso, sección 1.4 y entrega
 | **Personal** | Paciente dueño, personal que lo atiende o lo registra, administración autorizada | Nombre, DUI, fecha de nacimiento, teléfono, dirección, cama asignada, citas |
 | **Clínica (sensible)** | Paciente dueño (lo revisado), médico tratante, enfermería del área, laboratorio en lo que procesa | Consultas, diagnósticos, recetas, signos vitales, órdenes y resultados de laboratorio, reporte prehospital, notas de enfermería, alta |
 
-"Administración autorizada" (texto del curso) se implementa así (D-031): Administrador y Jefe de Operaciones ven datos personales necesarios para operar (cama asignada, admisión) pero **nunca** lo clínico por su rol. Para ver algo clínico piden acceso excepcional con motivo y duración; lo aprueba el Delegado de protección de datos (nunca el mismo que lo pide); vence solo; todo queda auditado.
+"Administración autorizada" (texto del curso) se implementa así (D-031): Administrador y Jefe de Operaciones ven datos personales necesarios para operar (cama asignada, admisión) pero **nunca** lo clínico por su rol. Para ver algo clínico necesitan relación de atención; el acceso excepcional se retiró (D-082). Todo queda auditado.
 
 ## 2. Campos del expediente del paciente
 

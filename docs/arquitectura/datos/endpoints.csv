@@ -88,6 +88,9 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 109,GET,/api/v1/ambulancia/bitacora,ambulancia.ver_bitacora,Datos del paciente ocultos sin relación,R,4,Bitácora filtrable (D-056)
 110,GET,/api/v1/auditoria,auditoria.ver,,R,4,Consultar auditoría
 110,POST,/api/v1/auditoria/verificacion,auditoria.ver,,R,4,Verificar cadena de hash
+110,GET,/api/v1/auditoria/registros,auditoria.ver,,R,4,"Auditoría paginada y ordenable con filtros por persona, rol, paciente, acción, entidad, resultado y fecha"
+110,GET,/api/v1/auditoria/registros/{seq},auditoria.ver,,R,4,Detalle de una fila de auditoría con metadatos y hashes de la cadena
+110,GET,/api/v1/auditoria/opciones,auditoria.ver,,R,4,Acciones entidades y roles disponibles para los filtros
 110,GET,/api/v1/me/accesos,auditoria.mis_accesos,Propio,E,5,Quién vio mi expediente
 111,GET,/api/v1/inventario/existencias,inventario.ver,,R,4,"Existencias por bodega, lote y vencimiento"
 111,GET,/api/v1/inventario/movimientos,inventario.ver,,R,4,"Historial de movimientos por artículo y lote"
@@ -97,7 +100,9 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 112,GET,/api/v1/publico/medicos-de-turno,(público),"Nombre, especialidad, área",R,3,Médicos de turno
 112,GET,/api/v1/publico/avisos,(público),,R,3,Avisos vigentes
 112,GET,/api/v1/publico/fila/{servicio},(público),Sin nombres,E,4,Números llamados
-112,POST,/api/v1/avisos,avisos.publicar,Vigencia,R,3,Publicar aviso
+112,POST,/api/v1/avisos,avisos.publicar,Vigencia,R,3,Publicar aviso con audiencia (público y/o roles) y prioridad
+112,GET,/api/v1/avisos,avisos.publicar,,R,3,Avisos recientes con audiencia prioridad y estado para quien los redacta
+112,GET,/api/v1/me/avisos,sesion.perfil,Propio,R,3,Avisos vigentes para mis roles incluidos los públicos
 113,GET,/api/v1/metricas/tablero,metricas.ver,Agregados sin datos personales,R,2,Tablero inicial
 113,GET,/api/v1/metricas/{indicador},metricas.ver,,E,5,Serie de un indicador
 111,POST,/api/v1/inventario/articulos,inventario.configurar,,R,4,Crear artículo

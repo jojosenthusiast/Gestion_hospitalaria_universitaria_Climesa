@@ -22,6 +22,8 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   const [invite, setInvite] = useState<{ person: Staff | null } | null>(null), [roles, setRoles] = useState<UserAccount | null>(null), [accountState, setAccountState] = useState<UserAccount | null>(null);
   const [quick, consumeQuick] = useQuickAction();
   const manage = can(profile, 'personal.gestionar'), canInvite = can(profile, 'usuarios.invitar');
+  // Sin `personal.ver` (Protección de datos) el módulo es la lista de cuentas en solo lectura: sin columna de área ni función, que no tienen dato.
+  const accountsOnly = !canStaff;
   useEffect(() => {
     if (!quick) return;
     if (quick === 'invitar' && canInvite) setInvite({ person: null });
@@ -55,25 +57,25 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   const nameOf = (row: Row) => row.staff ? `${row.staff.givenNames} ${row.staff.surnames}` : row.account?.name || 'Sin nombre registrado';
 
   return <>
-    <Heading eyebrow="Administración / Equipo" title="Personal" description="El equipo del hospital y su acceso al sistema: ficha, función, roles, invitación por correo y estado de la cuenta en un solo lugar."
+    <Heading eyebrow={accountsOnly ? 'Protección de datos / Cuentas' : 'Administración / Equipo'} title="Personal" description={accountsOnly ? 'Cuentas de acceso del hospital y sus roles, en solo lectura. Para cambiar roles o estados, la solicitud va a Administración.' : "El equipo del hospital y su acceso al sistema: ficha, función, roles, invitación por correo y estado de la cuenta en un solo lugar."}
       actions={<>{manage && <button className="primary-button" onClick={() => { setEdit(null); setStaffOpen(true); }}><Icon name="plus" size={18} />Registrar personal</button>}{canInvite && <button className={manage ? 'secondary-button' : 'primary-button'} onClick={() => setInvite({ person: null })}><Icon name="mail" size={18} />Invitar persona</button>}</>} />
     {canStaff && canAccounts && <div className="number-strip"><div><strong>{rows.filter(r => r.staff && r.staff.active).length}</strong><span>Personal activo</span></div><div><strong>{withAccount}</strong><span>Con cuenta de acceso</span></div><div><strong>{withoutAccount}</strong><span>Sin cuenta todavía</span></div></div>}
     <section className="data-workbench">
       <div className="table-toolbar">
-        <Field label="Buscar en el directorio" value={query} onChange={setQuery} placeholder="Nombre, correo, especialidad o rol" />
-        <Select label="Mostrar" value={state} onChange={setState}><option value="activos">Personal activo</option><option value="inactivos">Personal inactivo</option><option value="todos">Todo el directorio</option></Select>
+        <Field label="Buscar en el directorio" value={query} onChange={setQuery} placeholder={accountsOnly ? 'Nombre, correo o rol' : 'Nombre, correo, especialidad o rol'} />
+        <Select label="Mostrar" value={state} onChange={setState}><option value="activos">{accountsOnly ? 'Cuentas activas' : 'Personal activo'}</option><option value="inactivos">{accountsOnly ? 'Cuentas inactivas' : 'Personal inactivo'}</option><option value="todos">{accountsOnly ? 'Todas las cuentas' : 'Todo el directorio'}</option></Select>
         {canStaff && <Select label="Filtrar por función" value={type} onChange={setType}><option value="todos">Todas las funciones</option>{Object.entries(staffTypeNames).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>}
         {canStaff && canAccounts && <Select label="Cuenta de acceso" value={account} onChange={setAccount}><option value="todas">Con o sin cuenta</option><option value="con">Con cuenta</option><option value="sin">Sin cuenta todavía</option></Select>}
       </div>
       <RemoteState state={primary}>{() => filtered.length
         ? <table className="record-table"><caption className="sr-only">Directorio de personal y cuentas</caption>
-          <thead><tr><th>Persona</th><th>Función y roles</th><th>Área</th><th>Cuenta</th><th>Estado</th><th>Acción</th></tr></thead>
+          <thead><tr><th>Persona</th><th>{accountsOnly ? 'Roles' : 'Función y roles'}</th>{!accountsOnly && <th>Área</th>}<th>Cuenta</th>{!accountsOnly && <th>Estado</th>}<th>Acción</th></tr></thead>
           <tbody>{filtered.map(row => <tr key={row.key}>
             <td data-label="Persona"><strong>{nameOf(row)}{row.account?.id === profile.id && <span className="own-account">Tu cuenta</span>}</strong><small>{row.staff ? row.staff.specialty || 'Sin especialidad registrada' : row.account?.email}</small></td>
-            <td data-label="Función y roles">{row.staff ? staffTypeNames[row.staff.type] ?? row.staff.type : 'Solo cuenta'}{row.account && <div className="role-tags">{row.account.roles.map(r => <span key={r} title={roleNames[r]}>{r}</span>)}</div>}</td>
-            <td data-label="Área">{row.staff ? row.staff.area || 'Sin asignar' : '—'}</td>
-            <td data-label="Cuenta">{row.account ? <><Tag value={row.account.state} /><small>{row.account.email}</small></> : <span className="muted">Sin cuenta</span>}</td>
-            <td data-label="Estado"><Tag value={isActive(row) ? 'activo' : 'inactivo'} /></td>
+            <td data-label={accountsOnly ? 'Roles' : 'Función y roles'}>{row.staff ? staffTypeNames[row.staff.type] ?? row.staff.type : accountsOnly ? null : 'Solo cuenta'}{row.account && <div className="role-tags">{row.account.roles.map(r => <span key={r} title={roleNames[r]}>{r}</span>)}</div>}</td>
+            {!accountsOnly && <td data-label="Área">{row.staff ? row.staff.area || 'Sin asignar' : '—'}</td>}
+            <td data-label="Cuenta">{row.account ? <><Tag value={row.account.state} />{!accountsOnly && <small>{row.account.email}</small>}</> : <span className="muted">Sin cuenta</span>}</td>
+            {!accountsOnly && <td data-label="Estado"><Tag value={isActive(row) ? 'activo' : 'inactivo'} /></td>}
             <td data-label="Acción"><div className="row-actions">
               {row.staff && <button className="row-action" aria-label={`Ver ficha de ${nameOf(row)}`} onClick={() => setFicha(row.staff!.id)}>Ver ficha <Icon name="arrow" size={16} /></button>}
               {row.staff && manage && <button className="row-action" aria-label={`Editar ${nameOf(row)}`} onClick={() => { setEdit(row.staff); setStaffOpen(true); }}>Editar <Icon name="arrow" size={16} /></button>}

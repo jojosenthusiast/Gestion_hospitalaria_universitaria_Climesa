@@ -893,6 +893,16 @@ insert into publico.aviso (id, titulo, cuerpo, vigencia, publicado_por) values
      tstzrange(now() - interval '1 day', now() + interval '20 days', '[)'), pg_temp.actor('ADM'))
 on conflict do nothing;
 
+-- Avisos dirigidos a roles (no salen en la pantalla pública): se ven en el tablero de inicio de cada rol.
+insert into publico.aviso (id, titulo, cuerpo, vigencia, publicado_por, prioridad, publico, roles) values
+  (pg_temp.did('0090', 5), 'Simulacro de evacuación',
+     '[DEMO] Aviso interno para el personal clínico: simulacro de evacuación mañana a las 10:00 a. m.',
+     tstzrange(now() - interval '1 hour', now() + interval '3 days', '[)'), pg_temp.actor('ADM'), 'urgente', false, array['ENF','MED','AST','LAB']),
+  (pg_temp.did('0090', 6), 'Cierre mensual de inventario',
+     '[DEMO] Aviso interno para Administración y Jefatura: el cierre mensual del inventario es el viernes.',
+     tstzrange(now() - interval '1 hour', now() + interval '8 days', '[)'), pg_temp.actor('ADM'), 'atencion', false, array['ADM','JOP'])
+on conflict do nothing;
+
 -- ---------------------------------------------------------------------------------------------------------
 -- 13. Vinculaciones de cuenta y expediente (REC) e invitaciones (ADM)
 --     Las cuentas solicitantes son filas demo de acceso.usuario SIN usuario en Supabase Auth: no pueden entrar,

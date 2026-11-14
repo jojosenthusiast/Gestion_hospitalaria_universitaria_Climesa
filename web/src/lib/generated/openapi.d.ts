@@ -1316,6 +1316,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auditoria/registros": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Auditoría paginada y ordenable por persona, rol, paciente, acción, entidad, resultado y fecha */
+        get: operations["PrivacyController_page"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auditoria/opciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Acciones, entidades y roles que existen en la auditoría, para los filtros */
+        get: operations["PrivacyController_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auditoria/registros/{seq}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle de una fila de auditoría: quién, qué, cuándo, metadatos y hashes de la cadena */
+        get: operations["PrivacyController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auditoria/verificacion": {
         parameters: {
             query?: never;
@@ -1493,10 +1544,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Avisos recientes con su audiencia, prioridad y estado, para quien los redacta */
+        get: operations["NoticesController_list"];
         put?: never;
         /** Publicar un aviso general con vigencia; advierte si parece llevar datos personales */
         post: operations["NoticesController_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/avisos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Avisos vigentes para mis roles, incluidos los públicos */
+        get: operations["MyNoticesController_mine"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3179,6 +3248,52 @@ export interface components {
             result: components["schemas"]["ResultadoAuditoria"];
             reason: string | null;
         };
+        AuditPageResponse: {
+            filas: components["schemas"]["AuditEntryResponse"][];
+            /** @description Filas que cumplen el filtro, sin paginar */
+            total: number;
+            pagina: number;
+            limite: number;
+        };
+        AuditOptionsResponse: {
+            acciones: string[];
+            entidades: string[];
+            /** @description Códigos de rol que aparecen en la auditoría */
+            roles: string[];
+        };
+        AuditDetailResponse: {
+            /** @description Entero de 64 bits como texto */
+            seq: string;
+            /** Format: date-time */
+            at: string;
+            role: string | null;
+            actor: string | null;
+            /** Format: uuid */
+            actorId: string | null;
+            permission: string | null;
+            action: string;
+            entity: string;
+            entityId: string | null;
+            /** Format: uuid */
+            patientId: string | null;
+            patientRecord: string | null;
+            result: components["schemas"]["ResultadoAuditoria"];
+            reason: string | null;
+            /** @description Identificador de correlación de la petición */
+            correlation: string | null;
+            /** @description Metadatos del evento (sin el evento canónico firmado); nunca valores clínicos */
+            detail: {
+                [key: string]: unknown;
+            };
+            /** @description Hash SHA-256 de esta fila, en hexadecimal */
+            hash: string;
+            /** @description Hash de la fila anterior, en hexadecimal */
+            previousHash: string;
+            /** @description Entero de 64 bits como texto */
+            previousSeq: string | null;
+            /** @description Entero de 64 bits como texto */
+            nextSeq: string | null;
+        };
         AuditVerificationResponse: {
             integra: boolean;
             revisados: number;
@@ -3302,6 +3417,8 @@ export interface components {
             desde: string | null;
             /** Format: date-time */
             hasta: string | null;
+            /** @description atencion, urgente o critico (D-071) */
+            prioridad: string;
         };
         NoticesResponse: {
             /** Format: date-time */
@@ -3326,6 +3443,24 @@ export interface components {
             fecha: string;
             llamados: components["schemas"]["CalledNumberResponse"][];
         };
+        NoticeListItemResponse: {
+            /** Format: uuid */
+            id: string;
+            titulo: string;
+            cuerpo: string;
+            /** Format: date-time */
+            desde: string | null;
+            /** Format: date-time */
+            hasta: string | null;
+            /** @description atencion, urgente o critico (D-071) */
+            prioridad: string;
+            publico: boolean;
+            roles: string[];
+            /** @description vigente, programado o vencido */
+            estado: string;
+            /** Format: date-time */
+            publicadoEn: string | null;
+        };
         NoticeDto: {
             titulo: string;
             cuerpo: string;
@@ -3339,6 +3474,19 @@ export interface components {
              * @description Fin de la vigencia, con zona horaria
              */
             hasta: string;
+            /**
+             * @description Escalera de avisos (D-071): atencion, urgente o critico
+             * @default atencion
+             * @enum {string}
+             */
+            prioridad: "atencion" | "urgente" | "critico";
+            /**
+             * @description Visible en la pantalla pública y en las apps sin sesión. Sin roles, debe ser true
+             * @default true
+             */
+            publico: boolean;
+            /** @description Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol */
+            roles?: string[];
             /** @description Publicar aunque el texto parezca contener un DUI, expediente o teléfono (FR-112-05) */
             confirmarDatosPersonales?: boolean;
         };
@@ -3351,8 +3499,33 @@ export interface components {
             desde: string | null;
             /** Format: date-time */
             hasta: string | null;
+            /** @description atencion, urgente o critico (D-071) */
+            prioridad: string;
+            publico: boolean;
+            roles: string[];
             /** Format: date-time */
             publicadoEn: string | null;
+        };
+        NoticeAudienceResponse: {
+            /** Format: uuid */
+            id: string;
+            titulo: string;
+            cuerpo: string;
+            /** Format: date-time */
+            desde: string | null;
+            /** Format: date-time */
+            hasta: string | null;
+            /** @description atencion, urgente o critico (D-071) */
+            prioridad: string;
+            publico: boolean;
+            roles: string[];
+        };
+        MyNoticesResponse: {
+            /** Format: date-time */
+            actualizadoEn: string;
+            avisos: components["schemas"]["NoticeAudienceResponse"][];
+            /** Format: date-time */
+            proximoCambio: string | null;
         };
         BedTotalsResponse: {
             total: number;
@@ -9865,11 +10038,23 @@ export interface operations {
                 persona?: string;
                 /** @description Id del paciente o número de expediente */
                 paciente?: string;
-                /** @description Acción exacta o prefijo (por ejemplo consulta.) */
+                /** @description Acción exacta o prefijo (por ejemplo consulta.); varias separadas por coma */
                 accion?: string;
+                /** @description Código de rol que actuó (por ejemplo MED) */
+                rol?: string;
+                /** @description Entidad auditada (por ejemplo consulta) */
+                entidad?: string;
+                /** @description Resultado: exito, denegado o fallido; varios separados por coma */
+                resultado?: string;
                 desde?: string;
                 hasta?: string;
                 limite?: number;
+                /** @description Página (solo en /auditoria/registros) */
+                pagina?: number;
+                orden?: "fecha" | "persona" | "rol" | "accion" | "entidad" | "paciente" | "resultado";
+                sentido?: "asc" | "desc";
+                /** @description true cuando la consulta alimenta una exportación: queda auditada como auditoria.exportar */
+                exportar?: string;
             };
             header?: never;
             path?: never;
@@ -9905,6 +10090,204 @@ export interface operations {
             };
             /** @description Sin permiso (`sin_permiso`) o regla de acceso */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PrivacyController_page: {
+        parameters: {
+            query?: {
+                /** @description Id de la cuenta, o parte de su nombre o correo */
+                persona?: string;
+                /** @description Id del paciente o número de expediente */
+                paciente?: string;
+                /** @description Acción exacta o prefijo (por ejemplo consulta.); varias separadas por coma */
+                accion?: string;
+                /** @description Código de rol que actuó (por ejemplo MED) */
+                rol?: string;
+                /** @description Entidad auditada (por ejemplo consulta) */
+                entidad?: string;
+                /** @description Resultado: exito, denegado o fallido; varios separados por coma */
+                resultado?: string;
+                desde?: string;
+                hasta?: string;
+                limite?: number;
+                /** @description Página (solo en /auditoria/registros) */
+                pagina?: number;
+                orden?: "fecha" | "persona" | "rol" | "accion" | "entidad" | "paciente" | "resultado";
+                sentido?: "asc" | "desc";
+                /** @description true cuando la consulta alimenta una exportación: queda auditada como auditoria.exportar */
+                exportar?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPageResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PrivacyController_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOptionsResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PrivacyController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seq: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditDetailResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10494,6 +10877,61 @@ export interface operations {
             };
         };
     };
+    NoticesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeListItemResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     NoticesController_publish: {
         parameters: {
             query?: never;
@@ -10547,6 +10985,61 @@ export interface operations {
             };
             /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    MyNoticesController_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNoticesResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

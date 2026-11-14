@@ -8624,7 +8624,34 @@
             "name": "accion",
             "required": false,
             "in": "query",
-            "description": "Acción exacta o prefijo (por ejemplo consulta.)",
+            "description": "Acción exacta o prefijo (por ejemplo consulta.); varias separadas por coma",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rol",
+            "required": false,
+            "in": "query",
+            "description": "Código de rol que actuó (por ejemplo MED)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entidad",
+            "required": false,
+            "in": "query",
+            "description": "Entidad auditada (por ejemplo consulta)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resultado",
+            "required": false,
+            "in": "query",
+            "description": "Resultado: exito, denegado o fallido; varios separados por coma",
             "schema": {
               "type": "string"
             }
@@ -8656,6 +8683,57 @@
               "maximum": 500,
               "default": 100,
               "type": "number"
+            }
+          },
+          {
+            "name": "pagina",
+            "required": false,
+            "in": "query",
+            "description": "Página (solo en /auditoria/registros)",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "orden",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "fecha",
+              "type": "string",
+              "enum": [
+                "fecha",
+                "persona",
+                "rol",
+                "accion",
+                "entidad",
+                "paciente",
+                "resultado"
+              ]
+            }
+          },
+          {
+            "name": "sentido",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "exportar",
+            "required": false,
+            "in": "query",
+            "description": "true cuando la consulta alimenta una exportación: queda auditada como auditoria.exportar",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -8720,6 +8798,364 @@
           }
         ],
         "summary": "Metadatos de auditoría por persona, paciente, acción y fecha; no contiene valores clínicos",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "auditoria.ver"
+      }
+    },
+    "/api/v1/auditoria/registros": {
+      "get": {
+        "operationId": "PrivacyController_page",
+        "parameters": [
+          {
+            "name": "persona",
+            "required": false,
+            "in": "query",
+            "description": "Id de la cuenta, o parte de su nombre o correo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paciente",
+            "required": false,
+            "in": "query",
+            "description": "Id del paciente o número de expediente",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accion",
+            "required": false,
+            "in": "query",
+            "description": "Acción exacta o prefijo (por ejemplo consulta.); varias separadas por coma",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rol",
+            "required": false,
+            "in": "query",
+            "description": "Código de rol que actuó (por ejemplo MED)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entidad",
+            "required": false,
+            "in": "query",
+            "description": "Entidad auditada (por ejemplo consulta)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resultado",
+            "required": false,
+            "in": "query",
+            "description": "Resultado: exito, denegado o fallido; varios separados por coma",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pagina",
+            "required": false,
+            "in": "query",
+            "description": "Página (solo en /auditoria/registros)",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "orden",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "fecha",
+              "type": "string",
+              "enum": [
+                "fecha",
+                "persona",
+                "rol",
+                "accion",
+                "entidad",
+                "paciente",
+                "resultado"
+              ]
+            }
+          },
+          {
+            "name": "sentido",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "exportar",
+            "required": false,
+            "in": "query",
+            "description": "true cuando la consulta alimenta una exportación: queda auditada como auditoria.exportar",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Auditoría paginada y ordenable por persona, rol, paciente, acción, entidad, resultado y fecha",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "auditoria.ver"
+      }
+    },
+    "/api/v1/auditoria/opciones": {
+      "get": {
+        "operationId": "PrivacyController_options",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Acciones, entidades y roles que existen en la auditoría, para los filtros",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "auditoria.ver"
+      }
+    },
+    "/api/v1/auditoria/registros/{seq}": {
+      "get": {
+        "operationId": "PrivacyController_detail",
+        "parameters": [
+          {
+            "name": "seq",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una fila de auditoría: quién, qué, cuándo, metadatos y hashes de la cadena",
         "tags": [
           "privacy"
         ],
@@ -9490,6 +9926,75 @@
       }
     },
     "/api/v1/avisos": {
+      "get": {
+        "operationId": "NoticesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoticeListItemResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Avisos recientes con su audiencia, prioridad y estado, para quien los redacta",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "avisos.publicar"
+      },
       "post": {
         "operationId": "NoticesController_publish",
         "parameters": [
@@ -9588,6 +10093,74 @@
           "publico"
         ],
         "x-permiso": "avisos.publicar"
+      }
+    },
+    "/api/v1/me/avisos": {
+      "get": {
+        "operationId": "MyNoticesController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyNoticesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Avisos vigentes para mis roles, incluidos los públicos",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "sesion.perfil"
       }
     },
     "/api/v1/metricas/tablero": {
@@ -16187,6 +16760,171 @@
           "reason"
         ]
       },
+      "AuditPageResponse": {
+        "type": "object",
+        "properties": {
+          "filas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntryResponse"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Filas que cumplen el filtro, sin paginar"
+          },
+          "pagina": {
+            "type": "integer"
+          },
+          "limite": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filas",
+          "total",
+          "pagina",
+          "limite"
+        ]
+      },
+      "AuditOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "acciones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entidades": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "roles": {
+            "description": "Códigos de rol que aparecen en la auditoría",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "acciones",
+          "entidades",
+          "roles"
+        ]
+      },
+      "AuditDetailResponse": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "string",
+            "description": "Entero de 64 bits como texto"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "actor": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "permission": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "entity": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "patientRecord": {
+            "type": "string",
+            "nullable": true
+          },
+          "result": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ResultadoAuditoria"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlation": {
+            "type": "string",
+            "nullable": true,
+            "description": "Identificador de correlación de la petición"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Metadatos del evento (sin el evento canónico firmado); nunca valores clínicos"
+          },
+          "hash": {
+            "type": "string",
+            "description": "Hash SHA-256 de esta fila, en hexadecimal"
+          },
+          "previousHash": {
+            "type": "string",
+            "description": "Hash de la fila anterior, en hexadecimal"
+          },
+          "previousSeq": {
+            "type": "string",
+            "description": "Entero de 64 bits como texto",
+            "nullable": true
+          },
+          "nextSeq": {
+            "type": "string",
+            "description": "Entero de 64 bits como texto",
+            "nullable": true
+          }
+        },
+        "required": [
+          "seq",
+          "at",
+          "role",
+          "actor",
+          "actorId",
+          "permission",
+          "action",
+          "entity",
+          "entityId",
+          "patientId",
+          "patientRecord",
+          "result",
+          "reason",
+          "correlation",
+          "detail",
+          "hash",
+          "previousHash",
+          "previousSeq",
+          "nextSeq"
+        ]
+      },
       "AuditVerificationResponse": {
         "type": "object",
         "properties": {
@@ -16570,6 +17308,10 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "prioridad": {
+            "type": "string",
+            "description": "atencion, urgente o critico (D-071)"
           }
         },
         "required": [
@@ -16577,7 +17319,8 @@
           "titulo",
           "cuerpo",
           "desde",
-          "hasta"
+          "hasta",
+          "prioridad"
         ]
       },
       "NoticesResponse": {
@@ -16654,6 +17397,65 @@
           "llamados"
         ]
       },
+      "NoticeListItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "cuerpo": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "prioridad": {
+            "type": "string",
+            "description": "atencion, urgente o critico (D-071)"
+          },
+          "publico": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "estado": {
+            "type": "string",
+            "description": "vigente, programado o vencido"
+          },
+          "publicadoEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "titulo",
+          "cuerpo",
+          "desde",
+          "hasta",
+          "prioridad",
+          "publico",
+          "roles",
+          "estado",
+          "publicadoEn"
+        ]
+      },
       "NoticeDto": {
         "type": "object",
         "properties": {
@@ -16676,6 +17478,28 @@
             "type": "string",
             "format": "date-time",
             "description": "Fin de la vigencia, con zona horaria"
+          },
+          "prioridad": {
+            "type": "string",
+            "enum": [
+              "atencion",
+              "urgente",
+              "critico"
+            ],
+            "default": "atencion",
+            "description": "Escalera de avisos (D-071): atencion, urgente o critico"
+          },
+          "publico": {
+            "type": "boolean",
+            "default": true,
+            "description": "Visible en la pantalla pública y en las apps sin sesión. Sin roles, debe ser true"
+          },
+          "roles": {
+            "description": "Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "confirmarDatosPersonales": {
             "type": "boolean",
@@ -16711,6 +17535,19 @@
             "format": "date-time",
             "nullable": true
           },
+          "prioridad": {
+            "type": "string",
+            "description": "atencion, urgente o critico (D-071)"
+          },
+          "publico": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "publicadoEn": {
             "type": "string",
             "format": "date-time",
@@ -16723,7 +17560,83 @@
           "cuerpo",
           "desde",
           "hasta",
+          "prioridad",
+          "publico",
+          "roles",
           "publicadoEn"
+        ]
+      },
+      "NoticeAudienceResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "cuerpo": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "prioridad": {
+            "type": "string",
+            "description": "atencion, urgente o critico (D-071)"
+          },
+          "publico": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "titulo",
+          "cuerpo",
+          "desde",
+          "hasta",
+          "prioridad",
+          "publico",
+          "roles"
+        ]
+      },
+      "MyNoticesResponse": {
+        "type": "object",
+        "properties": {
+          "actualizadoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "avisos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoticeAudienceResponse"
+            }
+          },
+          "proximoCambio": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "actualizadoEn",
+          "avisos",
+          "proximoCambio"
         ]
       },
       "BedTotalsResponse": {

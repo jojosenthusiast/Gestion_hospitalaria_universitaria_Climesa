@@ -22,7 +22,7 @@ Registro de diagnósticos, recetas y solicitudes de exámenes (regla de negocio 
 | FR-106-06 | Cuando el médico firma, el sistema debe verificar su inscripción vigente en ese instante y cerrar la consulta. | R | RN-23; D-012 |
 | FR-106-07 | Si se intenta editar una consulta firmada, entonces el sistema debe rechazarlo y ofrecer addendum. | R | RN-23; D-003 |
 | FR-106-08 | El addendum debe conservar el texto original, el autor, el motivo y el instante. | E | Norma 1616 Art. 42 |
-| FR-106-09 | El sistema debe mostrar el historial clínico del paciente en orden cronológico al médico con relación de atención o acceso excepcional. | R | REQ-ROL-02; D-031 |
+| FR-106-09 | El sistema debe mostrar el historial clínico del paciente en orden cronológico al médico con relación de atención (el acceso excepcional se retiró, D-082). | R | REQ-ROL-02; D-031 |
 | FR-106-10 | El paciente debe ver en su historial sus consultas firmadas, diagnósticos y recetas. | R | REQ-ROL-04 |
 | FR-106-11 | El médico debe poder indicar hospitalización desde la consulta, lo que crea una solicitud de admisión de origen "consulta". | R | D-038 |
 | FR-106-12 | Toda lectura del historial debe quedar auditada. | R | D-009 |

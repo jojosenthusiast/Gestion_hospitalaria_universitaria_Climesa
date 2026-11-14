@@ -40,6 +40,50 @@ describe('110 · auditoría y quién vio mi expediente', () => {
     expect(broken.body).toMatchObject({ integra: false, primeraFallida: Number(target.seq) });
   });
 
+  test('espacio del auditor: filtros por rol, entidad y resultado, orden, páginas, detalle con hashes y exportación auditada', async () => {
+    await t.call('JOP', 'GET', '/auditoria');                      // genera una fila denegada
+    await t.call('DPD', 'GET', '/auditoria?accion=auditoria.');
+    const denied = await t.call('DPD', 'GET', '/auditoria/registros?resultado=denegado,fallido&limite=10');
+    expect(denied.status).toBe(200);
+    expect(denied.body.total).toBeGreaterThan(0);
+    expect(denied.body.filas.every((row: any) => row.result !== 'exito')).toBe(true);
+
+    const byRole = await t.call('DPD', 'GET', '/auditoria/registros?rol=DPD&entidad=auditoria&limite=5&pagina=1&orden=accion&sentido=asc');
+    expect(byRole.status).toBe(200);
+    expect(byRole.body).toMatchObject({ pagina: 1, limite: 5 });
+    expect(byRole.body.filas.length).toBeLessThanOrEqual(5);
+    expect(byRole.body.filas.every((row: any) => row.role.split(',').includes('DPD') && row.entity === 'auditoria')).toBe(true);
+    const actions = byRole.body.filas.map((row: any) => row.action);
+    expect(actions).toEqual([...actions].sort());
+
+    const second = await t.call('DPD', 'GET', '/auditoria/registros?limite=2&pagina=2');
+    const first = await t.call('DPD', 'GET', '/auditoria/registros?limite=2&pagina=1');
+    expect(second.body.filas.map((r: any) => r.seq)).not.toEqual(first.body.filas.map((r: any) => r.seq));
+    expect(second.body.total).toBeGreaterThan(first.body.filas.length);   // cada consulta también se audita, por eso el total sube
+
+    const many = await t.call('DPD', 'GET', '/auditoria/registros?accion=auditoria.consultar,acceso.&limite=50');
+    expect(many.body.filas.every((r: any) => /^(auditoria\.consultar|acceso\.)/.test(r.action))).toBe(true);
+    expect((await t.call('DPD', 'GET', '/auditoria/registros?orden=hash')).status).toBe(400);
+    expect((await t.call('DPD', 'GET', '/auditoria/registros?resultado=bien')).status).toBe(400);
+    expect((await t.call('JOP', 'GET', '/auditoria/registros')).status).toBe(403);
+
+    const detail = await t.call('DPD', 'GET', `/auditoria/registros/${first.body.filas[0].seq}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(detail.body.previousHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(detail.body.detail).not.toHaveProperty('canonicalEvent');
+    expect((await t.call('DPD', 'GET', '/auditoria/registros/999999999')).status).toBe(404);
+    expect((await t.call('DPD', 'GET', '/auditoria/registros/abc')).status).toBe(404);
+
+    const options = await t.call('DPD', 'GET', '/auditoria/opciones');
+    expect(options.body.acciones).toContain('auditoria.consultar');
+    expect(options.body.roles).toContain('DPD');
+
+    await t.call('DPD', 'GET', '/auditoria/registros?exportar=true&limite=5');
+    const exported = await t.one<{ n: string }>("SELECT count(*)::text AS n FROM plataforma.auditoria WHERE accion='auditoria.exportar'");
+    expect(Number(exported.n)).toBeGreaterThan(0);
+  });
+
   test('escenario 4: Ana ve rol, fecha y motivo de quien vio su expediente, sin nombres', async () => {
     t.setNow(start);
     const patientId = await t.patient({ linkPac: true, name: 'Ana' });

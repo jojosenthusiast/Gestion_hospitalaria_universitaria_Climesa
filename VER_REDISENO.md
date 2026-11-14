@@ -10,9 +10,9 @@ La galería importa `HospitalShell` y las páginas del producto; únicamente sus
 | JOP | Inicio, Personal, Camas, Edificio, Turnos, Inventario, Mi cuenta |
 | REC | Inicio, Pacientes, Camas, Edificio, Turnos, Fila del día, Citas, Mi cuenta |
 | LAB | Inicio, Laboratorio, Inventario, Mi cuenta |
-| DPD | Inicio, Usuarios, Auditoría, Accesos excepcionales, Mi cuenta |
+| DPD | Inicio, Personal, Auditoría, Mi cuenta |
 
-Inventario, fila/citas, operaciones de laboratorio y accesos excepcionales están identificados como pendientes de las semanas siguientes. Pacientes, personal, turnos, espacios, camas y usuarios tienen sus formularios/consultas del core. La aplicación conectada utiliza `/auth/me`, permisos efectivos y la API; la galería no sustituye esas comprobaciones.
+Inventario, fila/citas, operaciones de laboratorio están identificados como pendientes de las semanas siguientes. Pacientes, personal, turnos, espacios, camas y usuarios tienen sus formularios/consultas del core. La aplicación conectada utiliza `/auth/me`, permisos efectivos y la API; la galería no sustituye esas comprobaciones.
 
 En http://localhost:5173/design-preview.html se revisan los componentes actuales de ingreso, registro PAC, confirmación, activación y errores. Ya no se usa la antigua vista única de invitaciones como si fuera todo el portal.
 

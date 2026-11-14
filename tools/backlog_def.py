@@ -78,7 +78,7 @@ TAREAS = {
     "110-T01": ["BE"], "110-T02": ["BE"], "110-T03": ["BE"], "110-T04": ["BE", "WEB"], "110-T05": ["WEB", "AND", "IOS"],
     "110-T06": ["DOC"], "110-T07": ["BE", "AND", "IOS"], "110-T08": ["BE", "AND", "IOS"],
     "111-T01": ["BE"], "111-T02": ["BE"], "111-T03": ["BE", "WEB"], "111-T04": ["AND"],
-    "112-T01": ["BE"], "112-T02": ["BE", "WEB", "AND", "IOS"], "112-T03": ["WEB"],
+    "112-T01": ["BE"], "112-T02": ["BE", "WEB", "AND", "IOS"], "112-T03": ["WEB"], "112-T04": ["BE", "WEB", "AND"],
     "113-T01": ["BE", "WEB"], "113-T02": ["BE", "WEB"], "113-T03": ["BE", "WEB"], "113-T04": ["BE", "WEB"],
     "114-T01": ["WEB", "AND", "IOS"], "114-T02": ["WEB", "AND", "IOS"], "114-T03": ["BE", "WEB", "AND", "IOS"],
     "120-T01": ["WEB"], "120-T02": ["WEB"], "120-T03": ["WEB"], "120-T04": ["WEB"], "120-T05": ["WEB", "QA"],
@@ -310,7 +310,7 @@ h("HU-111-2", "111", "enfermería", "registrar el consumo de insumos desde el te
 h("HU-112-1", "112", "visitante", "ver ocupación general, médicos de turno y avisos en una pantalla pública y en las apps",
   "informarme sin datos privados", ["112-T01", "112-T02", "120-T04"], 3, "High", "S3", "W25, W34, A10, I10",
   ["Ninguna respuesta pública contiene datos personales", "El aviso aparece y vence solo"])
-h("HU-112-2", "112", "jefe de operaciones", "que me advierta si un aviso tiene datos personales", "no publicarlos por error", ["112-T03"], 1, "Low", "BL", "W25",
+h("HU-112-2", "112", "jefe de operaciones", "que me advierta si un aviso tiene datos personales", "no publicarlos por error", ["112-T03", "112-T04"], 1, "Low", "BL", "W25",
   ["Un aviso con un DUI muestra advertencia"])
 
 # Épica 113 Tablero

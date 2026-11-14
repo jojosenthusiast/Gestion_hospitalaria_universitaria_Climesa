@@ -12,10 +12,11 @@ La cara pública del hospital: estado general de ocupación, médicos de turno y
 |---|---|---|---|
 | FR-112-01 | El sistema debe publicar sin sesión la ocupación por planta y tipo (camas libres de total), sin identificar camas ni pacientes. | R | REQ-PRV-01 |
 | FR-112-02 | El sistema debe publicar sin sesión los médicos de turno con nombre, especialidad y área. | R | REQ-PRV-01; RN-17 |
-| FR-112-03 | El Jefe de Operaciones debe publicar y retirar avisos generales con vigencia. | R | REQ-PRV-01 |
+| FR-112-03 | El Jefe de Operaciones debe publicar avisos generales con vigencia, prioridad (atención, urgente, crítico) y audiencia: público, uno o más roles, o ambos. | R | REQ-PRV-01 |
 | FR-112-04 | La información pública debe actualizarse en vivo en la pantalla pública y en las apps. | R | REQ-PLT-06 |
 | FR-112-05 | Si un aviso contiene un DUI, número de expediente o teléfono, entonces el sistema debe advertir antes de publicarlo. | E | LPDP |
 | FR-112-06 | La pantalla pública debe mostrar los números de fila llamados con su consultorio, sin nombres. | E | FR-105-11 |
+| FR-112-08 | Cada rol debe ver en su tablero de inicio, en web y Android, los avisos vigentes públicos y los dirigidos a su rol; un aviso solo para roles no sale en la pantalla pública. | R | REQ-PRV-01; obs. 14 ronda 2 |
 
 ## Escenarios de aceptación
 

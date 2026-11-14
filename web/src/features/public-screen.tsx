@@ -3,6 +3,7 @@ import type { Api } from '../lib/api';
 import { Brand } from '../components/ui';
 import { PublicApi, categoryNames, publicServices, usePublicLive, useRefreshAt, type PublicDoctors, type PublicNotices, type PublicOccupancy, type PublicQueue } from '../lib/publico';
 import { useData, type Remote } from './common';
+import './avisos/avisos.css';
 
 const timeFormat = new Intl.DateTimeFormat('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23', timeZone: 'America/El_Salvador' });
 const dateFormat = new Intl.DateTimeFormat('es-SV', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/El_Salvador' });
@@ -70,7 +71,7 @@ export function PublicScreen({ api: given }: { api?: Api }) {
         <ul className="public-doctors">{d.medicos.map((m, i) => <li key={`${m.nombre}-${i}`}><strong>{m.nombre}</strong><span>{m.especialidad}{m.area ? ` · ${m.area}` : ''}</span><small>Hasta las {hour(m.hasta)}</small></li>)}</ul>}
       </Panel>
       <Panel title="Avisos" state={notices} empty="No hay avisos vigentes." isEmpty={d => d.avisos.length === 0} className="public-panel-notices">{d =>
-        <ul className="public-notices">{d.avisos.map(a => <li key={a.id}><strong>{a.titulo}</strong><p>{a.cuerpo}</p></li>)}</ul>}
+        <ul className="public-notices">{d.avisos.map(a => <li key={a.id}><strong>{a.titulo}</strong>{a.prioridad && a.prioridad !== 'atencion' && <span className={`notice-badge notice-${a.prioridad}`}>{a.prioridad === 'critico' ? 'Crítico' : 'Urgente'}</span>}<p>{a.cuerpo}</p></li>)}</ul>}
       </Panel>
     </main>
   </div>;

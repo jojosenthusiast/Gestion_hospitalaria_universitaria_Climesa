@@ -1,0 +1,36 @@
+/* Avisos (obs. 14): redacción con vista previa y tarjetas por prioridad. */
+.notice-composer { margin-bottom: 24px; display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); gap: 24px; align-items: start; }
+.notice-composer > form { padding: 22px 24px; display: grid; gap: 18px; border: 1px solid var(--line); border-top: 4px solid var(--primary); border-radius: var(--radius-card); background: var(--surface, #fff); }
+.notice-composer h2 { font-size: 20px; }
+.notice-preview { position: sticky; top: 96px; padding: 20px; display: grid; gap: 12px; border: 1px dashed var(--line); border-radius: var(--radius-card); background: var(--bg); }
+.notice-preview h3 { font-size: 15px; }
+.notice-fieldset { margin: 0; padding: 0; display: grid; gap: 10px; border: 0; }
+.notice-fieldset legend { margin-bottom: 6px; padding: 0; color: var(--ink); font-size: 14px; font-weight: 700; }
+.notice-roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 14px; }
+.notice-check { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; }
+.notice-check input { width: 18px; height: 18px; accent-color: var(--primary); }
+.field-hint { color: var(--muted); font-size: 12.5px; }
+
+.notice-card { padding: 14px 16px; display: flex; gap: 12px; border: 1px solid var(--line); border-left: 6px solid var(--primary); border-radius: var(--radius-card); background: var(--surface, #fff); }
+.notice-card > div { min-width: 0; display: grid; gap: 4px; }
+.notice-card p { margin: 0; color: var(--ink); font-size: 14.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.notice-card small { color: var(--muted); font-size: 12.5px; }
+.notice-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.notice-card-icon { flex-shrink: 0; color: var(--primary-text); }
+.notice-card.notice-urgente { border-left-color: var(--warning); background: var(--warning-soft); }
+.notice-card.notice-urgente .notice-card-icon { color: var(--warning); }
+.notice-card.notice-critico { border-left-color: var(--danger); background: var(--danger-soft); }
+.notice-card.notice-critico .notice-card-icon { color: var(--danger); }
+.notice-badge { padding: 2px 9px; border-radius: 999px; background: var(--soft); color: var(--primary-text); font-size: 12px; font-weight: 700; }
+.notice-urgente .notice-badge, .notice-badge.notice-urgente { background: var(--warning-soft); color: var(--warning); }
+.notice-critico .notice-badge, .notice-badge.notice-critico { background: var(--danger-soft); color: var(--danger); }
+
+.notice-panel { margin-bottom: 24px; padding: 16px 18px; display: grid; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface, #fff); }
+.notice-panel > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.notice-panel > header h2 { font-size: 18px; }
+.notice-panel > header span { color: var(--muted); font-size: 13px; }
+.notice-list { display: grid; gap: 10px; }
+.notice-panel .row-action { justify-self: start; }
+.notice-history { margin-top: 0; }
+
+@media (max-width: 900px) { .notice-composer { grid-template-columns: 1fr; } .notice-preview { position: static; } }
