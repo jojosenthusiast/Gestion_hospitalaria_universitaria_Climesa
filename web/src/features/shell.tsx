@@ -2,6 +2,7 @@ import { useEffect,useRef,useState,type ReactNode } from 'react';
 import { Brand,Icon,StatusView,type IconName } from '../components/ui';
 import { can,roleNames,type AccessProfile,type Api,type Summary } from '../lib/api';
 import { AmbulancePage } from './ambulance';
+import { AmbulanceLogPage } from './ambulance-log';
 import { Heading,RemoteState,Tag,formatDateTime,useData } from './common';
 import { PatientsPage } from './patients';
 import { PersonnelPage,ShiftsPage } from './personnel';
@@ -28,6 +29,7 @@ export const modules:Module[]=[
  {id:'camas',label:'Camas',permission:'camas.ver_tablero'},
  {id:'espacios',label:'Edificio',permission:'espacios.ver'},
  {id:'ambulancia',label:'Ambulancia',permission:'ambulancia.ver_estado'},
+ {id:'bitacora-ambulancia',label:'Bitácora de ambulancia',permission:'ambulancia.ver_bitacora'},
  {id:'turnos',label:'Turnos',permission:'turnos.ver'},
  {id:'usuarios',label:'Usuarios',permission:'usuarios.ver'},
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver'},
@@ -42,7 +44,7 @@ export const modules:Module[]=[
  {id:'privacidad',label:'Accesos excepcionales',permission:'privacidad.aprobar_acceso',alsoPermissions:['privacidad.solicitar_acceso']},
  {id:'perfil',label:'Perfil'},
 ];
-const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',vinculaciones:'shield',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',privacidad:'privacy',perfil:'user',avisos:'info',metricas:'grid'};
+const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',vinculaciones:'shield',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',privacidad:'privacy',perfil:'user',avisos:'info',metricas:'grid'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
 export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
@@ -85,6 +87,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout}
  else if(route==='espacios')content=<SpacesPage api={api} profile={profile} version={version}/>;
  else if(route==='camas')content=<BedsPage api={api} profile={profile} version={version}/>;
  else if(route==='ambulancia')content=<AmbulancePage api={api} profile={profile} version={version}/>;
+ else if(route==='bitacora-ambulancia')content=<AmbulanceLogPage api={api} version={version}/>;
  else if(route==='usuarios')content=<UsersPage api={api} profile={profile} version={version}/>;
  else if(route==='vinculaciones')content=<AccountLinksPage api={api} profile={profile} version={version}/>;
  else if(route==='citas')content=<AppointmentsPage api={api} profile={profile} version={version}/>;
