@@ -1,8 +1,8 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api } from '../lib/api';
-import { AmbulancePage, type AmbulanceStatus } from '../features/ambulance';
+import { AmbulancePage, waitingLabel, type AmbulanceStatus } from '../features/ambulance';
 import { AmbulanceLogPage, logPath } from '../features/ambulance-log';
 import { modules, visibleModules } from '../features/shell';
 
@@ -88,20 +88,81 @@ describe('W18 centro de despacho', () => {
   });
 });
 
-describe('W19 bitácora de ambulancia', () => {
-  it('arma la consulta solo con los filtros llenos', () => {
-    expect(logPath({ from: '2026-11-01', to: '', type: '', finalState: 'completado', priority: '', municipality: ' ', minResponseMinutes: '15' })).toBe('/ambulancia/bitacora?from=2026-11-01&finalState=completado&minResponseMinutes=15');
+describe('W18 solicitudes en maestro-detalle', () => {
+  const phone = { ...request, id: 'req-2', channel: 'telefono', address: 'Calle a Apopa', municipality: 'Apopa', reason: 'Persona caída en la vía', contactPhone: '7000-2222', registeredPatient: false, requesterName: 'Marta Quintanilla', callerName: 'Marta Quintanilla', patientRecord: null, createdAt: '2026-11-15T13:00:00.000Z' };
+  const known = { ...request, requesterName: 'Ana Ficticia Pérez', patientRecord: 'EXP-0042' };
+
+  it('muestra quién pidió, su expediente o teléfono y el tiempo de espera, y cambia el detalle al elegir otra', async () => {
+    const api = apiReturning({ ...board, pendingRequests: [known, phone] });
+    render(<AmbulancePage api={api} profile={dispatcher} version={0} />);
+    const detail = await screen.findByRole('article', { name: 'Detalle de la solicitud' });
+    expect(within(detail).getByText(/Ana Ficticia Pérez · expediente/)).toBeTruthy();
+    expect(within(detail).getByText('EXP-0042')).toBeTruthy();
+    expect(within(detail).getByText('7000-0001')).toBeTruthy();
+    expect(within(detail).getByText('Caída en casa')).toBeTruthy();
+    expect(screen.getAllByText(/^(Espera |Recién)/).length).toBe(2);
+    expect(waitingLabel(0)).toBe('Recién recibida');
+    expect(waitingLabel(45)).toBe('Espera 45 min');
+    expect(waitingLabel(130)).toBe('Espera 2 h 10 min');
+    await userEvent.click(within(screen.getByRole('list', { name: 'Lista de solicitudes' })).getByRole('button', { name: /Marta Quintanilla/ }));
+    const second = screen.getByRole('article', { name: 'Detalle de la solicitud' });
+    expect(within(second).getByText(/Marta Quintanilla · sin expediente/)).toBeTruthy();
+    expect(within(second).getByText('7000-2222')).toBeTruthy();
+    expect(within(second).getByText('Llamada telefónica')).toBeTruthy();
+    await userEvent.click(within(second).getByRole('button', { name: 'Confirmar y despachar' }));
+    await screen.findByRole('dialog', { name: 'Confirmar y despachar' });
+    expect(screen.getByText(/pidió Marta Quintanilla/)).toBeTruthy();
   });
 
-  it('muestra tiempos y destinos, y vuelve a pedir con los filtros', async () => {
-    const rows = [{ id: 's1', type: 'emergencia_domicilio', priority: 'roja', origin: 'Colonia Ficticia', destination: 'Hospital CLIMESA', municipality: 'San Salvador', dispatchedAt: '2026-11-15T14:00:00.000Z', finishedAt: '2026-11-15T14:40:00.000Z', finalState: 'completado', responseMinutes: 20, crew: [{ staffId: 'p1', role: 'paramedico', name: 'Persona Ficticia' }] }];
+  it('con la unidad en mantenimiento no despacha, dice por qué y qué hacer, y deja descartar', async () => {
+    const blocked: AmbulanceStatus = { ...board, unit: { ...board.unit, state: 'en_mantenimiento', stateReason: 'Cambio de llantas', stateSince: '2026-11-15T12:00:00.000Z' }, paramedicOnDuty: false, dispatchBlock: { code: 'en_mantenimiento', message: 'La unidad está en mantenimiento y no hay paramédico con turno en curso.', action: 'Publica un turno de paramédico que cubra la hora actual y luego saca la unidad de mantenimiento (RN-30).' }, pendingRequests: [phone] };
+    render(<AmbulancePage api={apiReturning(blocked)} profile={profile([...dispatcher.permissions.map(p => p.code), 'ambulancia.mantenimiento'], ['JOP'])} version={0} />);
+    const detail = await screen.findByRole('article', { name: 'Detalle de la solicitud' });
+    expect(within(detail).getByText(/No se puede despachar ahora/)).toBeTruthy();
+    expect(within(detail).getByText(/Publica un turno de paramédico/)).toBeTruthy();
+    expect((within(detail).getByRole('button', { name: 'Confirmar y despachar' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(detail).getByRole('button', { name: 'Descartar' }) as HTMLButtonElement).disabled).toBe(false);
+    const maintenance = screen.getByRole('region', { name: 'Mantenimiento de la unidad' });
+    expect(within(maintenance).getByText(/Cambio de llantas/)).toBeTruthy();
+    expect((within(maintenance).getByRole('button', { name: 'Sacar de mantenimiento' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe('W19 bitácora de ambulancia', () => {
+  it('arma la consulta solo con los filtros llenos', () => {
+    expect(logPath({ from: '2026-11-01', to: '', type: '', finalState: 'completado', priority: '', municipality: ' ', minResponseMinutes: '15', q: '' })).toBe('/ambulancia/bitacora?from=2026-11-01&finalState=completado&minResponseMinutes=15');
+  });
+
+  it('cuenta cada servicio como historia con sus tiempos y vuelve a pedir con los filtros', async () => {
+    const rows = [{ id: 's1', type: 'emergencia_domicilio', priority: 'roja', origin: 'Colonia Ficticia', destination: 'Hospital CLIMESA', municipality: 'San Salvador', dispatchedAt: '2026-11-15T14:00:00.000Z', finishedAt: '2026-11-15T14:40:00.000Z', finalState: 'completado', responseMinutes: 20, patientRef: '*******042', milestones: [{ type: 'salida', occurredAt: '2026-11-15T14:05:00.000Z' }, { type: 'en_escena', occurredAt: '2026-11-15T14:20:00.000Z' }], crew: [{ staffId: 'p1', role: 'paramedico', name: 'Persona Ficticia' }] }];
     const api = { request: vi.fn().mockResolvedValue(rows), write: vi.fn() } as unknown as Api & { request: ReturnType<typeof vi.fn> };
     render(<AmbulanceLogPage api={api} version={0} />);
-    expect(await screen.findByText('20 min')).toBeTruthy();
-    expect(screen.getByRole('cell', { name: 'Completado' })).toBeTruthy();
+    expect(await screen.findByText(/Llegó a la escena en 20 min/)).toBeTruthy();
+    expect(screen.getByText(/La ambulancia salió de Colonia Ficticia \(San Salvador\) hacia Hospital CLIMESA — paciente con expediente \*+042, con Persona Ficticia, completado\./)).toBeTruthy();
+    expect(within(screen.getByRole('list', { name: 'Hitos del servicio' })).getAllByRole('listitem')).toHaveLength(2);
+    // Los filtros viven en un panel plegable; al elegir uno aparece su chip y la consulta cambia.
+    expect(screen.queryByLabelText('Prioridad')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Filtros' }));
     await userEvent.selectOptions(screen.getByLabelText('Prioridad'), 'roja');
-    await userEvent.click(screen.getByRole('button', { name: 'Filtrar' }));
     expect(api.request).toHaveBeenLastCalledWith('/ambulancia/bitacora?priority=roja', expect.anything());
+    expect(screen.getByText('Prioridad: Roja')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+    expect(api.request).toHaveBeenLastCalledWith('/ambulancia/bitacora', expect.anything());
+    expect(screen.queryByText('Prioridad: Roja')).toBeNull();
+  });
+
+  it('la búsqueda compacta consulta con q y la vista de tabla conserva los datos', async () => {
+    const rows = [{ id: 's1', type: 'traslado_interhospitalario', priority: 'verde', origin: 'Clínica Norte', destination: 'Hospital CLIMESA', dispatchedAt: '2026-11-15T14:00:00.000Z', finalState: null, responseMinutes: null, crew: [] }];
+    const api = { request: vi.fn().mockResolvedValue(rows), write: vi.fn() } as unknown as Api & { request: ReturnType<typeof vi.fn> };
+    render(<AmbulanceLogPage api={api} version={0} />);
+    await screen.findByText(/sin paciente vinculado/);
+    await userEvent.type(screen.getByLabelText('Buscar en la bitácora'), 'Soyapango');
+    await waitFor(() => expect(api.request).toHaveBeenLastCalledWith('/ambulancia/bitacora?q=Soyapango', expect.anything()));
+    await userEvent.click(screen.getByRole('button', { name: 'Tabla' }));
+    expect(screen.getByRole('cell', { name: 'En curso' })).toBeTruthy();
+    expect(screen.getByRole('cell', { name: 'Sin llegada a escena' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar búsqueda' }));
+    await waitFor(() => expect(api.request).toHaveBeenLastCalledWith('/ambulancia/bitacora', expect.anything()));
   });
 
   it('aparece en el menú solo con ambulancia.ver_bitacora', () => {
