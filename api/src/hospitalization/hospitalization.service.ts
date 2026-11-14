@@ -22,6 +22,45 @@ export class HospitalizationService {
     return row;
   }
 
+  /** Areas where the staff member has a published or running shift now (the `area` context, as in PatientsService.inArea). */
+  private async currentAreas(c: PoolClient, staffId: string | null) {
+    if (!staffId) return [] as string[];
+    return (await c.query("SELECT area_id FROM personal.turno WHERE persona_id=$1 AND estado IN ('publicado','en_curso') AND periodo @> $2::timestamptz", [staffId,this.clock.now()])).rows.map(r => r.area_id as string);
+  }
+
+  /** The admission's current bed is inside one of `areas` (walking up from the room through its parent spaces). */
+  private async admissionInAreas(c: PoolClient, admissionId: string, areas: string[]) {
+    if (!areas.length) return false;
+    return (await c.query(`SELECT 1 FROM hospitalizacion.ocupacion_cama o WHERE o.admision_id=$1 AND o.periodo @> $3::timestamptz
+      AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=o.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($2::uuid[])) LIMIT 1`, [admissionId,areas,this.clock.now()])).rows.length > 0;
+  }
+
+  /**
+   * SEG-03 (audit 02 A-1): `enfermeria.registrar` with context `area` only reaches admissions whose bed is in an area where the
+   * nurse has a current shift; context `x` reaches any admission.
+   */
+  private async assertNursingContext(c: PoolClient, actor: Actor, admissionId: string) {
+    const contexts = contextsOf(actor, 'enfermeria.registrar');
+    if (contexts.includes('x')) return;
+    if (contexts.includes('area') && await this.admissionInAreas(c, admissionId, await this.currentAreas(c, actor.staffId))) return;
+    throw new ForbiddenException('Solo puedes registrar notas de pacientes hospitalizados en el área de tu turno.');
+  }
+
+  /**
+   * SEG-03 (audit 02 A-1): `alta.firmar` with context `relacion` requires being the attending doctor of the admission or having a
+   * current care relationship with the patient; context `x` signs any discharge.
+   */
+  private async assertDischargeContext(c: PoolClient, actor: Actor, admission: Row) {
+    const contexts = contextsOf(actor, 'alta.firmar');
+    if (contexts.includes('x')) return;
+    if (contexts.includes('relacion') && actor.staffId) {
+      if (admission.attendingDoctorId === actor.staffId) return;
+      const related = (await c.query('SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz LIMIT 1', [admission.patientId,actor.staffId,this.clock.now()])).rows.length > 0;
+      if (related) return;
+    }
+    throw new ForbiddenException('Solo el médico tratante o con relación de atención vigente puede firmar esta alta.');
+  }
+
   /**
    * RN-05: under the lock taken on the bed and its room, a semiprivate room only mixes patients of the
    * same recorded sex, and isolation needs a room with nobody else in it (DAT-05, RN-05.5).
@@ -60,10 +99,13 @@ export class HospitalizationService {
       const global = contextsOf(actor, 'admision.ver').includes('x');
       const ownDoctor = actor.staffId && contextsOf(actor, 'admision.ver').includes('relacion');
       const ownPatient = actor.patientId && contextsOf(actor, 'admision.ver').includes('propio');
-      if (!global && !ownDoctor && !ownPatient) return [];
+      // SEG-03: context `area` (ENF) sees the admissions whose current bed is in an area of the nurse's current shift.
+      const areas = !global && contextsOf(actor, 'admision.ver').includes('area') ? await this.currentAreas(c, actor.staffId) : [];
+      if (!global && !ownDoctor && !ownPatient && !areas.length) return [];
       const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed,oc.id AS "occupationId"
         FROM hospitalizacion.admision a JOIN pacientes.paciente p ON p.id=a.paciente_id LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $1::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id
-        WHERE a.estado IN ('pendiente_cama','hospitalizado','alta_firmada') AND ($2::boolean OR ($3::uuid IS NOT NULL AND a.medico_tratante_id=$3) OR ($4::uuid IS NOT NULL AND a.paciente_id=$4)) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,actor.staffId ?? null,actor.patientId ?? null])).rows;
+        WHERE a.estado IN ('pendiente_cama','hospitalizado','alta_firmada') AND ($2::boolean OR ($3::uuid IS NOT NULL AND a.medico_tratante_id=$3) OR ($4::uuid IS NOT NULL AND a.paciente_id=$4)
+          OR (cardinality($5::uuid[])>0 AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=oc.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($5::uuid[])))) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,ownDoctor ? actor.staffId : null,ownPatient ? actor.patientId : null,areas])).rows;
       for (const row of rows) await this.commands.audit(c, actor, { action: 'admision.leer', entity: 'admision', entityId: row.id, patientId: row.patientId, permission: 'admision.ver' });
       return rows;
     });
@@ -194,6 +236,9 @@ export class HospitalizationService {
   async note(actor: Actor, id: string, dto: NursingNoteDto, key?: string) {
     return this.commands.run(actor, `enfermeria.registrar:${id}`, key, dto, async c => {
       const admission = await this.admission(c, id);
+      await this.assertNursingContext(c, actor, id);
+      // SEG-03: notes only while the patient is in the bed (hospitalized, or discharge signed but not yet out).
+      if (!['hospitalizado','alta_firmada'].includes(admission.state)) throw new ConflictException('Solo se registran notas de pacientes hospitalizados.');
       const row = (await c.query(`INSERT INTO hospitalizacion.nota_enfermeria(admision_id,autor_id,texto) VALUES($1,$2,$3) RETURNING id,creada_en AS "createdAt"`, [id,actor.id,dto.text.trim()])).rows[0];
       await this.commands.audit(c, actor, { action: 'enfermeria.nota', entity: 'nota_enfermeria', entityId: row.id, patientId: admission.patientId, permission: 'enfermeria.registrar' });
       await this.admissionChanged(c, id, admission.version);
@@ -204,6 +249,7 @@ export class HospitalizationService {
   async discharge(actor: Actor, id: string, dto: DischargeDto, key?: string) {
     return this.commands.run(actor, `alta.firmar:${id}`, key, dto, async c => {
       const admission = await this.admission(c, id, true);
+      await this.assertDischargeContext(c, actor, admission);
       if (admission.version !== dto.version) throw new VersionConflictException(admission.version, 'La admisión cambió; vuelve a consultarla.');
       if (admission.state !== 'hospitalizado') throw new ConflictException('Solo se puede firmar el alta de un paciente hospitalizado.');
       await requireCurrentEnrollment(c, actor.staffId, this.clock.today());

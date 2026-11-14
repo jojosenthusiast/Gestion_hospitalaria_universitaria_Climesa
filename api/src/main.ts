@@ -7,11 +7,16 @@ import { AppModule } from './app.module';
 import { ApiErrorsFilter } from './platform/errors.filter';
 import { CommandService } from './platform/command.service';
 import { completeDocument } from './platform/openapi';
+import { assertProductionEnvironment } from './config/environment';
+import { registerSecurity, trustProxyOption } from './config/security';
 /** FR-100-15: el registro de solicitudes solo lleva método, ruta sin consulta e id; nunca cuerpos, encabezados ni cookies. */
 export const requestLogging={serializers:{req:(r:{method:string;url:string;id:string})=>({method:r.method,url:r.url.split('?')[0],id:r.id})},redact:['req.headers.authorization','req.headers.cookie']};
 export function configureApplication(app:NestFastifyApplication) {
   const config=app.get(ConfigService);
   if(config.get('NODE_ENV')==='production'&&!config.get<string>('SUPABASE_URL')?.startsWith('https://'))throw new Error('Supabase requiere HTTPS en producción.');
+  // API-19: in production every Supabase and database variable must come from the environment, never from a code default.
+  if(config.get('NODE_ENV')==='production')assertProductionEnvironment();
+  registerSecurity(app,config);
   const prefix=config.get<string>('API_PREFIX','api/v1');
   app.setGlobalPrefix(prefix,{exclude:[{path:'salud',method:RequestMethod.GET}]});
   const primaryWebOrigin=config.get<string>('WEB_APP_URL','http://localhost:5173');
@@ -28,7 +33,7 @@ export function configureApplication(app:NestFastifyApplication) {
   return document;
 }
 export async function createApplication() {
-  const app=await NestFactory.create<NestFastifyApplication>(AppModule,new FastifyAdapter({ logger:process.env.NODE_ENV==='production'?requestLogging:false }));
+  const app=await NestFactory.create<NestFastifyApplication>(AppModule,new FastifyAdapter({ logger:process.env.NODE_ENV==='production'?requestLogging:false, trustProxy:trustProxyOption() }));
   const document=configureApplication(app);
   return {app,document};
 }
