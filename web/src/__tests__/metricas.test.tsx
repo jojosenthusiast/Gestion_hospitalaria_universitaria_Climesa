@@ -19,7 +19,7 @@ describe('W33 · métricas por rango', () => {
   });
 
   it('explica cada indicador, colorea según el umbral, ofrece rangos rápidos y exportación', async () => {
-    const api = { request: vi.fn(async (path: string) => ({ indicador: 'x', unidad: 'minutos', desde: '2026-11-14', hasta: '2026-11-15', actualizadoEn: '', serie: [{ fecha: '2026-11-14', valor: 130, muestras: 2 }] })), write: vi.fn() };
+    const api = { request: vi.fn(async () => ({ indicador: 'x', unidad: 'minutos', desde: '2026-11-14', hasta: '2026-11-15', actualizadoEn: '', serie: [{ fecha: '2026-11-14', valor: 130, muestras: 2 }] })), write: vi.fn() };
     render(<MetricsPage api={api as unknown as Api} profile={perfil(['metricas.ver'])} version={0} />);
     const lab = await screen.findByRole('region', { name: 'Tiempo de laboratorio (orden a completado)' });
     expect(within(lab).getByText(/Minutos entre que se pide el examen/)).toBeTruthy();

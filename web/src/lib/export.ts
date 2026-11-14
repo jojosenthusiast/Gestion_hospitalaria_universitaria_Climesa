@@ -60,7 +60,7 @@ export async function downloadXlsx(table: ExportTable) {
 }
 
 // Las fuentes estándar de PDF solo cubren Latin-1: se sustituyen los pocos símbolos que quedan fuera.
-const pdfSafe = (text: string) => text.replace(/[…]/g, '...').replace(/[–—]/g, '-').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/≥/g, '>=').replace(/≤/g, '<=').replace(/[^\x00-\xFF]/g, '');
+const pdfSafe = (text: string) => text.replace(/[…]/g, '...').replace(/[–—]/g, '-').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/≥/g, '>=').replace(/≤/g, '<=').replace(/[\u0100-\uFFFF]/g, '');
 
 /** Arma el PDF (sin descargarlo): banda azul con el logotipo y el nombre en cada página, fecha de generación y «Página X de Y». */
 export async function buildPdf(table: ExportTable, now = new Date()) {
