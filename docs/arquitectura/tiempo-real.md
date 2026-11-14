@@ -72,6 +72,7 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `caso_duplicado.abierto` | `caso_duplicado` | Registro con posible duplicado | `rol:REC` | 102 |
 | `usuario.actualizado` | `usuario` | Invitar, roles, desactivar | `rol:ADM`, `usuario:<id>` | 101 |
 | `personal.actualizado` | `personal` | Ficha e inscripción | `rol:ADM`, `rol:JOP` | 103 |
+| `signos.registrados` | `paciente` | Toma de signos vitales fuera de consulta | `signos.registrar` y `expediente.ver` | 106 |
 | `turno.actualizado` / `turno.publicado` | `turno` | Planificar, publicar, cambio de estado por reloj | `rol:JOP`, `rol:ADM`, `usuario:<persona>` | 103 |
 | `turno.publicado` / `turno.cambiado` | `publico` | Derivado en la base (turnos de médicos) | `publico` | 112 |
 | `espacio.actualizado` | `espacio` | Crear o editar espacio | `camas.ver_tablero`, `espacios.ver` | 104 |

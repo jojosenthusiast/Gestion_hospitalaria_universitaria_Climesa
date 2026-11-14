@@ -18,6 +18,7 @@ export const EVENT_TYPES = [
   'metricas.recalculadas',
   'paciente.actualizado', 'paciente.creado',
   'personal.actualizado',
+  'signos.registrados',
   'turno.actualizado', 'turno.cambiado', 'turno.publicado',
   'usuario.actualizado',
   'vinculacion.resuelta', 'vinculacion.solicitada',

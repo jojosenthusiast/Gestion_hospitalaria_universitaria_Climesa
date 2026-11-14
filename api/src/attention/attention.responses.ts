@@ -138,6 +138,25 @@ export class VitalSignsResponse {
   @DecimalProp({ nullable: true }) heightCm!: string | null;
 }
 
+export class PatientVitalsItemResponse extends VitalSignsResponse {
+  @UuidProp({ nullable: true }) consultationId!: string | null;
+  @UuidProp({ nullable: true }) admissionId!: string | null;
+  @StrProp({ nullable: true }) takenByName!: string | null;
+  @IntProp({ nullable: true }) pain!: number | null;
+  @IntProp({ nullable: true }) glucoseMgDl!: number | null;
+  @StrProp({ nullable: true }) note!: string | null;
+}
+
+export class PatientVitalsHistoryResponse {
+  @UuidProp() patientId!: string;
+  @StrProp() patientName!: string;
+  @StrProp({ description: 'Número de expediente' }) record!: string;
+  @IntProp({ nullable: true, description: 'Edad en años; nula si el rol no puede ver la fecha de nacimiento' }) age!: number | null;
+  @UuidProp({ nullable: true, description: 'Admisión activa del paciente' }) admissionId!: string | null;
+  @StrProp({ nullable: true, description: 'Cama actual; nulo si no está hospitalizado o aún sin cama' }) bed!: string | null;
+  @ClassArrayProp(PatientVitalsItemResponse) items!: PatientVitalsItemResponse[];
+}
+
 export class VitalSignsCreatedResponse {
   @UuidProp() id!: string;
   @DateTimeProp() takenAt!: string;

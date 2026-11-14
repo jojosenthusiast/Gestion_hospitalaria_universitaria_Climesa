@@ -79,7 +79,7 @@ A34,Android,REC,Admisión y cama,Admitir y asignar,Mismo flujo de W14 en móvil,
 A35,Android,REC,Tablero de camas,Ver camas,"Por planta, colores y texto",Abrir cama,En vivo,Ocupante enmascarado salvo permiso,R,104
 A36,Android,REC,Despacho de ambulancia,Despachar desde el mostrador,"Estado, solicitudes, servicio activo",Confirmar y despachar,En vivo,,R,109
 A40,Android,AST,Mi consultorio,Mover la fila,Números asignados al consultorio y estado,Llamar siguiente; no se presentó,En vivo,Solo número e iniciales,R,105
-A41,Android,AST; ENF,Signos vitales,Tomar signos,"PA, FC, FR, temperatura, SatO2, peso, talla; fuera de rango resaltado",Guardar,,,R,106
+A41,Android,AST; ENF,Signos vitales,Tomar signos,"Paciente de mi planta, de la fila o por búsqueda; PA, FC, FR, temperatura, SatO2, dolor, glucemia, peso, talla; fuera de rango resaltado y alertas críticas; historial y tendencia",Guardar,En vivo,,R,106
 A50,Android,ENF,Mi planta,Pacientes del área,"Camas ocupadas del área, alertas (signos pendientes, resultados críticos)",Abrir paciente,En vivo,,R,108
 A51,Android,ENF,Paciente hospitalizado,Cuidado,"Signos, notas de enfermería, indicaciones",Registrar signos y notas,,,E,108
 A52,Android,ENF,Limpieza de camas,Liberar camas,Camas en limpieza; lista de verificación,Registrar limpieza; verificar la de otra persona,En vivo,,R,104

@@ -6317,6 +6317,221 @@
         "x-permiso": "expediente.ver"
       }
     },
+    "/api/v1/pacientes/{id}/signos": {
+      "get": {
+        "operationId": "PatientVitalsController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientVitalsHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historial de signos vitales del paciente, el más reciente primero",
+        "tags": [
+          "patient-vitals"
+        ],
+        "x-permiso": "signos.registrar"
+      },
+      "post": {
+        "operationId": "PatientVitalsController_register",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientVitalsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VitalSignsCreatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar signos vitales de un paciente fuera de una consulta",
+        "tags": [
+          "patient-vitals"
+        ],
+        "x-permiso": "signos.registrar"
+      }
+    },
     "/api/v1/laboratorio/catalogo": {
       "get": {
         "operationId": "LaboratoryController_catalog",
@@ -16788,6 +17003,215 @@
           "admissions"
         ]
       },
+      "PatientVitalsItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "takenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "takenBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "systolic": {
+            "type": "integer",
+            "nullable": true
+          },
+          "diastolic": {
+            "type": "integer",
+            "nullable": true
+          },
+          "heartRate": {
+            "type": "integer",
+            "nullable": true
+          },
+          "respiratoryRate": {
+            "type": "integer",
+            "nullable": true
+          },
+          "temperature": {
+            "type": "string",
+            "description": "Número decimal como texto (numeric de PostgreSQL)",
+            "nullable": true
+          },
+          "oxygenSaturation": {
+            "type": "integer",
+            "nullable": true
+          },
+          "weightKg": {
+            "type": "string",
+            "description": "Número decimal como texto (numeric de PostgreSQL)",
+            "nullable": true
+          },
+          "heightCm": {
+            "type": "string",
+            "description": "Número decimal como texto (numeric de PostgreSQL)",
+            "nullable": true
+          },
+          "consultationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "admissionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "takenByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "pain": {
+            "type": "integer",
+            "nullable": true
+          },
+          "glucoseMgDl": {
+            "type": "integer",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "takenAt",
+          "takenBy",
+          "systolic",
+          "diastolic",
+          "heartRate",
+          "respiratoryRate",
+          "temperature",
+          "oxygenSaturation",
+          "weightKg",
+          "heightCm",
+          "consultationId",
+          "admissionId",
+          "takenByName",
+          "pain",
+          "glucoseMgDl",
+          "note"
+        ]
+      },
+      "PatientVitalsHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientName": {
+            "type": "string"
+          },
+          "record": {
+            "type": "string",
+            "description": "Número de expediente"
+          },
+          "age": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Edad en años; nula si el rol no puede ver la fecha de nacimiento"
+          },
+          "admissionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Admisión activa del paciente"
+          },
+          "bed": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cama actual; nulo si no está hospitalizado o aún sin cama"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PatientVitalsItemResponse"
+            }
+          }
+        },
+        "required": [
+          "patientId",
+          "patientName",
+          "record",
+          "age",
+          "admissionId",
+          "bed",
+          "items"
+        ]
+      },
+      "PatientVitalsDto": {
+        "type": "object",
+        "properties": {
+          "systolic": {
+            "type": "number",
+            "minimum": 40,
+            "maximum": 300
+          },
+          "diastolic": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 200
+          },
+          "heartRate": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 250
+          },
+          "respiratoryRate": {
+            "type": "number",
+            "minimum": 4,
+            "maximum": 80
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 45
+          },
+          "oxygenSaturation": {
+            "type": "number",
+            "minimum": 40,
+            "maximum": 100
+          },
+          "weightKg": {
+            "type": "number",
+            "minimum": 0.3,
+            "maximum": 400
+          },
+          "heightCm": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 250
+          },
+          "admissionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pain": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Dolor, escala 0 a 10"
+          },
+          "glucoseMgDl": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 800,
+            "description": "Glucemia en mg/dL"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
       "TipoResultadoLaboratorio": {
         "type": "string",
         "enum": [
@@ -21544,6 +21968,7 @@
           "paciente.actualizado",
           "paciente.creado",
           "personal.actualizado",
+          "signos.registrados",
           "turno.actualizado",
           "turno.cambiado",
           "turno.publicado",

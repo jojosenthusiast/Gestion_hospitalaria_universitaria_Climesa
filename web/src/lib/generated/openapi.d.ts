@@ -964,6 +964,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pacientes/{id}/signos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Historial de signos vitales del paciente, el más reciente primero */
+        get: operations["PatientVitalsController_history"];
+        put?: never;
+        /** Registrar signos vitales de un paciente fuera de una consulta */
+        post: operations["PatientVitalsController_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/laboratorio/catalogo": {
         parameters: {
             query?: never;
@@ -3056,6 +3074,67 @@ export interface components {
             /** @description Vacío para el propio paciente */
             admissions: components["schemas"]["HistoryAdmissionResponse"][];
         };
+        PatientVitalsItemResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            takenAt: string;
+            /** Format: uuid */
+            takenBy: string;
+            systolic: number | null;
+            diastolic: number | null;
+            heartRate: number | null;
+            respiratoryRate: number | null;
+            /** @description Número decimal como texto (numeric de PostgreSQL) */
+            temperature: string | null;
+            oxygenSaturation: number | null;
+            /** @description Número decimal como texto (numeric de PostgreSQL) */
+            weightKg: string | null;
+            /** @description Número decimal como texto (numeric de PostgreSQL) */
+            heightCm: string | null;
+            /** Format: uuid */
+            consultationId: string | null;
+            /** Format: uuid */
+            admissionId: string | null;
+            takenByName: string | null;
+            pain: number | null;
+            glucoseMgDl: number | null;
+            note: string | null;
+        };
+        PatientVitalsHistoryResponse: {
+            /** Format: uuid */
+            patientId: string;
+            patientName: string;
+            /** @description Número de expediente */
+            record: string;
+            /** @description Edad en años; nula si el rol no puede ver la fecha de nacimiento */
+            age: number | null;
+            /**
+             * Format: uuid
+             * @description Admisión activa del paciente
+             */
+            admissionId: string | null;
+            /** @description Cama actual; nulo si no está hospitalizado o aún sin cama */
+            bed: string | null;
+            items: components["schemas"]["PatientVitalsItemResponse"][];
+        };
+        PatientVitalsDto: {
+            systolic?: number;
+            diastolic?: number;
+            heartRate?: number;
+            respiratoryRate?: number;
+            temperature?: number;
+            oxygenSaturation?: number;
+            weightKg?: number;
+            heightCm?: number;
+            /** Format: uuid */
+            admissionId?: string;
+            /** @description Dolor, escala 0 a 10 */
+            pain?: number;
+            /** @description Glucemia en mg/dL */
+            glucoseMgDl?: number;
+            note?: string;
+        };
         /** @enum {string} */
         TipoResultadoLaboratorio: "numerico" | "texto";
         LabExamResponse: {
@@ -4409,7 +4488,7 @@ export interface components {
          * @description Catálogo de eventos que la API emite (docs/arquitectura/tiempo-real.md).
          * @enum {string}
          */
-        TipoEvento: "admision.actualizada" | "admision.cama_asignada" | "admision.creada" | "ambulancia.estado_cambiado" | "ambulancia.hito" | "ambulancia.prehospital" | "ambulancia.solicitud_creada" | "ambulancia.ubicacion" | "aviso.publicado" | "cama.estado_cambiado" | "cama.limpieza_pendiente" | "caso_duplicado.abierto" | "cita.actualizada" | "consulta.actualizada" | "espacio.actualizado" | "fila.actualizada" | "fila.estado" | "fila.llamado" | "inventario.actualizado" | "inventario.bajo_minimo" | "laboratorio.actualizado" | "laboratorio.critico" | "metricas.recalculadas" | "paciente.actualizado" | "paciente.creado" | "personal.actualizado" | "turno.actualizado" | "turno.cambiado" | "turno.publicado" | "usuario.actualizado" | "vinculacion.resuelta" | "vinculacion.solicitada";
+        TipoEvento: "admision.actualizada" | "admision.cama_asignada" | "admision.creada" | "ambulancia.estado_cambiado" | "ambulancia.hito" | "ambulancia.prehospital" | "ambulancia.solicitud_creada" | "ambulancia.ubicacion" | "aviso.publicado" | "cama.estado_cambiado" | "cama.limpieza_pendiente" | "caso_duplicado.abierto" | "cita.actualizada" | "consulta.actualizada" | "espacio.actualizado" | "fila.actualizada" | "fila.estado" | "fila.llamado" | "inventario.actualizado" | "inventario.bajo_minimo" | "laboratorio.actualizado" | "laboratorio.critico" | "metricas.recalculadas" | "paciente.actualizado" | "paciente.creado" | "personal.actualizado" | "signos.registrados" | "turno.actualizado" | "turno.cambiado" | "turno.publicado" | "usuario.actualizado" | "vinculacion.resuelta" | "vinculacion.solicitada";
         EventoDelgado: {
             /** @description Posición en plataforma.outbox (entero de 64 bits como texto); sirve de cursor. */
             seq: string;
@@ -8864,6 +8943,156 @@ export interface operations {
             };
             /** @description No encontrado (`no_encontrado`) */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PatientVitalsController_history: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientVitalsHistoryResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PatientVitalsController_register: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientVitalsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VitalSignsCreatedResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
