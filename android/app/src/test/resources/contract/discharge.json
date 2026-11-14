@@ -1,0 +1,15 @@
+{
+  "operation": "POST /admisiones/{id}/alta",
+  "source": "HospitalizationRules.dischargeBody",
+  "body": {
+    "type": "medica",
+    "version": 3,
+    "summary": "Evolución favorable, afebril por 48 horas.",
+    "pending": [
+      {
+        "description": "Control en consulta externa",
+        "responsible": "Paciente"
+      }
+    ]
+  }
+}

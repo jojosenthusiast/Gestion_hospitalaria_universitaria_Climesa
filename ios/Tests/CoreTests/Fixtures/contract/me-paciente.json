@@ -1,0 +1,10 @@
+{
+  "operation": "PATCH /me/paciente",
+  "source": "PatientSelfUpdateBody (PatientProfileRules.body)",
+  "body": {
+    "address": "Colonia Ficticia, casa 1",
+    "email": "paciente@example.test",
+    "phone": "7000-0000",
+    "version": 4
+  }
+}

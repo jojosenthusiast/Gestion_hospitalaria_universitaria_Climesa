@@ -1,0 +1,11 @@
+{
+  "operation": "POST /consultas/{id}/signos",
+  "source": "ConsultationViewModel.vitals",
+  "body": {
+    "systolic": 120,
+    "diastolic": 80,
+    "heartRate": 72,
+    "temperature": 36.8,
+    "oxygenSaturation": 98
+  }
+}

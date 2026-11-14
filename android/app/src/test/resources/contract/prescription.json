@@ -1,0 +1,16 @@
+{
+  "operation": "POST /consultas/{id}/receta",
+  "source": "ConsultationViewModel.prescription",
+  "body": {
+    "items": [
+      {
+        "medication": "Amoxicilina 500 mg",
+        "dose": "1 cápsula",
+        "route": "oral",
+        "frequency": "cada 8 horas",
+        "duration": "7 días",
+        "instructions": "Tomar con alimentos"
+      }
+    ]
+  }
+}

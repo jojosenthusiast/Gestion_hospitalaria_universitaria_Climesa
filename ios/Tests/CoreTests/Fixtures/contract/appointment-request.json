@@ -1,0 +1,10 @@
+{
+  "operation": "POST /citas/solicitudes",
+  "source": "AppointmentRequestBody",
+  "body": {
+    "doctorId": "3f9a8b7c-6d5e-4f3a-8b2c-1d0e9f8a7b6c",
+    "end": "2026-11-20T15:20:00Z",
+    "reason": "Dolor de garganta",
+    "start": "2026-11-20T15:00:00Z"
+  }
+}
