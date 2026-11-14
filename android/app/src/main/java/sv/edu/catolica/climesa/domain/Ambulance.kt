@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Modelos de `GET /ambulancia` (spec 109) leídos con org.json; nunca traen datos del paciente. */
-data class AmbulanceUnit(val id: String, val plate: String, val state: String, val version: Int)
+data class AmbulanceUnit(val id: String, val plate: String, val state: String, val version: Int, val stateReason: String = "", val stateSince: String = "")
 data class AmbulanceMilestone(val type: String, val occurredAt: String)
 data class AmbulanceCrewMember(val staffId: String, val role: String, val name: String)
 data class AmbulanceService(
@@ -19,9 +19,24 @@ data class AmbulanceService(
     val milestones: List<AmbulanceMilestone>,
     val nextMilestones: List<String>,
 )
-data class AmbulanceRequestRow(val id: String, val channel: String, val address: String, val municipality: String, val reason: String, val contactPhone: String, val createdAt: String, val version: Int)
-data class AmbulanceStatus(val unit: AmbulanceUnit, val activeService: AmbulanceService?, val paramedicOnDuty: Boolean, val pendingRequests: List<AmbulanceRequestRow>)
-data class AmbulanceLogEntry(val id: String, val type: String, val priority: String, val origin: String, val destination: String, val dispatchedAt: String, val finalState: String?, val responseMinutes: Int?)
+/** Quién pidió (paciente o quien llamó), su expediente si lo tiene y desde cuándo espera (obs. 7). */
+data class AmbulanceRequestRow(
+    val id: String, val channel: String, val address: String, val municipality: String, val reason: String, val contactPhone: String, val createdAt: String, val version: Int,
+    val requesterName: String = "", val callerName: String = "", val patientRecord: String = "",
+)
+/** Por qué no se puede despachar ahora y qué hacer; la calcula la API (RN-29, RN-30). */
+data class DispatchBlock(val code: String, val message: String, val action: String)
+data class AmbulanceStatus(val unit: AmbulanceUnit, val activeService: AmbulanceService?, val paramedicOnDuty: Boolean, val pendingRequests: List<AmbulanceRequestRow>, val dispatchBlock: DispatchBlock? = null)
+/** Servicio de la bitácora: sin nombre del paciente, solo su expediente enmascarado. */
+data class AmbulanceLogEntry(
+    val id: String, val type: String, val priority: String, val origin: String, val destination: String, val dispatchedAt: String, val finalState: String?, val responseMinutes: Int?,
+    val municipality: String = "", val crew: List<String> = emptyList(), val milestones: List<AmbulanceMilestone> = emptyList(), val patientRef: String = "",
+)
+/** Búsqueda y filtros de la bitácora; vacío significa «todos». */
+data class LogFilters(val query: String = "", val priority: String = "", val finalState: String = "", val type: String = "") {
+    val activeCount get() = listOf(priority, finalState, type).count { it.isNotBlank() }
+    val any get() = query.isNotBlank() || activeCount > 0
+}
 data class PrehospitalEntry(val id: String, val priority: String, val estimatedArrival: String?, val capturedAt: String, val reason: String?, val vitalSigns: Map<String, String>)
 data class PrehospitalView(val serviceId: String, val active: Boolean, val clinical: Boolean, val reports: List<PrehospitalEntry>)
 
@@ -53,6 +68,12 @@ object AmbulanceLabels {
     fun priority(code: String) = priorities.firstOrNull { it.first == code }?.second ?: code
     fun type(code: String) = types.firstOrNull { it.first == code }?.second ?: code
     fun sign(code: String) = signs[code] ?: code
+    /** Prioridad, estado final y tipo elegidos, como texto de chip. */
+    fun chips(filters: LogFilters): List<Pair<String, String>> = buildList {
+        if (filters.priority.isNotBlank()) add("priority" to "Prioridad: ${priority(filters.priority)}")
+        if (filters.finalState.isNotBlank()) add("finalState" to "Estado: ${finals[filters.finalState] ?: filters.finalState}")
+        if (filters.type.isNotBlank()) add("type" to "Tipo: ${type(filters.type)}")
+    }
 }
 
 object AmbulanceRules {
@@ -79,6 +100,37 @@ object AmbulanceRules {
             if (type == "finalizado" && finalState != null) put("finalState", finalState)
             if (reason.isNotBlank()) put("reason", reason.trim())
         }
+
+    /** Ruta de la bitácora con solo los filtros llenos; la API busca sin acentos en origen, destino, municipio y tripulación. */
+    fun logPath(filters: LogFilters): String {
+        val params = buildList {
+            if (filters.query.isNotBlank()) add("q=" + java.net.URLEncoder.encode(filters.query.trim(), "UTF-8"))
+            if (filters.priority.isNotBlank()) add("priority=${filters.priority}")
+            if (filters.finalState.isNotBlank()) add("finalState=${filters.finalState}")
+            if (filters.type.isNotBlank()) add("type=${filters.type}")
+        }
+        return "/ambulancia/bitacora" + if (params.isEmpty()) "" else "?" + params.joinToString("&")
+    }
+
+    /** «La ambulancia salió de A hacia B — paciente con expediente ***042, con Ana y Luis, completado.» */
+    fun narrate(entry: AmbulanceLogEntry): String {
+        val moved = entry.milestones.any { it.type != "finalizado" }
+        val where = if (entry.municipality.isNotBlank()) " (${entry.municipality})" else ""
+        val patient = if (entry.patientRef.isNotBlank()) "paciente con expediente ${entry.patientRef}" else "sin paciente vinculado"
+        val crew = if (entry.crew.isNotEmpty()) ", con ${entry.crew.joinToString(" y ")}" else ""
+        val end = entry.finalState?.let { ", ${AmbulanceLabels.finalState(it).lowercase()}" } ?: ", en curso"
+        return "La ambulancia ${if (moved) "salió" else "fue despachada"} de ${entry.origin}$where hacia ${entry.destination} — $patient$crew$end."
+    }
+
+    /** Quién pidió: nombre del paciente o de quien llamó; si nadie lo dio, lo dice. */
+    fun requesterLabel(row: AmbulanceRequestRow) = row.requesterName.ifBlank { row.callerName }.ifBlank { "Llamada sin identificar" }
+
+    /** «Recién recibida», «Espera 12 min», «Espera 2 h 10 min». */
+    fun waiting(minutes: Long): String = when {
+        minutes < 1 -> "Recién recibida"
+        minutes < 60 -> "Espera $minutes min"
+        else -> "Espera ${minutes / 60} h" + if (minutes % 60 > 0) " ${minutes % 60} min" else ""
+    }
 
     fun finishNeedsReason(service: AmbulanceService) = service.milestones.none { it.type == "en_hospital" }
 
@@ -134,13 +186,17 @@ object AmbulanceParser {
             )
         }
         val pending = objects(root.optJSONArray("pendingRequests")).map {
-            AmbulanceRequestRow(it.text("id"), it.text("channel"), it.text("address"), it.text("municipality"), it.text("reason"), it.text("contactPhone"), it.text("createdAt"), it.optInt("version", 1))
+            AmbulanceRequestRow(it.text("id"), it.text("channel"), it.text("address"), it.text("municipality"), it.text("reason"), it.text("contactPhone"), it.text("createdAt"), it.optInt("version", 1), it.text("requesterName"), it.text("callerName"), it.text("patientRecord"))
         }
-        return AmbulanceStatus(AmbulanceUnit(unit.text("id"), unit.text("plate"), unit.text("state"), unit.optInt("version", 1)), service, root.optBoolean("paramedicOnDuty"), pending)
+        val block = root.optJSONObject("dispatchBlock")?.let { DispatchBlock(it.text("code"), it.text("message"), it.text("action")) }
+        return AmbulanceStatus(AmbulanceUnit(unit.text("id"), unit.text("plate"), unit.text("state"), unit.optInt("version", 1), unit.text("stateReason"), unit.text("stateSince")), service, root.optBoolean("paramedicOnDuty"), pending, block)
     }
 
     fun log(value: Any?): List<AmbulanceLogEntry> = objects(value as? JSONArray).map {
-        AmbulanceLogEntry(it.text("id"), it.text("type"), it.text("priority"), it.text("origin"), it.text("destination"), it.text("dispatchedAt"), it.text("finalState").ifBlank { null }, if (it.isNull("responseMinutes")) null else it.optInt("responseMinutes"))
+        AmbulanceLogEntry(
+            it.text("id"), it.text("type"), it.text("priority"), it.text("origin"), it.text("destination"), it.text("dispatchedAt"), it.text("finalState").ifBlank { null }, if (it.isNull("responseMinutes")) null else it.optInt("responseMinutes"),
+            it.text("municipality"), objects(it.optJSONArray("crew")).map { c -> c.text("name") }, objects(it.optJSONArray("milestones")).map { m -> AmbulanceMilestone(m.text("type"), m.text("occurredAt")) }, it.text("patientRef"),
+        )
     }
 
     fun prehospital(value: Any?): PrehospitalView? {

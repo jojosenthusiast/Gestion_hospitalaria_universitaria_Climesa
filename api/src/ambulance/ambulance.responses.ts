@@ -10,6 +10,8 @@ export class AmbulanceUnitResponse {
   @StrProp() plate!: string;
   @EnumProp(ESTADO_AMBULANCIA, 'EstadoAmbulancia') state!: string;
   @IntProp() version!: number;
+  @StrProp({ nullable: true, description: 'Motivo del último cambio a este estado' }) stateReason!: string | null;
+  @DateTimeProp({ nullable: true, description: 'Desde cuándo está en este estado' }) stateSince!: string | null;
 }
 
 export class CrewMemberResponse {
@@ -58,12 +60,22 @@ export class PendingAmbulanceRequestResponse {
   @DateTimeProp() createdAt!: string;
   @IntProp() version!: number;
   @BoolProp() registeredPatient!: boolean;
+  @StrProp({ nullable: true, description: 'Quién pidió: paciente (nombre o alias provisional) o la persona que llamó' }) requesterName!: string | null;
+  @StrProp({ nullable: true, description: 'Nombre de quien llamó, si recepción lo anotó' }) callerName!: string | null;
+  @StrProp({ nullable: true, description: 'Expediente del paciente registrado' }) patientRecord!: string | null;
+}
+
+export class DispatchBlockResponse {
+  @EnumProp(['en_servicio', 'en_mantenimiento', 'sin_paramedico_de_turno'] as const, 'MotivoBloqueoDespacho') code!: string;
+  @StrProp() message!: string;
+  @StrProp({ description: 'Qué hacer para poder despachar' }) action!: string;
 }
 
 export class AmbulanceStatusResponse {
   @ClassProp(AmbulanceUnitResponse) unit!: AmbulanceUnitResponse;
   @ClassProp(ActiveServiceResponse, { nullable: true }) activeService!: ActiveServiceResponse | null;
   @BoolProp() paramedicOnDuty!: boolean;
+  @ClassProp(DispatchBlockResponse, { nullable: true, description: 'Por qué no se puede despachar ahora; null si se puede' }) dispatchBlock!: DispatchBlockResponse | null;
   @ClassArrayProp(PendingAmbulanceRequestResponse, { optional: true, description: 'Solo con ambulancia.despachar' }) pendingRequests?: PendingAmbulanceRequestResponse[];
 }
 
@@ -162,4 +174,6 @@ export class ServiceLogEntryResponse {
   @EnumProp(ESTADO_FINAL_SERVICIO, 'EstadoFinalServicio', { nullable: true }) finalState!: string | null;
   @ClassArrayProp(ServiceLogCrewResponse) crew!: ServiceLogCrewResponse[];
   @NumProp({ nullable: true }) responseMinutes!: number | null;
+  @ClassArrayProp(MilestoneEntryResponse) milestones!: MilestoneEntryResponse[];
+  @StrProp({ nullable: true, description: 'Expediente enmascarado del paciente; nunca el nombre' }) patientRef!: string | null;
 }

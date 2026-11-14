@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ambulancia, ronda 2: solicitante, mantenimiento y bitácora. -->
+    <string name="amb_solicitante">Quién pidió</string>
+    <string name="amb_expediente">Expediente</string>
+    <string name="amb_donde">Dónde está</string>
+    <string name="amb_no_despachable">No se puede despachar ahora</string>
+    <string name="amb_estado_desde">En este estado desde %1$s</string>
+    <string name="amb_estado_motivo">Motivo registrado: %1$s</string>
+    <string name="amb_buscar">Buscar en la bitácora</string>
+    <string name="amb_buscar_pista">Lugar, municipio o tripulación</string>
+    <string name="amb_filtros">Filtros</string>
+    <string name="amb_filtros_n">Filtros (%1$d)</string>
+    <string name="amb_quitar_filtros">Quitar filtros</string>
+    <string name="amb_filtros_activos">Filtros activos</string>
+    <string name="amb_todas">Todas</string>
+    <string name="amb_estado_final">Estado final</string>
+    <string name="amb_tipo">Tipo</string>
+    <string name="amb_servicios_n">%1$d servicios</string>
+    <string name="amb_bitacora_sin_resultados">Ningún servicio coincide con la búsqueda y los filtros.</string>
+</resources>

@@ -48,6 +48,35 @@ class AmbulanceRulesTest {
         assertFalse(AmbulanceEvents.matches(EventoDominio("turno.publicado", "turno", "t1", 1)))
     }
 
+    @Test fun laSolicitudPendienteTraeQuienPidioYElBloqueoDeDespacho() {
+        val parsed = AmbulanceParser.status(JSONObject()
+            .put("unit", JSONObject().put("id", "u1").put("plate", "P-1").put("state", "en_mantenimiento").put("version", 3).put("stateReason", "Cambio de llantas").put("stateSince", "2026-11-15T12:00:00Z"))
+            .put("paramedicOnDuty", false).put("activeService", JSONObject.NULL)
+            .put("dispatchBlock", JSONObject().put("code", "en_mantenimiento").put("message", "La unidad está en mantenimiento.").put("action", "Publica un turno de paramédico."))
+            .put("pendingRequests", org.json.JSONArray()
+                .put(JSONObject().put("id", "r1").put("channel", "telefono").put("address", "Calle a Apopa").put("reason", "Caída").put("contactPhone", "7000-2222").put("createdAt", "2026-11-15T14:00:00Z").put("version", 1).put("requesterName", "Marta Quintanilla").put("callerName", "Marta Quintanilla").put("patientRecord", JSONObject.NULL))
+                .put(JSONObject().put("id", "r2").put("channel", "telefono").put("address", "Otra calle").put("reason", "Dolor").put("contactPhone", "7000-3333").put("createdAt", "2026-11-15T14:00:00Z").put("version", 1))))!!
+        assertEquals("Cambio de llantas", parsed.unit.stateReason)
+        assertEquals("en_mantenimiento", parsed.dispatchBlock!!.code)
+        assertEquals("Publica un turno de paramédico.", parsed.dispatchBlock!!.action)
+        assertEquals("Marta Quintanilla", AmbulanceRules.requesterLabel(parsed.pendingRequests[0]))
+        assertEquals("", parsed.pendingRequests[0].patientRecord)
+        assertEquals("Llamada sin identificar", AmbulanceRules.requesterLabel(parsed.pendingRequests[1]))
+        assertEquals("Recién recibida", AmbulanceRules.waiting(0)); assertEquals("Espera 45 min", AmbulanceRules.waiting(45)); assertEquals("Espera 2 h 10 min", AmbulanceRules.waiting(130))
+    }
+
+    @Test fun laBitacoraSeConsultaConBusquedaYFiltrosYSeCuentaComoHistoria() {
+        assertEquals("/ambulancia/bitacora", AmbulanceRules.logPath(LogFilters()))
+        assertEquals("/ambulancia/bitacora?q=San+Salvador&priority=roja&finalState=completado", AmbulanceRules.logPath(LogFilters(query = " San Salvador ", priority = "roja", finalState = "completado")))
+        assertEquals(2, LogFilters(priority = "roja", type = "emergencia_domicilio").activeCount)
+        assertEquals(listOf("Prioridad: Roja"), AmbulanceLabels.chips(LogFilters(priority = "roja")).map { it.second })
+        val entry = AmbulanceParser.log(org.json.JSONArray().put(JSONObject().put("id", "s1").put("type", "emergencia_domicilio").put("priority", "roja").put("origin", "Colonia Ficticia").put("destination", "Hospital CLIMESA").put("municipality", "Soyapango")
+            .put("dispatchedAt", "2026-11-15T14:00:00Z").put("finalState", "completado").put("responseMinutes", 20).put("patientRef", "*******042")
+            .put("crew", org.json.JSONArray().put(JSONObject().put("name", "Ana Ficticia"))).put("milestones", org.json.JSONArray().put(JSONObject().put("type", "salida").put("occurredAt", "2026-11-15T14:05:00Z")))))
+        assertEquals("La ambulancia salió de Colonia Ficticia (Soyapango) hacia Hospital CLIMESA — paciente con expediente *******042, con Ana Ficticia, completado.", AmbulanceRules.narrate(entry.single()))
+        assertTrue(AmbulanceRules.narrate(entry.single().copy(patientRef = "", milestones = emptyList(), finalState = null)).endsWith("sin paciente vinculado, con Ana Ficticia, en curso."))
+    }
+
     @Test fun elEstadoSeLeeSinServicioActivo() {
         val parsed = AmbulanceParser.status(JSONObject().put("unit", JSONObject().put("id", "u1").put("plate", "P-1").put("state", "disponible").put("version", 2)).put("activeService", JSONObject.NULL).put("paramedicOnDuty", true))!!
         assertNull(parsed.activeService)

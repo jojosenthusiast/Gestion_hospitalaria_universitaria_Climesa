@@ -7,11 +7,11 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
 import { AmbulanceRequestDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
-import { CREW_ON_DUTY_SQL, PARAMEDIC_ON_DUTY_SQL, UnitState, canReportAfter, finalStateError, finalStates, nextMilestones, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
+import { CREW_ON_DUTY_SQL, PARAMEDIC_ON_DUTY_SQL, UnitState, canReportAfter, dispatchBlock, finalStateError, finalStates, fold, maskRecord, nextMilestones, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
 
 type Unit = { id: string; estado: UnitState; version: number };
 type Service = { id: string; unidad_id: string; solicitud_id: string | null; paciente_id: string | null; finalizado_en: Date | null; version: number };
-export type LogFilters = { from?: string; to?: string; type?: string; finalState?: string; priority?: string; crewId?: string; municipality?: string; minResponseMinutes?: string };
+export type LogFilters = { from?: string; to?: string; type?: string; finalState?: string; priority?: string; crewId?: string; municipality?: string; minResponseMinutes?: string; q?: string };
 /** Permiso que habilita el contenido clínico del prehospital: quien tiene relación de atención con el expediente (privacidad.md). */
 const CLINICAL_PERMISSION = 'expediente.ver';
 const NOTICE_911 = 'Si hay riesgo de vida, llama al 911.';
@@ -56,11 +56,15 @@ export class AmbulanceService {
         activeService = { ...service, crew, milestones, nextMilestones: nextMilestones(milestones.map((m: { type: string }) => m.type)), lastLocation: location };
       }
       const paramedicOnDuty = await this.onDuty(c, this.clock.now());
-      const result: Record<string, unknown> = { unit, activeService, paramedicOnDuty };
+      const change = (await c.query<{ motivo: string | null; en: Date }>('SELECT motivo,en FROM ambulancia.cambio_estado WHERE unidad_id=$1 AND hacia=$2 ORDER BY id DESC LIMIT 1', [unit.id, unit.state])).rows[0];
+      Object.assign(unit, { stateReason: change?.motivo ?? null, stateSince: change?.en ?? null });
+      const result: Record<string, unknown> = { unit, activeService, paramedicOnDuty, dispatchBlock: dispatchBlock(unit.state, paramedicOnDuty) };
       if (hasPermission(actor, 'ambulancia.despachar')) {
-        const pending = (await c.query<{ id: string; patient: string | null }>(`SELECT id,canal AS channel,direccion AS address,municipio AS municipality,latitud::float AS latitude,longitud::float AS longitude,motivo AS reason,telefono_contacto AS "contactPhone",creada_en AS "createdAt",version,paciente_id AS patient
-          FROM ambulancia.solicitud WHERE estado='por_confirmar' ORDER BY creada_en`)).rows;
-        result.pendingRequests = pending.map(({ patient, ...row }) => ({ ...row, registeredPatient: !!patient }));
+        const pending = (await c.query(`SELECT s.id,s.canal AS channel,s.direccion AS address,s.municipio AS municipality,s.latitud::float AS latitude,s.longitud::float AS longitude,s.motivo AS reason,s.telefono_contacto AS "contactPhone",s.creada_en AS "createdAt",s.version,s.paciente_id AS patient,
+            s.solicitante_nombre AS "callerName",p.expediente AS "patientRecord",
+            nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),'') AS "patientName",p.alias_provisional AS "patientAlias"
+          FROM ambulancia.solicitud s LEFT JOIN pacientes.paciente p ON p.id=s.paciente_id WHERE s.estado='por_confirmar' ORDER BY s.creada_en`)).rows as Array<{ id: string; patient: string | null; patientName: string | null; patientAlias: string | null; callerName: string | null }>;
+        result.pendingRequests = pending.map(({ patient, patientName, patientAlias, callerName, ...row }) => ({ ...row, registeredPatient: !!patient, requesterName: patientName ?? patientAlias ?? callerName ?? null, callerName }));
         // Dirección y teléfono de contacto son datos personales: la consulta queda auditada (regla 7).
         for (const row of pending.filter(r => r.patient)) await this.commands.audit(c, actor, { action: 'ambulancia.solicitud.ver', entity: 'solicitud', entityId: row.id, patientId: row.patient!, permission: 'ambulancia.despachar' });
       }
@@ -100,8 +104,8 @@ export class AmbulanceService {
       const patientId = general ? dto.patientId ?? null : actor.patientId;
       if (patientId && !(await c.query("SELECT 1 FROM pacientes.paciente WHERE id=$1 AND estado IN ('activo','provisional')", [patientId])).rowCount) throw new NotFoundException('El paciente no existe o está inactivo.');
       const channel = general ? 'telefono' : 'app_paciente';
-      const row = (await c.query<{ id: string; version: number; creada_en: Date }>(`INSERT INTO ambulancia.solicitud(canal,solicitante_usuario_id,registrada_por,paciente_id,direccion,latitud,longitud,municipio,motivo,telefono_contacto,creada_en)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id,version,creada_en`, [channel, general ? null : actor.id, general ? actor.id : null, patientId, dto.address.trim(), dto.latitude ?? null, dto.longitude ?? null, dto.municipality?.trim() || null, dto.reason.trim(), dto.contactPhone.trim(), this.clock.now()])).rows[0];
+      const row = (await c.query<{ id: string; version: number; creada_en: Date }>(`INSERT INTO ambulancia.solicitud(canal,solicitante_usuario_id,registrada_por,paciente_id,direccion,latitud,longitud,municipio,motivo,telefono_contacto,creada_en,solicitante_nombre)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id,version,creada_en`, [channel, general ? null : actor.id, general ? actor.id : null, patientId, dto.address.trim(), dto.latitude ?? null, dto.longitude ?? null, dto.municipality?.trim() || null, dto.reason.trim(), dto.contactPhone.trim(), this.clock.now(), general ? dto.callerName?.trim() || null : null])).rows[0];
       await this.commands.audit(c, actor, { action: 'ambulancia.solicitar', entity: 'solicitud', entityId: row.id, patientId: patientId ?? undefined, permission: 'ambulancia.solicitar', detail: { channel } });
       const account = general ? (patientId ? await patientAccount(c, patientId) : null) : actor.id;
       await this.commands.event(c, 'ambulancia.solicitud_creada', 'solicitud', row.id, row.version, ['ambulancia', ...await channelsFor(c, ['ambulancia.despachar'], { users: [account] })]);
@@ -266,10 +270,15 @@ export class AmbulanceService {
       if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1440) throw new ProblemException('validacion', 400, 'El umbral de respuesta debe ser de 0 a 1440 minutos.', 'minResponseMinutes');
       add("(SELECT min(h.ocurrido_en) FROM ambulancia.hito h WHERE h.servicio_id=s.id AND h.tipo='en_escena')-s.despachado_en>=make_interval(mins=>?::int)", minutes);
     }
-    const rows = await this.db.query<{ dispatchedAt: Date; onScene: Date | null }>(`SELECT s.id,s.tipo AS type,s.prioridad AS priority,s.origen AS origin,s.destino AS destination,s.municipio AS municipality,s.despachado_en AS "dispatchedAt",s.finalizado_en AS "finishedAt",s.estado_final AS "finalState",
+    const rows = await this.db.query<{ dispatchedAt: Date; onScene: Date | null; record: string | null; origin: string; destination: string; municipality: string | null; crew: { name: string }[] }>(`SELECT s.id,s.tipo AS type,s.prioridad AS priority,s.origen AS origin,s.destino AS destination,s.municipio AS municipality,s.despachado_en AS "dispatchedAt",s.finalizado_en AS "finishedAt",s.estado_final AS "finalState",
         (SELECT min(h.ocurrido_en) FROM ambulancia.hito h WHERE h.servicio_id=s.id AND h.tipo='en_escena') AS "onScene",
+        (SELECT pa.expediente FROM pacientes.paciente pa WHERE pa.id=s.paciente_id) AS "record",
+        coalesce((SELECT json_agg(json_build_object('type',h.tipo,'occurredAt',h.ocurrido_en) ORDER BY h.ocurrido_en,h.registrado_en) FROM ambulancia.hito h WHERE h.servicio_id=s.id),'[]'::json) AS milestones,
         coalesce((SELECT json_agg(json_build_object('staffId',t.persona_id,'role',t.funcion,'name',p.nombres||' '||p.apellidos) ORDER BY t.funcion) FROM ambulancia.tripulacion t JOIN personal.persona p ON p.id=t.persona_id WHERE t.servicio_id=s.id),'[]'::json) AS crew
       FROM ambulancia.servicio s ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY s.despachado_en DESC LIMIT 500`, args);
-    return rows.map(({ onScene, ...row }) => ({ ...row, responseMinutes: responseMinutes(new Date(row.dispatchedAt), onScene ? new Date(onScene) : null) }));
+    // Búsqueda libre sin acentos sobre origen, destino, municipio y tripulación; el expediente solo sale enmascarado.
+    const needle = filters.q ? fold(filters.q.trim().slice(0, 80)) : '';
+    const matches = (r: { origin: string; destination: string; municipality: string | null; crew: { name: string }[] }) => !needle || fold([r.origin, r.destination, r.municipality ?? '', ...r.crew.map(m => m.name)].join(' ')).includes(needle);
+    return rows.filter(matches).map(({ onScene, record, ...row }) => ({ ...row, patientRef: maskRecord(record), responseMinutes: responseMinutes(new Date(row.dispatchedAt), onScene ? new Date(onScene) : null) }));
   }
 }
