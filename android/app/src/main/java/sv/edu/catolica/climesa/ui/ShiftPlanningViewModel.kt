@@ -15,9 +15,11 @@ import org.json.JSONObject
 import sv.edu.catolica.climesa.data.AuthRequestException
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
-import sv.edu.catolica.climesa.domain.AreaOption
 import sv.edu.catolica.climesa.domain.FILTER_ALL
 import sv.edu.catolica.climesa.domain.ShiftFilter
+import sv.edu.catolica.climesa.domain.ShiftAssignment
+import sv.edu.catolica.climesa.domain.ShiftCatalog
+import sv.edu.catolica.climesa.domain.ShiftCatalogs
 import sv.edu.catolica.climesa.domain.ShiftFilters
 import sv.edu.catolica.climesa.domain.LiveEntities
 import sv.edu.catolica.climesa.domain.PlannedShift
@@ -25,7 +27,6 @@ import sv.edu.catolica.climesa.domain.PublishSummary
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 import sv.edu.catolica.climesa.domain.ShiftForm
 import sv.edu.catolica.climesa.domain.ShiftPlanning
-import sv.edu.catolica.climesa.domain.StaffOption
 import javax.inject.Inject
 
 /** Acceso a la API de turnos; separado de [sv.edu.catolica.climesa.data.ApiClient] para poder probar el ViewModel. */
@@ -40,20 +41,20 @@ data class PlanningAction(val busy: Boolean = false, val error: String? = null, 
 data class PlanningState(
     val loading: Boolean = true,
     val shifts: List<PlannedShift> = emptyList(),
-    val people: List<StaffOption> = emptyList(),
-    val areas: List<AreaOption> = emptyList(),
+    /** Every real area, function and active person (`GET /turnos/catalogo`); the filters and the assignment form read it. */
+    val catalog: ShiftCatalog = ShiftCatalog(),
     val error: String? = null,
     val filter: String = "todos",
     val areaFilter: String = FILTER_ALL,
     val roleFilter: String = FILTER_ALL,
-    /** `staffId` to staff function, read from `/personal` when the account may (needed by the role filter). */
-    val staffTypes: Map<String, String> = emptyMap(),
+    val personFilter: String = FILTER_ALL,
     val canPlan: Boolean = false,
     val canPublish: Boolean = false,
     val action: PlanningAction = PlanningAction(),
     val summary: PublishSummary? = null,
 ) {
-    val shiftFilter get() = ShiftFilter(filter, areaFilter, roleFilter)
+    val shiftFilter get() = ShiftFilter(filter, areaFilter, roleFilter, personFilter)
+    val staffTypes get() = catalog.staffTypes
     val visibleShifts get() = ShiftFilters.apply(shifts, shiftFilter, staffTypes)
 }
 
@@ -90,12 +91,14 @@ class ShiftPlanningViewModel @Inject constructor(
             if (!silent) mutable.update { it.copy(loading = true, error = null) }
             try {
                 val shifts = ShiftPlanning.parseShifts(source.get("/turnos") as JSONArray)
-                val plan = mutable.value.canPlan
-                val staffRows = if (plan || "personal.ver" in (permissions ?: emptySet())) source.get("/personal") as JSONArray else null
-                val people = if (plan && staffRows != null) ShiftPlanning.parseStaff(staffRows) else emptyList()
-                val types = staffRows?.let(ShiftFilters::staffTypes) ?: emptyMap()
-                val areas = if (plan || mutable.value.canPublish) ShiftPlanning.parseAreas(source.get("/espacios") as JSONArray) else emptyList()
-                mutable.update { it.copy(loading = false, error = null, shifts = shifts, people = people, areas = areas, staffTypes = types) }
+                // The catalog is readable by every role that sees shifts; if it fails the options come from the loaded shifts.
+                val catalog = try {
+                    ShiftCatalogs.parse(source.get("/turnos/catalogo") as JSONObject)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    ShiftCatalogs.fallback(shifts, mutable.value.catalog.staffTypes)
+                }
+                mutable.update { it.copy(loading = false, error = null, shifts = shifts, catalog = catalog) }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 if (silent && mutable.value.shifts.isNotEmpty()) return@launch
@@ -107,14 +110,15 @@ class ShiftPlanningViewModel @Inject constructor(
     fun setFilter(filter: String) = mutable.update { it.copy(filter = filter) }
     fun setAreaFilter(area: String) = mutable.update { it.copy(areaFilter = area) }
     fun setRoleFilter(role: String) = mutable.update { it.copy(roleFilter = role) }
-    fun clearFilters() = mutable.update { it.copy(filter = FILTER_ALL, areaFilter = FILTER_ALL, roleFilter = FILTER_ALL) }
+    fun setPersonFilter(person: String) = mutable.update { it.copy(personFilter = person) }
+    fun clearFilters() = mutable.update { it.copy(filter = FILTER_ALL, areaFilter = FILTER_ALL, roleFilter = FILTER_ALL, personFilter = FILTER_ALL) }
     fun resetAction() = mutable.update { it.copy(action = PlanningAction()) }
     fun dismissSummary() = mutable.update { it.copy(summary = null) }
 
     /** Crea un borrador (`POST /turnos`) o edita uno existente (`PATCH /turnos/{id}`, con versión y motivo). */
     fun save(form: ShiftForm, editing: PlannedShift?, reason: String) {
         if (!mutable.value.canPlan) return
-        val problem = ShiftPlanning.formError(form) ?: if (editing != null) ShiftPlanning.reasonError(reason) else null
+        val problem = ShiftPlanning.formError(form) ?: ShiftAssignment.formProblem(form) ?: if (editing != null) ShiftPlanning.reasonError(reason) else null
         if (problem != null) { fail(problem); return }
         write {
             if (editing == null) source.send("/turnos", "POST", ShiftPlanning.createBody(form))

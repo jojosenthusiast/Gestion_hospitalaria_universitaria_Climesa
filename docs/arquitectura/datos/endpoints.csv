@@ -31,6 +31,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 103,PATCH,/api/v1/turnos/{id},turnos.planificar,Versión optimista,R,3,Editar turno
 103,POST,/api/v1/turnos/publicar,turnos.publicar,Advierte huecos de cobertura,R,4,Publicar planificación de un rango
 103,GET,/api/v1/turnos/cobertura,turnos.ver,,E,4,Huecos de cobertura por área y hora
+103,GET,/api/v1/turnos/catalogo,turnos.ver,"Todas las áreas, funciones y personal activo para filtrar y asignar turnos; sin datos personales",R,2,Catálogo de filtros y asignación de turnos
 103,GET,/api/v1/turnos/mios,turnos.ver,Propio,R,3,Mis turnos
 104,GET,/api/v1/espacios,espacios.ver,,R,2,Árbol del edificio con disponibilidad agregada (CTE recursiva)
 104,POST,/api/v1/espacios,espacios.configurar,,R,2,Crear espacio

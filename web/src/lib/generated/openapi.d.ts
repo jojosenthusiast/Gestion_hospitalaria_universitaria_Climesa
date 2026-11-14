@@ -365,6 +365,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/turnos/catalogo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catálogo completo de áreas, funciones y personal para filtrar y asignar turnos */
+        get: operations["OperationsController_shiftCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/turnos/mios": {
         parameters: {
             query?: never;
@@ -2162,6 +2179,41 @@ export interface components {
             justification: string | null;
             version: number;
         };
+        ShiftCatalogRoleResponse: {
+            code: components["schemas"]["TipoPersonal"];
+            name: string;
+        };
+        /** @enum {string} */
+        TipoEspacio: "hospital" | "planta" | "area" | "habitacion" | "cama" | "consultorio" | "cubiculo" | "bodega" | "bahia";
+        ShiftCatalogAreaResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            parentId: string | null;
+            type: components["schemas"]["TipoEspacio"];
+            code: string;
+            name: string;
+        };
+        ShiftCatalogValidityResponse: {
+            validFrom: string;
+            validTo: string;
+        };
+        ShiftCatalogStaffResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            type: components["schemas"]["TipoPersonal"];
+            specialty: string | null;
+            /** Format: uuid */
+            areaId: string | null;
+            area: string | null;
+            registrations: components["schemas"]["ShiftCatalogValidityResponse"][];
+        };
+        ShiftCatalogResponse: {
+            roles: components["schemas"]["ShiftCatalogRoleResponse"][];
+            areas: components["schemas"]["ShiftCatalogAreaResponse"][];
+            staff: components["schemas"]["ShiftCatalogStaffResponse"][];
+        };
         CoverageGapResponse: {
             /** Format: uuid */
             areaId: string;
@@ -2248,8 +2300,6 @@ export interface components {
             version: number;
             advertencias: components["schemas"]["ShiftWarningResponse"][];
         };
-        /** @enum {string} */
-        TipoEspacio: "hospital" | "planta" | "area" | "habitacion" | "cama" | "consultorio" | "cubiculo" | "bodega" | "bahia";
         /** @enum {string} */
         CategoriaHabitacion: "vip" | "semiprivada";
         SpaceResponse: {
@@ -5581,6 +5631,61 @@ export interface operations {
             };
             /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_shiftCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftCatalogResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

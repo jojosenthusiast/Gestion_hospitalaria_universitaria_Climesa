@@ -165,6 +165,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | PATCH | `/api/v1/turnos/{id}` | `turnos.planificar` | Versión optimista | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/publicar` | `turnos.publicar` | Advierte huecos de cobertura | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/turnos/cobertura` | `turnos.ver` |  | E | 4 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
+| GET | `/api/v1/turnos/catalogo` | `turnos.ver` | Todas las áreas, funciones y personal activo para filtrar y asignar turnos; sin datos personales | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | GET | `/api/v1/turnos/mios` | `turnos.ver` | Propio | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 
 ### Spec 104

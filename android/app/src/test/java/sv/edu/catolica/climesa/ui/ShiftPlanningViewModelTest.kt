@@ -23,6 +23,7 @@ import sv.edu.catolica.climesa.data.AuthRequestException
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.EventoDominio
 import sv.edu.catolica.climesa.domain.RealtimeSignal
+import sv.edu.catolica.climesa.domain.ShiftFilters
 import sv.edu.catolica.climesa.domain.ShiftForm
 
 private class PlanningBus : RealtimeRepository {
@@ -34,6 +35,14 @@ private class FakePlanning : PlanningDataSource {
     val gets = mutableListOf<String>()
     val sends = mutableListOf<Triple<String, String, JSONObject>>()
     var failWith: Exception? = null
+    var catalogFailure: Exception? = null
+    /** Everything in the system, including people and areas that have no shift in `listing`. */
+    val catalog = JSONObject()
+        .put("roles", JSONArray().put(JSONObject().put("code", "medico").put("name", "Médico")).put(JSONObject().put("code", "laboratorista").put("name", "Laboratorio")))
+        .put("areas", JSONArray().put(JSONObject().put("id", "a1").put("parentId", JSONObject.NULL).put("type", "area").put("code", "EMG").put("name", "Emergencia"))
+            .put(JSONObject().put("id", "a2").put("parentId", JSONObject.NULL).put("type", "area").put("code", "LAB").put("name", "Laboratorio clínico")))
+        .put("staff", JSONArray().put(JSONObject().put("id", "p1").put("name", "Ana Prueba").put("type", "medico").put("specialty", JSONObject.NULL).put("areaId", "a1").put("area", "Emergencia").put("registrations", JSONArray()))
+            .put(JSONObject().put("id", "p2").put("name", "Luis Laboratorio").put("type", "laboratorista").put("specialty", JSONObject.NULL).put("areaId", "a2").put("area", "Laboratorio clínico").put("registrations", JSONArray())))
     var listing = JSONArray().put(
         JSONObject().put("id", "t1").put("staffId", "p1").put("person", "Ana Prueba").put("areaId", "a1").put("area", "Emergencia")
             .put("start", "2026-11-10T13:00:00.000Z").put("end", "2026-11-10T21:00:00.000Z").put("type", "diurno").put("state", "borrador").put("version", 3),
@@ -44,9 +53,8 @@ private class FakePlanning : PlanningDataSource {
     override suspend fun get(path: String): Any {
         gets += path
         return when {
+            path == "/turnos/catalogo" -> catalogFailure?.let { throw it } ?: catalog
             path.startsWith("/turnos") -> listing
-            path == "/personal" -> JSONArray().put(JSONObject().put("id", "p1").put("givenNames", "Ana").put("surnames", "Prueba").put("type", "medico").put("active", true))
-            path == "/espacios" -> JSONArray().put(JSONObject().put("id", "a1").put("code", "EMG").put("name", "Emergencia").put("type", "area").put("active", true))
             else -> JSONObject()
         }
     }
@@ -72,18 +80,39 @@ class ShiftPlanningViewModelTest {
         val source = FakePlanning(); val vm = model(source)
         vm.start(jefe, listOf("publico")); runCurrent()
         assertEquals(2, vm.state.value.shifts.size)
-        assertEquals(1, vm.state.value.people.size)
-        assertEquals(1, vm.state.value.areas.size)
+        assertEquals(2, vm.state.value.catalog.staff.size)
+        assertEquals(2, vm.state.value.catalog.areas.size)
         assertFalse(vm.state.value.loading)
         assertTrue("/turnos" in source.gets)
     }
 
-    @Test fun sinPermisoDePlanificarEsSoloLecturaYNoPideCatalogosNiEscribe() = runTest(dispatcher) {
+    @Test fun sinPermisoDePlanificarEsSoloLecturaPeroLosFiltrosTraenTodasLasOpciones() = runTest(dispatcher) {
         val source = FakePlanning(); val vm = model(source)
         vm.start(setOf("turnos.ver", "turnos.ver_borradores"), listOf("publico")); runCurrent()
-        assertEquals(listOf("/turnos"), source.gets)
+        assertEquals(listOf("/turnos", "/turnos/catalogo"), source.gets)
+        // Solo hay turnos de Emergencia y de una persona, pero el catálogo ofrece todas las áreas, los roles y a todo el personal.
+        assertEquals(listOf("todos", "a1", "a2"), ShiftFilters.areaOptions(vm.state.value.catalog).map { it.first }.let { listOf(it[0]) + it.drop(1).sorted() })
+        assertEquals(setOf("todos", "medico", "laboratorista"), ShiftFilters.roleOptions(vm.state.value.catalog).map { it.first }.toSet())
+        vm.setPersonFilter("p2"); assertTrue(vm.state.value.visibleShifts.isEmpty())
+        vm.clearFilters(); assertEquals(2, vm.state.value.visibleShifts.size)
         vm.save(form, null, ""); vm.publish("2026-11-10", "2026-11-16", null); vm.cancel(vm.state.value.shifts.first(), "Motivo suficiente"); runCurrent()
         assertTrue(source.sends.isEmpty())
+    }
+
+    @Test fun siElCatalogoFallaLaPantallaSigueConLasOpcionesDeLosTurnosCargados() = runTest(dispatcher) {
+        val source = FakePlanning().apply { catalogFailure = IllegalStateException("sin catálogo") }; val vm = model(source)
+        vm.start(jefe, listOf("publico")); runCurrent()
+        assertNull(vm.state.value.error)
+        assertEquals(listOf("a1"), vm.state.value.catalog.areas.map { it.id })
+        assertEquals(2, vm.state.value.shifts.size)
+    }
+
+    @Test fun unaDuracionFueraDeLaReglaNoSeEnvia() = runTest(dispatcher) {
+        val source = FakePlanning(); val vm = model(source)
+        vm.start(jefe, listOf("publico")); runCurrent()
+        vm.save(form.copy(endDate = "2026-11-12", endTime = "09:00"), null, ""); runCurrent()
+        assertTrue(source.sends.isEmpty())
+        assertTrue(vm.state.value.action.error!!.contains("de 4 a 12 horas"))
     }
 
     @Test fun crearEnviaPostYVuelveAPedirLaLista() = runTest(dispatcher) {

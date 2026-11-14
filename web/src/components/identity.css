@@ -1,0 +1,29 @@
+/* Paleta de identidad de roles y áreas. Cada tono define texto y fondo suave con contraste AA en claro y oscuro. */
+.identity-chip { --id-fg: #3f4b5b; --id-bg: #edf0f2; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 10px 3px 8px; border: 1px solid color-mix(in srgb, var(--id-fg) 35%, transparent); border-radius: 999px; background: var(--id-bg); color: var(--id-fg); font-size: 0.8125rem; font-weight: 600; line-height: 1.3; white-space: nowrap; }
+.identity-chip > span { overflow: hidden; text-overflow: ellipsis; }
+.identity-chip svg { flex: none; }
+.identity-chip.identity-compact { padding: 4px; border-radius: 50%; }
+.identity-tone-indigo { --id-fg: #3f37a0; --id-bg: #ecebfa; }
+.identity-tone-teal { --id-fg: #0b6161; --id-bg: #e0f3f2; }
+.identity-tone-blue { --id-fg: #00358f; --id-bg: #e6eefb; }
+.identity-tone-orange { --id-fg: #8f3f06; --id-bg: #fdebdd; }
+.identity-tone-green { --id-fg: #17633a; --id-bg: #e4f3ea; }
+.identity-tone-magenta { --id-fg: #8f1f5b; --id-bg: #fbe6f1; }
+.identity-tone-cyan { --id-fg: #0a5a85; --id-bg: #e1f1fa; }
+.identity-tone-purple { --id-fg: #5b3a99; --id-bg: #f1ebfa; }
+.identity-tone-red { --id-fg: #a31515; --id-bg: #fceaea; }
+.identity-tone-slate { --id-fg: #3f4b5b; --id-bg: #edf0f2; }
+.identity-tone-amber { --id-fg: #7a4b00; --id-bg: #fff2d9; }
+@media (prefers-color-scheme: dark) {
+  .identity-tone-indigo { --id-fg: #b8b3f5; --id-bg: #25224a; }
+  .identity-tone-teal { --id-fg: #7fd6d3; --id-bg: #123433; }
+  .identity-tone-blue { --id-fg: #8db3fa; --id-bg: #18284a; }
+  .identity-tone-orange { --id-fg: #f2b27a; --id-bg: #3a2410; }
+  .identity-tone-green { --id-fg: #6ccb92; --id-bg: #13301f; }
+  .identity-tone-magenta { --id-fg: #f0a1cb; --id-bg: #3d1830; }
+  .identity-tone-cyan { --id-fg: #8ccbee; --id-bg: #112f42; }
+  .identity-tone-purple { --id-fg: #c4a8f0; --id-bg: #2e2147; }
+  .identity-tone-red { --id-fg: #f5a29a; --id-bg: #3e1816; }
+  .identity-tone-slate { --id-fg: #b9c3d1; --id-bg: #222b38; }
+  .identity-tone-amber { --id-fg: #f2b65a; --id-bg: #33240c; }
+}

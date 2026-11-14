@@ -170,7 +170,10 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     }
 }
 @Composable internal fun MyShiftCard(shift:MyShift){
-    DataRow(shift.area,subtitle=shift.period,status={StatusTag(shift.state,label=StaffLabels.shiftState(shift.state))})
+    Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+        AreaChip(shift.area)
+        DataRow(shift.period,status={StatusTag(shift.state,label=StaffLabels.shiftState(shift.state))})
+    }
 }
 /** Entrar o salir de mantenimiento; el motivo y el diálogo sobreviven al giro de pantalla. */
 @Composable private fun MaintenanceControl(model:RoleViewModel,unitState:String,version:Int,paramedicOnDuty:Boolean){

@@ -2280,6 +2280,74 @@
         "x-permiso": "turnos.planificar"
       }
     },
+    "/api/v1/turnos/catalogo": {
+      "get": {
+        "operationId": "OperationsController_shiftCatalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftCatalogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catálogo completo de áreas, funciones y personal para filtrar y asignar turnos",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.ver"
+      }
+    },
     "/api/v1/turnos/mios": {
       "get": {
         "operationId": "OperationsController_myShifts",
@@ -12913,6 +12981,163 @@
           "version"
         ]
       },
+      "ShiftCatalogRoleResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoPersonal"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "TipoEspacio": {
+        "type": "string",
+        "enum": [
+          "hospital",
+          "planta",
+          "area",
+          "habitacion",
+          "cama",
+          "consultorio",
+          "cubiculo",
+          "bodega",
+          "bahia"
+        ]
+      },
+      "ShiftCatalogAreaResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoEspacio"
+              }
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "parentId",
+          "type",
+          "code",
+          "name"
+        ]
+      },
+      "ShiftCatalogValidityResponse": {
+        "type": "object",
+        "properties": {
+          "validFrom": {
+            "type": "string"
+          },
+          "validTo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "validFrom",
+          "validTo"
+        ]
+      },
+      "ShiftCatalogStaffResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoPersonal"
+              }
+            ]
+          },
+          "specialty": {
+            "type": "string",
+            "nullable": true
+          },
+          "areaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "area": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShiftCatalogValidityResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "specialty",
+          "areaId",
+          "area",
+          "registrations"
+        ]
+      },
+      "ShiftCatalogResponse": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShiftCatalogRoleResponse"
+            }
+          },
+          "areas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShiftCatalogAreaResponse"
+            }
+          },
+          "staff": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShiftCatalogStaffResponse"
+            }
+          }
+        },
+        "required": [
+          "roles",
+          "areas",
+          "staff"
+        ]
+      },
       "CoverageGapResponse": {
         "type": "object",
         "properties": {
@@ -13137,20 +13362,6 @@
           "id",
           "version",
           "advertencias"
-        ]
-      },
-      "TipoEspacio": {
-        "type": "string",
-        "enum": [
-          "hospital",
-          "planta",
-          "area",
-          "habitacion",
-          "cama",
-          "consultorio",
-          "cubiculo",
-          "bodega",
-          "bahia"
         ]
       },
       "CategoriaHabitacion": {
