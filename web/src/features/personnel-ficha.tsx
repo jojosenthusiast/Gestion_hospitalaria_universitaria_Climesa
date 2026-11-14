@@ -55,26 +55,27 @@ export function StaffFicha({api,profile,person,version,onClose,onEdit,onChanged}
 }
 
 function RegistrationForm({api,person,onCancel,onSaved,onStale}:{api:Api;person:Staff;onCancel:()=>void;onSaved:()=>void;onStale:()=>void}){
- const [form,setForm]=useState({board:'JVPM' as RegistrationInput['board'],number:'',validFrom:'',validTo:''}),[reason,setReason]=useState(''),[problem,setProblem]=useState(''),action=useAction(api);
+ const [form,setForm]=useState({board:'JVPM' as RegistrationInput['board'],number:'',validFrom:'',validTo:''}),[reason,setReason]=useState(''),[problem,setProblem]=useState<{field:string;message:string}|null>(null),action=useAction(api);
  const validDate=(d:string)=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d;
- function check():string{
-  if(form.number.trim().length<2)return 'Escribe el número de inscripción, de al menos 2 caracteres.';
-  if(!validDate(form.validFrom)||!validDate(form.validTo))return 'Indica el inicio y el fin de la vigencia con fechas válidas.';
-  if(form.validTo<form.validFrom)return 'El fin de la vigencia no puede ser anterior al inicio.';
-  if(reason.trim().length<10)return 'Indica el motivo del registro, de al menos 10 caracteres.';
-  return '';
+ /** WEB-11: the first problem and the field it belongs to, or null. */
+ function check():{field:string;message:string}|null{
+  if(form.number.trim().length<2)return {field:'number',message:'Escribe el número de inscripción, de al menos 2 caracteres.'};
+  if(!validDate(form.validFrom)||!validDate(form.validTo))return {field:validDate(form.validFrom)?'validTo':'validFrom',message:'Indica el inicio y el fin de la vigencia con fechas válidas.'};
+  if(form.validTo<form.validFrom)return {field:'validTo',message:'El fin de la vigencia no puede ser anterior al inicio.'};
+  if(reason.trim().length<10)return {field:'reason',message:'Indica el motivo del registro, de al menos 10 caracteres.'};
+  return null;
  }
+ const fieldError=(field:string)=>problem?.field===field?problem.message:undefined;
  async function save(e:FormEvent){e.preventDefault();const found=check();setProblem(found);if(found)return;const body:RegistrationInput={...form,number:form.number.trim(),version:person.version,reason:reason.trim()};if(await action.run(`/personal/${person.id}/inscripciones`,body))onSaved();}
  return <form className="module-form" onSubmit={save} noValidate aria-label="Registrar inscripción">
-  {problem&&<Notice kind="error">{problem}</Notice>}
   {isVersionConflict(action.error)?<><Notice kind="error">La ficha cambió. Recárgala para ver los datos actuales; la inscripción no se guardó.</Notice><button type="button" className="secondary-button" onClick={onStale}>Recargar ficha</button></>:<WriteError error={action.error}/>}
   <div className="form-grid">
    <Select label="Junta" value={form.board} onChange={v=>setForm(f=>({...f,board:v as RegistrationInput['board']}))}>{Object.entries(boards).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Select>
-   <Field label="Número de inscripción" value={form.number} onChange={v=>setForm(f=>({...f,number:v}))} required minLength={2} maxLength={40}/>
-   <Field label="Vigente desde" type="date" value={form.validFrom} onChange={v=>setForm(f=>({...f,validFrom:v}))} required/>
-   <Field label="Vigente hasta" type="date" value={form.validTo} onChange={v=>setForm(f=>({...f,validTo:v}))} min={form.validFrom||undefined} required/>
+   <Field label="Número de inscripción" value={form.number} onChange={v=>setForm(f=>({...f,number:v}))} required minLength={2} maxLength={40} error={fieldError('number')}/>
+   <Field label="Vigente desde" type="date" value={form.validFrom} onChange={v=>setForm(f=>({...f,validFrom:v}))} required error={fieldError('validFrom')}/>
+   <Field label="Vigente hasta" type="date" value={form.validTo} onChange={v=>setForm(f=>({...f,validTo:v}))} min={form.validFrom||undefined} required error={fieldError('validTo')}/>
   </div>
-  <Field label="Motivo del registro" value={reason} onChange={setReason} required minLength={10} maxLength={500}/>
+  <Field label="Motivo del registro" value={reason} onChange={setReason} required minLength={10} maxLength={500} error={fieldError('reason')}/>
   <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onCancel} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} label="Guardar inscripción"/></div>
  </form>;
 }

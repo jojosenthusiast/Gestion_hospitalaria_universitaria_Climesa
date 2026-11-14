@@ -2,7 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile, Api } from '../lib/api';
-import { LoginView } from '../components/ui';
+import { Field, LoginView } from '../components/ui';
 import { Dialog, Select, Tag } from '../features/common';
 import { HospitalShell } from '../features/shell';
 
@@ -38,6 +38,19 @@ describe('accesibilidad de formularios y modales (W-10)', () => {
     const label = document.querySelector(`label[for="${select.id}"]`);
     expect(select.id).not.toBe('');
     expect(label?.textContent).toBe('Paciente');
+  });
+
+  it('un campo con error queda aria-invalid y describe el error; la ayuda no forma parte de su nombre (WEB-11)', () => {
+    render(<Field label="Motivo" value="" onChange={() => undefined} hint="Al menos 10 caracteres." error="El motivo es muy corto." />);
+    const input = screen.getByLabelText('Motivo');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    const described = input.getAttribute('aria-describedby')!.split(' ').map(id => document.getElementById(id)?.textContent);
+    expect(described).toEqual(['Al menos 10 caracteres.', 'El motivo es muy corto.']);
+  });
+
+  it('sin error el campo no se marca inválido', () => {
+    render(<Field label="Motivo" value="" onChange={() => undefined} />);
+    expect(screen.getByLabelText('Motivo').getAttribute('aria-invalid')).toBeNull();
   });
 });
 

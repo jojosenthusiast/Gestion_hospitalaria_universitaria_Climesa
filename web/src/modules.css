@@ -39,6 +39,18 @@
 .nav-backdrop { display: none; }
 .connection-band { padding: 11px 22px; display: flex; align-items: center; justify-content: center; gap: 9px; border-bottom: 1px solid currentColor; background: var(--soft); color: var(--primary-text); font-size: 13px; font-weight: 700; line-height: 1.4; }
 .connection-offline { background: var(--warning-soft); color: var(--warning); }
+.live-indicator { width: min(1240px, calc(100% - 64px)); margin: 12px auto 0; display: flex; align-items: center; justify-content: flex-end; gap: 7px; color: var(--success); font-size: 13px; font-weight: 700; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.conflict-notice { display: grid; gap: 10px; justify-items: start; }
+.auth-forgot { justify-self: start; }
+.work-inbox { margin: 0 0 28px; display: grid; gap: 14px; }
+.work-inbox h2 { margin: 4px 0; }
+.inbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.inbox-item { min-width: 0; padding: 18px 20px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); color: var(--ink); text-decoration: none; box-shadow: var(--shadow-soft); }
+.inbox-item strong { font-size: 32px; line-height: 1; letter-spacing: -0.04em; color: var(--primary-text); }
+.inbox-item:hover { border-color: var(--primary-text); }
+.password-change { margin: 24px 0; padding-top: 20px; border-top: 1px solid var(--line, currentColor); }
+.password-change h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
 .hospital-main { width: min(1240px, calc(100% - 64px)); flex: 1; margin: 0 auto; padding: 44px 0 64px; min-width: 0; }
 .hospital-main > *:not(.module-heading) { animation: reveal-up var(--motion-emphasis) ease both; }
 .hospital-main > *:nth-child(2) { animation-delay: 45ms; }
@@ -319,6 +331,7 @@
   .module-nav.shell-sidebar.is-open { transform: translateX(0); }
   .nav-backdrop { position: fixed; z-index: 15; inset: 70px 0 0; display: block; border: 0; background: rgb(5 10 20 / 0.58); }
   .hospital-main { width: calc(100% - 32px); padding: 30px 0 44px; }
+  .live-indicator { width: calc(100% - 32px); }
   .hospital-footer { width: calc(100% - 32px); padding: 20px 0; gap: 10px; }
   .hospital-footer > span:nth-child(2) { display: none; }
   .module-heading { display: block; margin-bottom: 26px; }
@@ -395,7 +408,7 @@
   .hospital-header-inner { padding-inline: 14px; }
   .hospital-header .brand-name { display: none; }
   .workspace-role > span:first-child { max-width: 118px; }
-  .hospital-main, .hospital-footer { width: calc(100% - 24px); }
+  .hospital-main, .hospital-footer, .live-indicator { width: calc(100% - 24px); }
   .module-heading h1 { font-size: 36px; }
   .number-strip { grid-template-columns: 1fr; }
   .record-table tr { grid-template-columns: 1fr; padding-inline: 15px; }

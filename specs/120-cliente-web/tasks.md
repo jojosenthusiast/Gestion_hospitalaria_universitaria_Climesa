@@ -24,6 +24,7 @@
   - Cubre: FR-120-08, FR-120-10
   - Depende de: T03
   - Hecho cuando: revisión de contraste sin errores y los flujos Playwright pasan
+  - Avance: 13-nov-2026 errores de formulario asociados al campo (`aria-invalid`, `aria-describedby`), foco visible en `textarea`, aviso de sesión por vencer a los 13 min con "Seguir trabajando" (`estados-sesion.test.tsx`, `estados-comunes.test.tsx`). Falta para marcarla: revisión de contraste y flujos Playwright
 
 
 ## Verificación del corte 0.3.0 · 24-oct-2026

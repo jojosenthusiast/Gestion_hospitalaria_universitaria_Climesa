@@ -1,11 +1,15 @@
-import { useCallback,useEffect,useMemo,useState,type FormEvent } from 'react';
+import { useCallback,useEffect,useMemo,useRef,useState,type FormEvent } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { HttpApi,type AccessProfile } from './lib/api';
+import type { AccessProfile } from './lib/api';
+import { IntentApi } from './features/intent';
+import { LiveContext } from './features/live-scope';
+import { SessionExpiryWarning,useIdleSession } from './features/session';
 import { supabase } from './lib/supabase';
 import { useLive } from './lib/live';
 import { ActivationView,LoginView,RegistrationView,StatusView } from './components/ui';
 import { HospitalShell } from './features/shell';
 import { PublicScreen } from './features/public-screen';
+import { PasswordRecoveryView,strongPassword } from './features/password';
 import './modules.css';
 export default function App(){
  const [session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(false),[expired,setExpired]=useState(false);
@@ -15,8 +19,11 @@ export default function App(){
  if(!supabase)return <StatusView title="Configura tu conexión" detail="Copia web/.env.example como web/.env y configura la conexión de CLIMESA antes de iniciar el portal."/>;
  if(location.pathname==='/aceptar-invitacion')return <AcceptInvitation/>;
  if(location.pathname==='/registro')return <Register/>;
+ // WEB-13: the recovery e-mail links to /restablecer (Supabase redirect URL, owner setting).
+ if(location.pathname==='/recuperar')return <PasswordRecoveryView onRequest={async email=>{await supabase!.auth.resetPasswordForEmail(email,{redirectTo:`${location.origin}/restablecer`});}}/>;
+ if(location.pathname==='/restablecer')return <AcceptInvitation reset/>;
  if(!ready)return <StatusView title="Comprobando tu sesión" detail="Estamos preparando tu espacio de trabajo."/>;
- if(!session)return <Login notice={expired?'Tu sesión se cerró por inactividad. Ingresa nuevamente.':undefined} onAttempt={()=>setExpired(false)}/>;
+ if(!session)return <Login notice={expired?'Tu sesión se cerró por inactividad. Ingresa nuevamente.':new URLSearchParams(location.search).get('contrasena')==='actualizada'?'Contraseña actualizada. Ingresa con tu nueva contraseña.':undefined} onAttempt={()=>setExpired(false)}/>;
  return <Portal session={session} onExpired={()=>{setExpired(true);void supabase?.auth.signOut({scope:'local'});}}/>;
 }
 function Login({notice,onAttempt}:{notice?:string;onAttempt:()=>void}){
@@ -25,7 +32,10 @@ function Login({notice,onAttempt}:{notice?:string;onAttempt:()=>void}){
  return <LoginView {...{email,password,setEmail,setPassword,busy,error,notice}} accepted={new URLSearchParams(location.search).get('invitacion')==='aceptada'} onSubmit={submit}/>;
 }
 function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
- const api=useMemo(()=>new HttpApi(async()=>{const {data}=await supabase!.auth.getSession();return data.session?.access_token??session.access_token;},()=>void supabase?.auth.signOut({scope:'local'})),[session.access_token]);
+ // WEB-10: one client per session. The token is read on every request, so a renewed token does not
+ // recreate the client: pending intent keys survive and the views do not all reload on renewal.
+ const token=useRef(session.access_token);token.current=session.access_token;
+ const api=useMemo(()=>new IntentApi(async()=>{const {data}=await supabase!.auth.getSession();return data.session?.access_token??token.current;},()=>void supabase?.auth.signOut({scope:'local'})),[]);
  const [profile,setProfile]=useState<AccessProfile|null>(null),[error,setError]=useState<string|null>(null),[loading,setLoading]=useState(true);
  const load=useCallback(()=>{setLoading(true);setError(null);void api.request<AccessProfile>('/auth/me').then(setProfile).catch(e=>setError(e instanceof Error?e.message:'No se pudo verificar el acceso.')).finally(()=>setLoading(false));},[api]);
  useEffect(load,[load]);
@@ -34,20 +44,30 @@ function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
  if(!profile.platforms.includes('web'))return <StatusView title="Tu rol no usa esta aplicación" detail={`Tu cuenta está habilitada para ${profile.platforms.map(p=>p==='ios'?'iOS':'Android').join(' e ')}. Ingresa desde la aplicación correspondiente.`} action="Cerrar sesión" onAction={()=>void supabase?.auth.signOut({scope:'local'})}/>;
  return <LivePortal {...{api,profile,session,onExpired}} refreshProfile={load}/>;
 }
-function LivePortal({api,profile,session,onExpired,refreshProfile}:{api:HttpApi;profile:AccessProfile;session:Session;onExpired:()=>void;refreshProfile:()=>void}){
+function LivePortal({api,profile,session,onExpired,refreshProfile}:{api:IntentApi;profile:AccessProfile;session:Session;onExpired:()=>void;refreshProfile:()=>void}){
  const live=useLive(api,profile,session.access_token,refreshProfile);
- useEffect(()=>{let last=Date.now();const active=()=>{last=Date.now();};const events=['pointerdown','keydown','scroll'] as const;for(const e of events)window.addEventListener(e,active,{passive:true});const timer=setInterval(()=>{if(Date.now()-last>15*60*1000)onExpired();},30000);return()=>{clearInterval(timer);for(const e of events)window.removeEventListener(e,active);};},[onExpired]);
- return <HospitalShell api={api} profile={profile} version={live.version} connection={live.status} onLogout={()=>void supabase?.auth.signOut({scope:'local'})}/>;
+ const idle=useIdleSession(onExpired),logout=()=>void supabase?.auth.signOut({scope:'local'});
+ return <LiveContext.Provider value={live.signal}><HospitalShell api={api} profile={profile} version={live.version} connection={live.status} updatedAt={live.updatedAt} onLogout={logout} onChangePassword={changePassword(profile.email)}/><SessionExpiryWarning remaining={idle.remaining} onContinue={idle.keepAlive} onLogout={logout}/></LiveContext.Provider>;
 }
+/** W35 (WEB-13): the current password is checked by signing in again; then Supabase stores the new one. */
+const changePassword=(email:string)=>async(current:string,next:string):Promise<string|null>=>{
+ const check=await supabase!.auth.signInWithPassword({email,password:current});
+ if(check.error)return 'La contraseña actual no es correcta.';
+ const {error}=await supabase!.auth.updateUser({password:next});
+ if(!error)return null;
+ if(error.code==='same_password')return 'La nueva contraseña debe ser distinta de la actual.';
+ if(error.code==='reauthentication_needed')return 'Por seguridad, cierra sesión y usa «¿Olvidaste tu contraseña?» para cambiarla.';
+ return 'No se pudo cambiar la contraseña. Intenta nuevamente.';
+};
 function Register(){
  const [name,setName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[done,setDone]=useState(false);
  async function submit(e:FormEvent){e.preventDefault();if(!strongPassword(password))return setError('Usa al menos 8 caracteres, mayúscula, minúscula, número y símbolo.');if(password!==confirmation)return setError('Las contraseñas no coinciden.');setBusy(true);setError(null);try{const result=await supabase!.auth.signUp({email:email.trim(),password,options:{data:{nombre:name.trim()},emailRedirectTo:location.origin}});if(result.error)setError('No se pudo crear la cuenta. Revisa los datos o intenta iniciar sesión.');else{if(result.data.session)await supabase!.auth.signOut({scope:'local'});setDone(true);}}catch{setError('No se pudo conectar. Intenta nuevamente.');}finally{setBusy(false);}}
  return <RegistrationView {...{name,email,password,confirmation,setName,setEmail,setPassword,setConfirmation,busy,error,done}} onSubmit={submit}/>;
 }
-const strongPassword=(s:string)=>s.length>=8&&/[a-z]/.test(s)&&/[A-Z]/.test(s)&&/\d/.test(s)&&/[^A-Za-z0-9]/.test(s);
-function AcceptInvitation(){
+/** W02 (invitation) and, with `reset`, W01 password recovery (WEB-13): both arrive with a Supabase link session. */
+function AcceptInvitation({reset=false}:{reset?:boolean}){
  const [session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(false),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(new URLSearchParams(location.search).get('error_description'));
  useEffect(()=>{void supabase!.auth.getSession().then(({data})=>{setSession(data.session);setReady(true);});const {data}=supabase!.auth.onAuthStateChange((_event,next)=>{setSession(next);setReady(true);});return()=>data.subscription.unsubscribe();},[]);
- async function submit(e:FormEvent){e.preventDefault();if(!strongPassword(password))return setError('Usa al menos 8 caracteres, mayúscula, minúscula, número y símbolo.');if(password!==confirmation)return setError('Las contraseñas no coinciden.');setBusy(true);setError(null);try{const {error}=await supabase!.auth.updateUser({password});if(error){setError('No se pudo activar la cuenta. Revisa el enlace de invitación.');return;}await supabase!.auth.signOut({scope:'local'});location.assign('/?invitacion=aceptada');}finally{setBusy(false);}}
- return <ActivationView {...{ready,password,confirmation,setPassword,setConfirmation,busy,error}} email={session?.user.email} onSubmit={submit}/>;
+ async function submit(e:FormEvent){e.preventDefault();if(!strongPassword(password))return setError('Usa al menos 8 caracteres, mayúscula, minúscula, número y símbolo.');if(password!==confirmation)return setError('Las contraseñas no coinciden.');setBusy(true);setError(null);try{const {error}=await supabase!.auth.updateUser({password});if(error){setError(error.code==='same_password'?'La nueva contraseña debe ser distinta de la anterior.':reset?'No se pudo guardar la contraseña. Pide un enlace nuevo.':'No se pudo activar la cuenta. Revisa el enlace de invitación.');return;}await supabase!.auth.signOut({scope:'local'});location.assign(reset?'/?contrasena=actualizada':'/?invitacion=aceptada');}finally{setBusy(false);}}
+ return <ActivationView {...{ready,password,confirmation,setPassword,setConfirmation,busy,error}} mode={reset?'reset':'activation'} email={session?.user.email} onSubmit={submit}/>;
 }

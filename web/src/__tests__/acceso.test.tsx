@@ -12,7 +12,7 @@ const auth = vi.hoisted(() => ({
   signOut: vi.fn(),
 }));
 vi.mock('../lib/supabase', () => ({ supabase: { auth, channel: vi.fn() } }));
-vi.mock('../lib/live', () => ({ useLive: () => ({ version: 0, status: 'live' }) }));
+vi.mock('../lib/live', () => ({ useLive: () => ({ version: 0, signal: { any: 0, counts: {} }, updatedAt: null, status: 'live' }) }));
 
 import App from '../App';
 

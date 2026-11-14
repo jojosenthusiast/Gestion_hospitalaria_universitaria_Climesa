@@ -16,7 +16,7 @@ const auth = vi.hoisted(() => ({
 }));
 const live = vi.hoisted(() => ({ status: 'live' as 'live' | 'polling' | 'offline' | 'reconnecting' }));
 vi.mock('../lib/supabase', () => ({ supabase: { auth, channel: vi.fn() } }));
-vi.mock('../lib/live', () => ({ useLive: () => ({ version: 0, status: live.status }) }));
+vi.mock('../lib/live', () => ({ useLive: () => ({ version: 0, signal: { any: 0, counts: {} }, updatedAt: null, status: live.status }) }));
 
 import App from '../App';
 

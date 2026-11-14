@@ -170,6 +170,10 @@ describe('W08 · registrar inscripción', () => {
     const guardar = () => userEvent.click(within(formulario).getByRole('button', { name: 'Guardar inscripción' }));
     await guardar();
     expect(await within(formulario).findByText(/Escribe el número de inscripción/)).toBeTruthy();
+    // WEB-11: el error queda asociado al campo que lo causa.
+    const numero = within(formulario).getByLabelText('Número de inscripción');
+    expect(numero.getAttribute('aria-invalid')).toBe('true');
+    expect(document.getElementById(numero.getAttribute('aria-describedby')!.split(' ').at(-1)!)?.textContent).toMatch(/Escribe el número de inscripción/);
     await llenar(formulario, { numero: 'JVPM-0099', desde: '2026-12-01', hasta: '2026-11-01' });
     await guardar();
     expect(await within(formulario).findByText(/no puede ser anterior al inicio/)).toBeTruthy();

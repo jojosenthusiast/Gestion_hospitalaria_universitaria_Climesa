@@ -7,13 +7,24 @@ export type ConnectionStatus = 'live' | 'offline' | 'reconnecting';
 /** Los eventos que llegan juntos (varios canales, una ráfaga) se agrupan en una sola invalidación. */
 export const INVALIDATION_BATCH_MS = 150;
 
-// Tiempo real sin sondeo (regla 9 de AGENTS.md): los cambios llegan por Realtime y cada lote de
-// eventos sube `version` una vez, que las vistas usan como dependencia para volver a pedir sus datos.
+/**
+ * WEB-01: invalidación por entidad. `counts` lleva un contador por `entidad` y por `entidad:id`
+ * (`entidad:*` si el evento no trae id); `any` sube con cualquier evento. Cada lectura (`useData`)
+ * depende solo de los contadores de las entidades que le afectan (`features/live-scope.ts`).
+ */
+export type LiveSignal = { any: number; counts: Readonly<Record<string, number>> };
+
+// Tiempo real sin sondeo (regla 9 de AGENTS.md): los cambios llegan por Realtime. Cada lote de
+// eventos sube, una vez, los contadores de las entidades que cambiaron (`signal`), y cada vista
+// vuelve a pedir solo lo afectado. `version` sube solo al (re)unirse a los canales o tras la
+// recuperación: entonces se invalidan todas las vistas, porque pudo perderse cualquier evento.
 // Solo hay UNA consulta a /eventos, la de recuperación, y únicamente tras una caída: cuando un
 // canal vuelve a estar suscrito o cuando el navegador recupera la red. Nunca por reloj.
 // El temporizador de abajo no sondea: solo espera a que termine una ráfaga de eventos ya recibidos.
 export function useLive(api: Api, profile: AccessProfile, token: string, refreshProfile: () => void) {
   const [version, setVersion] = useState(0);
+  const [signal, setSignal] = useState<LiveSignal>({ any: 0, counts: {} });
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>(() => (navigator.onLine ? 'reconnecting' : 'offline'));
 
   // Lo que cambia sin que los canales deban rehacerse (token renovado, api nueva) se lee desde refs.
@@ -28,9 +39,33 @@ export function useLive(api: Api, profile: AccessProfile, token: string, refresh
     let closed = false, catching = false, wasDown = false, cursor = '0', pending: ReturnType<typeof setTimeout> | undefined;
     const channels: ReturnType<NonNullable<typeof supabase>['channel']>[] = [], joined = new Set<string>();
     const allJoined = () => names.length > 0 && joined.size === names.length;
-    const invalidate = () => {
-      if (closed || pending !== undefined) return;
-      pending = setTimeout(() => { pending = undefined; if (!closed) setVersion(v => v + 1); }, INVALIDATION_BATCH_MS);
+    // Sin claves: invalida todo (unión de canal, recuperación). Con claves: solo esas entidades.
+    let pendingAll = false;
+    const pendingKeys = new Set<string>();
+    const flush = () => {
+      pending = undefined;
+      if (closed) return;
+      const keys = [...pendingKeys], all = pendingAll;
+      pendingKeys.clear();
+      pendingAll = false;
+      if (all) setVersion(v => v + 1);
+      if (keys.length) setSignal(s => {
+        const counts = { ...s.counts };
+        for (const k of keys) counts[k] = (counts[k] ?? 0) + 1;
+        return { any: s.any + 1, counts };
+      });
+      setUpdatedAt(new Date());
+    };
+    const invalidate = (keys?: string[]) => {
+      if (closed) return;
+      if (keys) for (const k of keys) pendingKeys.add(k);
+      else pendingAll = true;
+      if (pending === undefined) pending = setTimeout(flush, INVALIDATION_BATCH_MS);
+    };
+    const keysOf = (payload: { entidad?: unknown; id?: unknown } | undefined) => {
+      const entity = typeof payload?.entidad === 'string' ? payload.entidad : undefined;
+      if (!entity) return undefined;
+      return [entity, `${entity}:${payload?.id ? String(payload.id) : '*'}`];
     };
 
     // Recuperación: pide lo que pasó mientras no hubo conexión, invalida y refresca el perfil si
@@ -67,7 +102,8 @@ export function useLive(api: Api, profile: AccessProfile, token: string, refresh
         for (const name of names) {
           const channel = client.channel(name, { config: { private: true } })
             .on('broadcast', { event: '*' }, message => {
-              invalidate();
+              // Un evento sin entidad conocida no se puede acotar: invalida todo, como antes.
+              invalidate(keysOf(message.payload));
               if (message.payload?.entidad === 'usuario') latest.current.refreshProfile();
             })
             .subscribe(state => {
@@ -105,5 +141,5 @@ export function useLive(api: Api, profile: AccessProfile, token: string, refresh
     void Promise.resolve(supabase?.realtime.setAuth(token)).catch(() => undefined);
   }, [token]);
 
-  return { version, status };
+  return { version, signal, status, updatedAt };
 }
