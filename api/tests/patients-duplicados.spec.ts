@@ -83,7 +83,9 @@ describe('Pacientes · casos de posible duplicado (FR-102-09)',()=>{
   const audit=(await fixture.pg.query<any>("SELECT count(*)::int AS n FROM plataforma.auditoria WHERE accion='pacientes.caso_duplicado.abrir' AND entidad_id=$1",[found[0].id])).rows[0].n;
   expect(audit).toBe(1);
   const event=(await fixture.pg.query<any>("SELECT canales FROM plataforma.outbox WHERE tipo='caso_duplicado.abierto' AND entidad_id=$1",[found[0].id])).rows;
-  expect(event).toEqual([{canales:['rol:REC']}]);
+  // 20261119004000: también los demás roles que revisan duplicados (pacientes.gestionar_duplicados).
+  expect(event).toEqual([{canales:expect.arrayContaining(['rol:REC','rol:JOP'])}]);
+  expect(event[0].canales).not.toContain('rol:PAC');
  });
  test('otra fecha de nacimiento o otra fonética no abren caso',async()=>{
   const first=await register({...base,givenNames:'Marta',surnames:'Quintanilla Rivas',birth:'1975-01-20'},'Marta Quintanilla');
