@@ -17,7 +17,7 @@ class SupabaseAuthRepository(
     private val supabaseUrl: String,
     private val publishableKey: String,
     private val sessionStore: SecureSessionStore,
-) {
+) : SessionTokens {
     private val refreshMutex = Mutex()
     private val generation=AtomicInteger()
     private val storageLock=Any()
@@ -38,6 +38,17 @@ class SupabaseAuthRepository(
     suspend fun restoreSession(): AuthSession? = withContext(Dispatchers.IO) { refreshMutex.withLock {
         val stored = sessionStore.load() ?: return@withLock null
         if (stored.expiresAtEpochSeconds > Instant.now().epochSecond + 60) return@withLock stored
+        try { refresh(stored.refreshToken) } catch (error: AuthRequestException) {
+            if (error.statusCode == 400 || error.statusCode == 401) sessionStore.clear()
+            throw error
+        }
+    } }
+    override suspend fun current(): AuthSession? = restoreSession()
+
+    /** 401 from the API: refresh now unless another call already replaced the rejected token. */
+    override suspend fun renewAfterRejection(rejectedAccessToken: String): AuthSession? = withContext(Dispatchers.IO) { refreshMutex.withLock {
+        val stored = sessionStore.load() ?: return@withLock null
+        if (stored.accessToken != rejectedAccessToken) return@withLock stored
         try { refresh(stored.refreshToken) } catch (error: AuthRequestException) {
             if (error.statusCode == 400 || error.statusCode == 401) sessionStore.clear()
             throw error

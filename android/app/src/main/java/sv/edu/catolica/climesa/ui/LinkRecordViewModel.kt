@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.AuthRequestException
+import sv.edu.catolica.climesa.data.SubmissionIntent
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.LinkEvents
@@ -39,13 +40,16 @@ class LinkRecordViewModel @Inject constructor(private val api: ApiGateway, realt
         if (!patientId.isNullOrBlank()) mutable.value = mutable.value.copy(status = LinkStatus.APPROVED, error = null)
     }
 
+    /** The link form is one intent until the API answers; retries reuse its Idempotency-Key. */
+    private val linkIntent = SubmissionIntent()
+
     fun submit(dui: String, birth: String) {
         val errors = LinkRules.errors(dui, birth, today())
         if (errors.isNotEmpty()) { mutable.value = mutable.value.copy(fieldErrors = errors, error = null); return }
         mutable.value = mutable.value.copy(busy = true, error = null, fieldErrors = emptyMap())
         viewModelScope.launch {
             try {
-                val response = api.request("/cuentas/vinculacion", "POST", LinkRules.body(dui, birth)) as? JSONObject
+                val response = linkIntent.send { api.request("/cuentas/vinculacion", "POST", LinkRules.body(dui, birth)) } as? JSONObject
                 mutable.value = mutable.value.copy(busy = false, status = LinkRules.statusOf(response?.optString("state").orEmpty()).takeIf { it != LinkStatus.FORM } ?: LinkStatus.PENDING)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {

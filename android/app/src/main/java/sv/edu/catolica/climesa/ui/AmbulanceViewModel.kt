@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.AuthRequestException
+import sv.edu.catolica.climesa.data.SubmissionIntent
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.AmbulanceEvents
@@ -118,10 +119,13 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     }
 
     /** A09 / FR-109-02: queda "por confirmar" y muestra el aviso del 911. */
+    /** One request form = one intent: a retry after a lost answer reuses the key and never asks for two ambulances. */
+    private val requestIntent = SubmissionIntent()
+
     fun submitRequest(address: String, municipality: String, reason: String, contactPhone: String) {
         AmbulanceRules.requestError(address, reason, contactPhone)?.let { mutable.value = mutable.value.copy(formError = it); return }
         write {
-            val created = api.request("/ambulancia/solicitudes", "POST", AmbulanceRules.requestBody(address, municipality, reason, contactPhone)) as? JSONObject
+            val created = requestIntent.send { api.request("/ambulancia/solicitudes", "POST", AmbulanceRules.requestBody(address, municipality, reason, contactPhone)) } as? JSONObject
             mutable.value = mutable.value.copy(ownRequest = OwnAmbulanceRequest(created?.optString("id").orEmpty(), created?.optString("state")?.ifBlank { null } ?: "por_confirmar"), notice = AmbulanceRules.NOTICE_911)
         }
     }

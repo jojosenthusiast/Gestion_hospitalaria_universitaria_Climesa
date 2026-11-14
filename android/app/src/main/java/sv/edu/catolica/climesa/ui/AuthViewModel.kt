@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +16,7 @@ import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.*
 data class AuthUiState(val checkingSession:Boolean=true,val signingIn:Boolean=false,val signingOut:Boolean=false,val account:AuthenticatedAccount?=null,val fieldErrors:Map<String,String> = emptyMap(),val error:String?=null,val accessPending:Boolean=false,val registrationMessage:String?=null)
 @HiltViewModel
-class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,private val backend:BackendAccessRepository,realtime:RealtimeRepository):ViewModel() {
+class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,private val backend:BackendAccessRepository,realtime:RealtimeRepository,private val expiry:SessionExpiry):ViewModel() {
     private val mutableState=MutableStateFlow(AuthUiState());val state=mutableState.asStateFlow()
     private var pending:AuthSession?=null
     /** Un evento `usuario` vuelve a leer `/auth/me` y, si cambian los canales, se vuelve a unir con la lista nueva. */
@@ -24,12 +25,20 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
         channelsOf={it.profile.channels},
         apply={account->pending=account.session;mutableState.update{it.copy(account=account)}},
         onLost={retryAccess()})
-    private fun track(account:AuthenticatedAccount?){if(account==null)liveProfile.stop() else liveProfile.start(viewModelScope,account.profile.channels)}
+    private var expiryWatch:Job?=null
+    private fun track(account:AuthenticatedAccount?){if(account==null)liveProfile.stop() else {liveProfile.start(viewModelScope,account.profile.channels);watchExpiry()}}
+    /** A 401 that survived one renewal (see `authorizedCall`) ends the session and shows the login with the reason. */
+    private fun watchExpiry(){if(expiryWatch?.isActive==true)return;expiryWatch=viewModelScope.launch{expiry.expired.collect{message->if(mutableState.value.account!=null&&!mutableState.value.signingOut)expireSession(message)}}}
+    private fun expireSession(message:String){
+        liveProfile.stop()
+        auth.clearLocalSession();pending=null
+        mutableState.value=AuthUiState(checkingSession=false,error=message)
+    }
     init { retryAccess() }
     fun retryAccess(){viewModelScope.launch {
         mutableState.update{it.copy(checkingSession=true,error=null)}
         try {val session=auth.restoreSession();pending=session;val account=session?.let{AuthenticatedAccount(it,backend.profile(it))};mutableState.update{it.copy(checkingSession=false,account=account,accessPending=false)};track(account)}
-        catch(e:Exception){if(e is CancellationException)throw e;mutableState.update{it.copy(checkingSession=false,account=null,accessPending=pending!=null,error=e.message?:"No se pudo verificar la sesión.")}}
+        catch(e:Exception){if(e is CancellationException)throw e;if(e is AuthRequestException&&(e.statusCode==400||e.statusCode==401)){expireSession(SessionExpiry.MESSAGE);return@launch};mutableState.update{it.copy(checkingSession=false,account=null,accessPending=pending!=null,error=e.message?:"No se pudo verificar la sesión.")}}
     }}
     fun signIn(email:String,password:String){val errors=AuthRules.validate(email,password);if(errors.isNotEmpty()){mutableState.update{it.copy(fieldErrors=errors,error=null)};return}
         viewModelScope.launch{mutableState.update{it.copy(signingIn=true,error=null,fieldErrors=emptyMap())};try {val session=auth.signIn(email,password);pending=session;val account=AuthenticatedAccount(session,backend.profile(session));mutableState.update{it.copy(signingIn=false,account=account,accessPending=false)};track(account)}catch(e:Exception){if(e is CancellationException)throw e;mutableState.update{it.copy(signingIn=false,error=e.message?:"No se pudo iniciar sesión.",accessPending=pending!=null)}}}
