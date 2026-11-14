@@ -5,10 +5,13 @@ import { supabase } from './lib/supabase';
 import { useLive } from './lib/live';
 import { ActivationView,LoginView,RegistrationView,StatusView } from './components/ui';
 import { HospitalShell } from './features/shell';
+import { PublicScreen } from './features/public-screen';
 import './modules.css';
 export default function App(){
  const [session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(false),[expired,setExpired]=useState(false);
  useEffect(()=>{if(!supabase){setReady(true);return;}let cancelled=false;void supabase.auth.getSession().then(({data})=>{if(!cancelled){setSession(data.session);setReady(true);}});const {data}=supabase.auth.onAuthStateChange((_event,next)=>{setSession(next);setReady(true);});return()=>{cancelled=true;data.subscription.unsubscribe();};},[]);
+ // W34: la pantalla pública no usa sesión; sin Supabase solo pierde el tiempo real.
+ if(location.pathname==='/publico')return <PublicScreen/>;
  if(!supabase)return <StatusView title="Configura tu conexión" detail="Copia web/.env.example como web/.env y configura la conexión de CLIMESA antes de iniciar el portal."/>;
  if(location.pathname==='/aceptar-invitacion')return <AcceptInvitation/>;
  if(location.pathname==='/registro')return <Register/>;

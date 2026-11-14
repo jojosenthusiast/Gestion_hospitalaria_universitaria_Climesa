@@ -419,3 +419,27 @@
 .history-list ul { margin: 6px 0 0; padding-left: 18px; }
 .history-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .history-item-head small { display: block; color: var(--muted); }
+/* W34 · pantalla pública (modo televisor): letras grandes, sin interacción, solo datos públicos. */
+.public-screen { min-height: 100vh; padding: clamp(16px, 3vw, 40px); background: var(--bg); color: var(--ink); font-size: clamp(18px, 1.6vw, 28px); }
+.public-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding: 16px 24px; border-radius: var(--radius-panel); background: var(--navy); color: var(--on-primary); }
+.public-header h1 { margin: 0; font-size: clamp(24px, 2.6vw, 44px); }
+.public-clock { display: grid; justify-items: end; }
+.public-clock time { font-size: clamp(28px, 3vw, 52px); font-weight: 700; font-variant-numeric: tabular-nums; }
+.public-clock span { text-transform: capitalize; opacity: 0.85; }
+.public-band { margin: 0 0 16px; padding: 10px 16px; border-radius: var(--radius-control); background: var(--warning-soft); color: var(--ink); }
+.public-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; }
+.public-panel { min-width: 0; padding: 24px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-soft); }
+.public-panel h2 { margin: 0 0 16px; color: var(--primary-text); font-size: 1.1em; letter-spacing: 0.04em; text-transform: uppercase; }
+.public-panel-queue { grid-column: 1 / -1; }
+.public-muted { margin: 0; color: var(--muted); }
+.public-queues { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; }
+.public-queue h3 { margin: 0 0 8px; font-size: 1em; }
+.public-queue ol, .public-floors, .public-doctors, .public-notices { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.public-queue li { display: flex; align-items: baseline; gap: 12px; }
+.public-queue li strong { font-size: 2.4em; line-height: 1; font-variant-numeric: tabular-nums; color: var(--primary-text); }
+.public-queue li:not(:first-child) strong { font-size: 1.4em; color: var(--muted); }
+.public-floors li, .public-doctors li { display: grid; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.public-floors b { font-size: 1.3em; color: var(--success); }
+.public-doctors small { color: var(--muted); }
+.public-notices li { padding: 12px 16px; border-left: 4px solid var(--accent); background: var(--soft); border-radius: var(--radius-control); }
+.public-notices p { margin: 4px 0 0; }
