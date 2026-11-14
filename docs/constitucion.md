@@ -38,7 +38,7 @@ Estos principios son restricciones permanentes. Una spec, plan o tarea que los c
 1. Autorización por permiso y contexto (relación de atención, área, turno), no por nombre de rol en el código (D-010).
 2. Información pública, interna, personal y clínica se clasifican campo por campo en `docs/arquitectura/privacidad.md`. La API devuelve solo los campos que el permiso permite (minimización).
 3. Toda lectura, búsqueda, exportación y cambio de datos de paciente deja auditoría con actor, acción, paciente, resultado y motivo, en un registro de solo inserción encadenado por hash (D-009).
-4. La administración técnica no implica acceso clínico; el acceso excepcional es temporal, motivado, aprobado y auditado (D-031).
+4. La administración técnica no implica acceso clínico: sin relación de atención no hay lectura clínica. El acceso excepcional se retiró por decisión del propietario (D-082).
 5. Registros de sistema sin contenido clínico, credenciales ni tokens. Datos de prueba siempre ficticios (D-014).
 
 ## 6. Método

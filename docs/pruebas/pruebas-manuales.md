@@ -7,7 +7,7 @@ Requisito: FR-130-06 (lista de pruebas manuales por pantalla, derivada del inven
 ## Alcance
 
 - Solo pantallas web **implementadas hoy** en `web/src/features/` (corte S1/S2). Los códigos W son los de [inventario-pantallas.md](../diseno/inventario-pantallas.md) y `docs/arquitectura/datos/pantallas.csv`.
-- Las pantallas que el menú ya muestra como "Próxima entrega" (Laboratorio, Inventario, Fila del día, Citas, Accesos excepcionales) y las de Android e iOS no están aquí: no hay nada que probar todavía.
+- Las pantallas que el menú ya muestra como "Próxima entrega" (Laboratorio, Inventario, Fila del día, Citas) y las de Android e iOS no están aquí: no hay nada que probar todavía.
 - Qué rol ve qué sale de `modules` en `web/src/features/shell.tsx` y de `docs/arquitectura/datos/permisos.csv`. La web solo atiende ADM, JOP, REC, LAB y DPD; AST, ENF, MED, PAR y PAC ven "Tu rol no usa esta aplicación".
 
 ## Cuentas de prueba

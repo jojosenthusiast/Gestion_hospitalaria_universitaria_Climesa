@@ -377,7 +377,7 @@ Política técnica completa: [privacidad.md](privacidad.md). Resumen:
 | Personal | Paciente dueño y personal que lo atiende o registra |
 | Clínica (sensible) | Paciente dueño (lo revisado), equipo con relación de atención, o acceso excepcional aprobado |
 
-- ADM y JOP ven lo necesario para operar, **nunca** lo clínico por su rol; para verlo piden un acceso excepcional que aprueba el DPD (otra persona), vence solo y queda auditado.
+- ADM y JOP ven lo necesario para operar, **nunca** lo clínico por su rol; para verlo necesitan relación de atención (el acceso excepcional se retiró, D-082).
 - Toda lectura de datos de paciente queda auditada (regla 7). Los eventos de Realtime son delgados: entidad, identificador y versión, sin datos personales.
 - Sesión web: cierre a los 15 minutos de inactividad. Sesión móvil: cierre al volver tras 5 minutos en segundo plano.
 - Las búsquedas de pacientes guardan una huella de los criterios, no el texto original, y exigen buscar antes de registrar.
