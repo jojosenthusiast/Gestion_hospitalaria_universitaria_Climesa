@@ -16,6 +16,9 @@ import sv.edu.catolica.climesa.data.AuthRequestException
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.AreaOption
+import sv.edu.catolica.climesa.domain.FILTER_ALL
+import sv.edu.catolica.climesa.domain.ShiftFilter
+import sv.edu.catolica.climesa.domain.ShiftFilters
 import sv.edu.catolica.climesa.domain.LiveEntities
 import sv.edu.catolica.climesa.domain.PlannedShift
 import sv.edu.catolica.climesa.domain.PublishSummary
@@ -41,12 +44,17 @@ data class PlanningState(
     val areas: List<AreaOption> = emptyList(),
     val error: String? = null,
     val filter: String = "todos",
+    val areaFilter: String = FILTER_ALL,
+    val roleFilter: String = FILTER_ALL,
+    /** `staffId` to staff function, read from `/personal` when the account may (needed by the role filter). */
+    val staffTypes: Map<String, String> = emptyMap(),
     val canPlan: Boolean = false,
     val canPublish: Boolean = false,
     val action: PlanningAction = PlanningAction(),
     val summary: PublishSummary? = null,
 ) {
-    val visibleShifts get() = if (filter == "todos") shifts else shifts.filter { it.state == filter }
+    val shiftFilter get() = ShiftFilter(filter, areaFilter, roleFilter)
+    val visibleShifts get() = ShiftFilters.apply(shifts, shiftFilter, staffTypes)
 }
 
 @HiltViewModel
@@ -83,9 +91,11 @@ class ShiftPlanningViewModel @Inject constructor(
             try {
                 val shifts = ShiftPlanning.parseShifts(source.get("/turnos") as JSONArray)
                 val plan = mutable.value.canPlan
-                val people = if (plan) ShiftPlanning.parseStaff(source.get("/personal") as JSONArray) else emptyList()
+                val staffRows = if (plan || "personal.ver" in (permissions ?: emptySet())) source.get("/personal") as JSONArray else null
+                val people = if (plan && staffRows != null) ShiftPlanning.parseStaff(staffRows) else emptyList()
+                val types = staffRows?.let(ShiftFilters::staffTypes) ?: emptyMap()
                 val areas = if (plan || mutable.value.canPublish) ShiftPlanning.parseAreas(source.get("/espacios") as JSONArray) else emptyList()
-                mutable.update { it.copy(loading = false, error = null, shifts = shifts, people = people, areas = areas) }
+                mutable.update { it.copy(loading = false, error = null, shifts = shifts, people = people, areas = areas, staffTypes = types) }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 if (silent && mutable.value.shifts.isNotEmpty()) return@launch
@@ -95,6 +105,9 @@ class ShiftPlanningViewModel @Inject constructor(
     }
 
     fun setFilter(filter: String) = mutable.update { it.copy(filter = filter) }
+    fun setAreaFilter(area: String) = mutable.update { it.copy(areaFilter = area) }
+    fun setRoleFilter(role: String) = mutable.update { it.copy(roleFilter = role) }
+    fun clearFilters() = mutable.update { it.copy(filter = FILTER_ALL, areaFilter = FILTER_ALL, roleFilter = FILTER_ALL) }
     fun resetAction() = mutable.update { it.copy(action = PlanningAction()) }
     fun dismissSummary() = mutable.update { it.copy(summary = null) }
 
