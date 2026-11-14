@@ -42,7 +42,7 @@ import sv.edu.catolica.climesa.domain.AndroidSection
 
 private fun compactLabel(section: AndroidSection): String = when (section) {
     AndroidSection.QUEUE -> "Fila"
-    AndroidSection.LINKING -> "Vincular"
+    AndroidSection.LINKING, AndroidSection.LINK_RECORD -> "Vincular"
     AndroidSection.ADMISSION -> "Admisión"
     AndroidSection.BEDS -> "Camas"
     AndroidSection.ASSISTANT_STATION -> "Consultorio"
@@ -75,6 +75,7 @@ internal fun iconFor(section: AndroidSection): ImageVector = when (section) {
     AndroidSection.RESULT_REVIEW -> Icons.Default.Science
     AndroidSection.PATIENT_QUEUE, AndroidSection.QUEUE -> Icons.AutoMirrored.Filled.List
     AndroidSection.HISTORY, AndroidSection.RECORD, AndroidSection.LOG, AndroidSection.MY_ACCESS -> Icons.Default.Description
+    AndroidSection.LINK_RECORD -> Icons.Default.Link
     AndroidSection.SUPPLIES -> Icons.Default.Inventory
     AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.HOSPITALIZED,
     AndroidSection.INPATIENT_CARE, AndroidSection.VITAL_SIGNS -> Icons.Default.LocalHospital

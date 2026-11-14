@@ -29,13 +29,15 @@ class LaboratoryViewModel @Inject constructor(private val api: ApiGateway, realt
     val state = mutable.asStateFlow()
     private val live = LiveSubscription(realtime)
     private var loadJob: Job? = null
+    /** Source of the list: the lab queue, or `/me/laboratorio` for the patient (A07: state always, values only reviewed). */
+    var path: String = "/laboratorio/ordenes"
 
     /** A [silent] reload (realtime invalidation) keeps the shown orders and messages, even if it fails. */
     fun load(silent: Boolean = false) {
         if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            try { val orders = parse(api.request("/laboratorio/ordenes")); mutable.value = mutable.value.copy(loading = false, orders = orders) }
+            try { val orders = parse(api.request(path)); mutable.value = mutable.value.copy(loading = false, orders = orders) }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) }
         }

@@ -27,6 +27,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import sv.edu.catolica.climesa.R
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,11 +38,11 @@ import sv.edu.catolica.climesa.domain.LaboratoryLabels
 import sv.edu.catolica.climesa.domain.LaboratoryOrder
 
 @Composable
-fun LaboratoryScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: LaboratoryViewModel = viewModel()) {
+fun LaboratoryScreen(profile: AccessProfile, modifier: Modifier = Modifier, ownResults: Boolean = false, model: LaboratoryViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     var selected by rememberSaveable { mutableStateOf<Pair<String, String>?>(null) }
     var sampleOrderId by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(ownResults) { model.path = if (ownResults) "/me/laboratorio" else "/laboratorio/ordenes"; model.load() }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     val selectedOrder = selected?.let { key -> state.orders.firstOrNull { it.id == key.first } }
     val selectedItem = selectedOrder?.items?.firstOrNull { it.id == selected?.second }
@@ -65,7 +67,7 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, profile: AccessProfile, 
     ClimesaCard { Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(order.patientName, style = MaterialTheme.typography.titleMedium)
         Text("${if (order.priority == "urgente") "Urgente" else "Rutina"} · ${LaboratoryLabels.state(order.state)}", color = MaterialTheme.colorScheme.primary)
-        order.items.forEach { item -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${item.code} · ${item.name}", Modifier.weight(1f)); item.result?.let { result -> Text(LaboratoryLabels.mark(result.mark), style = MaterialTheme.typography.bodySmall) } ?: Text("Pendiente", style = MaterialTheme.typography.bodySmall) } }
+        order.items.forEach { item -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${item.code} · ${item.name}", Modifier.weight(1f)); item.result?.let { result -> Text(LaboratoryLabels.valueAndMark(result), style = MaterialTheme.typography.bodySmall) } ?: Text(if (order.state == "completado" && !order.reviewed) stringResource(R.string.lab_valor_en_revision) else "Pendiente", style = MaterialTheme.typography.bodySmall) } }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (canProcess && order.state == "pendiente") OutlinedButton(onClick = openSample, enabled = !busy) { Text("Tomar muestra") }
             if (canProcess && order.state == "en_proceso") order.items.filter { it.result == null }.forEach { item -> OutlinedButton(onClick = { openResult(order.id to item.id) }, enabled = !busy) { Text("Resultado ${item.code}") } }

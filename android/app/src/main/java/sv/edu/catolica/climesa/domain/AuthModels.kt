@@ -16,6 +16,8 @@ data class AccessProfile(
     val channels: List<String> = emptyList(),
     val name: String = "",
     val notice: String? = null,
+    /** Expediente enlazado a la cuenta (`patientId` de `/auth/me`); nulo hasta que Recepción aprueba la vinculación (RN-39). */
+    val patientId: String? = null,
 )
 
 data class AuthenticatedAccount(
@@ -50,17 +52,18 @@ object RoleAccess {
  */
 enum class AndroidSection(val screenId: String, val label: String, val permission: String, val ready: Boolean) {
     HOME("A04", "Inicio", "sesion.perfil", true),
+    LINK_RECORD("A03", "Vincular expediente", "cuenta.vincular", true),
     PATIENT_QUEUE("A05", "Mi turno", "fila.ver", true),
     MY_APPOINTMENTS("A06", "Mis citas", "citas.ver", true),
     RESULTS("A07", "Mis exámenes", "resultados.ver", true),
-    HISTORY("A08", "Mi historial", "expediente.ver", false),
+    HISTORY("A08", "Mi historial", "expediente.ver", true),
     AMBULANCE_REQUEST("A09", "Pedir ambulancia", "ambulancia.solicitar", false),
     HOSPITAL_INFO("A10", "Hospital", "sesion.perfil", false),
     MY_ACCESS("A11", "Quién vio mi expediente", "auditoria.mis_accesos", true),
     PROFILE("A12", "Perfil", "sesion.perfil", true),
     MEDICAL_DAY("A20", "Mi día", "consulta.iniciar", true),
     CONSULTATIONS("A21", "Consulta", "consulta.iniciar", true),
-    RECORD("A22", "Expediente", "expediente.ver", false),
+    RECORD("A22", "Expediente", "expediente.ver", true),
     RESULT_REVIEW("A23", "Resultados por revisar", "laboratorio.revisar", true),
     HOSPITALIZED("A24", "Mis hospitalizados", "admision.ver", true),
     AMBULANCE_ARRIVAL("A25", "Llegada de ambulancia", "ambulancia.recibir_prehospital", false),
@@ -100,7 +103,7 @@ object AndroidSections {
         "MED" to listOf(AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.RECORD, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "LAB" to listOf(AndroidSection.LAB, AndroidSection.SAMPLE, AndroidSection.CAPTURE_RESULTS, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "PAR" to listOf(AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "PAC" to listOf(AndroidSection.HOME, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
+        "PAC" to listOf(AndroidSection.HOME, AndroidSection.LINK_RECORD, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
     )
 
     /**
