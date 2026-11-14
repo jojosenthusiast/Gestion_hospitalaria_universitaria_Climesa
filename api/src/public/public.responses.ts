@@ -1,4 +1,4 @@
-import { ClassArrayProp, DateProp, DateTimeProp, EnumProp, IntProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, DateProp, DateTimeProp, EnumProp, IntProp, StrArrayProp, StrProp, UuidProp } from '../platform/responses';
 import { CATEGORIA_HABITACION } from '../platform/states';
 
 export class PublicOccupancyRowResponse {
@@ -33,6 +33,23 @@ export class NoticeResponse {
   @StrProp() cuerpo!: string;
   @DateTimeProp({ nullable: true }) desde!: string | null;
   @DateTimeProp({ nullable: true }) hasta!: string | null;
+  @StrProp({ description: 'atencion, urgente o critico (D-071)' }) prioridad!: string;
+}
+
+export class NoticeAudienceResponse extends NoticeResponse {
+  @BoolProp() publico!: boolean;
+  @StrArrayProp() roles!: string[];
+}
+
+export class NoticeListItemResponse extends NoticeAudienceResponse {
+  @StrProp({ description: 'vigente, programado o vencido' }) estado!: string;
+  @DateTimeProp({ nullable: true }) publicadoEn!: string | null;
+}
+
+export class MyNoticesResponse {
+  @DateTimeProp() actualizadoEn!: string;
+  @ClassArrayProp(NoticeAudienceResponse) avisos!: NoticeAudienceResponse[];
+  @DateTimeProp({ nullable: true }) proximoCambio!: string | null;
 }
 
 export class NoticesResponse {
@@ -41,7 +58,7 @@ export class NoticesResponse {
   @DateTimeProp({ nullable: true }) proximoCambio!: string | null;
 }
 
-export class NoticePublishedResponse extends NoticeResponse {
+export class NoticePublishedResponse extends NoticeAudienceResponse {
   @DateTimeProp({ nullable: true }) publicadoEn!: string | null;
 }
 
