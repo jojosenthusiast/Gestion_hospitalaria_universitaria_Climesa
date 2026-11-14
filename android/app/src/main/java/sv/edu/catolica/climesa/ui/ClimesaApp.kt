@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import sv.edu.catolica.climesa.BuildConfig
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.*
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -64,7 +65,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     val roles=if(destination==AndroidDestination.NOT_AVAILABLE||destination==AndroidDestination.PENDING_VERIFICATION)emptyList() else allowedRoles.filter { AndroidSections.hasAppScreens(it,account.profile.permissions) }
     var selectedRole by rememberSaveable(account.session.userId){mutableStateOf(roles.firstOrNull().orEmpty())}
     val role=selectedRole.takeIf{it in roles}?:roles.firstOrNull().orEmpty()
-    if(roles.isEmpty()){Surface{Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center){Text("Tu rol no usa esta aplicación",style=MaterialTheme.typography.headlineMedium);Spacer(Modifier.height(16.dp));Text("Ingresa desde la plataforma habilitada para tu cuenta.");Spacer(Modifier.height(24.dp));Button(onClick=logout){Text("Cerrar sesión")}}};return}
+    if(roles.isEmpty()){Surface{Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center){SectionIntro("Acceso / CLIMESA","Tu rol no usa esta aplicación");Spacer(Modifier.height(16.dp));Text("Ingresa desde la plataforma habilitada para tu cuenta.");Spacer(Modifier.height(24.dp));PrimaryButton(stringResource(R.string.cerrar_sesion),logout)}};return}
     Column(Modifier.fillMaxSize()){
         if(roles.size>1){var menu by remember{mutableStateOf(false)};Surface(color=BrandNavy){Box(Modifier.fillMaxWidth().safeDrawingPadding().padding(horizontal=20.dp)){TextButton(onClick={menu=true}){Text("${RoleAccess.label(role)}  ▾",color=Color.White)};DropdownMenu(expanded=menu,onDismissRequest={menu=false}){roles.forEach{r->DropdownMenuItem(text={Text(RoleAccess.label(r))},onClick={selectedRole=r;menu=false})}}}}}
         Box(Modifier.weight(1f)){if(role=="REC"){
@@ -100,6 +101,7 @@ private fun LoginScreen(state: AuthUiState, signIn: (String, String) -> Unit, on
     var password by remember { mutableStateOf("") }
     var showPassword by rememberSaveable { mutableStateOf(false) }
     val passwordFocus = remember { FocusRequester() }
+    val demoAccounts = remember { DemoLogin.accounts(BuildConfig.DEMO_LOGIN, BuildConfig.DEMO_CREDENTIALS) }
     val focusManager = LocalFocusManager.current
     val passwordAction = stringResource(if (showPassword) R.string.login_hide_password else R.string.login_show_password)
     val submit = {
@@ -148,6 +150,7 @@ private fun LoginScreen(state: AuthUiState, signIn: (String, String) -> Unit, on
                             Text(it, Modifier.fillMaxWidth().padding(14.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
+                    if (demoAccounts.isNotEmpty()) DemoAccountPicker(demoAccounts, enabled = !state.signingIn) { account -> email = account.email; password = account.password }
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it.trimStart().take(254) },

@@ -1,4 +1,5 @@
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type FormEvent } from 'react';
+import type { DemoAccount } from '../lib/demoLogin';
 
 export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry';
 const paths: Record<IconName, ReactNode> = {
@@ -86,7 +87,24 @@ export function AuthLayout({ children, activation = false }: { children: ReactNo
   );
 }
 
-export function LoginView({ email, password, setEmail, setPassword, busy, error, accepted, onSubmit, notice }: { email: string; password: string; setEmail: (s: string) => void; setPassword: (s: string) => void; busy: boolean; error: string | null; accepted: boolean; onSubmit: (e: FormEvent) => void; notice?:string }) {
+/** TEMPORARY testing aid (docs/operacion/login-de-prueba.md): picks a fictitious test account; the user still signs in. */
+function DemoAccountPicker({ accounts, disabled, onPick }: { accounts: DemoAccount[]; disabled: boolean; onPick: (account: DemoAccount) => void }) {
+  const selectId = useId();
+  return (
+    <>
+      <Notice kind="info">Modo de prueba: cuentas ficticias</Notice>
+      <div className="field">
+        <label htmlFor={selectId}>Cuenta de prueba</label>
+        <select id={selectId} defaultValue="" disabled={disabled} onChange={e => { const account = accounts.find(a => a.rol === e.target.value); if (account) onPick(account); }}>
+          <option value="" disabled>Elige un rol</option>
+          {accounts.map(a => <option key={a.rol} value={a.rol}>{a.rol}</option>)}
+        </select>
+      </div>
+    </>
+  );
+}
+
+export function LoginView({ email, password, setEmail, setPassword, busy, error, accepted, onSubmit, notice, demoAccounts = [] }: { email: string; password: string; setEmail: (s: string) => void; setPassword: (s: string) => void; busy: boolean; error: string | null; accepted: boolean; onSubmit: (e: FormEvent) => void; notice?:string; demoAccounts?: DemoAccount[] }) {
   // W-11: la validación del navegador sale en su idioma; aquí se valida con mensajes propios en español.
   const [problems, setProblems] = useState<{ email?: string; password?: string }>({});
   function submit(event: FormEvent) {
@@ -105,6 +123,7 @@ export function LoginView({ email, password, setEmail, setPassword, busy, error,
         {accepted && <Notice kind="success">Contraseña creada. Tu cuenta está lista para ingresar.</Notice>}
         {notice && <Notice kind="info">{notice}</Notice>}
         {error && <Notice kind="error">{error}</Notice>}
+        {demoAccounts.length > 0 && <DemoAccountPicker accounts={demoAccounts} disabled={busy} onPick={a => { setEmail(a.correo); setPassword(a.contrasena); }} />}
         <div className="form-fields">
           <Field required label="Correo electrónico" type="email" placeholder="nombre@correo.com" value={email} onChange={setEmail} autoComplete="email" disabled={busy} aria-invalid={problems.email ? true : undefined} hint={problems.email} />
           <Field required label="Contraseña" type="password" placeholder="Tu contraseña" value={password} onChange={setPassword} autoComplete="current-password" disabled={busy} aria-invalid={problems.password ? true : undefined} hint={problems.password} />

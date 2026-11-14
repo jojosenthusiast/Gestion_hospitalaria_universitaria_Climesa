@@ -1,0 +1,52 @@
+[
+  {
+    "rol": "ADM",
+    "correo": "prueba.adm@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  },
+  {
+    "rol": "DPD",
+    "correo": "prueba.dpd@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  },
+  {
+    "rol": "JOP",
+    "correo": "prueba.jop@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  },
+  {
+    "rol": "REC",
+    "correo": "prueba.rec@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  },
+  {
+    "rol": "AST",
+    "correo": "prueba.ast@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  },
+  {
+    "rol": "ENF",
+    "correo": "prueba.enf@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  },
+  {
+    "rol": "MED",
+    "correo": "prueba.med@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  },
+  {
+    "rol": "LAB",
+    "correo": "prueba.lab@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  },
+  {
+    "rol": "PAR",
+    "correo": "prueba.par@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  },
+  {
+    "rol": "PAC",
+    "correo": "prueba.pac@example.test",
+    "contrasena": "CAMBIAR-ESTA-CONTRASENA"
+  }
+]

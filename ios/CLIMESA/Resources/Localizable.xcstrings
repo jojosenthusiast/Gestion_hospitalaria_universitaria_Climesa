@@ -210,6 +210,39 @@
         }
       }
     },
+    "auth.demo.banner": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modo de prueba: cuentas ficticias"
+          }
+        }
+      }
+    },
+    "auth.demo.choose": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige un rol"
+          }
+        }
+      }
+    },
+    "auth.demo.selector": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuenta de prueba"
+          }
+        }
+      }
+    },
     "auth.email": {
       "extractionState": "manual",
       "localizations": {

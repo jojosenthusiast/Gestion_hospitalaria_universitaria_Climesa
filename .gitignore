@@ -39,3 +39,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.swp
+
+# Login de prueba (TEMPORAL, docs/operacion/login-de-prueba.md): contraseñas de cuentas ficticias, nunca se suben
+demo-credenciales.json
+ios/DemoLogin.xcconfig

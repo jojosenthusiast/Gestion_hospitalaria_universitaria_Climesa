@@ -75,3 +75,9 @@ services:
         sync: false
       - key: VITE_SUPABASE_PUBLISHABLE_KEY
         sync: false
+      # TEMPORARY test-account selector on the login (docs/operacion/login-de-prueba.md). Set VITE_DEMO_LOGIN=false
+      # (and clear VITE_DEMO_CREDENTIALS) before final delivery; the credentials JSON is entered by hand, never here.
+      - key: VITE_DEMO_LOGIN
+        sync: false
+      - key: VITE_DEMO_CREDENTIALS
+        sync: false
