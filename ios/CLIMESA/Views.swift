@@ -29,10 +29,13 @@ struct RootView:View {
     @EnvironmentObject private var account:AccountModel
     var body:some View {
         Group {
-            if account.loading { VStack(spacing:22) { BrandHeader(); Spacer(); ProgressView("root.verifying"); Spacer() }.background(Brand.paper) }
-            else if let profile=account.profile { WorkspaceView(profile:profile).id(profile.id) }
-            else if account.pending { VStack(alignment:.leading,spacing:24) { BrandHeader(); VStack(alignment:.leading,spacing:24) { Text("root.title").font(Brand.bold(42)); Notice(text:account.error ?? L.text("root.fallback_error"),failure:true); PrimaryButton(title:"common.retry",busy:account.loading) { Task { await account.restore() } }; Button("common.logout") { Task { await account.logout() } } }.padding(24); Spacer() }.background(Brand.paper) }
-            else { AuthView() }
+            // La ruta la decide SessionRouter (Core, probada): el ingreso no cambia de pantalla hasta tener el perfil de /auth/me.
+            switch SessionRouter.route(loading:account.loading,hasProfile:account.profile != nil,needsRetry:account.pending) {
+            case .verifying: VStack(spacing:22) { BrandHeader(); Spacer(); ProgressView("root.verifying"); Spacer() }.background(Brand.paper)
+            case .workspace: if let profile=account.profile { WorkspaceView(profile:profile).id(profile.id) }
+            case .retry: VStack(alignment:.leading,spacing:24) { BrandHeader(); VStack(alignment:.leading,spacing:24) { Text("root.title").font(Brand.bold(42)); Notice(text:account.error ?? L.text("root.fallback_error"),failure:true); PrimaryButton(title:"common.retry",busy:account.loading) { Task { await account.restore() } }; Button("common.logout") { Task { await account.logout() } } }.padding(24); Spacer() }.background(Brand.paper)
+            case .login: AuthView()
+            }
         }.font(Brand.body()).foregroundStyle(Brand.ink)
     }
 }

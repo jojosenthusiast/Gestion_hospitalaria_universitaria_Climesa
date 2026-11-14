@@ -52,7 +52,11 @@ import SwiftUI
         do {
             guard try await auth.session() != nil else { profile=nil; pending=false; loading=false; return }
             try await verify()
-        } catch { guard stamp==revision else { return }; self.error=error.localizedDescription; pending=true; profile=nil }
+        } catch {
+            guard stamp==revision else { return }
+            // Una cancelación no es un fallo: no muestra error ni ofrece reintento.
+            if let message=SessionFailure.visibleMessage(for:error) { self.error=message; pending=true; profile=nil }
+        }
         if stamp==revision { loading=false }
     }
     private func verify() async throws {
@@ -65,20 +69,38 @@ import SwiftUI
     }
     func signIn(email:String,password:String) async {
         guard !busy, let auth else { return }; let stamp=revision; busy=true; error=nil
-        do { try await auth.signIn(email:email,password:password); guard stamp==revision else { return }; pending=true; try await verify() }
-        catch { guard stamp==revision else { return }; self.error=error.localizedDescription }
+        var signedIn=false
+        do {
+            try await auth.signIn(email:email,password:password); signedIn=true
+            guard stamp==revision else { return }
+            // El perfil se publica solo cuando /auth/me responde: mientras tanto el botón sigue en carga y la pantalla no cambia.
+            try await verify()
+        } catch {
+            guard stamp==revision else { return }
+            if let message=SessionFailure.visibleMessage(for:error) {
+                self.error=message
+                if SessionFailure.offersRetry(after:error,signedIn:signedIn) { pending=true }
+            }
+        }
         if stamp==revision { busy=false }
     }
     func register(name:String,email:String,password:String,confirmation:String) async {
         let errors=RegistrationRules.errors(name:name,email:email,password:password,confirmation:confirmation)
         guard errors.isEmpty else { error=errors.joined(separator:" "); return }
         guard !busy, let auth else { return }; let stamp=revision; busy=true; error=nil
+        var savedSession=false
         do {
             let signedIn=try await auth.signUp(name:name,email:email,password:password)
             guard stamp==revision else { return }
-            if signedIn { pending=true; try await verify() }
+            if signedIn { savedSession=true; try await verify() }
             else { notice="Revisa tu correo para confirmar tu cuenta. Después podrás ingresar." }
-        } catch { guard stamp==revision else { return }; self.error=error.localizedDescription }
+        } catch {
+            guard stamp==revision else { return }
+            if let message=SessionFailure.visibleMessage(for:error) {
+                self.error=message
+                if SessionFailure.offersRetry(after:error,signedIn:savedSession) { pending=true }
+            }
+        }
         if stamp==revision { busy=false }
     }
     func logout() async { revision+=1; busy=true; loading=true; profile=nil; pending=false; notice=nil; error=nil; await auth?.signOut(); busy=false; loading=false }
@@ -93,5 +115,5 @@ struct Shift:Decodable,Identifiable {
 }
 @MainActor final class ShiftModel:ObservableObject {
     @Published var shifts:[Shift]=[]; @Published var loading=false; @Published var error:String?
-    func load(api:APIClient?) async { guard let api else { return }; loading=true; error=nil; do { shifts=try await api.get("/turnos/mios",as:[Shift].self) } catch { self.error=error.localizedDescription }; loading=false }
+    func load(api:APIClient?) async { guard let api else { return }; loading=true; error=nil; do { shifts=try await api.get("/turnos/mios",as:[Shift].self) } catch { self.error=SessionFailure.visibleMessage(for:error) }; loading=false }
 }
