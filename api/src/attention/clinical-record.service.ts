@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
 import { channelsFor } from '../platform/channels';
@@ -15,8 +15,12 @@ type Row = Record<string, any>;
 export class ClinicalRecordService {
   constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
 
-  /** `lock` serializes clinical writes with the signature (DAT-04): both take the consultation row FOR UPDATE. */
-  private async consultation(c: PoolClient, actor: Actor, id: string, lock = false) {
+  /**
+   * `lock` serializes clinical writes with the signature (DAT-04): both take the consultation row FOR UPDATE.
+   * `vitals`: `signos.registrar` with context `x` (AST, ENF, MED, PAR in permisos.csv) needs no care
+   * relationship, so the nurse or assistant can take vital signs in the open consultation (F-02, API-06).
+   */
+  private async consultation(c: PoolClient, actor: Actor, id: string, lock = false, vitals = false) {
     const row = (await c.query(`SELECT k.id,k.paciente_id AS "patientId",k.medico_id AS "doctorId",k.cita_id AS "appointmentId",
       k.motivo AS reason,k.examen_fisico AS "physicalExam",k.plan,k.estado AS state,k.version,
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName"
@@ -25,8 +29,9 @@ export class ClinicalRecordService {
     // SEG-07: the patient sees only a signed note (privacidad.md §2); a draft does not exist for them.
     const ownPatient = actor.patientId && actor.patientId === row.patientId && contextsOf(actor, 'expediente.ver').includes('propio_revisado');
     const ownDoctor = actor.staffId && actor.staffId === row.doctorId;
+    if (vitals && actor.staffId && contextsOf(actor, 'signos.registrar').includes('x')) return row;
     const relation = actor.staffId ? (await c.query(`SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz LIMIT 1`, [row.patientId, actor.staffId, this.clock.now()])).rowCount : 0;
-    const canRelation = contextsOf(actor, 'expediente.ver').includes('relacion') || contextsOf(actor, 'signos.registrar').includes('x') || contextsOf(actor, 'consulta.registrar').includes('relacion') || contextsOf(actor, 'recetas.emitir').includes('relacion');
+    const canRelation = contextsOf(actor, 'expediente.ver').includes('relacion') || contextsOf(actor, 'consulta.registrar').includes('relacion') || contextsOf(actor, 'recetas.emitir').includes('relacion');
     if (ownPatient && !ownDoctor && !(canRelation && relation) && row.state !== 'firmada') throw new NotFoundException('No se encontró la consulta.');
     if (!ownPatient && !ownDoctor && !(canRelation && relation)) throw new ForbiddenException('No tienes relación de atención con este paciente.');
     return row;
@@ -48,9 +53,13 @@ export class ClinicalRecordService {
   async addVitalSigns(actor: Actor, id: string, dto: VitalSignsDto, key?: string) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
     return this.commands.run(actor, 'signos.registrar', key, dto, async c => {
-      const consultation = await this.consultation(c, actor, id, true);
+      const consultation = await this.consultation(c, actor, id, true, true);
       // F-04: vital signs belong to the note; once signed they are rejected like any other change.
       if (consultation.state !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y no admite signos nuevos.');
+      if (dto.admissionId) {
+        const admission = (await c.query('SELECT paciente_id FROM hospitalizacion.admision WHERE id=$1', [dto.admissionId])).rows[0];
+        if (!admission || admission.paciente_id !== consultation.patientId) throw new BadRequestException('La admisión no pertenece al paciente de la consulta.');
+      }
       const row = (await c.query(`INSERT INTO atencion.signos_vitales(paciente_id,consulta_id,admision_id,tomado_por,pa_sistolica,pa_diastolica,fc,fr,temperatura,sat_o2,peso_kg,talla_cm)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id,tomado_en AS "takenAt"`, [consultation.patientId,id,dto.admissionId ?? null,actor.staffId,dto.systolic ?? null,dto.diastolic ?? null,dto.heartRate ?? null,dto.respiratoryRate ?? null,dto.temperature ?? null,dto.oxygenSaturation ?? null,dto.weightKg ?? null,dto.heightCm ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: 'signos.registrar', entity: 'signos_vitales', entityId: row.id, patientId: consultation.patientId, permission: 'signos.registrar', detail: { consultationId: id } });

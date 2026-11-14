@@ -7,7 +7,7 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { VersionConflictException } from '../platform/problem';
 import { requireCurrentEnrollment } from '../platform/enrollment';
-import { AdmissionDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
+import { AdmissionDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, ExitDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
 
 type Row = Record<string, any>;
 
@@ -34,6 +34,15 @@ export class HospitalizationService {
     if (occupants.some(other => other.sex !== admission.patientSex)) throw new ConflictException('La habitación semiprivada está ocupada por un paciente de otro sexo.');
   }
 
+  /** API-03: admissions and the bed board learn about every transition through the outbox (no polling). */
+  private async admissionChanged(c: PoolClient, id: string, version: number) {
+    await this.commands.event(c, 'admision.actualizada', 'admision', id, version, await channelsFor(c, ['admision.ver', 'camas.asignar']));
+  }
+
+  private async bedChanged(c: PoolClient, bedId: string, version: number) {
+    await this.commands.event(c, 'cama.estado_cambiado', 'cama', bedId, version, await channelsFor(c, ['camas.ver_tablero']));
+  }
+
   /** DAT-02: isolation blocks the other beds of the room with the catalogued origin `aislamiento`. */
   private async isolateRoom(c: PoolClient, roomId: string, bedId: string, at: Date, by: string) {
     await c.query(`INSERT INTO infra.bloqueo_cama(cama_id,periodo,motivo,origen,creado_por) SELECT e.id,tstzrange($2::timestamptz,NULL,'[)'),'Aislamiento de paciente hospitalizado','aislamiento',$3
@@ -52,7 +61,7 @@ export class HospitalizationService {
       const ownDoctor = actor.staffId && contextsOf(actor, 'admision.ver').includes('relacion');
       const ownPatient = actor.patientId && contextsOf(actor, 'admision.ver').includes('propio');
       if (!global && !ownDoctor && !ownPatient) return [];
-      const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed
+      const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed,oc.id AS "occupationId"
         FROM hospitalizacion.admision a JOIN pacientes.paciente p ON p.id=a.paciente_id LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $1::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id
         WHERE a.estado IN ('pendiente_cama','hospitalizado','alta_firmada') AND ($2::boolean OR ($3::uuid IS NOT NULL AND a.medico_tratante_id=$3) OR ($4::uuid IS NOT NULL AND a.paciente_id=$4)) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,actor.staffId ?? null,actor.patientId ?? null])).rows;
       for (const row of rows) await this.commands.audit(c, actor, { action: 'admision.leer', entity: 'admision', entityId: row.id, patientId: row.patientId, permission: 'admision.ver' });
@@ -86,6 +95,7 @@ export class HospitalizationService {
       if (!patient) throw new NotFoundException('No se encontró el paciente.');
       const row = (await c.query(`INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,aislamiento,medico_tratante_id,fecha_programada,creado_por) VALUES($1,'consulta',$2,$3,$4,$5,$6,$7,$8) RETURNING id,estado AS state,version`, [dto.patientId,dto.originId ?? null,dto.requestedCategory,patient.sex,dto.isolation,actor.staffId,dto.scheduledAt ?? null,actor.id])).rows[0];
       await this.commands.audit(c, actor, { action: 'admision.solicitar', entity: 'admision', entityId: row.id, patientId: dto.patientId, permission: 'admision.solicitar' });
+      await this.commands.event(c, 'admision.creada', 'admision', row.id, row.version, await channelsFor(c, ['admision.ver', 'camas.asignar']));
       return row;
     });
   }
@@ -124,6 +134,7 @@ export class HospitalizationService {
       if (admission.isolation) await this.isolateRoom(c, bed.roomId, dto.bedId, now, actor.id);
       await this.commands.audit(c, actor, { action: 'camas.asignar', entity: 'ocupacion_cama', entityId: occ.id, patientId: admission.patientId, permission: 'camas.asignar', reason: dto.reason });
       await this.commands.event(c, 'admision.cama_asignada', 'admision', id, admission.version + 1, await channelsFor(c, ['admision.ver', 'camas.ver_tablero']));
+      await this.bedChanged(c, dto.bedId, bed.version);
       return { id, bedId: dto.bedId, state: 'hospitalizado', version: admission.version + 1 };
     });
   }
@@ -134,22 +145,31 @@ export class HospitalizationService {
       if (admission.state !== 'pendiente_cama') throw new ConflictException('Solo se puede autorizar una admisión pendiente.');
       const row = (await c.query('UPDATE hospitalizacion.admision SET autorizado_por=$2,version=version+1 WHERE id=$1 RETURNING id,version', [id,actor.id])).rows[0];
       await this.commands.audit(c, actor, { action: 'admision.autorizar', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'admision.autorizar', reason: dto.reason });
+      await this.admissionChanged(c, id, row.version);
       return row;
     });
   }
 
-  async transfer(actor: Actor, id: string, dto: TransferDto, key?: string) {
-    return this.commands.run(actor, `camas.trasladar:${id}`, key, dto, async c => {
+  /**
+   * API-05: the route is `/ocupaciones/{id}/traslado`, so `id` is the active bed occupation. `version` is the
+   * admission version shown in `GET /admisiones`; the admission must be `hospitalizado` (D-037: VIP stays put).
+   */
+  async transfer(actor: Actor, occupationId: string, dto: TransferDto, key?: string) {
+    return this.commands.run(actor, `camas.trasladar:${occupationId}`, key, dto, async c => {
+      const now = this.clock.now();
+      const current = (await c.query(`SELECT o.id,o.admision_id AS "admissionId",o.cama_id AS "bedId",o.habitacion_id AS "roomId",o.categoria,e.version FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio e ON e.id=o.cama_id WHERE o.id=$1 AND o.periodo @> $2::timestamptz FOR UPDATE`, [occupationId, now])).rows[0] as Row | undefined;
+      if (!current) throw new NotFoundException('No se encontró una ocupación activa con ese identificador.');
+      const id = current.admissionId as string;
       const admission = await this.admission(c, id, true);
-      const current = (await c.query(`SELECT o.id,o.cama_id AS "bedId",o.habitacion_id AS "roomId",o.categoria,o.periodo,e.version FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio e ON e.id=o.cama_id WHERE o.admision_id=$1 AND o.periodo @> $2::timestamptz FOR UPDATE`, [id,this.clock.now()])).rows[0] as Row | undefined;
-      if (!current) throw new ConflictException('El paciente no tiene una cama activa.');
+      if (admission.version !== dto.version) throw new VersionConflictException(admission.version, 'La admisión cambió; vuelve a consultarla.');
+      if (admission.state !== 'hospitalizado') throw new ConflictException('Solo se traslada a un paciente hospitalizado.');
       if (current.categoria === 'vip') throw new ConflictException('Una ocupación VIP no se puede trasladar.');
+      if (dto.bedId === current.bedId) throw new BadRequestException('Selecciona una cama distinta de la actual.');
       const target = (await c.query(`SELECT e.id,e.version,h.id AS "roomId",h.categoria FROM infra.espacio e JOIN infra.espacio h ON h.id=e.padre_id WHERE e.id=$1 AND e.tipo='cama' AND e.activo FOR UPDATE`, [dto.bedId])).rows[0] as Row | undefined;
       if (!target) throw new NotFoundException('No se encontró la cama destino.');
       const state = (await c.query('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1', [dto.bedId])).rows[0]?.estado;
       if (state !== 'libre') throw new ConflictException('La cama destino ya no está disponible.');
       if (target.roomId !== current.roomId) await this.checkRoomCompatibility(c, target.roomId, admission);
-      const now = this.clock.now();
       await c.query(`UPDATE hospitalizacion.ocupacion_cama SET periodo=tstzrange(lower(periodo),$2::timestamptz,'[)'),motivo_fin='traslado' WHERE id=$1`, [current.id,now]);
       if (admission.isolation && target.roomId !== current.roomId) {
         await this.releaseIsolation(c, current.roomId, now);
@@ -158,9 +178,12 @@ export class HospitalizationService {
       const dest = (await c.query(`INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo,asignado_por) VALUES($1,$2,$3,$4,tstzrange($5::timestamptz,NULL,'[)'),$6) RETURNING id`, [id,dto.bedId,target.roomId,target.categoria,now,actor.id])).rows[0];
       await c.query(`INSERT INTO hospitalizacion.traslado(admision_id,ocupacion_origen_id,ocupacion_destino_id,motivo,realizado_por) VALUES($1,$2,$3,$4,$5)`, [id,current.id,dest.id,dto.reason,actor.id]);
       await c.query(`INSERT INTO infra.limpieza_cama(cama_id,pendiente_desde) VALUES($1,$2)`, [current.bedId,now]);
-      await this.commands.audit(c, actor, { action: 'camas.trasladar', entity: 'traslado', entityId: id, patientId: admission.patientId, permission: 'camas.trasladar', reason: dto.reason });
-      await this.commands.event(c, 'cama.estado_cambiado', 'cama', current.bedId, current.version + 1, await channelsFor(c, ['camas.ver_tablero']));
-      return { admissionId: id, fromBedId: current.bedId, toBedId: dto.bedId, state: 'hospitalizado' };
+      const row = (await c.query('UPDATE hospitalizacion.admision SET version=version+1 WHERE id=$1 RETURNING version', [id])).rows[0];
+      await this.commands.audit(c, actor, { action: 'camas.trasladar', entity: 'traslado', entityId: id, patientId: admission.patientId, permission: 'camas.trasladar', reason: dto.reason, detail: { fromOccupationId: current.id, toOccupationId: dest.id } });
+      await this.bedChanged(c, current.bedId, current.version);
+      await this.bedChanged(c, dto.bedId, target.version);
+      await this.admissionChanged(c, id, row.version);
+      return { admissionId: id, occupationId: dest.id, fromBedId: current.bedId, toBedId: dto.bedId, state: 'hospitalizado', version: row.version };
     });
   }
 
@@ -169,6 +192,7 @@ export class HospitalizationService {
       const admission = await this.admission(c, id);
       const row = (await c.query(`INSERT INTO hospitalizacion.nota_enfermeria(admision_id,autor_id,texto) VALUES($1,$2,$3) RETURNING id,creada_en AS "createdAt"`, [id,actor.id,dto.text.trim()])).rows[0];
       await this.commands.audit(c, actor, { action: 'enfermeria.nota', entity: 'nota_enfermeria', entityId: row.id, patientId: admission.patientId, permission: 'enfermeria.registrar' });
+      await this.admissionChanged(c, id, admission.version);
       return row;
     });
   }
@@ -176,31 +200,37 @@ export class HospitalizationService {
   async discharge(actor: Actor, id: string, dto: DischargeDto, key?: string) {
     return this.commands.run(actor, 'alta.firmar', key, dto, async c => {
       const admission = await this.admission(c, id, true);
+      if (admission.version !== dto.version) throw new VersionConflictException(admission.version, 'La admisión cambió; vuelve a consultarla.');
       if (admission.state !== 'hospitalizado') throw new ConflictException('Solo se puede firmar el alta de un paciente hospitalizado.');
       await requireCurrentEnrollment(c, actor.staffId, this.clock.today());
-      const pending = dto.pending ?? [];
-      if (pending.some(item => !item.description?.trim() || !item.responsible?.trim())) throw new BadRequestException('Cada pendiente debe tener responsable.');
+      // RN-11: each pending item keeps its responsible person; stored with the column's Spanish keys.
+      const pending = (dto.pending ?? []).map(item => ({ descripcion: item.description.trim(), responsable: item.responsible.trim() }));
+      if (pending.some(item => !item.descripcion || !item.responsable)) throw new BadRequestException('Cada pendiente debe tener descripción y responsable.');
       if (dto.type === 'voluntaria' && !dto.voluntaryConsent) throw new BadRequestException('El alta voluntaria necesita constancia.');
       await c.query(`INSERT INTO hospitalizacion.alta(admision_id,tipo,firmada_por,resumen,pendientes,constancia_voluntaria) VALUES($1,$2,$3,$4,$5::jsonb,$6)`, [id,dto.type,actor.id,dto.summary?.trim() ?? null,JSON.stringify(pending),dto.voluntaryConsent ?? false]);
       const row = (await c.query(`UPDATE hospitalizacion.admision SET estado='alta_firmada',version=version+1 WHERE id=$1 RETURNING id,estado AS state,version`, [id])).rows[0];
       await this.commands.audit(c, actor, { action: 'alta.firmar', entity: 'alta', entityId: id, patientId: admission.patientId, permission: 'alta.firmar' });
+      await this.admissionChanged(c, id, row.version);
       return row;
     });
   }
 
-  async exit(actor: Actor, id: string, dto: { version: number; reason: string }, key?: string) {
+  async exit(actor: Actor, id: string, dto: ExitDto, key?: string) {
     return this.commands.run(actor, 'admision.registrar_salida', key, dto, async c => {
       const admission = await this.admission(c, id, true);
+      if (admission.version !== dto.version) throw new VersionConflictException(admission.version, 'La admisión cambió; vuelve a consultarla.');
       if (admission.state !== 'alta_firmada') throw new ConflictException('Primero debe firmarse el alta.');
-      const occupation = (await c.query(`SELECT id,cama_id AS "bedId",habitacion_id AS "roomId" FROM hospitalizacion.ocupacion_cama WHERE admision_id=$1 AND periodo @> $2::timestamptz FOR UPDATE`, [id,this.clock.now()])).rows[0];
+      const occupation = (await c.query(`SELECT o.id,o.cama_id AS "bedId",o.habitacion_id AS "roomId",e.version AS "bedVersion" FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio e ON e.id=o.cama_id WHERE o.admision_id=$1 AND o.periodo @> $2::timestamptz FOR UPDATE OF o`, [id,this.clock.now()])).rows[0];
       if (!occupation) throw new ConflictException('No hay ocupación activa para registrar salida.');
       const now = this.clock.now();
       await c.query(`UPDATE hospitalizacion.ocupacion_cama SET periodo=tstzrange(lower(periodo),$2::timestamptz,'[)'),motivo_fin='egreso' WHERE id=$1`, [occupation.id,now]);
       if (admission.isolation) await this.releaseIsolation(c, occupation.roomId, now);
-      await c.query(`UPDATE hospitalizacion.admision SET estado='egresado',version=version+1 WHERE id=$1`, [id]);
+      const updated = (await c.query(`UPDATE hospitalizacion.admision SET estado='egresado',version=version+1 WHERE id=$1 RETURNING version`, [id])).rows[0];
       await c.query(`INSERT INTO infra.limpieza_cama(cama_id,pendiente_desde) VALUES($1,$2)`, [occupation.bedId,now]);
       await this.commands.audit(c, actor, { action: 'admision.salida', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'admision.registrar_salida', reason: dto.reason });
-      return { id, state: 'egresado', bedId: occupation.bedId };
+      await this.admissionChanged(c, id, updated.version);
+      await this.bedChanged(c, occupation.bedId, occupation.bedVersion);
+      return { id, state: 'egresado', bedId: occupation.bedId, version: updated.version };
     });
   }
 }

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsUUID, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
 import { Text } from '../platform/dto';
 
 export const admissionOrigins = ['consulta', 'emergencia', 'ambulancia', 'programada'] as const;
@@ -17,5 +18,19 @@ export class BedAssignmentDto { @ApiProperty({ format: 'uuid' }) @IsUUID() bedId
 export class BedSuggestionQuery { @ApiPropertyOptional({ enum: ['vip', 'semiprivada'] }) @IsOptional() @IsIn(['vip', 'semiprivada']) category?: string; }
 export class AuthorizationDto { @Text(10, 500) reason!: string; }
 export class TransferDto { @ApiProperty({ format: 'uuid' }) @IsUUID() bedId!: string; @Text(10, 500) reason!: string; @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; }
-export class DischargeDto { @ApiProperty({ enum: ['medica', 'voluntaria', 'traslado', 'defuncion'] }) @IsIn(['medica', 'voluntaria', 'traslado', 'defuncion']) type!: string; @Text(10, 2000, true) summary?: string; @ApiPropertyOptional() @IsOptional() @IsBoolean() voluntaryConsent?: boolean; @ApiPropertyOptional() @IsOptional() pending?: Array<{ description: string; responsible: string }>; }
+/** RN-11: a discharge pending item always names who is responsible for it. */
+export class DischargePendingDto {
+  @Text(1, 500) description!: string;
+  @Text(1, 200) responsible!: string;
+}
+export class DischargeDto {
+  @ApiProperty({ enum: ['medica', 'voluntaria', 'traslado', 'defuncion'] }) @IsIn(['medica', 'voluntaria', 'traslado', 'defuncion']) type!: string;
+  @ApiProperty({ minimum: 1, description: 'Versión vigente de la admisión (control de concurrencia).' }) @IsInt() @Min(1) version!: number;
+  @Text(10, 2000, true) summary?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() voluntaryConsent?: boolean;
+  @ApiPropertyOptional({ type: [DischargePendingDto], maxItems: 50, description: 'Pendientes al alta, cada uno con su responsable.' })
+  @IsOptional() @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => DischargePendingDto) pending?: DischargePendingDto[];
+}
+/** API-04: the physical exit validates its body and compares the admission version. */
+export class ExitDto { @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; @Text(10, 500) reason!: string; }
 export class NursingNoteDto { @Text(1, 4000) text!: string; }

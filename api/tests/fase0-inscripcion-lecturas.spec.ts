@@ -33,14 +33,15 @@ describe('Fase 0 · inscripción vigente, consultas firmadas y lecturas auditada
     expect(prescription.status).toBe(409);
     expect(prescription.body.codigo).toBe('inscripcion_no_vigente');
     const admission = await hospitalized();
-    const discharge = await t.call('MED', 'POST', `/admisiones/${admission}/alta`, { type: 'medica', summary: 'Evolución favorable sin complicaciones' });
+    const admissionVersion = (await t.one<{ version: number }>('SELECT version FROM hospitalizacion.admision WHERE id=$1', [admission])).version;
+    const discharge = await t.call('MED', 'POST', `/admisiones/${admission}/alta`, { type: 'medica', version: admissionVersion, summary: 'Evolución favorable sin complicaciones' });
     expect(discharge.status).toBe(409);
     expect(discharge.body.codigo).toBe('inscripcion_no_vigente');
 
     await t.enroll('MED');
     expect((await t.call('MED', 'POST', `/consultas/${consultation.id}/receta`, { items: [item] })).status).toBe(201);
     expect((await t.call('MED', 'POST', `/consultas/${consultation.id}/firmar`, { version })).status).toBe(201);
-    expect((await t.call('MED', 'POST', `/admisiones/${admission}/alta`, { type: 'medica', summary: 'Evolución favorable sin complicaciones' })).status).toBe(201);
+    expect((await t.call('MED', 'POST', `/admisiones/${admission}/alta`, { type: 'medica', version: admissionVersion, summary: 'Evolución favorable sin complicaciones' })).status).toBe(201);
   });
 
   test('SEG-07: el paciente no ve su consulta mientras no esté firmada', async () => {

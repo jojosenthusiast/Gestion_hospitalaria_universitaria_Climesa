@@ -93,7 +93,9 @@ export class ConsultationService {
       if (!String(old.motivo ?? '').trim() || !String(old.plan ?? '').trim()) throw new ConflictException('Completa el motivo y el plan antes de firmar la consulta.');
       await requireCurrentEnrollment(c, actor.staffId, this.clock.today());
       const row = (await c.query(`UPDATE atencion.consulta SET estado='firmada',firmada_en=$2,version=version+1 WHERE id=$1 RETURNING id,version,estado,firmada_en AS "signedAt"`, [id, this.clock.now()])).rows[0];
-      await c.query(`UPDATE atencion.cita SET estado='atendida',version=version+1 WHERE id=(SELECT cita_id FROM atencion.consulta WHERE id=$1) AND estado='confirmada'`, [id]);
+      const appointment = (await c.query(`UPDATE atencion.cita SET estado='atendida',version=version+1 WHERE id=(SELECT cita_id FROM atencion.consulta WHERE id=$1) AND estado='confirmada' RETURNING id,version`, [id])).rows[0];
+      // API-03: the appointment moved to `atendida`; agendas and the patient's appointments learn it.
+      if (appointment) await this.commands.event(c, 'cita.actualizada', 'cita', appointment.id, appointment.version, await channelsFor(c, ['citas.ver'], { users: [await patientAccount(c, old.paciente_id)] }));
       await this.commands.audit(c, actor, { action: 'consulta.firmar', entity: 'consulta', entityId: id, patientId: old.paciente_id, permission: 'consulta.registrar' });
       await this.commands.event(c, 'consulta.actualizada', 'consulta', id, row.version, await this.channels(c, old.paciente_id, true));
       return { id: row.id, version: row.version, state: row.estado, signedAt: row.signedAt };

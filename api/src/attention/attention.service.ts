@@ -3,12 +3,13 @@ import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException, VersionConflictException } from '../platform/problem';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { AppointmentCancelDto, AppointmentCreateDto, AppointmentStatusDto, PatientAppointmentRequestDto } from './attention.dto';
 
 type AppointmentRow = Record<string, any>;
+const SLOT_MS = 20 * 60_000;
 
 @Injectable()
 export class AttentionService {
@@ -40,15 +41,19 @@ export class AttentionService {
     if (!row) throw new BadRequestException('Selecciona un médico activo.');
   }
 
-  /** Una cita solo puede existir dentro de una jornada publicada o en curso del médico. */
+  /**
+   * Una cita solo puede existir dentro de una jornada publicada o en curso del médico, y empieza en una
+   * franja de 20 minutos contada desde el inicio de esa jornada (API-07).
+   */
   private async doctorHasShift(c: PoolClient, doctorId: string, start: Date, end: Date) {
-    const row = (await c.query(`SELECT 1
+    const row = (await c.query(`SELECT lower(periodo) AS start
       FROM personal.turno
       WHERE persona_id=$1 AND estado IN ('publicado','en_curso')
         AND periodo @> $2::timestamptz
         AND periodo @> ($3::timestamptz - interval '1 microsecond')
       LIMIT 1`, [doctorId, start, end])).rows[0];
     if (!row) throw new ConflictException('El médico no tiene una jornada publicada para esa franja.');
+    if ((start.valueOf() - new Date(row.start).valueOf()) % SLOT_MS !== 0) throw new ProblemException('franja_desalineada', 400, 'La cita debe empezar en una franja de 20 minutos de la jornada del médico.', 'start');
   }
 
   /** Evita que un mismo paciente quede con dos citas simultáneas, incluso con médicos distintos. */
@@ -125,7 +130,10 @@ export class AttentionService {
     const slots: Array<{ start: string; end: string }> = [];
     const seen = new Set<string>();
     for (const shift of shifts) {
-      const shiftStart = Math.max(new Date(shift.start).valueOf(), dayStart.valueOf(), now);
+      // API-07: slots are counted from the start of the shift, so a shift already in progress never yields odd times.
+      const origin = new Date(shift.start).valueOf();
+      const earliest = Math.max(origin, dayStart.valueOf(), now);
+      const shiftStart = origin + Math.ceil((earliest - origin) / SLOT_MS) * SLOT_MS;
       const shiftEnd = Math.min(new Date(shift.end).valueOf(), dayEnd.valueOf());
       for (let cursor = shiftStart; cursor + durationMinutes * 60_000 <= shiftEnd; cursor += durationMinutes * 60_000) {
         const end = cursor + durationMinutes * 60_000;
@@ -205,11 +213,13 @@ export class AttentionService {
   async cancel(actor: Actor, id: string, dto: AppointmentCancelDto, key?: string) {
     return this.commands.run(actor, 'citas.cancelar', key, dto, async c => {
       const old = (await c.query('SELECT paciente_id,estado,version FROM atencion.cita WHERE id=$1 FOR UPDATE', [id])).rows[0] as AppointmentRow | undefined;
+      // F-06/H-09: ownership comes first, and a foreign or missing appointment answers the same, so neither
+      // the version nor the existence of another patient's appointment leaks.
+      const onlyOwn = !contextsOf(actor, 'citas.cancelar').some(context => context !== 'propio');
+      if (onlyOwn && (!old || !actor.patientId || actor.patientId !== old.paciente_id)) throw new ForbiddenException('Solo puedes cancelar tus propias citas.');
       if (!old) throw new NotFoundException('No se encontró la cita.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
       if (!['solicitada', 'confirmada'].includes(old.estado)) throw new ConflictException('Solo se pueden cancelar citas solicitadas o confirmadas.');
-      const own = contextsOf(actor, 'citas.cancelar').includes('propio');
-      if (own && actor.patientId !== old.paciente_id) throw new ForbiddenException('Solo puedes cancelar tus propias citas.');
       const row = (await c.query("UPDATE atencion.cita SET estado='cancelada',version=version+1 WHERE id=$1 RETURNING version", [id])).rows[0];
       await this.commands.audit(c, actor, { action: 'citas.cancelar', entity: 'cita', entityId: id, permission: 'citas.cancelar', reason: dto.reason });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, old.paciente_id));

@@ -2,7 +2,7 @@ import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query, Req,
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { AdmissionDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
+import { AdmissionDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, ExitDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
 import { HospitalizationService } from './hospitalization.service';
 
 @ApiTags('hospitalization') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('admisiones')
@@ -15,6 +15,6 @@ export class HospitalizationController {
   @Post(':id/autorizar') @RequirePermission('admision.autorizar') authorize(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: AuthorizationDto, @Headers('idempotency-key') k?: string) { return this.service.authorize(r.actor, id, d, k); }
   @Post(':id/notas-enfermeria') @RequirePermission('enfermeria.registrar') note(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: NursingNoteDto, @Headers('idempotency-key') k?: string) { return this.service.note(r.actor, id, d, k); }
   @Post(':id/alta') @RequirePermission('alta.firmar') discharge(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: DischargeDto, @Headers('idempotency-key') k?: string) { return this.service.discharge(r.actor, id, d, k); }
-  @Post(':id/salida') @RequirePermission('admision.registrar_salida') exit(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: { version: number; reason: string }, @Headers('idempotency-key') k?: string) { return this.service.exit(r.actor, id, d, k); }
+  @Post(':id/salida') @RequirePermission('admision.registrar_salida') exit(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: ExitDto, @Headers('idempotency-key') k?: string) { return this.service.exit(r.actor, id, d, k); }
   @Post('indicaciones') @RequirePermission('admision.solicitar') indication(@Req() r: ActorRequest, @Body() d: AdmissionDto, @Headers('idempotency-key') k?: string) { return this.service.createIndication(r.actor, d, k); }
 }
