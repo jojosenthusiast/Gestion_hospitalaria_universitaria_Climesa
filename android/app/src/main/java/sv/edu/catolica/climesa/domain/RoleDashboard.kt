@@ -58,12 +58,10 @@ object RoleDashboard {
     private val zone: ZoneId = ZoneId.of("America/El_Salvador")
 
     private val sourcesByRole: Map<String, List<DashboardSource>> = mapOf(
-        "JOP" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.STOCK, DashboardSource.SHIFTS),
         "REC" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.LINKS, DashboardSource.APPOINTMENTS, DashboardSource.SHIFTS),
         "AST" to listOf(DashboardSource.QUEUE, DashboardSource.SHIFTS),
         "ENF" to listOf(DashboardSource.BEDS, DashboardSource.ADMISSIONS, DashboardSource.STOCK, DashboardSource.AMBULANCE, DashboardSource.SHIFTS),
         "MED" to listOf(DashboardSource.AGENDA, DashboardSource.LAB, DashboardSource.ADMISSIONS, DashboardSource.SHIFTS),
-        "LAB" to listOf(DashboardSource.LAB, DashboardSource.STOCK, DashboardSource.SHIFTS),
         "PAR" to listOf(DashboardSource.AMBULANCE, DashboardSource.SHIFTS),
         "PAC" to listOf(DashboardSource.QUEUE, DashboardSource.APPOINTMENTS, DashboardSource.MY_LAB),
     )
@@ -230,16 +228,6 @@ object RoleDashboard {
         }
 
         when (role) {
-            "JOP" -> {
-                bedKpis()
-                if (admissions != null) kpis += DashboardKpi("Admisiones sin cama", pendingBed.toString(), if (pendingBed > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.ADMISSION))
-                queueKpis()
-                ambulance?.let { kpis += DashboardKpi("Ambulancia", unitLabel(it.unit.state), unitTone(it.unit.state), target = null) }
-                stock?.let { kpis += DashboardKpi("Insumos bajo mínimo", it.belowMinimum.toString(), if (it.belowMinimum > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.SUPPLIES)) }
-                shiftKpi()
-                assignBedAttention()
-                stockAttention(target(AndroidSection.SUPPLIES))
-            }
             "REC" -> {
                 queueKpis()
                 val appointments = data[DashboardSource.APPOINTMENTS]?.let { states(it) }
@@ -301,21 +289,6 @@ object RoleDashboard {
                 }
                 lab?.takeIf { it.toReview - it.critical > 0 && AndroidSection.RESULT_REVIEW in sections }?.let {
                     attention += DashboardAttention("${it.toReview - it.critical} resultado(s) por revisar", "Al revisar, el resultado queda visible para el paciente.", DashboardTone.WARNING, "Revisar", QuickActionRequest(AndroidSection.RESULT_REVIEW))
-                }
-            }
-            "LAB" -> {
-                lab?.let {
-                    kpis += DashboardKpi("Solicitadas", it.requested.toString(), if (it.requested > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.SAMPLE))
-                    kpis += DashboardKpi("En proceso", it.inProcess.toString(), DashboardTone.PROCESS, target = target(AndroidSection.CAPTURE_RESULTS))
-                    kpis += DashboardKpi("Esperan revisión médica", it.toReview.toString(), DashboardTone.RESERVED, target = target(AndroidSection.LAB))
-                    kpis += DashboardKpi("Urgentes abiertas", it.urgent.toString(), if (it.urgent > 0) DashboardTone.DANGER else DashboardTone.SUCCESS, target = target(AndroidSection.LAB))
-                }
-                stock?.let { kpis += DashboardKpi("Reactivos bajo mínimo", it.belowMinimum.toString(), if (it.belowMinimum > 0) DashboardTone.WARNING else DashboardTone.SUCCESS) }
-                shiftKpi()
-                labChart("Órdenes por etapa")
-                lab?.let {
-                    if (it.requested > 0 && AndroidSection.SAMPLE in sections) attention += DashboardAttention("${it.requested} orden(es) esperan muestra", if (it.urgent > 0) "Hay ${it.urgent} urgente(s): atiéndelas primero." else "Confirma la identidad del paciente al tomar la muestra.", if (it.urgent > 0) DashboardTone.DANGER else DashboardTone.WARNING, "Tomar muestra", QuickActionRequest(AndroidSection.SAMPLE, QuickAction.TAKE_SAMPLE))
-                    if (it.inProcess > 0 && AndroidSection.CAPTURE_RESULTS in sections) attention += DashboardAttention("${it.inProcess} orden(es) en proceso", "Captura todos los valores para poder completar la orden.", DashboardTone.PROCESS, "Capturar resultado", QuickActionRequest(AndroidSection.CAPTURE_RESULTS, QuickAction.CAPTURE_RESULT))
                 }
             }
             "PAR" -> {

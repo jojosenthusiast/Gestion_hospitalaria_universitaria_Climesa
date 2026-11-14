@@ -25,7 +25,6 @@ class QuickActionsTest {
     @Test fun elVerboCoincideConElParametroDeLaWeb() {
         assertEquals(QuickAction.REGISTER_PATIENT, QuickAction.fromVerb("registrar"))
         assertEquals(QuickAction.SCHEDULE_APPOINTMENT, QuickAction.fromVerb("agendar"))
-        assertEquals(QuickAction.TAKE_SAMPLE, QuickAction.fromVerb("muestra"))
         assertEquals(QuickAction.REQUEST_AMBULANCE, QuickAction.fromVerb("solicitud"))
         assertNull(QuickAction.fromVerb("inexistente"))
     }

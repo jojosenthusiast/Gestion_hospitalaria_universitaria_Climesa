@@ -117,7 +117,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         if(page==AndroidSection.SUPPLIES){InventoryScreen(Modifier.padding(padding),account.profile);return@content}
         if(page==AndroidSection.MY_ACCESS){MyAccessScreen(Modifier.padding(padding));return@content}
         if(page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION){QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
-        if(page==AndroidSection.LAB||page==AndroidSection.SAMPLE||page==AndroidSection.CAPTURE_RESULTS||page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW){LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page,quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
+        if(page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW){LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page);return@content}
         if(page==AndroidSection.LINK_RECORD){LinkRecordScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.HISTORY||page==AndroidSection.RECORD){ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding));return@content}
         if(page==AndroidSection.MEDICAL_DAY){ConsultationScreen(account.profile,Modifier.padding(padding));return@content}

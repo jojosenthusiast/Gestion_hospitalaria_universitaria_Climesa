@@ -10,13 +10,13 @@ import sv.edu.catolica.climesa.domain.QuickActionRequest
 class QuickActionInboxTest {
     @Test fun aPostedActionIsOnlyVisibleToItsSectionAndConsumedOnce() {
         val inbox = QuickActionInbox()
-        inbox.post(QuickActionRequest(AndroidSection.SAMPLE, QuickAction.TAKE_SAMPLE))
-        assertNull(inbox.actionFor(AndroidSection.LAB))
-        assertEquals(QuickAction.TAKE_SAMPLE, inbox.actionFor(AndroidSection.SAMPLE))
-        inbox.consume(AndroidSection.LAB)
-        assertEquals(QuickAction.TAKE_SAMPLE, inbox.actionFor(AndroidSection.SAMPLE))
-        inbox.consume(AndroidSection.SAMPLE)
-        assertNull(inbox.actionFor(AndroidSection.SAMPLE))
+        inbox.post(QuickActionRequest(AndroidSection.QUEUE, QuickAction.ISSUE_NUMBER))
+        assertNull(inbox.actionFor(AndroidSection.PATIENTS))
+        assertEquals(QuickAction.ISSUE_NUMBER, inbox.actionFor(AndroidSection.QUEUE))
+        inbox.consume(AndroidSection.PATIENTS)
+        assertEquals(QuickAction.ISSUE_NUMBER, inbox.actionFor(AndroidSection.QUEUE))
+        inbox.consume(AndroidSection.QUEUE)
+        assertNull(inbox.actionFor(AndroidSection.QUEUE))
     }
 
     @Test fun leavingTheTargetSectionDropsTheRequest() {

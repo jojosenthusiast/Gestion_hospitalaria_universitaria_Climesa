@@ -43,15 +43,6 @@ object Maquetas {
             ),
             listOf("Guardar borrador", "Firmar consulta"),
         ),
-        AndroidSection.LAB to Maqueta(
-            "A60", "Cola de laboratorio", "Trabajo del día por estado",
-            listOf(
-                MaquetaRow("Pendientes", "4 órdenes"),
-                MaquetaRow("En proceso", "2 órdenes"),
-                MaquetaRow("Completadas hoy", "7 órdenes"),
-            ),
-            listOf("Tomar muestra", "Capturar resultado"),
-        ),
     )
 
     fun of(section: AndroidSection): Maqueta? = catalog[section] ?: section.takeIf { !it.ready && it.screenId.isNotBlank() }?.let {

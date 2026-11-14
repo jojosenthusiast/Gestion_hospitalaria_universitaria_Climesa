@@ -55,24 +55,9 @@ object LabFlow {
         else -> ""
     }
 
-    /** What blocks the action of the current step, or null when it can proceed. */
-    fun completionBlocker(order: LaboratoryOrder): String? = when {
-        order.state == "en_proceso" && missingResults(order) > 0 -> "Para completar faltan ${missingResults(order)} resultado(s) por capturar."
-        else -> null
-    }
-
-    /** Default filter of each lab section, so the three lab entries do not show the same list. */
+    /** Default filter of each lab section: the review section opens on what waits for the doctor. */
     fun defaultFilter(section: AndroidSection?) = when (section) {
-        AndroidSection.SAMPLE -> LabFilter.REQUESTED
-        AndroidSection.CAPTURE_RESULTS -> LabFilter.IN_PROCESS
         AndroidSection.RESULT_REVIEW -> LabFilter.TO_REVIEW
         else -> LabFilter.ALL
     }
-
-    /** Order a quick action targets: urgent first, then the oldest in the list. */
-    fun nextToSample(orders: List<LaboratoryOrder>) = orders.filter { it.state == "pendiente" }.let { list -> list.firstOrNull { it.priority == "urgente" } ?: list.firstOrNull() }
-
-    fun nextToCapture(orders: List<LaboratoryOrder>): Pair<LaboratoryOrder, LaboratoryItem>? =
-        orders.filter { it.state == "en_proceso" && missingResults(it) > 0 }.let { list -> list.firstOrNull { it.priority == "urgente" } ?: list.firstOrNull() }
-            ?.let { order -> order.items.firstOrNull { it.result == null }?.let { order to it } }
 }

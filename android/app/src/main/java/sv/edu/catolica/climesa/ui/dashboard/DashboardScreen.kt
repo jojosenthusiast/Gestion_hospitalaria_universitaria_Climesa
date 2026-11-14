@@ -58,12 +58,10 @@ import sv.edu.catolica.climesa.ui.climesa
 import sv.edu.catolica.climesa.ui.iconFor
 
 private fun helpFor(role: String) = when (role) {
-    "JOP" -> R.string.dash_ayuda_jop
     "REC" -> R.string.dash_ayuda_rec
     "AST" -> R.string.dash_ayuda_ast
     "ENF" -> R.string.dash_ayuda_enf
     "MED" -> R.string.dash_ayuda_med
-    "LAB" -> R.string.dash_ayuda_lab
     "PAR" -> R.string.dash_ayuda_par
     else -> R.string.dash_ayuda_pac
 }

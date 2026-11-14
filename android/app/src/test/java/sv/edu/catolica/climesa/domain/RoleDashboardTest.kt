@@ -30,12 +30,12 @@ class RoleDashboardTest {
     }
 
     @Test fun sinCamasLibresLaTarjetaSePintaDePeligro() {
-        val model = RoleDashboard.build("JOP", everything, mapOf(DashboardSource.BEDS to beds("ocupada", "ocupada")), now = now)
+        val model = RoleDashboard.build("REC", everything, mapOf(DashboardSource.BEDS to beds("ocupada", "ocupada")), now = now)
         assertEquals(DashboardTone.DANGER, model.kpis.first { it.label == "Camas libres" }.tone)
     }
 
     @Test fun laFuenteQueFallaNoDejaUnCeroInventado() {
-        val model = RoleDashboard.build("JOP", everything, mapOf(DashboardSource.BEDS to beds("libre")), unavailable = setOf(DashboardSource.QUEUE), now = now)
+        val model = RoleDashboard.build("REC", everything, mapOf(DashboardSource.BEDS to beds("libre")), unavailable = setOf(DashboardSource.QUEUE), now = now)
         assertTrue(model.kpis.none { it.label == "En espera" })
         assertTrue(model.kpis.none { it.label == "Admisiones sin cama" })
         assertEquals(setOf(DashboardSource.QUEUE), model.unavailable)
