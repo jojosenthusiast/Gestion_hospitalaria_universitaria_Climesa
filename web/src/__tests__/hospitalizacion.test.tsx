@@ -16,8 +16,8 @@ const profile = (permissions: string[]): AccessProfile => ({
 });
 const admissions = [
   { id: 'a-1', patientId: 'p-1', patientName: 'Paciente Ficticio Uno', origin: 'programada', requestedCategory: 'semiprivada', state: 'pendiente_cama', isolation: false, bed: '', version: 1 },
-  { id: 'a-2', patientId: 'p-2', patientName: 'Paciente Ficticio Dos', origin: 'emergencia', requestedCategory: 'semiprivada', state: 'hospitalizado', isolation: true, bed: 'C-201', version: 2 },
-  { id: 'a-3', patientId: 'p-3', patientName: 'Paciente Ficticio Tres', origin: 'consulta', requestedCategory: 'vip', state: 'alta_firmada', isolation: false, bed: 'C-301', version: 4 },
+  { id: 'a-2', patientId: 'p-2', patientName: 'Paciente Ficticio Dos', origin: 'emergencia', requestedCategory: 'semiprivada', state: 'hospitalizado', isolation: true, bed: 'C-201', version: 2, occupationId: 'o-2' },
+  { id: 'a-3', patientId: 'p-3', patientName: 'Paciente Ficticio Tres', origin: 'consulta', requestedCategory: 'vip', state: 'alta_firmada', isolation: false, bed: 'C-301', version: 4, occupationId: 'o-3' },
 ];
 const catalogs = {
   patients: [],
@@ -78,7 +78,7 @@ describe('W13 · admisiones con acciones por estado y permiso (WEB-02)', () => {
     const dialog = screen.getByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText(/^Resumen de egreso/), 'Evolución favorable, control en consulta.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Firmar alta' }));
-    expect(api.write).toHaveBeenCalledWith('/admisiones/a-2/alta', { type: 'medica', summary: 'Evolución favorable, control en consulta.' }, 'POST');
+    expect(api.write).toHaveBeenCalledWith('/admisiones/a-2/alta', { type: 'medica', version: 2, summary: 'Evolución favorable, control en consulta.' }, 'POST');
   });
 
   it('el alta voluntaria exige la constancia antes de enviar', async () => {
@@ -95,10 +95,12 @@ describe('W13 · admisiones con acciones por estado y permiso (WEB-02)', () => {
     const api = mount(['admision.ver', 'admision.registrar_salida'], {}, async () => { throw new ApiError('Primero debe firmarse el alta.', 409); });
     await userEvent.click(within(await rowOf('Paciente Ficticio Tres')).getByRole('button', { name: /Registrar salida/ }));
     const dialog = screen.getByRole('dialog');
-    await userEvent.type(within(dialog).getByLabelText('Motivo o detalle de la salida'), 'Salida con familiar responsable.');
+    await userEvent.type(within(dialog).getByLabelText(/^Motivo o detalle de la salida/), 'Salida');
+    expect((within(dialog).getByRole('button', { name: 'Registrar salida' }) as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.type(within(dialog).getByLabelText(/^Motivo o detalle de la salida/), ' con familiar responsable.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar salida' }));
     expect(await within(dialog).findByText('Primero debe firmarse el alta.')).toBeTruthy();
-    expect((within(dialog).getByLabelText('Motivo o detalle de la salida') as HTMLInputElement).value).toBe('Salida con familiar responsable.');
+    expect((within(dialog).getByLabelText(/^Motivo o detalle de la salida/) as HTMLInputElement).value).toBe('Salida con familiar responsable.');
     expect(api.write).toHaveBeenCalledWith('/admisiones/a-3/salida', { version: 4, reason: 'Salida con familiar responsable.' }, 'POST');
   });
 
@@ -112,7 +114,7 @@ describe('W13 · admisiones con acciones por estado y permiso (WEB-02)', () => {
     expect(api.write).toHaveBeenCalledWith('/admisiones/a-1/cama', { bedId: 'b-1', version: 5, reason: 'Cercanía a estación de enfermería.' }, 'POST');
   });
 
-  it('traslada a una cama libre con motivo y la versión de la cama destino', async () => {
+  it('traslada la ocupación activa a una cama libre con motivo y la versión de la admisión (API-05)', async () => {
     const api = mount(['admision.ver', 'camas.trasladar', 'camas.ver_tablero'], { '/camas': [
       { id: 'b-7', code: 'C-207', room: 'H-207', category: 'semiprivada', state: 'libre', version: 9 },
       { id: 'b-8', code: 'C-208', room: 'H-208', category: 'semiprivada', state: 'ocupada', version: 3 },
@@ -124,6 +126,6 @@ describe('W13 · admisiones con acciones por estado y permiso (WEB-02)', () => {
     await userEvent.click(await within(dialog).findByLabelText(/C-207/));
     await userEvent.type(within(dialog).getByLabelText(/^Motivo del traslado/), 'Necesita cama cerca de oxígeno central.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar traslado' }));
-    expect(api.write).toHaveBeenCalledWith('/ocupaciones/a-2/traslado', { bedId: 'b-7', version: 9, reason: 'Necesita cama cerca de oxígeno central.' }, 'POST');
+    expect(api.write).toHaveBeenCalledWith('/ocupaciones/o-2/traslado', { bedId: 'b-7', version: 2, reason: 'Necesita cama cerca de oxígeno central.' }, 'POST');
   });
 });

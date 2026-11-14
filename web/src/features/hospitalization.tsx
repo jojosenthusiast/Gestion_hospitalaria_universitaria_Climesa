@@ -3,7 +3,7 @@ import { Field, Icon, Notice } from '../components/ui';
 import { can, type AccessProfile, type Api, type Bed, type Patient, type Staff } from '../lib/api';
 import { Dialog, Empty, Heading, RemoteState, type Remote, SaveButton, Select, Tag, WriteError, useAction, useData } from './common';
 
-type Admission = { id: string; patientId: string; patientName: string; origin: string; requestedCategory: string; state: string; isolation: boolean; bed: string; version: number; scheduledAt?: string | null };
+type Admission = { id: string; patientId: string; patientName: string; origin: string; requestedCategory: string; state: string; isolation: boolean; bed: string; version: number; occupationId?: string | null; scheduledAt?: string | null };
 type Suggestion = { id: string; version: number; code: string; room: string; category: string; reason: string };
 type Doctor = Pick<Staff, 'id' | 'givenNames' | 'surnames' | 'type' | 'specialty' | 'active'>;
 
@@ -27,7 +27,7 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
       <td data-label="Cama">{row.bed || 'Sin cama'}</td>
       <td data-label="Acción"><div className="row-actions">
         {row.state === 'pendiente_cama' && can(profile, 'camas.asignar') && <button className="row-action" onClick={() => setDialog({ kind: 'bed', admission: row })}>Asignar cama <Icon name="arrow" size={16} /></button>}
-        {row.state === 'hospitalizado' && row.bed && row.requestedCategory !== 'vip' && can(profile, 'camas.trasladar') && <button className="row-action" onClick={() => setDialog({ kind: 'transfer', admission: row })}>Trasladar</button>}
+        {row.state === 'hospitalizado' && row.bed && row.occupationId && row.requestedCategory !== 'vip' && can(profile, 'camas.trasladar') && <button className="row-action" onClick={() => setDialog({ kind: 'transfer', admission: row })}>Trasladar</button>}
         {row.state === 'hospitalizado' && can(profile, 'alta.firmar') && <button className="row-action" onClick={() => setDialog({ kind: 'discharge', admission: row })}>Firmar alta</button>}
         {row.state === 'alta_firmada' && can(profile, 'admision.registrar_salida') && <button className="row-action" onClick={() => setDialog({ kind: 'exit', admission: row })}>Registrar salida</button>}
       </div></td>
@@ -86,11 +86,11 @@ function BedSuggestionDialog({ api, admission, version, onClose, onSaved }: { ap
   return <Dialog title="Asignar cama" onClose={onClose} busy={action.busy}><RemoteState state={data}>{rows => rows.length ? <div className="module-form"><WriteError error={action.error} /><p className="form-intro">Selecciona una cama libre. La API vuelve a comprobar el conflicto al confirmar.</p><fieldset className="choice-list"><legend>Camas sugeridas</legend>{rows.map(row => <label className="check-field" key={row.id}><input type="radio" name="bed" value={row.id} checked={bedId === row.id} onChange={() => setBedId(row.id)} /><span><strong>{row.code}</strong> <small>{row.room} · {categoryNames[row.category] ?? row.category} · {row.reason}</small></span></label>)}</fieldset><Field label="Motivo de la asignación (opcional)" value={reason} onChange={setReason} maxLength={500} hint="Si lo escribes, al menos 10 caracteres." aria-invalid={reasonInvalid || undefined} /><div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose}>Cancelar</button><button className="primary-button" type="button" onClick={() => void assign()} disabled={action.busy || !selected || reasonInvalid}>Confirmar cama</button></div></div> : <Empty title="Sin camas sugeridas" description="Revisa la categoría, aislamiento o disponibilidad del edificio." />}</RemoteState></Dialog>;
 }
 
-/** W15 · traslado a otra cama libre (VIP no se traslada, D-037). */
+/** W15 · traslado a otra cama libre (VIP no se traslada, D-037). API-05: se dirige a la ocupación activa y compara la versión de la admisión. */
 function TransferDialog({ api, admission, version, onClose, onSaved }: { api: Api; admission: Admission; version: number; onClose: () => void; onSaved: () => void }) {
   const beds = useData<Bed[]>(api, '/camas', version), [bedId, setBedId] = useState(''), [reason, setReason] = useState(''), action = useAction(api);
   const free = (beds.data ?? []).filter(b => b.state === 'libre'), selected = free.find(b => b.id === bedId);
-  async function save(event: FormEvent) { event.preventDefault(); if (selected && await action.run(`/ocupaciones/${admission.id}/traslado`, { bedId: selected.id, version: selected.version, reason: reason.trim() })) onSaved(); }
+  async function save(event: FormEvent) { event.preventDefault(); if (selected && admission.occupationId && await action.run(`/ocupaciones/${admission.occupationId}/traslado`, { bedId: selected.id, version: admission.version, reason: reason.trim() })) onSaved(); }
   return <Dialog title="Trasladar a otra cama" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
     <p className="form-intro">Paciente: <strong>{admission.patientName}</strong> · cama actual {admission.bed}. La cama de origen queda pendiente de limpieza.</p>
     <WriteError error={action.error} />
@@ -103,7 +103,7 @@ function TransferDialog({ api, admission, version, onClose, onSaved }: { api: Ap
 function DischargeDialog({ api, admission, onClose, onSaved }: { api: Api; admission: Admission; onClose: () => void; onSaved: () => void }) {
   const [type, setType] = useState('medica'), [summary, setSummary] = useState(''), [consent, setConsent] = useState(false), action = useAction(api);
   const summaryInvalid = summary.trim().length > 0 && summary.trim().length < 10, voluntary = type === 'voluntaria';
-  async function save(event: FormEvent) { event.preventDefault(); if (await action.run(`/admisiones/${admission.id}/alta`, { type, ...(summary.trim() ? { summary: summary.trim() } : {}), ...(voluntary ? { voluntaryConsent: consent } : {}) })) onSaved(); }
+  async function save(event: FormEvent) { event.preventDefault(); if (await action.run(`/admisiones/${admission.id}/alta`, { type, version: admission.version, ...(summary.trim() ? { summary: summary.trim() } : {}), ...(voluntary ? { voluntaryConsent: consent } : {}) })) onSaved(); }
   return <Dialog title="Firmar alta" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
     <p className="form-intro">Paciente: <strong>{admission.patientName}</strong>. Después del alta, Recepción o Enfermería registra la salida física.</p>
     <WriteError error={action.error} />
@@ -120,7 +120,7 @@ function ExitDialog({ api, admission, onClose, onSaved }: { api: Api; admission:
   return <Dialog title="Registrar salida física" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
     <p className="form-intro">Paciente: <strong>{admission.patientName}</strong> · cama {admission.bed || 'sin cama'}. La cama queda pendiente de limpieza.</p>
     <WriteError error={action.error} />
-    <Field label="Motivo o detalle de la salida" value={reason} onChange={setReason} required minLength={5} maxLength={500} autoFocus />
-    <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} label="Registrar salida" disabled={reason.trim().length < 5} /></div>
+    <Field label="Motivo o detalle de la salida" value={reason} onChange={setReason} required minLength={10} maxLength={500} hint="Al menos 10 caracteres." autoFocus />
+    <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} label="Registrar salida" disabled={reason.trim().length < 10} /></div>
   </form></Dialog>;
 }
