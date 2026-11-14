@@ -144,10 +144,10 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 // verían exactamente lo que el catálogo les da si una cuenta suya tuviera la web habilitada.
 const menuCatalogo: Record<string, string[]> = {
   AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
-  ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario'],
-  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Laboratorio', 'Fila del día', 'Citas', 'Mi consultorio'],
+  ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización'],
+  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
   PAR: ['Pacientes', 'Ambulancia', 'Turnos'],
-  PAC: ['Fila del día', 'Citas'],
+  PAC: ['Hospitalización', 'Fila del día', 'Citas'],
 };
 
 describe('el menú depende solo del permiso (regla 8)', () => {

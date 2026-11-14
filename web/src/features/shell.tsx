@@ -28,7 +28,7 @@ export const modules:Module[]=[
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver'},
  {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola',alsoPermissions:['laboratorio.ordenar']},
  {id:'inventario',label:'Inventario',permission:'inventario.ver'},
- {id:'hospitalizacion',label:'Hospitalización',permission:'admision.crear'},
+ {id:'hospitalizacion',label:'Hospitalización',permission:'admision.ver',alsoPermissions:['admision.crear']},
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
  {id:'citas',label:'Citas',permission:'citas.ver'},
  {id:'consultas',label:'Mi consultorio',permission:'consulta.iniciar'},
