@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Paramédico, ronda 3: una sola pantalla "Servicio activo". -->
+    <string name="par_eyebrow">Unidad %1$s</string>
+    <string name="par_titulo_activo">Servicio activo</string>
+    <string name="par_titulo_libre">Sin servicio activo</string>
+    <string name="par_turno_si">Paramédico con turno en curso</string>
+    <string name="par_turno_no">Sin paramédico con turno en curso</string>
+    <string name="par_bloqueo_titulo">La unidad no puede salir</string>
+    <string name="par_origen">Origen</string>
+    <string name="par_destino">Destino</string>
+    <string name="par_paciente">Paciente</string>
+    <string name="par_despachado">Despachado</string>
+    <string name="par_avance">Paso %1$d de %2$d</string>
+    <string name="par_confirmar_titulo">¿Registrar este paso?</string>
+    <string name="par_confirmar">Registrar</string>
+    <string name="par_acciones">Acciones rápidas</string>
+    <string name="par_reporte">Reporte prehospital</string>
+    <string name="par_sin_identidad">Paciente sin identidad</string>
+    <string name="par_ubicacion">Enviar mi ubicación</string>
+    <string name="par_ubicacion_ultima">Última ubicación enviada: %1$s</string>
+    <string name="par_ubicacion_ninguna">Aún no has enviado tu ubicación en este servicio.</string>
+    <string name="par_libre_detalle">Cuando despacho te asigne un servicio aparecerá aquí, con un solo botón grande para cada paso.</string>
+    <string name="par_ultimos">Últimos servicios</string>
+    <string name="par_sin_ultimos">Todavía no hay servicios en tu bitácora.</string>
+    <string name="par_ver_todos">La bitácora completa está en «Mi bitácora».</string>
+    <string name="par_eta_titulo">¿En cuántos minutos llegan al hospital?</string>
+    <string name="par_eta_min">%1$d min</string>
+    <string name="par_signos">Signos vitales (opcional)</string>
+    <string name="par_cerrar">Cerrar</string>
+    <string name="par_sexo">Sexo observado</string>
+    <string name="par_cola_borrador">Reporte guardado sin conexión</string>
+</resources>

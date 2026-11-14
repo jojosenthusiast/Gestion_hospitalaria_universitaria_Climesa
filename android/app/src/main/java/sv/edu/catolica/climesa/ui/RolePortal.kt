@@ -122,7 +122,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         if(page==AndroidSection.HISTORY||page==AndroidSection.RECORD){ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding));return@content}
         if(page==AndroidSection.MEDICAL_DAY||page==AndroidSection.CONSULTATIONS){ConsultationScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.HOSPITAL_INFO){HospitalInfoScreen(Modifier.padding(padding));return@content}
-        if(page in ambulanceSections){AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding));return@content}
+        if(page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)){AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding));return@content}
         PageList(Modifier.padding(padding)){
             item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",page.label)}
             if(page==AndroidSection.PROFILE){

@@ -138,6 +138,30 @@ class AmbulanceViewModelTest {
         assertTrue(vm.state.value.log.isEmpty())
     }
 
+    @Test fun elInicioDelParamedicoCargaEstadoYUltimosServiciosYSoloMuestraElEstadoSiLaBitacoraFalla() = runTest(dispatcher) {
+        val api = FakeGateway(); api.responses["/ambulancia"] = status(withService = true)
+        api.responses["/ambulancia/bitacora"] = JSONArray().put(JSONObject().put("id", "s0").put("type", "emergencia_domicilio").put("priority", "roja").put("origin", "A").put("destination", "B").put("dispatchedAt", "2026-11-14T10:00:00Z"))
+        val vm = AmbulanceViewModel(api, AmbulanceBus())
+        vm.open(AmbulanceMode.PARAMEDIC); runCurrent()
+        assertEquals("s1", vm.state.value.status!!.activeService!!.id)
+        assertEquals("s0", vm.state.value.log.single().id)
+        api.failures["/ambulancia/bitacora"] = AuthRequestException("x", 500, "error")
+        vm.load(); runCurrent()
+        assertNull(vm.state.value.error)
+        assertEquals("s1", vm.state.value.status!!.activeService!!.id)
+    }
+
+    @Test fun enviarUbicacionPublicaElPuntoYVuelveAPedirElEstado() = runTest(dispatcher) {
+        val api = FakeGateway(); api.responses["/ambulancia"] = status(withService = true)
+        val vm = AmbulanceViewModel(api, AmbulanceBus())
+        vm.open(AmbulanceMode.PARAMEDIC); runCurrent()
+        vm.sendLocation(13.69, -89.19, Instant.parse("2026-11-15T14:10:00Z")); runCurrent()
+        val body = api.calls.single { it.first == "/ambulancia/ubicacion" }.third!!
+        assertEquals(13.69, body.getDouble("latitude"), 0.0)
+        assertEquals("Ubicación enviada a despacho.", vm.state.value.notice)
+        assertEquals(2, api.gets("/ambulancia"))
+    }
+
     @Test fun enfermeriaAbreElReporteDelServicioQueLlegaPorEvento() = runTest(dispatcher) {
         val api = FakeGateway()
         api.responses["/ambulancia/servicios/s1/prehospital"] = JSONObject().put("serviceId", "s1").put("active", true).put("clinical", true)
