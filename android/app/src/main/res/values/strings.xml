@@ -10,6 +10,9 @@
     <string name="login_show_password">Mostrar contraseña</string>
     <string name="login_hide_password">Ocultar contraseña</string>
     <string name="login_submit">Iniciar sesión</string>
+    <string name="login_demo_banner">Modo de prueba: cuentas ficticias</string>
+    <string name="login_demo_selector">Cuenta de prueba</string>
+    <string name="login_demo_choose">Elige un rol</string>
     <string name="login_checking">Verificando…</string>
     <string name="login_first_time">¿Primera vez aquí?</string>
     <string name="login_staff_help">El personal ingresa con una invitación del hospital.</string>
