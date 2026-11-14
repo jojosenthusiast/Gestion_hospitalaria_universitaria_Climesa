@@ -112,6 +112,9 @@ struct AmbulanceOverviewView: View {
             ListRow(title: value.unit.plate, subtitle: value.unit.stateReason, meta: value.unit.stateSince.map { String(format: L.text("ambulance.since"), ClimesaDates.display($0)) }) {
                 StatusTag(value.unit.state)
             }
+            if let crew = AmbulanceLogRules.crewNotice(value) {
+                Text(verbatim: crew).font(Typo.small).foregroundStyle(Theme.ink)
+            }
             if let block = value.dispatchBlock {
                 MedicoAlert(text: block.message)
                 Text(verbatim: AmbulanceLogRules.blockAdvice(block, canPlanShifts: account.can("turnos.planificar"))).font(Typo.small).foregroundStyle(Theme.ink)

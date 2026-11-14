@@ -17,6 +17,8 @@ data class UnitView(
     val paramedicOnDuty: Boolean,
     val serviceOrigin: String?,
     val serviceDestination: String?,
+    /** Missing in older API versions: then it counts as covered (no false alarm). */
+    val driverOnDuty: Boolean = true,
 ) {
     val hasService get() = serviceOrigin != null || serviceDestination != null
 }
@@ -47,6 +49,7 @@ object PortalParsers {
             paramedicOnDuty = root.optBoolean("paramedicOnDuty"),
             serviceOrigin = service?.optString("origin"),
             serviceDestination = service?.optString("destination"),
+            driverOnDuty = root.optBoolean("driverOnDuty", true),
         )
     }
 }

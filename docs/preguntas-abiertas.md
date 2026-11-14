@@ -247,3 +247,14 @@ Cambios de producto autorizados por el dueño. Supuestos aplicados mientras se c
 | Cama a futuro | La ocupación se evalúa al instante, no por fecha | Un ingreso con fecha a más de 15 minutos queda `pendiente_cama` y la cama se asigna al llegar; solo el ingreso inmediato elige cama en el mismo comando |
 | Turno del médico | ¿Cuenta el turno `borrador`? | No: solo `publicado` o `en_curso` que cubra el instante del ingreso (el mismo criterio que `currentAreas`) |
 | Indicaciones | `POST /admisiones/indicaciones` | Hereda las mismas reglas de motivo y origen (siempre `consulta`); no exige turno porque lo firma el propio médico |
+
+## RN-30 con motorista (rama `feat/rn-motorista-de-turno`)
+
+Decisión del dueño (2026-11-14): la ambulancia necesita paramédico **y** motorista con turno en curso para quedar Disponible y despacharse.
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| Campo nuevo | `GET /ambulancia` no decía si había motorista de turno. | Se agrega `driverOnDuty` y los motivos `sin_motorista_de_turno` y `sin_tripulacion_de_turno` (faltan los dos), también como códigos 409 al salir de mantenimiento y al despachar. |
+| Invariante en la base | RN-30 dependía del reloj de la API; la base no la garantizaba. | La base garantiza lo que no depende del reloj: la unidad no pasa a En Servicio sin paramédico y motorista en la tripulación del servicio (20261119002000). |
+| FR-109-06 | La spec solo nombra al paramédico. | No se edita `specs/109-ambulancia/spec.md` sin decisión registrada: queda pendiente que el equipo actualice FR-109-06 para incluir al motorista. |
+| Alerta de cobertura | ¿Dónde se ve que faltará tripulación? | Turnos (web y Android) muestra los tramos de los próximos 7 días sin paramédico o sin motorista con turno publicado o en curso. |

@@ -11,6 +11,7 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
   let unitVersion: number;
   let pacRequestId: string;
   let pacPatientId: string;
+  let driverId: string;
   const unit = () => t.one<{ id: string; estado: string; version: number }>('SELECT id,estado,version FROM ambulancia.unidad');
   const request = (role: string, body: Record<string, unknown> = {}, key?: string) => t.call(role, 'POST', '/ambulancia/solicitudes', { address: 'Colonia Ficticia, pasaje 3, casa 12', municipality: 'San Salvador', reason: 'Caída en casa con dolor de cadera', contactPhone: '7000-0001', ...body }, key);
   const dispatch = (body: Record<string, unknown>, role = 'REC', key?: string) => t.call(role, 'POST', '/ambulancia/servicios', { type: 'emergencia_domicilio', priority: 'naranja', destination: 'Hospital CLIMESA, emergencia', ...body }, key);
@@ -19,6 +20,7 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
   beforeAll(async () => {
     t = await createTestApp(at('08:00'));
     await t.shift('PAR', at('06:00'), at('14:00'));
+    driverId = await t.driverShift(at('06:00'), at('14:00'));
     const current = await unit();
     const ready = await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: current.version, inMaintenance: false, reason: 'Inicio de turno con paramédico' });
     expect(ready.status).toBe(201);
@@ -84,7 +86,8 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     expect(lost[0].body.detail).toBe('La ambulancia ya fue despachada.');
     expect((await t.one<{ n: number }>('SELECT count(*)::int AS n FROM ambulancia.servicio WHERE finalizado_en IS NULL')).n).toBe(1);
     expect((await unit()).estado).toBe('en_servicio');
-    expect(won[0].body.crew).toEqual([{ staffId: await t.staffOf('PAR'), role: 'paramedico' }]);
+    expect(won[0].body.crew).toEqual(expect.arrayContaining([{ staffId: await t.staffOf('PAR'), role: 'paramedico' }, { staffId: driverId, role: 'motorista' }]));
+    expect(won[0].body.crew).toHaveLength(2);
     // La solicitud perdedora sigue por confirmar; la ganadora queda confirmada.
     const states = (await t.pg.query<{ estado: string }>('SELECT estado FROM ambulancia.solicitud WHERE id = ANY($1::uuid[]) ORDER BY estado', [[first.body.id, second.body.id]])).rows.map(r => r.estado);
     expect(states).toEqual(['confirmada', 'por_confirmar']);
@@ -194,12 +197,48 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     expect((await t.call('PAR', 'POST', '/ambulancia/ubicacion', { latitude: 13.7, longitude: -89.2, capturedAt: at('08:45').toISOString() })).body.codigo).toBe('sin_servicio_activo');
   });
 
-  test('sin paramédico con turno en curso no se despacha (RN-30)', async () => {
+  test('sin paramédico ni motorista con turno en curso no se despacha (RN-30)', async () => {
     t.setNow(at('15:00'));
     const refused = await dispatch({ version: unitVersion, origin: 'Calle ficticia 5' });
     expect(refused.status).toBe(409);
-    expect(refused.body.codigo).toBe('sin_paramedico_de_turno');
+    expect(refused.body.codigo).toBe('sin_tripulacion_de_turno');
+    expect((await t.call('REC', 'GET', '/ambulancia')).body.dispatchBlock).toMatchObject({ code: 'sin_tripulacion_de_turno' });
     t.setNow(at('09:00'));
+  });
+
+  test('con paramédico pero sin motorista de turno no se despacha, y con motorista sin paramédico tampoco (RN-30)', async () => {
+    await t.shift('PAR', at('14:00'), at('18:00'));
+    t.setNow(at('15:00'));
+    const board = await t.call('REC', 'GET', '/ambulancia');
+    expect(board.body).toMatchObject({ paramedicOnDuty: true, driverOnDuty: false, dispatchBlock: { code: 'sin_motorista_de_turno' } });
+    const noDriver = await dispatch({ version: unitVersion, origin: 'Calle ficticia 6' });
+    expect(noDriver.status).toBe(409);
+    expect(noDriver.body.codigo).toBe('sin_motorista_de_turno');
+    await t.driverShift(at('18:00'), at('23:00'));
+    t.setNow(at('19:00'));
+    const noMedic = await dispatch({ version: unitVersion, origin: 'Calle ficticia 7' });
+    expect(noMedic.status).toBe(409);
+    expect(noMedic.body.codigo).toBe('sin_paramedico_de_turno');
+    expect((await unit()).estado).toBe('disponible');
+    t.setNow(at('09:00'));
+  });
+
+  test('la base no deja la unidad En Servicio si la tripulación del servicio no tiene paramédico y motorista (RN-30)', async () => {
+    const u = await unit();
+    const parId = await t.staffOf('PAR');
+    // Todo dentro de una transacción que se revierte: la bitácora de las pruebas siguientes no cambia.
+    await t.pg.transaction(async tx => {
+      const service = (await tx.query<{ id: string }>("INSERT INTO ambulancia.servicio(unidad_id,tipo,prioridad,origen,destino,despachado_por) VALUES($1,'emergencia_domicilio','verde','Calle ficticia 8','Hospital CLIMESA',$2) RETURNING id", [u.id, userId('REC')])).rows[0];
+      await tx.query("INSERT INTO ambulancia.tripulacion(servicio_id,persona_id,funcion) VALUES($1,$2,'paramedico')", [service.id, parId]);
+      await tx.exec('SAVEPOINT sin_motorista');
+      await expect(tx.query("UPDATE ambulancia.unidad SET estado='en_servicio'")).rejects.toThrow(/tripulacion_incompleta/);
+      await tx.exec('ROLLBACK TO SAVEPOINT sin_motorista');
+      await tx.query("INSERT INTO ambulancia.tripulacion(servicio_id,persona_id,funcion) VALUES($1,$2,'motorista')", [service.id, driverId]);
+      await tx.query("UPDATE ambulancia.unidad SET estado='en_servicio'");
+      expect((await tx.query<{ estado: string }>('SELECT estado FROM ambulancia.unidad')).rows[0].estado).toBe('en_servicio');
+      await tx.rollback();
+    });
+    expect((await unit()).estado).toBe('disponible');
   });
 
   // Escenario 5 (FR-109-14, FR-109-15): bitácora filtrable sin datos del paciente.
@@ -211,7 +250,7 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     const completed = await t.call('JOP', 'GET', '/ambulancia/bitacora?finalState=completado');
     expect(completed.body).toHaveLength(1);
     expect(completed.body[0]).toMatchObject({ priority: 'naranja', destination: 'Hospital CLIMESA, emergencia', responseMinutes: 20 });
-    expect(completed.body[0].crew[0]).toMatchObject({ role: 'paramedico' });
+    expect(completed.body[0].crew.map((c: { role: string }) => c.role)).toEqual(['motorista', 'paramedico']);
     expect((await t.call('DPD', 'GET', '/ambulancia/bitacora?priority=roja')).body).toHaveLength(1);
     expect((await t.call('REC', 'GET', '/ambulancia/bitacora?type=traslado_interhospitalario')).body).toHaveLength(0);
     expect((await t.call('JOP', 'GET', '/ambulancia/bitacora?minResponseMinutes=10')).body).toHaveLength(1);

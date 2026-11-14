@@ -20974,7 +20974,9 @@
         "enum": [
           "en_servicio",
           "en_mantenimiento",
-          "sin_paramedico_de_turno"
+          "sin_paramedico_de_turno",
+          "sin_motorista_de_turno",
+          "sin_tripulacion_de_turno"
         ]
       },
       "DispatchBlockResponse": {
@@ -21104,6 +21106,10 @@
           "paramedicOnDuty": {
             "type": "boolean"
           },
+          "driverOnDuty": {
+            "type": "boolean",
+            "description": "Hay motorista con turno en curso (RN-30 exige paramédico y motorista)"
+          },
           "dispatchBlock": {
             "nullable": true,
             "description": "Por qué no se puede despachar ahora; null si se puede",
@@ -21126,6 +21132,7 @@
           "unit",
           "activeService",
           "paramedicOnDuty",
+          "driverOnDuty",
           "dispatchBlock"
         ]
       },
@@ -21883,6 +21890,8 @@
           "servicio_cerrado",
           "servicio_finalizado",
           "sin_paramedico_de_turno",
+          "sin_motorista_de_turno",
+          "sin_tripulacion_de_turno",
           "sin_servicio_activo",
           "solicitud_resuelta",
           "unidad_en_mantenimiento",

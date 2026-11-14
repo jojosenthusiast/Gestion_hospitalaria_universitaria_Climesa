@@ -5,6 +5,7 @@ import { can,type AccessProfile,type Api } from '../lib/api';
 import { DiscardForm,DispatchForm,PhoneRequestForm } from './ambulance/dialogs';
 import { MaintenancePanel } from './ambulance/maintenance';
 import { RequestsBoard } from './ambulance/requests';
+import { CrewAction,CrewCoverage,missingCrew } from './ambulance/crew';
 import { milestoneNames,minutesBetween,priorityNames,roleNames,stateNames,typeNames,type AmbulanceRequest,type AmbulanceStatus,type PrehospitalView } from './ambulance/types';
 import './ambulance/ambulance.css';
 export * from './ambulance/types';
@@ -20,12 +21,12 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  useEffect(()=>{if(previous.current!==null&&pendingCount>previous.current)beep();if(data.data)previous.current=pendingCount;},[pendingCount,data.data]);
  const saved=()=>{setDispatching(null);setDiscarding(null);setCalling(false);data.refresh();};
  return <><Heading eyebrow="Operaciones / Ambulancia" title="Centro de despacho" description="Estado de la unidad, solicitudes y servicio en curso, actualizado en vivo." actions={phoneDesk?<button type="button" className="secondary-button" onClick={()=>setCalling(true)}>Registrar llamada</button>:undefined}/><RemoteState state={data}>{s=><section className="data-workbench" aria-label="Estado de la unidad">
-  <div className="number-strip"><div><strong className="mono-data">{s.unit.plate}</strong><span>Unidad única</span></div><div><strong><span className={`status-tag status-${s.unit.state}`}>{stateNames[s.unit.state]??s.unit.state}</span></strong><span>Estado actual</span></div><div><strong>{s.paramedicOnDuty?'Paramédico de turno':'Sin paramédico con turno en curso'}</strong><span>Cobertura de la tripulación</span></div></div>
-  {dispatcher&&s.dispatchBlock&&<section aria-label="Despacho bloqueado"><Notice kind="info"><strong>No se puede despachar ahora.</strong> {s.dispatchBlock.message} {s.dispatchBlock.action}</Notice></section>}
+  <div className="number-strip"><div><strong className="mono-data">{s.unit.plate}</strong><span>Unidad única</span></div><div><strong><span className={`status-tag status-${s.unit.state}`}>{stateNames[s.unit.state]??s.unit.state}</span></strong><span>Estado actual</span></div><CrewCoverage status={s}/></div>
+  {dispatcher&&s.dispatchBlock&&<section aria-label="Despacho bloqueado"><Notice kind="info"><strong>No se puede despachar ahora.</strong> {s.dispatchBlock.message} {s.dispatchBlock.action}</Notice>{missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}
   {s.activeService?<ActiveService service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:<p className="muted">Sin servicio activo</p>}
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
   {dispatcher&&s.unit.state==='disponible'&&!s.dispatchBlock&&<p><button type="button" className="secondary-button" onClick={()=>setDispatching('direct')}>Despachar traslado sin solicitud</button></p>}
-  {manage&&s.unit.state!=='en_servicio'&&<MaintenancePanel status={s} api={api} onSaved={data.refresh}/>}
+  {manage&&s.unit.state!=='en_servicio'&&<MaintenancePanel status={s} api={api} profile={profile} onSaved={data.refresh}/>}
   {dispatching&&<DispatchForm api={api} unitVersion={s.unit.version} request={dispatching==='direct'?null:dispatching} onClose={()=>setDispatching(null)} onSaved={saved}/>}
   {discarding&&<DiscardForm api={api} request={discarding} onClose={()=>setDiscarding(null)} onSaved={saved}/>}
  </section>}</RemoteState>

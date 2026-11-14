@@ -205,7 +205,10 @@ from (values
   (44, 'Rosa Delmy',           'Ayala Escobar',      'limpieza',      null,                         'P3-VIP'),
   (45, 'Jeovany Alexander',    'Argueta Rosales',    'limpieza',      null,                         'P4-HOS'),
   (46, 'Dina Marisela',        'Flores Aguirre',     'asistente',     null,                         'BOD-CEN'),
-  (47, 'Gustavo Adolfo',       'Reyes Chávez',       'recepcionista', null,                         'P1-REC')
+  (47, 'Gustavo Adolfo',       'Reyes Chávez',       'recepcionista', null,                         'P1-REC'),
+  -- Motoristas de noche: RN-30 exige paramédico y motorista con turno en curso para despachar la ambulancia.
+  (48, 'Wilber Arnoldo',       'Quintanilla Mejía',  'motorista',     null,                         'P1-AMB'),
+  (49, 'Edwin Mauricio',       'Rivas Cornejo',      'motorista',     null,                         'P1-AMB')
 ) v(idx, nombres, apellidos, tipo, especialidad, area)
 on conflict do nothing;
 
@@ -243,8 +246,9 @@ insert into plan_turno values
   (16, pg_temp.persona('LAB'),  'P1-LAB', 'D5'),
   (17, pg_temp.did('0002', 11), 'P1-LAB', 'T7'),
   (18, pg_temp.persona('PAR'),  'P1-AMB', 'D7'),
-  (19, pg_temp.did('0002', 12), 'P1-AMB', 'T5'),
-  (20, pg_temp.did('0002', 13), 'P1-AMB', 'D5'),
+  -- Ambulancia cubierta las 24 h los 7 días con paramédico y motorista (RN-30): día D7, tarde T7, noche N2/N2B.
+  (19, pg_temp.did('0002', 12), 'P1-AMB', 'T7'),
+  (20, pg_temp.did('0002', 13), 'P1-AMB', 'D7'),
   (21, pg_temp.did('0002', 14), 'P2-HOS', 'D5'),
   (22, pg_temp.did('0002', 15), 'P1-REC', 'D5'),
   -- Medicina general adicional, hospitalización por planta con noches cubiertas por dos personas alternas,
@@ -262,11 +266,13 @@ insert into plan_turno values
   (33, pg_temp.did('0002', 40), 'P1-LAB', 'N2'),
   (34, pg_temp.did('0002', 41), 'P1-AMB', 'N2'),
   (35, pg_temp.did('0002', 42), 'P1-AMB', 'N2B'),
-  (36, pg_temp.did('0002', 43), 'P1-AMB', 'T5'),
+  (36, pg_temp.did('0002', 43), 'P1-AMB', 'T7'),
   (37, pg_temp.did('0002', 44), 'P3-VIP', 'D5'),
   (38, pg_temp.did('0002', 45), 'P4-HOS', 'T5'),
   (39, pg_temp.did('0002', 46), 'BOD-CEN', 'D5'),
-  (40, pg_temp.did('0002', 47), 'P1-REC', 'T7');
+  (40, pg_temp.did('0002', 47), 'P1-REC', 'T7'),
+  (41, pg_temp.did('0002', 48), 'P1-AMB', 'N2'),
+  (42, pg_temp.did('0002', 49), 'P1-AMB', 'N2B');
 -- La cardióloga (persona demo 4) no tiene plan a propósito: en la agenda aparece como "Sin turno".
 
 insert into personal.turno (id, persona_id, area_id, periodo, tipo, estado, justificacion, publicado_por, publicado_en, creado_por)

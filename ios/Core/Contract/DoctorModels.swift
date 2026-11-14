@@ -179,6 +179,8 @@ public struct AmbulanceStatus: Decodable, Sendable, Equatable {
     public let unit: UnitInfo
     public let activeService: ActiveService?
     public let paramedicOnDuty: Bool?
+    /// RN-30: la unidad también necesita motorista de turno; `nil` (API anterior) cuenta como cubierto.
+    public let driverOnDuty: Bool?
     public let dispatchBlock: DispatchBlock?
 }
 

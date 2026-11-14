@@ -12,9 +12,17 @@ object MaintenanceRules {
     fun available(permissions: Collection<String>, unitState: String) =
         PERMISSION in permissions && unitState != "en_servicio"
 
-    /** Para sacar la unidad de mantenimiento debe haber un paramédico con turno en curso. */
-    fun leavingBlocked(unitState: String, paramedicOnDuty: Boolean) =
-        unitState == "en_mantenimiento" && !paramedicOnDuty
+    /** Para sacar la unidad de mantenimiento debe haber un paramédico y un motorista con turno en curso (RN-30). */
+    fun leavingBlocked(unitState: String, paramedicOnDuty: Boolean, driverOnDuty: Boolean) =
+        unitState == "en_mantenimiento" && missingCrew(paramedicOnDuty, driverOnDuty) != null
+
+    /** Código de la API para la tripulación que falta, o null si están ambos. */
+    fun missingCrew(paramedicOnDuty: Boolean, driverOnDuty: Boolean): String? = when {
+        !paramedicOnDuty && !driverOnDuty -> "sin_tripulacion_de_turno"
+        !paramedicOnDuty -> "sin_paramedico_de_turno"
+        !driverOnDuty -> "sin_motorista_de_turno"
+        else -> null
+    }
 
     fun reasonError(reason: String): String? = when {
         reason.trim().length < MIN_REASON -> "Indica el motivo, de al menos $MIN_REASON caracteres."

@@ -120,6 +120,10 @@ private fun LazyListScope.unitCard(state: AmbulanceUiState, canPlan: Boolean) {
                 stringResource(if (status.paramedicOnDuty) R.string.par_turno_si else R.string.par_turno_no),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Text(
+                stringResource(if (status.driverOnDuty) R.string.par_motorista_si else R.string.par_motorista_no),
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             status.dispatchBlock?.let { block ->
                 NoticeBanner(NoticeKind.WARNING, stringResource(R.string.par_bloqueo_titulo) + ". " + block.message + " " + ParamedicRules.blockGuidance(block.code, canPlan))
             }

@@ -234,8 +234,32 @@ public enum AmbulanceLogRules {
         return "Respuesta en \(Int(minutes.rounded())) min"
     }
 
+    /// Códigos de bloqueo por tripulación incompleta (RN-30): faltan paramédico, motorista o ambos.
+    public static let crewBlockCodes: Set<String> = ["sin_paramedico_de_turno", "sin_motorista_de_turno", "sin_tripulacion_de_turno"]
+
     /// Lo que tiene que hacer quien ve una unidad bloqueada: publicar un turno o a quién avisar (RN-30).
+    /// Sin `turnos.planificar` no puede publicar turnos, así que se le dice a quién avisar por la tripulación que falta.
     public static func blockAdvice(_ block: AmbulanceStatus.DispatchBlock, canPlanShifts: Bool) -> String {
-        canPlanShifts ? block.action : "\(block.action) Avisa a quien planifica los turnos."
+        if canPlanShifts { return block.action }
+        switch block.code {
+        case "sin_paramedico_de_turno": return "Falta el turno del paramédico: avisa a la Jefatura de Operaciones."
+        case "sin_motorista_de_turno": return "Falta el turno del motorista: avisa a la Jefatura de Operaciones."
+        case "sin_tripulacion_de_turno": return "Faltan los turnos del paramédico y del motorista: avisa a la Jefatura de Operaciones."
+        default: return "\(block.action) Avisa a quien planifica los turnos."
+        }
+    }
+
+    /// Tripulación que falta en la unidad, o `nil` si está completa o la API no lo informa.
+    /// No se repite cuando el bloqueo de despacho ya es por tripulación.
+    public static func crewNotice(_ status: AmbulanceStatus) -> String? {
+        if let code = status.dispatchBlock?.code, crewBlockCodes.contains(code) { return nil }
+        let paramedic = status.paramedicOnDuty ?? true
+        let driver = status.driverOnDuty ?? true
+        switch (paramedic, driver) {
+        case (false, false): return "Sin paramédico ni motorista con turno en curso."
+        case (false, true): return "Sin paramédico con turno en curso."
+        case (true, false): return "Sin motorista con turno en curso."
+        default: return nil
+        }
     }
 }

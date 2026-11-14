@@ -17,9 +17,21 @@ class OperationsRulesTest {
     }
 
     @Test fun sacarLaUnidadDeMantenimientoExigeParamedicoDeTurno() {
-        assertTrue(MaintenanceRules.leavingBlocked("en_mantenimiento", paramedicOnDuty = false))
-        assertFalse(MaintenanceRules.leavingBlocked("en_mantenimiento", paramedicOnDuty = true))
-        assertFalse(MaintenanceRules.leavingBlocked("disponible", paramedicOnDuty = false))
+        assertTrue(MaintenanceRules.leavingBlocked("en_mantenimiento", paramedicOnDuty = false, driverOnDuty = true))
+        assertFalse(MaintenanceRules.leavingBlocked("en_mantenimiento", paramedicOnDuty = true, driverOnDuty = true))
+        assertFalse(MaintenanceRules.leavingBlocked("disponible", paramedicOnDuty = false, driverOnDuty = false))
+    }
+
+    @Test fun sacarLaUnidadDeMantenimientoExigeTambienMotoristaDeTurno() {
+        assertTrue(MaintenanceRules.leavingBlocked("en_mantenimiento", paramedicOnDuty = true, driverOnDuty = false))
+        assertTrue(MaintenanceRules.leavingBlocked("en_mantenimiento", paramedicOnDuty = false, driverOnDuty = false))
+    }
+
+    @Test fun laTripulacionFaltanteSeNombraConElCodigoDeLaApi() {
+        assertEquals("sin_paramedico_de_turno", MaintenanceRules.missingCrew(paramedicOnDuty = false, driverOnDuty = true))
+        assertEquals("sin_motorista_de_turno", MaintenanceRules.missingCrew(paramedicOnDuty = true, driverOnDuty = false))
+        assertEquals("sin_tripulacion_de_turno", MaintenanceRules.missingCrew(paramedicOnDuty = false, driverOnDuty = false))
+        assertNull(MaintenanceRules.missingCrew(paramedicOnDuty = true, driverOnDuty = true))
     }
 
     @Test fun elMotivoLleva_entre10y500Caracteres() {

@@ -152,5 +152,20 @@ final class HospitalRulesTests: XCTestCase {
         XCTAssertTrue(AmbulanceLogRules.blockAdvice(block, canPlanShifts: false).hasSuffix("Avisa a quien planifica los turnos."))
         let old = try decode(AmbulanceStatus.self, #"{"unit":{"id":"u1","plate":"P-000","state":"disponible"},"activeService":null}"#)
         XCTAssertNil(old.dispatchBlock)
+        XCTAssertNil(old.driverOnDuty)
+        XCTAssertNil(AmbulanceLogRules.crewNotice(old))
+    }
+
+    func testAmbulanceNeedsDriverToo() throws {
+        let noDriver = try decode(AmbulanceStatus.self, #"{"unit":{"id":"u1","plate":"P-000","state":"disponible"},"activeService":null,"paramedicOnDuty":true,"driverOnDuty":false,"dispatchBlock":{"code":"sin_motorista_de_turno","message":"No hay motorista con turno en curso.","action":"Publica un turno de motorista que cubra la hora actual; la unidad no puede despacharse sin quien la conduzca (RN-30)."}}"#)
+        XCTAssertEqual(noDriver.driverOnDuty, false)
+        let block = try XCTUnwrap(noDriver.dispatchBlock)
+        XCTAssertTrue(AmbulanceLogRules.blockAdvice(block, canPlanShifts: true).hasPrefix("Publica un turno de motorista"))
+        XCTAssertEqual(AmbulanceLogRules.blockAdvice(block, canPlanShifts: false), "Falta el turno del motorista: avisa a la Jefatura de Operaciones.")
+        XCTAssertNil(AmbulanceLogRules.crewNotice(noDriver))
+        let both = AmbulanceStatus.DispatchBlock(code: "sin_tripulacion_de_turno", message: "No hay paramédico ni motorista con turno en curso.", action: "Publica un turno de paramédico y otro de motorista.")
+        XCTAssertTrue(AmbulanceLogRules.blockAdvice(both, canPlanShifts: false).contains("Jefatura de Operaciones"))
+        let busy = try decode(AmbulanceStatus.self, #"{"unit":{"id":"u1","plate":"P-000","state":"en_servicio"},"activeService":null,"paramedicOnDuty":true,"driverOnDuty":false,"dispatchBlock":{"code":"en_servicio","message":"La unidad está en servicio.","action":"Espera a que termine."}}"#)
+        XCTAssertEqual(AmbulanceLogRules.crewNotice(busy), "Sin motorista con turno en curso.")
     }
 }

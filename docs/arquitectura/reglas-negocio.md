@@ -49,7 +49,7 @@ Una sola lista de las reglas que el sistema hace cumplir. Cada spec las referenc
 ## Ambulancia
 - **RN-28** Existe una sola unidad. Estados: Disponible, En Servicio, En Mantenimiento (REQ-AMB-01, 02).
 - **RN-29** Solo se despacha si está Disponible; despachar la pasa a En Servicio en la misma transacción. Dos despachos simultáneos: uno gana, el otro recibe "la ambulancia ya fue despachada" (D-063).
-- **RN-30** No puede estar Disponible sin paramédico con turno en curso (D-054).
+- **RN-30** No puede estar Disponible ni despacharse sin un paramédico **y** un motorista con turno en curso (D-054; motorista agregado por decisión del dueño el 2026-11-14). Códigos: `sin_paramedico_de_turno`, `sin_motorista_de_turno`, `sin_tripulacion_de_turno` (faltan los dos). La base rechaza pasar la unidad a En Servicio si la tripulación del servicio no tiene paramédico y motorista (`tripulacion_incompleta`, 20261119002000).
 - **RN-31** Mantenimiento solo sin servicio activo; lo pone y lo quita el Jefe de Operaciones con motivo.
 - **RN-32** Hitos en orden: salida, en escena, trasladando, en hospital, finalizado. Se puede finalizar sin traslado indicando motivo. Al finalizar vuelve a Disponible.
 - **RN-33** Solicitud del paciente: "por confirmar" hasta que despacho llama y confirma; la app muestra el aviso del 911 (D-058).

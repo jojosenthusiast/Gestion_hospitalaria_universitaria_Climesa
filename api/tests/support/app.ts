@@ -61,6 +61,12 @@ export async function createTestApp(start: Date) {
   const shift = async (role: string, from: Date, to: Date) => {
     await pg.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado' FROM infra.espacio WHERE codigo='P1-CON'`, [await staffOf(role), from, to]);
   };
+  /** Ambulance driver (motorista) with a published shift: RN-30 needs one on duty to dispatch or leave maintenance. */
+  const driverShift = async (from: Date, to: Date) => {
+    const driver = await one<{ id: string }>(`INSERT INTO personal.persona(nombres,apellidos,tipo,area_id) SELECT 'Motorista','Prueba ' || substr(md5(random()::text),1,6),'motorista',id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id`);
+    await pg.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado' FROM infra.espacio WHERE codigo='P1-CON'`, [driver.id, from, to]);
+    return driver.id;
+  };
   /**
    * Body of a valid admission: links the patient to a fresh emergency ticket and makes sure the doctor has a shift
    * covering the test clock (the create command checks both): a 4-hour shift that ends right after `now`, so
@@ -92,7 +98,7 @@ export async function createTestApp(start: Date) {
   const audits = async (action: string) => (await pg.query<{ paciente_id: string | null; resultado: string; detalle: any }>('SELECT paciente_id,resultado,detalle FROM plataforma.auditoria WHERE accion=$1 ORDER BY seq', [action])).rows;
 
   return {
-    app, pg, call, one, staffOf, patient, enroll, shift, appointment, consultation, admissionBody, events, audits,
+    app, pg, call, one, staffOf, patient, enroll, shift, driverShift, appointment, consultation, admissionBody, events, audits,
     setNow: (value: Date) => { current = value; },
     close: async () => { await app.close(); await pg.close(); },
   };
