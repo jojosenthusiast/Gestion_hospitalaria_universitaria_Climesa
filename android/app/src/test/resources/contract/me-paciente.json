@@ -1,0 +1,10 @@
+{
+  "method": "PATCH",
+  "path": "/api/v1/me/paciente",
+  "body": {
+    "version": 3,
+    "phone": "7000-2222",
+    "email": "nuevo@example.test",
+    "address": "Calle 2"
+  }
+}

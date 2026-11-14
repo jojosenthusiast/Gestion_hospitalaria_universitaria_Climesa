@@ -1,0 +1,13 @@
+{
+  "method": "POST",
+  "path": "/api/v1/pacientes/{id}/signos",
+  "body": {
+    "temperature": 37.2,
+    "heartRate": 80,
+    "systolic": 120,
+    "diastolic": 80,
+    "oxygenSaturation": 98,
+    "note": "Paciente tranquilo",
+    "admissionId": "66666666-6666-4666-8666-666666666666"
+  }
+}

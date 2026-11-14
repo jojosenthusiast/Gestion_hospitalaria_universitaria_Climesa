@@ -16,12 +16,10 @@
     <string name="clin_lab_sin_ordenes">No hay órdenes de laboratorio disponibles.</string>
     <string name="clin_lab_sin_ordenes_detalle">Las órdenes nuevas aparecen aquí en cuanto se emiten.</string>
     <string name="clin_lab_pendiente">Pendiente</string>
-    <string name="clin_historial_sin_resultados">No hay pacientes con esa búsqueda.</string>
     <string name="clin_historial_buscar_resultados">Resultados</string>
     <string name="clin_hosp_sin_admisiones">No hay admisiones activas.</string>
     <string name="clin_hosp_sin_admisiones_detalle">Las admisiones nuevas aparecen aquí en tiempo real.</string>
     <string name="clin_hosp_sin_cama">Sin cama asignada</string>
-    <string name="clin_hosp_cama">Cama: %1$s</string>
     <string name="clin_hosp_aislamiento">Aislamiento activo</string>
     <string name="clin_hosp_buscando_camas">Buscando camas compatibles…</string>
     <string name="clin_hosp_seleccionar_cama">Seleccionar cama</string>

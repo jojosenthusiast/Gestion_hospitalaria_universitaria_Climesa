@@ -56,4 +56,21 @@
     <string name="ing_resumen_hasta">Hasta %1$d acompañante(s)</string>
     <string name="ing_factibilidad">Comprobación de factibilidad</string>
     <string name="ing_creado">Ingreso registrado.</string>
+    <string name="ind_titulo">Indicar hospitalización</string>
+    <string name="ind_abrir">Indicar hospitalización</string>
+    <string name="ind_enviar">Enviar indicación</string>
+    <string name="ind_paciente">Paciente</string>
+    <string name="ind_origen">Origen</string>
+    <string name="ind_origen_consulta">Esta consulta</string>
+    <string name="ind_medico">Médico tratante</string>
+    <string name="ind_medico_yo">Tú</string>
+    <string name="ind_motivo">Motivo de la hospitalización</string>
+    <string name="ind_motivo_minimo">mínimo %1$d</string>
+    <string name="ind_categoria">Categoría de habitación</string>
+    <string name="ind_aislamiento">Requiere aislamiento</string>
+    <string name="ind_inestable">Paciente inestable</string>
+    <string name="ind_posquirurgico">Posquirúrgico</string>
+    <string name="ind_enviada_titulo">Hospitalización indicada</string>
+    <string name="ind_enviada_detalle">Recepción recibió la indicación de %1$s y asignará la cama.</string>
+    <string name="ind_cerrar">Cerrar</string>
 </resources>

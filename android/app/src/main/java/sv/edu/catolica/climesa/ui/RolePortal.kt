@@ -110,8 +110,6 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     ) content@{padding->
         if(page==AndroidSection.HOME){RoleDashboardScreen(account,role,onDashboardAction,Modifier.padding(padding));return@content}
         if(page==AndroidSection.BEDS||page==AndroidSection.CLEANING){BedsScreen(account.profile,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.PLANNING){ShiftPlanningScreen(account.profile,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.STAFF){StaffScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.MY_APPOINTMENTS){PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
         if(page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD){HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
         if(page==AndroidSection.SUPPLIES){InventoryScreen(Modifier.padding(padding),account.profile);return@content}
@@ -127,7 +125,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         PageList(Modifier.padding(padding)){
             if(page==AndroidSection.PROFILE){
                 profileItems(account,dark,setDark,{if(!signingOut)logout()},myData=if("pacientes.editar_propios" in account.profile.permissions){{MyDataCard()}}else null)
-            }else if(!page.ready){val maqueta=Maquetas.of(page);if(maqueta!=null)item{MaquetaContent(maqueta)}else item{PendingModule()}}
+            }
             else if(data.loading)item{LoadingState()}
             else if(data.error!=null)item{ErrorState(data.error,{model.load(path)})}
             else if(page==AndroidSection.PATIENTS){
@@ -149,7 +147,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
                 val shifts=MyShifts.parse(data.data)
                 if(shifts.isEmpty())item{EmptyState("No tienes turnos publicados.")}
                 else items(shifts){shift->MyShiftCard(shift)}
-            }else item{PendingModule()}
+            }else item{EmptyState(stringResource(R.string.portal_seccion_no_disponible))}
         }
     }
 }
@@ -204,4 +202,3 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         )
     }
 }
-@Composable private fun PendingModule(){Column{HorizontalDivider();Spacer(Modifier.height(22.dp));Text(stringResource(R.string.portal_proxima_entrega),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary);Spacer(Modifier.height(14.dp));Text(stringResource(R.string.portal_modulo_pendiente),style=MaterialTheme.typography.titleLarge);Spacer(Modifier.height(12.dp));Text(stringResource(R.string.portal_modulo_pendiente_detalle),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}}

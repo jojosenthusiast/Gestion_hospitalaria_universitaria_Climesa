@@ -27,13 +27,11 @@
     <string name="signos_sin_tomas_aun">Sin tomas</string>
     <string name="signos_alerta_critico">Crítico: %1$s %2$s</string>
     <string name="signos_alerta_alterado">Alterado: %1$s %2$s</string>
-    <string name="signos_alerta_normal">Normal: %1$s</string>
     <string name="signos_nueva_toma">Nueva toma</string>
     <string name="signos_nueva_toma_detalle">Llena solo lo que mediste. Los valores fuera de lo normal se marcan al escribirlos.</string>
     <string name="signos_nota">Nota (opcional)</string>
     <string name="signos_nota_contador">%1$d de %2$d caracteres</string>
     <string name="signos_guardar">Guardar signos</string>
-    <string name="signos_guardado">Signos guardados.</string>
     <string name="signos_solo_lectura">Tu rol consulta los signos vitales; las tomas las registra el personal de enfermería.</string>
     <string name="signos_tendencia">Tendencia</string>
     <string name="signos_tendencia_detalle">Últimas tomas de cada medida, de la más antigua a la más reciente. La franja verde es el rango normal.</string>

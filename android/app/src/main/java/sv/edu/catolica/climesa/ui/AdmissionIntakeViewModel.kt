@@ -82,7 +82,8 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway) 
                 // The suggestion arrives pre-selected; the person can pick another compatible bed.
                 mutable.update { it.copy(bedMap = map, draft = if (it.draft.bed == null) it.draft.copy(bed = map.beds.firstOrNull { b -> b.suggested }) else it.draft) }
             }
-            7 -> load { mutable.update { it.copy(feasibility = AdmissionIntake.feasibility(api.request(AdmissionIntake.feasibilityPath(draft, canAssignBed)) as JSONObject)) } }
+            7 -> AdmissionIntake.feasibilityPath(draft, canAssignBed)?.let { path -> load { mutable.update { it.copy(feasibility = AdmissionIntake.feasibility(api.request(path) as JSONObject)) } } }
+                ?: mutable.update { it.copy(error = AdmissionIntake.missing(draft)) }
         }
     }
 
@@ -162,10 +163,11 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway) 
     fun confirm(canAssignBed: Boolean) {
         val s = mutable.value
         if (s.busy || s.step != AdmissionIntake.LAST_STEP || error(canAssignBed) != null) return
+        val body = AdmissionIntake.body(s.draft, canAssignBed) ?: run { mutable.update { it.copy(error = AdmissionIntake.missing(s.draft)) }; return }
         mutable.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
-                api.request("/admisiones", "POST", AdmissionIntake.body(s.draft, canAssignBed))
+                api.request("/admisiones", "POST", body)
                 mutable.value = AdmissionIntakeState(finished = true)
             } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.update { it.copy(busy = false, error = e.message ?: "No se pudo crear el ingreso.") } }
         }
