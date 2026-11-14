@@ -18,19 +18,30 @@ public struct PatientProfile: Decodable, Sendable, Equatable {
     public let address: String?
 }
 
-/// `PatientUpdateDto` de `PATCH /pacientes/{id}`: los datos que no se editan viajan sin cambio.
-public struct PatientUpdateBody: Encodable, Sendable, Equatable {
-    public let givenNames: String
-    public let surnames: String
-    public let sex: String
+/// `PatientSelfUpdateDto` de `PATCH /me/paciente`: el paciente cambia solo su contacto. `""` borra el dato; `nil` no lo toca.
+public struct PatientSelfUpdateBody: Encodable, Sendable, Equatable {
+    public let version: Int
     public let phone: String?
     public let email: String?
     public let address: String?
-    public let version: Int
-    public let reason: String
-    public init(givenNames: String, surnames: String, sex: String, phone: String?, email: String?, address: String?, version: Int, reason: String) {
-        self.givenNames = givenNames; self.surnames = surnames; self.sex = sex
-        self.phone = phone; self.email = email; self.address = address; self.version = version; self.reason = reason
+    public init(version: Int, phone: String?, email: String?, address: String?) {
+        self.version = version; self.phone = phone; self.email = email; self.address = address
+    }
+}
+
+/// `HospitalLocationResponse` de `GET /publico/hospital`: nombre, dirección, teléfono y coordenadas del hospital.
+public struct HospitalLocation: Decodable, Sendable, Equatable {
+    public let name: String
+    public let address: String
+    public let municipality: String
+    public let department: String
+    public let phone: String
+    public let latitude: Double
+    public let longitude: Double
+
+    enum CodingKeys: String, CodingKey {
+        case name = "nombre", address = "direccion", municipality = "municipio", department = "departamento"
+        case phone = "telefono", latitude = "latitud", longitude = "longitud"
     }
 }
 
@@ -60,7 +71,7 @@ public struct AmbulanceLogEntry: Decodable, Sendable, Identifiable, Equatable {
     public let patientRef: String?
 }
 
-/// `IdVersionResponse` de `PATCH /pacientes/{id}`.
+/// `IdVersionResponse` de `PATCH /me/paciente`.
 public struct PatientUpdateResult: Decodable, Sendable, Equatable {
     public let id: String
     public let version: Int

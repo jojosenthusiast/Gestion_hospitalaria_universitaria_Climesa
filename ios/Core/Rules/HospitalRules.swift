@@ -75,29 +75,50 @@ public enum RoomRules {
     }
 }
 
-/// "Mis datos": solo el contacto es editable y solo con `pacientes.editar_demograficos` (la API decide quién lo tiene).
+/// "Mis datos": el paciente edita solo su contacto con `pacientes.editar_propios` (`PATCH /me/paciente`).
+/// Las reglas espejan `validateContact` de la API: teléfono de 8 dígitos que empieza en 2, 6 o 7, y correo válido.
 public enum PatientProfileRules {
-    public static func errors(phone: String, email: String, address: String, reason: String) -> [String: String] {
+    public static func errors(phone: String, email: String, address: String) -> [String: String] {
         var errors: [String: String] = [:]
         let phoneText = phone.trimmingCharacters(in: .whitespaces)
-        if !phoneText.isEmpty && phoneText.range(of: #"^[0-9+ -]{8,9}$"#, options: .regularExpression) == nil {
-            errors["phone"] = "Escribe el teléfono con 8 dígitos (por ejemplo 7777-7777)."
+        if !phoneText.isEmpty && phoneText.range(of: #"^[267][0-9]{3}-?[0-9]{4}$"#, options: .regularExpression) == nil {
+            errors["phone"] = "Escribe el teléfono con 8 dígitos y empieza con 2, 6 o 7 (por ejemplo 7777-7777)."
         }
         let emailText = email.trimmingCharacters(in: .whitespaces)
         if !emailText.isEmpty && (emailText.count > 254 || emailText.range(of: #"^[^\s@]+@[^\s@]+\.[^\s@]+$"#, options: .regularExpression) == nil) {
             errors["email"] = "Ingresa un correo válido."
         }
         if address.trimmingCharacters(in: .whitespacesAndNewlines).count > 500 { errors["address"] = "La dirección admite hasta 500 caracteres." }
-        let size = reason.trimmingCharacters(in: .whitespacesAndNewlines).count
-        if !(10...500).contains(size) { errors["reason"] = "Escribe el motivo del cambio (10 a 500 caracteres)." }
         return errors
     }
 
-    public static func body(profile: PatientProfile, phone: String, email: String, address: String, reason: String) -> PatientUpdateBody {
-        func clean(_ text: String) -> String? { let value = text.trimmingCharacters(in: .whitespacesAndNewlines); return value.isEmpty ? nil : value }
-        return PatientUpdateBody(givenNames: profile.givenNames, surnames: profile.surnames, sex: profile.sex,
-                                 phone: clean(phone), email: clean(email), address: clean(address),
-                                 version: profile.version, reason: reason.trimmingCharacters(in: .whitespacesAndNewlines))
+    /// Cuerpo de `PATCH /me/paciente`: el texto vacío se envía como `""` para que la API borre el dato.
+    public static func body(version: Int, phone: String, email: String, address: String) -> PatientSelfUpdateBody {
+        func trimmed(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return PatientSelfUpdateBody(version: version, phone: trimmed(phone), email: trimmed(email), address: trimmed(address))
+    }
+}
+
+/// Ubicación del hospital: teléfono para llamar y enlace de Mapas en las coordenadas publicadas.
+public enum HospitalLocationRules {
+    /// `tel:` con solo dígitos; nil si el hospital no tiene teléfono utilizable.
+    public static func callURL(_ location: HospitalLocation) -> URL? {
+        let digits = location.phone.filter(\.isNumber)
+        return digits.isEmpty ? nil : URL(string: "tel:" + digits)
+    }
+
+    /// Apple Maps en las coordenadas del hospital; sin ubicación, búsqueda por nombre (`fallbackQuery`).
+    public static func mapsURL(_ location: HospitalLocation?, fallbackQuery: String) -> URL? {
+        var components = URLComponents(string: "https://maps.apple.com/")
+        if let location {
+            components?.queryItems = [
+                URLQueryItem(name: "ll", value: "\(location.latitude),\(location.longitude)"),
+                URLQueryItem(name: "q", value: location.name)
+            ]
+        } else {
+            components?.queryItems = [URLQueryItem(name: "q", value: fallbackQuery)]
+        }
+        return components?.url
     }
 }
 
