@@ -28,7 +28,7 @@ export type PublishResult={from:string;to:string;published:number;publishedBy:st
 export type InvitationResult={userId:string;email:string;roles:string[];role:string;status:'sent'};
 export interface Api {request<T>(path:string,init?:RequestInit):Promise<T>;write<T>(path:string,body:unknown,method?:string):Promise<T>;}
 /** `code` y `currentVersion` vienen del problem+json de la API (`codigo`, `versionActual`); faltan en errores de red o sin cuerpo. */
-export class ApiError extends Error {constructor(message:string,public status=0,public code?:string,public currentVersion?:number){super(message);}}
+export class ApiError extends Error {constructor(message:string,public status=0,public code?:string,public currentVersion?:number,public details?:Record<string,unknown>){super(message);}}
 const base=(import.meta.env.VITE_API_BASE_URL as string|undefined)?.replace(/\/$/,'')??'http://localhost:3000/api/v1';
 export class HttpApi implements Api {
  private attempts=new Map<string,string>();
@@ -37,7 +37,7 @@ export class HttpApi implements Api {
   let response:Response;
   try{response=await fetch(base+path,{...init,cache:'no-store',headers:{Accept:'application/json',Authorization:`Bearer ${await this.token()}`,...(init.body?{'Content-Type':'application/json'}:{}),...init.headers}});}catch(e){if(e instanceof DOMException&&e.name==='AbortError')throw e;throw new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.');}
   const body=await response.json().catch(()=>({}));
-  if(!response.ok){if(response.status===401)this.unauthorized?.();throw new ApiError(body.detail??body.error?.message??body.message??'No se pudo completar la operación.',response.status,typeof body.codigo==='string'?body.codigo:undefined,typeof body.versionActual==='number'?body.versionActual:undefined);}
+  if(!response.ok){if(response.status===401)this.unauthorized?.();throw new ApiError(body.detail??body.error?.message??body.message??'No se pudo completar la operación.',response.status,typeof body.codigo==='string'?body.codigo:undefined,typeof body.versionActual==='number'?body.versionActual:undefined,body&&typeof body==='object'?body:undefined);}
   return body as T;
  }
  async write<T>(path:string,body:unknown,method='POST'):Promise<T>{
