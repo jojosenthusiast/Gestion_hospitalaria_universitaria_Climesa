@@ -102,7 +102,7 @@ export function AuditPage({ api, version }: { api: Api; version: number }) {
               <button type="button" className="secondary-button" disabled={page >= pages} onClick={() => setPage(page + 1)}>Siguiente<Icon name="arrow" size={16} /></button></div>
           </nav>
         </>
-        : <Empty title="Ningún registro coincide" description={filterChips.length ? 'Quita algún filtro o amplía el rango de fechas para ver más operaciones.' : 'Todavía no hay operaciones auditadas.'} />}</RemoteState>
+        : <Empty title={filterChips.length ? 'Ningún registro coincide' : 'Todavía no hay actividad'} description={filterChips.length ? 'Quita algún filtro o amplía el rango de fechas para ver más operaciones.' : 'Todavía no hay operaciones auditadas.'} />}</RemoteState>
       <p className="table-footnote">La auditoría no incluye valores clínicos. Consultar, abrir un detalle y exportar quedan registrados en la misma auditoría.</p>
     </section>
     {detail && <AuditDrawer api={api} seq={detail} version={version} onClose={() => setDetail(null)} onOpen={setDetail} />}

@@ -6,7 +6,7 @@ import { INVALIDATION_BATCH_MS } from './live';
 // Spec 112: información pública sin sesión. Tipos escritos a mano (el contrato se regenera al integrar).
 export type PublicOccupancy = { actualizadoEn: string; ocupacion: { planta: number | null; categoria: string; camas: number; libres: number; ocupadas: number }[] };
 export type PublicDoctors = { actualizadoEn: string; medicos: { nombre: string; especialidad: string; area: string | null; hasta: string }[]; proximoCambio: string | null };
-export type PublicNotice = { id: string; titulo: string; cuerpo: string; desde: string; hasta: string };
+export type PublicNotice = { id: string; titulo: string; cuerpo: string; desde: string; hasta: string; prioridad?: 'atencion' | 'urgente' | 'critico' };
 export type PublicNotices = { actualizadoEn: string; avisos: PublicNotice[]; proximoCambio: string | null };
 export type PublicQueue = { actualizadoEn: string; servicio: string; fecha: string; llamados: { numero: number; consultorio: string | null; llamados: number }[] };
 

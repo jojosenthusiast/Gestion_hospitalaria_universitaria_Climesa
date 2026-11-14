@@ -19,6 +19,7 @@ vi.mock('../lib/supabase', () => ({ supabase: { auth, channel: vi.fn() } }));
 vi.mock('../lib/live', () => ({ useLive: () => ({ version: 0, signal: { any: 0, counts: {} }, updatedAt: null, status: live.status }) }));
 
 import App from '../App';
+import { modules } from '../features/shell';
 
 const session = { access_token: 'token-ficticio', user: { id: 'u-1', email: 'prueba@example.test' } };
 
@@ -85,6 +86,14 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
     expect(permisosDe('LAB').map((p) => p.code)).toContain('laboratorio.ver_cola');
     expect(permisosDe('DPD').map((p) => p.code)).toContain('auditoria.ver');
     expect(permisosDe('ADM').map((p) => p.code)).not.toContain('camas.ver_tablero');
+  });
+
+  it('ningún rol tiene acceso excepcional en el menú ni en el catálogo de permisos (obs. 15 y 19, D-082)', () => {
+    expect(modules.map(m => m.id).filter(id => /excepcion/i.test(id))).toEqual([]);
+    for (const rol of Object.keys(menuEsperado)) {
+      expect(permisosDe(rol).map(p => p.code).filter(code => /solicitar_acceso|aprobar_acceso/.test(code)), rol).toEqual([]);
+      expect(menuEsperado[rol].filter(item => /excepcional/i.test(item)), rol).toEqual([]);
+    }
   });
 
   for (const [rol, menu] of Object.entries(menuEsperado)) {
@@ -264,18 +273,18 @@ describe('estados comunes (FR-120-06)', () => {
   });
 
   it('vacío: la auditoría sin eventos muestra "Todavía no hay actividad"', async () => {
-    await entrar(perfil('DPD'), { '/auditoria': () => json([]) }, '#/auditoria');
+    await entrar(perfil('DPD'), { '/auditoria/registros': () => json({ filas: [], total: 0, pagina: 1, limite: 25 }) }, '#/auditoria');
     expect(await screen.findByText('Todavía no hay actividad')).toBeTruthy();
   });
 
   it('error: un fallo del servidor muestra el aviso y permite volver a intentar', async () => {
-    await entrar(perfil('DPD'), { '/auditoria': () => json({ detail: 'El servicio no está disponible.' }, 500) }, '#/auditoria');
+    await entrar(perfil('DPD'), { '/auditoria/registros': () => json({ detail: 'El servicio no está disponible.' }, 500) }, '#/auditoria');
     expect(await screen.findByText('El servicio no está disponible.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Volver a intentar' })).toBeTruthy();
   });
 
   it('sin permiso: un 403 de la API muestra que la cuenta no puede consultar la sección', async () => {
-    await entrar(perfil('DPD'), { '/auditoria': () => json({ detail: 'Prohibido' }, 403) }, '#/auditoria');
+    await entrar(perfil('DPD'), { '/auditoria/registros': () => json({ detail: 'Prohibido' }, 403) }, '#/auditoria');
     expect(await screen.findByText('Tu cuenta no tiene permiso para consultar esta sección.')).toBeTruthy();
   });
 

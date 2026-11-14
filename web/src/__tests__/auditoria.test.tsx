@@ -92,9 +92,9 @@ describe('W32 · espacio del auditor', () => {
     expect(await screen.findByRole('dialog', { name: 'Detalle del registro 7' })).toBeTruthy();
   });
 
-  it('con filtros sin resultados explica cómo seguir; sin filas muestra el estado vacío', async () => {
+  it('sin filas muestra el estado vacío', async () => {
     render(<AuditPage api={fakeApi({ page: { filas: [], total: 0, pagina: 1, limite: 25 } })} version={0} />);
-    expect(await screen.findByText('Ningún registro coincide')).toBeTruthy();
+    expect(await screen.findByText('Todavía no hay actividad')).toBeTruthy();
   });
 });
 
