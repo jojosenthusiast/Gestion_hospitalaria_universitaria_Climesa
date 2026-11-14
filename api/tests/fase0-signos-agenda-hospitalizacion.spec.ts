@@ -29,6 +29,26 @@ describe('Fase 0 · signos, franjas, salida, traslado, eventos y cancelación (F
     }
   });
 
+  test('R3: AST y ENF registran signos de un paciente sin consulta y leen su historial con dolor y glucemia', async () => {
+    const patientId = await t.patient();
+    const saved = await t.call('ENF', 'POST', `/pacientes/${patientId}/signos`, { systolic: 120, diastolic: 80, heartRate: 72, pain: 3, glucoseMgDl: 95, note: 'En reposo' });
+    expect(saved.status).toBe(201);
+    const history = await t.call('AST', 'GET', `/pacientes/${patientId}/signos`);
+    expect(history.status).toBe(200);
+    expect(history.body.patientId).toBe(patientId);
+    expect(history.body.items[0]).toMatchObject({ id: saved.body.id, systolic: 120, pain: 3, glucoseMgDl: 95, note: 'En reposo', consultationId: null });
+  });
+
+  test('R3: los signos sin consulta exigen una medida, presión completa y ordenada, y un rol clínico', async () => {
+    const patientId = await t.patient();
+    expect((await t.call('ENF', 'POST', `/pacientes/${patientId}/signos`, {})).status).toBe(400);
+    expect((await t.call('ENF', 'POST', `/pacientes/${patientId}/signos`, { systolic: 120 })).status).toBe(400);
+    expect((await t.call('ENF', 'POST', `/pacientes/${patientId}/signos`, { systolic: 80, diastolic: 90 })).status).toBe(400);
+    expect((await t.call('ENF', 'POST', `/pacientes/${patientId}/signos`, { pain: 11 })).status).toBe(400);
+    expect((await t.call('REC', 'POST', `/pacientes/${patientId}/signos`, { heartRate: 70 })).status).toBe(403);
+    expect((await t.call('REC', 'GET', `/pacientes/${patientId}/signos`)).status).toBe(403);
+  });
+
   test('API-06: los signos rechazan una admisión de otro paciente', async () => {
     const consultation = await t.consultation(await t.patient());
     const foreign = await hospitalize('HAB-203-A');

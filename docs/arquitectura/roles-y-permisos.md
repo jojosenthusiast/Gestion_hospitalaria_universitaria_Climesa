@@ -213,6 +213,8 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | POST | `/api/v1/consultas` | `consulta.iniciar` | Desde número llamado (ticketId) o cita confirmada (appointmentId), uno solo | R | 3 | · | · | · | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/signos` | `signos.registrar` |  | R | 3 | · | · | · | ✔ | ✔ | ✔ | · | ✔ | · | · |
+| GET | `/api/v1/pacientes/{id}/signos` | `signos.registrar` | Contexto x; audita la lectura | R | 3 | · | · | · | ✔ | ✔ | ✔ | · | ✔ | · | · |
+| POST | `/api/v1/pacientes/{id}/signos` | `signos.registrar` | Fuera de consulta; incluye dolor y glucemia; Idempotency-Key | R | 3 | · | · | · | ✔ | ✔ | ✔ | · | ✔ | · | · |
 | POST | `/api/v1/consultas/{id}/diagnosticos` | `consulta.registrar` | CIE-10 | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/firmar` | `consulta.registrar` | Inscripción vigente en el acto | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/addendum` | `consulta.corregir` | Solo el autor; conserva original | E | 4 | · | · | · | · | · | autor | · | · | · | · |

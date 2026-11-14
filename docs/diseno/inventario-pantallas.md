@@ -766,8 +766,9 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 - **Para:** AST; ENF
 - **Propósito:** Tomar signos
-- **Muestra:** PA, FC, FR, temperatura, SatO2, peso, talla; fuera de rango resaltado
+- **Muestra:** Paciente de mi planta, de la fila o por búsqueda; PA, FC, FR, temperatura, SatO2, dolor, glucemia, peso, talla; fuera de rango resaltado y alertas críticas; historial y tendencia
 - **Acciones:** Guardar
+- **En vivo:** En vivo
 - **Spec:** 106
 
 ### A50 · Mi planta (R)
