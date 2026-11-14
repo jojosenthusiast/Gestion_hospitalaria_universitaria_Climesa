@@ -136,3 +136,18 @@ Decisiones conservadoras tomadas mientras se confirman. Convenciones completas e
 | API-09 | `no_asistio` existe en la base pero ningún endpoint lo usa | El trigger lo admite solo desde `confirmada`; no se agregó endpoint |
 | DAT-06 | ¿Se retiran `type`/`entity` de `GET /eventos`? | Se conservan como alias obsoletos junto a `tipo`/`entidad` (esquema `EventoDelgado`) porque `web/src/lib/live.ts` y Android `domain/Realtime.kt` los leen. Retirarlos cuando ambos lean los nombres en español |
 | CON-04 | Filas de `endpoints.csv` sin ruta | Se quitaron las 9 filas originales reemplazadas por la forma implementada (`/fila/tickets*`, `PUT /consultas/{id}`, `/recetas`, `/ordenes-laboratorio`, `PUT .../resultados`, `GET /catalogo/examenes`). Quedan 8 pendientes reales, listados en `api/tests/contrato-api.spec.ts`. Falta la D-xxx que registre el reemplazo |
+
+
+## Remediación de la auditoría 2026-11-13 (fase 1, seguridad, CI y configuración)
+
+Decisiones conservadoras tomadas mientras se confirman:
+
+| Hallazgo | Pregunta | Opción aplicada |
+|---|---|---|
+| SEG-03 | ¿Enfermería puede escribir notas cuando el alta ya está firmada pero el paciente sigue en la cama? | Sí: se aceptan notas en `hospitalizado` y `alta_firmada`; se rechazan en `pendiente_cama`, `egresado` y demás estados |
+| SEG-03 | ¿La relación que habilita `alta.firmar` incluye una relación de atención vigente además del médico tratante? | Sí: médico tratante de la admisión o `atencion.relacion_atencion` vigente con el paciente |
+| SEG-09 | `privacidad.md` §2 da a Laboratorio la fecha de nacimiento "por rangos", pero `permisos-sin-roles.spec.ts` exige hoy `birth` exacto para LAB en `GET /pacientes` y `POST /pacientes/busquedas` | Sin cambio en esta rama: corregirlo exige cambiar esa prueba (fuera del alcance). Propuesta: en la búsqueda, `birth` solo con contexto `x` y `ageRange` con `rango` |
+| SEG-09 | ¿La búsqueda `GET /pacientes` sin texto debe rechazarse (mínimo 2 caracteres)? | Sin cambio: la web (`features/patients.tsx`) y Android (`RemotePatientRepository.kt`) cargan `/pacientes?limit=50` sin texto como lista inicial. Exigir el mínimo rompe esas pantallas; se audita ahora qué pacientes devolvió cada búsqueda |
+| SEG-08 | ¿Límite general de la API? | 300 solicitudes por IP y minuto (`RATE_LIMIT_MAX`), `/salud` exento; las pantallas públicas conservan 120. El límite por usuario de búsquedas (FR-100-17, 100-T09) sigue pendiente |
+| SEG-08 | ¿Cuántos proxies hay delante de la API en Render? | `TRUST_PROXY_HOPS=1`. Confirmarlo en el registro: si dos clientes distintos reciben 429 juntos, la IP no se está leyendo bien |
+| API-19 | `app.module.ts` conserva la URL real de Supabase como valor por defecto | En producción la API exige la variable (`config/environment.ts`); quitar el valor por defecto requiere tocar `app.module.ts` (fuera del alcance) |
