@@ -5,14 +5,16 @@
   - Depende de: 104-T01
   - Hecho cuando: la semilla carga artículos con lotes en dos bodegas
   - Verificado: Aplicada en Supabase; semilla de 10 artículos con lotes en BOD-CEN y BOD-LAB (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
-- [ ] T02 · S3 · R · Movimientos atómicos sin negativos y sin lotes vencidos
+- [x] T02 · S3 · R · Movimientos atómicos sin negativos y sin lotes vencidos
   - Cubre: FR-111-03, FR-111-04, FR-111-05, FR-111-08
   - Depende de: T01
   - Hecho cuando: escenario 1 pasa como prueba concurrente
-- [ ] T03 · S3 · R · Alerta de mínimo en vivo y pantallas W22, W23
+  - Verificado: 15-nov-2026 `npm test -- --ci` en api/ (`inventario-movimientos.spec.ts`: dos salidas de 4 sobre 5 lanzadas a la vez, una 201 y otra 409, queda 1; el ajuste negativo resta y nunca deja saldo negativo, API-15). PGlite serializa las transacciones; la carrera multisesión real la cubre `supabase/pruebas/02_concurrencia.sh` en PostgreSQL nativo
+- [x] T03 · S3 · R · Alerta de mínimo en vivo y pantallas W22, W23
   - Cubre: FR-111-06
   - Depende de: T02, 120-T03
   - Hecho cuando: escenario 2 pasa
+  - Verificado: 15-nov-2026 `npm test -- --ci` en api/ (escenario 2: mínimo 10 y 11 unidades, consumir 2 emite una sola vez `inventario.bajo_minimo` a `rol:JOP`, no a ENF; un reactivo también a `rol:LAB`) y `npm test` en web/ (alertas de mínimo en W22); Android muestra las alertas en Insumos (`InventoryConsumptionTest`)
 - [ ] T04 · S5 · E · Consumo desde enfermería y laboratorio (A53)
   - Cubre: FR-111-07
   - Depende de: T02, 121-T03
