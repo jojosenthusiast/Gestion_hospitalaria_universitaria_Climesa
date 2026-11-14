@@ -9,6 +9,8 @@ import { StaffDto, ShiftDto, RegistrationDto, PublishDto } from './operations.dt
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
 const HOUR=3600_000,DAY=24*HOUR,LOCAL_OFFSET=6*HOUR;
+/** Turnos que devuelve `GET /turnos`: los de las últimas semanas y toda la planificación próxima. */
+export const SHIFT_WINDOW={pastDays:31,futureDays:93} as const;
 /** Lunes 00:00 local (en UTC) de la semana que contiene el instante; la semana va de lunes a domingo (RN-14). */
 export const weekStart=(at:Date)=>{const day=new Date(`${businessDate(at)}T00:00:00Z`);return new Date(day.getTime()-((day.getUTCDay()+6)%7)*DAY+LOCAL_OFFSET);};
 /** Horas de [a,b) (ms UTC) que caen entre las 06:00 y las 22:00 locales. */
@@ -140,9 +142,14 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   async shifts(actor:Actor,mine=false) {
     if(mine&&!actor.staffId)return [];
     await this.advanceStates();
+    // Ventana alrededor de hoy, no "los 300 más lejanos": con la planificación a dos semanas, un tope fijo ordenado
+    // del más futuro al más antiguo dejaba fuera los turnos de hoy (el recién asignado no aparecía y el formulario
+    // no veía los conflictos de la jornada).
+    const now=this.clock.now().valueOf();
     return this.db.query(`SELECT t.id,t.persona_id AS "staffId",p.nombres||' '||p.apellidos AS person,p.tipo AS "staffType",t.area_id AS "areaId",e.nombre AS area,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.tipo AS type,t.estado AS state,t.justificacion AS justification,t.version
       FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id JOIN infra.espacio e ON e.id=t.area_id
-      WHERE ($1::uuid IS NULL OR t.persona_id=$1) AND ((NOT $2 AND $3) OR t.estado IN ('publicado','en_curso','completado')) ORDER BY lower(t.periodo) DESC LIMIT 300`,[mine?actor.staffId:null,mine,hasPermission(actor,'turnos.ver_borradores')]);
+      WHERE ($1::uuid IS NULL OR t.persona_id=$1) AND ((NOT $2 AND $3) OR t.estado IN ('publicado','en_curso','completado'))
+        AND t.periodo && tstzrange($4::timestamptz,$5::timestamptz,'[)') ORDER BY lower(t.periodo) DESC LIMIT 3000`,[mine?actor.staffId:null,mine,hasPermission(actor,'turnos.ver_borradores'),new Date(now-SHIFT_WINDOW.pastDays*DAY),new Date(now+SHIFT_WINDOW.futureDays*DAY)]);
   }
   /** Obs. 2/9: opciones reales para filtrar y asignar turnos; no depende de los turnos cargados ni de `personal.ver`/`espacios.ver`. Sin DUI, teléfono ni números de junta. */
   async shiftCatalog() {

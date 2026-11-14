@@ -50,6 +50,7 @@ export function ShiftForm({ api, shift, catalog, shifts, onClose, onSaved }: Pro
   const staffValue = staffItems.find(i => i.id === staffId) ?? (chosen ? { id: chosen.id, label: chosen.name, detail: roleIdentity(chosen.type).label } : shift && staffId === shift.staffId ? { id: shift.staffId, label: shift.person } : null);
   const chosenConflicts = chosen ? conflictsOf(chosen) : [];
   const incomplete = !areaId || !date || !startTime || !endTime || !staffId || (Boolean(shift) && reason.trim().length < 10);
+  const missing = [!areaId && 'el área', !date && 'la fecha', !startTime && 'la hora de inicio', !endTime && 'la hora de fin', !staffId && 'la persona', Boolean(shift) && reason.trim().length < 10 && 'el motivo del cambio (10 caracteres)'].filter(Boolean).join(', ');
   const blocked = incomplete || Boolean(durationIssue) || (!cancel && chosenConflicts.length > 0);
 
   async function save(event: FormEvent) {
@@ -112,6 +113,7 @@ export function ShiftForm({ api, shift, catalog, shifts, onClose, onSaved }: Pro
         <Field label="Motivo del cambio" value={reason} onChange={setReason} minLength={10} maxLength={500} required />
       </fieldset>}
 
+      {missing && <p className="form-hint" role="status">Para guardar falta indicar {missing}.</p>}
       <div className="dialog-actions">
         <button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button>
         <SaveButton busy={action.busy} label={shift ? 'Guardar turno' : 'Asignar turno'} disabled={blocked} />

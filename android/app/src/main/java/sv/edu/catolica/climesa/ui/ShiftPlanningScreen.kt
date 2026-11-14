@@ -276,6 +276,9 @@ private fun ShiftFormDialog(model: ShiftPlanningViewModel, state: PlanningState,
     var reason by rememberSaveable(key) { mutableStateOf("") }
     val action = state.action
     val catalog = state.catalog
+    // El error de guardar se muestra arriba del formulario: al aparecer se sube a verlo, para que el botón no parezca no hacer nada.
+    val scroll = rememberScrollState()
+    LaunchedEffect(action.error) { if (action.error != null) scroll.animateScrollTo(0) }
     val window = ShiftAssignment.window(startDate, startTime, endTime)
     val kind = if (typeTouched || window == null) type else ShiftAssignment.suggestKind(window.first, window.second)
     val durationIssue = window?.let { ShiftAssignment.durationProblem(it.first, it.second, kind) }
@@ -294,7 +297,7 @@ private fun ShiftFormDialog(model: ShiftPlanningViewModel, state: PlanningState,
         onDismissRequest = { if (!action.busy) onClose() },
         title = { Text(stringResource(if (shift == null) R.string.plan_nuevo else R.string.plan_editar)) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.plan_horario), style = MaterialTheme.typography.bodySmall)
                 action.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
                 if (!action.conflict) {
