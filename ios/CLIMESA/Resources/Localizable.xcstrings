@@ -1,6 +1,39 @@
 {
   "sourceLanguage": "es",
   "strings": {
+    "ds.paciente.queue.number": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu número"
+          }
+        }
+      }
+    },
+    "ds.paciente.home.pending": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exámenes pendientes"
+          }
+        }
+      }
+    },
+    "ds.paciente.home.ready": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultados listos"
+          }
+        }
+      }
+    },
     "ds.retry": {
       "extractionState": "manual",
       "localizations": {
