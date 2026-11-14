@@ -1,14 +1,17 @@
 # 112. Tareas
 
-- [ ] T01 · S3 · R · Vistas públicas y endpoints sin sesión con prueba de ausencia de datos personales
+- [x] T01 · S3 · R · Vistas públicas y endpoints sin sesión con prueba de ausencia de datos personales
   - Cubre: FR-112-01, FR-112-02
   - Depende de: 104-T02, 103-T08
   - Hecho cuando: escenario 1 pasa
+  - Verificado: 15-nov-2026 `npm test -- --ci` en api/: 34 suites, 362 pruebas pasan; `tests/publico-metricas.spec.ts` asigna una cama por la API y comprueba sin sesión que solo cambia el conteo de la planta y que el JSON de los cuatro endpoints públicos no trae claves ni valores personales (nombre, expediente, DUI, teléfono, código o id de cama)
 - [ ] T02 · S3 · R · Avisos con vigencia y pantalla pública en vivo (W25, W34)
   - Cubre: FR-112-03, FR-112-04
   - Depende de: T01, 120-T03
   - Hecho cuando: escenario 2 pasa en la pantalla pública y en las apps (A10, I10)
-- [ ] T03 · S5 · E · Advertencia de datos personales en avisos
+  - Avance: 15-nov-2026 API (`POST /avisos`, `GET /publico/avisos`, evento `aviso.publicado` en `publico`, vencimiento por el reloj) probada en `tests/publico-metricas.spec.ts`; web W25 y W34 (`/publico`) en `npm test` de web/ (`publico.test.tsx`); Android A10 con `HospitalInfoViewModelTest` en `gradlew testDebugUnitTest`. Falta para marcarla: iOS I10 (fuera de esta rama)
+- [x] T03 · S5 · E · Advertencia de datos personales en avisos
   - Cubre: FR-112-05
   - Depende de: T02
   - Hecho cuando: un aviso con un DUI muestra advertencia
+  - Verificado: 15-nov-2026 `npm test -- --ci` en api/: un aviso con DUI y teléfono responde 422 `aviso_con_datos_personales` con `datosPersonales: [dui, telefono]` y publica al confirmar; `npm test` en web/: `publico.test.tsx` muestra la advertencia y "Publicar de todos modos" (T02 sigue abierta solo por iOS)
