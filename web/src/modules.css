@@ -42,6 +42,9 @@
 .live-indicator { width: min(1240px, calc(100% - 64px)); margin: 12px auto 0; display: flex; align-items: center; justify-content: flex-end; gap: 7px; color: var(--success); font-size: 13px; font-weight: 700; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .conflict-notice { display: grid; gap: 10px; justify-items: start; }
+.auth-forgot { justify-self: start; }
+.password-change { margin: 24px 0; padding-top: 20px; border-top: 1px solid var(--line, currentColor); }
+.password-change h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
 .hospital-main { width: min(1240px, calc(100% - 64px)); flex: 1; margin: 0 auto; padding: 44px 0 64px; min-width: 0; }
 .hospital-main > *:not(.module-heading) { animation: reveal-up var(--motion-emphasis) ease both; }
 .hospital-main > *:nth-child(2) { animation-delay: 45ms; }
