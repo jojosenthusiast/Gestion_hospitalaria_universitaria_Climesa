@@ -91,7 +91,7 @@ final class DoctorRulesTests: XCTestCase {
         XCTAssertFalse(ReviewRules.isCritical(normal))
     }
 
-    func testValidacionesDeConsultaAltaYAccesoExcepcional() {
+    func testValidacionesDeConsultaYAlta() {
         XCTAssertNil(ConsultationRules.diagnosisCodeError("J06.9"))
         XCTAssertNotNil(ConsultationRules.diagnosisCodeError(" "))
         XCTAssertNotNil(ConsultationRules.prescriptionError(PrescriptionItemBody(medication: "Acetaminofén", dose: "", route: "oral", frequency: "c/8h", duration: "3 días", instructions: nil)))
@@ -100,8 +100,6 @@ final class DoctorRulesTests: XCTestCase {
         XCTAssertNotNil(DischargeRules.errors(type: .voluntaria, summary: "", voluntaryConsent: false, pending: [])["voluntaryConsent"])
         XCTAssertNotNil(DischargeRules.errors(type: .medica, summary: "", voluntaryConsent: false, pending: [DischargePendingBody(description: "Control", responsible: "")])["pending"])
         XCTAssertTrue(DischargeRules.errors(type: .medica, summary: "Evolución favorable, control en una semana.", voluntaryConsent: false, pending: []).isEmpty)
-        XCTAssertEqual(Set(ExceptionalAccessRules.errors(reason: "corto", hours: 30).keys), ["motivo", "horas"])
-        XCTAssertTrue(ExceptionalAccessRules.errors(reason: "Interconsulta por urgencia", hours: 4).isEmpty)
     }
 }
 

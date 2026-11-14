@@ -85,7 +85,7 @@ struct DoctorDayView: View {
                     }
                     if account.can("expediente.ver") {
                         NavigationLink {
-                            ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: entry.patientId, canRequestAccess: account.can("privacidad.solicitar_acceso")) }
+                            ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: entry.patientId) }
                         } label: { Text("day.record") }
                             .buttonStyle(ClimesaButtonStyle(kind: .secondary))
                     }
@@ -163,7 +163,7 @@ struct DoctorPatientsView: View {
                 if rows.isEmpty { EmptyStateView(title: L.text("patients.none"), symbol: "magnifyingglass") }
                 ForEach(rows) { patient in
                     NavigationLink {
-                        ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: patient.id, canRequestAccess: account.can("privacidad.solicitar_acceso")) }
+                        ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: patient.id) }
                     } label: {
                         SectionCard {
                             ListRow(title: patient.fullName, meta: patient.record) {
@@ -226,7 +226,7 @@ private struct ReviewDetailView: View {
             }
             if account.can("expediente.ver") {
                 NavigationLink {
-                    ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: order.patientId, canRequestAccess: account.can("privacidad.solicitar_acceso")) }
+                    ScreenFrame(title: "patients.record") { ClinicalHistoryView(patientId: order.patientId) }
                 } label: { Text("day.record") }
                     .buttonStyle(ClimesaButtonStyle(kind: .secondary))
             }

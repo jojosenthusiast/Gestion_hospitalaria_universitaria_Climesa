@@ -134,15 +134,6 @@ public struct DischargeBody: Encodable, Sendable, Equatable {
     }
 }
 
-/// `ExceptionalAccessRequestDto`
-public struct ExceptionalAccessBody: Encodable, Sendable, Equatable {
-    public let patientId: String
-    public let reason: String
-    public let hours: Int
-    enum CodingKeys: String, CodingKey { case patientId = "pacienteId", reason = "motivo", hours = "horas" }
-    public init(patientId: String, reason: String, hours: Int) { self.patientId = patientId; self.reason = reason; self.hours = hours }
-}
-
 public enum JSONBody {
     /// Bytes estables (claves ordenadas) del cuerpo; también sirven de huella para `SubmissionIntent`.
     public static func encode<Body: Encodable>(_ body: Body) throws -> Data {

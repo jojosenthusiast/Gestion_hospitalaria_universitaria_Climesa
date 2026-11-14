@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Estados del paciente que `StatusCatalog` no cubre: turno en fila, citas, vinculación, ambulancia y acceso excepcional.
+/// Estados del paciente que `StatusCatalog` no cubre: turno en fila, citas, vinculación, ambulancia.
 /// Mismos grupos de tono que las clases `.status-*` de web; un código sin entrada usa `StatusCatalog`.
 enum PatientStatus {
     private static let tones: [String: StatusTone] = [
@@ -9,8 +9,7 @@ enum PatientStatus {
         "aprobada": .success, "aprobado": .success, "negado": .danger,
         "por_confirmar": .warning, "descartada": .blocked,
         "en_proceso": .process, "firmada": .success, "abierta": .process,
-        "normal": .success, "alto": .warning, "bajo": .warning, "critico_alto": .danger, "critico_bajo": .danger,
-        "acceso_excepcional": .warning
+        "normal": .success, "alto": .warning, "bajo": .warning, "critico_alto": .danger, "critico_bajo": .danger
     ]
 
     static func style(for code: String, label: String? = nil) -> StatusStyle {

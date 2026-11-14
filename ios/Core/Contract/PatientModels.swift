@@ -237,8 +237,7 @@ public struct MyAccess: Decodable, Sendable, Equatable {
     public let role: String
     public let dataType: String
     public let reason: String
-    public let exceptional: Bool
-    enum CodingKeys: String, CodingKey { case date = "fecha", role = "rol", dataType = "tipoDato", reason = "motivo", exceptional = "accesoExcepcional" }
+    enum CodingKeys: String, CodingKey { case date = "fecha", role = "rol", dataType = "tipoDato", reason = "motivo" }
 }
 
 /// `PublicOccupancyResponse` de `GET /publico/ocupacion`.

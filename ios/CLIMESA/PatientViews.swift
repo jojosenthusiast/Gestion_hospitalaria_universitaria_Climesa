@@ -436,7 +436,7 @@ struct PatientSectionView: View {
             switch section {
             case .vinculacion: LinkRecordView()
             case .historial:
-                if let patientId = profile.patientId { ClinicalHistoryView(patientId: patientId, canRequestAccess: false) }
+                if let patientId = profile.patientId { ClinicalHistoryView(patientId: patientId) }
                 else { EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link") }
             case .ambulancia: AmbulanceRequestView()
             case .hospital: HospitalInfoView()
@@ -517,56 +517,22 @@ struct LinkRecordView: View {
 }
 
 /// I08 (paciente) e I22 (médico) · Historial: consultas, diagnósticos, recetas, resultados y hospitalizaciones.
-/// Si el médico no es tratante (403), puede pedir acceso excepcional con motivo y duración.
+/// Sin relación de atención, la API responde 403 y se muestra su mensaje.
 struct ClinicalHistoryView: View {
     let patientId: String
-    let canRequestAccess: Bool
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<ClinicalHistory>()
-    @State private var submission = Submission()
-    @State private var reason = ""
-    @State private var hours = 4
-    @State private var errors: [String: String] = [:]
-    @State private var requested: ExceptionalAccess?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             LoadState(loader: loader, retry: load) { history in HistoryContent(history: history) }
-            if canRequestAccess && loader.failure?.isForbidden == true { accessForm }
         }
         .task(id: live.snapshot.version([.consultations, .laboratory, .admissions, .access, .patient])) { await load() }
     }
 
-    @ViewBuilder private var accessForm: some View {
-        SectionCard(title: L.text("access.title")) {
-            if let requested {
-                PatientTag(requested.state.rawValue, label: requested.state.label)
-                EmptyNote("access.pending.body")
-            } else {
-                EmptyNote("access.body")
-                PatientTextArea(label: L.text("access.reason"), text: $reason, lines: 2...5, error: errors["motivo"])
-                Stepper(value: $hours, in: 1...24) { Text(verbatim: String(format: L.text("access.hours"), hours)).font(Typo.body).foregroundStyle(Theme.ink) }
-                FieldError(text: errors["horas"])
-                PatientSubmissionNotice(submission: submission)
-                ClimesaButton(title: L.text("access.submit"), loading: submission.busy) { Task { await requestAccess() } }
-            }
-        }
-    }
-
     private func load() async {
         await loader.load { try await account.client().get("/pacientes/\(patientId)/historial", as: ClinicalHistory.self) }
-    }
-
-    private func requestAccess() async {
-        errors = ExceptionalAccessRules.errors(reason: reason, hours: hours)
-        guard errors.isEmpty else { return }
-        let body = ExceptionalAccessBody(patientId: patientId, reason: reason.trimmingCharacters(in: .whitespacesAndNewlines), hours: hours)
-        var created: ExceptionalAccess?
-        let ok = await submission.run(body: body) { key in
-            created = try await account.client().send("POST", "/accesos-excepcionales", body: body, key: key, as: ExceptionalAccess.self)
-        }
-        if ok { requested = created }
     }
 }
 
@@ -786,9 +752,7 @@ struct MyAccessView: View {
             if rows.isEmpty { EmptyStateView(title: L.text("accesses.none"), symbol: "eye.slash") }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 SectionCard {
-                    ListRow(title: ClimesaDates.display(row.date), subtitle: row.reason, meta: "\(row.role) · \(row.dataType)") {
-                        if row.exceptional { PatientTag("acceso_excepcional", label: L.text("accesses.exceptional")) }
-                    }
+                    ListRow(title: ClimesaDates.display(row.date), subtitle: row.reason, meta: "\(row.role) · \(row.dataType)")
                 }
             }
         }

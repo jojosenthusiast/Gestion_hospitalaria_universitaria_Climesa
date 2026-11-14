@@ -69,7 +69,7 @@ final class ContractDecodingTests: XCTestCase {
         let view = try decode(PrehospitalView.self, #"{"serviceId":"s1","active":true,"priority":"roja","patientLinked":false,"clinical":true,"reports":[{"id":"r1","priority":"roja","estimatedArrival":"2026-11-20T15:10:00.000Z","capturedAt":"2026-11-20T15:00:00.000Z","receivedAt":"2026-11-20T15:00:01.000Z","reason":"Dolor torácico","vitalSigns":{"heartRate":110,"systolic":"90","alerta":true}}]}"#)
         XCTAssertEqual(view.reports.first?.vitalSigns?["heartRate"]?.text, "110")
         XCTAssertEqual(view.reports.first?.vitalSigns?["alerta"]?.text, "Sí")
-        let accesses = try decode([MyAccess].self, #"[{"fecha":"2026-11-20T15:00:00.000Z","rol":"MED","tipoDato":"expediente","motivo":"Atención","accesoExcepcional":false}]"#)
+        let accesses = try decode([MyAccess].self, #"[{"fecha":"2026-11-20T15:00:00.000Z","rol":"MED","tipoDato":"expediente","motivo":"Atención"}]"#)
         XCTAssertEqual(accesses.first?.role, "MED")
     }
 
@@ -83,8 +83,6 @@ final class ContractDecodingTests: XCTestCase {
     }
 
     func testLosCuerposSeCodificanConLosNombresDelContrato() throws {
-        let access = String(decoding: try JSONBody.encode(ExceptionalAccessBody(patientId: "p1", reason: "Interconsulta urgente", hours: 4)), as: UTF8.self)
-        XCTAssertEqual(access, #"{"horas":4,"motivo":"Interconsulta urgente","pacienteId":"p1"}"#)
         let start = String(decoding: try JSONBody.encode(ConsultationStartBody(appointmentId: "c1")), as: UTF8.self)
         XCTAssertEqual(start, #"{"appointmentId":"c1"}"#)
         let order = String(decoding: try JSONBody.encode(LabOrderBody(consultationId: "k1", exams: ["e1"], priority: .urgente)), as: UTF8.self)
