@@ -14,6 +14,7 @@ import org.json.JSONObject
 import sv.edu.catolica.climesa.data.ApiClient
 import sv.edu.catolica.climesa.data.AuthRequestException
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
+import sv.edu.catolica.climesa.domain.AppointmentEvents
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.AppointmentDoctor
 import sv.edu.catolica.climesa.domain.AppointmentSlot
@@ -68,7 +69,7 @@ class PatientAppointmentsViewModel @Inject constructor(
 
     fun startLive(channels: List<String>) {
         live.start(viewModelScope, channels) { signal ->
-            if (signal is RealtimeSignal.Event && (signal.event.entity == "cita" || signal.event.type.startsWith("cita.")) || signal is RealtimeSignal.Resync) load()
+            if (signal is RealtimeSignal.Event && AppointmentEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load()
         }
     }
 

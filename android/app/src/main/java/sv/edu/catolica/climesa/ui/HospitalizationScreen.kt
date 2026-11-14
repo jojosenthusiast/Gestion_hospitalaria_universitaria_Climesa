@@ -200,7 +200,7 @@ fun HospitalizationScreen(
         if (quickAction == QuickAction.ASSIGN_BED && QuickActions.allowed(QuickAction.ASSIGN_BED, profile?.permissions.orEmpty())) state.admissions.firstOrNull { it.state == "pendiente_cama" }?.let(model::open)
         onQuickActionHandled()
     }
-    LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
+    LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels); intake.startLive(it.channels) } }
     val permissions = profile?.permissions.orEmpty()
     val canAssignBed = "camas.asignar" in permissions
     if (intakeState.open) { AdmissionIntakeScreen(canAssignBed, modifier, intake); return }

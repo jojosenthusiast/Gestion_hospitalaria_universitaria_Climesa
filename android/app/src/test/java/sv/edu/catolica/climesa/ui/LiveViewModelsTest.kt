@@ -51,7 +51,8 @@ class LiveViewModelsTest {
         val bus = SignalBus(); val calls = mutableListOf<String>()
         val vm = RoleViewModel({ path -> calls += path; org.json.JSONObject() }, bus)
         vm.start(listOf("publico")); vm.load("/ambulancia"); runCurrent()
-        bus.signals.tryEmit(event("turno.publicado", "turno")); runCurrent()
+        // Los turnos sí cuentan aquí (tripulación de turno, RN-30); un paciente editado es de otra sección.
+        bus.signals.tryEmit(event("paciente.actualizado", "paciente")); runCurrent()
         assertEquals(1, calls.size)
         bus.signals.tryEmit(event("ambulancia.estado_cambiado", "ambulancia")); runCurrent()
         assertEquals(2, calls.size)
