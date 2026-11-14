@@ -41,6 +41,7 @@ class HospitalizationViewModelTest {
         vm.addPending(); vm.onPending(0, DischargePending("Control en consulta externa", "Dr. Ramírez"))
         vm.signDischarge(admission); runCurrent()
         val body = api.calls.single { it.first == "/admisiones/ad1/alta" }.third!!
+        assertEquals(4, body.getInt("version"))
         assertEquals("Evolución favorable, afebril 48 h.", body.getString("summary"))
         assertEquals("Dr. Ramírez", body.getJSONArray("pending").getJSONObject(0).getString("responsible"))
         assertNull(vm.state.value.discharge)

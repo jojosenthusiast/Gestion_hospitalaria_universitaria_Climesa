@@ -35,13 +35,14 @@ class HospitalizationRulesTest {
         assertNull(HospitalizationRules.dischargeError(DischargeType.VOLUNTARY, summary, emptyList(), true))
     }
 
-    @Test fun dischargeBodyCarriesTheTypedTextAndNoVersion() {
-        val body = HospitalizationRules.dischargeBody(DischargeType.MEDICAL, "  Evolución favorable.  ", listOf(DischargePending("Control", "Dra. López"), DischargePending()), false)
+    @Test fun dischargeBodyCarriesTheTypedTextAndTheAdmissionVersion() {
+        val body = HospitalizationRules.dischargeBody(6, DischargeType.MEDICAL, "  Evolución favorable.  ", listOf(DischargePending("Control", "Dra. López"), DischargePending()), false)
         assertEquals("medica", body.getString("type"))
         assertEquals("Evolución favorable.", body.getString("summary"))
         assertEquals(1, body.getJSONArray("pending").length())
+        assertEquals("Control", body.getJSONArray("pending").getJSONObject(0).getString("description"))
         assertEquals("Dra. López", body.getJSONArray("pending").getJSONObject(0).getString("responsible"))
-        assertFalse(body.has("version"))
+        assertEquals(6, body.getInt("version"))
         assertFalse(body.has("voluntaryConsent"))
     }
 
