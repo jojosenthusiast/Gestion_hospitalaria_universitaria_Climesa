@@ -107,5 +107,16 @@
     <string name="lab_orden_sin_catalogo">No hay exámenes activos en el catálogo.</string>
     <string name="lab_orden_panel">panel</string>
     <string name="lab_orden_urgente">Prioridad urgente</string>
-    <string name="lab_orden_emitir">Ordenar exámenes</string></resources>
+    <string name="lab_orden_emitir">Ordenar exámenes</string>
+    <string name="inventario_alertas_titulo">Alertas de mínimo</string>
+    <string name="inventario_alerta_articulo">%1$s · %2$s: por debajo del mínimo de %3$s %4$s</string>
+    <string name="inventario_bajo_minimo">Bajo mínimo</string>
+    <string name="mis_accesos_eyebrow">Mi expediente / Transparencia</string>
+    <string name="mis_accesos_titulo">Quién vio mi expediente</string>
+    <string name="mis_accesos_descripcion">Fecha, rol y motivo de cada consulta a tu información. No mostramos nombres del personal.</string>
+    <string name="mis_accesos_vacio">Nadie del personal ha consultado tu expediente todavía.</string>
+    <string name="mis_accesos_detalle">%1$s · motivo: %2$s</string>
+    <string name="mis_accesos_excepcional">Acceso excepcional aprobado por el Delegado de protección de datos</string>
+    <string name="mis_accesos_reintentar">Reintentar</string>
+    <string name="mis_accesos_actualizar">Actualizar</string></resources>
 
