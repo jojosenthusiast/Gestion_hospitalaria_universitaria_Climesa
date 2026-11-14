@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="turnos_filtros">Filtros</string>
+    <string name="turnos_filtros_con_cuenta">Filtros (%1$d)</string>
+    <string name="turnos_buscar_persona">Buscar persona</string>
+    <string name="turnos_buscar_persona_hint">Escribe un nombre; no distingue tildes ni mayúsculas.</string>
+    <string name="turnos_persona_campo">Persona</string>
+    <string name="turnos_area_campo">Área</string>
+    <string name="turnos_cambiar">Cambiar</string>
+    <string name="turnos_todos">Todos</string>
+    <string name="turnos_filtro_rol">Rol del personal</string>
+    <string name="turnos_filtro_area">Área de trabajo</string>
+    <string name="turnos_filtro_estado">Estado del turno</string>
+    <string name="turnos_paso_area">1. Área del turno</string>
+    <string name="turnos_paso_horario">2. Fecha y horario</string>
+    <string name="turnos_paso_personal">3. Personal</string>
+    <string name="turnos_area_hint">Escribe: Emergencia, Consulta, Laboratorio…</string>
+    <string name="turnos_fecha_inicio">Fecha de inicio (AAAA-MM-DD)</string>
+    <string name="turnos_hora_inicio">Hora de inicio (HH:mm)</string>
+    <string name="turnos_hora_fin">Hora de fin (HH:mm)</string>
+    <string name="turnos_termina_siguiente">Termina el día siguiente.</string>
+    <string name="turnos_tipo">Tipo de turno</string>
+    <string name="turnos_duracion">Duración: %1$s h</string>
+    <string name="turnos_elige_area">Elige primero el área del turno.</string>
+    <string name="turnos_elegibles">%1$d personas elegibles para esta área.</string>
+    <string name="turnos_otras_areas">Incluir personal de otras áreas (cobertura)</string>
+    <string name="turnos_sin_coincidencias">Nadie coincide. Prueba con otro rol o incluye personal de otras áreas.</string>
+    <string name="turnos_sin_conflictos">Sin conflictos de traslape ni descanso con los turnos cargados.</string>
+    <string name="turnos_conflicto_aviso">%1$s. Elige otra persona u otro horario.</string>
+    <string name="turnos_quitar_filtro">Quitar filtro %1$s</string>
+</resources>
