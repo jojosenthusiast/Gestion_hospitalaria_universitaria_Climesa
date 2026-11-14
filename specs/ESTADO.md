@@ -2,7 +2,7 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 45 de 131 (34%) · **Requisitos:** 221 · **Specs:** 20
+**Tareas:** 47 de 131 (35%) · **Requisitos:** 221 · **Specs:** 20
 
 ## Por spec
 
@@ -20,7 +20,7 @@
 | [109 Ambulancia](./109-ambulancia/spec.md) | En revisión | 14/3/0 | 2/10 | ██░░░░░░░░ |
 | [110 Privacidad y auditoría](./110-privacidad-auditoria/spec.md) | En revisión | 8/2/0 | 2/8 | ██░░░░░░░░ |
 | [111 Inventario de insumos](./111-inventario/spec.md) | En revisión | 7/1/0 | 3/4 | ████████░░ |
-| [112 Información pública y avisos](./112-informacion-publica/spec.md) | En revisión | 4/2/0 | 0/3 | ░░░░░░░░░░ |
+| [112 Información pública y avisos](./112-informacion-publica/spec.md) | En revisión | 4/2/0 | 2/3 | ███████░░░ |
 | [113 Métricas y tablero](./113-metricas-tablero/spec.md) | En revisión | 5/1/0 | 0/4 | ░░░░░░░░░░ |
 | [114 Avisos y alarmas](./114-avisos-alarmas/spec.md) | En revisión | 6/4/0 | 0/3 | ░░░░░░░░░░ |
 | [120 Cliente web](./120-cliente-web/spec.md) | En revisión | 10/0/0 | 3/5 | ██████░░░░ |
@@ -35,9 +35,9 @@
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
 | S2 | 24 a 30 oct | 24/36 | 1/1 | ███████░░░ |
-| S3 | 31 oct a 6 nov | 6/29 | 0/0 | ██░░░░░░░░ |
+| S3 | 31 oct a 6 nov | 7/29 | 0/0 | ██░░░░░░░░ |
 | S4 | 7 a 13 nov | 0/22 | 0/0 | ░░░░░░░░░░ |
-| S5 | 14 a 20 nov | 0/8 | 2/23 | █░░░░░░░░░ |
+| S5 | 14 a 20 nov | 0/8 | 3/23 | █░░░░░░░░░ |
 
 ## Para el avance del 31 de octubre (tareas R de S1 y S2)
 
