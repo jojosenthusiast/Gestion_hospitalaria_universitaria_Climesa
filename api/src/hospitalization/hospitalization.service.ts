@@ -6,6 +6,7 @@ import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { VersionConflictException } from '../platform/problem';
+import { requireCurrentEnrollment } from '../platform/enrollment';
 import { AdmissionDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
 
 type Row = Record<string, any>;
@@ -176,6 +177,7 @@ export class HospitalizationService {
     return this.commands.run(actor, 'alta.firmar', key, dto, async c => {
       const admission = await this.admission(c, id, true);
       if (admission.state !== 'hospitalizado') throw new ConflictException('Solo se puede firmar el alta de un paciente hospitalizado.');
+      await requireCurrentEnrollment(c, actor.staffId, this.clock.today());
       const pending = dto.pending ?? [];
       if (pending.some(item => !item.description?.trim() || !item.responsible?.trim())) throw new BadRequestException('Cada pendiente debe tener responsable.');
       if (dto.type === 'voluntaria' && !dto.voluntaryConsent) throw new BadRequestException('El alta voluntaria necesita constancia.');

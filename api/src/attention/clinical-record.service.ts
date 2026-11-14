@@ -6,6 +6,7 @@ import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException } from '../platform/problem';
+import { requireCurrentEnrollment } from '../platform/enrollment';
 import { DiagnosisDto, PrescriptionDto, VitalSignsDto } from './clinical-record.dto';
 
 type Row = Record<string, any>;
@@ -21,10 +22,12 @@ export class ClinicalRecordService {
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName"
       FROM atencion.consulta k JOIN pacientes.paciente p ON p.id=k.paciente_id WHERE k.id=$1 ${lock ? 'FOR UPDATE OF k' : ''}`, [id])).rows[0] as Row | undefined;
     if (!row) throw new NotFoundException('No se encontró la consulta.');
-    const ownPatient = actor.patientId && actor.patientId === row.patientId;
+    // SEG-07: the patient sees only a signed note (privacidad.md §2); a draft does not exist for them.
+    const ownPatient = actor.patientId && actor.patientId === row.patientId && contextsOf(actor, 'expediente.ver').includes('propio_revisado');
     const ownDoctor = actor.staffId && actor.staffId === row.doctorId;
     const relation = actor.staffId ? (await c.query(`SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz LIMIT 1`, [row.patientId, actor.staffId, this.clock.now()])).rowCount : 0;
     const canRelation = contextsOf(actor, 'expediente.ver').includes('relacion') || contextsOf(actor, 'signos.registrar').includes('x') || contextsOf(actor, 'consulta.registrar').includes('relacion') || contextsOf(actor, 'recetas.emitir').includes('relacion');
+    if (ownPatient && !ownDoctor && !(canRelation && relation) && row.state !== 'firmada') throw new NotFoundException('No se encontró la consulta.');
     if (!ownPatient && !ownDoctor && !(canRelation && relation)) throw new ForbiddenException('No tienes relación de atención con este paciente.');
     return row;
   }
@@ -32,6 +35,7 @@ export class ClinicalRecordService {
   async detail(actor: Actor, id: string) {
     return this.db.transaction(async c => {
       const consultation = await this.consultation(c, actor, id);
+      await this.commands.audit(c, actor, { action: 'consulta.leer', entity: 'consulta', entityId: id, patientId: consultation.patientId, permission: 'expediente.ver' });
       const [vitals, diagnoses, prescriptions] = await Promise.all([
         c.query(`SELECT id,tomado_en AS "takenAt",tomado_por AS "takenBy",pa_sistolica AS systolic,pa_diastolica AS diastolic,fc AS "heartRate",fr AS "respiratoryRate",temperatura AS temperature,sat_o2 AS "oxygenSaturation",peso_kg AS "weightKg",talla_cm AS "heightCm" FROM atencion.signos_vitales WHERE consulta_id=$1 ORDER BY tomado_en DESC`, [id]),
         c.query(`SELECT id,cie10 AS code,principal,nota AS note FROM atencion.diagnostico WHERE consulta_id=$1 ORDER BY principal DESC,id`, [id]),
@@ -77,6 +81,7 @@ export class ClinicalRecordService {
     return this.commands.run(actor, 'recetas.emitir', key, dto, async c => {
       const consultation = await this.consultation(c, actor, id, true);
       if (consultation.state !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y no admite recetas nuevas.');
+      await requireCurrentEnrollment(c, actor.staffId, this.clock.today());
       const prescription = (await c.query(`INSERT INTO atencion.receta(consulta_id) VALUES($1) RETURNING id,emitida_en AS "issuedAt"`, [id])).rows[0];
       const items: Row[] = [];
       for (const item of dto.items) {

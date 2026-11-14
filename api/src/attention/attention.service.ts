@@ -76,13 +76,17 @@ export class AttentionService {
   async catalogs(actor: Actor) {
     const canManagePatients = contextsOf(actor, 'citas.agendar').length > 0;
     const [patients, doctors] = await Promise.all([
-      this.db.query(`SELECT id, expediente AS record,
+      this.db.transaction(async c => { const rows = (await c.query(`SELECT id, expediente AS record,
         coalesce(nullif(concat_ws(' ',nombres,primer_apellido,segundo_apellido),''),alias_provisional) AS "fullName",
         (estado IN ('activo','provisional')) AS active
         FROM pacientes.paciente
         WHERE estado IN ('activo','provisional') AND ($1::boolean OR id=$2::uuid)
         ORDER BY primer_apellido,nombres,id
-        LIMIT 500`, [canManagePatients, actor.patientId]),
+        LIMIT 500`, [canManagePatients, actor.patientId])).rows;
+        // SEG-02: the scheduling catalog lists patients, so its read is audited in aggregate.
+        await this.commands.audit(c, actor, { action: 'citas.catalogo_leer', entity: 'paciente', permission: canManagePatients ? 'citas.agendar' : 'citas.solicitar', detail: { patientIds: rows.map(row => row.id) } });
+        return rows;
+      }),
       this.db.query(`SELECT p.id,p.nombres AS "givenNames",p.apellidos AS surnames,p.tipo AS type,
         p.especialidad AS specialty,p.area_id AS "areaId",e.nombre AS area,p.activo AS active
         FROM personal.persona p LEFT JOIN infra.espacio e ON e.id=p.area_id
@@ -149,12 +153,16 @@ export class AttentionService {
     const ownPatient = contextsOf(actor, 'citas.ver').includes('propio') && actor.patientId ? actor.patientId : patientId ?? null;
     const ownDoctor = contextsOf(actor, 'citas.ver').includes('propio') && actor.staffId ? actor.staffId : doctorId ?? null;
     await this.allowedToSee(actor, ownPatient ?? undefined, ownDoctor ?? undefined);
-    return this.db.query(`SELECT c.id,c.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
+    return this.db.transaction(async c => { const rows = (await c.query(`SELECT c.id,c.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       c.medico_id AS "doctorId",concat_ws(' ',m.nombres,m.apellidos) AS "doctorName",lower(c.horario) AS start,upper(c.horario) AS "end",
       c.motivo AS reason,c.estado AS state,c.origen AS origin,c.motivo_rechazo AS "rejectionReason",c.version
       FROM atencion.cita c JOIN pacientes.paciente p ON p.id=c.paciente_id JOIN personal.persona m ON m.id=c.medico_id
       WHERE c.horario && tstzrange($1,$2) AND ($3::uuid IS NULL OR c.paciente_id=$3) AND ($4::uuid IS NULL OR c.medico_id=$4)
-      ORDER BY lower(c.horario),c.id`, [start, end, ownPatient, ownDoctor]);
+      ORDER BY lower(c.horario),c.id`, [start, end, ownPatient, ownDoctor])).rows;
+      // SEG-02: aggregated read audit with every patient listed.
+      await this.commands.audit(c, actor, { action: 'citas.leer', entity: 'cita', permission: 'citas.ver', detail: { patientIds: [...new Set(rows.map(row => row.patientId))] } });
+      return rows;
+    });
   }
 
   async create(actor: Actor, dto: AppointmentCreateDto | PatientAppointmentRequestDto, patientRequest: boolean, key?: string) {

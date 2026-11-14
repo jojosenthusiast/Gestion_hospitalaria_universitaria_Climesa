@@ -54,12 +54,16 @@ export class QueueService {
     // SEG-01: una cuenta con solo `propio` y sin expediente vinculado no tiene número que ver.
     if (!whole && !actor.patientId) return [];
     const own = whole ? null : actor.patientId;
-    return this.db.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
+    return this.db.transaction(async c => { const rows = (await c.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       t.estado AS state,t.consultorio_id AS "officeId",t.llamados,t.version,t.emitido_en AS "issuedAt"
       FROM atencion.ticket_fila t LEFT JOIN pacientes.paciente p ON p.id=t.paciente_id
       WHERE t.fecha=$1::date AND ($2::text IS NULL OR t.servicio=$2) AND ($3::uuid IS NULL OR t.paciente_id=$3)
-      ORDER BY t.servicio,t.numero`, [date, service ?? null, own]);
+      ORDER BY t.servicio,t.numero`, [date, service ?? null, own])).rows;
+      // SEG-02: aggregated read audit with every patient listed.
+      await this.commands.audit(c, actor, { action: 'fila.leer', entity: 'ticket_fila', permission: 'fila.ver', detail: { date, patientIds: [...new Set(rows.map(row => row.patientId).filter(Boolean))] } });
+      return rows;
+    });
   }
 
   async issue(actor: Actor, dto: QueueIssueDto, key?: string) {
