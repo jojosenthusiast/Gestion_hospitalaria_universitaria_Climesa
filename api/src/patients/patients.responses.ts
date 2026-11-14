@@ -66,6 +66,20 @@ export class PatientDetailResponse {
   @ClassArrayProp(PatientHistoryEntryResponse, { optional: true, description: 'Solo con pacientes.editar_demograficos' }) history?: PatientHistoryEntryResponse[];
 }
 
+export class PatientPickerItemResponse {
+  @UuidProp() id!: string;
+  @StrProp({ description: 'Número de expediente' }) record!: string;
+  @StrProp() fullName!: string;
+  @IntProp({ optional: true, description: 'Edad en años; solo si el rol puede ver la fecha de nacimiento' }) age?: number | null;
+}
+
+export class PatientPickerResponse {
+  @ClassArrayProp(PatientPickerItemResponse) items!: PatientPickerItemResponse[];
+  @IntProp() offset!: number;
+  @IntProp() limit!: number;
+  @BoolProp({ description: 'Hay más resultados después de esta página' }) hasMore!: boolean;
+}
+
 export class PatientCreatedResponse {
   @UuidProp() id!: string;
   @StrProp({ description: 'Número de expediente' }) record!: string;

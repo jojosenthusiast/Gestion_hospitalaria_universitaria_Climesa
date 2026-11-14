@@ -4,10 +4,10 @@ import { SupabaseAuthGuard } from '../auth';
 import { PermissionGuard } from '../auth';
 import { RequirePermission } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { PatientSearchDto, PatientSearchQueryDto } from './patient.dto';
+import { PatientPickerQueryDto, PatientSearchDto, PatientSearchQueryDto } from './patient.dto';
 import { PatientCreateDto, PatientUpdateDto, PatientStateDto } from './patient-write.dto';
 import { PatientsService } from './patients.service';
-import { DuplicateCaseResponse, PatientCandidateResponse, PatientCreatedResponse, PatientDetailResponse, PatientSearchRecordResponse, PatientStateResponse } from './patients.responses';
+import { DuplicateCaseResponse, PatientCandidateResponse, PatientCreatedResponse, PatientDetailResponse, PatientPickerResponse, PatientSearchRecordResponse, PatientStateResponse } from './patients.responses';
 import { IdVersionResponse } from '../platform/responses';
 @ApiTags('patients')
 @ApiBearerAuth()
@@ -16,7 +16,9 @@ import { IdVersionResponse } from '../platform/responses';
 export class PatientsController {
   constructor(private readonly patients: PatientsService) {}
   @Get() @RequirePermission('pacientes.buscar') @ApiOperation({summary:'Buscar por nombre, fonética, DUI o expediente; devuelve campos mínimos'}) @ApiOkResponse({ type: [PatientCandidateResponse] })
-  search(@Req() req:ActorRequest,@Query() q:PatientSearchQueryDto) { return this.patients.search(req.actor,q.query,q.limit); }
+  search(@Req() req:ActorRequest,@Query() q:PatientSearchQueryDto) { return this.patients.search(req.actor,q.query,q.limit,undefined,q.offset); }
+  @Get('selector') @RequirePermission('pacientes.buscar') @ApiOperation({summary:'Selector de pacientes: id, expediente, nombre y edad, paginado y sin tildes'}) @ApiOkResponse({ type: PatientPickerResponse })
+  picker(@Req() req:ActorRequest,@Query() q:PatientPickerQueryDto) { return this.patients.picker(req.actor,q.query,q.limit,q.offset); }
   @Post('busquedas') @RequirePermission('pacientes.buscar') @ApiOperation({summary:'Buscar y obtener constancia de diez minutos, ligada a la cuenta y criterios'}) @ApiCreatedResponse({ type: PatientSearchRecordResponse })
   recordSearch(@Req() req:ActorRequest,@Body() dto:PatientSearchDto) { return this.patients.recordSearch(req.actor,dto.query); }
   @Get('casos-duplicado') @RequirePermission('pacientes.gestionar_duplicados') @ApiOperation({summary:'Casos abiertos de posible duplicado con los dos pacientes mínimos'}) @ApiOkResponse({ type: [DuplicateCaseResponse] })

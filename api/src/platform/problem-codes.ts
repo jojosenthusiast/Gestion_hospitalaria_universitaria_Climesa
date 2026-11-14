@@ -7,7 +7,7 @@ export const PROBLEM_CODES = [
   // Generic, by HTTP status (errors.filter.ts).
   'validacion', 'no_autenticado', 'sin_permiso', 'no_encontrado', 'conflicto', 'limite_excedido', 'no_disponible', 'error_interno', 'error',
   // Platform.
-  'idempotency_key_invalida', 'idempotencia_conflicto', 'version_conflicto', 'politica_no_vigente', 'demasiadas_solicitudes', 'transicion_invalida',
+  'idempotency_key_invalida', 'idempotencia_conflicto', 'version_conflicto', 'dui_duplicado', 'posible_duplicado', 'politica_no_vigente', 'demasiadas_solicitudes', 'transicion_invalida',
   // Database rules (P0001).
   'ultimo_administrador', 'capacidad_excedida', 'capacidad_menor_que_camas', 'ciclo_en_arbol', 'consulta_firmada',
   // Personnel, spaces and beds.

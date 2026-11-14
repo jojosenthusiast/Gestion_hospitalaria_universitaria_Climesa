@@ -93,9 +93,9 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   const count=(await fixture.pg.query<{n:number}>('SELECT count(*)::int AS n FROM plataforma.outbox WHERE entidad_id=$1',[patientId])).rows[0].n;expect(count).toBe(1);
   expect((await call('REC','POST','/pacientes',{...body,phone:'7111-1111'},key)).status).toBe(409);
  });
- test('rechaza búsqueda vencida, ajena o de otra identidad y DUI repetido',async()=>{
+ test('rechaza búsqueda vencida o ajena y DUI repetido; la búsqueda ya no debe parecerse a los datos',async()=>{
   const x=await call('REC','POST','/pacientes/busquedas',{query:'Otra Persona'});
-  expect((await call('REC','POST','/pacientes',{...patient,searchToken:x.body.token,searchQuery:'Otra Persona'})).status).toBe(400);
+  expect((await call('REC','POST','/pacientes',{...patient,searchToken:x.body.token,searchQuery:'Otra Persona'})).status).toBe(409);
   const s=await call('REC','POST','/pacientes/busquedas',{query:'Ana Lucía'});await fixture.pg.query("UPDATE pacientes.busqueda_registro SET vence_en='2020-01-01' WHERE token=$1",[s.body.token]);
   expect((await call('REC','POST','/pacientes',{...patient,searchToken:s.body.token,searchQuery:'Ana Lucía'})).status).toBe(400);
   const foreign=await call('MED','POST','/pacientes/busquedas',{query:'Ana Lucía'});
