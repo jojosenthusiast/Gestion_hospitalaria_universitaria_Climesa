@@ -23,7 +23,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.FactCheck
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -82,25 +83,44 @@ private fun compactLabel(section: AndroidSection): String = when (section) {
     else -> section.label
 }
 
+/** E-04/E-07: every section has its own icon, so the bar and the "Más" sheet never repeat one. */
 internal fun iconFor(section: AndroidSection): ImageVector = when (section) {
     AndroidSection.HOME -> Icons.Default.Home
     AndroidSection.PROFILE -> Icons.Default.AccountCircle
-    AndroidSection.SHIFTS, AndroidSection.PLANNING -> Icons.Default.Schedule
-    AndroidSection.APPOINTMENTS, AndroidSection.MY_APPOINTMENTS -> Icons.Default.DateRange
-    AndroidSection.PATIENTS, AndroidSection.STAFF, AndroidSection.UNIDENTIFIED_PATIENT -> Icons.Default.Person
-    AndroidSection.BEDS, AndroidSection.ADMISSION, AndroidSection.WARD -> Icons.Default.Bed
-    AndroidSection.UNIT, AndroidSection.SERVICE, AndroidSection.DISPATCH, AndroidSection.AMBULANCE_REQUEST,
-    AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.AMBULANCE_RECEPTION -> Icons.Default.LocalShipping
-    AndroidSection.RESULTS,
-    AndroidSection.RESULT_REVIEW -> Icons.Default.Science
-    AndroidSection.PATIENT_QUEUE, AndroidSection.QUEUE -> Icons.AutoMirrored.Filled.List
-    AndroidSection.HISTORY, AndroidSection.RECORD, AndroidSection.LOG, AndroidSection.MY_ACCESS -> Icons.Default.Description
+    AndroidSection.SHIFTS -> Icons.Default.Schedule
+    AndroidSection.APPOINTMENTS -> Icons.Default.DateRange
+    AndroidSection.MY_APPOINTMENTS -> Icons.Default.EventAvailable
+    AndroidSection.PATIENTS -> Icons.Default.Groups
+    AndroidSection.UNIDENTIFIED_PATIENT -> Icons.Default.PersonSearch
+    AndroidSection.BEDS -> Icons.Default.Bed
+    AndroidSection.ADMISSION -> Icons.Default.AssignmentInd
+    AndroidSection.WARD -> Icons.Default.Apartment
+    AndroidSection.UNIT -> Icons.Default.LocalShipping
+    AndroidSection.SERVICE -> Icons.Default.Emergency
+    AndroidSection.DISPATCH -> Icons.Default.SupportAgent
+    AndroidSection.AMBULANCE_REQUEST -> Icons.Default.Sos
+    AndroidSection.AMBULANCE_ARRIVAL -> Icons.Default.AirportShuttle
+    AndroidSection.AMBULANCE_RECEPTION -> Icons.Default.MoveToInbox
+    AndroidSection.RESULTS -> Icons.Default.Science
+    AndroidSection.RESULT_REVIEW -> Icons.AutoMirrored.Filled.FactCheck
+    AndroidSection.PATIENT_QUEUE -> Icons.Default.HourglassTop
+    AndroidSection.QUEUE -> Icons.Default.ConfirmationNumber
+    AndroidSection.HISTORY -> Icons.Default.History
+    AndroidSection.RECORD -> Icons.Default.FolderShared
+    AndroidSection.LOG -> Icons.AutoMirrored.Filled.ListAlt
+    AndroidSection.MY_ACCESS -> Icons.Default.Shield
     AndroidSection.LINK_RECORD -> Icons.Default.Link
+    AndroidSection.LINKING -> Icons.Default.HowToReg
     AndroidSection.SUPPLIES -> Icons.Default.Inventory
-    AndroidSection.MEDICAL_DAY, AndroidSection.CONSULTATIONS, AndroidSection.HOSPITALIZED,
-    AndroidSection.INPATIENT_CARE, AndroidSection.VITAL_SIGNS -> Icons.Default.LocalHospital
+    AndroidSection.MEDICAL_DAY -> Icons.Default.Today
+    AndroidSection.CONSULTATIONS -> Icons.Default.MedicalServices
+    AndroidSection.HOSPITALIZED -> Icons.Default.Hotel
+    AndroidSection.INPATIENT_CARE -> Icons.Default.Healing
+    AndroidSection.VITAL_SIGNS -> Icons.Default.MonitorHeart
     AndroidSection.HOSPITAL_INFO -> Icons.Default.Info
-    else -> Icons.Default.Dashboard
+    AndroidSection.ASSISTANT_STATION -> Icons.Default.MeetingRoom
+    AndroidSection.CLEANING -> Icons.Default.CleaningServices
+    AndroidSection.PREHOSPITAL_REPORT -> Icons.Default.NoteAlt
 }
 
 @Composable

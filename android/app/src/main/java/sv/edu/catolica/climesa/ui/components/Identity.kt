@@ -1,7 +1,6 @@
 package sv.edu.catolica.climesa.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -34,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -123,7 +123,8 @@ internal object IdentityCatalog {
 
 @Composable
 internal fun IdentityChip(identity: Identity, modifier: Modifier = Modifier, label: String = identity.label, compact: Boolean = false) {
-    val dark = isSystemInDarkTheme()
+    // E-17: follow the app theme (its own light/dark toggle), not the system setting.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val fg = Color(if (dark) identity.tone.darkFg else identity.tone.lightFg)
     val bg = Color(if (dark) identity.tone.darkBg else identity.tone.lightBg)
     Surface(

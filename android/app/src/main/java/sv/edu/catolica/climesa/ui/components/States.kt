@@ -99,7 +99,11 @@ internal fun LoadingState(
     modifier: Modifier = Modifier,
     title: String = stringResource(R.string.ui_cargando_titulo),
     detail: String? = stringResource(R.string.ui_cargando_detalle),
-) = StateLayout({ StateSymbol(null) }, title, detail, modifier.semantics { liveRegion = LiveRegionMode.Polite })
+) {
+    // MA-OPS-01: after a few seconds the first load explains that the server may be waking up.
+    val shown = if (rememberSlowServer(true)) stringResource(R.string.servidor_activando) else detail
+    StateLayout({ StateSymbol(null) }, title, shown, modifier.semantics { liveRegion = LiveRegionMode.Polite })
+}
 
 /** Thin bar shown above stale content while a silent refresh runs (web `.refresh-hint`). */
 @Composable

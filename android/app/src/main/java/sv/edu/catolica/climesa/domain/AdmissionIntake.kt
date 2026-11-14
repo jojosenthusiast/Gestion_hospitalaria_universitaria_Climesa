@@ -100,21 +100,53 @@ object AdmissionIntake {
 
     private fun withBed(d: AdmissionDraft, canAssignBed: Boolean, now: Instant) = if (canAssignBed && isImmediate(d.at, now)) d.bed else null
 
-    fun body(d: AdmissionDraft, canAssignBed: Boolean, now: Instant = Instant.now()): JSONObject = JSONObject()
-        .put("patientId", d.patient!!.id).put("origin", d.origin!!.wire).put("originId", d.originRecord!!.id).put("motive", d.motive.trim())
-        .put("requestedCategory", d.category).put("isolation", d.isolation).put("unstable", d.unstable).put("postSurgical", d.postSurgical)
-        .put("attendingDoctorId", d.doctor!!.id).put("scheduledAt", instantOf(d.at)!!.toString())
-        .put("visitorsAllowed", d.visitorsAllowed).put("visitorsMax", if (d.visitorsAllowed) d.visitorsMax else 0)
-        .apply {
-            if (d.isolation && d.isolationType != null) put("isolationType", d.isolationType.wire)
-            withBed(d, canAssignBed, now)?.let { put("bedId", it.id).put("bedVersion", it.version) }
-        }
+    /** The validated values every request of the intake needs; null fields never reach the API (MOV-02). */
+    private class Ready(val patientId: String, val origin: OriginKind, val originId: String, val doctorId: String, val at: Instant, val category: String)
 
-    fun feasibilityPath(d: AdmissionDraft, canAssignBed: Boolean, now: Instant = Instant.now()): String {
+    private fun ready(d: AdmissionDraft): Ready? {
+        val patient = d.patient ?: return null
+        val origin = d.origin ?: return null
+        val record = d.originRecord ?: return null
+        val doctor = d.doctor ?: return null
+        val at = instantOf(d.at) ?: return null
+        val category = d.category ?: return null
+        if (patient.id.isBlank() || record.id.isBlank() || doctor.id.isBlank()) return null
+        return Ready(patient.id, origin, record.id, doctor.id, at, category)
+    }
+
+    /** What is still missing to send the admission, in Spanish, or null when [body] can be built. */
+    fun missing(d: AdmissionDraft): String? = when {
+        d.patient == null || d.patient.id.isBlank() -> "Elige al paciente."
+        d.origin == null -> "Elige el origen del ingreso."
+        d.originRecord == null || d.originRecord.id.isBlank() -> "Elige el registro de origen del paciente."
+        d.motive.trim().length !in MOTIVE_MIN..MOTIVE_MAX -> "Escribe el motivo del ingreso, de $MOTIVE_MIN a $MOTIVE_MAX caracteres."
+        instantOf(d.at) == null -> "Indica la fecha y la hora como aaaa-mm-dd hh:mm."
+        d.doctor == null || d.doctor.id.isBlank() -> "Elige al médico tratante."
+        d.category == null -> "Elige la categoría de habitación."
+        else -> null
+    }
+
+    /** `POST /admisiones` body, or null while [missing] reports something. */
+    fun body(d: AdmissionDraft, canAssignBed: Boolean, now: Instant = Instant.now()): JSONObject? {
+        if (missing(d) != null) return null
+        val r = ready(d) ?: return null
+        return JSONObject()
+            .put("patientId", r.patientId).put("origin", r.origin.wire).put("originId", r.originId).put("motive", d.motive.trim())
+            .put("requestedCategory", r.category).put("isolation", d.isolation).put("unstable", d.unstable).put("postSurgical", d.postSurgical)
+            .put("attendingDoctorId", r.doctorId).put("scheduledAt", r.at.toString())
+            .put("visitorsAllowed", d.visitorsAllowed).put("visitorsMax", if (d.visitorsAllowed) d.visitorsMax else 0)
+            .apply {
+                if (d.isolation && d.isolationType != null) put("isolationType", d.isolationType.wire)
+                withBed(d, canAssignBed, now)?.let { put("bedId", it.id).put("bedVersion", it.version) }
+            }
+    }
+
+    fun feasibilityPath(d: AdmissionDraft, canAssignBed: Boolean, now: Instant = Instant.now()): String? {
         fun enc(v: String) = java.net.URLEncoder.encode(v, "UTF-8")
+        val r = ready(d) ?: return null
         val parts = mutableListOf(
-            "patientId=${enc(d.patient!!.id)}", "origin=${d.origin!!.wire}", "originId=${enc(d.originRecord!!.id)}", "doctorId=${enc(d.doctor!!.id)}",
-            "at=${enc(instantOf(d.at)!!.toString())}", "category=${d.category}", "isolation=${d.isolation}", "visitorsAllowed=${d.visitorsAllowed}",
+            "patientId=${enc(r.patientId)}", "origin=${r.origin.wire}", "originId=${enc(r.originId)}", "doctorId=${enc(r.doctorId)}",
+            "at=${enc(r.at.toString())}", "category=${r.category}", "isolation=${d.isolation}", "visitorsAllowed=${d.visitorsAllowed}",
             "visitorsMax=${if (d.visitorsAllowed) d.visitorsMax else 0}",
         )
         withBed(d, canAssignBed, now)?.let { parts += "bedId=${enc(it.id)}" }
