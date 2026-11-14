@@ -42,7 +42,9 @@ struct RootView:View {
 struct AuthView:View {
     @EnvironmentObject private var account:AccountModel
     @State private var registering=false
-    @State private var name=""; @State private var email=""; @State private var password=""; @State private var confirmation=""
+    // El correo sobrevive a segundo plano con SceneStorage; la contraseña solo en memoria (account.draft), nunca en disco.
+    @SceneStorage("auth.email") private var email=""
+    @State private var name=""; @State private var password=""; @State private var confirmation=""
     // TEMPORARY testing aid (docs/operacion/login-de-prueba.md): empty unless the build was made with CLIMESA_DEMO_LOGIN = YES.
     private let demoAccounts = DemoLogin.accounts(info: Bundle.main.infoDictionary)
     @State private var demoRole:String?
@@ -74,6 +76,10 @@ struct AuthView:View {
                 Divider(); Text("auth.footer").font(Brand.body(12)).foregroundStyle(.secondary)
             }.padding(24).frame(maxWidth:560,alignment:.leading).frame(maxWidth:.infinity)
         }.background(Brand.paper).scrollDismissesKeyboard(.interactively).disabled(account.busy)
+            .onAppear { name=account.draft.name; password=account.draft.password; confirmation=account.draft.confirmation }
+            .onChange(of:name) { _,value in account.draft.name=value }
+            .onChange(of:password) { _,value in account.draft.password=value }
+            .onChange(of:confirmation) { _,value in account.draft.confirmation=value }
     }
     func field(_ label:LocalizedStringKey,value:Binding<String>,type:UITextContentType)->some View { VStack(alignment:.leading,spacing:10) { Text(label).font(Brand.body(13)); TextField(label,text:value).textContentType(type); Divider() } }
 }

@@ -213,3 +213,12 @@ Cambios de producto autorizados por el dueño. Quedan registrados porque agregan
 | Tema | Pregunta | Opción aplicada |
 |---|---|---|
 | Ronda 2 · avisos | `avisos.publicar` solo lo tiene el Jefe de Operaciones; la observación 14 dice «JOP/ADM según permisos». ¿Debe poder publicar también Administración? | No: se respeta `permisos.csv` (D-050, segregación de funciones). Si se quiere, es una fila nueva en `permisos.csv` y una migración. |
+## iOS ronda 3 (observaciones del dueño, 2026-11-14)
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| Editar mis datos (PAC) | `PATCH /pacientes/{id}` exige `pacientes.editar_demograficos`, que solo tiene Recepción; el paciente no puede corregir su ficha con los endpoints actuales. ¿Se le da un permiso propio (`pacientes.editar_propios`, contexto `propio`, solo contacto) o un `PATCH /me/paciente`? | iOS: pantalla "Mis datos" con la ficha de `GET /me/paciente` y el formulario de contacto (teléfono, correo, dirección, motivo) detrás del permiso; sin él muestra "pide ayuda en Recepción". Cuando la API conceda el permiso al paciente, el formulario aparece sin cambiar la app. |
+| Ubicación del hospital | No hay dato público de la dirección ni de coordenadas (`/publico/*` solo trae ocupación, médicos y avisos). | "Ubicación" abre Apple Maps con una búsqueda de "Hospital CLIMESA" y muestra la guía de pisos con `/publico/ocupacion`. ¿Se publica la dirección y las coordenadas (por ejemplo en `/publico/hospital`) para fijar el pin exacto? |
+| Bitácora de ambulancia (MED) | El médico no tiene `ambulancia.ver_bitacora` (solo JOP, REC, PAR propio y DPD), así que `GET /ambulancia/bitacora` le respondería 403. | iOS muestra el estado de la unidad (`ambulancia.ver_estado`) y, con el permiso, la bitácora con búsqueda, fechas, prioridad y resultado. Sin permiso explica que la bitácora requiere otro permiso. ¿Se concede `ambulancia.ver_bitacora` al médico? |
+| Atajo para publicar turno (RN-30) | El bloqueo por falta de paramédico se explica en iOS, pero MED y PAC no tienen `turnos.planificar`, así que no hay atajo. | iOS muestra el motivo y la acción (`dispatchBlock`) y le dice a quien no planifica turnos que avise a quien los planifica. |
+

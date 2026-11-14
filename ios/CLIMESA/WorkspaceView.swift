@@ -52,11 +52,10 @@ struct RoleTabsView:View {
                 NavigationStack {
                     ScrollView {
                         VStack(alignment:.leading,spacing:25) {
-                            Text(verbatim:"\(L.text(RolePolicy.labelKey(role)).uppercased()) / CLIMESA").font(Typo.eyebrow).foregroundStyle(Theme.primaryText)
                             Text(LocalizedStringKey(tab.titleKey)).font(Typo.display).foregroundStyle(Theme.ink).fixedSize(horizontal:false,vertical:true).accessibilityAddTraits(.isHeader)
                             content(for:tab)
                         }.padding(24).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
-                    }.safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(verbatim:"climesa")).navigationBarTitleDisplayMode(.inline)
+                    }.safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
                         .toolbarBackground(Theme.navy,for:.navigationBar).toolbarBackground(.visible,for:.navigationBar).toolbarColorScheme(.dark,for:.navigationBar)
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
                         .refreshable { await refresh(tab) }
@@ -86,7 +85,7 @@ struct RoleTabsView:View {
         case .fila: PatientQueueView()
         case .citas: PatientAppointmentsView()
         case .examenes: PatientExamsView(profile:profile)
-        case .mas: PatientMoreView(profile:profile,role:role)
+        case .mas: MoreView(profile:profile,role:role)
         }
     }
 

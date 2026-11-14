@@ -159,6 +159,14 @@ public struct AmbulanceStatus: Decodable, Sendable, Equatable {
         public let id: String
         public let plate: String
         public let state: String
+        public let stateReason: String?
+        public let stateSince: String?
+    }
+    /// `DispatchBlockResponse`: por qué no se puede despachar la unidad y qué hacer (RN-30).
+    public struct DispatchBlock: Decodable, Sendable, Equatable {
+        public let code: String
+        public let message: String
+        public let action: String
     }
     public struct ActiveService: Decodable, Sendable, Equatable {
         public let id: String
@@ -170,6 +178,8 @@ public struct AmbulanceStatus: Decodable, Sendable, Equatable {
     }
     public let unit: UnitInfo
     public let activeService: ActiveService?
+    public let paramedicOnDuty: Bool?
+    public let dispatchBlock: DispatchBlock?
 }
 
 /// Valor de un objeto libre del contrato (por ejemplo `vitalSigns`) mostrado como texto.

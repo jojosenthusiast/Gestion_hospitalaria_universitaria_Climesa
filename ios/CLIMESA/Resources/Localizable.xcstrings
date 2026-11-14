@@ -2607,6 +2607,677 @@
           }
         }
       }
+    },
+    "hospital.percent": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%ld %% ocupado"
+          }
+        }
+      }
+    },
+    "hospital.occupancy.total": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocupación total"
+          }
+        }
+      }
+    },
+    "hospital.free": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "camas libres"
+          }
+        }
+      }
+    },
+    "hospital.occupied": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "camas ocupadas"
+          }
+        }
+      }
+    },
+    "hospital.updated": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizado a las %@"
+          }
+        }
+      }
+    },
+    "hospital.floor.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin piso asignado"
+          }
+        }
+      }
+    },
+    "hospital.occupied.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%ld ocupadas"
+          }
+        }
+      }
+    },
+    "location.eyebrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ubicación"
+          }
+        }
+      }
+    },
+    "location.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hospital CLIMESA"
+          }
+        }
+      }
+    },
+    "location.address.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La dirección exacta todavía no está publicada en la aplicación. Abre el mapa para buscar el hospital."
+          }
+        }
+      }
+    },
+    "location.open_maps": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir en Mapas"
+          }
+        }
+      }
+    },
+    "location.floors": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guía de pisos"
+          }
+        }
+      }
+    },
+    "location.beds": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%ld camas"
+          }
+        }
+      }
+    },
+    "location.map_query": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hospital CLIMESA"
+          }
+        }
+      }
+    },
+    "room.waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu hospitalización está confirmada y espera una cama."
+          }
+        }
+      }
+    },
+    "room.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No tienes una habitación asignada"
+          }
+        }
+      }
+    },
+    "room.none.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aquí aparece tu cama cuando estés hospitalizado."
+          }
+        }
+      }
+    },
+    "room.eyebrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mi habitación"
+          }
+        }
+      }
+    },
+    "room.treating_only": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo la ve el médico tratante."
+          }
+        }
+      }
+    },
+    "mydata.birth": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nacimiento"
+          }
+        }
+      }
+    },
+    "mydata.dui": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DUI"
+          }
+        }
+      }
+    },
+    "mydata.phone": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teléfono"
+          }
+        }
+      }
+    },
+    "mydata.email": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Correo"
+          }
+        }
+      }
+    },
+    "mydata.address": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dirección"
+          }
+        }
+      }
+    },
+    "mydata.edit": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar mis datos"
+          }
+        }
+      }
+    },
+    "mydata.readonly": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para corregir tus datos pide ayuda en Recepción: tu cuenta todavía no puede editarlos desde la aplicación."
+          }
+        }
+      }
+    },
+    "mydata.reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motivo del cambio"
+          }
+        }
+      }
+    },
+    "mydata.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar cambios"
+          }
+        }
+      }
+    },
+    "mydata.saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datos actualizados."
+          }
+        }
+      }
+    },
+    "section.misDatos": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mis datos"
+          }
+        }
+      }
+    },
+    "section.miHabitacion": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mi habitación"
+          }
+        }
+      }
+    },
+    "section.ubicacion": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ubicación"
+          }
+        }
+      }
+    },
+    "section.agenda": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agenda"
+          }
+        }
+      }
+    },
+    "section.ambulanciaEstado": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambulancia"
+          }
+        }
+      }
+    },
+    "exams.filter": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estado del examen"
+          }
+        }
+      }
+    },
+    "exams.filter.all": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos"
+          }
+        }
+      }
+    },
+    "exams.filter.pendiente": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pendiente"
+          }
+        }
+      }
+    },
+    "exams.filter.enProceso": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En proceso"
+          }
+        }
+      }
+    },
+    "exams.filter.completado": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completado"
+          }
+        }
+      }
+    },
+    "exams.filter.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay exámenes con ese estado."
+          }
+        }
+      }
+    },
+    "history.forbidden.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expediente protegido"
+          }
+        }
+      }
+    },
+    "patients.treating_only": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo verás el expediente de los pacientes que atiendes."
+          }
+        }
+      }
+    },
+    "agenda.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No tienes citas próximas."
+          }
+        }
+      }
+    },
+    "agenda.past": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar citas anteriores"
+          }
+        }
+      }
+    },
+    "ambulance.log.restricted": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu cuenta ve el estado de la unidad. La bitácora requiere otro permiso."
+          }
+        }
+      }
+    },
+    "ambulance.unit": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unidad"
+          }
+        }
+      }
+    },
+    "ambulance.since": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desde %@"
+          }
+        }
+      }
+    },
+    "ambulance.active": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servicio activo"
+          }
+        }
+      }
+    },
+    "ambulance.log": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitácora"
+          }
+        }
+      }
+    },
+    "ambulance.log.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar en la bitácora"
+          }
+        }
+      }
+    },
+    "ambulance.log.search.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Origen, destino, municipio o tripulación."
+          }
+        }
+      }
+    },
+    "ambulance.log.filters": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtros"
+          }
+        }
+      }
+    },
+    "ambulance.log.filters.active": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtros (%ld activos)"
+          }
+        }
+      }
+    },
+    "ambulance.log.clear": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar filtros"
+          }
+        }
+      }
+    },
+    "ambulance.log.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay servicios con esos filtros."
+          }
+        }
+      }
+    },
+    "ambulance.log.priority": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prioridad"
+          }
+        }
+      }
+    },
+    "ambulance.log.state": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultado"
+          }
+        }
+      }
+    },
+    "ambulance.log.any": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todas"
+          }
+        }
+      }
+    },
+    "ambulance.log.from": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desde"
+          }
+        }
+      }
+    },
+    "ambulance.log.to": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hasta"
+          }
+        }
+      }
+    },
+    "ambulance.log.apply": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aplicar filtros"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -129,6 +129,7 @@ public enum PatientLabRules {
     /// Texto del estado para el paciente: un completado sin revisar sigue "En revisión médica".
     public static func statusText(_ order: LabOrder) -> String {
         if order.state == .completado && order.reviewedAt == nil { return "En revisión médica" }
+        if order.state == .completado { return "Resultados disponibles" }
         return order.state.label
     }
 
