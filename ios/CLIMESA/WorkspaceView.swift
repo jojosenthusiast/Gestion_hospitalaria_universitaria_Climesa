@@ -39,6 +39,7 @@ struct RoleTabsView:View {
     @EnvironmentObject private var account:AccountModel
     @State private var selection:AppTab
     @State private var live=LiveViewModel()
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var shifts=ShiftModel()
 
     init(profile:AccessProfile,role:String,tabs:[AppTab]) {
@@ -64,11 +65,15 @@ struct RoleTabsView:View {
         }
         .environment(live)
         // Tiempo real: se suscribe al entrar y la conexión se cierra al cancelar la tarea. No hay temporizadores de datos.
-        .task(id:profile.channels) {
+        // `connectionGeneration` sube al volver a primer plano o al recuperar la red para reconectar de inmediato.
+        .task(id:"\(profile.channels.joined(separator:"|"))#\(live.connectionGeneration)") {
             let service=await account.makeRealtime()
             await live.run(service:service,channels:profile.channels)
         }
         .onChange(of:live.snapshot.profileVersion) { _,_ in Task { await account.refreshProfile() } }
+        .onChange(of:scenePhase) { _,value in
+            if value == .background { live.sceneEnteredBackground() } else if value == .active { live.sceneBecameActive() }
+        }
         .onChange(of:role) { _,_ in selection=tabs.first ?? .perfil }
     }
 
