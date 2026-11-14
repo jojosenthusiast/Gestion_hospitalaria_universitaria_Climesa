@@ -108,6 +108,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/paciente": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ficha del paciente autenticado */
+        get: operations["MePatientController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -912,6 +929,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pacientes/{id}/historial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Historial clínico: relación, acceso excepcional o propio revisado */
+        get: operations["ClinicalHistoryController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/laboratorio/catalogo": {
         parameters: {
             query?: never;
@@ -1026,6 +1060,23 @@ export interface paths {
         put?: never;
         /** Cancelar una orden pendiente o en proceso */
         post: operations["LaboratoryController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/laboratorio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mis exámenes: estado siempre; valores solo revisados */
+        get: operations["MeLaboratoryController_mine"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1345,6 +1396,74 @@ export interface paths {
         get: operations["PrivacyController_mine"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cuentas/vinculacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** El paciente pide vincular su cuenta con DUI y fecha de nacimiento */
+        post: operations["AccountLinkingController_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cuentas/vinculaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vinculaciones pendientes con el expediente que coincide */
+        get: operations["AccountLinkingController_pending"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cuentas/vinculaciones/{id}/aprobar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aprobar vinculación tras verificar identidad */
+        post: operations["AccountLinkingController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cuentas/vinculaciones/{id}/rechazar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rechazar vinculación con motivo obligatorio */
+        post: operations["AccountLinkingController_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1726,6 +1845,25 @@ export interface components {
             version: number;
             motivo: string;
         };
+        LinkRequestDto: {
+            /**
+             * @description DUI con o sin guion.
+             * @example 00000000-0
+             */
+            dui: string;
+            /**
+             * Format: date
+             * @example 1990-01-31
+             */
+            birth: string;
+        };
+        LinkApproveDto: {
+            version: number;
+        };
+        LinkRejectDto: {
+            version: number;
+            reason: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1908,6 +2046,23 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MePatientController_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3096,6 +3251,25 @@ export interface operations {
             };
         };
     };
+    ClinicalHistoryController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     LaboratoryController_catalog: {
         parameters: {
             query?: never;
@@ -3277,6 +3451,23 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeLaboratoryController_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3785,6 +3976,99 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AccountLinkingController_request: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AccountLinkingController_pending: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AccountLinkingController_approve: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkApproveDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AccountLinkingController_reject: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkRejectDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -354,6 +354,27 @@
         "x-permiso": "pacientes.editar_demograficos"
       }
     },
+    "/api/v1/me/paciente": {
+      "get": {
+        "operationId": "MePatientController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ficha del paciente autenticado",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.ver_ficha"
+      }
+    },
     "/api/v1/auth/me": {
       "get": {
         "operationId": "AuthController_me",
@@ -2666,6 +2687,36 @@
         "x-permiso": "recetas.emitir"
       }
     },
+    "/api/v1/pacientes/{id}/historial": {
+      "get": {
+        "operationId": "ClinicalHistoryController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historial clínico: relación, acceso excepcional o propio revisado",
+        "tags": [
+          "clinical-record"
+        ],
+        "x-permiso": "expediente.ver"
+      }
+    },
     "/api/v1/laboratorio/catalogo": {
       "get": {
         "operationId": "LaboratoryController_catalog",
@@ -3044,6 +3095,27 @@
           "laboratory"
         ],
         "x-permiso": "laboratorio.cancelar"
+      }
+    },
+    "/api/v1/me/laboratorio": {
+      "get": {
+        "operationId": "MeLaboratoryController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mis exámenes: estado siempre; valores solo revisados",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "resultados.ver"
       }
     },
     "/api/v1/admisiones": {
@@ -4074,6 +4146,193 @@
           "privacy"
         ],
         "x-permiso": "auditoria.mis_accesos"
+      }
+    },
+    "/api/v1/cuentas/vinculacion": {
+      "post": {
+        "operationId": "AccountLinkingController_request",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El paciente pide vincular su cuenta con DUI y fecha de nacimiento",
+        "tags": [
+          "accounts"
+        ],
+        "x-permiso": "cuenta.vincular"
+      }
+    },
+    "/api/v1/cuentas/vinculaciones": {
+      "get": {
+        "operationId": "AccountLinkingController_pending",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vinculaciones pendientes con el expediente que coincide",
+        "tags": [
+          "accounts"
+        ],
+        "x-permiso": "cuentas.verificar"
+      }
+    },
+    "/api/v1/cuentas/vinculaciones/{id}/aprobar": {
+      "post": {
+        "operationId": "AccountLinkingController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkApproveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aprobar vinculación tras verificar identidad",
+        "tags": [
+          "accounts"
+        ],
+        "x-permiso": "cuentas.verificar"
+      }
+    },
+    "/api/v1/cuentas/vinculaciones/{id}/rechazar": {
+      "post": {
+        "operationId": "AccountLinkingController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkRejectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rechazar vinculación con motivo obligatorio",
+        "tags": [
+          "accounts"
+        ],
+        "x-permiso": "cuentas.verificar"
       }
     }
   },
@@ -5490,6 +5749,55 @@
         "required": [
           "version",
           "motivo"
+        ]
+      },
+      "LinkRequestDto": {
+        "type": "object",
+        "properties": {
+          "dui": {
+            "type": "string",
+            "example": "00000000-0",
+            "description": "DUI con o sin guion."
+          },
+          "birth": {
+            "type": "string",
+            "format": "date",
+            "example": "1990-01-31"
+          }
+        },
+        "required": [
+          "dui",
+          "birth"
+        ]
+      },
+      "LinkApproveDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "LinkRejectDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "reason"
         ]
       }
     }
