@@ -32,7 +32,6 @@ fun HospitalInfoScreen(modifier: Modifier = Modifier, model: HospitalInfoViewMod
         item {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 SectionIntro(stringResource(R.string.hospital_info_eyebrow), stringResource(R.string.hospital_info_titulo), stringResource(R.string.hospital_info_detalle))
-                LiveIndicator(Modifier.fillMaxWidth())
             }
         }
         if (state.loading) item { LoadingState() }

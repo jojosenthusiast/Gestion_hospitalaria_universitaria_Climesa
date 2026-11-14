@@ -22,21 +22,6 @@ private fun BedAction.labelRes() = when (this) {
     BedAction.VERIFY_CLEANING -> R.string.camas_verificar_limpieza
 }
 
-@Composable
-fun ConnectionBadge(state: ConnectionState) {
-    Text(
-        stringResource(
-            when (state) {
-                ConnectionState.LIVE -> R.string.camas_en_vivo
-                ConnectionState.RECONNECTING -> R.string.camas_reconectando
-                ConnectionState.OFFLINE -> R.string.camas_sin_conexion
-            },
-        ),
-        style = MaterialTheme.typography.labelSmall,
-        color = if (state == ConnectionState.LIVE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-    )
-}
-
 /** Tablero de camas: el estado vive en [BedsViewModel]; esta vista solo lo muestra y le manda eventos. */
 @Composable
 fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: BedsViewModel = viewModel()) {
@@ -46,8 +31,7 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
         item {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 SectionIntro("Hospital / CLIMESA", stringResource(R.string.camas_titulo), stringResource(R.string.op_camas_detalle))
-                if (state.connection == ConnectionState.LIVE) LiveIndicator()
-                else NoticeBanner(NoticeKind.WARNING, stringResource(if (state.connection == ConnectionState.RECONNECTING) R.string.camas_reconectando else R.string.camas_sin_conexion))
+                if (state.connection != ConnectionState.LIVE) NoticeBanner(NoticeKind.WARNING, stringResource(if (state.connection == ConnectionState.RECONNECTING) R.string.camas_reconectando else R.string.camas_sin_conexion))
                 if (state.partialLive) NoticeBanner(NoticeKind.WARNING, stringResource(R.string.tiempo_real_parcial))
             }
         }

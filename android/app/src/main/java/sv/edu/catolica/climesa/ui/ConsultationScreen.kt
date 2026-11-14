@@ -57,7 +57,6 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     val retry = { model.clearMessages(); model.load() }
     PageList(modifier) {
         item { SectionIntro("Medicina / Atención", "Mi consultorio", "Agenda propia y registro clínico conectado a cada cita confirmada.") }
-        if (profile != null) item { LiveIndicator() }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         when {
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
