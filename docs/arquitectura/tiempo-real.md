@@ -64,6 +64,8 @@ El broadcast en vivo y `GET /eventos` entregan la misma forma, publicada en el c
 
 ## Eventos
 
+> Desde la migración `20261119004000_tiempo_real_canales_ampliados.sql`, la base amplía en `plataforma.outbox` los canales de turnos, personal, usuarios, duplicados, ambulancia, avisos, citas (médico) y admisiones (paciente). Los canales que siguen son los que pone la API; la ampliación está en "Cobertura entre plataformas".
+
 Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato). `api/tests/contrato-api.spec.ts` falla si el código o una migración emiten un tipo que no está ahí, o si la lista tiene uno que nadie emite. Los canales `rol:*` salen de los permisos indicados.
 
 | Evento | Entidad | Emite | Canales (permiso → roles) | Spec |
@@ -115,3 +117,48 @@ Pendientes (no emitidos; su spec no está implementada): push con la app cerrada
 ## Límites conocidos
 
 - **Pantalla de auditoría (W32, `#/auditoria`).** La web la sirve con la `version` del canal en vivo, pero ninguna mutación emite hoy un evento de auditoría: las filas de `plataforma.auditoria` no pasan por el outbox. La pantalla solo se refresca cuando llega otro evento (que sube `version`), al reconectar o al recargar a mano. No hay evento `auditoria.*` en el catálogo; crearlo queda fuera de este corte y se decide con 110-T04.
+
+## Cobertura entre plataformas (auditoría 2026-11-14)
+
+Requisito del dueño: lo que un rol cambia en una plataforma aparece en las demás sin recargar (un turno asignado en la web aparece en Android; una cita agendada en iOS aparece en la web y se atiende en Android).
+
+**No se usa `postgres_changes`.** La publicación `supabase_realtime` no tiene tablas, a propósito: los clientes nunca leen tablas de Supabase (regla 4). Los cambios viajan como Broadcast desde `plataforma.outbox` (`outbox_publicar`) y la autorización es la política `sghu_escuchar_canales` sobre `realtime.messages` (`realtime.topic() = any(acceso.canales_actuales())`). Por eso la privacidad no depende de las RLS de cada tabla: el evento es delgado (tipo, entidad, id, versión) y cada cliente vuelve a pedir el dato a la API con su permiso.
+
+Revisión de producción (solo lectura, 2026-11-14): la publicación existe con 0 tablas, la política `sghu_escuchar_canales` está activa, los disparadores `outbox_derivar` y `outbox_publicar` existen, y los 17 grupos de eventos del outbox tienen `publicado_en` (ninguno atascado).
+
+### Matriz
+
+"Web" y "Android" indican si la pantalla vuelve a pedir sus datos al llegar el evento. "Canales" es quién recibe el evento después de la migración `20261119004000_tiempo_real_canales_ampliados.sql`.
+
+| Módulo | Entidad del evento | Web | Android | Canales (permiso → roles) | Antes de esta revisión |
+|---|---|---|---|---|---|
+| Turnos | `turno` | Sí: `/turnos`, `/citas`, `/ambulancia`, médicos disponibles al ingresar | Sí: planificación, mis turnos, citas, ingreso guiado, ambulancia del portal | JOP, ADM, la persona del turno y todo rol con `turnos.ver` | Solo JOP y ADM: REC, MED, ENF, PAR y AST no veían turnos nuevos |
+| Citas | `cita` | Sí: citas, agenda del médico, fila | Sí: citas de recepción y del paciente, consulta, tablero | `citas.ver` (sin propio), el paciente y la cuenta del médico de la cita | El médico nunca recibía la cita (su `citas.ver` es propio). Android no refrescaba horarios libres al cambiar un turno |
+| Fila | `ticket_fila` | Sí | Sí | `fila.ver`, `fila.llamar`, `fila.gestionar`, el paciente | Sin cambio |
+| Consultas | `consulta` | Sí | Sí | `expediente.ver` y el permiso del paso; el paciente al firmar | Sin cambio |
+| Laboratorio | `orden_laboratorio` | Sí | Sí | `laboratorio.ver_cola`, `resultados.ver`; el paciente al revisar | Sin cambio |
+| Admisiones y camas (incluye el bloqueo por aislamiento, `20261119004100`) | `admision`, `cama`, `espacio` | Sí; el mapa de camas del ingreso también sigue `espacio` | Sí; el ingreso guiado (A34) ahora recarga médicos y mapa de camas en vivo | `admision.ver`, `camas.*`, `espacios.ver` y la cuenta del paciente internado | El paciente no recibía su admisión; el ingreso guiado de Android no estaba suscrito |
+| Ambulancia | `unidad`, `solicitud`, `servicio` | Sí; la tripulación de turno sigue `turno` | Sí; el portal ya no recarga con cada ubicación en vivo | Canal `ambulancia` y roles con `ambulancia.ver_estado` o `ver_bitacora` (MED, DPD...); la ubicación en vivo solo en `ambulancia` | MED y DPD no recibían cambios de estado ni bitácora |
+| Inventario | `articulo` | Sí | Sí | `inventario.ver`, `inventario.mover` | Crear, editar o eliminar un artículo y crear o editar un lote no emitían evento; ahora los emite la base (`20261119004100`) |
+| Signos vitales | `paciente` | Sí: expediente e historial | Sí: signos | `signos.registrar`, `expediente.ver` | Sin cambio |
+| Avisos | `aviso` | Sí: `/me/avisos`, `/avisos` | Sí: avisos del tablero | Público: `publico` y toda cuenta con sesión (`sesion.perfil`). Dirigido: sus roles. Siempre: `avisos.publicar` | Un aviso público solo iba a `publico`, que web y Android no escuchan con sesión: no aparecía hasta recargar |
+| Pacientes y duplicados | `paciente`, `caso_duplicado` | Sí | Sí | Permisos de pacientes; duplicados a `pacientes.gestionar_duplicados` | Duplicados solo a REC (JOP también los revisa) |
+| Personal y usuarios | `personal`, `usuario` | Sí | Sí | ADM, JOP y roles con `personal.ver` o `usuarios.ver` | DPD no recibía cambios de usuarios |
+| Vinculación de cuentas | `vinculacion_paciente` | Sí | Sí | `cuentas.verificar`, el solicitante | Sin cambio |
+| Información pública | `publico` | Sí (pantalla sin sesión, canal `publico`) | No (ver límites) | `publico` | Sin cambio |
+| Métricas | `metricas` | Sí | Sí (tablero) | `metricas.ver` | Sin cambio |
+| Auditoría | — | Bajo demanda (cada lectura se audita) | No aplica | — | Por diseño |
+
+### Volver a la app o a la pestaña
+
+Un socket puede quedar muerto sin cerrarse (teléfono bloqueado, equipo suspendido). Ninguna plataforma consulta por reloj; recupera al volver:
+
+- **Web** (`web/src/lib/live.ts`): al volver a ver la pestaña tras al menos 30 s oculta (`RESUME_STALE_MS`), al restaurarse desde la caché de páginas (`pageshow` persistido) o con el evento `online`, hace una consulta de recuperación a `GET /eventos` e invalida todas las vistas. Un vistazo corto a otra pestaña no pide nada.
+- **Android** (`data/realtime/AppWakeups.kt`): cuando la app vuelve al frente tras al menos 30 s en segundo plano, o cuando la red vuelve tras perderse (`ConnectivityManager`, permiso `ACCESS_NETWORK_STATE`), el repositorio cierra el socket y reconecta sin esperar el reintento. Luego recupera desde el cursor y emite `Resync`, y cada ViewModel vuelve a pedir sus datos. Se usan los callbacks de `Application`, sin `lifecycle-process`.
+
+### Límites que quedan
+
+- **Eventos que emite la base y no la API:** `20261119004100_tiempo_real_eventos_faltantes.sql` emite `inventario.actualizado` al cambiar artículos o lotes, y `cama.estado_cambiado` por cada cama que se bloquea o libera por aislamiento (el bloqueo manual lo anuncia la API). Cuando la API los emita, el disparador sobra y se retira con su reversión.
+- **Android, información pública:** `HospitalInfoViewModel` se suscribe solo a `publico`, que el repositorio descarta. Se pone al día al abrirse.
+- **Android, Mis datos y Mis accesos:** no están suscritos. Mis datos se edita solo por el propio paciente, y Mis accesos lee una función retirada (`20261117002000`).
+- **Consulta en Android:** el diálogo no sigue `signos.registrados` tomados fuera de la consulta.

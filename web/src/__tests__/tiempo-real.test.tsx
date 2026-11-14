@@ -16,7 +16,7 @@ vi.mock('../lib/supabase', () => ({
   supabase: { realtime: { setAuth: realtime.setAuth }, channel: realtime.channel, removeChannel: realtime.removeChannel },
 }));
 
-import { INVALIDATION_BATCH_MS, useLive } from '../lib/live';
+import { INVALIDATION_BATCH_MS, RESUME_STALE_MS, useLive } from '../lib/live';
 
 const perfil = (channels: string[]): AccessProfile => ({
   id: 'u-1', user: { id: 'u-1' }, email: 'prueba@example.test', name: 'Cuenta de prueba', roles: ['JOP'], platforms: ['web'],
@@ -205,6 +205,47 @@ describe('tiempo real sin sondeo', () => {
     await vaciar();
     expect(consultas(api, '/eventos')).toBe(2);
     expect(result.current.status).toBe('live');
+  });
+
+  it('al volver a una pestaña oculta un buen rato hace una recuperación e invalida todo; un vistazo corto no pide nada', async () => {
+    const visible = vi.spyOn(document, 'visibilityState', 'get');
+    const mostrar = (estado: 'hidden' | 'visible') => act(() => { visible.mockReturnValue(estado); document.dispatchEvent(new Event('visibilitychange')); });
+    try {
+      const { api, result } = montarHook();
+      await vaciar();
+      act(() => canales()[0].estado('SUBSCRIBED'));
+      await lote();
+      const base = result.current.version;
+      mostrar('hidden');
+      await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+      mostrar('visible');
+      await vaciar();
+      expect(consultas(api, '/eventos')).toBe(0);
+      mostrar('hidden');
+      await act(async () => { await vi.advanceTimersByTimeAsync(RESUME_STALE_MS + 1_000); });
+      expect(consultas(api, '/eventos')).toBe(0);
+      mostrar('visible');
+      await vaciar();
+      await lote();
+      expect(consultas(api, '/eventos')).toBe(1);
+      expect(result.current.version).toBe(base + 1);
+      expect(result.current.status).toBe('live');
+    } finally {
+      visible.mockRestore();
+    }
+  });
+
+  it('al restaurarse desde la caché de páginas del navegador recupera e invalida', async () => {
+    const { api, result } = montarHook();
+    await vaciar();
+    act(() => canales()[0].estado('SUBSCRIBED'));
+    await lote();
+    const base = result.current.version;
+    act(() => { window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true })); });
+    await vaciar();
+    await lote();
+    expect(consultas(api, '/eventos')).toBe(1);
+    expect(result.current.version).toBe(base + 1);
   });
 
   it('al desmontar quita los canales y deja de escuchar la red', async () => {

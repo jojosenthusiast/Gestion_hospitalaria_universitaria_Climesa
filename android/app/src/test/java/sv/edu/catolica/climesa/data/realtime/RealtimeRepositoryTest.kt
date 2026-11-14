@@ -3,6 +3,7 @@
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -131,6 +132,50 @@ class RealtimeRepositoryTest {
         runCurrent()
         assertTrue(signals.contains(RealtimeSignal.State(ConnectionState.OFFLINE)))
         assertTrue(h.catchUps.isEmpty())
+    }
+
+    private fun wakingRepository(h: Harness, wakeups: MutableSharedFlow<Unit>, backoff: Long = 10) = SupabaseRealtimeRepository(
+        websocketUrl = "wss://ejemplo.test/socket",
+        accessToken = { "token-ejemplo" },
+        catchUp = { cursor -> h.catchUps += cursor; h.recovered },
+        sockets = h.factory,
+        heartbeatMillis = 1_000_000,
+        backoffMillis = { backoff },
+        wakeups = wakeups,
+    )
+
+    @Test fun alVolverAlFrenteOConLaRedReconectaRecuperaYPideResincronizar() = runTest {
+        val h = Harness()
+        val wakeups = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val signals = mutableListOf<RealtimeSignal>()
+        backgroundScope.launch { wakingRepository(h, wakeups).observe(channels).collect { signals += it } }
+        runCurrent()
+        h.sockets[0].receive(joined("rol:MED")); h.sockets[0].receive(joined("rol:ENF"))
+        runCurrent()
+        val resyncs = signals.count { it == RealtimeSignal.Resync }
+        wakeups.emit(Unit)
+        runCurrent()
+        assertTrue("el socket viejo se cierra", h.sockets[0].closed)
+        assertEquals("reconecta sin esperar el reintento", 2, h.sockets.size)
+        h.sockets[1].receive(joined("rol:MED")); h.sockets[1].receive(joined("rol:ENF"))
+        runCurrent()
+        assertEquals("recupera desde el cursor conocido", listOf("0", "9"), h.catchUps)
+        assertEquals(resyncs + 1, signals.count { it == RealtimeSignal.Resync })
+        assertEquals(RealtimeSignal.State(ConnectionState.LIVE), signals.last())
+    }
+
+    @Test fun unaSenalDuranteLaEsperaDeReintentoReconectaEnSeguida() = runTest {
+        val h = Harness()
+        val wakeups = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val signals = mutableListOf<RealtimeSignal>()
+        backgroundScope.launch { wakingRepository(h, wakeups, backoff = 60_000).observe(channels).collect { signals += it } }
+        runCurrent()
+        h.sockets[0].inbox.trySend(SocketEvent.Closed("red"))
+        runCurrent()
+        assertEquals(1, h.sockets.size)
+        wakeups.emit(Unit)
+        runCurrent()
+        assertEquals("la red volvio: no espera el minuto de reintento", 2, h.sockets.size)
     }
 
     private fun TestScope.collectInto(signals: MutableList<RealtimeSignal>, repo: SupabaseRealtimeRepository, list: List<String> = channels) {

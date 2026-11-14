@@ -38,12 +38,15 @@ object AppModule {
         override suspend fun send(path:String,method:String,body:JSONObject):Any=api.request(path,method,body)
     }
     /** Un solo socket para toda la app: los ViewModels que piden los mismos canales lo comparten. */
-    @Provides @Singleton fun realtime(auth:SupabaseAuthRepository,api:ApiClient):RealtimeRepository=SharedRealtime(
+    /** Volver al frente o recuperar la red reconecta el tiempo real y cada pantalla vuelve a pedir sus datos. */
+    @Provides @Singleton fun wakeups():sv.edu.catolica.climesa.data.realtime.AppWakeups=sv.edu.catolica.climesa.data.realtime.AppWakeups()
+    @Provides @Singleton fun realtime(auth:SupabaseAuthRepository,api:ApiClient,wakeups:sv.edu.catolica.climesa.data.realtime.AppWakeups):RealtimeRepository=SharedRealtime(
         upstream=SupabaseRealtimeRepository(
             websocketUrl=RealtimeProtocol.websocketUrl(BuildConfig.SUPABASE_URL,BuildConfig.SUPABASE_PUBLISHABLE_KEY),
             accessToken={auth.restoreSession()?.accessToken},
             catchUp={cursor->RealtimeProtocol.parseCatchUp(api.request("/eventos?after=$cursor") as JSONObject)},
             sockets=OkHttpRealtimeSocketFactory(),
+            wakeups=wakeups.wakeups,
         ),
         scope=CoroutineScope(SupervisorJob()+Dispatchers.Default),
     )

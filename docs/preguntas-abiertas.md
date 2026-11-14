@@ -258,3 +258,11 @@ Decisión del dueño (2026-11-14): la ambulancia necesita paramédico **y** moto
 | Invariante en la base | RN-30 dependía del reloj de la API; la base no la garantizaba. | La base garantiza lo que no depende del reloj: la unidad no pasa a En Servicio sin paramédico y motorista en la tripulación del servicio (20261119002000). |
 | FR-109-06 | La spec solo nombra al paramédico. | No se edita `specs/109-ambulancia/spec.md` sin decisión registrada: queda pendiente que el equipo actualice FR-109-06 para incluir al motorista. |
 | Alerta de cobertura | ¿Dónde se ve que faltará tripulación? | Turnos (web y Android) muestra los tramos de los próximos 7 días sin paramédico o sin motorista con turno publicado o en curso. |
+
+## Tiempo real entre plataformas (rama `feat/tiempo-real`)
+
+| Tema | Pregunta | Decisión conservadora tomada |
+|---|---|---|
+| Canales en la API | `personnel.service.ts` e `invitations.service.ts` ponen `rol:JOP`/`rol:ADM` a mano (regla 8), y varios eventos no llegaban a todos los que leen ese dato. ¿Se corrige en la API? | La base amplía los canales al insertar en el outbox, derivándolos del catálogo de permisos (20261119004000). Queda pendiente que la API use `channelsFor` en esos servicios; la ampliación de la base es idempotente con ese cambio. |
+| Eventos que faltaban | Crear, editar o eliminar un artículo o lote no emitía `inventario.actualizado`; aislar una habitación bloqueaba camas sin `cama.estado_cambiado`. ¿Lo emite la API o la base? | Lo emite la base con disparadores (20261119004100), en la misma transacción. Si la API los emite después, se retiran los disparadores con su reversión. |
+| Avisos programados | Un aviso con inicio de vigencia futuro no emite nada cuando empieza a regir. | Sin cambio: aparece al siguiente evento, al reconectar o al volver a la app (no se agrega un reloj, regla 9). |
