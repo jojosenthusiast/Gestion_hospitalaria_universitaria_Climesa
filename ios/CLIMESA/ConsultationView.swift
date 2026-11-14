@@ -265,7 +265,12 @@ struct ConsultationView: View {
         let ok = await starting.run(body: body) { key in
             started = try await account.client().send("POST", "/consultas", body: body, key: key, as: ConsultationStartResult.self)
         }
-        if ok, let started { consultationId = started.id }
+        if ok, let started { consultationId = started.id; return }
+        // Ya estaba iniciada por este médico (otro toque, la web o una visita anterior a este número): se retoma.
+        if let existing = starting.lastFailure?.resumableConsultationId {
+            starting.error = nil
+            consultationId = existing
+        }
     }
 
     private func save(_ value: ConsultationDetail) async {
