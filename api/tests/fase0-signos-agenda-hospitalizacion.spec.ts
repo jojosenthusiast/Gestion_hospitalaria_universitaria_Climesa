@@ -37,23 +37,29 @@ describe('Fase 0 · signos, franjas, salida, traslado, eventos y cancelación (F
   });
 
   test('API-07: con la jornada ya iniciada, las franjas se alinean desde el inicio de la jornada y se exige inicio alineado', async () => {
-    const shiftStart = new Date(now.valueOf() - 37 * MINUTE);
+    // Fixed business time (tomorrow 10:00 local) so the test never runs out of slots near midnight.
+    const day = businessDate(new Date(now.valueOf() + 86_400_000));
+    const at10 = new Date(`${day}T10:00:00-06:00`);
+    const shiftStart = new Date(at10.valueOf() - 37 * MINUTE);
     await t.shift('MED', shiftStart, new Date(shiftStart.valueOf() + 8 * 60 * MINUTE));
     const doctorId = await t.staffOf('MED');
-    const availability = await t.call('REC', 'GET', `/citas/disponibilidad?doctorId=${doctorId}&date=${businessDate(now)}`);
-    expect(availability.status).toBe(200);
-    expect(availability.body.slots.length).toBeGreaterThan(0);
-    for (const slot of availability.body.slots) {
-      const offset = Date.parse(slot.start) - shiftStart.valueOf();
-      expect(offset % (20 * MINUTE)).toBe(0);
-      expect(Date.parse(slot.start)).toBeGreaterThanOrEqual(now.valueOf());
-    }
-    const patientId = await t.patient();
-    const at = (minutes: number) => ({ patientId, doctorId, start: new Date(shiftStart.valueOf() + minutes * MINUTE).toISOString(), end: new Date(shiftStart.valueOf() + (minutes + 20) * MINUTE).toISOString() });
-    const misaligned = await t.call('REC', 'POST', '/citas', at(70));
-    expect(misaligned.status).toBe(400);
-    expect(misaligned.body.codigo).toBe('franja_desalineada');
-    expect((await t.call('REC', 'POST', '/citas', at(80))).status).toBe(201);
+    t.setNow(at10);
+    try {
+      const availability = await t.call('REC', 'GET', `/citas/disponibilidad?doctorId=${doctorId}&date=${day}`);
+      expect(availability.status).toBe(200);
+      expect(availability.body.slots.length).toBeGreaterThan(0);
+      for (const slot of availability.body.slots) {
+        const offset = Date.parse(slot.start) - shiftStart.valueOf();
+        expect(offset % (20 * MINUTE)).toBe(0);
+        expect(Date.parse(slot.start)).toBeGreaterThanOrEqual(at10.valueOf());
+      }
+      const patientId = await t.patient();
+      const at = (minutes: number) => ({ patientId, doctorId, start: new Date(shiftStart.valueOf() + minutes * MINUTE).toISOString(), end: new Date(shiftStart.valueOf() + (minutes + 20) * MINUTE).toISOString() });
+      const misaligned = await t.call('REC', 'POST', '/citas', at(70));
+      expect(misaligned.status).toBe(400);
+      expect(misaligned.body.codigo).toBe('franja_desalineada');
+      expect((await t.call('REC', 'POST', '/citas', at(80))).status).toBe(201);
+    } finally { t.setNow(now); }
   });
 
   test('API-04: el alta y la salida física validan su cuerpo y la versión', async () => {

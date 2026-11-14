@@ -42,10 +42,12 @@ export class AttentionService {
   }
 
   /**
-   * Una cita solo puede existir dentro de una jornada publicada o en curso del médico, y empieza en una
-   * franja de 20 minutos contada desde el inicio de esa jornada (API-07).
+   * Una cita solo puede existir dentro de una jornada publicada o en curso del médico. Al crearla
+   * (`requireAligned`) además empieza en una franja de 20 minutos contada desde el inicio de esa jornada
+   * (API-07); al confirmar una solicitud previa basta con que la jornada la cubra, porque las solicitudes
+   * hechas con la disponibilidad anterior pueden tener inicios sin redondear.
    */
-  private async doctorHasShift(c: PoolClient, doctorId: string, start: Date, end: Date) {
+  private async doctorHasShift(c: PoolClient, doctorId: string, start: Date, end: Date, requireAligned: boolean) {
     const row = (await c.query(`SELECT lower(periodo) AS start
       FROM personal.turno
       WHERE persona_id=$1 AND estado IN ('publicado','en_curso')
@@ -53,7 +55,7 @@ export class AttentionService {
         AND periodo @> ($3::timestamptz - interval '1 microsecond')
       LIMIT 1`, [doctorId, start, end])).rows[0];
     if (!row) throw new ConflictException('El médico no tiene una jornada publicada para esa franja.');
-    if ((start.valueOf() - new Date(row.start).valueOf()) % SLOT_MS !== 0) throw new ProblemException('franja_desalineada', 400, 'La cita debe empezar en una franja de 20 minutos de la jornada del médico.', 'start');
+    if (requireAligned && (start.valueOf() - new Date(row.start).valueOf()) % SLOT_MS !== 0) throw new ProblemException('franja_desalineada', 400, 'La cita debe empezar en una franja de 20 minutos de la jornada del médico.', 'start');
   }
 
   /** Evita que un mismo paciente quede con dos citas simultáneas, incluso con médicos distintos. */
@@ -88,8 +90,9 @@ export class AttentionService {
         WHERE estado IN ('activo','provisional') AND ($1::boolean OR id=$2::uuid)
         ORDER BY primer_apellido,nombres,id
         LIMIT 500`, [canManagePatients, actor.patientId])).rows;
-        // SEG-02: the scheduling catalog lists patients, so its read is audited in aggregate.
-        await this.commands.audit(c, actor, { action: 'citas.catalogo_leer', entity: 'paciente', permission: canManagePatients ? 'citas.agendar' : 'citas.solicitar', detail: { patientIds: rows.map(row => row.id) } });
+        // SEG-02: the scheduling catalog lists patients, so its read is audited in aggregate. The identifiers stay
+        // (privacidad.md §3.9: the patient can see who consulted their data); the detail is stored only once.
+        await this.commands.audit(c, actor, { action: 'citas.catalogo_leer', entity: 'paciente', permission: canManagePatients ? 'citas.agendar' : 'citas.solicitar', detail: { patientCount: rows.length, patientIds: rows.map(row => row.id) } });
         return rows;
       }),
       this.db.query(`SELECT p.id,p.nombres AS "givenNames",p.apellidos AS surnames,p.tipo AS type,
@@ -182,7 +185,7 @@ export class AttentionService {
     return this.commands.run(actor, permission, key, dto, async c => {
       await this.patient(c, patientId);
       await this.doctor(c, dto.doctorId);
-      await this.doctorHasShift(c, dto.doctorId, start, end);
+      await this.doctorHasShift(c, dto.doctorId, start, end, true);
       await this.patientHasConflict(c, patientId, start, end);
       const row = (await c.query(`INSERT INTO atencion.cita(paciente_id,medico_id,horario,motivo,estado,origen,creado_por)
         VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7,$8) RETURNING id,version`, [patientId, dto.doctorId, start, end, dto.reason?.trim() || null, state, patientRequest ? 'paciente' : 'recepcion', actor.id])).rows[0];
@@ -200,7 +203,7 @@ export class AttentionService {
       if (dto.status === 'rechazada' && (dto.rejectionReason?.trim().length ?? 0) < 10) throw new BadRequestException('Indica el motivo del rechazo.');
       if (!['solicitada', 'confirmada'].includes(old.estado)) throw new ConflictException('La cita ya no admite cambios de agenda.');
       if (dto.status === 'confirmada') {
-        await this.doctorHasShift(c, old.medico_id, new Date(old.start), new Date(old.end));
+        await this.doctorHasShift(c, old.medico_id, new Date(old.start), new Date(old.end), false);
         await this.patientHasConflict(c, old.paciente_id, new Date(old.start), new Date(old.end), id);
       }
       const row = (await c.query('UPDATE atencion.cita SET estado=$2,motivo_rechazo=$3,version=version+1 WHERE id=$1 RETURNING version', [id, dto.status, dto.rejectionReason?.trim() || null])).rows[0];

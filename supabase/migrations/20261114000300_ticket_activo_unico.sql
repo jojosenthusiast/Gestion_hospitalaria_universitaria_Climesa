@@ -7,6 +7,10 @@
 -- ya hubiera duplicados, la migración se detiene y lista cuántos hay; resuélvelos en la fila (marcar
 -- "no se presentó" o completar el número que sobra) y vuelve a aplicarla.
 
+-- El índice toma un candado fuerte sobre la fila de números: si no lo obtiene en 5 s, la migración falla en
+-- lugar de detener la recepción; vuelve a aplicarla.
+set local lock_timeout = '5s';
+
 do $$
 declare
   v_desde date := (now() at time zone 'America/El_Salvador')::date;

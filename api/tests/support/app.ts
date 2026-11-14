@@ -54,9 +54,9 @@ export async function createTestApp(start: Date) {
     if (options.linkPac) await pg.query('UPDATE acceso.usuario SET paciente_id=$2 WHERE id=$1', [userId('PAC'), row.id]);
     return row.id;
   };
-  /** Current professional registration for the account of a role (D-012). */
+  /** Current professional registration for the account of a role (D-012); same validity as the seed's `[2026-01-01,2027-12-31)`. */
   const enroll = async (role: string, from = '2026-01-01', to = '2027-12-31') => {
-    await pg.query(`INSERT INTO personal.inscripcion(persona_id,junta,numero,vigencia) VALUES($1,'JVPM',$2,daterange($3::date,$4::date,'[]'))`, [await staffOf(role), `N-${role}-${randomUUID().slice(0, 8)}`, from, to]);
+    await pg.query(`INSERT INTO personal.inscripcion(persona_id,junta,numero,vigencia) VALUES($1,'JVPM',$2,daterange($3::date,$4::date,'[)'))`, [await staffOf(role), `N-${role}-${randomUUID().slice(0, 8)}`, from, to]);
   };
   const shift = async (role: string, from: Date, to: Date) => {
     await pg.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado' FROM infra.espacio WHERE codigo='P1-CON'`, [await staffOf(role), from, to]);

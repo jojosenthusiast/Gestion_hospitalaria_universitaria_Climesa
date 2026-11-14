@@ -157,10 +157,13 @@ export class HospitalizationService {
   async transfer(actor: Actor, occupationId: string, dto: TransferDto, key?: string) {
     return this.commands.run(actor, `camas.trasladar:${occupationId}`, key, dto, async c => {
       const now = this.clock.now();
+      // Same lock order as `exit` (admission, then occupation) so a transfer and an exit never deadlock.
+      const owner = (await c.query(`SELECT admision_id AS "admissionId" FROM hospitalizacion.ocupacion_cama WHERE id=$1`, [occupationId])).rows[0] as Row | undefined;
+      if (!owner) throw new NotFoundException('No se encontró una ocupación activa con ese identificador.');
+      const id = owner.admissionId as string;
+      const admission = await this.admission(c, id, true);
       const current = (await c.query(`SELECT o.id,o.admision_id AS "admissionId",o.cama_id AS "bedId",o.habitacion_id AS "roomId",o.categoria,e.version FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio e ON e.id=o.cama_id WHERE o.id=$1 AND o.periodo @> $2::timestamptz FOR UPDATE`, [occupationId, now])).rows[0] as Row | undefined;
       if (!current) throw new NotFoundException('No se encontró una ocupación activa con ese identificador.');
-      const id = current.admissionId as string;
-      const admission = await this.admission(c, id, true);
       if (admission.version !== dto.version) throw new VersionConflictException(admission.version, 'La admisión cambió; vuelve a consultarla.');
       if (admission.state !== 'hospitalizado') throw new ConflictException('Solo se traslada a un paciente hospitalizado.');
       if (current.categoria === 'vip') throw new ConflictException('Una ocupación VIP no se puede trasladar.');

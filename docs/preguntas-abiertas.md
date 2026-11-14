@@ -31,6 +31,8 @@ Decisiones conservadoras tomadas mientras se confirman:
 | F-04 | ¿Se aceptan signos vitales después de firmar la consulta? | No: 409 `consulta_firmada`, igual que diagnóstico y receta; la base lo garantiza con `exigir_consulta_abierta` |
 | W-07 | ¿Qué pasa con los números duplicados ya existentes en producción? | No se cambian (no se inventa su desenlace); el índice único rige desde el día en que se aplica la migración |
 | F-06 | ¿Qué responde un PAC al cancelar una cita que no existe? | 403, igual que una cita ajena, para no revelar la existencia de citas de otros |
+| API-07 | ¿Las solicitudes creadas antes de alinear las franjas (inicios como 10:07:33) se pueden confirmar? | Sí: la alineación de 20 minutos se exige al crear o solicitar; al confirmar solo se exige que la jornada publicada cubra la cita y que no haya traslape |
+| SEG-02 | ¿Cómo se audita la lectura del catálogo de agenda (hasta 500 pacientes) sin inflar la auditoría? | El detalle se guarda una sola vez: el evento firmado lleva solo su SHA-256 (`detailHash`) y no una segunda copia. El catálogo conserva los identificadores (más `patientCount`) porque `privacidad.md` §3.9 da al paciente el derecho a ver quién consultó sus datos; un conteo con hash no lo permitiría. Las filas anteriores, con el detalle dentro del evento, se siguen verificando |
 
 ## Para producción CLIMESA (registro institucional INS01 a INS12 de P01)
 
