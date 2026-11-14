@@ -3476,8 +3476,8 @@ export interface components {
              * @default true
              */
             publico: boolean;
-            /** @description Roles que ven el aviso en su tablero de inicio */
-            roles?: ("ADM" | "JOP" | "REC" | "AST" | "ENF" | "MED" | "LAB" | "PAR" | "DPD" | "PAC")[];
+            /** @description Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol */
+            roles?: string[];
             /** @description Publicar aunque el texto parezca contener un DUI, expediente o teléfono (FR-112-05) */
             confirmarDatosPersonales?: boolean;
         };

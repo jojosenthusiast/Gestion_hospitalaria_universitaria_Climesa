@@ -17466,22 +17466,10 @@
             "description": "Visible en la pantalla pública y en las apps sin sesión. Sin roles, debe ser true"
           },
           "roles": {
+            "description": "Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol",
             "type": "array",
-            "description": "Roles que ven el aviso en su tablero de inicio",
             "items": {
-              "type": "string",
-              "enum": [
-                "ADM",
-                "JOP",
-                "REC",
-                "AST",
-                "ENF",
-                "MED",
-                "LAB",
-                "PAR",
-                "DPD",
-                "PAC"
-              ]
+              "type": "string"
             }
           },
           "confirmarDatosPersonales": {

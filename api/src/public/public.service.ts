@@ -109,6 +109,11 @@ export class PublicService {
     if (to <= from) throw new ProblemException('validacion', 400, 'El fin de la vigencia debe ser posterior al inicio.', 'hasta');
     if (to <= now) throw new ProblemException('validacion', 400, 'El aviso ya habría vencido; indica un fin futuro.', 'hasta');
     const priority = dto.prioridad ?? 'atencion', roles = [...new Set(dto.roles ?? [])].sort(), isPublic = dto.publico ?? roles.length === 0;
+    if (roles.length) {
+      const known = new Set((await this.db.query<{ codigo: string }>('SELECT codigo FROM acceso.rol')).map(r => r.codigo));
+      const unknown = roles.filter(r => !known.has(r));
+      if (unknown.length) throw new ProblemException('validacion', 400, `No existe el rol ${unknown.join(', ')}.`, 'roles');
+    }
     if (!isPublic && roles.length === 0) throw new ProblemException('validacion', 400, 'Elige a quién va dirigido: público, uno o más roles, o ambos.', 'roles');
     const found = personalDataIn(dto.titulo, dto.cuerpo);
     if (found.length && !dto.confirmarDatosPersonales) {
