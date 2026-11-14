@@ -20,7 +20,7 @@ flowchart TB
 
 Los tres clientes obtienen tokens de Supabase Auth. La API comprueba emisor, audiencia y vencimiento y valida la identidad con `auth.getUser`. Después resuelve cuenta activa, roles, permisos, plataformas y canales en la base. Ningún permiso se toma de `user_metadata`.
 
-En este corte, Realtime se consume en web; Android e iOS actualizan por consulta y refresco. Sus suscripciones nativas corresponden a S3. La web usa Broadcast sin sondeo periódico (regla 9): solo tras una caída del canal o al volver la red pide una vez los eventos pendientes a `GET /eventos?after=` y vuelve a consultar (ver `web/src/lib/live.ts` y `tiempo-real.md`). `publico` es un Broadcast público sin datos personales; los canales de rol y usuario son privados. Su política de autorización consulta la cuenta vigente.
+Realtime se consume en web, Android e iOS con el mismo protocolo Phoenix de Supabase (`web/src/lib/live.ts`, `android/.../data/realtime/`, `ios/Core/Realtime/`). Ningún cliente sondea (regla 9): solo tras una caída del canal o al volver la red cada uno pide una vez los eventos pendientes a `GET /eventos?after=` y vuelve a consultar (ver `web/src/lib/live.ts` y `tiempo-real.md`). `publico` es un Broadcast público sin datos personales; los canales de rol y usuario son privados. Su política de autorización consulta la cuenta vigente.
 
 ## API modular
 
@@ -37,8 +37,12 @@ flowchart TB
 
 - `auth`: identidad y perfil efectivo.
 - `users`: invitaciones, directorio de cuentas, roles y estado.
+- `accounts`: vinculación de cuentas PAC con su expediente.
+- `ambulance`: solicitud, despacho, hitos, prehospital y bitácora.
+- `privacy`: accesos excepcionales, auditoría (búsqueda y verificación de la cadena) y "quién vio mi expediente".
+- `public` y `metrics`: información pública, avisos y métricas.
 - `patients`: búsqueda fonética, constancia previa al registro, identificadores, historial y privacidad.
-- `operations`: personal, turnos, espacios, camas, resumen, metadatos de auditoría y recuperación de eventos.
+- `operations`: personal, turnos, espacios, camas, resumen y recuperación de eventos.
 - `platform`: conexiones `pg`, transacciones, Clock, PolicyRegistry, idempotencia, auditoría y errores uniformes.
 
 La base conserva un esquema por dominio. El core S1/S2 orquesta lecturas entre acceso, personal, pacientes, infraestructura y relaciones asistenciales para resolver permisos y operaciones compartidas; no es un conjunto de servicios desplegados por separado. Las transacciones usan el mismo `PoolClient`, con `SET LOCAL ROLE sghu_api` y tiempo máximo de consulta. Las invariantes concurrentes también están en SQL: índices únicos, exclusiones GiST y validadores del árbol.
@@ -74,7 +78,7 @@ Solo el servidor recibe `DATABASE_URL` y la clave privada necesaria para invitac
 
 Las pruebas locales cubren HTTP, roles, migraciones, RLS, comandos y reglas de negocio con PGlite. PGlite usa un motor PostgreSQL con una sola conexión y no demuestra carreras multisesión; `compose.test.yaml` y el workflow `postgres-native` cubren ese entorno cuando se ejecuten con Docker. No hay Docker ni SDK móviles en este entorno. La cuenta conectada de Supabase no expone el proyecto CLIMESA: la migración nueva no fue aplicada en la nube y no hay una URL de API desplegada verificada.
 
-FCM, APNs, Storage clínico y operaciones clínicas de S3–S5 siguen fuera del corte construido. Figma se sincronizará después de cerrar la implementación, según el orden solicitado.
+FCM, APNs (notificaciones push) y Storage clínico no están construidos; las operaciones clínicas, ambulancia, información pública, métricas y privacidad sí lo están. Figma se sincronizará después de cerrar la implementación, según el orden solicitado.
 
 ---
 
