@@ -97,7 +97,10 @@ describe('Spec 112 · información pública sin sesión y sin datos personales',
     expect(list.body.avisos.map((a: any) => a.id)).toContain(published.body.id);
     expect(list.body.proximoCambio).toBe(hasta);
     expectNoPersonalData(list.body, [userIdOf('JOP')]);
-    expect(await t.events('aviso.publicado', published.body.id)).toEqual([['publico']]);
+    // 20261119004000: un aviso público llega también a las cuentas con sesión (`GET /me/avisos`), no solo a la pantalla pública.
+    const [channels] = await t.events('aviso.publicado', published.body.id);
+    expect(channels).toEqual(expect.arrayContaining(['publico', 'rol:REC', 'rol:MED', 'rol:PAC']));
+    expect(channels.filter((c: string) => c.startsWith('usuario:'))).toEqual([]);
     // Vencido: el reloj de la API pasa el fin de la vigencia.
     t.setNow(new Date(now.valueOf() + 4 * hour));
     try {

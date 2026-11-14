@@ -110,7 +110,9 @@ describe('Ambulancia · estado de la unidad y paramédico de turno (HU-109)',()=
   const audit=(await fixture.pg.query<any>("SELECT actor_id,permiso,motivo FROM plataforma.auditoria WHERE accion='ambulancia.mantenimiento' ORDER BY seq DESC LIMIT 1")).rows[0];
   expect(audit).toEqual({actor_id:userId('JOP'),permiso:'ambulancia.mantenimiento',motivo:'Fin de la revisión mecánica'});
   const events=(await fixture.pg.query<any>("SELECT version,canales FROM plataforma.outbox WHERE tipo='ambulancia.estado_cambiado' AND entidad_id=$1",[before.id])).rows;
-  expect(events).toEqual([{version:before.version+1,canales:['ambulancia']}]);
+  // 20261119004000: también los roles que ven el estado o la bitácora (MED, DPD...), nunca el paciente.
+  expect(events).toEqual([{version:before.version+1,canales:expect.arrayContaining(['ambulancia','rol:MED','rol:DPD'])}]);
+  expect(events[0].canales).not.toContain('rol:PAC');
  });
 
  test('versión vieja, permiso denegado y estados inválidos se rechazan; entrar a mantenimiento emite el evento',async()=>{
