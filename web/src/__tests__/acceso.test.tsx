@@ -142,7 +142,7 @@ describe('registro de paciente en /registro', () => {
     await waitFor(() => expect(auth.signUp).toHaveBeenCalledTimes(1));
     expect(auth.signUp).toHaveBeenCalledWith({
       email: 'paciente@example.test', password: 'Clave#1234',
-      options: { data: { nombre: 'Paciente Ficticio' }, emailRedirectTo: location.origin },
+      options: { data: { nombre: 'Paciente Ficticio' }, emailRedirectTo: `${location.origin}/confirmar-correo` },
     });
     expect(await screen.findByText(/Si el correo necesita confirmación/)).toBeTruthy();
   });
