@@ -1274,7 +1274,7 @@ export interface paths {
         /** Historial de movimientos */
         get: operations["InventoryController_movements"];
         put?: never;
-        /** Registrar entrada, salida, ajuste, traslado o consumo */
+        /** Registrar entrada, salida, ajuste, traslado, consumo o merma */
         post: operations["InventoryController_move"];
         delete?: never;
         options?: never;
@@ -1289,7 +1289,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Artículos con resumen de existencia y estado, según lo que el rol puede ver */
+        get: operations["InventoryController_articles"];
         put?: never;
         /** Crear artículo de inventario */
         post: operations["InventoryController_create"];
@@ -1306,9 +1307,79 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Detalle del artículo: lotes con vencimiento, existencia por bodega e historial */
+        get: operations["InventoryController_article"];
         /** Editar artículo de inventario */
         put: operations["InventoryController_edit"];
+        post?: never;
+        /** Eliminar un artículo creado por error; con lotes o historial solo se desactiva */
+        delete: operations["InventoryController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventario/bodegas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bodegas donde el rol puede mover existencias */
+        get: operations["InventoryController_warehouses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventario/lotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lotes de un artículo con su cantidad en una bodega, el que vence primero marcado (FEFO) */
+        get: operations["InventoryController_lots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventario/articulos/{id}/lotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Crear lote de un artículo */
+        post: operations["InventoryController_createLot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventario/lotes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Editar vencimiento, número o baja de un lote */
+        put: operations["InventoryController_editLot"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3206,7 +3277,7 @@ export interface components {
             quantity: string | null;
         };
         /** @enum {string} */
-        TipoMovimiento: "entrada" | "salida" | "ajuste" | "traslado" | "consumo";
+        TipoMovimiento: "entrada" | "salida" | "ajuste" | "traslado" | "consumo" | "merma";
         MovementResponse: {
             /** Format: uuid */
             id: string;
@@ -3230,11 +3301,136 @@ export interface components {
             articleName: string;
             lotNumber: string;
         };
+        /** @enum {string} */
+        EstadoStock: "ok" | "bajo_minimo" | "agotado" | "por_vencer" | "inactivo";
+        ArticleSummaryResponse: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            type: components["schemas"]["TipoArticulo"];
+            unit: string;
+            minimum: number;
+            active: boolean;
+            version: number;
+            /** @description Existencia usable: sin lotes vencidos ni dados de baja */
+            available: number;
+            expired: number;
+            /** @description Existencia que vence en los próximos 30 días */
+            expiringSoon: number;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            nextExpiry: string | null;
+            lots: number;
+            status: components["schemas"]["EstadoStock"];
+        };
+        LotStockResponse: {
+            /** Format: uuid */
+            warehouseId: string;
+            warehouseCode: string;
+            warehouseName: string;
+            quantity: number;
+        };
+        LotResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            expiresAt: string | null;
+            active: boolean;
+            version: number;
+            expired: boolean;
+            total: number;
+            warehouses: components["schemas"]["LotStockResponse"][];
+        };
+        WarehouseStockResponse: {
+            /** Format: uuid */
+            warehouseId: string;
+            warehouseCode: string;
+            warehouseName: string;
+            quantity: number;
+        };
+        ArticleMovementResponse: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["TipoMovimiento"];
+            lotNumber: string;
+            /** @description Negativo en un ajuste que resta */
+            quantity: number;
+            reason: string;
+            originWarehouseCode: string | null;
+            destinationWarehouseCode: string | null;
+            authorName: string;
+            /** Format: date-time */
+            registeredAt: string;
+        };
+        ArticleDetailResponse: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            type: components["schemas"]["TipoArticulo"];
+            unit: string;
+            minimum: number;
+            active: boolean;
+            version: number;
+            /** @description Existencia usable: sin lotes vencidos ni dados de baja */
+            available: number;
+            expired: number;
+            /** @description Existencia que vence en los próximos 30 días */
+            expiringSoon: number;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            nextExpiry: string | null;
+            lots: number;
+            status: components["schemas"]["EstadoStock"];
+            lotList: components["schemas"]["LotResponse"][];
+            warehouses: components["schemas"]["WarehouseStockResponse"][];
+            movements: components["schemas"]["ArticleMovementResponse"][];
+            /** @description Tipos de movimiento que el rol puede registrar sobre este artículo, según el contexto de inventario.mover */
+            allowedMovements: string[];
+        };
+        WarehouseResponse: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+        };
+        AvailableLotResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            expiresAt: string | null;
+            expired: boolean;
+            /** @description Cantidad del lote en la bodega consultada */
+            quantity: number;
+            /** @description Verdadero en el lote que se debe usar primero (vence antes) */
+            fefo: boolean;
+        };
         MovementDto: {
             /** @enum {string} */
-            type: "entrada" | "salida" | "ajuste" | "traslado" | "consumo";
+            type: "entrada" | "salida" | "ajuste" | "traslado" | "consumo" | "merma";
+            /**
+             * Format: uuid
+             * @description Lote existente; una entrada puede traer en su lugar articleId + lotNumber para registrar el lote nuevo
+             */
+            lotId?: string;
             /** Format: uuid */
-            lotId: string;
+            articleId?: string;
+            lotNumber?: string;
+            /** Format: date */
+            expiresAt?: string;
             /** Format: uuid */
             originWarehouseId?: string;
             /** Format: uuid */
@@ -3275,6 +3471,34 @@ export interface components {
             /** @description Número decimal como texto (numeric de PostgreSQL) */
             minimo: string;
             activo: boolean;
+            version: number;
+        };
+        ArticleDeletedResponse: {
+            /** Format: uuid */
+            id: string;
+            deleted: boolean;
+        };
+        LotDto: {
+            number: string;
+            /**
+             * Format: date
+             * @description Vencimiento yyyy-MM-dd; sin fecha para lotes que no vencen
+             */
+            expiresAt?: string;
+            active?: boolean;
+            version?: number;
+            reason?: string;
+        };
+        LotCreatedResponse: {
+            /** Format: uuid */
+            id: string;
+            number: string;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            expiresAt: string | null;
+            active: boolean;
             version: number;
         };
         /** @enum {string} */
@@ -9983,6 +10207,61 @@ export interface operations {
             };
         };
     };
+    InventoryController_articles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleSummaryResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     InventoryController_create: {
         parameters: {
             query?: never;
@@ -10054,6 +10333,72 @@ export interface operations {
             };
         };
     };
+    InventoryController_article: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleDetailResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     InventoryController_edit: {
         parameters: {
             query?: never;
@@ -10078,6 +10423,362 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArticleResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    InventoryController_remove: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleDeletedResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    InventoryController_warehouses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    InventoryController_lots: {
+        parameters: {
+            query: {
+                articleId: string;
+                warehouseId?: string;
+                includeExpired?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailableLotResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    InventoryController_createLot: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LotDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotCreatedResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    InventoryController_editLot: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LotDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotCreatedResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */

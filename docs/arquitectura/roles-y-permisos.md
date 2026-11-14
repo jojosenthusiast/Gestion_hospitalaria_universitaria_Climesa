@@ -286,6 +286,13 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/inventario/movimientos` | `inventario.mover` | Sin existencia negativa | R | 4 | · | ✔ | · | · | consumo | · | reactivos | · | · | · |
 | PUT | `/api/v1/inventario/articulos/{id}` | `inventario.configurar` |  | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/inventario/articulos` | `inventario.configurar` |  | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/inventario/articulos` | `inventario.ver` | Según el contexto del rol | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| GET | `/api/v1/inventario/articulos/{id}` | `inventario.ver` | Según el contexto del rol | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| DELETE | `/api/v1/inventario/articulos/{id}` | `inventario.configurar` | Solo sin lotes ni historial | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/inventario/articulos/{id}/lotes` | `inventario.configurar` |  | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
+| PUT | `/api/v1/inventario/lotes/{id}` | `inventario.configurar` | Sin existencia para dar de baja | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/inventario/lotes` | `inventario.ver` | Según el contexto del rol | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| GET | `/api/v1/inventario/bodegas` | `inventario.ver` | Según el contexto del rol | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
 
 ### Spec 112
 

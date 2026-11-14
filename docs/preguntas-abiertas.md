@@ -222,3 +222,16 @@ Cambios de producto autorizados por el dueño. Quedan registrados porque agregan
 | Bitácora de ambulancia (MED) | El médico no tiene `ambulancia.ver_bitacora` (solo JOP, REC, PAR propio y DPD), así que `GET /ambulancia/bitacora` le respondería 403. | iOS muestra el estado de la unidad (`ambulancia.ver_estado`) y, con el permiso, la bitácora con búsqueda, fechas, prioridad y resultado. Sin permiso explica que la bitácora requiere otro permiso. ¿Se concede `ambulancia.ver_bitacora` al médico? |
 | Atajo para publicar turno (RN-30) | El bloqueo por falta de paramédico se explica en iOS, pero MED y PAC no tienen `turnos.planificar`, así que no hay atajo. | iOS muestra el motivo y la acción (`dispatchBlock`) y le dice a quien no planifica turnos que avise a quien los planifica. |
 
+## Ronda 2 · Inventario (rama `feat/r2-inventario`; observaciones 5 y 10)
+
+Cambios de producto autorizados por el dueño (prueba manual del 14-nov). Tocan rutas, respuestas y la base fuera del catálogo original.
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| Rutas nuevas | `GET /inventario/articulos`, `GET /inventario/articulos/{id}`, `DELETE /inventario/articulos/{id}`, `POST /inventario/articulos/{id}/lotes`, `PUT /inventario/lotes/{id}`, `GET /inventario/lotes`, `GET /inventario/bodegas` no estaban en el catálogo | Se agregaron a `endpoints.csv` con los permisos existentes (`inventario.ver` para leer, `inventario.configurar` para artículos y lotes). No hay permisos nuevos. |
+| Merma | ¿Cómo se da de baja un lote vencido o dañado? | Nuevo tipo de movimiento `merma` (resta de la bodega de origen, permitido incluso en lote vencido). Migración `20261118002000`. El consumo, la salida y el traslado siguen bloqueados con lote vencido. |
+| Alcance por rol | ¿Qué ve y mueve cada rol? | Se deriva del contexto de `inventario.mover`: `x` (JOP) todo; `reactivos` (LAB) solo reactivos y todos los tipos de movimiento; `consumo` (ENF) solo insumos y equipo menor y solo consumo. La API lo aplica en lectura (lista, detalle, historial) y en escritura (403). |
+| Bodegas por rol | No existe relación bodega-área en el modelo | JOP ve todas las bodegas. LAB y ENF ven las bodegas donde hay existencia de los artículos de su alcance. Si se quiere "solo la bodega de mi área", hace falta una tabla de asignación bodega-área (no se inventó). |
+| Entrada con lote nuevo | ¿Se crea el lote antes de la entrada? | No es necesario: la entrada acepta `articleId` + `lotNumber` (+ `expiresAt`) y crea el lote si no existe; si existe con otro vencimiento responde 409. También se puede crear el lote aparte (JOP/ADM). |
+| Bajas | ¿Se borra un artículo o un lote? | Un artículo sin lotes ni historial se elimina; con historial solo se desactiva. Un lote nunca se borra: se da de baja y solo sin existencia (primero merma). La baja de bodegas es de Espacios (`infra.espacio`), no de Inventario. |
+| Consumo con paciente (Android) | ¿El consumo en Android debe ligar paciente? | Sigue sin ligar (como antes); la web ya ofrece el selector de pacientes para quien tiene `pacientes.buscar`. |
