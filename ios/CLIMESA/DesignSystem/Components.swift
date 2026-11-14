@@ -277,16 +277,3 @@ struct ConflictBanner: View {
         .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Theme.danger, lineWidth: 1))
     }
 }
-
-/// «En vivo · hh:mm»: la conexión en tiempo real está al día (`.live-indicator` de web).
-struct LiveIndicator: View {
-    var time: String?
-
-    var body: some View {
-        HStack(spacing: 7) {
-            Circle().fill(Theme.success).frame(width: 8, height: 8).accessibilityHidden(true)
-            Text(verbatim: time.map { "\(L.text("ds.live")) · \($0)" } ?? L.text("ds.live")).font(Typo.tag).foregroundStyle(Theme.success)
-        }
-        .accessibilityElement(children: .combine)
-    }
-}

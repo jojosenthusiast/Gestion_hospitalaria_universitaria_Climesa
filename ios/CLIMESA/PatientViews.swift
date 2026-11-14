@@ -158,8 +158,6 @@ private struct QueueTicketCard: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(verbatim: "\(ticket.number)").font(.custom("DMSans-Bold", size: 96, relativeTo: .largeTitle)).foregroundStyle(Theme.ink).minimumScaleFactor(0.5)
                         .accessibilityLabel(Text(verbatim: "\(L.text("ds.paciente.queue.number")) \(ticket.number)"))
-                    Spacer()
-                    LiveIndicator()
                 }
                 PatientTag(ticket.state.rawValue, label: ticket.state.label)
                 if ticket.state == .enEspera, let board, let ahead = QueueRules.ahead(of: ticket.number, called: board.called) {
@@ -690,7 +688,7 @@ struct AmbulanceRequestView: View {
                 SectionCard(eyebrow: L.text("ambulance.status")) {
                     PatientTag(created.state.rawValue, label: created.state.label)
                     Text(verbatim: created.notice).font(Typo.body).foregroundStyle(Theme.ink)
-                    if let update = updateText { LiveIndicator(); PatientNotice(text: update) }
+                    if let update = updateText { PatientNotice(text: update) }
                 }
             } else {
                 SectionCard {
