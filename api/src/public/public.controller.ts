@@ -5,7 +5,7 @@ import { ActorRequest } from '../platform/actor';
 import { NoticeDto } from './public.dto';
 import { PublicRateLimitGuard } from './rate-limit.guard';
 import { PublicService } from './public.service';
-import { DoctorsOnDutyResponse, MyNoticesResponse, NoticeListItemResponse, NoticePublishedResponse, NoticesResponse, PublicOccupancyResponse, PublicQueueResponse } from './public.responses';
+import { DoctorsOnDutyResponse, HospitalLocationResponse, MyNoticesResponse, NoticeListItemResponse, NoticePublishedResponse, NoticesResponse, PublicOccupancyResponse, PublicQueueResponse } from './public.responses';
 
 /** Spec 112 sin sesión: sin guardas de identidad, con límite por IP. Solo agregados y campos públicos. */
 @ApiTags('publico') @ApiExtension('x-permiso', 'publico') @UseGuards(PublicRateLimitGuard) @Controller('publico')
@@ -13,6 +13,8 @@ export class PublicController {
   constructor(private readonly service: PublicService) {}
   @Get('ocupacion') @ApiExtension('x-permiso', 'publico') @ApiOperation({ summary: 'Ocupación por planta y tipo, solo agregados' }) @ApiOkResponse({ type: PublicOccupancyResponse })
   occupancy() { return this.service.occupancy(); }
+  @Get('hospital') @ApiExtension('x-permiso', 'publico') @ApiOperation({ summary: 'Dirección, teléfono y coordenadas del hospital' }) @ApiOkResponse({ type: HospitalLocationResponse })
+  hospital() { return this.service.hospital(); }
   @Get('medicos-de-turno') @ApiExtension('x-permiso', 'publico') @ApiOperation({ summary: 'Médicos de turno: nombre, especialidad y área' }) @ApiOkResponse({ type: DoctorsOnDutyResponse })
   doctors() { return this.service.doctorsOnDuty(); }
   @Get('avisos') @ApiExtension('x-permiso', 'publico') @ApiOperation({ summary: 'Avisos vigentes' }) @ApiOkResponse({ type: NoticesResponse })

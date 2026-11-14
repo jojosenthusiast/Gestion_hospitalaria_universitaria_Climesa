@@ -1,4 +1,4 @@
-import { BoolProp, ClassArrayProp, DateProp, DateTimeProp, EnumProp, IntProp, StrArrayProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, DateProp, DateTimeProp, EnumProp, IntProp, NumProp, StrArrayProp, StrProp, UuidProp } from '../platform/responses';
 import { CATEGORIA_HABITACION } from '../platform/states';
 
 export class PublicOccupancyRowResponse {
@@ -12,6 +12,17 @@ export class PublicOccupancyRowResponse {
 export class PublicOccupancyResponse {
   @DateTimeProp() actualizadoEn!: string;
   @ClassArrayProp(PublicOccupancyRowResponse) ocupacion!: PublicOccupancyRowResponse[];
+}
+
+/** Ubicación pública del hospital (política `hospital.ubicacion`). */
+export class HospitalLocationResponse {
+  @StrProp() nombre!: string;
+  @StrProp() direccion!: string;
+  @StrProp() municipio!: string;
+  @StrProp() departamento!: string;
+  @StrProp() telefono!: string;
+  @NumProp() latitud!: number;
+  @NumProp() longitud!: number;
 }
 
 export class DoctorOnDutyResponse {

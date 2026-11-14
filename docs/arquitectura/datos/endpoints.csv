@@ -21,6 +21,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 102,POST,/api/v1/pacientes/{id}/estado,pacientes.editar_demograficos,Nunca borra,R,2,Inactivar registro conservando historial
 102,GET,/api/v1/pacientes/casos-duplicado,pacientes.gestionar_duplicados,,E,4,Casos de posible duplicado
 102,GET,/api/v1/me/paciente,pacientes.ver_ficha,Propio,R,2,Ficha del paciente autenticado
+102,PATCH,/api/v1/me/paciente,pacientes.editar_propios,Propio; solo teléfono correo y dirección; versión optimista,R,2,El paciente edita su contacto
 103,GET,/api/v1/personal,personal.ver,Incluye las inscripciones de cada persona (W07 y W08),R,2,Listado de personal de salud
 103,GET,/api/v1/personal/especialidades,personal.ver,"Catálogo por categoría (medico, enfermero); la API valida la especialidad contra él",R,2,Catálogo de especialidades por tipo de personal
 103,POST,/api/v1/personal,personal.gestionar,,R,2,Crear personal
@@ -102,6 +103,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 111,POST,/api/v1/inventario/movimientos,inventario.mover,Sin existencia negativa,R,4,"Entrada, salida, ajuste, traslado, consumo o merma"
 111,PUT,/api/v1/inventario/articulos/{id},inventario.configurar,,R,4,Artículo y mínimo
 112,GET,/api/v1/publico/ocupacion,(público),Solo agregados,R,3,Ocupación por planta y tipo
+112,GET,/api/v1/publico/hospital,(público),Dirección teléfono y coordenadas del hospital,R,3,Ubicación del hospital
 112,GET,/api/v1/publico/medicos-de-turno,(público),"Nombre, especialidad, área",R,3,Médicos de turno
 112,GET,/api/v1/publico/avisos,(público),,R,3,Avisos vigentes
 112,GET,/api/v1/publico/fila/{servicio},(público),Sin nombres,E,4,Números llamados

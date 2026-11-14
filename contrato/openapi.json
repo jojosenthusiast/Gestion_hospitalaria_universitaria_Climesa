@@ -984,6 +984,105 @@
           "patients"
         ],
         "x-permiso": "pacientes.ver_ficha"
+      },
+      "patch": {
+        "operationId": "MePatientController_update",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientSelfUpdateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El paciente edita su teléfono, correo y dirección; versión optimista e historial",
+        "tags": [
+          "patients"
+        ],
+        "x-permiso": "pacientes.editar_propios"
       }
     },
     "/api/v1/auth/me": {
@@ -10954,6 +11053,49 @@
         "x-permiso": "publico"
       }
     },
+    "/api/v1/publico/hospital": {
+      "get": {
+        "operationId": "PublicController_hospital",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HospitalLocationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Dirección, teléfono y coordenadas del hospital",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "publico"
+      }
+    },
     "/api/v1/publico/medicos-de-turno": {
       "get": {
         "operationId": "PublicController_doctors",
@@ -13204,6 +13346,33 @@
           "id",
           "version",
           "state"
+        ]
+      },
+      "PatientSelfUpdateDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 9
+          },
+          "email": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 254
+          },
+          "address": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version"
         ]
       },
       "SessionUserResponse": {
@@ -19357,6 +19526,41 @@
         "required": [
           "actualizadoEn",
           "ocupacion"
+        ]
+      },
+      "HospitalLocationResponse": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "direccion": {
+            "type": "string"
+          },
+          "municipio": {
+            "type": "string"
+          },
+          "departamento": {
+            "type": "string"
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "latitud": {
+            "type": "number"
+          },
+          "longitud": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "nombre",
+          "direccion",
+          "municipio",
+          "departamento",
+          "telefono",
+          "latitud",
+          "longitud"
         ]
       },
       "DoctorOnDutyResponse": {

@@ -176,7 +176,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 const menuCatalogo: Record<string, string[]> = {
   AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
   ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización'],
-  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
+  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
   PAR: ['Pacientes', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos'],
   PAC: ['Hospitalización', 'Fila del día', 'Citas'],
 };
