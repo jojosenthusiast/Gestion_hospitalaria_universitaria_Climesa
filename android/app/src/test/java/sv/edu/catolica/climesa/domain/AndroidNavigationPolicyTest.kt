@@ -12,7 +12,7 @@ class AndroidNavigationPolicyTest {
         assertEquals(AndroidNavigationMode.DRAWER, AndroidNavigationPolicy.mode(840))
     }
 
-    @Test fun laBarraCompactaPriorizaTresOperacionesYPerfil() {
+    @Test fun laBarraCompactaPriorizaInicioDosOperacionesYPerfil() {
         val sections = listOf(
             AndroidSection.HOME,
             AndroidSection.PATIENTS,
@@ -24,23 +24,23 @@ class AndroidNavigationPolicyTest {
 
         val partition = AndroidNavigationPolicy.compact(sections)
 
-        assertEquals(4, partition.primary.size)
-        assertTrue(AndroidSection.PROFILE in partition.primary)
-        assertTrue(AndroidSection.HOME !in partition.primary)
+        assertEquals(listOf(AndroidSection.HOME, AndroidSection.PATIENTS, AndroidSection.QUEUE, AndroidSection.PROFILE), partition.primary)
         assertEquals(sections.toSet(), (partition.primary + partition.overflow).toSet())
     }
 
-    @Test fun inicioYHospitalQuedanEnElMenuSecundario() {
+    @Test fun sinInicioCaenTresOperacionesYElHospitalQuedaEnElMenuSecundario() {
         val sections = listOf(
-            AndroidSection.HOME,
             AndroidSection.SHIFTS,
             AndroidSection.RESULTS,
+            AndroidSection.HISTORY,
+            AndroidSection.MY_ACCESS,
+            AndroidSection.HOSPITAL_INFO,
             AndroidSection.PROFILE,
         )
 
         val partition = AndroidNavigationPolicy.compact(sections)
 
-        assertEquals(listOf(AndroidSection.SHIFTS, AndroidSection.RESULTS, AndroidSection.PROFILE), partition.primary)
-        assertEquals(listOf(AndroidSection.HOME), partition.overflow)
+        assertEquals(listOf(AndroidSection.SHIFTS, AndroidSection.RESULTS, AndroidSection.HISTORY, AndroidSection.PROFILE), partition.primary)
+        assertEquals(listOf(AndroidSection.MY_ACCESS, AndroidSection.HOSPITAL_INFO), partition.overflow)
     }
 }

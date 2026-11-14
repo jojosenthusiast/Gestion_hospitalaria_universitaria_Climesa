@@ -138,12 +138,3 @@ internal fun ConflictBanner(onReload: () -> Unit, modifier: Modifier = Modifier,
     }
 }
 
-/** Green dot and "En vivo" while the realtime subscription is active (web `.live-indicator`). */
-@Composable
-internal fun LiveIndicator(modifier: Modifier = Modifier) {
-    val color = MaterialTheme.climesa.success
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        Box(Modifier.size(8.dp).background(color, CircleShape))
-        Text(stringResource(R.string.ui_en_vivo), style = MaterialTheme.typography.labelLarge, color = color)
-    }
-}

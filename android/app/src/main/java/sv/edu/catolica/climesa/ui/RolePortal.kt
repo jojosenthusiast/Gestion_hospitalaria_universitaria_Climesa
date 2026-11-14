@@ -32,6 +32,7 @@ import org.json.JSONObject
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
+import sv.edu.catolica.climesa.ui.dashboard.RoleDashboardScreen
 import sv.edu.catolica.climesa.domain.*
 import java.net.URLEncoder
 import java.time.Instant
@@ -76,7 +77,7 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
         }
     }}
 }
-private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.HOME->"/inicio";AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";else->null}
+private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";else->null}
 private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En servicio","en_mantenimiento" to "En mantenimiento")
 @Composable fun HospitalClock(){
     var now by remember { mutableStateOf(Instant.now()) }
@@ -92,43 +93,44 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
 @Composable fun RolePortal(account:AuthenticatedAccount,role:String,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit,refresh:()->Unit){
     val model:RoleViewModel=viewModel(key="role-${account.session.userId}")
     val data by model.state.collectAsStateWithLifecycle()
-    var selectedName by rememberSaveable(role){mutableStateOf(AndroidSection.PROFILE.name)};var query by rememberSaveable{mutableStateOf("")}
+    var selectedName by rememberSaveable(role){mutableStateOf(AndroidSection.HOME.name)};var query by rememberSaveable{mutableStateOf("")}
     val sections=AndroidSections.visible(role,account.profile.permissions)
     val page=sections.firstOrNull{it.name==selectedName}?:sections.firstOrNull()?:return
     val path=sectionPath(page)
-    LaunchedEffect(role,sections){if(sections.none{it.name==selectedName})selectedName=sections.firstOrNull{it==AndroidSection.PROFILE}?.name?:sections.first().name}
+    // Every role lands on its dashboard ("Inicio"); a role without one falls back to Perfil.
+    LaunchedEffect(role,sections){if(sections.none{it.name==selectedName})selectedName=sections.firstOrNull{it==AndroidSection.HOME}?.name?:sections.firstOrNull{it==AndroidSection.PROFILE}?.name?:sections.first().name}
+    val inbox=rememberQuickActionInbox()
+    LaunchedEffect(page){inbox.dropUnless(page)}
+    val handled={inbox.consume(page)}
+    val onDashboardAction:(QuickActionRequest)->Unit={request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}}
     LaunchedEffect(role,page){model.load(path)}
     LaunchedEffect(account.profile.channels){model.start(account.profile.channels)}
     PortalScaffold(
         roleLabel=RoleAccess.label(role),sections=sections,selected=page,onSelected={selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
     ) content@{padding->
+        if(page==AndroidSection.HOME){RoleDashboardScreen(account,role,onDashboardAction,Modifier.padding(padding));return@content}
         if(page==AndroidSection.BEDS){BedsScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.PLANNING){ShiftPlanningScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.STAFF){StaffScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.MY_APPOINTMENTS){PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD||page==AndroidSection.INPATIENT_CARE){HospitalizationScreen(Modifier.padding(padding),account.profile);return@content}
+        if(page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD||page==AndroidSection.INPATIENT_CARE){HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
         if(page==AndroidSection.SUPPLIES){InventoryScreen(Modifier.padding(padding),account.profile);return@content}
         if(page==AndroidSection.MY_ACCESS){MyAccessScreen(Modifier.padding(padding));return@content}
-        if(page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION){QueueScreen(account.profile,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.LAB||page==AndroidSection.SAMPLE||page==AndroidSection.CAPTURE_RESULTS||page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW){LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS);return@content}
+        if(page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION){QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
+        if(page==AndroidSection.LAB||page==AndroidSection.SAMPLE||page==AndroidSection.CAPTURE_RESULTS||page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW){LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page,quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
         if(page==AndroidSection.LINK_RECORD){LinkRecordScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.HISTORY||page==AndroidSection.RECORD){ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding));return@content}
         if(page==AndroidSection.MEDICAL_DAY||page==AndroidSection.CONSULTATIONS){ConsultationScreen(account.profile,Modifier.padding(padding));return@content}
         if(page==AndroidSection.HOSPITAL_INFO){HospitalInfoScreen(Modifier.padding(padding));return@content}
         if(page in ambulanceSections){AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding));return@content}
         PageList(Modifier.padding(padding)){
-            if(page!=AndroidSection.HOME)item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",page.label)}
+            item{SectionIntro("${RoleAccess.label(role)} / CLIMESA",page.label)}
             if(page==AndroidSection.PROFILE){
                 profileItems(account,sections,{selectedName=it.name},refresh)
             }else if(!page.ready){val maqueta=Maquetas.of(page);if(maqueta!=null)item{MaquetaContent(maqueta)}else item{PendingModule()}}
             else if(data.loading)item{LoadingState()}
             else if(data.error!=null)item{ErrorState(data.error,{model.load(path)})}
-            else if(page==AndroidSection.HOME){
-                item{Surface(color=MaterialTheme.colorScheme.primary,shape=MaterialTheme.shapes.large){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(account.profile.name.ifBlank{"Bienvenido a CLIMESA"},style=MaterialTheme.typography.titleLarge,color=MaterialTheme.colorScheme.onPrimary);Text(RoleAccess.label(role),color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),style=MaterialTheme.typography.bodySmall)}}}
-                val beds=PortalParsers.bedSummary(data.data)
-                if(beds!=null)item{StatTile(beds.free.toString(),stringResource(R.string.ui_camas_libres),suffix="de ${beds.total}",icon=Icons.Default.Bed)}
-                items(sections.filter{it!=AndroidSection.HOME}){s->DataRow(s.label,leadingIcon=iconFor(s),onClick={selectedName=s.name})}
-            }else if(page==AndroidSection.PATIENTS){
+            else if(page==AndroidSection.PATIENTS){
                 item{ClimesaActionGroup {FormField("Nombre, DUI o expediente",query,{query=it.take(100)});PrimaryButton("Buscar paciente",{model.load("/pacientes?query="+URLEncoder.encode(query,"UTF-8")+"&limit=50")},icon=Icons.Default.Search,enabled=query.trim().length>=2)}}
                 val rows=PortalParsers.patients(data.data)
                 if(rows.isEmpty())item{EmptyState("No hay coincidencias. Ajusta la búsqueda.")}

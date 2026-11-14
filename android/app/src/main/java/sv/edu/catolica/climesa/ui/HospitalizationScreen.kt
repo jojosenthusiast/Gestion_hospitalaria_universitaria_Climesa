@@ -63,6 +63,8 @@ import sv.edu.catolica.climesa.domain.ChangeReason
 import sv.edu.catolica.climesa.domain.DischargePending
 import sv.edu.catolica.climesa.domain.DischargeType
 import sv.edu.catolica.climesa.domain.HospitalizationRules
+import sv.edu.catolica.climesa.domain.QuickAction
+import sv.edu.catolica.climesa.domain.QuickActions
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 
 data class HospitalAdmission(val id: String, val patientName: String, val state: String, val bed: String, val category: String, val isolation: Boolean, val version: Int)
@@ -177,8 +179,20 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
 }
 
 @Composable
-fun HospitalizationScreen(modifier: Modifier = Modifier, profile: AccessProfile? = null, model: HospitalizationViewModel = viewModel()) {
+fun HospitalizationScreen(
+    modifier: Modifier = Modifier,
+    profile: AccessProfile? = null,
+    quickAction: QuickAction? = null,
+    onQuickActionHandled: () -> Unit = {},
+    model: HospitalizationViewModel = viewModel(),
+) {
     val state by model.state.collectAsStateWithLifecycle(); LaunchedEffect(Unit) { model.load() }
+    // A dashboard asked to "assign a bed": open the bed suggestions of the first admission still waiting for one.
+    LaunchedEffect(quickAction, state.loading, state.admissions) {
+        if (quickAction == null || state.loading) return@LaunchedEffect
+        if (quickAction == QuickAction.ASSIGN_BED && QuickActions.allowed(QuickAction.ASSIGN_BED, profile?.permissions.orEmpty())) state.admissions.firstOrNull { it.state == "pendiente_cama" }?.let(model::open)
+        onQuickActionHandled()
+    }
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
     val permissions = profile?.permissions.orEmpty()
     state.selectedId?.let { id -> state.admissions.firstOrNull { it.id == id } }?.let { BedSuggestionDialog(it, state, model) }
@@ -187,7 +201,6 @@ fun HospitalizationScreen(modifier: Modifier = Modifier, profile: AccessProfile?
     val retry = { model.clearMessages(); model.load() }
     PageList(modifier) {
         item { SectionIntro("Hospital / Admisiones", "Hospitalización", "Asigna cama, gestiona el alta y registra la salida física.") }
-        if (profile != null) item { LiveIndicator() }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         when {
             state.loading && state.admissions.isEmpty() -> item { LoadingState() }

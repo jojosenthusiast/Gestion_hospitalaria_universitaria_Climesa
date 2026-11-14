@@ -21,7 +21,6 @@
     <string name="camas_titulo">Camas.</string>
     <string name="camas_vacio">No hay camas disponibles en esta vista.</string>
     <string name="camas_reintentar">Volver a intentar</string>
-    <string name="camas_en_vivo">En vivo</string>
     <string name="camas_reconectando">Reconectando…</string>
     <string name="camas_sin_conexion">Sin conexión</string>
     <string name="tiempo_real_parcial">Actualización en vivo parcial: algunos avisos pueden tardar en llegar.</string>
@@ -222,7 +221,6 @@
     <string name="amb_llegada_estimada">Llegada estimada</string>
     <string name="amb_sin_estimar">Sin estimar</string>
     <string name="amb_capturado">Capturado</string>
-    <string name="ui_en_vivo">En vivo</string>
     <string name="ui_reintentar">Reintentar</string>
     <string name="ui_cerrar_recargar">Cerrar y recargar</string>
     <string name="ui_cargando_titulo">Cargando información…</string>

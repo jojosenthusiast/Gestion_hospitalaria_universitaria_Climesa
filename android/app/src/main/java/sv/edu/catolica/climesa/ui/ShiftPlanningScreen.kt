@@ -51,10 +51,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AccessProfile
 import sv.edu.catolica.climesa.domain.PlannedShift
+import sv.edu.catolica.climesa.domain.ShiftFilters
 import sv.edu.catolica.climesa.domain.ShiftForm
 import sv.edu.catolica.climesa.domain.ShiftPlanning
 
-private val filters = listOf("todos" to "Todos", "borrador" to "Borradores", "publicado" to "Publicados", "en_curso" to "En curso", "completado" to "Completados", "cancelado" to "Cancelados")
 private val shiftTypes = listOf("diurno", "nocturno", "guardia").map { it to ShiftPlanning.typeLabel(it) }
 
 private enum class PlanDialog { NONE, FORM, CANCEL, PUBLISH }
@@ -88,14 +88,11 @@ fun ShiftPlanningScreen(profile: AccessProfile, modifier: Modifier = Modifier, m
                 }
             }
         }
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filters) { (code, label) -> FilterChip(state.filter == code, { model.setFilter(code) }, { Text(label) }) }
-            }
-        }
+        item { ShiftFilterPanel(state, model) }
         when {
             state.loading -> item { LoadingState() }
             state.error != null -> item { ErrorState(state.error, onRetry = { model.load() }) }
+            state.visibleShifts.isEmpty() && state.shiftFilter.active -> item { EmptyState(stringResource(R.string.filtro_sin_coincidencias), detail = stringResource(R.string.filtro_sin_coincidencias_detalle), action = { SecondaryButton(stringResource(R.string.filtro_limpiar), model::clearFilters) }) }
             state.visibleShifts.isEmpty() -> item { EmptyState(stringResource(R.string.plan_vacio)) }
             else -> items(state.visibleShifts, key = { it.id }) { shift ->
                 ShiftCard(shift, state.canPlan, { open(PlanDialog.FORM, shift.id) }, { open(PlanDialog.CANCEL, shift.id) })
@@ -108,6 +105,25 @@ fun ShiftPlanningScreen(profile: AccessProfile, modifier: Modifier = Modifier, m
         PlanDialog.CANCEL -> target?.let { CancelDialog(model, state, it) { dialog = PlanDialog.NONE; model.resetAction() } }
         PlanDialog.PUBLISH -> PublishDialog(model, state) { dialog = PlanDialog.NONE; model.resetAction() }
         PlanDialog.NONE -> Unit
+    }
+}
+
+/** State, area and staff function, each with "Todos". The options come from the shifts shown, so they never offer an empty result. */
+@Composable
+private fun ShiftFilterPanel(state: PlanningState, model: ShiftPlanningViewModel) {
+    ClimesaCard {
+        Column(Modifier.fillMaxWidth().padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Text(stringResource(R.string.filtro_titulo), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.filtro_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Picker(stringResource(R.string.filtro_estado), ShiftFilters.stateOptions(), state.filter, model::setFilter)
+            Picker(stringResource(R.string.filtro_area), ShiftFilters.areaOptions(state.shifts), state.areaFilter, model::setAreaFilter)
+            val roles = ShiftFilters.roleOptions(state.shifts, state.staffTypes)
+            if (roles.size > 1) Picker(stringResource(R.string.filtro_rol), roles, state.roleFilter, model::setRoleFilter)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.filtro_mostrando, state.visibleShifts.size, state.shifts.size), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                if (state.shiftFilter.active) TextButton(model::clearFilters) { Text(stringResource(R.string.filtro_limpiar)) }
+            }
+        }
     }
 }
 
