@@ -38,8 +38,6 @@ const infraestructura=['GET /api/v1/health','GET /salud'];
  * explícitos de su tarea, no desvíos: al implementarse, la entrada sobra y la prueba obliga a quitarla.
  */
 const pendientesSemana2=[
- 'POST /api/v1/cuentas/vinculacion',// 101: vinculación de cuenta del paciente (GES-15 / app de paciente)
- 'GET /api/v1/me/paciente',// 102: ficha propia del paciente (app de paciente)
  'GET /api/v1/metricas/tablero',// 113: tablero de métricas
 ];jest.setTimeout(120000);
 describe('110-T06 · matriz RBAC: CSV ↔ base ↔ OpenAPI',()=>{

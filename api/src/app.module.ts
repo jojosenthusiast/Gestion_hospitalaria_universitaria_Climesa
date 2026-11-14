@@ -13,6 +13,7 @@ import { LaboratoryModule } from './laboratory/laboratory.module';
 import { HospitalizationModule } from './hospitalization/hospitalization.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { PrivacyModule } from './privacy/privacy.module';
+import { AccountsModule } from './accounts/accounts.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { PrivacyModule } from './privacy/privacy.module';
     HospitalizationModule,
     InventoryModule,
     PrivacyModule,
+    AccountsModule,
   ],
 })
 export class AppModule {}

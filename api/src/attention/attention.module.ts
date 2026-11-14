@@ -7,7 +7,9 @@ import { QueueController } from './queue.controller';
 import { QueueService } from './queue.service';
 import { ClinicalRecordController } from './clinical-record.controller';
 import { ClinicalRecordService } from './clinical-record.service';
+import { ClinicalHistoryController } from './clinical-history.controller';
+import { ClinicalHistoryService } from './clinical-history.service';
 
-@Module({ controllers: [AttentionController, ConsultationController, QueueController, ClinicalRecordController], providers: [AttentionService, ConsultationService, QueueService, ClinicalRecordService] })
+@Module({ controllers: [AttentionController, ConsultationController, QueueController, ClinicalRecordController, ClinicalHistoryController], providers: [AttentionService, ConsultationService, QueueService, ClinicalRecordService, ClinicalHistoryService] })
 export class AttentionModule {}
 
