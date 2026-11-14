@@ -10,6 +10,7 @@
   - Depende de: T01
   - Hecho cuando: escenario 1 pasa
   - Avance: 15-nov-2026 tarjetas en vivo hechas: `metricas.recalculadas` se deriva en la base de cada evento de cama, fila, laboratorio, ambulancia, turno y paciente hacia los roles con `metricas.ver`; la API invalida su caché con la cabeza del outbox (`tests/publico-metricas.spec.ts`: tras bloquear una cama el tablero ya la cuenta) y la web vuelve a pedir `GET /metricas/tablero` al cambiar la versión (`tablero.test.tsx`). Falta para marcarla: bandejas por rol W04 (FR-113-04)
+  - Avance: 13-nov-2026 bandeja W04 en Inicio (`web/src/features/inbox.tsx`): vinculaciones, solicitudes de cita y de ambulancia, admisiones sin cama, cola de laboratorio y accesos por aprobar, cada una por permiso y con contador en vivo por entidad; `web/src/__tests__/bandeja.test.tsx` pasa. Se deja sin marcar hasta comprobar el escenario 1 en la web desplegada
 - [ ] T03 · S4 · R · Completar tarjetas de laboratorio, fila y ambulancia
   - Cubre: FR-113-01
   - Depende de: T02, 107-T03, 105-T02, 109-T04
