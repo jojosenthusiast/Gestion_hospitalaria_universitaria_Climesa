@@ -16,6 +16,7 @@ export const daytimeHours=(a:number,b:number)=>{let total=0;for(let day=Math.flo
 // RN-15: la política turnos.cobertura_minima se evalúa por área; hoy solo Emergencia (24 h) tiene área y horario definidos.
 const COVERAGE_AREAS:Record<string,string>={'P1-EMG':'emergencia'};
 const COVERAGE_ROLES:Record<string,string>={MED:'medico',ENF:'enfermero',REC:'recepcionista',LAB:'laboratorista'};
+const STAFF_TYPE_NAMES:Record<string,string>={medico:'Médico',enfermero:'Enfermería',asistente:'Asistencia',recepcionista:'Recepción',laboratorista:'Laboratorio',paramedico:'Paramédico',motorista:'Motorista',limpieza:'Limpieza',administrativo:'Administración',otro:'Otro'};
 export type CoverageGap={areaId:string;area:string;role:string;start:string;end:string;required:number;actual:number};
 @Injectable()
 export class PersonnelService implements OnModuleInit,OnModuleDestroy {
@@ -142,6 +143,15 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     return this.db.query(`SELECT t.id,t.persona_id AS "staffId",p.nombres||' '||p.apellidos AS person,p.tipo AS "staffType",t.area_id AS "areaId",e.nombre AS area,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.tipo AS type,t.estado AS state,t.justificacion AS justification,t.version
       FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id JOIN infra.espacio e ON e.id=t.area_id
       WHERE ($1::uuid IS NULL OR t.persona_id=$1) AND ((NOT $2 AND $3) OR t.estado IN ('publicado','en_curso','completado')) ORDER BY lower(t.periodo) DESC LIMIT 300`,[mine?actor.staffId:null,mine,hasPermission(actor,'turnos.ver_borradores')]);
+  }
+  /** Obs. 2/9: opciones reales para filtrar y asignar turnos; no depende de los turnos cargados ni de `personal.ver`/`espacios.ver`. Sin DUI, teléfono ni números de junta. */
+  async shiftCatalog() {
+    const [areas,staff]=await Promise.all([
+      this.db.query(`SELECT id,padre_id AS "parentId",tipo AS type,codigo AS code,nombre AS name FROM infra.espacio WHERE activo AND tipo IN ('area','planta','consultorio','hospital') ORDER BY nombre`),
+      this.db.query<{type:string}>(`SELECT p.id,p.nombres||' '||p.apellidos AS name,p.tipo AS type,p.especialidad AS specialty,p.area_id AS "areaId",e.nombre AS area,COALESCE((SELECT json_agg(json_build_object('validFrom',lower(i.vigencia)::text,'validTo',(upper(i.vigencia)-1)::text) ORDER BY lower(i.vigencia)) FROM personal.inscripcion i WHERE i.persona_id=p.id),'[]'::json) AS registrations FROM personal.persona p LEFT JOIN infra.espacio e ON e.id=p.area_id WHERE p.activo ORDER BY p.apellidos,p.nombres`),
+    ]);
+    const roles=[...new Set(staff.map(p=>p.type))].map(code=>({code,name:STAFF_TYPE_NAMES[code]??code})).sort((a,b)=>a.name.localeCompare(b.name,'es'));
+    return {roles,areas,staff};
   }
   async saveShift(actor:Actor,id:string|null,dto:ShiftDto,key?:string) {
     const start=new Date(dto.start),end=new Date(dto.end);

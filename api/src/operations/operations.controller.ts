@@ -8,7 +8,7 @@ import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
 import { BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
-import { BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftResponse, ShiftSavedResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
+import { BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
 import { IdVersionResponse } from '../platform/responses';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
 export class OperationsController {
@@ -27,6 +27,8 @@ export class OperationsController {
   registerRegistration(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:RegistrationDto,@Headers('idempotency-key') k?:string){return this.people.register(r.actor,id,d,k);}
   @Get('turnos') @RequirePermission('turnos.ver') @ApiOperation({summary:'Consultar la planificación de turnos'}) @ApiOkResponse({ type: [ShiftResponse] })
   shifts(@Req() r:ActorRequest){return this.people.shifts(r.actor);}
+  @Get('turnos/catalogo') @RequirePermission('turnos.ver') @ApiOperation({summary:'Catálogo completo de áreas, funciones y personal para filtrar y asignar turnos'}) @ApiOkResponse({ type: ShiftCatalogResponse })
+  shiftCatalog(){return this.people.shiftCatalog();}
   @Get('turnos/mios') @RequirePermission('turnos.ver') @ApiOperation({summary:'Turnos publicados de la persona vinculada a la cuenta'}) @ApiOkResponse({ type: [ShiftResponse] })
   myShifts(@Req() r:ActorRequest){return this.people.shifts(r.actor,true);}
   @Get('turnos/cobertura') @RequirePermission('turnos.ver') @ApiOperation({summary:'Huecos de cobertura por área y hora frente al mínimo vigente'}) @ApiQuery({name:'from',type:String,description:'Primer día local, yyyy-MM-dd'}) @ApiQuery({name:'to',type:String,description:'Último día local, yyyy-MM-dd'}) @ApiQuery({name:'areaId',type:String,format:'uuid',required:false}) @ApiOkResponse({ type: CoverageResponse })

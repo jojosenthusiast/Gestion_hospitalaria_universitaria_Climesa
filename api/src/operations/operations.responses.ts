@@ -67,6 +67,40 @@ export class StaffResponse {
 
 // ---- Turnos ----
 
+export class ShiftCatalogRoleResponse {
+  @EnumProp(TIPO_PERSONAL, 'TipoPersonal') code!: string;
+  @StrProp() name!: string;
+}
+
+export class ShiftCatalogAreaResponse {
+  @UuidProp() id!: string;
+  @UuidProp({ nullable: true }) parentId!: string | null;
+  @EnumProp(TIPO_ESPACIO, 'TipoEspacio') type!: string;
+  @StrProp() code!: string;
+  @StrProp() name!: string;
+}
+
+export class ShiftCatalogValidityResponse {
+  @StrProp() validFrom!: string;
+  @StrProp() validTo!: string;
+}
+
+export class ShiftCatalogStaffResponse {
+  @UuidProp() id!: string;
+  @StrProp() name!: string;
+  @EnumProp(TIPO_PERSONAL, 'TipoPersonal') type!: string;
+  @StrProp({ nullable: true }) specialty!: string | null;
+  @UuidProp({ nullable: true }) areaId!: string | null;
+  @StrProp({ nullable: true }) area!: string | null;
+  @ClassArrayProp(ShiftCatalogValidityResponse) registrations!: ShiftCatalogValidityResponse[];
+}
+
+export class ShiftCatalogResponse {
+  @ClassArrayProp(ShiftCatalogRoleResponse) roles!: ShiftCatalogRoleResponse[];
+  @ClassArrayProp(ShiftCatalogAreaResponse) areas!: ShiftCatalogAreaResponse[];
+  @ClassArrayProp(ShiftCatalogStaffResponse) staff!: ShiftCatalogStaffResponse[];
+}
+
 export class ShiftResponse {
   @UuidProp() id!: string;
   @UuidProp() staffId!: string;
