@@ -15,6 +15,8 @@ import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.ConsultationEvents
+import sv.edu.catolica.climesa.domain.LabExam
+import sv.edu.catolica.climesa.domain.LabOrderRules
 import sv.edu.catolica.climesa.data.AuthRequestException
 import sv.edu.catolica.climesa.domain.MedicalAppointment
 import sv.edu.catolica.climesa.domain.RealtimeSignal
@@ -25,6 +27,9 @@ data class ConsultationState(
     val saving: Boolean = false,
     val error: String? = null,
     val notice: String? = null,
+    /** Active lab catalog, loaded once when a physician with `laboratorio.ordenar` opens a consultation. */
+    val labCatalog: List<LabExam> = emptyList(),
+    val labCatalogLoading: Boolean = false,
 )
 
 @HiltViewModel
@@ -138,6 +143,30 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
             try { api.request("/consultas/${item.consultationId}/receta", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Receta emitida."); onDone() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
+        }
+    }
+
+    /** Loads the lab catalog once; a failure is shown and the next call retries. */
+    fun loadLabCatalog() {
+        val current = mutable.value
+        if (current.labCatalog.isNotEmpty() || current.labCatalogLoading) return
+        mutable.value = current.copy(labCatalogLoading = true)
+        viewModelScope.launch {
+            try { val exams = LabOrderRules.parseCatalog(api.request("/laboratorio/catalogo")); mutable.value = mutable.value.copy(labCatalogLoading = false, labCatalog = exams) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.value = mutable.value.copy(labCatalogLoading = false, error = message(e)) }
+        }
+    }
+
+    /** `POST /laboratorio/ordenes` for this consultation; [onDone] runs only after the API accepts the order. */
+    fun orderLab(item: MedicalAppointment, exams: Collection<String>, urgent: Boolean, onDone: () -> Unit = {}) {
+        LabOrderRules.error(item.consultationId, exams)?.let { mutable.value = mutable.value.copy(error = it); return }
+        val consultationId = item.consultationId ?: return
+        mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        viewModelScope.launch {
+            try { api.request("/laboratorio/ordenes", "POST", LabOrderRules.body(consultationId, exams, urgent)); mutable.value = mutable.value.copy(saving = false, notice = "Orden de laboratorio emitida."); onDone() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }

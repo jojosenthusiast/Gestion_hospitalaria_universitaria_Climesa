@@ -83,6 +83,30 @@ class ConsultationViewModelTest {
         assertEquals("Sin conexión.", vm.state.value.error)
     }
 
+    @Test fun physicianOrdersLabExamsFromTheConsultation() = runTest(dispatcher) {
+        val api = FakeGateway(agenda())
+        api.responses["/laboratorio/catalogo"] = JSONArray().put(JSONObject().put("id", "e1").put("code", "HEM").put("name", "Hemograma"))
+        val vm = ConsultationViewModel(api, NoRealtime)
+        vm.load(); runCurrent()
+        vm.loadLabCatalog(); runCurrent()
+        assertEquals(listOf("e1"), vm.state.value.labCatalog.map { it.id })
+        var cleared = false
+        vm.orderLab(vm.state.value.appointments.single(), setOf("e1"), urgent = false) { cleared = true }; runCurrent()
+        val body = api.calls.single { it.first == "/laboratorio/ordenes" && it.second == "POST" }.third!!
+        assertEquals("c1", body.getString("consultationId"))
+        assertEquals("e1", body.getJSONArray("exams").getString(0))
+        assertTrue(cleared)
+        assertEquals("Orden de laboratorio emitida.", vm.state.value.notice)
+    }
+
+    @Test fun aLabOrderWithoutExamsNeverReachesTheApi() = runTest(dispatcher) {
+        val api = FakeGateway(agenda())
+        val vm = ConsultationViewModel(api, NoRealtime)
+        vm.load(); runCurrent()
+        vm.orderLab(vm.state.value.appointments.single(), emptySet(), urgent = false); runCurrent()
+        assertTrue(api.calls.none { it.first == "/laboratorio/ordenes" })
+    }
+
     @Test fun laboratorySampleDialogClosesOnlyAfterTheApiAccepts() = runTest(dispatcher) {
         val api = FakeGateway()
         api.failures["/laboratorio/ordenes/o1/muestra"] = AuthRequestException("La identidad no coincide.", 422)

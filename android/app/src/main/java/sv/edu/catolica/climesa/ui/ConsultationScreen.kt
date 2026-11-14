@@ -31,12 +31,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import sv.edu.catolica.climesa.R
+import sv.edu.catolica.climesa.domain.LabExam
 import sv.edu.catolica.climesa.domain.MedicalAppointment
 import sv.edu.catolica.climesa.domain.AccessProfile
 
@@ -50,7 +53,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     LaunchedEffect(Unit) { model.load() }
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
     val selectedItem = state.appointments.firstOrNull { it.appointmentId == selected }
-    selectedItem?.let { item -> ConsultationDialog(item, profile, state.saving, state.error, model, onClose = { selected = null }) }
+    selectedItem?.let { item -> ConsultationDialog(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, onClose = { selected = null }) }
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { SectionIntro("Medicina / Atención", "Mi consultorio", "Agenda propia y registro clínico conectado a cada cita confirmada.") }
         state.error?.let { error -> item { ClimesaActionGroup { Text(error, color = MaterialTheme.colorScheme.error); ClimesaButton("Reintentar", Icons.Default.Refresh, { model.clearMessages(); model.load() }, outlined = true) } } }
@@ -73,7 +76,7 @@ private fun MedicalAppointmentCard(item: MedicalAppointment, onOpen: () -> Unit)
 }
 
 @Composable
-private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, model: ConsultationViewModel, onClose: () -> Unit) {
+private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, onClose: () -> Unit) {
     var reason by rememberSaveable(item.appointmentId) { mutableStateOf(item.consultationReason ?: item.reason.orEmpty()) }
     var physicalExam by rememberSaveable(item.appointmentId) { mutableStateOf(item.physicalExam.orEmpty()) }
     var plan by rememberSaveable(item.appointmentId) { mutableStateOf(item.plan.orEmpty()) }
@@ -91,6 +94,9 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
     var frequency by rememberSaveable(item.appointmentId) { mutableStateOf("") }
     var duration by rememberSaveable(item.appointmentId) { mutableStateOf("") }
     var instructions by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    // Selected exam ids joined by commas, so the selection survives rotation without a custom saver.
+    var labExams by rememberSaveable(item.appointmentId) { mutableStateOf("") }
+    var labUrgent by rememberSaveable(item.appointmentId) { mutableStateOf(false) }
     val signed = item.consultationState == "firmada"
     AlertDialog(onDismissRequest = { if (!busy) onClose() }, title = { Text(if (signed) "Consulta firmada" else if (item.consultationId == null) "Iniciar consulta" else "Continuar consulta") }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Paciente: ${item.patientName}\nCita: ${formatDateTime(item.start)}", style = MaterialTheme.typography.bodySmall)
@@ -118,6 +124,16 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(frequency, { frequency = it.take(200) }, label = { Text("Frecuencia") }, modifier = Modifier.weight(1f), singleLine = true); OutlinedTextField(duration, { duration = it.take(100) }, label = { Text("Duración") }, modifier = Modifier.weight(1f), singleLine = true) }
             OutlinedTextField(instructions, { instructions = it.take(1000) }, label = { Text("Indicaciones") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
             OutlinedButton(onClick = { model.prescription(item, medication, dose, route, frequency, duration, instructions) { medication = ""; dose = ""; route = ""; frequency = ""; duration = ""; instructions = "" } }, enabled = !busy && listOf(medication, dose, route, frequency, duration).all { it.trim().isNotBlank() }, modifier = Modifier.fillMaxWidth()) { Text("Emitir receta") }
+        }
+        if (item.consultationId != null && profile?.permissions?.contains("laboratorio.ordenar") == true) {
+            LaunchedEffect(item.consultationId) { model.loadLabCatalog() }
+            val chosen = labExams.split(',').filter { it.isNotBlank() }.toSet()
+            Text(stringResource(R.string.lab_orden_titulo), style = MaterialTheme.typography.titleSmall)
+            if (labCatalog.isEmpty()) Text(stringResource(if (labCatalogLoading) R.string.lab_orden_cargando else R.string.lab_orden_sin_catalogo), style = MaterialTheme.typography.bodySmall)
+            val panelLabel = stringResource(R.string.lab_orden_panel)
+            labCatalog.forEach { exam -> Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(exam.id in chosen, { checked -> labExams = (if (checked) chosen + exam.id else chosen - exam.id).joinToString(",") }, enabled = !busy); Text(if (exam.isPanel) "${exam.code} · ${exam.name} · $panelLabel" else "${exam.code} · ${exam.name}", style = MaterialTheme.typography.bodySmall) } }
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(labUrgent, { labUrgent = it }, enabled = !busy); Text(stringResource(R.string.lab_orden_urgente)) }
+            OutlinedButton(onClick = { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lab_orden_emitir)) }
         }
     } }, confirmButton = { if (!signed) Button(onClick = { if (item.consultationId == null) model.start(item, reason) else model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(if (busy) "Guardando…" else if (item.consultationId == null) "Iniciar consulta" else "Guardar borrador") } }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (!signed && item.consultationId != null) Button(onClick = { model.sign(item, reason, physicalExam, plan, onClose) }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) { Text("Firmar") }; TextButton(onClick = onClose, enabled = !busy) { Text("Cerrar") } } })
 }
