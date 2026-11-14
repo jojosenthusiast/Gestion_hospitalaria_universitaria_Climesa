@@ -2,7 +2,7 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 42 de 131 (32%) · **Requisitos:** 221 · **Specs:** 20
+**Tareas:** 45 de 131 (34%) · **Requisitos:** 221 · **Specs:** 20
 
 ## Por spec
 
@@ -18,8 +18,8 @@
 | [107 Laboratorio](./107-laboratorio/spec.md) | En revisión | 11/2/0 | 1/7 | █░░░░░░░░░ |
 | [108 Admisión y hospitalización](./108-admision-hospitalizacion/spec.md) | En revisión | 14/2/0 | 1/10 | █░░░░░░░░░ |
 | [109 Ambulancia](./109-ambulancia/spec.md) | En revisión | 14/3/0 | 2/10 | ██░░░░░░░░ |
-| [110 Privacidad y auditoría](./110-privacidad-auditoria/spec.md) | En revisión | 8/2/0 | 1/8 | █░░░░░░░░░ |
-| [111 Inventario de insumos](./111-inventario/spec.md) | En revisión | 7/1/0 | 1/4 | ██░░░░░░░░ |
+| [110 Privacidad y auditoría](./110-privacidad-auditoria/spec.md) | En revisión | 8/2/0 | 2/8 | ██░░░░░░░░ |
+| [111 Inventario de insumos](./111-inventario/spec.md) | En revisión | 7/1/0 | 3/4 | ████████░░ |
 | [112 Información pública y avisos](./112-informacion-publica/spec.md) | En revisión | 4/2/0 | 0/3 | ░░░░░░░░░░ |
 | [113 Métricas y tablero](./113-metricas-tablero/spec.md) | En revisión | 5/1/0 | 0/4 | ░░░░░░░░░░ |
 | [114 Avisos y alarmas](./114-avisos-alarmas/spec.md) | En revisión | 6/4/0 | 0/3 | ░░░░░░░░░░ |
@@ -35,7 +35,7 @@
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
 | S2 | 24 a 30 oct | 24/36 | 1/1 | ███████░░░ |
-| S3 | 31 oct a 6 nov | 3/29 | 0/0 | █░░░░░░░░░ |
+| S3 | 31 oct a 6 nov | 6/29 | 0/0 | ██░░░░░░░░ |
 | S4 | 7 a 13 nov | 0/22 | 0/0 | ░░░░░░░░░░ |
 | S5 | 14 a 20 nov | 0/8 | 2/23 | █░░░░░░░░░ |
 

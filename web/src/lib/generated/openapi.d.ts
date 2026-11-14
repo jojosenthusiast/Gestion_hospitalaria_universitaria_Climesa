@@ -553,23 +553,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auditoria": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Metadatos de auditoría; no contiene valores clínicos */
-        get: operations["OperationsController_audit"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/eventos": {
         parameters: {
             query?: never;
@@ -1265,6 +1248,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accesos-excepcionales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Solicitudes de acceso excepcional; el solicitante ve solo las suyas */
+        get: operations["PrivacyController_list"];
+        put?: never;
+        /** Pedir acceso excepcional con motivo y duración (o de urgencia, pendiente de revisión) */
+        post: operations["PrivacyController_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accesos-excepcionales/{id}/aprobar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aprobar un acceso excepcional (nunca el propio) o confirmar uno de urgencia */
+        post: operations["PrivacyController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accesos-excepcionales/{id}/negar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Negar un acceso excepcional o cerrar uno de urgencia */
+        post: operations["PrivacyController_deny"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auditoria": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Metadatos de auditoría por persona, paciente, acción y fecha; no contiene valores clínicos */
+        get: operations["PrivacyController_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auditoria/verificacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verificar la integridad de la cadena de hash de la auditoría */
+        post: operations["PrivacyController_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/accesos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quién vio mi expediente: fecha, rol y motivo, sin nombres del personal */
+        get: operations["PrivacyController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1607,6 +1693,7 @@ export interface components {
             originWarehouseId?: string;
             /** Format: uuid */
             destinationWarehouseId?: string;
+            /** @description Mayor que cero; solo el ajuste admite negativos para restar (API-15) */
             quantity: number;
             reason: string;
             /** Format: uuid */
@@ -1622,6 +1709,22 @@ export interface components {
             active?: boolean;
             version?: number;
             reason?: string;
+        };
+        ExceptionalAccessRequestDto: {
+            /** Format: uuid */
+            pacienteId: string;
+            motivo: string;
+            horas: number;
+            /** @default false */
+            urgencia: boolean;
+        };
+        ExceptionalAccessApproveDto: {
+            version: number;
+            horas?: number;
+        };
+        ExceptionalAccessDenyDto: {
+            version: number;
+            motivo: string;
         };
     };
     responses: never;
@@ -2446,23 +2549,6 @@ export interface operations {
         };
         responses: {
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    OperationsController_audit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3539,6 +3625,164 @@ export interface operations {
                 "application/json": components["schemas"]["ArticleDto"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PrivacyController_list: {
+        parameters: {
+            query?: {
+                estado?: "pendiente" | "aprobado" | "negado";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PrivacyController_request: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExceptionalAccessRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PrivacyController_approve: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExceptionalAccessApproveDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PrivacyController_deny: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExceptionalAccessDenyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PrivacyController_audit: {
+        parameters: {
+            query?: {
+                /** @description Id de la cuenta, o parte de su nombre o correo */
+                persona?: string;
+                /** @description Id del paciente o número de expediente */
+                paciente?: string;
+                /** @description Acción exacta o prefijo (por ejemplo consulta.) */
+                accion?: string;
+                desde?: string;
+                hasta?: string;
+                limite?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PrivacyController_verify: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PrivacyController_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {
