@@ -84,8 +84,8 @@ El job `ipa` de `.github/workflows/ios.yml` compila `CLIMESA-sin-firmar.ipa` en 
 
 La firma con Apple ID gratuita dura 7 días: al vencer, la app deja de abrir y hay que volver a instalarla con Sideloadly. Una Apple ID gratuita admite hasta 3 apps sideloaded a la vez.
 
-### Login de prueba (opcional)
+### Login de prueba (solo Debug)
 
-Para que la app muestre el selector de cuentas de prueba, define el secreto de repositorio `CLIMESA_DEMO_CREDENTIALS` (Settings → Secrets and variables → Actions → New repository secret). Su valor es el contenido completo del archivo `demo-credenciales.json` (cuentas ficticias). El job lo escribe en la raíz, ejecuta `sh ios/scripts/demo-login.sh` y nunca imprime su valor.
+El IPA es una compilación Release y nunca lleva el selector de cuentas de prueba ni sus contraseñas (B-02): `Config/Release.xcconfig` no incluye `DemoLogin.xcconfig` y fuerza `CLIMESA_DEMO_LOGIN = NO`, `DemoLogin.accounts` devuelve una lista vacía fuera de Debug y el job `ipa` falla si el `Info.plist` del IPA trae `ClimesaDemoLogin = YES`.
 
-Si el secreto está vacío o no existe, el job omite ese paso y el IPA se compila sin el selector. Si existe, el IPA incluye las credenciales de prueba: no lo compartas fuera del equipo. El login de prueba es temporal (ver `docs/operacion/login-de-prueba.md`).
+Para probar con cuentas ficticias, compila en Debug en la Mac: `sh ios/scripts/demo-login.sh` genera `ios/DemoLogin.xcconfig` (fuera de git) desde `demo-credenciales.json`. El login de prueba es temporal (ver `docs/operacion/login-de-prueba.md`).
