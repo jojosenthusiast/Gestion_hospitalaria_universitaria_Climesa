@@ -6,11 +6,21 @@ const at = (local: string) => new Date(`2026-11-15T${local}:00-06:00`);
 
 describe('Ambulancia · reglas de bloqueo y bitácora (ronda 2)', () => {
   test('dispatchBlock explica por qué no se despacha y qué hacer', () => {
-    expect(dispatchBlock('disponible', true)).toBeNull();
-    expect(dispatchBlock('en_servicio', true)).toMatchObject({ code: 'en_servicio' });
-    expect(dispatchBlock('en_mantenimiento', true)).toMatchObject({ code: 'en_mantenimiento', action: expect.stringContaining('Saca la unidad') });
-    expect(dispatchBlock('en_mantenimiento', false)?.action).toMatch(/turno de paramédico/);
-    expect(dispatchBlock('disponible', false)).toMatchObject({ code: 'sin_paramedico_de_turno' });
+    expect(dispatchBlock('disponible', true, true)).toBeNull();
+    expect(dispatchBlock('en_servicio', true, true)).toMatchObject({ code: 'en_servicio' });
+    expect(dispatchBlock('en_mantenimiento', true, true)).toMatchObject({ code: 'en_mantenimiento', action: expect.stringContaining('Saca la unidad') });
+    expect(dispatchBlock('en_mantenimiento', false, true)?.action).toMatch(/turno de paramédico/);
+    expect(dispatchBlock('disponible', false, true)).toMatchObject({ code: 'sin_paramedico_de_turno' });
+  });
+  test('dispatchBlock exige también motorista de turno y nombra a quien falta (RN-30)', () => {
+    expect(dispatchBlock('disponible', true, false)).toEqual({ code: 'sin_motorista_de_turno', message: 'No hay motorista con turno en curso.', action: expect.stringMatching(/turno de motorista/) });
+    const both = dispatchBlock('disponible', false, false);
+    expect(both).toMatchObject({ code: 'sin_tripulacion_de_turno' });
+    expect(both?.message).toMatch(/paramédico ni motorista/);
+    expect(both?.action).toMatch(/paramédico y otro de motorista/);
+    expect(dispatchBlock('en_mantenimiento', true, false)).toMatchObject({ code: 'en_mantenimiento', message: expect.stringMatching(/no hay motorista/), action: expect.stringMatching(/turno de motorista/) });
+    expect(dispatchBlock('en_mantenimiento', false, false)?.message).toMatch(/paramédico ni motorista/);
+    expect(dispatchBlock('en_servicio', false, false)).toMatchObject({ code: 'en_servicio' });
   });
   test('maskRecord deja solo los últimos 3 caracteres y fold ignora acentos', () => {
     expect(maskRecord('EXP-2026-0042')).toBe('**********042');
@@ -26,18 +36,27 @@ describe('Ambulancia · mantenimiento, solicitante y bitácora narrativa (ronda 
   beforeAll(async () => { t = await createTestApp(at('08:00')); });
   afterAll(async () => { await t?.close(); });
 
-  test('sin paramédico de turno la unidad en mantenimiento no sale y el tablero dice por qué', async () => {
+  test('sin paramédico ni motorista de turno la unidad en mantenimiento no sale y el tablero dice por qué', async () => {
     const board = await t.call('JOP', 'GET', '/ambulancia');
     expect(board.body.unit.state).toBe('en_mantenimiento');
-    expect(board.body.dispatchBlock).toMatchObject({ code: 'en_mantenimiento', action: expect.stringMatching(/turno de paramédico/) });
+    expect(board.body).toMatchObject({ paramedicOnDuty: false, driverOnDuty: false });
+    expect(board.body.dispatchBlock).toMatchObject({ code: 'en_mantenimiento', action: expect.stringMatching(/turno de paramédico y otro de motorista/) });
     const denied = await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: (await unit()).version, inMaintenance: false, reason: 'Revisión terminada en taller' });
     expect(denied.status).toBe(409);
-    expect(denied.body.codigo).toBe('sin_paramedico_de_turno');
+    expect(denied.body.codigo).toBe('sin_tripulacion_de_turno');
     expect((await t.call('REC', 'POST', '/ambulancia/mantenimiento', { version: 1, inMaintenance: false, reason: 'Revisión terminada en taller' })).status).toBe(403);
   });
 
   test('con turno de paramédico sale de mantenimiento, vuelve a entrar con motivo y el estado conserva el motivo', async () => {
     await t.shift('PAR', at('06:00'), at('14:00'));
+    // Con paramédico pero sin motorista la unidad tampoco sale (RN-30).
+    const noDriver = await t.call('JOP', 'GET', '/ambulancia');
+    expect(noDriver.body).toMatchObject({ paramedicOnDuty: true, driverOnDuty: false });
+    expect(noDriver.body.dispatchBlock).toMatchObject({ code: 'en_mantenimiento', message: expect.stringMatching(/no hay motorista/) });
+    const refused = await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: (await unit()).version, inMaintenance: false, reason: 'Revisión terminada en taller' });
+    expect(refused.status).toBe(409);
+    expect(refused.body.codigo).toBe('sin_motorista_de_turno');
+    await t.driverShift(at('06:00'), at('14:00'));
     const out = await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: (await unit()).version, inMaintenance: false, reason: 'Revisión terminada en taller' });
     expect(out.status).toBe(201);
     const ready = await t.call('JOP', 'GET', '/ambulancia');

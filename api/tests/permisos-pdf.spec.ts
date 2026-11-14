@@ -52,6 +52,7 @@ describe('Permisos del PDF · edición propia del paciente, bitácora del médic
     const patientId = await t.patient({});
     const record = (await t.one<{ expediente: string }>('SELECT expediente FROM pacientes.paciente WHERE id=$1', [patientId])).expediente;
     await t.shift('PAR', at('06:00'), at('14:00'));
+    await t.driverShift(at('06:00'), at('14:00'));
     const unit = () => t.one<{ version: number }>('SELECT version FROM ambulancia.unidad');
     expect((await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: (await unit()).version, inMaintenance: false, reason: 'Revisión terminada en taller' })).status).toBe(201);
     const req = await t.call('REC', 'POST', '/ambulancia/solicitudes', { address: 'Colonia Ficticia, casa 9', municipality: 'Soyapango', reason: 'Caída de altura', contactPhone: '7000-3333', patientId });

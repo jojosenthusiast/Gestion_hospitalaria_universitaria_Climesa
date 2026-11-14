@@ -7,7 +7,7 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
 import { AmbulanceRequestDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
-import { CREW_ON_DUTY_SQL, PARAMEDIC_ON_DUTY_SQL, UnitState, canReportAfter, dispatchBlock, finalStateError, finalStates, fold, maskRecord, nextMilestones, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
+import { CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, UnitState, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, nextMilestones, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
 
 type Unit = { id: string; estado: UnitState; version: number };
 type Service = { id: string; unidad_id: string; solicitud_id: string | null; paciente_id: string | null; finalizado_en: Date | null; version: number };
@@ -25,8 +25,10 @@ export class AmbulanceService {
     if (!unit) throw new NotFoundException('No hay una unidad de ambulancia registrada.');
     return unit;
   }
+  /** Quién de la tripulación mínima tiene turno en curso en el instante dado (RN-30: paramédico y motorista). */
   private async onDuty(c: { query: (sql: string, args: unknown[]) => Promise<{ rows: unknown[] }> }, at: Date) {
-    return (await c.query(PARAMEDIC_ON_DUTY_SQL, [at])).rows.length > 0;
+    const row = (await c.query(CREW_ROLES_ON_DUTY_SQL, [at])).rows[0] as { paramedic: boolean | null; driver: boolean | null } | undefined;
+    return { paramedic: row?.paramedic === true, driver: row?.driver === true };
   }
   private async setUnit(c: PoolClient, actor: Actor, unit: Unit, target: UnitState, reason: string | null) {
     const version = (await c.query<{ version: number }>('UPDATE ambulancia.unidad SET estado=$2,version=version+1 WHERE id=$1 RETURNING version', [unit.id, target])).rows[0].version;
@@ -55,10 +57,10 @@ export class AmbulanceService {
         const location = (await c.query('SELECT latitud::float AS latitude,longitud::float AS longitude,capturada_en AS "capturedAt" FROM ambulancia.ubicacion WHERE servicio_id=$1 ORDER BY capturada_en DESC LIMIT 1', [service.id])).rows[0] ?? null;
         activeService = { ...service, crew, milestones, nextMilestones: nextMilestones(milestones.map((m: { type: string }) => m.type)), lastLocation: location };
       }
-      const paramedicOnDuty = await this.onDuty(c, this.clock.now());
+      const duty = await this.onDuty(c, this.clock.now());
       const change = (await c.query<{ motivo: string | null; en: Date }>('SELECT motivo,en FROM ambulancia.cambio_estado WHERE unidad_id=$1 AND hacia=$2 ORDER BY id DESC LIMIT 1', [unit.id, unit.state])).rows[0];
       Object.assign(unit, { stateReason: change?.motivo ?? null, stateSince: change?.en ?? null });
-      const result: Record<string, unknown> = { unit, activeService, paramedicOnDuty, dispatchBlock: dispatchBlock(unit.state, paramedicOnDuty) };
+      const result: Record<string, unknown> = { unit, activeService, paramedicOnDuty: duty.paramedic, driverOnDuty: duty.driver, dispatchBlock: dispatchBlock(unit.state, duty.paramedic, duty.driver) };
       if (hasPermission(actor, 'ambulancia.despachar')) {
         const pending = (await c.query(`SELECT s.id,s.canal AS channel,s.direccion AS address,s.municipio AS municipality,s.latitud::float AS latitude,s.longitud::float AS longitude,s.motivo AS reason,s.telefono_contacto AS "contactPhone",s.creada_en AS "createdAt",s.version,s.paciente_id AS patient,
             s.solicitante_nombre AS "callerName",p.expediente AS "patientRecord",
@@ -84,7 +86,8 @@ export class AmbulanceService {
         target = 'en_mantenimiento';
       } else {
         if (unit.estado !== 'en_mantenimiento') throw new ConflictException('La unidad no está en mantenimiento.');
-        if (!(await this.onDuty(c, this.clock.now()))) throw new ProblemException('sin_paramedico_de_turno', 409, 'No hay un paramédico con turno en curso; la unidad no puede quedar Disponible.');
+        const duty = await this.onDuty(c, this.clock.now()), missing = missingCrew(duty.paramedic, duty.driver);
+        if (missing) throw new ProblemException(missing.code, 409, missingCrewDetail(missing.who, 'la unidad no puede quedar Disponible (RN-30).'));
         target = 'disponible';
       }
       const version = await this.setUnit(c, actor, unit, target, dto.reason.trim());
@@ -141,7 +144,8 @@ export class AmbulanceService {
       if (unit.estado === 'en_mantenimiento') throw new ProblemException('unidad_en_mantenimiento', 409, 'La ambulancia está en mantenimiento; no se puede despachar.');
       if (unit.version !== dto.version) throw new VersionConflictException(unit.version, 'La unidad cambió; vuelve a consultar su estado.');
       const crew = (await c.query<{ id: string; tipo: string }>(CREW_ON_DUTY_SQL, [now])).rows;
-      if (!crew.some(p => p.tipo === 'paramedico')) throw new ProblemException('sin_paramedico_de_turno', 409, 'No hay un paramédico con turno en curso para el servicio.');
+      const missing = missingCrew(crew.some(p => p.tipo === 'paramedico'), crew.some(p => p.tipo === 'motorista'));
+      if (missing) throw new ProblemException(missing.code, 409, missingCrewDetail(missing.who, 'no se puede despachar el servicio (RN-30).'));
       let origin = dto.origin?.trim() || null, municipality = dto.municipality?.trim() || null, patientId: string | null = null, account: string | null = null;
       if (dto.requestId) {
         const request = (await c.query<{ estado: string; direccion: string; municipio: string | null; paciente_id: string | null }>('SELECT estado,direccion,municipio,paciente_id FROM ambulancia.solicitud WHERE id=$1 FOR UPDATE', [dto.requestId])).rows[0];

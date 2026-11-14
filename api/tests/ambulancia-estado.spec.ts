@@ -73,8 +73,9 @@ describe('Ambulancia · estado de la unidad y paramédico de turno (HU-109)',()=
   const before=await unit();
   const denied=await maintenance('JOP',false,before.version);
   expect(denied.status).toBe(409);
-  expect(denied.body.codigo).toBe('sin_paramedico_de_turno');
+  expect(denied.body.codigo).toBe('sin_tripulacion_de_turno');
   expect(denied.body.detail).toContain('paramédico');
+  expect(denied.body.detail).toContain('motorista');
   expect(await unit()).toMatchObject({estado:'en_mantenimiento',version:before.version});
   // un turno que aún no empieza no cuenta (empieza a las 14:00 local; ahora son las 11:00)
   await onDuty('2026-11-10T14:00:00-06:00','2026-11-10T20:00:00-06:00');
@@ -90,6 +91,13 @@ describe('Ambulancia · estado de la unidad y paramédico de turno (HU-109)',()=
   const before=await unit();
   await onDuty('2026-11-10T07:00:00-06:00','2026-11-10T15:00:00-06:00');
   expect((await call('REC','GET','/ambulancia')).body.paramedicOnDuty).toBe(true);
+  // Con paramédico pero sin motorista de turno sigue sin poder quedar Disponible (RN-30).
+  const noDriver=await maintenance('JOP',false,before.version);
+  expect(noDriver.status).toBe(409);expect(noDriver.body.codigo).toBe('sin_motorista_de_turno');
+  const driver=await person('motorista');
+  expect((await call('JOP','POST','/turnos',{staffId:driver.id,areaId,type:'diurno',start:'2026-11-10T07:00:00-06:00',end:'2026-11-10T15:00:00-06:00'})).status).toBe(201);
+  expect((await call('JOP','POST','/turnos/publicar',{from:'2026-11-10',to:'2026-11-10',areaId})).status).toBe(201);
+  expect((await call('REC','GET','/ambulancia')).body).toMatchObject({paramedicOnDuty:true,driverOnDuty:true});
   const key=randomUUID();
   const done=await maintenance('JOP',false,before.version,'Fin de la revisión mecánica',key);
   expect(done.status).toBe(201);
@@ -127,12 +135,14 @@ describe('Ambulancia · estado de la unidad y paramédico de turno (HU-109)',()=
   const ready=await maintenance('JOP',false,now.version,'Fin del cambio de llantas');
   expect(ready.status).toBe(201);
   const service=(await fixture.pg.query<any>("INSERT INTO ambulancia.servicio(unidad_id,tipo,prioridad,paciente_id,origen,destino,despachado_por) VALUES($1,'emergencia_domicilio','roja',gen_random_uuid(),'Calle ficticia 1','Hospital CLIMESA',$2) RETURNING id",[now.id,userId('REC')])).rows[0];
+  // La base exige paramédico y motorista en la tripulación antes de pasar a En Servicio (RN-30).
+  const driver=await person('motorista');
+  await fixture.pg.query("INSERT INTO ambulancia.tripulacion(servicio_id,persona_id,funcion) VALUES($1,$2,'paramedico'),($1,$3,'motorista')",[service.id,crew.id,driver.id]);
   await fixture.pg.query("UPDATE ambulancia.unidad SET estado='en_servicio'");
-  await fixture.pg.query("INSERT INTO ambulancia.tripulacion(servicio_id,persona_id,funcion) VALUES($1,$2,'paramedico')",[service.id,crew.id]);
   const seen=await call('JOP','GET','/ambulancia');
   expect(seen.body.unit.state).toBe('en_servicio');
   expect(seen.body.activeService).toMatchObject({id:service.id,type:'emergencia_domicilio',priority:'roja',origin:'Calle ficticia 1',destination:'Hospital CLIMESA'});
-  expect(seen.body.activeService.crew).toEqual([{staffId:crew.id,role:'paramedico',name:expect.stringContaining('Persona')}]);
+  expect(seen.body.activeService.crew).toEqual([{staffId:driver.id,role:'motorista',name:expect.stringContaining('Persona')},{staffId:crew.id,role:'paramedico',name:expect.stringContaining('Persona')}]);
   expect(JSON.stringify(seen.body)).not.toContain('paciente');
   const refused=await maintenance('JOP',true,ready.body.version);
   expect(refused.status).toBe(409);expect(refused.body.codigo).toBe('unidad_en_servicio');

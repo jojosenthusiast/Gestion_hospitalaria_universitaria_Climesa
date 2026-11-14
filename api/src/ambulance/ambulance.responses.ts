@@ -66,7 +66,7 @@ export class PendingAmbulanceRequestResponse {
 }
 
 export class DispatchBlockResponse {
-  @EnumProp(['en_servicio', 'en_mantenimiento', 'sin_paramedico_de_turno'] as const, 'MotivoBloqueoDespacho') code!: string;
+  @EnumProp(['en_servicio', 'en_mantenimiento', 'sin_paramedico_de_turno', 'sin_motorista_de_turno', 'sin_tripulacion_de_turno'] as const, 'MotivoBloqueoDespacho') code!: string;
   @StrProp() message!: string;
   @StrProp({ description: 'Qué hacer para poder despachar' }) action!: string;
 }
@@ -75,6 +75,7 @@ export class AmbulanceStatusResponse {
   @ClassProp(AmbulanceUnitResponse) unit!: AmbulanceUnitResponse;
   @ClassProp(ActiveServiceResponse, { nullable: true }) activeService!: ActiveServiceResponse | null;
   @BoolProp() paramedicOnDuty!: boolean;
+  @BoolProp({ description: 'Hay motorista con turno en curso (RN-30 exige paramédico y motorista)' }) driverOnDuty!: boolean;
   @ClassProp(DispatchBlockResponse, { nullable: true, description: 'Por qué no se puede despachar ahora; null si se puede' }) dispatchBlock!: DispatchBlockResponse | null;
   @ClassArrayProp(PendingAmbulanceRequestResponse, { optional: true, description: 'Solo con ambulancia.despachar' }) pendingRequests?: PendingAmbulanceRequestResponse[];
 }

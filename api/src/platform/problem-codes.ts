@@ -22,6 +22,6 @@ export const PROBLEM_CODES = [
   'existencia_insuficiente', 'aviso_con_datos_personales', 'indicador_desconocido',
   // Ambulance.
   'ambulancia_ya_despachada', 'estado_final_invalido', 'hito_fuera_de_orden', 'servicio_cerrado', 'servicio_finalizado', 'sin_paramedico_de_turno',
-  'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio',
+  'sin_motorista_de_turno', 'sin_tripulacion_de_turno', 'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio',
 ] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
