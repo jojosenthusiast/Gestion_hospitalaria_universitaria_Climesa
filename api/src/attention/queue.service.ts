@@ -5,7 +5,7 @@ import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException, VersionConflictException } from '../platform/problem';
 import { QUEUE_SERVICES, QueueIssueDto, QueueTransitionDto } from './queue.dto';
 
 type QueueRow = Record<string, any>;
@@ -16,6 +16,9 @@ const serviceNames: Record<string, string> = {
   laboratorio: 'Laboratorio',
   admisiones: 'Admisiones',
 };
+
+const activeTicket = (number?: number) => new ProblemException('ticket_activo_existente', 409,
+  number ? `El paciente ya tiene el número ${number} activo en este servicio hoy.` : 'El paciente ya tiene un número activo en este servicio hoy.');
 
 @Injectable()
 export class QueueService {
@@ -67,9 +70,15 @@ export class QueueService {
       const patient = (await c.query("SELECT id FROM pacientes.paciente WHERE id=$1 AND estado IN ('activo','provisional')", [patientId])).rows[0];
       if (!patient) throw new BadRequestException('Selecciona un paciente activo.');
       const date = this.clock.today();
+      // W-07: one active number per patient, service and day; `ticket_fila_activo_unico` guarantees it under races.
+      const active = (await c.query(`SELECT numero FROM atencion.ticket_fila WHERE paciente_id=$1 AND servicio=$2 AND fecha=$3::date AND estado IN ('en_espera','llamado','en_atencion') LIMIT 1`, [patientId, dto.service, date])).rows[0];
+      if (active) throw activeTicket(active.numero);
       const number = (await c.query('SELECT atencion.emitir_numero($1,$2::date) AS number', [dto.service, date])).rows[0].number;
       const row = (await c.query(`INSERT INTO atencion.ticket_fila(servicio,fecha,numero,paciente_id,emitido_por)
-        VALUES($1,$2::date,$3,$4,$5) RETURNING id,servicio AS service,fecha,numero,estado AS state,version`, [dto.service, date, number, patientId, actor.id])).rows[0];
+        VALUES($1,$2::date,$3,$4,$5) RETURNING id,servicio AS service,fecha,numero,estado AS state,version`, [dto.service, date, number, patientId, actor.id]).catch(error => {
+        if (error?.code === '23505' && String(error?.constraint ?? error?.message ?? '').includes('ticket_fila_activo_unico')) throw activeTicket();
+        throw error;
+      })).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.emitir', entity: 'ticket_fila', entityId: row.id, patientId, permission: 'fila.emitir', detail: { service: dto.service, number } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', row.id, row.version, await this.channels(c, patientId));
       return { ...row, serviceName: serviceNames[dto.service], patientId };
