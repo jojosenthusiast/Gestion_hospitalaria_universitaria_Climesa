@@ -43,6 +43,12 @@
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .conflict-notice { display: grid; gap: 10px; justify-items: start; }
 .auth-forgot { justify-self: start; }
+.work-inbox { margin: 0 0 28px; display: grid; gap: 14px; }
+.work-inbox h2 { margin: 4px 0; }
+.inbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.inbox-item { min-width: 0; padding: 18px 20px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); color: var(--ink); text-decoration: none; box-shadow: var(--shadow-soft); }
+.inbox-item strong { font-size: 32px; line-height: 1; letter-spacing: -0.04em; color: var(--primary-text); }
+.inbox-item:hover { border-color: var(--primary-text); }
 .password-change { margin: 24px 0; padding-top: 20px; border-top: 1px solid var(--line, currentColor); }
 .password-change h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
 .hospital-main { width: min(1240px, calc(100% - 64px)); flex: 1; margin: 0 auto; padding: 44px 0 64px; min-width: 0; }
