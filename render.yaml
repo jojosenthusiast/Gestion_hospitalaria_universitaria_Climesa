@@ -1,7 +1,7 @@
 # Render Blueprint for SGHU: API (Docker) + web (static SPA).
 # Service names fix the public URLs, so each service can reference the other
 # without waiting for the first deploy. If Render reports a name as taken it
-# appends a suffix: then update WEB_APP_URL and VITE_API_BASE_URL together.
+# appends a suffix: then update WEB_APP_URL, VITE_API_BASE_URL and the web CSP connect-src together.
 # Secrets are never stored here: every `sync: false` variable is entered by hand.
 services:
   - type: web
@@ -20,6 +20,13 @@ services:
         value: api/v1
       - key: WEB_APP_URL
         value: https://sghu-web.onrender.com
+      # Render's proxy appends the client address to X-Forwarded-For; trusting exactly one hop gives each client
+      # its own rate-limit bucket (SEG-08). Do not raise it: extra hops let clients spoof their address.
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      # Requests per IP and minute for the whole API (default 300 when unset).
+      - key: RATE_LIMIT_MAX
+        value: "300"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY
@@ -40,6 +47,27 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    # Security headers for the SPA (SEG-08, audit 02 M-5). connect-src allows the API and any Supabase project
+    # (Auth over HTTPS, Realtime over WSS); the project URL is a build variable, so it is not written here.
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://sghu-api.onrender.com https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
     envVars:
       - key: VITE_API_BASE_URL
         value: https://sghu-api.onrender.com/api/v1
