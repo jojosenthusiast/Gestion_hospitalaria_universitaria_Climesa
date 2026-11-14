@@ -1100,6 +1100,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admisiones/origenes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Registros recientes del paciente que pueden originar el ingreso */
+        get: operations["HospitalizationController_origins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admisiones/medicos-disponibles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Médicos con su disponibilidad (turno) en el instante de ingreso */
+        get: operations["HospitalizationController_doctors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admisiones/mapa-camas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Camas por planta y habitación con su compatibilidad para el paciente */
+        get: operations["HospitalizationController_bedMap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admisiones/factibilidad": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Comprobación previa a confirmar el ingreso (sin escribir) */
+        get: operations["HospitalizationController_feasibility"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admisiones": {
         parameters: {
             query?: never;
@@ -3116,7 +3184,67 @@ export interface components {
             version: number;
         };
         /** @enum {string} */
-        OrigenAdmision: "consulta" | "emergencia" | "ambulancia" | "programada";
+        OrigenAdmisionNueva: "cita" | "consulta" | "emergencia" | "ambulancia";
+        OriginOptionResponse: {
+            origin: components["schemas"]["OrigenAdmisionNueva"];
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            at: string;
+            label: string;
+            detail: string;
+        };
+        DoctorAvailabilityResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            specialty: string | null;
+            available: boolean;
+            /** @description Motivo por el que no está disponible */
+            reason: string | null;
+        };
+        BedMapCategoryResponse: {
+            category: components["schemas"]["CategoriaHabitacion"];
+            free: number;
+            compatible: number;
+        };
+        BedMapBedResponse: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            code: string;
+            /** Format: uuid */
+            roomId: string;
+            room: string;
+            /** @description Planta de la habitación */
+            floor: number | null;
+            category: components["schemas"]["CategoriaHabitacion"];
+            /** @description Camas de la habitación */
+            capacity: number;
+            state: components["schemas"]["EstadoCama"];
+            occupiedInRoom: number;
+            /** @description Libre y compatible con el sexo y el aislamiento del paciente */
+            compatible: boolean;
+            reason: string | null;
+            suggested: boolean;
+        };
+        BedMapResponse: {
+            categories: components["schemas"]["BedMapCategoryResponse"][];
+            beds: components["schemas"]["BedMapBedResponse"][];
+        };
+        FeasibilityCheckResponse: {
+            code: string;
+            ok: boolean;
+            message: string;
+        };
+        FeasibilityResponse: {
+            feasible: boolean;
+            checks: components["schemas"]["FeasibilityCheckResponse"][];
+        };
+        /** @enum {string} */
+        OrigenAdmision: "cita" | "consulta" | "emergencia" | "ambulancia" | "programada";
+        /** @enum {string} */
+        TipoAislamiento: "contacto" | "gotitas" | "aerea" | "protector";
         AdmissionResponse: {
             /** Format: uuid */
             id: string;
@@ -3136,14 +3264,26 @@ export interface components {
             bed: string;
             /** Format: uuid */
             occupationId: string | null;
+            /** Format: uuid */
+            originId: string | null;
+            /** @description Motivo del ingreso; nulo solo en admisiones anteriores a la regla. */
+            motive: string | null;
+            isolationType: components["schemas"]["TipoAislamiento"] | null;
+            unstable: boolean;
+            postSurgical: boolean;
+            visitorsAllowed: boolean;
+            visitorsMax: number;
         };
         AdmissionDto: {
             /** Format: uuid */
             patientId: string;
             /** @enum {string} */
-            origin: "consulta" | "emergencia" | "ambulancia" | "programada";
-            /** Format: uuid */
-            originId?: string;
+            origin: "cita" | "consulta" | "emergencia" | "ambulancia";
+            /**
+             * Format: uuid
+             * @description Registro de origen (cita, consulta, ticket de emergencia o servicio de ambulancia) del mismo paciente.
+             */
+            originId: string;
             /** @enum {string} */
             requestedCategory: "vip" | "semiprivada";
             isolation: boolean;
@@ -3152,6 +3292,21 @@ export interface components {
             /** Format: date-time */
             scheduledAt?: string;
             reason?: string;
+            motive: string;
+            /** @enum {string} */
+            isolationType?: "contacto" | "gotitas" | "aerea" | "protector";
+            unstable?: boolean;
+            postSurgical?: boolean;
+            /** @description Por omisión, sí. */
+            visitorsAllowed?: boolean;
+            /** @description Acompañantes permitidos; 0 si no se permiten visitas. */
+            visitorsMax?: number;
+            /**
+             * Format: uuid
+             * @description Cama elegida: se asigna en el mismo comando (ingreso inmediato).
+             */
+            bedId?: string;
+            bedVersion?: number;
         };
         AdmissionCommandResponse: {
             /** Format: uuid */
@@ -9229,6 +9384,247 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LabOrderResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    HospitalizationController_origins: {
+        parameters: {
+            query: {
+                patientId: string;
+                origin?: "cita" | "consulta" | "emergencia" | "ambulancia";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OriginOptionResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    HospitalizationController_doctors: {
+        parameters: {
+            query?: {
+                /** @description Instante de ingreso; por omisión, ahora. */
+                at?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorAvailabilityResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    HospitalizationController_bedMap: {
+        parameters: {
+            query: {
+                patientId: string;
+                isolation?: boolean;
+                category?: "vip" | "semiprivada";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BedMapResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    HospitalizationController_feasibility: {
+        parameters: {
+            query: {
+                patientId: string;
+                origin: "cita" | "consulta" | "emergencia" | "ambulancia";
+                originId: string;
+                doctorId: string;
+                at?: string;
+                category: "vip" | "semiprivada";
+                isolation?: boolean;
+                bedId?: string;
+                visitorsAllowed?: boolean;
+                visitorsMax?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeasibilityResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */

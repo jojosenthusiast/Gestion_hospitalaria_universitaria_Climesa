@@ -19,11 +19,6 @@ const admissions = [
   { id: 'a-2', patientId: 'p-2', patientName: 'Paciente Ficticio Dos', origin: 'emergencia', requestedCategory: 'semiprivada', state: 'hospitalizado', isolation: true, bed: 'C-201', version: 2, occupationId: 'o-2' },
   { id: 'a-3', patientId: 'p-3', patientName: 'Paciente Ficticio Tres', origin: 'consulta', requestedCategory: 'vip', state: 'alta_firmada', isolation: false, bed: 'C-301', version: 4, occupationId: 'o-3' },
 ];
-const catalogs = {
-  patients: [],
-  doctors: [{ id: 'd1d1d1d1-0000-4000-8000-000000000001', givenNames: 'Médica', surnames: 'Ficticia', type: 'medico', specialty: 'Medicina interna', active: true }],
-};
-const found = [{ id: 'p9p9p9p9-0000-4000-8000-000000000009', record: 'EXP-000009', fullName: 'Paciente Ficticio Nueve', active: true, state: 'activo' }];
 
 function mount(permissions: string[], routes: Record<string, unknown> = {}, write?: (path: string, body: unknown) => Promise<unknown>) {
   const api = {
@@ -50,26 +45,7 @@ describe('W13 · admisiones con acciones por estado y permiso (WEB-02)', () => {
     expect(within(pending).getByRole('button', { name: /Asignar cama/ })).toBeTruthy();
     expect(within(await rowOf('Paciente Ficticio Dos')).queryByRole('button', { name: /Firmar alta/ })).toBeNull();
     expect(within(await rowOf('Paciente Ficticio Tres')).getByRole('button', { name: /Registrar salida/ })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Nueva admisión/ })).toBeNull();
-  });
-
-  it('crea una admisión programada: busca al paciente, elige médico tratante y envía con su origen', async () => {
-    const api = mount(['admision.ver', 'admision.crear', 'citas.agendar', 'pacientes.buscar'], { '/citas/catalogos': catalogs, '/pacientes': found });
-    await userEvent.click(await screen.findByRole('button', { name: /Nueva admisión/ }));
-    const dialog = screen.getByRole('dialog');
-    await userEvent.type(within(dialog).getByLabelText(/^Buscar paciente/), 'Nueve');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Buscar' }));
-    await userEvent.click(await within(dialog).findByLabelText(/Paciente Ficticio Nueve/));
-    await userEvent.selectOptions(within(dialog).getByLabelText('Médico tratante'), catalogs.doctors[0].id);
-    await userEvent.selectOptions(within(dialog).getByLabelText('Categoría solicitada'), 'vip');
-    await userEvent.type(within(dialog).getByLabelText('Fecha y hora prevista'), '2026-11-20T08:30');
-    await userEvent.click(within(dialog).getByLabelText('Requiere aislamiento'));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear admisión' }));
-    expect(api.request).toHaveBeenCalledWith('/pacientes?query=Nueve&limit=20', expect.anything());
-    expect(api.write).toHaveBeenCalledWith('/admisiones', {
-      patientId: found[0].id, origin: 'programada', requestedCategory: 'vip', isolation: true,
-      attendingDoctorId: catalogs.doctors[0].id, scheduledAt: '2026-11-20T08:30:00-06:00',
-    }, 'POST');
+    expect(screen.queryByRole('button', { name: /Ingresar paciente/ })).toBeNull();
   });
 
   it('firma el alta de un hospitalizado con alta.firmar', async () => {
