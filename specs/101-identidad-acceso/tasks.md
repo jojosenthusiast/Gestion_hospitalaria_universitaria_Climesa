@@ -30,11 +30,13 @@
   - Depende de: T03, 120-T01, 121-T01, 122-T01
   - Hecho cuando: se ingresa con un usuario de cada rol en su plataforma y el paciente se registra en Android e iOS
   - Avance 28-oct-2026 (solo web): `web/src/__tests__/acceso.test.tsx` (10 pruebas) verifica que MED y PAC ven "Tu rol no usa esta aplicación", que ADM entra al portal, el error de credenciales incorrectas, el error de red, y el registro (contraseña débil y contraseñas distintas no llaman a `signUp`; una válida lo llama una vez). Se comprobó por mutación que invertir la regla de plataforma rompe 3 pruebas. Existen 10 cuentas de demostración (una por rol, en la nube) para la prueba manual en `https://sghu-web.onrender.com`. **Sigue abierta**: faltan Android e iOS y el ingreso comprobado a mano con cada rol.
+  - Avance 14-nov-2026 (iOS): I01/I02 con Supabase Auth y la puerta de `/auth/me` (`platforms` con `ios` y rol MED o PAC; otro rol ve "Tu rol no usa esta aplicación"); un 401 vuelve al ingreso con "Tu sesión expiró". compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
 - [ ] T07 · S3 · R · Vinculación de cuenta y verificación por recepción
   - Cubre: FR-101-08, FR-101-09, FR-101-10, FR-101-11
   - Depende de: T05, 102-T03
   - Hecho cuando: escenario 2 pasa de punta a punta con el aviso en vivo
   - Avance 13-nov-2026: API `POST /cuentas/vinculacion`, `GET /cuentas/vinculaciones`, `POST /cuentas/vinculaciones/{id}/aprobar|rechazar` con idempotencia, versión, auditoría y eventos `vinculacion.solicitada`/`vinculacion.resuelta` a `rol:REC` y `usuario:<cuenta>`; migración `20261115003000_vinculacion_invariantes.sql` (vinculación resuelta inmutable y completa). `api/tests/paciente-vinculacion-historial.spec.ts`: sin vincular `/me/paciente` da 404 `sin_vinculacion`, la aprobación enlaza la cuenta (`/auth/me` trae `patientId`), versión vieja 409, sin expediente 409 `sin_expediente`, rechazo exige motivo; web W27 (`web/src/__tests__/vinculaciones.test.tsx`) y Android A03 (`PatientRecordViewModelsTest`, cambia sola con `vinculacion.resuelta`). **Sigue abierta**: falta iOS, la prueba de punta a punta en la nube y mostrar el motivo del rechazo al paciente (ver `docs/preguntas-abiertas.md`).
+  - Avance 14-nov-2026 (iOS): I03 en `ios/CLIMESA/PatientViews.swift` (`POST /cuentas/vinculacion`, validación de DUI en `Core/Rules/PatientRules.swift`, cambia sola con `vinculacion.resuelta` al volver a leer `/auth/me`). compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo. Sin GET de la vinculación propia (ver `docs/preguntas-abiertas.md`).
 - [ ] T08 · S5 · E · Vigencia de inscripción en el perfil
   - Cubre: FR-101-16
   - Depende de: 103-T05

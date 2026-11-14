@@ -10,11 +10,13 @@
   - Depende de: T01, 101-T03
   - Hecho cuando: escenarios 1 y 2 pasan (criterio del avance)
   - Avance: código escrito; compila en el CI de macOS (`xcodebuild` para simulador sin firma) y pasan las 34 pruebas del paquete, 0 fallos (30-oct-2026); sin ejecutar en simulador. `TabPolicy` (`ios/Core/Access.swift`) decide las pestañas de Médico y Paciente desde `/auth/me` y devuelve rol sin iOS; `WorkspaceView.swift` las dibuja con "Próxima entrega" en las que aún no tienen datos y muestra "Tu rol no usa esta aplicación" con cierre de sesión. Textos en `Localizable.xcstrings`. Pruebas XCTest escritas en `ios/Tests/CoreTests/AccessTests.swift`, sin correr. Falta la maquetación completa de cada pantalla y sus estados.
+  - Avance 14-nov-2026: todas las pestañas de Médico y Paciente consultan la API (I03 a I12, I20 a I26; tabla en `ios/README.md`); `AppSection` decide las secciones por permiso. Modelos del contrato, problem+json e `Idempotency-Key` por intención en `ios/Core/Contract`. compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
 - [ ] T03 · S2 · R · Servicio de Realtime e invalidación en view models
   - Cubre: FR-122-04
   - Depende de: T02, 100-T03
   - Hecho cuando: el número de fila del paciente cambia en vivo al ser llamado
   - Avance: código escrito; compila en el CI de macOS (`xcodebuild` para simulador sin firma) y pasan las 34 pruebas del paquete, 0 fallos (30-oct-2026); sin ejecutar en simulador. `ios/Core/Realtime` porta el protocolo Phoenix de web y Android (tramas, latido, unión a canales de `/auth/me`, reconexión con espera creciente y una sola consulta `GET /eventos?after=` tras una caída) sobre `URLSessionWebSocketTask` detrás de un protocolo; `LiveViewModel` lo consume en `.task {}` y la pestaña Turnos vuelve a pedir datos; la banda muestra en vivo, recuperando y sin conexión. Pruebas XCTest con socket falso escritas, sin correr. Falta la pantalla de fila del paciente, que depende de 105, y la prueba contra Supabase real.
+  - Avance 14-nov-2026: `LiveTopic` invalida cada grupo (fila, citas, consultas, laboratorio, admisiones, ambulancia, avisos, vinculación) y cada pantalla vuelve a pedir lo suyo; el número del paciente cambia con `fila.actualizada` en `usuario:<id>`. compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo. Falta la prueba contra Supabase real.
 - [ ] T04 · S5 · E · Notificaciones APNs
   - Cubre: FR-122-05
   - Depende de: T03, 100-T10

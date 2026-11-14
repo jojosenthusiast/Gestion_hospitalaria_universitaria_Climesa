@@ -36,6 +36,7 @@
   - Cubre: FR-103-11
   - Depende de: T06, 121-T02, 122-T02
   - Hecho cuando: un cambio de turno aparece en el teléfono de la persona sin recargar
+  - Avance 14-nov-2026 (iOS): I26 sin cambios funcionales; ahora se invalida con el contador `LiveTopic.shifts`.
 - [ ] T08 · S3 · R · Médicos de turno públicos
   - Cubre: FR-103-12
   - Depende de: T06

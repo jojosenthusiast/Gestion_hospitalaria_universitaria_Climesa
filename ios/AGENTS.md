@@ -15,13 +15,20 @@ Lee antes `../AGENTS.md`. Spec base: `specs/122-cliente-ios/`. Roles en iOS: Mé
     Views.swift            marca, componentes, ingreso, raíz
     WorkspaceView.swift    pestañas por rol, rol sin iOS, banda de conexión
     LiveViewModel.swift    @MainActor @Observable: consume el flujo de tiempo real
+    Support.swift          Loader (lecturas) y Submission (escrituras con Idempotency-Key), componentes
+    PatientViews.swift     I03 a I12 (Paciente)
+    DoctorViews.swift      I20, I22 a I25 (Médico)
+    ConsultationView.swift I21 (consulta)
     Resources/             Localizable.xcstrings, Configuration.plist, fuentes
   Core/                    Swift puro (Foundation), compilado por la app y por Package.swift
-    Access.swift           perfil, pestañas por rol y permiso (TabPolicy), registro
-    Realtime/              protocolo Phoenix, servicio, transporte URLSession, estado en vivo
+    Access.swift           perfil, pestañas por rol y permiso (TabPolicy), secciones (AppSection), registro
+    Contract/              modelos Codable del contrato, Problem, SubmissionIntent, fechas
+    Rules/                 reglas puras de Paciente y Médico
+    Realtime/              protocolo Phoenix, servicio, transporte URLSession, estado en vivo (LiveTopic)
+  Config/                  Debug.xcconfig y Release.xcconfig (CLIMESA_API_BASE_URL; incluyen ../Config.xcconfig local)
   Tests/CoreTests/         XCTest de Core con sockets y API falsos
   ```
-- Configuración en `CLIMESA/Resources/Configuration.plist` y la variable `CLIMESA_API_BASE_URL`; nunca claves privadas.
+- Configuración en `CLIMESA/Resources/Configuration.plist` (Supabase, públicas) y `CLIMESA_API_BASE_URL` en `Config/*.xcconfig`; nunca claves privadas.
 - Todo archivo `.swift` nuevo se agrega también a `CLIMESA.xcodeproj/project.pbxproj` (Core y app se compilan en el mismo destino). `Package.swift` toma `Core/` completo.
 
 ## Reglas
@@ -30,8 +37,9 @@ Lee antes `../AGENTS.md`. Spec base: `specs/122-cliente-ios/`. Roles en iOS: Mé
 - Asincronía con `async/await` y `Task`. Sin Combine nuevo ni callbacks.
 - Modelos `Codable` escritos a mano según `../contrato/openapi.json`; propiedades en inglés con `CodingKeys` hacia los nombres en español.
 - Repositorios y servicios detrás de un protocolo para poder probar sin red (`RealtimeService`, `RealtimeSocket`).
-- Pestañas: se deciden con `TabPolicy.decide` a partir del perfil de `/auth/me` (rol y permisos), no con metadatos del JWT. Las pestañas sin datos muestran "Próxima entrega".
-- Tiempo real: el view model consume el `AsyncStream` en `.task {}` y las vistas vuelven a pedir datos al subir un contador (`.task(id:)`). Prohibido refrescar con temporizadores; solo el latido del protocolo y la espera entre reconexiones usan reloj, y tras una caída hay una única consulta a `GET /eventos?after=`.
+- Pestañas: se deciden con `TabPolicy.decide` a partir del perfil de `/auth/me` (rol y permisos), no con metadatos del JWT. Las secciones de Más y Mi día salen de `AppSection.visible` con su permiso.
+- Escrituras: `Submission.run` con la intención del usuario (`SubmissionIntent`, `convenciones-api.md`); nunca una clave calculada de la petición. Toda escritura sobre un registro existente envía `version`.
+- Tiempo real: el view model consume el `AsyncStream` en `.task {}` y las vistas vuelven a pedir datos al subir el contador de su `LiveTopic` (`.task(id: live.snapshot.version(.queue))`). Prohibido refrescar con temporizadores; solo el latido del protocolo y la espera entre reconexiones usan reloj, y tras una caída hay una única consulta a `GET /eventos?after=`.
 - Diseño: `docs/diseno/claude-design/20-ios-medico.html` y `21-ios-paciente.html`, por código de pantalla (I01, I20...). Iconos SF Symbols. Cada pantalla con sus estados.
 - Textos en español en `CLIMESA/Resources/Localizable.xcstrings` (claves como `tab.turnos`); en las vistas se usa `Text("clave")` o `L.text("clave")`. Los mensajes de error de `Network.swift`, `AccountModel.swift` y las validaciones de `Core/` siguen escritos en español dentro del código.
 - Solo compila en Mac (la de la universidad). Si no tienes Xcode, dilo y entrega el código sin afirmar que compila.

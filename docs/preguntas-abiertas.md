@@ -151,3 +151,19 @@ Decisiones conservadoras tomadas mientras se confirman:
 | SEG-08 | ¿Límite general de la API? | 300 solicitudes por IP y minuto (`RATE_LIMIT_MAX`), `/salud` exento; las pantallas públicas conservan 120. El límite por usuario de búsquedas (FR-100-17, 100-T09) sigue pendiente |
 | SEG-08 | ¿Cuántos proxies hay delante de la API en Render? | `TRUST_PROXY_HOPS=1`. Confirmarlo en el registro: si dos clientes distintos reciben 429 juntos, la IP no se está leyendo bien |
 | API-19 | `app.module.ts` conserva la URL real de Supabase como valor por defecto | En producción la API exige la variable (`config/environment.ts`); quitar el valor por defecto requiere tocar `app.module.ts` (fuera del alcance) |
+
+## App iOS de Médico y Paciente (acción 1.3, CON-05; rama `feat/ios-med-pac`)
+
+La app usa solo endpoints que ya existen en `contrato/openapi.json`. Donde la pantalla del catálogo pide algo que la API no ofrece, se tomó la opción conservadora:
+
+| Pantalla | Pregunta | Opción aplicada |
+|---|---|---|
+| I05 | ¿Cómo calcula el paciente "cuántos faltan"? `GET /fila` (contexto `propio`) solo trae su número | Se estima con `GET /publico/fila/{servicio}`: mi número menos el último número llamado hoy, rotulado "aproximado". La app no se une al canal `publico`, así que el conteo se actualiza cuando cambia el número propio o al reabrir. Propuesta: que `GET /fila` devuelva `delante` para el ticket propio |
+| I09 | El paciente no tiene lectura de su solicitud de ambulancia (no tiene `ambulancia.ver_estado`) ni un endpoint para cancelarla antes de confirmar | Se muestra el estado devuelto por `POST /ambulancia/solicitudes` y un aviso cuando llega un evento `ambulancia.*` de esa solicitud; no hay botón de cancelar. Propuesta: `GET /me/ambulancia` y `POST /ambulancia/solicitudes/{id}/cancelar` con `ambulancia.solicitar` |
+| I03 | No hay `GET` de la vinculación propia: tras reiniciar la app no se sabe si está pendiente, y el motivo del rechazo no llega | Se muestra el estado devuelto al enviar; al llegar `vinculacion.resuelta` se vuelve a pedir `/auth/me`: con `patientId` está aprobada, sin él se informa el rechazo sin motivo. Reenviar mientras está pendiente devuelve `vinculacion_pendiente` |
+| I21 | No hay endpoint de búsqueda CIE-10 ni árbol del catálogo de laboratorio | El código CIE-10 se escribe a mano (la API lo valida contra `atencion.cie10`); el catálogo de laboratorio se muestra como lista plana con la marca "Panel" |
+| I24 | `AdmissionResponse` no trae fecha de ingreso, así que no se pueden mostrar "días" de hospitalización | Se muestran paciente, cama, categoría, aislamiento y estado, sin días |
+| I25 | No existe una acción "Marcar recibido" para la llegada de ambulancia | Pantalla de solo lectura con `GET /ambulancia` y el reporte prehospital; se indica que la recepción todavía no está en la API |
+| I23 | Push de valor crítico (APNs, 122-T04) | Fuera de este corte: el crítico se marca en rojo y llega en vivo por `laboratorio.critico` solo con la app abierta |
+| I13 | "Mi cuenta" (cargos y factura) es de nivel F | No se implementa |
+| Config | Release apunta a `https://sghu-api.onrender.com/api/v1` (pública, la misma de web y Android) desde `ios/Config/Release.xcconfig` | Debug usa `http://localhost:3000/api/v1`; un `ios/Config.xcconfig` local (ignorado) puede cambiar ambas |

@@ -22,6 +22,7 @@
   - Depende de: T03
   - Hecho cuando: escenario 1 completo pasa en iOS y Android
   - Avance 13-nov-2026: `GET /me/laboratorio` (`resultados.ver`): el paciente ve siempre el estado de sus órdenes y los valores solo tras la revisión médica (D-040); una cuenta sin vincular recibe 404. Prueba en `api/tests/paciente-vinculacion-historial.spec.ts` (sin valor antes de `revisar`, con marca después). Android A07 usa `/me/laboratorio` y muestra "En revisión médica" mientras falta la revisión. **Sigue abierta**: falta iOS y el escenario 1 completo en dispositivo.
+  - Avance 14-nov-2026 (iOS): I07 (`GET /me/laboratorio`, valores solo revisados) e I23 (pendientes con críticos arriba, `POST /laboratorio/ordenes/{id}/revisar`). compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
 - [ ] T06 · S5 · E · Aviso de valor crítico con push
   - Cubre: FR-107-08
   - Depende de: T03, 100-T10

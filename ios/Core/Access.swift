@@ -13,19 +13,27 @@ public struct AccessProfile: Codable, Sendable {
     public let permissions: [Permission]
     /// Canales de Realtime a los que el usuario puede unirse (los entrega /auth/me). Vacío si la API no los envía.
     public let channels: [String]
-    public init(id: String, email: String, name: String, roles: [String], platforms: [String], permissions: [Permission], channels: [String] = []) {
+    /// Expediente vinculado a la cuenta (paciente); nil mientras no se apruebe la vinculación (I03).
+    public let patientId: String?
+    /// Persona de personal vinculada (médico); la usa la indicación de hospitalización como médico tratante.
+    public let staffId: String?
+    public init(id: String, email: String, name: String, roles: [String], platforms: [String], permissions: [Permission], channels: [String] = [], patientId: String? = nil, staffId: String? = nil) {
         self.id=id; self.email=email; self.name=name; self.roles=roles; self.platforms=platforms; self.permissions=permissions; self.channels=channels
+        self.patientId=patientId; self.staffId=staffId
     }
-    private enum CodingKeys: String, CodingKey { case id, email, name, roles, platforms, permissions, channels }
+    private enum CodingKeys: String, CodingKey { case id, email, name, roles, platforms, permissions, channels, patientId, staffId }
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         email = try container.decode(String.self, forKey: .email)
-        name = try container.decode(String.self, forKey: .name)
+        // `SessionProfileResponse.name` es nullable en el contrato.
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
         roles = try container.decode([String].self, forKey: .roles)
         platforms = try container.decode([String].self, forKey: .platforms)
         permissions = try container.decode([Permission].self, forKey: .permissions)
         channels = try container.decodeIfPresent([String].self, forKey: .channels) ?? []
+        patientId = try container.decodeIfPresent(String.self, forKey: .patientId)
+        staffId = try container.decodeIfPresent(String.self, forKey: .staffId)
     }
     public func hasPermission(_ code: String) -> Bool { permissions.contains { $0.code == code } }
     // Solo se invoca con el perfil verificado que devuelve /auth/me; nunca con metadatos del JWT.
@@ -63,8 +71,8 @@ public enum AppTab: String, Equatable, Hashable, Sendable, CaseIterable {
         }
     }
 
-    /// Las demás pestañas muestran el aviso "Próxima entrega".
-    public var isImplemented: Bool { self == .turnos || self == .perfil || self == .mas }
+    /// Todas las pestañas de Médico y Paciente consultan la API (las secciones sin permiso no aparecen).
+    public var isImplemented: Bool { true }
 
     /// Permiso que la pestaña exige además del rol (regla 8 de AGENTS.md: se pregunta por permiso).
     public var requiredPermission: String? {
@@ -73,6 +81,7 @@ public enum AppTab: String, Equatable, Hashable, Sendable, CaseIterable {
         case .turnos: return "turnos.ver"
         case .fila: return "fila.ver"
         case .citas: return "citas.ver"
+        case .resultados, .examenes: return "resultados.ver"
         default: return nil
         }
     }
@@ -101,6 +110,54 @@ public enum TabPolicy {
         return .tabs(role: role, tabs: tabs)
     }
 }
+/// Secciones que se abren desde una pestaña (Más del paciente y Mi día del médico). Cada una exige su permiso del
+/// catálogo (`acceso.rol_permiso`); sin él no aparece. Nada se decide por el nombre del rol.
+public enum AppSection: String, CaseIterable, Hashable, Sendable {
+    // Paciente (Más)
+    case vinculacion, historial, ambulancia, hospital, accesos, perfil
+    // Médico (Mi día)
+    case hospitalizados, llegadaAmbulancia
+
+    public var titleKey: String { "section.\(rawValue)" }
+
+    public var symbol: String {
+        switch self {
+        case .vinculacion: return "link"
+        case .historial: return "doc.text.magnifyingglass"
+        case .ambulancia: return "cross.case"
+        case .hospital: return "building.2"
+        case .accesos: return "eye"
+        case .perfil: return "person.crop.circle"
+        case .hospitalizados: return "bed.double"
+        case .llegadaAmbulancia: return "light.beacon.max"
+        }
+    }
+
+    /// Permiso que exige la sección; nil si basta la sesión.
+    public var requiredPermission: String? {
+        switch self {
+        case .vinculacion: return "cuenta.vincular"
+        case .historial: return "expediente.ver"
+        case .ambulancia: return "ambulancia.solicitar"
+        case .accesos: return "auditoria.mis_accesos"
+        case .hospitalizados: return "admision.ver"
+        case .llegadaAmbulancia: return "ambulancia.recibir_prehospital"
+        case .hospital, .perfil: return nil
+        }
+    }
+
+    /// Secciones visibles para el rol de trabajo y los permisos del perfil.
+    public static func visible(for role: String, profile: AccessProfile) -> [AppSection] {
+        let candidates: [AppSection] = role == "MED" ? [.hospitalizados, .llegadaAmbulancia] : [.vinculacion, .historial, .ambulancia, .hospital, .accesos, .perfil]
+        return candidates.filter { section in
+            // La vinculación solo tiene sentido mientras la cuenta no tenga expediente.
+            if section == .vinculacion && profile.patientId != nil { return false }
+            guard let code = section.requiredPermission else { return true }
+            return profile.hasPermission(code)
+        }
+    }
+}
+
 public enum RegistrationRules {
     public static func errors(name: String, email: String, password: String, confirmation: String) -> [String] {
         var errors: [String] = []
