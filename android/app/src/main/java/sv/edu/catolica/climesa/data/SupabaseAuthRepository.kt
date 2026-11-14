@@ -5,6 +5,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
+import sv.edu.catolica.climesa.domain.AuthErrors
+import sv.edu.catolica.climesa.domain.AuthRedirects
 import sv.edu.catolica.climesa.domain.AuthSession
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -17,6 +19,8 @@ class SupabaseAuthRepository(
     private val supabaseUrl: String,
     private val publishableKey: String,
     private val sessionStore: SecureSessionStore,
+    /** Web app base URL (BuildConfig.WEB_URL): email links land on its pages, never on the Supabase Site URL. */
+    private val webUrl: String,
 ) : SessionTokens {
     private val refreshMutex = Mutex()
     private val generation=AtomicInteger()
@@ -56,8 +60,18 @@ class SupabaseAuthRepository(
     } }
     suspend fun signUp(name: String, email: String, password: String): AuthSession? = withContext(Dispatchers.IO) {
         val stamp=generation.get()
-        val result=requestJson("/auth/v1/signup","POST",JSONObject().put("email",email.trim()).put("password",password).put("data",JSONObject().put("nombre",name.trim())))
+        val result=requestJson(AuthRedirects.withRedirect("/auth/v1/signup",AuthRedirects.confirmEmail(webUrl)),"POST",JSONObject().put("email",email.trim()).put("password",password).put("data",JSONObject().put("nombre",name.trim())))
         if(result.optString("access_token").isNotBlank()) saveCurrent(parseSession(result),stamp) else null
+    }
+    /** Sends the sign-up confirmation email again (Supabase `/auth/v1/resend`, type `signup`). */
+    suspend fun resendSignupConfirmation(email: String) = withContext(Dispatchers.IO) {
+        requestJson(AuthRedirects.withRedirect("/auth/v1/resend",AuthRedirects.confirmEmail(webUrl)),"POST",JSONObject().put("type","signup").put("email",email.trim()),allowEmpty=true)
+        Unit
+    }
+    /** Password reset email; its link opens the web page that sets the new password. */
+    suspend fun requestPasswordReset(email: String) = withContext(Dispatchers.IO) {
+        requestJson(AuthRedirects.withRedirect("/auth/v1/recover",AuthRedirects.resetPassword(webUrl)),"POST",JSONObject().put("email",email.trim()),allowEmpty=true)
+        Unit
     }
     fun clearLocalSession() { synchronized(storageLock){generation.incrementAndGet();sessionStore.clear()} }
 
@@ -121,15 +135,9 @@ class SupabaseAuthRepository(
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (status !in 200..299) {
                 val error = runCatching { JSONObject(text) }.getOrNull()
-                val code = error?.optString("error_code").orEmpty().ifBlank { error?.optString("code").orEmpty() }
                 val detail = error?.optString("msg").orEmpty().ifBlank { error?.optString("error_description").orEmpty() }
-                val message = when (code) {
-                    "invalid_credentials" -> "Correo o contraseña incorrectos, o la cuenta todavía no está activa."
-                    "email_not_confirmed" -> "Correo o contraseña incorrectos, o la cuenta todavía no está activa."
-                    "over_request_rate_limit" -> "Demasiados intentos. Espera un momento y vuelve a intentar."
-                    else -> "No se pudo completar la autenticación. Revisa los datos o intenta más tarde."
-                }
-                throw AuthRequestException(message, status)
+                val code = AuthErrors.code(error?.optString("error_code"), detail)
+                throw AuthRequestException(AuthErrors.message(code), status, code)
             }
             if (text.isBlank() && allowEmpty) return JSONObject()
             return JSONObject(text)
