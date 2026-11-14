@@ -5,7 +5,7 @@ import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException, VersionConflictException } from '../platform/problem';
 import { QUEUE_SERVICES, QueueIssueDto, QueueTransitionDto } from './queue.dto';
 
 type QueueRow = Record<string, any>;
@@ -16,6 +16,9 @@ const serviceNames: Record<string, string> = {
   laboratorio: 'Laboratorio',
   admisiones: 'Admisiones',
 };
+
+const activeTicket = (number?: number) => new ProblemException('ticket_activo_existente', 409,
+  number ? `El paciente ya tiene el número ${number} activo en este servicio hoy.` : 'El paciente ya tiene un número activo en este servicio hoy.');
 
 @Injectable()
 export class QueueService {
@@ -31,9 +34,13 @@ export class QueueService {
     const row = (await c.query(`SELECT id,servicio AS service,fecha,numero,paciente_id AS "patientId",estado AS state,
       consultorio_id AS "officeId",llamados,version FROM atencion.ticket_fila WHERE id=$1 ${lock ? 'FOR UPDATE' : ''}`, [id])).rows[0] as QueueRow | undefined;
     if (!row) throw new NotFoundException('No se encontró el número de fila.');
-    const own = contextsOf(actor, 'fila.ver').includes('propio');
-    if (own && actor.patientId !== row.patientId) throw new ForbiddenException('Solo puedes consultar tu propio número de fila.');
+    if (!this.seesWholeQueue(actor) && (!actor.patientId || actor.patientId !== row.patientId)) throw new ForbiddenException('Solo puedes consultar tu propio número de fila.');
     return row;
+  }
+
+  /** `fila.ver` con contexto distinto de `propio` ve la fila completa; con `propio`, solo el número del paciente vinculado. */
+  private seesWholeQueue(actor: Actor) {
+    return contextsOf(actor, 'fila.ver').some(context => context !== 'propio');
   }
 
   private async channels(c: PoolClient, patientId?: string) {
@@ -43,13 +50,20 @@ export class QueueService {
   async list(actor: Actor, dateText?: string, service?: string) {
     const date = this.date(dateText);
     if (service && !QUEUE_SERVICES.includes(service as any)) throw new BadRequestException('Selecciona un servicio válido.');
-    const own = contextsOf(actor, 'fila.ver').includes('propio') && actor.patientId ? actor.patientId : null;
-    return this.db.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
+    const whole = this.seesWholeQueue(actor);
+    // SEG-01: una cuenta con solo `propio` y sin expediente vinculado no tiene número que ver.
+    if (!whole && !actor.patientId) return [];
+    const own = whole ? null : actor.patientId;
+    return this.db.transaction(async c => { const rows = (await c.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       t.estado AS state,t.consultorio_id AS "officeId",t.llamados,t.version,t.emitido_en AS "issuedAt"
       FROM atencion.ticket_fila t LEFT JOIN pacientes.paciente p ON p.id=t.paciente_id
       WHERE t.fecha=$1::date AND ($2::text IS NULL OR t.servicio=$2) AND ($3::uuid IS NULL OR t.paciente_id=$3)
-      ORDER BY t.servicio,t.numero`, [date, service ?? null, own]);
+      ORDER BY t.servicio,t.numero`, [date, service ?? null, own])).rows;
+      // SEG-02: aggregated read audit with every patient listed.
+      await this.commands.audit(c, actor, { action: 'fila.leer', entity: 'ticket_fila', permission: 'fila.ver', detail: { date, patientIds: [...new Set(rows.map(row => row.patientId).filter(Boolean))] } });
+      return rows;
+    });
   }
 
   async issue(actor: Actor, dto: QueueIssueDto, key?: string) {
@@ -60,9 +74,15 @@ export class QueueService {
       const patient = (await c.query("SELECT id FROM pacientes.paciente WHERE id=$1 AND estado IN ('activo','provisional')", [patientId])).rows[0];
       if (!patient) throw new BadRequestException('Selecciona un paciente activo.');
       const date = this.clock.today();
+      // W-07: one active number per patient, service and day; `ticket_fila_activo_unico` guarantees it under races.
+      const active = (await c.query(`SELECT numero FROM atencion.ticket_fila WHERE paciente_id=$1 AND servicio=$2 AND fecha=$3::date AND estado IN ('en_espera','llamado','en_atencion') LIMIT 1`, [patientId, dto.service, date])).rows[0];
+      if (active) throw activeTicket(active.numero);
       const number = (await c.query('SELECT atencion.emitir_numero($1,$2::date) AS number', [dto.service, date])).rows[0].number;
       const row = (await c.query(`INSERT INTO atencion.ticket_fila(servicio,fecha,numero,paciente_id,emitido_por)
-        VALUES($1,$2::date,$3,$4,$5) RETURNING id,servicio AS service,fecha,numero,estado AS state,version`, [dto.service, date, number, patientId, actor.id])).rows[0];
+        VALUES($1,$2::date,$3,$4,$5) RETURNING id,servicio AS service,fecha,numero,estado AS state,version`, [dto.service, date, number, patientId, actor.id]).catch(error => {
+        if (error?.code === '23505' && String(error?.constraint ?? error?.message ?? '').includes('ticket_fila_activo_unico')) throw activeTicket();
+        throw error;
+      })).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.emitir', entity: 'ticket_fila', entityId: row.id, patientId, permission: 'fila.emitir', detail: { service: dto.service, number } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', row.id, row.version, await this.channels(c, patientId));
       return { ...row, serviceName: serviceNames[dto.service], patientId };

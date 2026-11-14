@@ -3436,6 +3436,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExitDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -4915,6 +4925,25 @@
           "text"
         ]
       },
+      "DischargePendingDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "responsible": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "description",
+          "responsible"
+        ]
+      },
       "DischargeDto": {
         "type": "object",
         "properties": {
@@ -4927,6 +4956,11 @@
               "defuncion"
             ]
           },
+          "version": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Versión vigente de la admisión (control de concurrencia)."
+          },
           "summary": {
             "type": "string",
             "minLength": 10,
@@ -4936,14 +4970,35 @@
             "type": "boolean"
           },
           "pending": {
+            "maxItems": 50,
+            "description": "Pendientes al alta, cada uno con su responsable.",
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/DischargePendingDto"
             }
           }
         },
         "required": [
-          "type"
+          "type",
+          "version"
+        ]
+      },
+      "ExitDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "reason"
         ]
       },
       "TransferDto": {

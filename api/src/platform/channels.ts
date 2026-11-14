@@ -1,7 +1,13 @@
 import { PoolClient } from 'pg';
 
+/**
+ * Contextos que solo dan acceso a lo propio del paciente. Nunca abren un canal de rol: el paciente recibe
+ * sus eventos por su cuenta (`users`), y `rol:PAC` no debe enterarse de la actividad de otros (SEG-05).
+ */
+export const OWN_CONTEXTS = ['propio', 'propio_revisado'];
+
 type Options = {
-  /** Contextos del catálogo que no cuentan como acceso general (por ejemplo `propio`). */
+  /** Contextos adicionales que no cuentan como acceso general; `OWN_CONTEXTS` siempre se excluyen. */
   excludeContexts?: string[];
   /** Cuentas individuales que también deben recibir el evento. */
   users?: Array<string | null | undefined>;
@@ -10,14 +16,14 @@ type Options = {
 /**
  * Canales `rol:<código>` de los roles que tienen alguno de los permisos dados en el catálogo
  * (`acceso.rol_permiso`). Cualquier celda con contexto cuenta como concesión, salvo los
- * contextos excluidos. Se consulta dentro de la misma transacción del comando, así que no hay
+ * contextos propios del paciente y los excluidos. Se consulta dentro de la misma transacción del comando, así que no hay
  * caché que invalidar: un cambio de catálogo se ve en el siguiente evento.
  * Regla 8: los canales se derivan de permisos, no de listas de roles escritas en el código.
  */
 export async function channelsFor(c: PoolClient, permissions: string[], options: Options = {}): Promise<string[]> {
   const rows = (await c.query(
     'SELECT DISTINCT rol_codigo FROM acceso.rol_permiso WHERE permiso_codigo = ANY($1::text[]) AND NOT (contexto = ANY($2::text[])) ORDER BY rol_codigo',
-    [permissions, options.excludeContexts ?? []],
+    [permissions, [...OWN_CONTEXTS, ...(options.excludeContexts ?? [])]],
   )).rows as Array<{ rol_codigo: string }>;
   const users = (options.users ?? []).filter((id): id is string => !!id).map(id => `usuario:${id}`);
   return [...new Set([...rows.map(r => `rol:${r.rol_codigo}`), ...users])];

@@ -21,10 +21,14 @@ export class CommandService {
     // A single lock establishes a reproducible, append-only order for the audit chain.
     await client.query('SELECT pg_advisory_xact_lock(671003)');
     const previous = (await client.query('SELECT hash FROM plataforma.auditoria ORDER BY seq DESC LIMIT 1')).rows[0]?.hash ?? Buffer.alloc(32);
-    const event = { id: randomUUID(), at: this.clock.now().toISOString(), actorId: actor.id, actorRole: actor.roles.join(','), ...input, result: input.result ?? 'exito' };
+    // The detail is stored once, in `detalle`; the signed event carries only its SHA-256 (`detailHash`).
+    // JSON round trip: the hash covers exactly what jsonb stores (undefined fields dropped, dates as text).
+    const { detail: raw, ...header } = input;
+    const detail = JSON.parse(JSON.stringify(raw ?? {})) as Record<string, unknown>;
+    const event = { id: randomUUID(), at: this.clock.now().toISOString(), actorId: actor.id, actorRole: actor.roles.join(','), ...header, result: input.result ?? 'exito', detailHash: fingerprint(detail) };
     const digest = createHash('sha256').update(previous).update(canonical(event)).digest();
     await client.query(`INSERT INTO plataforma.auditoria(evento_id,registrado_en,actor_id,actor_rol,permiso,accion,entidad,entidad_id,paciente_id,motivo,resultado,detalle,hash_previo,hash)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, [event.id,event.at,actor.id,event.actorRole,input.permission ?? null,input.action,input.entity,input.entityId ?? null,input.patientId ?? null,input.reason ?? null,event.result,{ ...input.detail, canonicalEvent: canonical(event) },previous,digest]);
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, [event.id,event.at,actor.id,event.actorRole,input.permission ?? null,input.action,input.entity,input.entityId ?? null,input.patientId ?? null,input.reason ?? null,event.result,{ ...detail, canonicalEvent: canonical(event) },previous,digest]);
   }
   async denied(actor: Actor, permission: string, method: string, path: string) {
     await this.db.transaction(c => this.audit(c, actor, { action: 'acceso.denegado', entity: 'endpoint', permission, result: 'denegado', detail: { method, path: path.split('?')[0] } }));

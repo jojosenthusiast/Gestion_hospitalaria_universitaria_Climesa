@@ -46,12 +46,12 @@ object HospitalizationRules {
         else -> null
     }
 
-    /** `DischargeDto` has no `version` field and the API rejects unknown fields, so none is sent. */
-    fun dischargeBody(type: DischargeType, summary: String, pending: List<DischargePending>, voluntaryConsent: Boolean): JSONObject {
+    /** `DischargeDto` requires the admission `version` (409 with `versionActual` on mismatch) and pending items as `{description, responsible}`. */
+    fun dischargeBody(admissionVersion: Int, type: DischargeType, summary: String, pending: List<DischargePending>, voluntaryConsent: Boolean): JSONObject {
         val items = JSONArray()
         pending.filter { it.description.isNotBlank() && it.responsible.isNotBlank() }
             .forEach { items.put(JSONObject().put("description", it.description.trim()).put("responsible", it.responsible.trim())) }
-        return JSONObject().put("type", type.value).put("summary", summary.trim()).put("pending", items)
+        return JSONObject().put("type", type.value).put("version", admissionVersion).put("summary", summary.trim()).put("pending", items)
             .apply { if (type == DischargeType.VOLUNTARY) put("voluntaryConsent", voluntaryConsent) }
     }
 

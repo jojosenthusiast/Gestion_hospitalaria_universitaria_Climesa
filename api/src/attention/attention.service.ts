@@ -3,12 +3,13 @@ import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
-import { VersionConflictException } from '../platform/problem';
+import { ProblemException, VersionConflictException } from '../platform/problem';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { AppointmentCancelDto, AppointmentCreateDto, AppointmentStatusDto, PatientAppointmentRequestDto } from './attention.dto';
 
 type AppointmentRow = Record<string, any>;
+const SLOT_MS = 20 * 60_000;
 
 @Injectable()
 export class AttentionService {
@@ -40,15 +41,21 @@ export class AttentionService {
     if (!row) throw new BadRequestException('Selecciona un médico activo.');
   }
 
-  /** Una cita solo puede existir dentro de una jornada publicada o en curso del médico. */
-  private async doctorHasShift(c: PoolClient, doctorId: string, start: Date, end: Date) {
-    const row = (await c.query(`SELECT 1
+  /**
+   * Una cita solo puede existir dentro de una jornada publicada o en curso del médico. Al crearla
+   * (`requireAligned`) además empieza en una franja de 20 minutos contada desde el inicio de esa jornada
+   * (API-07); al confirmar una solicitud previa basta con que la jornada la cubra, porque las solicitudes
+   * hechas con la disponibilidad anterior pueden tener inicios sin redondear.
+   */
+  private async doctorHasShift(c: PoolClient, doctorId: string, start: Date, end: Date, requireAligned: boolean) {
+    const row = (await c.query(`SELECT lower(periodo) AS start
       FROM personal.turno
       WHERE persona_id=$1 AND estado IN ('publicado','en_curso')
         AND periodo @> $2::timestamptz
         AND periodo @> ($3::timestamptz - interval '1 microsecond')
       LIMIT 1`, [doctorId, start, end])).rows[0];
     if (!row) throw new ConflictException('El médico no tiene una jornada publicada para esa franja.');
+    if (requireAligned && (start.valueOf() - new Date(row.start).valueOf()) % SLOT_MS !== 0) throw new ProblemException('franja_desalineada', 400, 'La cita debe empezar en una franja de 20 minutos de la jornada del médico.', 'start');
   }
 
   /** Evita que un mismo paciente quede con dos citas simultáneas, incluso con médicos distintos. */
@@ -76,13 +83,18 @@ export class AttentionService {
   async catalogs(actor: Actor) {
     const canManagePatients = contextsOf(actor, 'citas.agendar').length > 0;
     const [patients, doctors] = await Promise.all([
-      this.db.query(`SELECT id, expediente AS record,
+      this.db.transaction(async c => { const rows = (await c.query(`SELECT id, expediente AS record,
         coalesce(nullif(concat_ws(' ',nombres,primer_apellido,segundo_apellido),''),alias_provisional) AS "fullName",
         (estado IN ('activo','provisional')) AS active
         FROM pacientes.paciente
         WHERE estado IN ('activo','provisional') AND ($1::boolean OR id=$2::uuid)
         ORDER BY primer_apellido,nombres,id
-        LIMIT 500`, [canManagePatients, actor.patientId]),
+        LIMIT 500`, [canManagePatients, actor.patientId])).rows;
+        // SEG-02: the scheduling catalog lists patients, so its read is audited in aggregate. The identifiers stay
+        // (privacidad.md §3.9: the patient can see who consulted their data); the detail is stored only once.
+        await this.commands.audit(c, actor, { action: 'citas.catalogo_leer', entity: 'paciente', permission: canManagePatients ? 'citas.agendar' : 'citas.solicitar', detail: { patientCount: rows.length, patientIds: rows.map(row => row.id) } });
+        return rows;
+      }),
       this.db.query(`SELECT p.id,p.nombres AS "givenNames",p.apellidos AS surnames,p.tipo AS type,
         p.especialidad AS specialty,p.area_id AS "areaId",e.nombre AS area,p.activo AS active
         FROM personal.persona p LEFT JOIN infra.espacio e ON e.id=p.area_id
@@ -121,7 +133,10 @@ export class AttentionService {
     const slots: Array<{ start: string; end: string }> = [];
     const seen = new Set<string>();
     for (const shift of shifts) {
-      const shiftStart = Math.max(new Date(shift.start).valueOf(), dayStart.valueOf(), now);
+      // API-07: slots are counted from the start of the shift, so a shift already in progress never yields odd times.
+      const origin = new Date(shift.start).valueOf();
+      const earliest = Math.max(origin, dayStart.valueOf(), now);
+      const shiftStart = origin + Math.ceil((earliest - origin) / SLOT_MS) * SLOT_MS;
       const shiftEnd = Math.min(new Date(shift.end).valueOf(), dayEnd.valueOf());
       for (let cursor = shiftStart; cursor + durationMinutes * 60_000 <= shiftEnd; cursor += durationMinutes * 60_000) {
         const end = cursor + durationMinutes * 60_000;
@@ -149,12 +164,16 @@ export class AttentionService {
     const ownPatient = contextsOf(actor, 'citas.ver').includes('propio') && actor.patientId ? actor.patientId : patientId ?? null;
     const ownDoctor = contextsOf(actor, 'citas.ver').includes('propio') && actor.staffId ? actor.staffId : doctorId ?? null;
     await this.allowedToSee(actor, ownPatient ?? undefined, ownDoctor ?? undefined);
-    return this.db.query(`SELECT c.id,c.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
+    return this.db.transaction(async c => { const rows = (await c.query(`SELECT c.id,c.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       c.medico_id AS "doctorId",concat_ws(' ',m.nombres,m.apellidos) AS "doctorName",lower(c.horario) AS start,upper(c.horario) AS "end",
       c.motivo AS reason,c.estado AS state,c.origen AS origin,c.motivo_rechazo AS "rejectionReason",c.version
       FROM atencion.cita c JOIN pacientes.paciente p ON p.id=c.paciente_id JOIN personal.persona m ON m.id=c.medico_id
       WHERE c.horario && tstzrange($1,$2) AND ($3::uuid IS NULL OR c.paciente_id=$3) AND ($4::uuid IS NULL OR c.medico_id=$4)
-      ORDER BY lower(c.horario),c.id`, [start, end, ownPatient, ownDoctor]);
+      ORDER BY lower(c.horario),c.id`, [start, end, ownPatient, ownDoctor])).rows;
+      // SEG-02: aggregated read audit with every patient listed.
+      await this.commands.audit(c, actor, { action: 'citas.leer', entity: 'cita', permission: 'citas.ver', detail: { patientIds: [...new Set(rows.map(row => row.patientId))] } });
+      return rows;
+    });
   }
 
   async create(actor: Actor, dto: AppointmentCreateDto | PatientAppointmentRequestDto, patientRequest: boolean, key?: string) {
@@ -166,7 +185,7 @@ export class AttentionService {
     return this.commands.run(actor, permission, key, dto, async c => {
       await this.patient(c, patientId);
       await this.doctor(c, dto.doctorId);
-      await this.doctorHasShift(c, dto.doctorId, start, end);
+      await this.doctorHasShift(c, dto.doctorId, start, end, true);
       await this.patientHasConflict(c, patientId, start, end);
       const row = (await c.query(`INSERT INTO atencion.cita(paciente_id,medico_id,horario,motivo,estado,origen,creado_por)
         VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7,$8) RETURNING id,version`, [patientId, dto.doctorId, start, end, dto.reason?.trim() || null, state, patientRequest ? 'paciente' : 'recepcion', actor.id])).rows[0];
@@ -184,7 +203,7 @@ export class AttentionService {
       if (dto.status === 'rechazada' && (dto.rejectionReason?.trim().length ?? 0) < 10) throw new BadRequestException('Indica el motivo del rechazo.');
       if (!['solicitada', 'confirmada'].includes(old.estado)) throw new ConflictException('La cita ya no admite cambios de agenda.');
       if (dto.status === 'confirmada') {
-        await this.doctorHasShift(c, old.medico_id, new Date(old.start), new Date(old.end));
+        await this.doctorHasShift(c, old.medico_id, new Date(old.start), new Date(old.end), false);
         await this.patientHasConflict(c, old.paciente_id, new Date(old.start), new Date(old.end), id);
       }
       const row = (await c.query('UPDATE atencion.cita SET estado=$2,motivo_rechazo=$3,version=version+1 WHERE id=$1 RETURNING version', [id, dto.status, dto.rejectionReason?.trim() || null])).rows[0];
@@ -197,11 +216,13 @@ export class AttentionService {
   async cancel(actor: Actor, id: string, dto: AppointmentCancelDto, key?: string) {
     return this.commands.run(actor, 'citas.cancelar', key, dto, async c => {
       const old = (await c.query('SELECT paciente_id,estado,version FROM atencion.cita WHERE id=$1 FOR UPDATE', [id])).rows[0] as AppointmentRow | undefined;
+      // F-06/H-09: ownership comes first, and a foreign or missing appointment answers the same, so neither
+      // the version nor the existence of another patient's appointment leaks.
+      const onlyOwn = !contextsOf(actor, 'citas.cancelar').some(context => context !== 'propio');
+      if (onlyOwn && (!old || !actor.patientId || actor.patientId !== old.paciente_id)) throw new ForbiddenException('Solo puedes cancelar tus propias citas.');
       if (!old) throw new NotFoundException('No se encontró la cita.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
       if (!['solicitada', 'confirmada'].includes(old.estado)) throw new ConflictException('Solo se pueden cancelar citas solicitadas o confirmadas.');
-      const own = contextsOf(actor, 'citas.cancelar').includes('propio');
-      if (own && actor.patientId !== old.paciente_id) throw new ForbiddenException('Solo puedes cancelar tus propias citas.');
       const row = (await c.query("UPDATE atencion.cita SET estado='cancelada',version=version+1 WHERE id=$1 RETURNING version", [id])).rows[0];
       await this.commands.audit(c, actor, { action: 'citas.cancelar', entity: 'cita', entityId: id, permission: 'citas.cancelar', reason: dto.reason });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, old.paciente_id));

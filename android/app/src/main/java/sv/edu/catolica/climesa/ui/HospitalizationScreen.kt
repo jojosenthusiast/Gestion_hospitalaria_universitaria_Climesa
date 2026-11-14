@@ -143,7 +143,7 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
     fun signDischarge(admission: HospitalAdmission) {
         val form = mutable.value.discharge?.takeIf { it.admissionId == admission.id } ?: return
         HospitalizationRules.dischargeError(form.type, form.summary, form.pending, form.voluntaryConsent)?.let { error -> mutable.update { it.copy(formError = error) }; return }
-        mutate("/admisiones/${admission.id}/alta", HospitalizationRules.dischargeBody(form.type, form.summary, form.pending, form.voluntaryConsent), "Alta firmada.")
+        mutate("/admisiones/${admission.id}/alta", HospitalizationRules.dischargeBody(admission.version, form.type, form.summary, form.pending, form.voluntaryConsent), "Alta firmada.")
     }
 
     fun openExit(admission: HospitalAdmission) = mutable.update { it.copy(exitId = admission.id, exitReason = "", formError = null, error = null) }

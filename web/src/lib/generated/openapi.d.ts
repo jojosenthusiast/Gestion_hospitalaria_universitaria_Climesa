@@ -1574,12 +1574,23 @@ export interface components {
         NursingNoteDto: {
             text: string;
         };
+        DischargePendingDto: {
+            description: string;
+            responsible: string;
+        };
         DischargeDto: {
             /** @enum {string} */
             type: "medica" | "voluntaria" | "traslado" | "defuncion";
+            /** @description Versión vigente de la admisión (control de concurrencia). */
+            version: number;
             summary?: string;
             voluntaryConsent?: boolean;
-            pending?: string[];
+            /** @description Pendientes al alta, cada uno con su responsable. */
+            pending?: components["schemas"]["DischargePendingDto"][];
+        };
+        ExitDto: {
+            version: number;
+            reason: string;
         };
         TransferDto: {
             /** Format: uuid */
@@ -3365,7 +3376,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExitDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {

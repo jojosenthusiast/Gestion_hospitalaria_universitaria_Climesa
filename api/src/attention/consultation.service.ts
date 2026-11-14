@@ -5,6 +5,8 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { VersionConflictException } from '../platform/problem';
 import { Clock } from '../platform/clock';
+import { channelsFor, patientAccount } from '../platform/channels';
+import { requireCurrentEnrollment } from '../platform/enrollment';
 import { ConsultationSignDto, ConsultationStartDto, ConsultationUpdateDto } from './consultation.dto';
 
 type Row = Record<string, any>;
@@ -17,14 +19,15 @@ export class ConsultationService {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a un médico.');
   }
 
-  private async channels(c: PoolClient, patientId: string) {
-    const rows = (await c.query(`SELECT id FROM acceso.usuario WHERE paciente_id=$1 AND estado='activo'`, [patientId])).rows;
-    return ['rol:ADM', 'rol:MED', ...rows.map(row => `usuario:${row.id}`)];
+  /** Roles that read clinical records; the patient's account only once the note is signed (SEG-05, SEG-07). */
+  private async channels(c: PoolClient, patientId: string, notifyPatient = false) {
+    return channelsFor(c, ['expediente.ver', 'consulta.iniciar'], { users: notifyPatient ? [await patientAccount(c, patientId)] : [] });
   }
 
   async agenda(actor: Actor) {
     this.requireDoctor(actor);
-    return this.db.query(`SELECT c.id AS "appointmentId",c.paciente_id AS "patientId",
+    return this.db.transaction(async c => {
+      const rows = (await c.query(`SELECT c.id AS "appointmentId",c.paciente_id AS "patientId",
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       lower(c.horario) AS start,upper(c.horario) AS "end",c.motivo AS reason,c.estado AS "appointmentState",
       k.id AS "consultationId",k.estado AS "consultationState",k.motivo AS "consultationReason",
@@ -35,7 +38,11 @@ export class ConsultationService {
       WHERE c.medico_id=$1 AND c.estado IN ('confirmada','atendida')
         AND lower(c.horario) >= $2::timestamptz - interval '7 days'
         AND lower(c.horario) <= $2::timestamptz + interval '31 days'
-      ORDER BY lower(c.horario),c.id`, [actor.staffId, this.clock.now()]);
+      ORDER BY lower(c.horario),c.id`, [actor.staffId, this.clock.now()])).rows;
+      // SEG-02: one aggregated read audit with every patient shown.
+      await this.commands.audit(c, actor, { action: 'consulta.agenda_leer', entity: 'consulta', permission: 'consulta.iniciar', detail: { patientIds: [...new Set(rows.map(row => row.patientId))] } });
+      return rows;
+    });
   }
 
   async start(actor: Actor, dto: ConsultationStartDto, key?: string) {
@@ -84,10 +91,13 @@ export class ConsultationService {
       const old = await this.ownOpen(c, actor, id);
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La consulta cambió; vuelve a abrirla.');
       if (!String(old.motivo ?? '').trim() || !String(old.plan ?? '').trim()) throw new ConflictException('Completa el motivo y el plan antes de firmar la consulta.');
+      await requireCurrentEnrollment(c, actor.staffId, this.clock.today());
       const row = (await c.query(`UPDATE atencion.consulta SET estado='firmada',firmada_en=$2,version=version+1 WHERE id=$1 RETURNING id,version,estado,firmada_en AS "signedAt"`, [id, this.clock.now()])).rows[0];
-      await c.query(`UPDATE atencion.cita SET estado='atendida',version=version+1 WHERE id=(SELECT cita_id FROM atencion.consulta WHERE id=$1) AND estado='confirmada'`, [id]);
+      const appointment = (await c.query(`UPDATE atencion.cita SET estado='atendida',version=version+1 WHERE id=(SELECT cita_id FROM atencion.consulta WHERE id=$1) AND estado='confirmada' RETURNING id,version`, [id])).rows[0];
+      // API-03: the appointment moved to `atendida`; agendas and the patient's appointments learn it.
+      if (appointment) await this.commands.event(c, 'cita.actualizada', 'cita', appointment.id, appointment.version, await channelsFor(c, ['citas.ver'], { users: [await patientAccount(c, old.paciente_id)] }));
       await this.commands.audit(c, actor, { action: 'consulta.firmar', entity: 'consulta', entityId: id, patientId: old.paciente_id, permission: 'consulta.registrar' });
-      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, row.version, await this.channels(c, old.paciente_id));
+      await this.commands.event(c, 'consulta.actualizada', 'consulta', id, row.version, await this.channels(c, old.paciente_id, true));
       return { id: row.id, version: row.version, state: row.estado, signedAt: row.signedAt };
     });
   }

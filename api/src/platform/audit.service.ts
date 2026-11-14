@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { DatabaseService } from './database.service';
-import { canonical } from './command.service';
+import { canonical, fingerprint } from './command.service';
 
 export type ChainVerification = { ok: true; checked: number } | { ok: false; checked: number; seq: number; reason: string };
 type Row = { seq: string | number; evento_id: string; actor_id: string | null; permiso: string | null; accion: string; entidad: string; entidad_id: string | null; paciente_id: string | null; motivo: string | null; resultado: string; detalle: Record<string, unknown>; hash_previo: Uint8Array; hash: Uint8Array };
@@ -24,7 +24,9 @@ export class AuditService {
       const event = JSON.parse(canonicalEvent) as Record<string, unknown>;
       const columns: Record<string, unknown> = { id: row.evento_id, actorId: row.actor_id, permission: row.permiso, action: row.accion, entity: row.entidad, entityId: row.entidad_id, patientId: row.paciente_id, reason: row.motivo, result: row.resultado };
       for (const [name, value] of Object.entries(columns)) if ((event[name] ?? null) !== (value ?? null)) return fail(`la columna ${name} difiere del evento firmado`);
-      if (canonical(detail) !== canonical(event.detail ?? {})) return fail('el detalle difiere del evento firmado');
+      // Current rows sign `detailHash`; rows written before 2026-11-14 carry the whole detail inside the event.
+      const signedDetail = typeof event.detailHash === 'string' ? event.detailHash === fingerprint(detail) : canonical(detail) === canonical(event.detail ?? {});
+      if (!signedDetail) return fail('el detalle difiere del evento firmado');
       previous = Buffer.from(row.hash);
       checked++;
     }
