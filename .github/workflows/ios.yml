@@ -6,12 +6,28 @@ on:
     paths: ['ios/**', '.github/workflows/ios.yml']
 permissions:
   contents: read
+# Builds the monorepo ios/ project (CLIMESA.xcodeproj, shared scheme CLIMESA) and tests the ClimesaCore package.
+# No secrets: the project reads Configuration.plist and CLIMESA_API_BASE_URL; Config.xcconfig is not used by the build.
 jobs:
   build:
     runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ios
     steps:
       - uses: actions/checkout@v4
-      - run: swift test
-        working-directory: ios
-      - run: xcodebuild -project CLIMESA.xcodeproj -scheme CLIMESA -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
-        working-directory: ios
+      - name: Toolchain
+        run: xcodebuild -version && swift --version
+      - name: Every Swift source is in the Xcode project
+        # ios/AGENTS.md: each new .swift file under CLIMESA/ or Core/ must also be added to project.pbxproj.
+        run: |
+          missing=0
+          for file in $(find CLIMESA Core -name '*.swift' | sort); do
+            grep -q "path = \"$file\"" CLIMESA.xcodeproj/project.pbxproj || { echo "::error file=ios/$file::not in CLIMESA.xcodeproj/project.pbxproj"; missing=1; }
+          done
+          exit $missing
+      - name: Core tests (Swift package)
+        run: swift test
+      - name: App build (simulator, unsigned)
+        run: xcodebuild -project CLIMESA.xcodeproj -scheme CLIMESA -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
