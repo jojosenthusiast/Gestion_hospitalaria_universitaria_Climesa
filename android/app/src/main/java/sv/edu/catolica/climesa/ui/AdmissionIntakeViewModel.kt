@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.data.realtime.LiveSubscription
+import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.AdmissionDraft
 import sv.edu.catolica.climesa.domain.AdmissionIntake
 import sv.edu.catolica.climesa.domain.BedMap
@@ -22,9 +24,11 @@ import sv.edu.catolica.climesa.domain.Feasibility
 import sv.edu.catolica.climesa.domain.IntakeBed
 import sv.edu.catolica.climesa.domain.IntakeDoctor
 import sv.edu.catolica.climesa.domain.IsolationType
+import sv.edu.catolica.climesa.domain.LiveEntities
 import sv.edu.catolica.climesa.domain.OriginKind
 import sv.edu.catolica.climesa.domain.OriginRecord
 import sv.edu.catolica.climesa.domain.PickerPatient
+import sv.edu.catolica.climesa.domain.RealtimeSignal
 import sv.edu.catolica.climesa.domain.ReceptionScheduling
 
 data class AdmissionIntakeState(
@@ -48,16 +52,52 @@ data class AdmissionIntakeState(
 
 /** A34: guided admission in eight steps. Every step validates before moving on; the API repeats every check when confirming. */
 @HiltViewModel
-class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway) : ViewModel() {
+class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
     private val mutable = MutableStateFlow(AdmissionIntakeState())
     val state = mutable.asStateFlow()
     var debounceMs = ReceptionScheduling.DEBOUNCE_MS
     private var searchJob: Job? = null
     private var stepJob: Job? = null
     private var doctorsJob: Job? = null
+    private var liveJob: Job? = null
+    private val live = LiveSubscription(realtime)
+
+    /**
+     * While the guide is open other people admit patients, free beds or change shifts (on any platform). The step on
+     * screen reloads in place: doctors on duty (step 2) and the bed map (steps 3 and 5). The API repeats every check on confirm.
+     */
+    fun startLive(channels: List<String>) {
+        live.start(viewModelScope, channels) { signal ->
+            if (signal is RealtimeSignal.Resync || signal is RealtimeSignal.Event && LiveEntities.matches(signal.event, "cama", "espacio", "admision", "turno")) refreshStep()
+        }
+    }
+
+    private fun refreshStep() {
+        val s = mutable.value
+        if (!s.open || s.busy) return
+        when (s.step) {
+            2 -> loadDoctors(immediately = true)
+            3, 5 -> {
+                val path = bedMapPath(s.step, s.draft) ?: return
+                liveJob?.cancel()
+                liveJob = viewModelScope.launch {
+                    try {
+                        val map = AdmissionIntake.bedMap(api.request(path) as JSONObject)
+                        mutable.update { if (it.open && it.step == s.step) it.copy(bedMap = map) else it }
+                    } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+                }
+            }
+        }
+    }
+
+    private fun bedMapPath(step: Int, draft: AdmissionDraft): String? {
+        val patient = draft.patient ?: return null
+        return if (step == 5) "/admisiones/mapa-camas?patientId=${enc(patient.id)}&isolation=${draft.isolation}&category=${draft.category}"
+        else "/admisiones/mapa-camas?patientId=${enc(patient.id)}"
+    }
 
     fun open() { mutable.value = AdmissionIntakeState(open = true) }
-    fun close() { searchJob?.cancel(); stepJob?.cancel(); doctorsJob?.cancel(); mutable.value = AdmissionIntakeState() }
+    fun close() { searchJob?.cancel(); stepJob?.cancel(); doctorsJob?.cancel(); liveJob?.cancel(); mutable.value = AdmissionIntakeState() }
     fun consumeFinished() = mutable.update { it.copy(finished = false) }
 
     fun error(canAssignBed: Boolean): String? = mutable.value.let { AdmissionIntake.stepError(it.step, it.draft, canAssignBed, it.feasibility?.feasible == true) }

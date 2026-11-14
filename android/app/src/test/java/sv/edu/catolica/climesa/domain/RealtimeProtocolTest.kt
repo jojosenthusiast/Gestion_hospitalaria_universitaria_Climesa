@@ -70,6 +70,16 @@ class RealtimeProtocolTest {
         assertFalse(PortalEvents.matches(null, turno))
     }
 
+    @Test fun laAmbulanciaDelPortalIgnoraLaUbicacionEnVivoYSigueLosTurnosYLasCitasTambien() {
+        val turno = EventoDominio("turno.actualizado", "turno", "t1", 2)
+        assertFalse(PortalEvents.matches("/ambulancia", EventoDominio("ambulancia.ubicacion", "servicio", "s1", 1)))
+        assertTrue(PortalEvents.matches("/ambulancia", EventoDominio("ambulancia.hito", "servicio", "s1", 2)))
+        assertTrue(PortalEvents.matches("/ambulancia", turno))
+        assertTrue(AppointmentEvents.matches(EventoDominio("cita.actualizada", "cita", "c1", 2)))
+        assertTrue("los horarios libres dependen del turno del medico", AppointmentEvents.matches(turno))
+        assertFalse(AppointmentEvents.matches(EventoDominio("cama.estado_cambiado", "cama", "b1", 1)))
+    }
+
     @Test fun elPlanDePacientesNoReemplazaUnaBusquedaActiva() {
         val ev = EventoDominio("paciente.actualizado", "paciente", "p1", 2)
         assertEquals(PatientEvents.Refresh.Detail("p1"), PatientEvents.refreshFor(ev, setOf("p1"), null, true))

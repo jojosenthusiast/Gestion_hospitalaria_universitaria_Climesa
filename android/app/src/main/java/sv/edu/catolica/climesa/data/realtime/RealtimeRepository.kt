@@ -4,11 +4,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -52,6 +54,8 @@ const val CATCH_UP_PAGE_SIZE = 200
  * - El latido espera su `phx_reply`; sin respuesta en [heartbeatTimeoutMillis] el socket se da por caído.
  * - En cada latido se comprueba el token de la sesión; si cambió (la sesión lo renovó) se manda `access_token` a los canales unidos.
  * - Un canal rechazado [maxJoinRejections] veces seguidas se deja fuera y el resto sigue en vivo, con un aviso no fatal.
+ * - Cada señal de [wakeups] (la app vuelve al frente, regresa la red; ver [AppWakeups]) cierra el socket y reconecta
+ *   sin esperar: se recupera desde el cursor y se emite `Resync`. Si estaba esperando para reintentar, deja de esperar.
  */
 class SupabaseRealtimeRepository(
     private val websocketUrl: String,
@@ -63,6 +67,7 @@ class SupabaseRealtimeRepository(
     private val backoffMillis: (attempt: Int) -> Long = { minOf(30_000L, 1_000L shl (it - 1).coerceIn(0, 5)) },
     private val offlineAfterFailures: Int = 3,
     private val maxJoinRejections: Int = 3,
+    private val wakeups: Flow<Unit> = emptyFlow(),
 ) : RealtimeRepository {
 
     private class Dropped : Exception()
@@ -75,6 +80,13 @@ class SupabaseRealtimeRepository(
         var failures = 0
         val rejections = mutableMapOf<String, Int>()
         val dropped = linkedSetOf<String>()
+        val wake = Channel<Unit>(Channel.CONFLATED)
+        launch { wakeups.collect { wake.trySend(Unit) } }
+
+        /** Espera para reintentar; una señal de [wakeups] corta la espera y reinicia la cuenta de fallos. */
+        suspend fun pause(millis: Long) {
+            if (withTimeoutOrNull(millis) { wake.receive() } != null) failures = 0
+        }
 
         suspend fun fetch(from: String): CatchUp = try {
             catchUp(from)
@@ -95,9 +107,10 @@ class SupabaseRealtimeRepository(
             if (token == null) {
                 failures++
                 wasDown = true
-                delay(backoffMillis(failures))
+                pause(backoffMillis(failures))
                 continue
             }
+            var woke = false
             val socket = sockets.open(websocketUrl)
             val joined = mutableSetOf<String>()
             var liveReported = false
@@ -186,7 +199,10 @@ class SupabaseRealtimeRepository(
                             }
                         }
                     }
+                    // Volver al frente o recuperar la red: el socket pudo quedar muerto sin cerrarse; se rehace.
+                    val watcher = launch { wake.receive(); woke = true; reader?.cancel() }
                     reader.join()
+                    watcher.cancel()
                     heartbeat?.cancel()
                 }
             } catch (_: Dropped) {
@@ -194,9 +210,13 @@ class SupabaseRealtimeRepository(
                 socket.close()
             }
             wasDown = true
+            if (woke) {
+                failures = 0
+                continue
+            }
             failures++
             send(RealtimeSignal.State(if (failures >= offlineAfterFailures) ConnectionState.OFFLINE else ConnectionState.RECONNECTING))
-            delay(backoffMillis(failures))
+            pause(backoffMillis(failures))
         }
         awaitClose()
     }

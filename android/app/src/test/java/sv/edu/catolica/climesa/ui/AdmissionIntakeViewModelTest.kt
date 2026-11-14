@@ -2,6 +2,8 @@ package sv.edu.catolica.climesa.ui
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -19,9 +21,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import sv.edu.catolica.climesa.data.AuthRequestException
+import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
+import sv.edu.catolica.climesa.domain.EventoDominio
+import sv.edu.catolica.climesa.domain.RealtimeSignal
 import sv.edu.catolica.climesa.domain.AdmissionIntake
 import sv.edu.catolica.climesa.domain.OriginKind
 import sv.edu.catolica.climesa.domain.PickerPatient
+
+private class IntakeBus : RealtimeRepository {
+    val signals = MutableSharedFlow<RealtimeSignal>(extraBufferCapacity = 16)
+    override fun observe(channels: List<String>): Flow<RealtimeSignal> = signals
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdmissionIntakeViewModelTest {
@@ -40,7 +50,7 @@ class AdmissionIntakeViewModelTest {
     }
 
     @Test fun walksTheStepsValidatingEachOneAndConfirmsWithTheSuggestedBed() = runTest(dispatcher) {
-        val api = gateway(); val vm = AdmissionIntakeViewModel(api); vm.debounceMs = 0
+        val api = gateway(); val vm = AdmissionIntakeViewModel(api, IntakeBus()); vm.debounceMs = 0
         vm.open()
         assertNotNull(vm.error(true)); vm.next(true); assertEquals(0, vm.state.value.step) // no patient: cannot advance
         vm.query("nueve"); advanceUntilIdle()
@@ -68,7 +78,7 @@ class AdmissionIntakeViewModelTest {
     }
 
     @Test fun confirmDoesNothingUntilEveryStepIsValid() = runTest(dispatcher) {
-        val api = gateway(); val vm = AdmissionIntakeViewModel(api); vm.debounceMs = 0
+        val api = gateway(); val vm = AdmissionIntakeViewModel(api, IntakeBus()); vm.debounceMs = 0
         api.responses["/admisiones/factibilidad"] = JSONObject()
         vm.open()
         vm.pickPatient(PickerPatient("p9", "EXP-9", "Paciente Ficticio Nueve", 41))
@@ -80,9 +90,32 @@ class AdmissionIntakeViewModelTest {
 
     @Test fun closingDropsTheDraft() = runTest(dispatcher) {
         val api = gateway(); api.failures["/admisiones"] = AuthRequestException("Otra persona tomó esta cama.", 409)
-        val vm = AdmissionIntakeViewModel(api); vm.debounceMs = 0
+        val vm = AdmissionIntakeViewModel(api, IntakeBus()); vm.debounceMs = 0
         vm.open(); vm.pickPatient(PickerPatient("p9", "EXP-9", "Paciente Ficticio Nueve", 41))
         assertEquals("Paciente Ficticio Nueve", vm.state.value.draft.patient?.name)
         vm.close(); assertNull(vm.state.value.draft.patient); assertFalse(vm.state.value.open)
+    }
+
+    @Test fun aShiftChangedElsewhereReloadsTheDoctorsOnScreenButOtherEventsDoNot() = runTest(dispatcher) {
+        val api = gateway(); val bus = IntakeBus(); val vm = AdmissionIntakeViewModel(api, bus); vm.debounceMs = 0
+        vm.startLive(listOf("rol:REC")); runCurrent()
+        vm.open()
+        vm.query("nueve"); advanceUntilIdle()
+        vm.pickPatient(vm.state.value.results.single()); vm.next(true); runCurrent()
+        vm.pickOrigin(OriginKind.APPOINTMENT); vm.pickRecord(vm.state.value.origins.single()); vm.motive("Dolor abdominal con fiebre"); vm.next(true)
+        vm.at(AdmissionIntake.nowLocal()); advanceUntilIdle()
+        val instant = AdmissionIntake.instantOf(vm.state.value.draft.at)!!
+        val doctors = "/admisiones/medicos-disponibles?at=${java.net.URLEncoder.encode(instant.toString(), "UTF-8")}"
+        assertEquals(2, vm.state.value.step)
+        val before = api.gets(doctors)
+        bus.signals.emit(RealtimeSignal.Event(EventoDominio("orden_laboratorio.actualizado", "orden_laboratorio", "o1", 2))); advanceUntilIdle()
+        assertEquals(before, api.gets(doctors))
+        api.responses[doctors] = JSONArray("""[{"id":"d1","name":"Dra. Ficticia","specialty":null,"available":true,"reason":null}]""")
+        bus.signals.emit(RealtimeSignal.Event(EventoDominio("turno.actualizado", "turno", "t1", 3))); advanceUntilIdle()
+        assertEquals(before + 1, api.gets(doctors))
+        assertTrue(vm.state.value.doctors.single().available)
+        vm.close()
+        bus.signals.emit(RealtimeSignal.Resync); advanceUntilIdle()
+        assertEquals("a closed guide asks for nothing", before + 1, api.gets(doctors))
     }
 }

@@ -15,6 +15,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
+import sv.edu.catolica.climesa.domain.AppointmentEvents
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.DaySlot
 import sv.edu.catolica.climesa.domain.PickerPatient
@@ -74,7 +75,7 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
 
     fun startLive(channels: List<String>) {
         live.start(viewModelScope, channels) { signal ->
-            if (signal is RealtimeSignal.Event && (signal.event.entity == "cita" || signal.event.type.startsWith("cita.")) || signal is RealtimeSignal.Resync) {
+            if (signal is RealtimeSignal.Event && AppointmentEvents.matches(signal.event) || signal is RealtimeSignal.Resync) {
                 load()
                 if (mutable.value.scheduling) { loadDoctors(); loadSlots() }
             }
