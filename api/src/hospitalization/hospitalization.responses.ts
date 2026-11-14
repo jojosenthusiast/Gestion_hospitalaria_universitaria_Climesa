@@ -1,7 +1,8 @@
-import { BoolProp, DateTimeProp, EnumProp, IntProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, DateTimeProp, EnumProp, IntProp, StrProp, UuidProp } from '../platform/responses';
 import { CATEGORIA_HABITACION, ESTADO_ADMISION, ESTADO_CAMA, SEXO_PACIENTE } from '../platform/states';
 
-export const ORIGEN_ADMISION = ['consulta', 'emergencia', 'ambulancia', 'programada'] as const;
+export const ORIGEN_ADMISION = ['cita', 'consulta', 'emergencia', 'ambulancia', 'programada'] as const;
+export const TIPO_AISLAMIENTO = ['contacto', 'gotitas', 'aerea', 'protector'] as const;
 
 export class AdmissionResponse {
   @UuidProp() id!: string;
@@ -16,6 +17,13 @@ export class AdmissionResponse {
   @IntProp() version!: number;
   @StrProp({ description: 'Código de la cama actual; cadena vacía si no tiene' }) bed!: string;
   @UuidProp({ nullable: true }) occupationId!: string | null;
+  @UuidProp({ nullable: true }) originId!: string | null;
+  @StrProp({ nullable: true, description: 'Motivo del ingreso; nulo solo en admisiones anteriores a la regla.' }) motive!: string | null;
+  @EnumProp(TIPO_AISLAMIENTO, 'TipoAislamiento', { nullable: true }) isolationType!: string | null;
+  @BoolProp() unstable!: boolean;
+  @BoolProp() postSurgical!: boolean;
+  @BoolProp() visitorsAllowed!: boolean;
+  @IntProp() visitorsMax!: number;
 }
 
 export class AdmissionCommandResponse {
@@ -65,4 +73,58 @@ export class TransferResponse {
   @UuidProp() toBedId!: string;
   @EnumProp(ESTADO_ADMISION, 'EstadoAdmision') state!: string;
   @IntProp() version!: number;
+}
+
+export class OriginOptionResponse {
+  @EnumProp(['cita', 'consulta', 'emergencia', 'ambulancia'], 'OrigenAdmisionNueva') origin!: string;
+  @UuidProp() id!: string;
+  @DateTimeProp() at!: string;
+  @StrProp() label!: string;
+  @StrProp() detail!: string;
+}
+
+export class DoctorAvailabilityResponse {
+  @UuidProp() id!: string;
+  @StrProp() name!: string;
+  @StrProp({ nullable: true }) specialty!: string | null;
+  @BoolProp() available!: boolean;
+  @StrProp({ nullable: true, description: 'Motivo por el que no está disponible' }) reason!: string | null;
+}
+
+export class BedMapBedResponse {
+  @UuidProp() id!: string;
+  @IntProp() version!: number;
+  @StrProp() code!: string;
+  @UuidProp() roomId!: string;
+  @StrProp() room!: string;
+  @IntProp({ nullable: true, description: 'Planta de la habitación' }) floor!: number | null;
+  @EnumProp(CATEGORIA_HABITACION, 'CategoriaHabitacion') category!: string;
+  @IntProp({ description: 'Camas de la habitación' }) capacity!: number;
+  @EnumProp(ESTADO_CAMA, 'EstadoCama') state!: string;
+  @IntProp() occupiedInRoom!: number;
+  @BoolProp({ description: 'Libre y compatible con el sexo y el aislamiento del paciente' }) compatible!: boolean;
+  @StrProp({ nullable: true }) reason!: string | null;
+  @BoolProp() suggested!: boolean;
+}
+
+export class BedMapCategoryResponse {
+  @EnumProp(CATEGORIA_HABITACION, 'CategoriaHabitacion') category!: string;
+  @IntProp() free!: number;
+  @IntProp() compatible!: number;
+}
+
+export class BedMapResponse {
+  @ClassArrayProp(BedMapCategoryResponse) categories!: BedMapCategoryResponse[];
+  @ClassArrayProp(BedMapBedResponse) beds!: BedMapBedResponse[];
+}
+
+export class FeasibilityCheckResponse {
+  @StrProp() code!: string;
+  @BoolProp() ok!: boolean;
+  @StrProp() message!: string;
+}
+
+export class FeasibilityResponse {
+  @BoolProp() feasible!: boolean;
+  @ClassArrayProp(FeasibilityCheckResponse) checks!: FeasibilityCheckResponse[];
 }

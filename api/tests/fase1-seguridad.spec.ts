@@ -13,7 +13,7 @@ describe('Fase 1 · seguridad (SEG-03, SEG-08, SEG-09, API-19)', () => {
   afterAll(async () => { await t?.close(); });
 
   const hospitalize = async (code: string) => {
-    const created = await t.call('REC', 'POST', '/admisiones', { patientId: await t.patient(), origin: 'emergencia', originId: randomUUID(), requestedCategory: 'semiprivada', isolation: false, attendingDoctorId: await t.staffOf('MED') });
+    const created = await t.call('REC', 'POST', '/admisiones', await t.admissionBody(await t.patient(), { requestedCategory: 'semiprivada', isolation: false }));
     expect(created.status).toBe(201);
     const bed = await t.one<{ id: string; version: number }>('SELECT id,version FROM infra.espacio WHERE codigo=$1', [code]);
     const assigned = await t.call('REC', 'POST', `/admisiones/${created.body.id}/cama`, { bedId: bed.id, version: bed.version });

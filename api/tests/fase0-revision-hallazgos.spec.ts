@@ -25,7 +25,7 @@ describe('Fase 0 · revisión de la remediación (confirmación, firmado, fila, 
     return consultation.id;
   };
   const hospitalize = async (code: string, options: { sex?: string; isolation?: boolean } = {}) => {
-    const created = await t.call('REC', 'POST', '/admisiones', { patientId: await t.patient({ sex: options.sex ?? 'femenino' }), origin: 'emergencia', originId: randomUUID(), requestedCategory: 'semiprivada', isolation: options.isolation ?? false, attendingDoctorId: await t.staffOf('MED') });
+    const created = await t.call('REC', 'POST', '/admisiones', await t.admissionBody(await t.patient({ sex: options.sex ?? 'femenino' }), { requestedCategory: 'semiprivada', isolation: options.isolation ?? false }));
     expect(created.status).toBe(201);
     const bed = await t.one<{ id: string; version: number }>('SELECT id,version FROM infra.espacio WHERE codigo=$1', [code]);
     expect((await t.call('REC', 'POST', `/admisiones/${created.body.id}/cama`, { bedId: bed.id, version: bed.version })).status).toBe(201);

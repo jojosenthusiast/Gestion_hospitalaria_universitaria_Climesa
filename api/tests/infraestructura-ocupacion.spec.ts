@@ -27,7 +27,7 @@ describe('HU-104 · disponibilidad recursiva, tablero por permiso y capacidad ba
   return (await call('PAR','POST','/pacientes/provisionales',{givenNames:'',surnames:'',sex:'femenino',estimatedAge:30,description:'Persona ficticia para pruebas',searchToken:search.body.token,searchQuery:query})).body.id as string;
  };
  const occupy=async(bed:{id:string;roomId:string},owner?:string)=>{
-  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado') RETURNING id",[owner??await newPatient(),randomUUID(),doctorId])).rows[0];
+  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado,motivo) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado','Ingreso de prueba') RETURNING id",[owner??await newPatient(),randomUUID(),doctorId])).rows[0];
   await fixture.pg.query("INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo) VALUES($1,$2,$3,'semiprivada',tstzrange(now()-interval '1 hour',NULL,'[)'))",[admission.id,bed.id,bed.roomId]);
   return admission.id;
  };
@@ -71,7 +71,7 @@ describe('HU-104 · disponibilidad recursiva, tablero por permiso y capacidad ba
  });
  test('una cama con reserva activa se muestra como reservada',async()=>{
   const bed=(await bedsOf('HAB-205'))[0];
-  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'pendiente_cama') RETURNING id",[await newPatient(),randomUUID(),doctorId])).rows[0];
+  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado,motivo) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'pendiente_cama','Ingreso de prueba') RETURNING id",[await newPatient(),randomUUID(),doctorId])).rows[0];
   await fixture.pg.query("INSERT INTO hospitalizacion.reserva_cama(admision_id,cama_id,periodo,estado) VALUES($1,$2,tstzrange(now()-interval '1 hour',now()+interval '1 day','[)'),'activa')",[admission.id,bed.id]);
   const row=(await call('REC','GET','/camas')).body.find((b:any)=>b.id===bed.id);
   expect(row.state).toBe('reservada');expect(row.occupant).toBeUndefined();

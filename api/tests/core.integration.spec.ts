@@ -160,7 +160,7 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   expect(unblocked.status).toBe(201);
 
   const doctorId=(await call('MED','GET','/auth/me')).body.staffId;
-  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado') RETURNING id",[patientId,randomUUID(),doctorId])).rows[0];
+  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado,motivo) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado','Ingreso de prueba') RETURNING id",[patientId,randomUUID(),doctorId])).rows[0];
   await fixture.pg.query("INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo) VALUES($1,$2,$3,'semiprivada',tstzrange(now()-interval '1 hour',NULL,'[)'))",[admission.id,bed.id,bed.roomId]);
   expect((await call('JOP','POST',`/camas/${bed.id}/bloquear`,{version:initial+2,motivo:'Bloqueo inválido'},'bed-block-occupied')).status).toBe(409);
   expect((await call('ENF','POST',`/camas/${bed.id}/limpieza/completar`,{version:initial+2,reason:'Limpieza no solicitada'})).status).toBe(409);
@@ -194,7 +194,7 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
  test('la cama ocupada muestra iniciales fuera del área y nombre al médico tratante',async()=>{
   const med=(await call('MED','GET','/auth/me')).body,enf=(await call('ENF','GET','/auth/me')).body;
   const bed=(await call('REC','GET','/camas')).body.find((b:any)=>b.code==='HAB-201-A');
-  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado') RETURNING id",[patientId,randomUUID(),med.staffId])).rows[0];
+  const admission=(await fixture.pg.query<{id:string}>("INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,medico_tratante_id,estado,motivo) VALUES($1,'consulta',$2,'semiprivada','femenino',$3,'hospitalizado','Ingreso de prueba') RETURNING id",[patientId,randomUUID(),med.staffId])).rows[0];
   await fixture.pg.query("INSERT INTO hospitalizacion.ocupacion_cama(admision_id,cama_id,habitacion_id,categoria,periodo) VALUES($1,$2,$3,'semiprivada',tstzrange(now()-interval '1 hour',NULL,'[)'))",[admission.id,bed.id,bed.roomId]);
   const other=(await call('ENF','GET','/camas')).body.find((b:any)=>b.id===bed.id);expect(other.occupantRestricted).toBe(true);expect(other.patientId).toBeUndefined();expect(other.occupant).not.toContain('Lucía');
   const related=(await call('MED','GET','/camas')).body.find((b:any)=>b.id===bed.id);expect(related.patientId).toBe(patientId);expect(related.occupant).toContain('Ana Lucía');
