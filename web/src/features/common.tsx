@@ -30,12 +30,17 @@ export function useAction(api:Api){
 export function Heading({eyebrow,title,description,actions}:{eyebrow:string;title:string;description:string;actions?:ReactNode}){return <header className="module-heading reveal"><div><span className="eyebrow">{eyebrow}</span><h1>{title}<span>.</span></h1><p>{description}</p></div>{actions&&<div className="heading-actions">{actions}</div>}</header>;}
 export function RemoteState<T>({state,children}:{state:Remote<T>;children:(data:T)=>ReactNode}){
  if(state.loading&&!state.data)return <div className="module-state module-state-loading" role="status" aria-live="polite"><span className="status-symbol"><span className="status-spinner"/></span><div><strong>Cargando información…</strong><span>Estamos preparando esta sección…</span></div></div>;
- if(state.error)return <div className="module-state module-state-error"><Notice kind="error">{state.error.status===403?'Tu cuenta no tiene permiso para consultar esta sección.':state.error.message}</Notice><button className="secondary-button" onClick={state.refresh}><Icon name="retry" size={18}/>Volver a intentar</button></div>;
+ // WEB-04 (diseño 04): "sin permiso" y "error de carga" son estados distintos; ambos permiten reintentar (un acceso puede concederse).
+ if(state.error?.status===403)return <div className="module-state module-state-error"><strong>No tienes acceso a esta información</strong><Notice kind="error">Tu cuenta no tiene permiso para consultar esta sección.</Notice><p className="muted">Si la necesitas para atender a alguien, pide el acceso con un motivo y vuelve a intentar.</p><button className="secondary-button" onClick={state.refresh}><Icon name="retry" size={18}/>Volver a intentar</button></div>;
+ if(state.error)return <div className="module-state module-state-error"><strong>No pudimos cargar esta información</strong><Notice kind="error">{state.error.message}</Notice><button className="secondary-button" onClick={state.refresh}><Icon name="retry" size={18}/>Volver a intentar</button></div>;
  if(!state.data)return null;
  return <>{state.loading&&<p className="refresh-hint" role="status" aria-live="polite"><span className="spinner"/>Actualizando información…</p>}{children(state.data)}</>;
 }
 export function Empty({title,description}:{title:string;description:string}){return <div className="empty-state" role="status"><span className="empty-state-icon"><Icon name="search" size={28}/></span><h2>{title}</h2><p>{description}</p></div>;}
-export function WriteError({error}:{error:ApiError|null}){return error?<Notice kind="error">{isVersionConflict(error)?`${error.message} Conservamos lo que escribiste; cierra y vuelve a abrir el registro para cargar su estado actual.`:error.message}</Notice>:null;}
+/** WEB-04: with `onReload`, a version conflict offers the common "Cerrar y recargar" action (design 04, state "Conflicto"). */
+export function WriteError({error,onReload,reloadLabel='Cerrar y recargar'}:{error:ApiError|null;onReload?:()=>void;reloadLabel?:string}){
+ if(error&&onReload&&isVersionConflict(error))return <div className="conflict-notice"><Notice kind="error">{error.message} Alguien cambió este registro mientras lo tenías abierto; tus cambios no se guardaron.</Notice><button type="button" className="secondary-button" onClick={onReload}><Icon name="retry" size={18}/>{reloadLabel}</button></div>;
+ return error?<Notice kind="error">{isVersionConflict(error)?`${error.message} Conservamos lo que escribiste; cierra y vuelve a abrir el registro para cargar su estado actual.`:error.message}</Notice>:null;}
 export function Dialog({title,onClose,busy=false,children}:{title:string;onClose:()=>void;busy?:boolean;children:ReactNode}){
  const ref=useRef<HTMLDialogElement>(null),titleId=useId();
  useEffect(()=>{const node=ref.current;node?.showModal();return()=>{node?.close();};},[]);

@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import type { AccessProfile } from './lib/api';
 import { IntentApi } from './features/intent';
 import { LiveContext } from './features/live-scope';
+import { SessionExpiryWarning,useIdleSession } from './features/session';
 import { supabase } from './lib/supabase';
 import { useLive } from './lib/live';
 import { ActivationView,LoginView,RegistrationView,StatusView } from './components/ui';
@@ -41,8 +42,8 @@ function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
 }
 function LivePortal({api,profile,session,onExpired,refreshProfile}:{api:IntentApi;profile:AccessProfile;session:Session;onExpired:()=>void;refreshProfile:()=>void}){
  const live=useLive(api,profile,session.access_token,refreshProfile);
- useEffect(()=>{let last=Date.now();const active=()=>{last=Date.now();};const events=['pointerdown','keydown','scroll'] as const;for(const e of events)window.addEventListener(e,active,{passive:true});const timer=setInterval(()=>{if(Date.now()-last>15*60*1000)onExpired();},30000);return()=>{clearInterval(timer);for(const e of events)window.removeEventListener(e,active);};},[onExpired]);
- return <LiveContext.Provider value={live.signal}><HospitalShell api={api} profile={profile} version={live.version} connection={live.status} onLogout={()=>void supabase?.auth.signOut({scope:'local'})}/></LiveContext.Provider>;
+ const idle=useIdleSession(onExpired),logout=()=>void supabase?.auth.signOut({scope:'local'});
+ return <LiveContext.Provider value={live.signal}><HospitalShell api={api} profile={profile} version={live.version} connection={live.status} updatedAt={live.updatedAt} onLogout={logout}/><SessionExpiryWarning remaining={idle.remaining} onContinue={idle.keepAlive} onLogout={logout}/></LiveContext.Provider>;
 }
 function Register(){
  const [name,setName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[done,setDone]=useState(false);
