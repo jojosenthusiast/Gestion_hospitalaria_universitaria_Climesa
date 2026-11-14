@@ -48,18 +48,18 @@ fun canConfigureInventory(permissions: List<String>): Boolean = "inventario.conf
 fun parseAllowedMovements(codes: List<String>): List<MovementKind> = MovementKind.entries.filter { it.code in codes }
 
 /** Without accents or capitals: "creatinina" finds "Reactivo de Creatinína". */
-fun foldText(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "").lowercase()
+fun foldInventoryText(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "").lowercase()
 
 data class InventoryFilter(val query: String = "", val statuses: Set<StockStatus> = emptySet(), val categories: Set<ArticleCategory> = emptySet()) {
     val active: Boolean get() = query.isNotBlank() || statuses.isNotEmpty() || categories.isNotEmpty()
 }
 private val urgency = listOf(StockStatus.OUT, StockStatus.LOW, StockStatus.EXPIRING, StockStatus.OK, StockStatus.INACTIVE)
 fun filterArticles(rows: List<ArticleSummary>, filter: InventoryFilter): List<ArticleSummary> {
-    val q = foldText(filter.query.trim())
+    val q = foldInventoryText(filter.query.trim())
     return rows.filter {
-        (q.isEmpty() || foldText("${it.code} ${it.name} ${it.category.label}").contains(q)) &&
+        (q.isEmpty() || foldInventoryText("${it.code} ${it.name} ${it.category.label}").contains(q)) &&
             (filter.statuses.isEmpty() || it.status in filter.statuses) && (filter.categories.isEmpty() || it.category in filter.categories)
-    }.sortedWith(compareBy({ urgency.indexOf(it.status) }, { foldText(it.name) }))
+    }.sortedWith(compareBy({ urgency.indexOf(it.status) }, { foldInventoryText(it.name) }))
 }
 /** Share of the gauge (0..1): full at twice the minimum, so the bar shows the margin over the minimum. */
 fun gaugeFraction(available: Double, minimum: Double): Float = if (minimum > 0) (available / (minimum * 2)).coerceIn(0.0, 1.0).toFloat() else if (available > 0) 1f else 0f
