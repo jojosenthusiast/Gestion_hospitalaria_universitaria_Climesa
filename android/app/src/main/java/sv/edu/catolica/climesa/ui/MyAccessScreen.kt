@@ -1,15 +1,8 @@
 package sv.edu.catolica.climesa.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,7 +10,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -54,17 +46,22 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
 
 @Composable fun MyAccessScreen(modifier: Modifier = Modifier, model: MyAccessViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle(); LaunchedEffect(Unit) { model.load() }
-    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    PageList(modifier) {
         item { SectionIntro(stringResource(R.string.mis_accesos_eyebrow), stringResource(R.string.mis_accesos_titulo), stringResource(R.string.mis_accesos_descripcion)) }
-        state.error?.let { item { ClimesaActionGroup { Text(it, color = MaterialTheme.colorScheme.error); ClimesaButton(stringResource(R.string.mis_accesos_reintentar), Icons.Default.Refresh, { model.load() }, outlined = true) } } }
-        if (state.loading) item { CircularProgressIndicator() }
-        else if (state.error == null && state.entries.isEmpty()) item { ClimesaCard { Text(stringResource(R.string.mis_accesos_vacio), Modifier.padding(18.dp)) } }
-        else items(state.entries) { entry -> ClimesaCard { Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(entry.role, style = MaterialTheme.typography.titleMedium)
-            Text(MyAccessRules.displayDate(entry.at), color = MaterialTheme.colorScheme.primary)
-            Text(stringResource(R.string.mis_accesos_detalle, entry.dataKind, entry.reason), style = MaterialTheme.typography.bodySmall)
-            if (entry.exceptional) Text(stringResource(R.string.mis_accesos_excepcional), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
-        } } }
-        if (!state.loading) item { ClimesaActionGroup { ClimesaButton(stringResource(R.string.mis_accesos_actualizar), Icons.Default.Refresh, { model.load() }, outlined = true) } }
+        when {
+            state.loading -> item { LoadingState() }
+            state.error != null -> item { ErrorState(state.error, onRetry = { model.load() }) }
+            state.entries.isEmpty() -> item { EmptyState(stringResource(R.string.mis_accesos_vacio)) }
+            else -> items(state.entries) { entry -> AccessCard(entry) }
+        }
+        if (!state.loading) item { SecondaryButton(stringResource(R.string.mis_accesos_actualizar), { model.load() }, icon = Icons.Default.Refresh) }
+    }
+}
+
+@Composable private fun AccessCard(entry: AccessEntry) {
+    SectionCard(entry.role) {
+        Text(MyAccessRules.displayDate(entry.at), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.primaryText)
+        Text(stringResource(R.string.mis_accesos_detalle, entry.dataKind, entry.reason), style = MaterialTheme.typography.bodySmall)
+        if (entry.exceptional) StatusPill(stringResource(R.string.mis_accesos_excepcional), StatusTone.DANGER)
     }
 }

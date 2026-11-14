@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="paciente_maqueta_datos">Datos de referencia</string>
+    <string name="recepcion_home_eyebrow">Recepción / CLIMESA</string>
+    <string name="recepcion_home_titulo">Tu jornada.</string>
+    <string name="recepcion_home_detalle">Pacientes y registro, en un mismo lugar.</string>
+    <string name="recepcion_stat_activos">Activos</string>
+    <string name="recepcion_stat_inactivos">Inactivos</string>
+    <string name="recepcion_buscar_paciente">Buscar paciente</string>
+    <string name="recepcion_pacientes_recientes">Pacientes recientes</string>
+    <string name="recepcion_ver_todos">Ver todos</string>
+    <string name="recepcion_home_ayuda">Busca un paciente para consultar o actualizar su ficha.</string>
+</resources>
