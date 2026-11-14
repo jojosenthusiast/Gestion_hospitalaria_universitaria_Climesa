@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api, type Space, type Staff } from '../lib/api';
 import { PersonnelPage } from '../features/personnel';
+import type { Specialty } from '../features/personal/StaffForm';
 
 // jsdom no implementa <dialog>: lo abrimos con el atributo para que sus campos sean accesibles.
 beforeEach(() => {
@@ -15,16 +16,23 @@ const perfil = (permisos: string[]): AccessProfile => ({
   id: 'u-1', user: { id: 'u-1' }, email: 'adm@example.test', name: 'Administración de prueba', roles: ['ADM'], platforms: ['web'],
   permissions: permisos.map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId: null,
 });
-const administrador = perfil(['personal.ver', 'personal.gestionar']);
+const administrador = perfil(['personal.ver', 'personal.gestionar', 'espacios.ver']);
 const jefatura = perfil(['personal.ver']);
 
 const area: Space = { id: 'a-1', parentId: null, type: 'area', code: 'EMG', name: 'Emergencia', active: true, version: 1, path: 'Emergencia', totalBeds: 0, freeBeds: 0 };
 const ana: Staff = { id: 's-1', givenNames: 'Ana', surnames: 'Ficticia Prueba', type: 'medico', specialty: 'Medicina interna', areaId: 'a-1', area: 'Emergencia', phone: '7000-0000', dui: '00000001-8', active: true, version: 3 };
 const luis: Staff = { id: 's-2', givenNames: 'Luis', surnames: 'Ejemplo Muestra', type: 'motorista', active: false, version: 1 };
 
+const catalogo: Specialty[] = [
+  { code: 'medicina_general', name: 'Medicina general', category: 'medico' },
+  { code: 'cardiologia', name: 'Cardiología', category: 'medico' },
+  { code: 'medicina_interna', name: 'Medicina interna', category: 'medico' },
+  { code: 'enfermeria_uci', name: 'Cuidados intensivos', category: 'enfermero' },
+];
+
 function montar(opciones: { perfil?: AccessProfile; lista?: () => Promise<Staff[]>; escritura?: (path: string, body: unknown, method?: string) => Promise<unknown> } = {}) {
   const api = {
-    request: vi.fn(async (path: string) => (path === '/espacios' ? [area] : (opciones.lista ? opciones.lista() : [ana, luis]))),
+    request: vi.fn(async (path: string): Promise<unknown> => (path === '/espacios' ? [area] : path === '/personal/especialidades' ? catalogo : (opciones.lista ? opciones.lista() : [ana, luis]))),
     write: vi.fn(async (path: string, body: unknown, method?: string) => (opciones.escritura ? opciones.escritura(path, body, method) : { id: 's-9', version: 4 })),
   };
   render(<PersonnelPage api={api as unknown as Api} profile={opciones.perfil ?? administrador} version={0} />);
@@ -77,6 +85,7 @@ describe('W07 · crear personal', () => {
     await escribir(dialogo, 'Nombres', 'María José');
     await escribir(dialogo, 'Apellidos', 'Prueba Ejemplo');
     await userEvent.selectOptions(within(dialogo).getByLabelText('Función'), 'enfermero');
+    await userEvent.selectOptions(within(dialogo).getByLabelText(/Área de enfermería/), 'Cuidados intensivos');
     await userEvent.selectOptions(within(dialogo).getByLabelText('Área de trabajo'), 'a-1');
     await escribir(dialogo, /Teléfono/, '7000-1111');
     await escribir(dialogo, /DUI/, '00000001-8');
@@ -85,7 +94,7 @@ describe('W07 · crear personal', () => {
     const [ruta, cuerpo, metodo] = escrituras(api)[0] as [string, Record<string, unknown>, string | undefined];
     expect(ruta).toBe('/personal');
     expect(metodo ?? 'POST').toBe('POST');
-    expect(cuerpo).toMatchObject({ givenNames: 'María José', surnames: 'Prueba Ejemplo', type: 'enfermero', areaId: 'a-1', phone: '7000-1111', dui: '00000001-8' });
+    expect(cuerpo).toMatchObject({ givenNames: 'María José', surnames: 'Prueba Ejemplo', type: 'enfermero', specialty: 'Cuidados intensivos', areaId: 'a-1', phone: '7000-1111', dui: '00000001-8' });
     expect(cuerpo).not.toHaveProperty('version');
     expect(cuerpo).not.toHaveProperty('reason');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Registrar personal' })).toBeNull());
@@ -123,13 +132,51 @@ describe('W07 · crear personal', () => {
   });
 });
 
+describe('W07 · especialidad desde el catálogo (obs. 9)', () => {
+  it('un médico nuevo parte en Medicina general y solo ofrece especialidades médicas', async () => {
+    montar();
+    await screen.findByText('Ana Ficticia Prueba');
+    await userEvent.click(screen.getByRole('button', { name: /Registrar personal/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Registrar personal' });
+    const especialidad = within(dialogo).getByLabelText('Especialidad') as HTMLSelectElement;
+    expect(especialidad.value).toBe('Medicina general');
+    expect([...especialidad.options].map(o => o.value)).toEqual(['Medicina general', 'Cardiología', 'Medicina interna']);
+  });
+
+  it('al cambiar la función cambia la lista y los tipos sin catálogo no llevan especialidad', async () => {
+    const api = montar();
+    await screen.findByText('Ana Ficticia Prueba');
+    await userEvent.click(screen.getByRole('button', { name: /Registrar personal/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Registrar personal' });
+    await userEvent.selectOptions(within(dialogo).getByLabelText('Función'), 'enfermero');
+    const area = within(dialogo).getByLabelText(/Área de enfermería/) as HTMLSelectElement;
+    expect([...area.options].map(o => o.value)).toEqual(['', 'Cuidados intensivos']);
+    await userEvent.selectOptions(within(dialogo).getByLabelText('Función'), 'recepcionista');
+    expect(within(dialogo).queryByLabelText(/Especialidad|Área de enfermería/)).toBeNull();
+    expect(within(dialogo).getByText(/no lleva especialidad/)).toBeTruthy();
+    await escribir(dialogo, 'Nombres', 'Rosa');
+    await escribir(dialogo, 'Apellidos', 'Ejemplo');
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Registrar persona/ }));
+    await waitFor(() => expect(escrituras(api)).toHaveLength(1));
+    expect((escrituras(api)[0] as [string, Record<string, unknown>])[1]).toMatchObject({ type: 'recepcionista', specialty: '' });
+  });
+
+  it('conserva un valor histórico que ya no está en el catálogo', async () => {
+    montar({ lista: async () => [{ ...ana, specialty: 'Alergología clásica' }] });
+    const dialogo = await abrirEdicion();
+    const especialidad = within(dialogo).getByLabelText('Especialidad') as HTMLSelectElement;
+    expect(especialidad.value).toBe('Alergología clásica');
+    expect([...especialidad.options].some(o => o.textContent?.includes('valor anterior'))).toBe(true);
+  });
+});
+
 describe('W07 · editar e inactivar', () => {
   it('abre la ficha con los datos actuales y envía PATCH con la versión y el motivo', async () => {
     const api = montar();
     const dialogo = await abrirEdicion();
     expect((within(dialogo).getByLabelText('Nombres') as HTMLInputElement).value).toBe('Ana');
-    expect((within(dialogo).getByLabelText(/Especialidad/) as HTMLInputElement).value).toBe('Medicina interna');
-    await escribir(dialogo, /Especialidad/, 'Cardiología');
+    expect((within(dialogo).getByLabelText('Especialidad') as HTMLSelectElement).value).toBe('Medicina interna');
+    await userEvent.selectOptions(within(dialogo).getByLabelText('Especialidad'), 'Cardiología');
     await escribir(dialogo, 'Motivo de la modificación', 'Cambio de especialidad');
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Guardar cambios' }));
     await waitFor(() => expect(escrituras(api)).toHaveLength(1));

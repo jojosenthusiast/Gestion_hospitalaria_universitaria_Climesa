@@ -7,7 +7,6 @@ import { Heading,Tag } from './common';
 import { PatientsPage } from './patients';
 import { PersonnelPage,ShiftsPage } from './personnel';
 import { BedsPage,SpacesPage } from './spaces';
-import { UsersPage } from './users';
 import { AppointmentsPage } from './appointments';
 import { ConsultationsPage } from './consultations';
 import { QueuePage } from './queue';
@@ -26,13 +25,12 @@ export const modules:Module[]=[
  {id:'inicio',label:'Inicio'},
  {id:'pacientes',label:'Pacientes',permission:'pacientes.buscar'},
  {id:'vinculaciones',label:'Vinculaciones',permission:'cuentas.verificar'},
- {id:'personal',label:'Personal',permission:'personal.ver'},
+ {id:'personal',label:'Personal',permission:'personal.ver',alsoPermissions:['usuarios.ver']},
  {id:'camas',label:'Camas',permission:'camas.ver_tablero'},
  {id:'espacios',label:'Edificio',permission:'espacios.ver'},
  {id:'ambulancia',label:'Ambulancia',permission:'ambulancia.ver_estado'},
  {id:'bitacora-ambulancia',label:'Bitácora de ambulancia',permission:'ambulancia.ver_bitacora'},
  {id:'turnos',label:'Turnos',permission:'turnos.ver'},
- {id:'usuarios',label:'Usuarios',permission:'usuarios.ver'},
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver'},
  {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola',alsoPermissions:['laboratorio.ordenar']},
  {id:'inventario',label:'Inventario',permission:'inventario.ver'},
@@ -91,7 +89,6 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  else if(route==='camas')content=<BedsPage api={api} profile={profile} version={version}/>;
  else if(route==='ambulancia')content=<AmbulancePage api={api} profile={profile} version={version}/>;
  else if(route==='bitacora-ambulancia')content=<AmbulanceLogPage api={api} version={version}/>;
- else if(route==='usuarios')content=<UsersPage api={api} profile={profile} version={version}/>;
  else if(route==='vinculaciones')content=<AccountLinksPage api={api} profile={profile} version={version}/>;
  else if(route==='citas')content=<AppointmentsPage api={api} profile={profile} version={version}/>;
  else if(route==='consultas')content=<ConsultationsPage api={api} profile={profile} version={version}/>;

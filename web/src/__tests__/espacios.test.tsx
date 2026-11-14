@@ -44,7 +44,7 @@ const espacios: Space[] = [
 
 function montar(pagina: 'camas' | 'espacios', permisos: string[] = ['espacios.ver', 'camas.ver_tablero']) {
   const api = {
-    request: vi.fn(async (path: string) => (path.startsWith('/camas') ? camas : path.startsWith('/espacios') ? espacios : [])),
+    request: vi.fn(async (path: string): Promise<unknown> => (path.startsWith('/camas') ? camas : path.startsWith('/espacios') ? espacios : [])),
     write: vi.fn(async () => ({ ok: true })),
   };
   const props = { api: api as unknown as Api, profile: { ...perfil, permissions: permisos.map(code => ({ code, context: 'global' })) }, version: 0 };
