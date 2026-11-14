@@ -1,7 +1,7 @@
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type FormEvent } from 'react';
 import type { DemoAccount } from '../lib/demoLogin';
 
-export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry';
+export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry' | 'download' | 'clock' | 'alert' | 'chart' | 'userPlus' | 'megaphone' | 'steth' | 'drop' | 'pulse';
 const paths: Record<IconName, ReactNode> = {
   arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
   back: <><path d="M19 12H5M11 6l-6 6 6 6" /></>,
@@ -33,6 +33,15 @@ const paths: Record<IconName, ReactNode> = {
   privacy: <><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" /><path d="M9 12a3 3 0 0 1 6 0v3H9z" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   retry: <><path d="M20 7v5h-5" /><path d="M19 12a7 7 0 1 0-2 5" /></>,
+  download: <><path d="M12 4v11M7 11l5 5 5-5M5 20h14" /></>,
+  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  alert: <><path d="M12 3 2 20h20z" /><path d="M12 10v5M12 18v.01" /></>,
+  chart: <><path d="M4 20V4M4 20h16" /><path d="M8 16v-4M12 16V8M16 16v-6" /></>,
+  userPlus: <><circle cx="9" cy="8" r="4" /><path d="M2 21v-2a6 6 0 0 1 12 0v2M19 8v6M16 11h6" /></>,
+  megaphone: <><path d="M3 10v4h4l8 5V5L7 10zM18 9a4 4 0 0 1 0 6" /></>,
+  steth: <><path d="M6 3v6a4 4 0 0 0 8 0V3M10 13v2a5 5 0 0 0 10 0v-2" /><circle cx="20" cy="11" r="2" /></>,
+  drop: <><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.500 6-11 6-11z" /></>,
+  pulse: <><path d="M3 12h4l3-8 4 16 3-8h4" /></>,
 };
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{paths[name]}</svg>;
