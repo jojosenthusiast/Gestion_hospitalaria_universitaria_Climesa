@@ -10,6 +10,11 @@ export class PermissionGrantResponse {
   @StrProp({ description: 'Contexto del permiso (x, propio, relacion, area, ...)' }) context!: string;
 }
 
+export class RolePlatformsResponse {
+  @StrProp({ description: 'Código de rol' }) role!: string;
+  @StrArrayProp({ description: 'Plataformas del rol en minúscula (web, android, ios)' }) platforms!: string[];
+}
+
 export class SessionProfileResponse {
   @ClassProp(SessionUserResponse) user!: SessionUserResponse;
   @UuidProp() id!: string;
@@ -17,6 +22,7 @@ export class SessionProfileResponse {
   @StrProp({ nullable: true }) name!: string | null;
   @StrArrayProp({ description: 'Códigos de rol' }) roles!: string[];
   @StrArrayProp({ description: 'Plataformas permitidas en minúscula' }) platforms!: string[];
+  @ClassArrayProp(RolePlatformsResponse, { description: 'Plataformas de cada rol; `platforms` es su unión' }) rolePlatforms!: RolePlatformsResponse[];
   @ClassArrayProp(PermissionGrantResponse) permissions!: PermissionGrantResponse[];
   @StrArrayProp({ description: 'Canales de tiempo real autorizados' }) channels!: string[];
   @UuidProp({ nullable: true }) patientId!: string | null;

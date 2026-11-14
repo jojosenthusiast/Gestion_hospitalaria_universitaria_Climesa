@@ -2134,6 +2134,12 @@ export interface components {
             id: string;
             email?: string;
         };
+        RolePlatformsResponse: {
+            /** @description Código de rol */
+            role: string;
+            /** @description Plataformas del rol en minúscula (web, android, ios) */
+            platforms: string[];
+        };
         PermissionGrantResponse: {
             /** @description Código del permiso, por ejemplo citas.ver */
             code: string;
@@ -2150,6 +2156,8 @@ export interface components {
             roles: string[];
             /** @description Plataformas permitidas en minúscula */
             platforms: string[];
+            /** @description Plataformas de cada rol; `platforms` es su unión */
+            rolePlatforms: components["schemas"]["RolePlatformsResponse"][];
             permissions: components["schemas"]["PermissionGrantResponse"][];
             /** @description Canales de tiempo real autorizados */
             channels: string[];
