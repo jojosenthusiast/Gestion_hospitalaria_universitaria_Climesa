@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { ExportMenu } from '../components/export-menu';
 import { AuditExport } from '../features/audit/AuditExport';
 import { registerExportAuditor } from '../lib/export';
+import type { Api } from '../lib/api';
 
 // MA-SEG-05: the file is built in the browser, so the web records each export in the API audit before saving it.
 const table = () => ({ filename: 'Pacientes Hoy', title: 'Pacientes', columns: ['Expediente'], rows: [['9900001-1'], ['9900002-2']] });
@@ -36,7 +37,7 @@ describe('exportación auditada (MA-SEG-05)', () => {
     registerExportAuditor(auditor);
     URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn();
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    const api = { request: vi.fn(async () => ({ filas: [], total: 0, pagina: 1, limite: 500 })), write: vi.fn() };
+    const api = { request: vi.fn(async () => ({ filas: [], total: 0, pagina: 1, limite: 500 })), write: vi.fn() } as unknown as Api;
     render(<AuditExport api={api} total={3} subtitle="Hoy" queryFor={() => '?exportar=true'} />);
     fireEvent.click(screen.getByRole('button', { name: /Exportar/ }));
     fireEvent.click(screen.getByRole('menuitem', { name: /CSV/ }));
@@ -47,7 +48,7 @@ describe('exportación auditada (MA-SEG-05)', () => {
   it('si el registro de la exportación de auditoría falla, no descarga', async () => {
     registerExportAuditor(async () => { throw new Error('Network down'); });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    const api = { request: vi.fn(async () => ({ filas: [], total: 0, pagina: 1, limite: 500 })), write: vi.fn() };
+    const api = { request: vi.fn(async () => ({ filas: [], total: 0, pagina: 1, limite: 500 })), write: vi.fn() } as unknown as Api;
     render(<AuditExport api={api} total={3} subtitle="Hoy" queryFor={() => '?exportar=true'} />);
     fireEvent.click(screen.getByRole('button', { name: /Exportar/ }));
     fireEvent.click(screen.getByRole('menuitem', { name: /CSV/ }));
