@@ -3,8 +3,8 @@ import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuer
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { AmbulanceService, LogFilters } from './ambulance.service';
-import { AmbulanceRequestDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
-import { AmbulanceRequestCreatedResponse, AmbulanceRequestStateResponse, AmbulanceStatusResponse, AmbulanceUnitStateResponse, DispatchResponse, LocationRecordedResponse, MilestoneResponse, PrehospitalCreatedResponse, PrehospitalViewResponse, ServiceLogEntryResponse } from './ambulance.responses';
+import { AmbulanceRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
+import { AmbulanceRequestCreatedResponse, AmbulanceRequestStateResponse, CloseServiceResponse, AmbulanceStatusResponse, AmbulanceUnitStateResponse, DispatchResponse, LocationRecordedResponse, MilestoneResponse, PrehospitalCreatedResponse, PrehospitalViewResponse, ServiceLogEntryResponse } from './ambulance.responses';
 
 /** Spec 109: rutas de `endpoints.csv`, cada una con su permiso de `permisos.csv`. */
 @ApiTags('ambulancia') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller('ambulancia')
@@ -22,6 +22,8 @@ export class AmbulanceController {
   dispatch(@Req() r:ActorRequest,@Body() d:DispatchDto,@Headers('idempotency-key') k?:string){return this.ambulance.dispatch(r.actor,d,k);}
   @Post('servicios/:id/hitos') @RequirePermission('ambulancia.operar') @ApiOperation({summary:'Registrar hito en orden: salida, en escena, trasladando, en hospital, finalizado'}) @ApiCreatedResponse({ type: MilestoneResponse })
   milestone(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:MilestoneDto,@Headers('idempotency-key') k?:string){return this.ambulance.milestone(r.actor,id,d,k);}
+  @Post('servicios/:id/cerrar') @RequirePermission('ambulancia.mantenimiento') @ApiOperation({summary:'Cierre administrativo de un servicio activo (Jefatura, con motivo): queda cancelado y la unidad vuelve a Disponible'}) @ApiCreatedResponse({ type: CloseServiceResponse })
+  close(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:CloseServiceDto,@Headers('idempotency-key') k?:string){return this.ambulance.close(r.actor,id,d,k);}
   @Post('servicios/:id/prehospital') @RequirePermission('ambulancia.reportar_prehospital') @ApiOperation({summary:'Reporte prehospital; el reenvío con la misma Idempotency-Key no duplica'}) @ApiCreatedResponse({ type: PrehospitalCreatedResponse })
   prehospital(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:PrehospitalDto,@Headers('idempotency-key') k?:string){return this.ambulance.prehospital(r.actor,id,d,k);}
   @Get('servicios/:id/prehospital') @RequirePermission('ambulancia.recibir_prehospital') @ApiOperation({summary:'Ver el reporte prehospital; el contenido clínico solo con relación de atención'}) @ApiOkResponse({ type: PrehospitalViewResponse })

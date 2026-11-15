@@ -87,11 +87,18 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 108,POST,/api/v1/admisiones/{id}/alta,alta.firmar,Pendientes con responsable; inscripción vigente,R,4,Firmar alta
 108,POST,/api/v1/admisiones/{id}/salida,admision.registrar_salida,Cama pasa a limpieza,R,4,Registrar salida física
 108,POST,/api/v1/admisiones/indicaciones,admision.solicitar,,R,4,Médico indica hospitalización
+108,GET,/api/v1/admisiones/{id}/notas-enfermeria,enfermeria.registrar,Mismo contexto de área que al escribir; lectura auditada,R,6,Notas de enfermería de la admisión
+108,POST,/api/v1/admisiones/{id}/cancelar,admision.crear,Solo pendiente de cama; motivo de 10 caracteres o más,R,6,Cancelar admisión
+108,POST,/api/v1/admisiones/{id}/anular,admision.autorizar,Solo hospitalizado; ocupación cerrada como ingresado por error y cama a limpieza,R,6,Anular hospitalización ingresada por error
+108,POST,/api/v1/admisiones/{id}/tratante,admision.autorizar,Médico activo con cuenta; motivo; historial en cambio_tratante,R,6,Reasignar médico tratante
+108,POST,/api/v1/admisiones/{id}/solicitar-alta,admision.crear,Solo hospitalizado; aviso en vivo a la cuenta del médico tratante (D-02),R,6,Solicitar alta al médico tratante
+108,POST,/api/v1/admisiones/{id}/revocar-alta,alta.firmar OR admision.autorizar,El firmante o Jefatura; antes de la salida física; motivo,R,6,Revocar alta firmada
 109,GET,/api/v1/ambulancia,ambulancia.ver_estado,,R,3,Estado actual y servicio activo
 109,POST,/api/v1/ambulancia/solicitudes,ambulancia.solicitar,PAC: cuenta verificada; queda por confirmar,R,4,Solicitar ambulancia
 109,POST,/api/v1/ambulancia/solicitudes/{id}/descartar,ambulancia.despachar,Motivo,R,4,Descartar solicitud
 109,POST,/api/v1/ambulancia/servicios,ambulancia.despachar,Solo si Disponible; bloqueo de fila,R,4,Despachar: pasa a En Servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/hitos,ambulancia.operar,Orden de hitos,R,4,"Salida, en escena, trasladando, en hospital, finalizado"
+109,POST,/api/v1/ambulancia/servicios/{id}/cerrar,ambulancia.mantenimiento,Solo servicio activo; motivo; estado final cancelado; unidad a Disponible,R,6,Cierre administrativo del servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.reportar_prehospital,Funciona sin conexión con reintento,E,4,Reporte prehospital y hora estimada
 109,GET,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.recibir_prehospital,,E,4,Ver reporte prehospital
 109,POST,/api/v1/ambulancia/ubicacion,ambulancia.operar,Solo con servicio activo,E,5,Ubicación en vivo

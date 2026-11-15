@@ -30,7 +30,7 @@ camas.ver_ocupante,Ver qué paciente ocupa una cama,,x,x,,area,relacion,,,,propi
 camas.asignar,Asignar cama a una admisión,,x,x,,,,,,,
 camas.trasladar,Trasladar a otra cama,,x,x,,,,,,,
 camas.bloquear,Bloquear o desbloquear una cama,,x,,,,,,,,
-camas.registrar_limpieza,Registrar limpieza de cama,,,,,x,,,,,
+camas.registrar_limpieza,Registrar limpieza de cama,,x,,,x,,,,,
 camas.verificar_limpieza,Verificar limpieza (otra persona),,x,,,x,,,,,
 recursos.gestionar,Equipo médico por espacio y su estado,,x,,,,,,,,
 recursos.configurar,Tipos de equipo y catálogos de recursos,x,,,,,,,,,

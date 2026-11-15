@@ -6,6 +6,7 @@ import { DiscardForm,DispatchForm,PhoneRequestForm } from './ambulance/dialogs';
 import { MaintenancePanel } from './ambulance/maintenance';
 import { RequestsBoard } from './ambulance/requests';
 import { CrewAction,CrewCoverage,missingCrew } from './ambulance/crew';
+import { AdminCloseAction } from './ambulance/admin-close';
 import { milestoneNames,minutesBetween,priorityNames,roleNames,stateNames,typeNames,type AmbulanceRequest,type AmbulanceStatus,type PrehospitalView } from './ambulance/types';
 import './ambulance/ambulance.css';
 export * from './ambulance/types';
@@ -23,7 +24,7 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  return <><Heading eyebrow="Operaciones / Ambulancia" title="Centro de despacho" description="Estado de la unidad, solicitudes y servicio en curso, actualizado en vivo." actions={phoneDesk?<button type="button" className="secondary-button" onClick={()=>setCalling(true)}>Registrar llamada</button>:undefined}/><RemoteState state={data}>{s=><section className="data-workbench" aria-label="Estado de la unidad">
   <div className="number-strip"><div><strong className="mono-data">{s.unit.plate}</strong><span>Unidad única</span></div><div><strong><span className={`status-tag status-${s.unit.state}`}>{stateNames[s.unit.state]??s.unit.state}</span></strong><span>Estado actual</span></div><CrewCoverage status={s}/></div>
   {dispatcher&&s.dispatchBlock&&<section aria-label="Despacho bloqueado"><Notice kind="info"><strong>No se puede despachar ahora.</strong> {s.dispatchBlock.message} {s.dispatchBlock.action}</Notice>{missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}
-  {s.activeService?<ActiveService service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:<p className="muted">Sin servicio activo</p>}
+  {s.activeService?<ActiveService api={api} onSaved={data.refresh} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:<p className="muted">Sin servicio activo</p>}
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
   {dispatcher&&s.unit.state==='disponible'&&!s.dispatchBlock&&<p><button type="button" className="secondary-button" onClick={()=>setDispatching('direct')}>Despachar traslado sin solicitud</button></p>}
   {manage&&s.unit.state!=='en_servicio'&&<MaintenancePanel status={s} api={api} profile={profile} onSaved={data.refresh}/>}
@@ -34,17 +35,18 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  {report&&<PrehospitalDialog api={api} serviceId={report} version={version} onClose={()=>setReport(null)}/>}
  </>;
 }
-function ActiveService({service,onReport}:{service:NonNullable<AmbulanceStatus['activeService']>;onReport?:()=>void}){
- const milestones=service.milestones??[];
+function ActiveService({api,service,onReport,onSaved}:{api:Api;service:NonNullable<AmbulanceStatus['activeService']>;onReport?:()=>void;onSaved:()=>void}){
+ const milestones=service.milestones??[],withoutAccount=service.crew.some(c=>c.hasAccount===false);
  return <section aria-label="Servicio activo"><h2>Servicio activo</h2><dl className="detail-grid">
   <div><dt>Tipo</dt><dd>{typeNames[service.type]??service.type}</dd></div><div><dt>Prioridad</dt><dd>{priorityNames[service.priority]??service.priority}</dd></div>
   <div><dt>Origen</dt><dd>{service.origin}</dd></div><div><dt>Destino</dt><dd>{service.destination}</dd></div>
   <div><dt>Despachado</dt><dd>{formatDateTime(service.dispatchedAt)} · hace {minutesBetween(service.dispatchedAt)} min</dd></div>
-  <div><dt>Tripulación</dt><dd>{service.crew.length?service.crew.map(c=>`${c.name} (${roleNames[c.role]??c.role})`).join(' · '):'Sin tripulación registrada'}</dd></div>
+  <div><dt>Tripulación</dt><dd>{service.crew.length?service.crew.map(c=>`${c.name} (${roleNames[c.role]??c.role})${c.hasAccount===false?' · sin cuenta en la app':''}`).join(' · '):'Sin tripulación registrada'}{withoutAccount&&<small className="amb-crew-note">Quien no tiene cuenta no puede registrar hitos desde la app; si nadie de la tripulación puede terminar el servicio, Jefatura lo cierra con cierre administrativo.</small>}</dd></div>
   {service.lastLocation&&<div><dt>Última ubicación</dt><dd className="mono-data">{service.lastLocation.latitude.toFixed(5)}, {service.lastLocation.longitude.toFixed(5)} · {formatDateTime(service.lastLocation.capturedAt)}</dd></div>}
  </dl>
  <ol className="milestone-list" aria-label="Hitos del servicio">{['salida','en_escena','trasladando','en_hospital','finalizado'].map(type=>{const m=milestones.find(x=>x.type===type);return <li key={type} className={m?'done':''}><strong>{milestoneNames[type]}</strong> <span>{m?formatDateTime(m.occurredAt):'Pendiente'}</span></li>;})}</ol>
  {onReport&&<button type="button" className="row-action" onClick={onReport}>Ver reporte prehospital</button>}
+ <AdminCloseAction api={api} service={service} onSaved={onSaved}/>
  </section>;
 }
 /** FR-109-11: reporte prehospital; la API omite motivo y signos a quien no tiene relación de atención. */

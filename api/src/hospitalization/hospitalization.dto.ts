@@ -1,7 +1,10 @@
 import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 import { Text } from '../platform/dto';
+
+/** The database checks count `btrim(reason)`; trimming before validation turns padded input into a 400, not a 500. */
+const trimmed = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
 
 /** `programada` only survives in legacy rows: a new admission always links to its source record. */
 export const admissionOrigins = ['cita', 'consulta', 'emergencia', 'ambulancia'] as const;
@@ -53,3 +56,15 @@ export class DischargeDto {
 /** API-04: the physical exit validates its body and compares the admission version. */
 export class ExitDto { @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; @Text(10, 500) reason!: string; }
 export class NursingNoteDto { @Text(1, 4000) text!: string; }
+/** BL-04: cancel a pending admission or annul one hospitalized by mistake; both keep who, when and why (D-13). */
+export class AdmissionCloseDto { @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; @Transform(trimmed) @Text(10, 500) reason!: string; }
+/** BL-03: Jefatura reassigns the attending doctor (the one who signs the discharge). */
+export class AttendingChangeDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() attendingDoctorId!: string;
+  @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
+  @Transform(trimmed) @Text(10, 500) reason!: string;
+}
+/** BL-03: Recepción or Jefatura asks the attending doctor to sign the discharge (D-02: only MED signs). */
+export class DischargeRequestDto { @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; @Text(0, 500, true) note?: string; }
+/** MA-HOS-02: revoking a signed discharge before the physical exit, with a reason. */
+export class DischargeRevocationDto { @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number; @Transform(trimmed) @Text(10, 500) reason!: string; }

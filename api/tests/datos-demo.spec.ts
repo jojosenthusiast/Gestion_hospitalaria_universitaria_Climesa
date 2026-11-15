@@ -66,7 +66,9 @@ const TABLAS: Record<string, string> = {
 const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acceso.dispositivo_push', 'acceso.administrador_principal',
   'pacientes.busqueda_registro', 'plataforma.auditoria', 'plataforma.outbox', 'plataforma.inbox', 'plataforma.idempotencia',
   // Fase 0/1 (CITA-02): las solicitudes de reprogramación nacen solo del uso real.
-  'atencion.reprogramacion'];
+  'atencion.reprogramacion',
+  // Historial de cambios de médico tratante (BL-03): nace de una acción de Jefatura, la demo no lo siembra.
+  'hospitalizacion.cambio_tratante'];
 
 const MINIMOS: Record<string, number> = {
   'pacientes.paciente': 120, 'pacientes.identificador': 100, 'atencion.cita': 130, 'atencion.ticket_fila': 30, 'atencion.consulta': 70,

@@ -100,17 +100,19 @@ public struct LabOrderBody: Encodable, Sendable, Equatable {
     }
 }
 
-/// `AdmissionDto` para `POST /admisiones/indicaciones` desde una consulta: el origen es la consulta abierta,
-/// el médico tratante es quien la indica y `motive` (10 a 500 caracteres) explica por qué se hospitaliza.
+/// `AdmissionIndicationDto` para `POST /admisiones/indicaciones` desde una consulta (MOV-01): el origen es la consulta
+/// abierta y `motive` (10 a 500 caracteres) explica por qué se hospitaliza. `attendingDoctorId` se omite: la API pone
+/// como tratante al médico que indica.
 public struct AdmissionBody: Encodable, Sendable, Equatable {
     public let patientId: String
     public let origin: String
     public let originId: String
     public let requestedCategory: String
     public let isolation: Bool
-    public let attendingDoctorId: String
+    /// Nil se omite del JSON (la API usa al propio médico).
+    public let attendingDoctorId: String?
     public let motive: String
-    public init(patientId: String, consultationId: String, category: RoomCategory, isolation: Bool, attendingDoctorId: String, motive: String) {
+    public init(patientId: String, consultationId: String, category: RoomCategory, isolation: Bool, attendingDoctorId: String? = nil, motive: String) {
         self.patientId = patientId; self.origin = "consulta"; self.originId = consultationId; self.requestedCategory = category.rawValue
         self.isolation = isolation; self.attendingDoctorId = attendingDoctorId; self.motive = motive.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -132,6 +134,15 @@ public struct DischargeBody: Encodable, Sendable, Equatable {
     public let pending: [DischargePendingBody]
     public init(type: DischargeType, version: Int, summary: String?, voluntaryConsent: Bool?, pending: [DischargePendingBody]) {
         self.type = type.rawValue; self.version = version; self.summary = summary; self.voluntaryConsent = voluntaryConsent; self.pending = pending
+    }
+}
+
+/// `DischargeRevocationDto` para `POST /admisiones/{id}/revocar-alta`: vuelve la admisión a hospitalizado.
+public struct DischargeRevocationBody: Encodable, Sendable, Equatable {
+    public let version: Int
+    public let reason: String
+    public init(version: Int, reason: String) {
+        self.version = version; self.reason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

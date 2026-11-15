@@ -1,0 +1,7 @@
+/* W13 row actions and discharge context (D-02, MA-HOS-03). */
+.admission-wait { display: block; }
+.admission-action-note { margin: 0; }
+.admission-discharge { display: grid; gap: 0.5rem; }
+.admission-discharge h3 { font-size: 1rem; margin: 0; }
+.admission-discharge ul { margin: 0; padding-left: 1.25rem; }
+.admission-discharge li small { display: block; }

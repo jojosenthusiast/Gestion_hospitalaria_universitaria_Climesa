@@ -22,6 +22,7 @@ SALIDA_CONTEXTOS = RAIZ / "supabase" / "migrations" / "20261029000100_acceso_con
 SALIDA_ATRIBUTOS = RAIZ / "supabase" / "migrations" / "20261030000100_permisos_atributos.sql"
 SALIDA_RONDA3 = RAIZ / "supabase" / "migrations" / "20261118007000_permisos_ronda3.sql"
 SALIDA_PLATAFORMAS = RAIZ / "supabase" / "migrations" / "20261118008000_plataformas_sin_android.sql"
+SALIDA_FASE01 = RAIZ / "supabase" / "migrations" / "20261120001200_permisos_fase01_hospitalizacion.sql"
 
 # Permisos que se agregaron al catálogo después de aplicada la semilla (regla 10 de AGENTS.md: la semilla no se edita). La semilla
 # no los emite; la migración de SALIDA_ATRIBUTOS los inserta. Son permisos de atributo: deciden qué campos o filas ve quien ya
@@ -37,6 +38,10 @@ PERMISOS_POSTERIORES = [
 # no los emite (regla 10 de AGENTS.md); los inserta la migración de SALIDA_RONDA3, con el contexto que diga permisos.csv.
 PERMISOS_RONDA3 = ["pacientes.editar_propios"]
 ADICIONES_ROL = [("MED", "ambulancia.ver_bitacora")]
+
+# Fase 0/1 de la auditoría final (D-03, MA-HOS-04): asignaciones nuevas de permisos que ya existían, después de aplicadas la
+# semilla y la ronda 3. Ninguna migración aplicada las emite; las inserta la migración de SALIDA_FASE01.
+ADICIONES_ROL_FASE01 = [("JOP", "camas.registrar_limpieza")]
 
 # Permisos que se retiraron del catálogo (observación 12: módulo de acceso excepcional) después de aplicada la semilla. Ya no están en
 # permisos.csv ni en los documentos RBAC, pero la semilla (aplicada, regla 10 de AGENTS.md) los sigue emitiendo tal como estaban, en su
@@ -321,7 +326,7 @@ def generar_sql(roles, permisos):
     filas = []
     for p in permisos:
         for c in codigos:
-            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL:
+            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL and (c, p["permiso"]) not in ADICIONES_ROL_FASE01:
                 filas.append(f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(historico.get((c, p['permiso']), p[c]))})")
     l.append(",\n".join(filas) + ";")
     return "\n".join(l) + "\n"
@@ -393,6 +398,26 @@ def generar_sql_ronda3(roles, permisos):
     return "\n".join(l) + "\n"
 
 
+def generar_sql_fase01(permisos):
+    por_nombre = {p["permiso"]: p for p in permisos}
+    l = [
+        "-- Generado por tools/generar_docs.py desde ADICIONES_ROL_FASE01 y permisos.csv. No editar a mano.",
+        "-- Auditoría final, D-03 (MA-HOS-04): Jefatura registra la limpieza de camas desde la Web; la verificación sigue exigiendo",
+        "-- a otra persona (camas.verificar_limpieza). Idempotente: no duplica asignaciones que ya existan.",
+        "--",
+        "-- Pre-comprobación en producción (ninguna fila debe existir todavía):",
+        "--   select rol_codigo, permiso_codigo from acceso.rol_permiso where rol_codigo = 'JOP' and permiso_codigo = 'camas.registrar_limpieza';",
+        "--",
+        "-- Reversa:",
+        "--   delete from acceso.rol_permiso where rol_codigo = 'JOP' and permiso_codigo = 'camas.registrar_limpieza';",
+        "",
+        "insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values",
+        ",\n".join(f"  ({sql_txt(r)}, {sql_txt(perm)}, {sql_txt(por_nombre[perm][r])})" for r, perm in ADICIONES_ROL_FASE01),
+        "on conflict (rol_codigo, permiso_codigo) do nothing;",
+    ]
+    return "\n".join(l) + "\n"
+
+
 def generar_sql_plataformas(roles):
     por_codigo = {r["codigo"]: r for r in roles}
     l = [
@@ -449,6 +474,9 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
     for r, perm in ADICIONES_ROL:
         if not por_permiso.get(perm, {}).get(r):
             errores.append(f"ADICIONES_ROL dice {r} {perm} y permisos.csv no se lo asigna")
+    for r, perm in ADICIONES_ROL_FASE01:
+        if not por_permiso.get(perm, {}).get(r):
+            errores.append(f"ADICIONES_ROL_FASE01 dice {r} {perm} y permisos.csv no se lo asigna")
     usados = {parte for e in endpoints for parte in partes_permiso(e["permiso"])}
     for p in permisos:
         if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante" and p["permiso"] not in PERMISOS_POSTERIORES:
@@ -556,6 +584,7 @@ def main():
         SALIDA_ATRIBUTOS: generar_sql_atributos(roles, permisos),
         SALIDA_RONDA3: generar_sql_ronda3(roles, permisos),
         SALIDA_PLATAFORMAS: generar_sql_plataformas(roles),
+        SALIDA_FASE01: generar_sql_fase01(permisos),
     }
     if "--verificar" in sys.argv:
         for ruta, contenido in salidas.items():

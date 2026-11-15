@@ -170,8 +170,8 @@ struct ConsultationView: View {
         diagnosesSection(value, editable: editable)
         prescriptionSection(value, editable: editable && profile.hasPermission("recetas.emitir"))
         if editable && profile.hasPermission("laboratorio.ordenar") { labSection(value) }
-        if editable && profile.hasPermission("admision.solicitar"), let staffId = profile.staffId {
-            AdmissionIndicationCard(consultationId: value.consultation.id, patientId: value.consultation.patientId, staffId: staffId)
+        if editable && profile.hasPermission("admision.solicitar") && profile.staffId != nil {
+            AdmissionIndicationCard(consultationId: value.consultation.id, patientId: value.consultation.patientId)
         }
         if editable {
             WriteNotice(submission: signing, reload: loadDetail)

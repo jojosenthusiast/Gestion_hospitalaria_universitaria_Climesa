@@ -9,7 +9,8 @@ import { ProblemException, VersionConflictException } from '../platform/problem'
 import { requireCurrentEnrollment } from '../platform/enrollment';
 import { AdmissionIntakeService } from './admission-intake.service';
 import { Category, visitorError, visitorPolicy } from './admission-intake.rules';
-import { AdmissionDto, AdmissionIndicationDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, ExitDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
+import { AdmissionCloseDto, AdmissionDto, AdmissionIndicationDto, AttendingChangeDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, DischargeRequestDto, DischargeRevocationDto, ExitDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
+import { admissionActions, SPECIAL_EXIT } from './hospitalization.rules';
 
 type Row = Record<string, any>;
 
@@ -76,8 +77,22 @@ export class HospitalizationService {
   }
 
   /** API-03: admissions and the bed board learn about every transition through the outbox (no polling). */
-  private async admissionChanged(c: PoolClient, id: string, version: number) {
-    await this.commands.event(c, 'admision.actualizada', 'admision', id, version, await channelsFor(c, ['admision.ver', 'camas.asignar']));
+  private async admissionChanged(c: PoolClient, id: string, version: number, users: Array<string | null> = []) {
+    await this.commands.event(c, 'admision.actualizada', 'admision', id, version, await channelsFor(c, ['admision.ver', 'camas.asignar'], { users }));
+  }
+
+  /** Active app account of a staff member (the attending doctor's `usuario:` channel), if any. */
+  private async staffAccount(c: PoolClient, staffId: string | null) {
+    if (!staffId) return null;
+    return ((await c.query("SELECT id FROM acceso.usuario WHERE persona_personal_id=$1 AND estado='activo' LIMIT 1", [staffId])).rows[0]?.id as string | undefined) ?? null;
+  }
+
+  private assertVersion(admission: Row, version: number) {
+    if (admission.version !== version) throw new VersionConflictException(admission.version, 'La admisión cambió; vuelve a consultarla.');
+  }
+
+  private assertState(admission: Row, states: string[], message: string) {
+    if (!states.includes(admission.state)) throw new ProblemException('transicion_invalida', 409, message);
   }
 
   private async bedChanged(c: PoolClient, bedId: string, version: number) {
@@ -104,12 +119,36 @@ export class HospitalizationService {
       // SEG-03: context `area` (ENF) sees the admissions whose current bed is in an area of the nurse's current shift.
       const areas = !global && contextsOf(actor, 'admision.ver').includes('area') ? await this.currentAreas(c, actor.staffId) : [];
       if (!global && !ownDoctor && !ownPatient && !areas.length) return [];
-      const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed,oc.id AS "occupationId",a.origen_id AS "originId",a.motivo AS motive,a.tipo_aislamiento AS "isolationType",a.inestable AS unstable,a.postquirurgico AS "postSurgical",a.visitas_permitidas AS "visitorsAllowed",a.visitantes_max AS "visitorsMax"
-        FROM hospitalizacion.admision a JOIN pacientes.paciente p ON p.id=a.paciente_id LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $1::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id
-        WHERE a.estado IN ('pendiente_cama','hospitalizado','alta_firmada') AND ($2::boolean OR ($3::uuid IS NOT NULL AND a.medico_tratante_id=$3) OR ($4::uuid IS NOT NULL AND a.paciente_id=$4)
-          OR (cardinality($5::uuid[])>0 AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=oc.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($5::uuid[])))) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,ownDoctor ? actor.staffId : null,ownPatient ? actor.patientId : null,areas])).rows;
+      // BL-03: MED (`relacion`) sees the admissions where it is the attending doctor or has a current care relationship,
+      // the same two cases in which it may sign the discharge.
+      const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed,oc.id AS "occupationId",a.origen_id AS "originId",a.motivo AS motive,a.tipo_aislamiento AS "isolationType",a.inestable AS unstable,a.postquirurgico AS "postSurgical",a.visitas_permitidas AS "visitorsAllowed",a.visitantes_max AS "visitorsMax",
+          nullif(concat_ws(' ',d.nombres,d.apellidos),'') AS "attendingDoctorName",EXISTS(SELECT 1 FROM acceso.usuario du WHERE du.persona_personal_id=a.medico_tratante_id AND du.estado='activo') AS "attendingDoctorHasAccount",
+          oc.categoria AS "bedCategory",(a.autorizado_por IS NOT NULL) AS authorized,a.alta_solicitada_en AS "dischargeRequestedAt",
+          al.tipo AS "dischargeType",al.firmada_en AS "dischargeSignedAt",al.firmada_por AS "dischargeSignedBy",al.pendientes AS "dischargePending",
+          (SELECT nullif(concat_ws(' ',sp.nombres,sp.apellidos),'') FROM acceso.usuario su JOIN personal.persona sp ON sp.id=su.persona_personal_id WHERE su.id=al.firmada_por) AS "dischargeSignedByName",
+          ($6::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=a.paciente_id AND r.profesional_id=$6 AND r.vigencia @> $1::timestamptz)) AS related
+        FROM hospitalizacion.admision a JOIN pacientes.paciente p ON p.id=a.paciente_id LEFT JOIN personal.persona d ON d.id=a.medico_tratante_id
+          LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $1::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id
+          LEFT JOIN hospitalizacion.alta al ON al.admision_id=a.id AND al.revocada_en IS NULL
+        WHERE a.estado IN ('pendiente_cama','hospitalizado','alta_firmada') AND ($2::boolean OR ($4::uuid IS NOT NULL AND a.paciente_id=$4)
+          OR ($3::uuid IS NOT NULL AND (a.medico_tratante_id=$3 OR EXISTS(SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=a.paciente_id AND r.profesional_id=$3 AND r.vigencia @> $1::timestamptz)))
+          OR (cardinality($5::uuid[])>0 AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=oc.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($5::uuid[])))) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,ownDoctor ? actor.staffId : null,ownPatient ? actor.patientId : null,areas,actor.staffId ?? null])).rows;
+      const enrolled = hasPermission(actor, 'alta.firmar') && !!actor.staffId && (await c.query('SELECT personal.inscrito($1::uuid,$2::date) AS ok', [actor.staffId, this.clock.today()])).rows[0]?.ok === true;
       for (const row of rows) await this.commands.audit(c, actor, { action: 'admision.leer', entity: 'admision', entityId: row.id, patientId: row.patientId, permission: 'admision.ver' });
-      return rows;
+      return rows.map(({ dischargeType, dischargeSignedAt, dischargeSignedBy, dischargePending, dischargeSignedByName, related, ...row }) => {
+        // D-031: without a care relationship (global context: Recepción, Jefatura) the discharge is operational only;
+        // its type and pending descriptions are clinical. Non-global readers only see rows through a care context.
+        const clinical = !global || (!!ownDoctor && (row.attendingDoctorId === actor.staffId || related === true));
+        const pending = ((dischargePending ?? []) as Array<{ descripcion: string; responsable: string }>).map(item => ({ description: item.descripcion, responsible: item.responsable }));
+        return {
+          ...row,
+          discharge: dischargeType ? {
+            type: clinical ? dischargeType : null, signedAt: dischargeSignedAt, signedByName: dischargeSignedByName ?? null,
+            pending: clinical ? pending : null, pendingCount: pending.length, specialHandling: SPECIAL_EXIT.includes(dischargeType as string),
+          } : null,
+          allowedActions: admissionActions(actor, { ...row, related, enrolled, dischargeSignedBy: dischargeSignedBy ?? null }),
+        };
+      });
     });
   }
 
@@ -165,6 +204,109 @@ export class HospitalizationService {
       await this.commands.audit(c, actor, { action: 'admision.solicitar', entity: 'admision', entityId: row.id, patientId: dto.patientId, permission: 'admision.solicitar' });
       await this.commands.event(c, 'admision.creada', 'admision', row.id, row.version, await channelsFor(c, ['admision.ver', 'camas.asignar']));
       return row;
+    });
+  }
+
+  /** BL-04: a pending admission (duplicate or mistaken) is cancelled with a reason; its active bed reservations are released. */
+  async cancel(actor: Actor, id: string, dto: AdmissionCloseDto, key?: string) {
+    return this.commands.run(actor, `admision.crear:${id}:cancelar`, key, dto, async c => {
+      const admission = await this.admission(c, id, true);
+      this.assertVersion(admission, dto.version);
+      this.assertState(admission, ['pendiente_cama'], 'Solo se cancela una admisión pendiente de cama; si ya está hospitalizada, Jefatura puede anularla.');
+      const row = (await c.query(`UPDATE hospitalizacion.admision SET estado='cancelada',cerrada_en=$2,cerrada_por=$3,motivo_cierre=$4,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version`, [id, this.clock.now(), actor.id, dto.reason.trim()])).rows[0];
+      await c.query(`UPDATE hospitalizacion.reserva_cama SET estado='cancelada' WHERE admision_id=$1 AND estado='activa'`, [id]);
+      await this.commands.audit(c, actor, { action: 'admision.cancelar', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'admision.crear', reason: dto.reason });
+      await this.admissionChanged(c, id, row.version, [await this.staffAccount(c, admission.attendingDoctorId)]);
+      return row;
+    });
+  }
+
+  /**
+   * BL-04: a hospitalization entered by mistake is annulled by Jefatura: the occupation ends with `ingresado_por_error`,
+   * the isolation blocks are released and the bed goes to cleaning. The admission ends `cancelada`; nothing is deleted.
+   */
+  async annul(actor: Actor, id: string, dto: AdmissionCloseDto, key?: string) {
+    return this.commands.run(actor, `admision.autorizar:${id}:anular`, key, dto, async c => {
+      const admission = await this.admission(c, id, true);
+      this.assertVersion(admission, dto.version);
+      this.assertState(admission, ['hospitalizado'], 'Solo se anula una admisión hospitalizada; si está pendiente de cama, cancélala.');
+      const now = this.clock.now();
+      const occupation = (await c.query(`SELECT o.id,o.cama_id AS "bedId",o.habitacion_id AS "roomId",e.version AS "bedVersion" FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio e ON e.id=o.cama_id WHERE o.admision_id=$1 AND o.periodo @> $2::timestamptz FOR UPDATE OF o`, [id, now])).rows[0] as Row | undefined;
+      if (occupation) {
+        await c.query(`UPDATE hospitalizacion.ocupacion_cama SET periodo=tstzrange(lower(periodo),greatest(lower(periodo),$2::timestamptz),'[)'),motivo_fin='ingresado_por_error' WHERE id=$1`, [occupation.id, now]);
+        if (admission.isolation) await this.releaseIsolation(c, occupation.roomId, now);
+        await c.query(`INSERT INTO infra.limpieza_cama(cama_id,pendiente_desde) VALUES($1,$2)`, [occupation.bedId, now]);
+      }
+      const row = (await c.query(`UPDATE hospitalizacion.admision SET estado='cancelada',cerrada_en=$2,cerrada_por=$3,motivo_cierre=$4,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version`, [id, now, actor.id, dto.reason.trim()])).rows[0];
+      await this.commands.audit(c, actor, { action: 'admision.anular', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'admision.autorizar', reason: dto.reason, detail: { occupationId: occupation?.id ?? null } });
+      await this.admissionChanged(c, id, row.version, [await this.staffAccount(c, admission.attendingDoctorId)]);
+      if (occupation) await this.bedChanged(c, occupation.bedId, occupation.bedVersion);
+      return row;
+    });
+  }
+
+  /** BL-03: Jefatura reassigns the attending doctor (an active doctor with an app account, so the discharge can be signed). */
+  async changeAttending(actor: Actor, id: string, dto: AttendingChangeDto, key?: string) {
+    return this.commands.run(actor, `admision.autorizar:${id}:tratante`, key, dto, async c => {
+      const admission = await this.admission(c, id, true);
+      this.assertVersion(admission, dto.version);
+      this.assertState(admission, ['pendiente_cama', 'hospitalizado'], 'Solo se cambia el médico tratante de una admisión pendiente u hospitalizada.');
+      if (dto.attendingDoctorId === admission.attendingDoctorId) throw new ProblemException('validacion', 400, 'Elige un médico distinto del tratante actual.', 'attendingDoctorId');
+      const doctor = (await c.query(`SELECT p.id,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS "hasAccount" FROM personal.persona p WHERE p.id=$1 AND p.tipo='medico' AND p.activo`, [dto.attendingDoctorId])).rows[0] as Row | undefined;
+      if (!doctor) throw new ProblemException('validacion', 400, 'El médico elegido no existe o no está activo.', 'attendingDoctorId');
+      if (!doctor.hasAccount) throw new ProblemException('validacion', 400, 'El médico elegido no tiene cuenta en la app; no podría firmar el alta.', 'attendingDoctorId');
+      await c.query('INSERT INTO hospitalizacion.cambio_tratante(admision_id,anterior_id,nuevo_id,motivo,realizado_por,realizado_en) VALUES($1,$2,$3,$4,$5,$6)', [id, admission.attendingDoctorId, dto.attendingDoctorId, dto.reason.trim(), actor.id, this.clock.now()]);
+      const row = (await c.query('UPDATE hospitalizacion.admision SET medico_tratante_id=$2,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version', [id, dto.attendingDoctorId])).rows[0];
+      await this.commands.audit(c, actor, { action: 'admision.tratante', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'admision.autorizar', reason: dto.reason, detail: { from: admission.attendingDoctorId, to: dto.attendingDoctorId } });
+      await this.admissionChanged(c, id, row.version, [await this.staffAccount(c, admission.attendingDoctorId), await this.staffAccount(c, dto.attendingDoctorId)]);
+      return row;
+    });
+  }
+
+  /** BL-03 (D-02): only the doctor signs; Recepción and Jefatura ask for it and the attending doctor's account is told live. */
+  async requestDischarge(actor: Actor, id: string, dto: DischargeRequestDto, key?: string) {
+    return this.commands.run(actor, `admision.crear:${id}:solicitar_alta`, key, dto, async c => {
+      const admission = await this.admission(c, id, true);
+      this.assertVersion(admission, dto.version);
+      this.assertState(admission, ['hospitalizado'], 'Solo se pide el alta de un paciente hospitalizado.');
+      const doctorAccount = await this.staffAccount(c, admission.attendingDoctorId);
+      if (!doctorAccount) throw new ProblemException('conflicto', 409, 'El médico tratante no tiene cuenta en la app; pide a Jefatura que reasigne el tratante.');
+      const row = (await c.query('UPDATE hospitalizacion.admision SET alta_solicitada_en=$2,alta_solicitada_por=$3,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version', [id, this.clock.now(), actor.id])).rows[0];
+      await this.commands.audit(c, actor, { action: 'admision.solicitar_alta', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'admision.crear', reason: dto.note?.trim() || undefined });
+      await this.admissionChanged(c, id, row.version, [doctorAccount]);
+      return row;
+    });
+  }
+
+  /** MA-HOS-02: before the physical exit, the signer (or Jefatura) revokes the discharge with a reason; the signed one is kept. */
+  async revokeDischarge(actor: Actor, id: string, dto: DischargeRevocationDto, key?: string) {
+    // The signer revokes under `alta.firmar`; Jefatura under `admision.autorizar` (CommandService checks the scope's permission).
+    const scope = `${hasPermission(actor, 'alta.firmar') ? 'alta.firmar' : 'admision.autorizar'}:${id}:revocar`;
+    return this.commands.run(actor, scope, key, dto, async c => {
+      const admission = await this.admission(c, id, true);
+      this.assertVersion(admission, dto.version);
+      this.assertState(admission, ['alta_firmada'], 'Solo se revoca un alta firmada antes de la salida física.');
+      const discharge = (await c.query('SELECT id,firmada_por AS "signedBy" FROM hospitalizacion.alta WHERE admision_id=$1 AND revocada_en IS NULL FOR UPDATE', [id])).rows[0] as Row | undefined;
+      if (!discharge) throw new ProblemException('transicion_invalida', 409, 'La admisión no tiene un alta vigente.');
+      const bySigner = hasPermission(actor, 'alta.firmar') && discharge.signedBy === actor.id;
+      if (!bySigner && !hasPermission(actor, 'admision.autorizar')) throw new ForbiddenException('Solo quien firmó el alta o Jefatura puede revocarla.');
+      await c.query('UPDATE hospitalizacion.alta SET revocada_en=$2,revocada_por=$3,motivo_revocacion=$4 WHERE id=$1', [discharge.id, this.clock.now(), actor.id, dto.reason.trim()]);
+      const row = (await c.query(`UPDATE hospitalizacion.admision SET estado='hospitalizado',version=version+1 WHERE id=$1 RETURNING id,estado AS state,version`, [id])).rows[0];
+      await this.commands.audit(c, actor, { action: 'alta.revocar', entity: 'alta', entityId: id, patientId: admission.patientId, permission: bySigner ? 'alta.firmar' : 'admision.autorizar', reason: dto.reason });
+      await this.admissionChanged(c, id, row.version, [await this.staffAccount(c, admission.attendingDoctorId)]);
+      return row;
+    });
+  }
+
+  /** MA-HOS-05: the nursing notes of an admission, newest first, under the same area context as writing them. */
+  async notes(actor: Actor, id: string) {
+    return this.db.transaction(async c => {
+      const admission = await this.admission(c, id);
+      await this.assertNursingContext(c, actor, id);
+      const rows = (await c.query(`SELECT n.id,n.texto AS text,n.creada_en AS "createdAt",(SELECT nullif(concat_ws(' ',p.nombres,p.apellidos),'') FROM acceso.usuario u JOIN personal.persona p ON p.id=u.persona_personal_id WHERE u.id=n.autor_id) AS "authorName"
+        FROM hospitalizacion.nota_enfermeria n WHERE n.admision_id=$1 ORDER BY n.creada_en DESC LIMIT 200`, [id])).rows;
+      await this.commands.audit(c, actor, { action: 'enfermeria.leer', entity: 'admision', entityId: id, patientId: admission.patientId, permission: 'enfermeria.registrar', detail: { count: rows.length } });
+      return rows;
     });
   }
 
@@ -287,7 +429,7 @@ export class HospitalizationService {
       if (pending.some(item => !item.descripcion || !item.responsable)) throw new BadRequestException('Cada pendiente debe tener descripción y responsable.');
       if (dto.type === 'voluntaria' && !dto.voluntaryConsent) throw new BadRequestException('El alta voluntaria necesita constancia.');
       await c.query(`INSERT INTO hospitalizacion.alta(admision_id,tipo,firmada_por,resumen,pendientes,constancia_voluntaria) VALUES($1,$2,$3,$4,$5::jsonb,$6)`, [id,dto.type,actor.id,dto.summary?.trim() ?? null,JSON.stringify(pending),dto.voluntaryConsent ?? false]);
-      const row = (await c.query(`UPDATE hospitalizacion.admision SET estado='alta_firmada',version=version+1 WHERE id=$1 RETURNING id,estado AS state,version`, [id])).rows[0];
+      const row = (await c.query(`UPDATE hospitalizacion.admision SET estado='alta_firmada',alta_solicitada_en=NULL,alta_solicitada_por=NULL,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version`, [id])).rows[0];
       await this.commands.audit(c, actor, { action: 'alta.firmar', entity: 'alta', entityId: id, patientId: admission.patientId, permission: 'alta.firmar' });
       await this.admissionChanged(c, id, row.version);
       return row;

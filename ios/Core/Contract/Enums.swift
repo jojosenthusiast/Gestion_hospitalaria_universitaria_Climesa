@@ -233,7 +233,7 @@ public enum DischargeType: String, CaseIterable, Sendable {
         switch self {
         case .medica: return "Médica"
         case .voluntaria: return "Voluntaria"
-        case .traslado: return "Traslado"
+        case .traslado: return "Traslado a otro centro"
         case .defuncion: return "Defunción"
         }
     }

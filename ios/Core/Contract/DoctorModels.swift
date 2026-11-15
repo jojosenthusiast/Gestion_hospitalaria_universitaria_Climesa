@@ -136,8 +136,50 @@ public struct LabReviewResult: Decodable, Sendable, Equatable {
     public let reviewedAt: String
 }
 
-/// `AdmissionResponse` de `GET /admisiones`.
+/// Acciones que la API permite sobre una admisión (`AdmissionResponse.allowedActions`). Los botones salen solo de
+/// esta lista, nunca del rol.
+public enum AdmissionAction: String, Sendable, CaseIterable {
+    case asignarCama = "asignar_cama", autorizar, cancelar, anular, trasladar
+    case firmarAlta = "firmar_alta", solicitarAlta = "solicitar_alta", revocarAlta = "revocar_alta"
+    case registrarSalida = "registrar_salida", reasignarTratante = "reasignar_tratante", notaEnfermeria = "nota_enfermeria"
+}
+
+/// `AdmissionResponse` de `GET /admisiones`. Los campos nuevos (acciones, tratante, alta firmada) se leen con
+/// tolerancia: si faltan o vienen con otra forma quedan vacíos y la fila se sigue mostrando.
 public struct Admission: Decodable, Sendable, Identifiable, Equatable {
+    /// `AdmissionDischargeResponse`: alta firmada vigente.
+    public struct Discharge: Decodable, Sendable, Equatable {
+        public struct Pending: Decodable, Sendable, Equatable {
+            public let description: String
+            public let responsible: String
+        }
+        /// `TipoAlta` como texto; `kind` es nil si la API trae un tipo que esta versión no conoce.
+        /// D-031: `type` y `pending` llegan nulos a quien no tiene relación de atención; `pendingCount` y
+        /// `specialHandling` llegan siempre.
+        public let type: String?
+        public let signedAt: String?
+        public let signedByName: String?
+        public let pending: [Pending]?
+        public let pendingCount: Int
+        public let specialHandling: Bool
+        public var kind: DischargeType? { type.flatMap(DischargeType.init(rawValue:)) }
+
+        enum CodingKeys: String, CodingKey { case type, signedAt, signedByName, pending, pendingCount, specialHandling }
+        public init(type: String?, signedAt: String?, signedByName: String?, pending: [Pending]?, pendingCount: Int? = nil, specialHandling: Bool = false) {
+            self.type = type; self.signedAt = signedAt; self.signedByName = signedByName; self.pending = pending
+            self.pendingCount = pendingCount ?? pending?.count ?? 0; self.specialHandling = specialHandling
+        }
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            type = (try? container.decodeIfPresent(String.self, forKey: .type)) ?? nil
+            signedAt = try container.decode(String.self, forKey: .signedAt)
+            signedByName = try? container.decodeIfPresent(String.self, forKey: .signedByName)
+            pending = (try? container.decodeIfPresent([Pending].self, forKey: .pending)) ?? nil
+            pendingCount = ((try? container.decodeIfPresent(Int.self, forKey: .pendingCount)) ?? nil) ?? pending?.count ?? 0
+            specialHandling = ((try? container.decodeIfPresent(Bool.self, forKey: .specialHandling)) ?? nil) ?? false
+        }
+    }
+
     public let id: String
     public let patientId: String
     public let patientName: String?
@@ -149,6 +191,45 @@ public struct Admission: Decodable, Sendable, Identifiable, Equatable {
     public let attendingDoctorId: String
     public let version: Int
     public let bed: String
+    /// Vacío en servidores anteriores: entonces no se muestra ninguna acción.
+    public let allowedActions: [String]
+    public let attendingDoctorName: String?
+    public let attendingDoctorHasAccount: Bool?
+    /// Última solicitud de alta de Recepción al médico tratante (se borra al firmar).
+    public let dischargeRequestedAt: String?
+    public let discharge: Discharge?
+    public let bedCategory: String?
+    public let authorized: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id, patientId, patientName, origin, requestedCategory, state, isolation, scheduledAt, attendingDoctorId, version, bed
+        case allowedActions, attendingDoctorName, attendingDoctorHasAccount, dischargeRequestedAt, discharge, bedCategory, authorized
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        patientId = try container.decode(String.self, forKey: .patientId)
+        patientName = try container.decodeIfPresent(String.self, forKey: .patientName)
+        origin = try container.decode(String.self, forKey: .origin)
+        requestedCategory = try container.decode(RoomCategory.self, forKey: .requestedCategory)
+        state = try container.decode(AdmissionState.self, forKey: .state)
+        isolation = try container.decode(Bool.self, forKey: .isolation)
+        scheduledAt = try container.decodeIfPresent(String.self, forKey: .scheduledAt)
+        attendingDoctorId = try container.decode(String.self, forKey: .attendingDoctorId)
+        version = try container.decode(Int.self, forKey: .version)
+        bed = try container.decode(String.self, forKey: .bed)
+        allowedActions = ((try? container.decodeIfPresent([String].self, forKey: .allowedActions)) ?? nil) ?? []
+        attendingDoctorName = (try? container.decodeIfPresent(String.self, forKey: .attendingDoctorName)) ?? nil
+        attendingDoctorHasAccount = (try? container.decodeIfPresent(Bool.self, forKey: .attendingDoctorHasAccount)) ?? nil
+        dischargeRequestedAt = (try? container.decodeIfPresent(String.self, forKey: .dischargeRequestedAt)) ?? nil
+        discharge = (try? container.decodeIfPresent(Discharge.self, forKey: .discharge)) ?? nil
+        bedCategory = (try? container.decodeIfPresent(String.self, forKey: .bedCategory)) ?? nil
+        authorized = (try? container.decodeIfPresent(Bool.self, forKey: .authorized)) ?? nil
+    }
+
+    /// La API permite esta acción al usuario actual.
+    public func allows(_ action: AdmissionAction) -> Bool { allowedActions.contains(action.rawValue) }
 }
 
 /// `AdmissionCommandResponse` de indicar hospitalización y firmar alta.

@@ -15,14 +15,15 @@ class AdmissionIndicationTest {
         val body = AdmissionIndication.body(context, ready)!!
         assertEquals("consulta", body.getString("origin"))
         assertEquals("c1", body.getString("originId"))
-        assertEquals("s1", body.getString("attendingDoctorId"))
+        assertFalse("the API takes the signed-in physician as attending; the field is not in AdmissionIndicationDto", body.has("attendingDoctorId"))
         assertEquals("p1", body.getString("patientId"))
         assertFalse(body.has("isolationType"))
     }
 
     @Test fun aMissingContextNeverSendsANullOrEmptyId() {
-        assertNull(AdmissionIndication.body(context.copy(doctorStaffId = null), ready))
-        assertTrue(AdmissionIndication.contextError(context.copy(doctorStaffId = null))!!.contains("vinculada"))
+        assertNotNull("the attending is the signed-in physician, resolved by the API", AdmissionIndication.body(context.copy(doctorStaffId = null), ready))
+        assertNull(AdmissionIndication.contextError(context.copy(doctorStaffId = null)))
+        assertTrue(AdmissionIndication.contextError(context.copy(consultationId = null))!!.contains("Inicia la consulta"))
         assertNull(AdmissionIndication.body(context.copy(consultationId = null), ready))
         assertNull(AdmissionIndication.body(context.copy(patientId = ""), ready))
     }

@@ -54,3 +54,5 @@
 .amb-crew-next { margin: 8px 0 0; }
 .amb-crew-link { display: inline-flex; align-items: center; text-decoration: none; }
 .amb-crew-contact { color: var(--muted, inherit); }
+
+.amb-crew-note{display:block;margin-top:.25rem;color:var(--muted,inherit);}

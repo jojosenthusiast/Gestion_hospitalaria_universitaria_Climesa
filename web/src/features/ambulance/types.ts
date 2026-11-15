@@ -5,7 +5,7 @@ export type DispatchBlock={code:string;message:string;action:string};
 /** Respuesta de `GET /ambulancia`: la única unidad, su servicio activo (sin datos del paciente), si hay paramédico y motorista de turno y, para despacho, las solicitudes por confirmar. */
 export type AmbulanceStatus={
  unit:{id:string;plate:string;state:string;version:number;stateReason?:string|null;stateSince?:string|null};
- activeService:null|{id:string;type:string;priority:string;origin:string;destination:string;municipality?:string|null;dispatchedAt:string;version?:number;requestId?:string|null;hasPrehospital?:boolean;crew:{staffId:string;role:string;name:string}[];milestones?:AmbulanceMilestone[];nextMilestones?:string[];lastLocation?:{latitude:number;longitude:number;capturedAt:string}|null};
+ activeService:null|{id:string;type:string;priority:string;origin:string;destination:string;municipality?:string|null;dispatchedAt:string;version?:number;requestId?:string|null;hasPrehospital?:boolean;crew:{staffId:string;role:string;name:string;hasAccount?:boolean}[];milestones?:AmbulanceMilestone[];allowedActions?:string[];nextMilestones?:string[];lastLocation?:{latitude:number;longitude:number;capturedAt:string}|null};
  paramedicOnDuty:boolean;
  /** RN-30 exige también motorista de turno; ausente en una API anterior. */
  driverOnDuty?:boolean;

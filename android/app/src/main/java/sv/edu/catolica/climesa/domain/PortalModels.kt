@@ -19,6 +19,8 @@ data class UnitView(
     val serviceDestination: String?,
     /** Missing in older API versions: then it counts as covered (no false alarm). */
     val driverOnDuty: Boolean = true,
+    /** Why the unit cannot be dispatched now (`dispatchBlock.message`, Spanish from the API); null when it can. */
+    val dispatchBlock: String? = null,
 ) {
     val hasService get() = serviceOrigin != null || serviceDestination != null
 }
@@ -50,6 +52,7 @@ object PortalParsers {
             serviceOrigin = service?.optString("origin"),
             serviceDestination = service?.optString("destination"),
             driverOnDuty = root.optBoolean("driverOnDuty", true),
+            dispatchBlock = root.optJSONObject("dispatchBlock")?.optString("message")?.takeIf { it.isNotBlank() },
         )
     }
 }

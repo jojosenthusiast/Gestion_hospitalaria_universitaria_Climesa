@@ -18,6 +18,7 @@ export class CrewMemberResponse {
   @UuidProp() staffId!: string;
   @EnumProp(FUNCION_TRIPULACION, 'FuncionTripulacion') role!: string;
   @StrProp() name!: string;
+  @BoolProp({ description: 'Tiene cuenta activa en la app: puede registrar hitos' }) hasAccount!: boolean;
 }
 
 export class MilestoneEntryResponse {
@@ -46,6 +47,7 @@ export class ActiveServiceResponse {
   @ClassArrayProp(MilestoneEntryResponse) milestones!: MilestoneEntryResponse[];
   @EnumArrayProp(HITO_SERVICIO, 'HitoServicio') nextMilestones!: string[];
   @ClassProp(LocationPointResponse, { nullable: true }) lastLocation!: LocationPointResponse | null;
+  @EnumArrayProp(['cerrar'], 'AccionServicioAmbulancia', { description: 'Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)' }) allowedActions!: string[];
 }
 
 export class PendingAmbulanceRequestResponse {
@@ -76,6 +78,7 @@ export class AmbulanceStatusResponse {
   @ClassProp(ActiveServiceResponse, { nullable: true }) activeService!: ActiveServiceResponse | null;
   @BoolProp() paramedicOnDuty!: boolean;
   @BoolProp({ description: 'Hay motorista con turno en curso (RN-30 exige paramédico y motorista)' }) driverOnDuty!: boolean;
+  @BoolProp({ description: 'Hay un paramédico con cuenta activa y turno en curso (BL-05: sin él no se despacha)' }) paramedicWithAccountOnDuty!: boolean;
   @ClassProp(DispatchBlockResponse, { nullable: true, description: 'Por qué no se puede despachar ahora; null si se puede' }) dispatchBlock!: DispatchBlockResponse | null;
   @ClassArrayProp(PendingAmbulanceRequestResponse, { optional: true, description: 'Solo con ambulancia.despachar' }) pendingRequests?: PendingAmbulanceRequestResponse[];
 }
@@ -84,6 +87,14 @@ export class AmbulanceUnitStateResponse {
   @UuidProp() id!: string;
   @EnumProp(ESTADO_AMBULANCIA, 'EstadoAmbulancia') state!: string;
   @IntProp() version!: number;
+}
+
+export class CloseServiceResponse {
+  @UuidProp() id!: string;
+  @EnumProp(ESTADO_FINAL_SERVICIO, 'EstadoFinalServicio') finalState!: string;
+  @IntProp() version!: number;
+  @EnumProp(ESTADO_AMBULANCIA, 'EstadoAmbulancia') unitState!: string;
+  @IntProp() unitVersion!: number;
 }
 
 export class AmbulanceRequestCreatedResponse {
@@ -173,6 +184,7 @@ export class ServiceLogEntryResponse {
   @DateTimeProp() dispatchedAt!: string;
   @DateTimeProp({ nullable: true }) finishedAt!: string | null;
   @EnumProp(ESTADO_FINAL_SERVICIO, 'EstadoFinalServicio', { nullable: true }) finalState!: string | null;
+  @BoolProp({ description: 'Lo cerró Jefatura (cierre administrativo), no la tripulación' }) administrativeClose!: boolean;
   @ClassArrayProp(ServiceLogCrewResponse) crew!: ServiceLogCrewResponse[];
   @NumProp({ nullable: true }) responseMinutes!: number | null;
   @ClassArrayProp(MilestoneEntryResponse) milestones!: MilestoneEntryResponse[];
