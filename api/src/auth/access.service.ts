@@ -1,11 +1,22 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { DatabaseService } from '../platform/database.service';
+import { CommandService } from '../platform/command.service';
+import { Clock } from '../platform/clock';
 import { Actor, hasPermission } from '../platform/actor';
 import { ACTIVE_AUTHORITY_HOLDERS_SQL, ADMIN_AUTHORITY_PERMISSION } from '../platform/admin-hierarchy';
 
 @Injectable()
 export class AccessService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
+  /** MA-CTA-01: the first profile request of an invited account (after it set its password) marks the invitation accepted. */
+  async markInvitationAccepted(actor: Actor): Promise<void> {
+    await this.db.transaction(async c => {
+      const accepted = (await c.query("UPDATE acceso.invitacion SET estado='aceptada',aceptada_en=$2,actualizado_en=$2 WHERE usuario_id=$1 AND estado='enviada' RETURNING id", [actor.id, this.clock.now()])).rows;
+      if (!accepted.length) return;
+      await this.commands.audit(c, actor, { action: 'usuarios.invitacion.aceptar', entity: 'usuario', entityId: actor.id, permission: 'sesion.perfil' });
+      await this.commands.event(c, 'usuario.actualizado', 'usuario', actor.id, 1, ['rol:ADM', `usuario:${actor.id}`]);
+    });
+  }
   /** Solo el administrador principal (o la única cuenta administradora activa, antes de fijarlo) puede crear otros administradores. */
   async canInviteAdmin(actor: Actor): Promise<boolean> {
     if (!hasPermission(actor, ADMIN_AUTHORITY_PERMISSION)) return false;

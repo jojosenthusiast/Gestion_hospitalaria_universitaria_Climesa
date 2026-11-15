@@ -83,3 +83,48 @@ describe('Personal · cuentas de acceso (W05, W06)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
+
+describe('Personal · invitaciones y acciones según el servidor (MA-CTA-01 a 03)', () => {
+  const pendiente: UserAccount = { id: 'u-9', email: 'nueva@example.test', name: 'Persona Invitada', roles: ['JOP'], state: 'activo', version: 1, invitationState: 'enviada', allowedActions: ['roles', 'desactivar', 'reenviar_invitacion', 'cancelar_invitacion'] };
+  const principal: UserAccount = { id: 'u-1', email: 'principal@example.test', name: 'Administración Principal', roles: ['ADM'], state: 'activo', version: 2, invitationState: null, allowedActions: [] };
+  function montarCon(lista: UserAccount[], write: Api['write'] = vi.fn(async () => ({})) as Api['write']) {
+    const api = { request: vi.fn(async (path: string) => path === '/usuarios' ? lista : []), write: vi.fn(write) } as unknown as Api & { request: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn> };
+    render(<PersonnelPage api={api} profile={perfil(['usuarios.ver', 'usuarios.invitar', 'usuarios.asignar_roles', 'usuarios.desactivar'])} version={0} />);
+    return api;
+  }
+
+  it('una invitación sin aceptar se ve como "Invitación enviada", no como activa, y se puede reenviar', async () => {
+    const api = montarCon([pendiente]);
+    await screen.findByText('Persona Invitada');
+    expect(screen.getByText('Invitación enviada')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /Reenviar invitación a Persona Invitada/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Reenviar invitación' });
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Reenviar invitación/ }));
+    expect(api.write).toHaveBeenCalledWith('/usuarios/u-9/invitacion/reenvio', {}, 'POST');
+  });
+
+  it('cancelar una invitación pide motivo', async () => {
+    const api = montarCon([pendiente]);
+    await screen.findByText('Persona Invitada');
+    await userEvent.click(screen.getByRole('button', { name: /Cancelar invitación de Persona Invitada/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Cancelar invitación' });
+    await userEvent.type(within(dialogo).getByLabelText('Motivo de la cancelación'), 'El correo de la invitación estaba mal');
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Cancelar invitación/ }));
+    expect(api.write).toHaveBeenCalledWith('/usuarios/u-9/invitacion/cancelacion', { reason: 'El correo de la invitación estaba mal' }, 'POST');
+  });
+
+  it('no ofrece roles ni desactivar cuando el servidor no lo permite (jerarquía de administración)', async () => {
+    montarCon([principal]);
+    await screen.findByText('Administración Principal');
+    expect(screen.queryByRole('button', { name: /Roles de Administración Principal/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Desactivar cuenta de Administración Principal/ })).toBeNull();
+  });
+
+  it('la invitación no ofrece el rol de paciente: el paciente se registra en la app', async () => {
+    montarCon([]);
+    await userEvent.click(await screen.findByRole('button', { name: /Invitar persona/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Invitar persona' });
+    expect(within(dialogo).queryByText('PAC')).toBeNull();
+    expect(within(dialogo).getByRole('button', { name: /Enviar invitación/ }).hasAttribute('disabled')).toBe(true);
+  });
+});

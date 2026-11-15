@@ -9,6 +9,8 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 101,POST,/api/v1/cuentas/vinculaciones/{id}/rechazar,cuentas.verificar,Motivo obligatorio,R,3,Rechazar vinculación
 101,GET,/api/v1/usuarios,usuarios.ver,,R,2,Listado de usuarios con roles y estado
 101,POST,/api/v1/usuarios/invitaciones,usuarios.invitar,,R,2,Crear cuenta de personal e invitarla
+101,POST,/api/v1/usuarios/{id}/invitacion/reenvio,usuarios.invitar,Solo invitación pendiente,R,2,Reenviar invitación (MA-CTA-01)
+101,POST,/api/v1/usuarios/{id}/invitacion/cancelacion,usuarios.invitar,Solo invitación pendiente; desactiva la cuenta,R,2,Cancelar invitación con motivo (MA-CTA-01)
 101,PATCH,/api/v1/usuarios/{id}/roles,usuarios.asignar_roles,Nunca a sí mismo,R,2,Asignar roles
 101,PATCH,/api/v1/usuarios/{id}/estado,usuarios.desactivar,Nunca a sí mismo,R,2,Desactivar cuenta
 102,GET,/api/v1/pacientes,pacientes.buscar,Devuelve datos mínimos y motivo de coincidencia,R,2,"Búsqueda fonética por nombre, DUI o expediente"

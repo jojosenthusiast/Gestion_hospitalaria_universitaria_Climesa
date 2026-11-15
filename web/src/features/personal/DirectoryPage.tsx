@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Field, Icon } from '../../components/ui';
-import { can, roleNames, staffTypeNames, type AccessProfile, type Api, type Space, type Staff, type UserAccount } from '../../lib/api';
+import { can, roleNames, staffTypeNames, type AccessProfile, type Api, type Space, type Staff, type UserAccount, type AccountAction } from '../../lib/api';
 import { Empty, Heading, RemoteState, Select, Tag, useData, type Remote } from '../common';
 import { StaffFicha } from '../personnel-ficha';
-import { InviteForm, RolesForm, StateForm } from './account-forms';
+import { InvitationActionForm, InviteForm, RolesForm, StateForm } from './account-forms';
 import { useQuickAction } from './accion';
 import { StaffForm, type Specialty } from './StaffForm';
 
 type Row = { key: string; staff: Staff | null; account: UserAccount | null };
+/** The server lists what this actor may do on each account (MA-CTA-01/03); an older API without the list falls back to the permission. */
+const allows = (account: UserAccount, action: AccountAction) => !account.allowedActions || account.allowedActions.includes(action);
+const invitationLabels: Record<string, string> = { enviada: 'Invitación enviada', cancelada: 'Invitación cancelada', expirada: 'Invitación vencida' };
 const plain = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('es');
 
 /** Personal: directorio del equipo con su cuenta de acceso (ficha, roles, invitación y estado) en un solo módulo (obs. 9). */
@@ -19,7 +22,7 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   const specialties = useData<Specialty[]>(api, '/personal/especialidades', version, canStaff);
   const [query, setQuery] = useState(''), [state, setState] = useState('activos'), [type, setType] = useState('todos'), [account, setAccount] = useState('todas');
   const [edit, setEdit] = useState<Staff | null>(null), [staffOpen, setStaffOpen] = useState(false), [ficha, setFicha] = useState<string | null>(null);
-  const [invite, setInvite] = useState<{ person: Staff | null } | null>(null), [roles, setRoles] = useState<UserAccount | null>(null), [accountState, setAccountState] = useState<UserAccount | null>(null);
+  const [invite, setInvite] = useState<{ person: Staff | null } | null>(null), [roles, setRoles] = useState<UserAccount | null>(null), [accountState, setAccountState] = useState<UserAccount | null>(null), [invitation, setInvitation] = useState<{ user: UserAccount; mode: 'resend' | 'cancel' } | null>(null);
   const [quick, consumeQuick] = useQuickAction();
   const manage = can(profile, 'personal.gestionar'), canInvite = can(profile, 'usuarios.invitar');
   // Sin `personal.ver` (Protección de datos) el módulo es la lista de cuentas en solo lectura: sin columna de área ni función, que no tienen dato.
@@ -52,7 +55,7 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   });
   const withAccount = rows.filter(r => r.staff && r.account).length, withoutAccount = rows.filter(r => r.staff && !r.account).length;
   const fichaPerson = staff.find(p => p.id === ficha) ?? null;
-  const done = () => { setInvite(null); setRoles(null); setAccountState(null); users.refresh(); };
+  const done = () => { setInvite(null); setRoles(null); setAccountState(null); setInvitation(null); users.refresh(); };
   const primary: Remote<unknown> = canStaff ? staffData : users;
   const nameOf = (row: Row) => row.staff ? `${row.staff.givenNames} ${row.staff.surnames}` : row.account?.name || 'Sin nombre registrado';
 
@@ -74,14 +77,16 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
             <td data-label="Persona"><strong>{nameOf(row)}{row.account?.id === profile.id && <span className="own-account">Tu cuenta</span>}</strong><small>{row.staff ? row.staff.specialty || 'Sin especialidad registrada' : row.account?.email}</small></td>
             <td data-label={accountsOnly ? 'Roles' : 'Función y roles'}>{row.staff ? staffTypeNames[row.staff.type] ?? row.staff.type : accountsOnly ? null : 'Solo cuenta'}{row.account && <div className="role-tags">{row.account.roles.map(r => <span key={r} title={roleNames[r]}>{r}</span>)}</div>}</td>
             {!accountsOnly && <td data-label="Área">{row.staff ? row.staff.area || 'Sin asignar' : '—'}</td>}
-            <td data-label="Cuenta">{row.account ? <><Tag value={row.account.state} />{!accountsOnly && <small>{row.account.email}</small>}</> : <span className="muted">Sin cuenta</span>}</td>
+            <td data-label="Cuenta">{row.account ? <>{row.account.invitationState && invitationLabels[row.account.invitationState] ? <Tag value={row.account.invitationState === 'enviada' ? 'pendiente' : 'cancelada'} label={invitationLabels[row.account.invitationState]} /> : <Tag value={row.account.state} />}{!accountsOnly && <small>{row.account.email}</small>}</> : <span className="muted">Sin cuenta</span>}</td>
             {!accountsOnly && <td data-label="Estado"><Tag value={isActive(row) ? 'activo' : 'inactivo'} /></td>}
             <td data-label="Acción"><div className="row-actions">
               {row.staff && <button className="row-action" aria-label={`Ver ficha de ${nameOf(row)}`} onClick={() => setFicha(row.staff!.id)}>Ver ficha <Icon name="arrow" size={16} /></button>}
               {row.staff && manage && <button className="row-action" aria-label={`Editar ${nameOf(row)}`} onClick={() => { setEdit(row.staff); setStaffOpen(true); }}>Editar <Icon name="arrow" size={16} /></button>}
               {row.staff && !row.account && canInvite && row.staff.active && <button className="row-action" aria-label={`Invitar a ${nameOf(row)}`} onClick={() => setInvite({ person: row.staff })}>Invitar <Icon name="mail" size={16} /></button>}
-              {row.account && can(profile, 'usuarios.asignar_roles') && row.account.id !== profile.id && <button className="row-action" aria-label={`Roles de ${nameOf(row)}`} onClick={() => setRoles(row.account)}>Roles <Icon name="arrow" size={16} /></button>}
-              {row.account && can(profile, 'usuarios.desactivar') && <button className="row-action" aria-label={`${row.account.state === 'activo' ? 'Desactivar' : 'Reactivar'} cuenta de ${nameOf(row)}`} onClick={() => setAccountState(row.account)}>{row.account.state === 'activo' ? 'Desactivar' : 'Reactivar'}</button>}
+              {row.account && can(profile, 'usuarios.asignar_roles') && row.account.id !== profile.id && allows(row.account, 'roles') && <button className="row-action" aria-label={`Roles de ${nameOf(row)}`} onClick={() => setRoles(row.account)}>Roles <Icon name="arrow" size={16} /></button>}
+              {row.account && can(profile, 'usuarios.invitar') && row.account.allowedActions?.includes('reenviar_invitacion') && <button className="row-action" aria-label={`Reenviar invitación a ${nameOf(row)}`} onClick={() => setInvitation({ user: row.account!, mode: 'resend' })}>Reenviar invitación <Icon name="mail" size={16} /></button>}
+              {row.account && can(profile, 'usuarios.invitar') && row.account.allowedActions?.includes('cancelar_invitacion') && <button className="row-action" aria-label={`Cancelar invitación de ${nameOf(row)}`} onClick={() => setInvitation({ user: row.account!, mode: 'cancel' })}>Cancelar invitación</button>}
+              {row.account && can(profile, 'usuarios.desactivar') && allows(row.account, row.account.state === 'activo' ? 'desactivar' : 'reactivar') && <button className="row-action" aria-label={`${row.account.state === 'activo' ? 'Desactivar' : 'Reactivar'} cuenta de ${nameOf(row)}`} onClick={() => setAccountState(row.account)}>{row.account.state === 'activo' ? 'Desactivar' : 'Reactivar'}</button>}
               {row.account && !can(profile, 'usuarios.desactivar') && !row.staff && <span className="muted">Solo consulta</span>}
             </div></td>
           </tr>)}</tbody></table>
@@ -92,5 +97,6 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
     {invite && <InviteForm api={api} staff={staff} person={invite.person} canInviteAdmin={!!profile.canInviteAdmin} onClose={() => setInvite(null)} onSaved={done} />}
     {roles && <RolesForm api={api} user={roles} staff={staff} canInviteAdmin={!!profile.canInviteAdmin} onClose={() => setRoles(null)} onSaved={done} />}
     {accountState && <StateForm api={api} user={accountState} onClose={() => setAccountState(null)} onSaved={done} />}
+    {invitation && <InvitationActionForm api={api} user={invitation.user} mode={invitation.mode} onClose={() => setInvitation(null)} onSaved={done} />}
   </>;
 }

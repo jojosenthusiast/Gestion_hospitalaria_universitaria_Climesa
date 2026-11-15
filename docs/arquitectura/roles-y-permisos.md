@@ -134,6 +134,8 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/cuentas/vinculaciones/{id}/rechazar` | `cuentas.verificar` | Motivo obligatorio | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/usuarios` | `usuarios.ver` |  | R | 2 | ✔ | · | · | · | · | · | · | · | ✔ | · |
 | POST | `/api/v1/usuarios/invitaciones` | `usuarios.invitar` |  | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/usuarios/{id}/invitacion/reenvio` | `usuarios.invitar` | Solo invitación pendiente | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/usuarios/{id}/invitacion/cancelacion` | `usuarios.invitar` | Solo invitación pendiente; desactiva la cuenta | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | PATCH | `/api/v1/usuarios/{id}/roles` | `usuarios.asignar_roles` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | PATCH | `/api/v1/usuarios/{id}/estado` | `usuarios.desactivar` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 

@@ -6,7 +6,9 @@ export type Staff={id:string;givenNames:string;surnames:string;type:string;speci
 export type Space={id:string;parentId:string|null;type:string;code:string;name:string;category?:string;capacity?:number;level?:number;active:boolean;version:number;path:string;totalBeds:number;freeBeds:number};
 export type Bed={id:string;code:string;roomId:string;room:string;category:string;level:number;state:string;version:number;cleaningPending:boolean;cleaningCompleted:boolean;cleanedByCurrentUser:boolean;path:string;occupant?:string;occupantRestricted?:boolean;patientId?:string};
 export type Shift={id:string;staffId:string;person:string;areaId:string;area:string;start:string;end:string;type:string;state:string;justification?:string;version:number};
-export type UserAccount={id:string;email:string;name:string;roles:string[];state:string;staffId?:string;version:number};
+/** `allowedActions` comes from the API (MA-CTA-01/03): the UI offers only what the server will accept for this account. */
+export type AccountAction='roles'|'desactivar'|'reactivar'|'reenviar_invitacion'|'cancelar_invitacion';
+export type UserAccount={id:string;email:string;name:string;roles:string[];state:string;staffId?:string;version:number;invitationState?:string|null;allowedActions?:AccountAction[]};
 export type Appointment={id:string;patientId:string;patientName:string;doctorId:string;doctorName:string;start:string;end:string;reason?:string|null;state:string;origin:string;rejectionReason?:string|null;version:number};
 export type AuditRow={seq:string;at:string;role:string;actor:string;actorId?:string|null;permission?:string|null;action:string;entity:string;entityId:string;patientId?:string|null;patientRecord?:string|null;result:string;reason?:string};
 /** Spec 110 (hand-written until the contract is regenerated): `vista` is the state shown to people. */

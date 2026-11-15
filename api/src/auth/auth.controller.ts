@@ -15,5 +15,5 @@ export class AuthController {
   @Get('me')
   @RequirePermission('sesion.perfil')
   @ApiOperation({ summary: 'Cuenta activa, roles, plataformas y permisos vigentes en la base' })
-  @ApiOkResponse({ type: SessionProfileResponse }) async me(@Req() req: ActorRequest) { return { user: req.user, ...req.actor, canInviteAdmin: await this.access.canInviteAdmin(req.actor) }; }
+  @ApiOkResponse({ type: SessionProfileResponse }) async me(@Req() req: ActorRequest) { await this.access.markInvitationAccepted(req.actor); return { user: req.user, ...req.actor, canInviteAdmin: await this.access.canInviteAdmin(req.actor) }; }
 }
