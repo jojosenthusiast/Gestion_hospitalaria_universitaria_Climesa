@@ -1,6 +1,6 @@
 import { finalStateNames,milestoneNames,priorityNames,typeNames } from './types';
 /** Fila de `GET /ambulancia/bitacora`: nunca trae nombre ni identificadores del paciente (FR-109-15); solo el expediente enmascarado. */
-export type AmbulanceLogRow={id:string;type:string;priority:string;origin:string;destination:string;municipality?:string|null;dispatchedAt:string;finishedAt?:string|null;finalState?:string|null;responseMinutes:number|null;crew:{staffId:string;role:string;name:string}[];milestones?:{type:string;occurredAt:string}[];patientRef?:string|null};
+export type AmbulanceLogRow={id:string;type:string;priority:string;origin:string;destination:string;municipality?:string|null;dispatchedAt:string;finishedAt?:string|null;finalState?:string|null;responseMinutes:number|null;crew:{staffId:string;role:string;name:string}[];milestones?:{type:string;occurredAt:string}[];patientRef?:string|null;administrativeClose?:boolean};
 export type LogFilters={q:string;from:string;to:string;type:string;finalState:string;priority:string;municipality:string;minResponseMinutes:string};
 export const emptyFilters:LogFilters={q:'',from:'',to:'',type:'',finalState:'',priority:'',municipality:'',minResponseMinutes:''};
 export const logPath=(f:Partial<LogFilters>)=>{const q=new URLSearchParams();for(const [k,v] of Object.entries(f))if(typeof v==='string'&&v.trim())q.set(k,v.trim());const s=q.toString();return '/ambulancia/bitacora'+(s?`?${s}`:'');};
