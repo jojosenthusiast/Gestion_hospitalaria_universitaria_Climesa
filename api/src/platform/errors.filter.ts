@@ -6,7 +6,7 @@ import { ProblemException } from './problem';
 
 const CODES: Record<number, string> = { 400: 'validacion', 401: 'no_autenticado', 403: 'sin_permiso', 404: 'no_encontrado', 409: 'conflicto', 429: 'limite_excedido', 503: 'no_disponible' };
 const TITLES: Record<number, string> = { 400: 'Datos no válidos', 401: 'Sesión requerida', 403: 'Sin permiso', 404: 'No encontrado', 409: 'Conflicto', 429: 'Demasiadas solicitudes', 503: 'Servicio no disponible' };
-const SQL_CODES: Record<string, string> = { ultimo_administrador: 'ultimo_administrador', capacidad_excedida: 'capacidad_excedida', capacidad_menor_que_camas: 'capacidad_menor_que_camas', ciclo_en_arbol: 'ciclo_en_arbol', consulta_firmada: 'consulta_firmada', transicion_invalida: 'transicion_invalida' };
+const SQL_CODES: Record<string, string> = { ultimo_administrador: 'ultimo_administrador', capacidad_excedida: 'capacidad_excedida', capacidad_menor_que_camas: 'capacidad_menor_que_camas', ciclo_en_arbol: 'ciclo_en_arbol', consulta_firmada: 'consulta_firmada', medico_ausente: 'medico_ausente', tripulante_ausente: 'tripulante_ausente', transicion_invalida: 'transicion_invalida' };
 /** CON-02: exclusion constraints whose overlap has a business meaning of its own (otherwise `conflicto`). */
 const CONSTRAINT_CODES: Record<string, { codigo: string; message: string }> = {
   cita_medico_id_horario_excl: { codigo: 'franja_ocupada', message: 'La franja ya no está disponible; vuelve a consultar la disponibilidad.' },
@@ -47,7 +47,7 @@ export class ApiErrorsFilter implements ExceptionFilter {
     } else if (sql.code === 'P0001') {
       // A trigger may append detail after the code (`transicion_invalida cancelada -> confirmada`).
       sql.message = sql.message?.split(' ')[0];
-      status = 409; message = ({ ultimo_administrador: 'No puedes quitar ni desactivar al último administrador.', capacidad_excedida: 'La habitación ya tiene todas sus camas.', capacidad_menor_que_camas: 'La capacidad no puede quedar por debajo de las camas activas.', ciclo_en_arbol: 'Un espacio no puede ser descendiente de sí mismo.', consulta_firmada: 'La consulta ya está firmada; corrígela con un addendum.', transicion_invalida: 'El registro ya no admite ese cambio de estado.' } as Record<string,string>)[sql.message ?? ''] ?? 'La operación incumple una regla del sistema.';
+      status = 409; message = ({ ultimo_administrador: 'No puedes quitar ni desactivar al último administrador.', capacidad_excedida: 'La habitación ya tiene todas sus camas.', capacidad_menor_que_camas: 'La capacidad no puede quedar por debajo de las camas activas.', ciclo_en_arbol: 'Un espacio no puede ser descendiente de sí mismo.', consulta_firmada: 'La consulta ya está firmada; corrígela con un addendum.', transicion_invalida: 'El registro ya no admite ese cambio de estado.', medico_ausente: 'El médico tiene registrada una ausencia en ese horario; elige otro médico u otra hora.', tripulante_ausente: 'La persona tiene registrada una ausencia en su turno; no puede ir en la tripulación.' } as Record<string,string>)[sql.message ?? ''] ?? 'La operación incumple una regla del sistema.';
       codigo = SQL_CODES[sql.message ?? ''];
     }
     codigo ??= CODES[status] ?? (status >= 500 ? 'error_interno' : 'error');
