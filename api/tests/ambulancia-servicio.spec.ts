@@ -131,8 +131,11 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     expect((await milestone(service.id, { type: 'finalizado' })).body.codigo).toBe('servicio_finalizado');
     const events = await t.events('ambulancia.hito', service.id);
     expect(events).toHaveLength(5);
-    // Solicitud telefónica sin paciente registrado: nadie más sigue el servicio.
-    expect(events[0]).toEqual(['ambulancia']);
+    // Solicitud telefónica sin paciente registrado: ninguna cuenta personal sigue el servicio. Los roles que ven el
+    // estado o la bitácora reciben el aviso delgado (migración 20261119004000) y vuelven a pedir con su permiso.
+    expect(events[0]).toContain('ambulancia');
+    expect(events[0].filter((c: string) => c.startsWith('usuario:'))).toEqual([]);
+    expect(events[0]).not.toContain('rol:PAC');
     unitVersion = finished.body.unitVersion;
   });
 
@@ -165,7 +168,8 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     expect(service.status).toBe(201);
     // El paciente que pidió desde la app sigue el despacho y los hitos por su canal propio (FR-109-16).
     const unitEvents = await t.events('ambulancia.estado_cambiado', (await unit()).id);
-    expect(unitEvents.at(-1)).toEqual(['ambulancia', `usuario:${userId('PAC')}`]);
+    expect(unitEvents.at(-1)).toEqual(expect.arrayContaining(['ambulancia', `usuario:${userId('PAC')}`]));
+    expect(unitEvents.at(-1)!.filter((c: string) => c.startsWith('usuario:'))).toEqual([`usuario:${userId('PAC')}`]);
     const key = randomUUID();
     const body = { reason: 'Dolor torácico', priority: 'amarilla', capturedAt: at('08:40').toISOString(), estimatedArrival: at('09:10').toISOString(), vitalSigns: { heartRate: 96, temperature: 37.2 } };
     const sent = await t.call('PAR', 'POST', `/ambulancia/servicios/${service.body.id}/prehospital`, body, key);
@@ -191,7 +195,9 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     expect(located.status).toBe(201);
     expect((await t.call('REC', 'GET', '/ambulancia')).body.activeService.lastLocation).toMatchObject({ latitude: 13.7, longitude: -89.2 });
     expect((await milestone(service.body.id, { type: 'salida' })).status).toBe(201);
-    expect((await t.events('ambulancia.hito', service.body.id))[0]).toEqual(['ambulancia', `usuario:${userId('PAC')}`]);
+    const hito = (await t.events('ambulancia.hito', service.body.id))[0];
+    expect(hito).toEqual(expect.arrayContaining(['ambulancia', `usuario:${userId('PAC')}`]));
+    expect(hito.filter((c: string) => c.startsWith('usuario:'))).toEqual([`usuario:${userId('PAC')}`]);
     const cancelled = await milestone(service.body.id, { type: 'finalizado', finalState: 'cancelado', reason: 'Traslado cancelado por el hospital de origen' });
     unitVersion = cancelled.body.unitVersion;
     expect((await t.call('PAR', 'POST', '/ambulancia/ubicacion', { latitude: 13.7, longitude: -89.2, capturedAt: at('08:45').toISOString() })).body.codigo).toBe('sin_servicio_activo');

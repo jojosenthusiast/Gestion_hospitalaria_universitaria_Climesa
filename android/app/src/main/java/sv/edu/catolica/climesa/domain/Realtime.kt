@@ -152,9 +152,15 @@ object PortalEvents {
         path.startsWith("/inicio") -> BedEvents.matches(event) || PatientEvents.matches(event)
         path.startsWith("/turnos") -> LiveEntities.matches(event, "turno", "personal")
         path.startsWith("/pacientes") -> PatientEvents.matches(event)
-        path.startsWith("/ambulancia") -> LiveEntities.matches(event, "ambulancia")
+        // La ubicación en vivo llega cada pocos segundos y no cambia esta vista; la tripulación de turno sí (RN-30).
+        path.startsWith("/ambulancia") -> (LiveEntities.matches(event, "ambulancia") && event.type != "ambulancia.ubicacion") || LiveEntities.matches(event, "turno")
         else -> false
     }
+}
+
+/** Appointment lists and booking: appointments publish `cita.*`; free slots depend on the doctor's shifts (`turno`). */
+object AppointmentEvents {
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, "cita", "turno")
 }
 
 /** Queue screen: tickets publish `fila.actualizada` on entity `ticket_fila`. */
