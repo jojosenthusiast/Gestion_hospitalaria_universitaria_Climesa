@@ -1,0 +1,8 @@
+{
+  "operation": "POST /citas/{id}/cancelar",
+  "source": "PatientAppointmentsViewModel.cancel",
+  "body": {
+    "version": 2,
+    "reason": "No podré asistir ese día"
+  }
+}

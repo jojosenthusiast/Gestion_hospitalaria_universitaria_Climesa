@@ -1,0 +1,11 @@
+{
+  "operation": "POST /pacientes/{id}/signos",
+  "source": "VitalsRules.body",
+  "body": {
+    "temperature": 37.2,
+    "heartRate": 88,
+    "respiratoryRate": 18,
+    "note": "Paciente tranquilo",
+    "admissionId": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
+  }
+}

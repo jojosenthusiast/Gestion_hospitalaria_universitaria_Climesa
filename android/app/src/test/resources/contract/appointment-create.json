@@ -1,0 +1,11 @@
+{
+  "operation": "POST /citas",
+  "source": "ReceptionScheduling.createBody",
+  "body": {
+    "patientId": "0b7e2d1c-4a5f-4e8b-9c3d-1a2b3c4d5e6f",
+    "doctorId": "3f9a8b7c-6d5e-4f3a-8b2c-1d0e9f8a7b6c",
+    "start": "2026-11-20T15:00:00Z",
+    "end": "2026-11-20T15:20:00Z",
+    "reason": "Control de presión arterial"
+  }
+}

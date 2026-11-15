@@ -8763,7 +8763,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AdmissionDto"
+                "$ref": "#/components/schemas/AdmissionIndicationDto"
               }
             }
           }
@@ -18491,6 +18491,100 @@
           "version"
         ]
       },
+      "AdmissionIndicationDto": {
+        "type": "object",
+        "properties": {
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "cita",
+              "consulta",
+              "emergencia",
+              "ambulancia"
+            ]
+          },
+          "originId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Registro de origen (cita, consulta, ticket de emergencia o servicio de ambulancia) del mismo paciente."
+          },
+          "requestedCategory": {
+            "type": "string",
+            "enum": [
+              "vip",
+              "semiprivada"
+            ]
+          },
+          "isolation": {
+            "type": "boolean"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          },
+          "motive": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          },
+          "isolationType": {
+            "type": "string",
+            "enum": [
+              "contacto",
+              "gotitas",
+              "aerea",
+              "protector"
+            ]
+          },
+          "unstable": {
+            "type": "boolean"
+          },
+          "postSurgical": {
+            "type": "boolean"
+          },
+          "visitorsAllowed": {
+            "type": "boolean",
+            "description": "Por omisión, sí."
+          },
+          "visitorsMax": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "Acompañantes permitidos; 0 si no se permiten visitas."
+          },
+          "bedId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cama elegida: se asigna en el mismo comando (ingreso inmediato)."
+          },
+          "bedVersion": {
+            "type": "number",
+            "minimum": 1
+          },
+          "attendingDoctorId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Por omisión, el médico que indica; si se envía, debe ser ese mismo médico."
+          }
+        },
+        "required": [
+          "patientId",
+          "origin",
+          "originId",
+          "requestedCategory",
+          "isolation",
+          "motive"
+        ]
+      },
       "TransferDto": {
         "type": "object",
         "properties": {
@@ -21932,6 +22026,27 @@
           "campo": {
             "type": "string",
             "description": "Campo del cuerpo o cabecera que causó el error, si aplica."
+          },
+          "errors": {
+            "type": "array",
+            "description": "Solo en `validacion` (MOV-03): un mensaje en español por campo inválido; `field` es el nombre del campo tal como viaja (`items[0].dose` en listas). `campo` repite el primero.",
+            "items": {
+              "type": "object",
+              "required": [
+                "field",
+                "message"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "example": "motive"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Debe tener al menos 10 caracteres."
+                }
+              }
+            }
           },
           "requestId": {
             "type": "string",

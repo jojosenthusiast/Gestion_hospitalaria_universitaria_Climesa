@@ -258,3 +258,11 @@ Decisión del dueño (2026-11-14): la ambulancia necesita paramédico **y** moto
 | Invariante en la base | RN-30 dependía del reloj de la API; la base no la garantizaba. | La base garantiza lo que no depende del reloj: la unidad no pasa a En Servicio sin paramédico y motorista en la tripulación del servicio (20261119002000). |
 | FR-109-06 | La spec solo nombra al paramédico. | No se edita `specs/109-ambulancia/spec.md` sin decisión registrada: queda pendiente que el equipo actualice FR-109-06 para incluir al motorista. |
 | Alerta de cobertura | ¿Dónde se ve que faltará tripulación? | Turnos (web y Android) muestra los tramos de los próximos 7 días sin paramédico o sin motorista con turno publicado o en curso. |
+
+## Errores de validación y contrato móvil (rama `fix/api-errores-contrato-movil`)
+
+| Tema | Pregunta | Opción aplicada |
+|---|---|---|
+| Nombres en inglés | `errors[].field` y `errors[].message` contradicen la regla de JSON en español. | Se respeta el contrato compartido de Fase 0 que ya implementan Android e iOS; `campo` (en español) sigue con el primer campo para no romper clientes. |
+| Indicación desde consulta | `POST /admisiones/indicaciones` exigía `attendingDoctorId` aunque solo puede ser el propio médico. | Ahora es opcional (`AdmissionIndicationDto`) y por omisión es el médico que indica; la consulta de `originId` debe ser del paciente y de ese médico (403 si es de otro). |
+| Deriva móvil | ¿Qué cuerpos móviles no cumplen hoy el contrato? | `api/tests/contrato-movil.spec.ts` los lista en `KNOWN_DRIFT` (hoy: iOS `AdmissionBody` sin `motive`); Android aún no tiene la indicación de hospitalización. |
