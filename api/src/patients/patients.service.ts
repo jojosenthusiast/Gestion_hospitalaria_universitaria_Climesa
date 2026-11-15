@@ -4,10 +4,10 @@ import { ProblemException, VersionConflictException } from '../platform/problem'
 import { Actor, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
-import { Clock } from '../platform/clock';
+import { Clock, businessDate } from '../platform/clock';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { PatientCreateDto, PatientUpdateDto, PatientSelfUpdateDto, PatientStateDto } from './patient-write.dto';
-import { ageOn, ageRange, fichaFields, searchShowsBirth } from './patient.privacy';
+import { ageOn, ageRange, fichaFields, searchBirthFields, searchShowsBirth } from './patient.privacy';
 import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateContact, validateDemographics } from './patient.rules';
 type Row = Record<string, any>;
 @Injectable()
@@ -29,7 +29,8 @@ export class PatientsService {
       const result=await this.candidates(c,query??'',limit,state,offset);
       // SEG-09 (audit 02 M-2): the audit keeps which patients the search exposed, not only how many.
       await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query??'')),count:result.length,patientIds:result.map(p=>p.id)}});
-      return searchShowsBirth(actor)?result:result.map(({birth,...p})=>p);
+      const today=businessDate(this.clock.now());
+      return result.map(p=>searchBirthFields(actor,p,today));
     });
   }
   /** Selector de pacientes (Ronda 1, obs. 8): respuesta mínima y paginada para listas con búsqueda mientras se escribe. */
@@ -48,7 +49,8 @@ export class PatientsService {
       const candidates=await this.candidates(c,query,50);
       const row=(await c.query('INSERT INTO pacientes.busqueda_registro(usuario_id,huella_criterios,resultados,vence_en,creado_en) VALUES($1,$2,$3,$4,$5) RETURNING token,vence_en',[actor.id,fingerprint(normalize(query)),candidates.length,new Date(this.clock.now().valueOf()+600000),this.clock.now()])).rows[0];
       await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query)),count:candidates.length,patientIds:candidates.map(p=>p.id)}});
-      return {token:row.token,expiresAt:row.vence_en,candidates:searchShowsBirth(actor)?candidates:candidates.map(({birth,...p})=>p)};
+      const today=businessDate(this.clock.now());
+      return {token:row.token,expiresAt:row.vence_en,candidates:candidates.map(p=>searchBirthFields(actor,p,today))};
     });
   }
   private async permitted(c:PoolClient,actor:Actor,id:string) {

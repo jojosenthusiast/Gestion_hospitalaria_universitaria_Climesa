@@ -2229,9 +2229,11 @@ export interface components {
             sex: components["schemas"]["SexoPaciente"];
             /**
              * Format: date
-             * @description Solo para roles que ven la fecha de nacimiento en la búsqueda
+             * @description Solo para roles que ven la fecha de nacimiento exacta (contexto x)
              */
             birth?: string | null;
+            /** @description Rango de edad en lugar de la fecha (contexto rango, por ejemplo Laboratorio): 30-39 o 90+ */
+            ageRange?: string | null;
             version: number;
             matchReason: string;
         };

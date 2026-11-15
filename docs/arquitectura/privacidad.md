@@ -48,7 +48,7 @@ Delegado de protección de datos: ve metadatos de auditoría (quién, cuándo, q
 2. Los mensajes de tiempo real nunca llevan datos personales ni clínicos (ADR-0005).
 3. Las notificaciones push dicen "Tienes un resultado revisado", nunca el resultado.
 4. Toda lectura de datos personales o clínicos genera auditoría con motivo implícito (relación de atención). El módulo de acceso excepcional (solicitar, aprobar, negar y urgencia) se retiró en la ronda 1 (observación 12): sin relación de atención no hay lectura clínica. Las filas de auditoría `acceso_excepcional.*` anteriores se conservan y se muestran como histórico.
-5. Las búsquedas de pacientes se auditan guardando un hash del texto buscado, no el texto.
+5. Las búsquedas de pacientes se auditan guardando un hash del texto buscado, no el texto. La búsqueda sigue la misma política de campos que la ficha: la fecha de nacimiento exacta solo con contexto `x`; con contexto `rango` (Laboratorio) llega solo `ageRange` (MA-SEG-06).
 6. Sesión del personal con cierre por inactividad (15 min en web; 5 min en móvil en segundo plano con datos clínicos en pantalla).
 7. Los clientes no guardan datos clínicos en disco, salvo la cola cifrada del paramédico sin conexión, que se borra al enviarse.
 8. Datos de prueba y demostración siempre ficticios.
