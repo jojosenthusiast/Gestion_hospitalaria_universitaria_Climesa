@@ -47,4 +47,19 @@ describe('Fase 0/1 seguridad y privacidad', () => {
       expect((await verify()).ok).toBe(true);
     });
   });
+  describe('MA-SEG-05: cada exportación de una lista queda auditada', () => {
+    test('POST /exportaciones registra quién exportó qué lista, cuántas filas y en qué formato', async () => {
+      const response = await t.call('REC', 'POST', '/exportaciones', { resource: 'pacientes', rows: 12, format: 'csv' });
+      expect(response.status).toBe(201);
+      const audit = await t.one<{ entidad: string; detalle: Record<string, unknown> }>("SELECT entidad,detalle FROM plataforma.auditoria WHERE accion='datos.exportar' ORDER BY seq DESC LIMIT 1");
+      expect(audit.entidad).toBe('pacientes');
+      expect(audit.detalle).toMatchObject({ filas: 12, formato: 'csv' });
+    });
+    test('formato o lista inválidos responden 400 y no auditan', async () => {
+      const before = (await t.audits('datos.exportar')).length;
+      expect((await t.call('REC', 'POST', '/exportaciones', { resource: 'pacientes', rows: 1, format: 'docx' })).status).toBe(400);
+      expect((await t.call('REC', 'POST', '/exportaciones', { resource: '../x', rows: 1, format: 'csv' })).status).toBe(400);
+      expect((await t.audits('datos.exportar')).length).toBe(before);
+    });
+  });
 });

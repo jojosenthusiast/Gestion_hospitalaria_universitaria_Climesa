@@ -40,6 +40,10 @@ export class AuditOptionsResponse {
   @StrArrayProp({ description: 'Códigos de rol que aparecen en la auditoría' }) roles!: string[];
 }
 
+export class ExportAuditResponse {
+  @DateTimeProp() registradoEn!: string;
+}
+
 export class AuditVerificationResponse {
   @BoolProp() integra!: boolean;
   @IntProp() revisados!: number;

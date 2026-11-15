@@ -8,6 +8,7 @@ import { supabase } from './lib/supabase';
 import { demoAccounts } from './lib/demoLogin';
 import { useLive } from './lib/live';
 import { retryColdStart,SLOW_SERVER_MESSAGE,warmUpApi } from './lib/cold-start';
+import { registerExportAuditor } from './lib/export';
 import { LoginView,PatientSignupInfoView,StatusView } from './components/ui';
 import { HospitalShell } from './features/shell';
 import { PublicScreen } from './features/public-screen';
@@ -57,6 +58,8 @@ function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
  return <LivePortal {...{api,profile,session,onExpired}} refreshProfile={load}/>;
 }
 function LivePortal({api,profile,session,onExpired,refreshProfile}:{api:IntentApi;profile:AccessProfile;session:Session;onExpired:()=>void;refreshProfile:()=>void}){
+ // MA-SEG-05: every list export is recorded in the API audit before the file is saved.
+ useEffect(()=>{registerExportAuditor(entry=>api.write('/exportaciones',entry));return()=>registerExportAuditor(null);},[api]);
  const live=useLive(api,profile,session.access_token,refreshProfile);
  const idle=useIdleSession(onExpired),logout=()=>{resetRoute();void supabase?.auth.signOut({scope:'local'});};
  return <LiveContext.Provider value={live.signal}><HospitalShell api={api} profile={profile} version={live.version} connection={live.status} onLogout={logout} onChangePassword={changePassword(profile.email)}/><SessionExpiryWarning remaining={idle.remaining} onContinue={idle.keepAlive} onLogout={logout}/></LiveContext.Provider>;

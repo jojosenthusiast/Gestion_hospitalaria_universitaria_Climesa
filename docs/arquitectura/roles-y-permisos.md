@@ -139,6 +139,18 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | PATCH | `/api/v1/usuarios/{id}/roles` | `usuarios.asignar_roles` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | PATCH | `/api/v1/usuarios/{id}/estado` | `usuarios.desactivar` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 
+### Spec 110
+
+| Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| POST | `/api/v1/exportaciones` | `sesion.perfil` | Solo registra la exportación; el archivo se arma en la web | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| GET | `/api/v1/auditoria` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| POST | `/api/v1/auditoria/verificacion` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/auditoria/registros` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/auditoria/registros/{seq}` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/auditoria/opciones` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/me/accesos` | `auditoria.mis_accesos` | Propio | E | 5 | · | · | · | · | · | · | · | · | · | propio |
+
 ### Spec 102
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
@@ -291,17 +303,6 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/ambulancia/ubicacion` | `ambulancia.operar` | Solo con servicio activo | E | 5 | · | · | · | · | · | · | · | ✔ | · | · |
 | POST | `/api/v1/ambulancia/mantenimiento` | `ambulancia.mantenimiento` | Solo sin servicio activo | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/ambulancia/bitacora` | `ambulancia.ver_bitacora` | Datos del paciente ocultos sin relación | R | 4 | · | ✔ | ✔ | · | · | ✔ | · | propio | ✔ | · |
-
-### Spec 110
-
-| Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/auditoria` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| POST | `/api/v1/auditoria/verificacion` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| GET | `/api/v1/auditoria/registros` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| GET | `/api/v1/auditoria/registros/{seq}` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| GET | `/api/v1/auditoria/opciones` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| GET | `/api/v1/me/accesos` | `auditoria.mis_accesos` | Propio | E | 5 | · | · | · | · | · | · | · | · | · | propio |
 
 ### Spec 111
 

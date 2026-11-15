@@ -157,7 +157,7 @@ Fuentes: controladores en `api/src/**/*.controller.ts`, menú web en `web/src/fe
 - El menú depende solo del permiso (`web/src/features/shell.tsx`): cada módulo declara el permiso que lo abre; nunca se pregunta por el rol.
 - Tipos de la API generados desde `contrato/openapi.json` (`web/src/lib/generated/`).
 - Tiempo real con Supabase Realtime en `web/src/lib/live.ts` (sección 9).
-- Sesión del personal con cierre por inactividad a los 15 minutos (`docs/arquitectura/privacidad.md`, regla 6).
+- Sesión del personal con cierre por inactividad a los 15 minutos (`docs/arquitectura/privacidad.md`, regla 7).
 - Rutas sin sesión: `/publico`, `/recuperar`, `/restablecer`, `/aceptar-invitacion` y `/confirmar-correo` (`web/src/App.tsx`). El paciente crea su cuenta solo en la app Android o iOS (BL-06, decisión D-04): la web no tiene formulario de registro y `/registro` es una página informativa que remite a la app, para que los enlaces viejos no den 404. `/confirmar-correo` termina con «Abre la app CLIMESA» cuando la cuenta no usa la web. Las rutas internas usan `#/<módulo>`. Para que estas rutas funcionen en producción, `render.yaml` reescribe `/*` a `/index.html` y define las cabeceras de seguridad (CSP, HSTS); esa configuración se sincroniza a mano en Render (sección 11).
 - ESLint 9 con `npm run lint` (`web/eslint.config.js`).
 

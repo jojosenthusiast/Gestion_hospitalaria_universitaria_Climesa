@@ -1,6 +1,7 @@
 spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 101,GET,/api/v1/auth/me,sesion.perfil,,R,2,"Perfil, roles, permisos y canales de tiempo real del usuario"
 101,GET,/api/v1/inicio,sesion.perfil,,R,2,Resumen de inicio según rol y permisos
+110,POST,/api/v1/exportaciones,sesion.perfil,Solo registra la exportación; el archivo se arma en la web,R,2,Auditar una exportación de lista con datos personales (MA-SEG-05)
 101,GET,/api/v1/eventos,sesion.perfil,Solo eventos de canales permitidos al usuario,R,2,Consulta de recuperación de eventos desde un cursor (?after=) tras reconectar
 101,PUT,/api/v1/me/dispositivos,sesion.perfil,,E,5,Registrar token de push FCM o APNs
 101,POST,/api/v1/cuentas/vinculacion,cuenta.vincular,Solo su cuenta,R,2,Paciente pide vincular su cuenta con DUI y fecha de nacimiento

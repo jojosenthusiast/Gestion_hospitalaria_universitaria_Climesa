@@ -100,6 +100,17 @@ export async function downloadPdf(table: ExportTable) {
   saveBlob(doc.output('blob'), `${table.filename}.pdf`);
 }
 
+/** MA-SEG-05: what the API audit records for an export (never the rows themselves). */
+export type ExportAuditEntry = { resource: string; rows: number; format: ExportFormat };
+type ExportAuditor = (entry: ExportAuditEntry) => Promise<unknown>;
+let auditor: ExportAuditor | null = null;
+/** The portal registers the API call once per session; without a session nothing is recorded (design preview, tests). */
+export const registerExportAuditor = (next: ExportAuditor | null) => { auditor = next; };
+const resourceOf = (filename: string) => filename.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'exportacion';
+export async function auditExport(format: ExportFormat, table: ExportTable) {
+  if (auditor) await auditor({ resource: resourceOf(table.filename), rows: table.rows.length, format });
+}
+
 export async function exportTable(format: ExportFormat, table: ExportTable) {
   if (format === 'csv') return downloadCsv(table);
   if (format === 'xlsx') return downloadXlsx(table);

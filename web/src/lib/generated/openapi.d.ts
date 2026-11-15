@@ -1798,6 +1798,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exportaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Registrar en la auditoría una exportación de lista (CSV, Excel o PDF) hecha en la web */
+        post: operations["PrivacyController_recordExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/accesos": {
         parameters: {
             query?: never;
@@ -4433,6 +4450,17 @@ export interface components {
             motivo?: string;
             /** Format: date-time */
             verificadoEn: string;
+        };
+        ExportAuditDto: {
+            /** @description Lista exportada: el nombre del archivo, por ejemplo pacientes o fila-del-dia */
+            resource: string;
+            rows: number;
+            /** @enum {string} */
+            format: "csv" | "xlsx" | "pdf";
+        };
+        ExportAuditResponse: {
+            /** Format: date-time */
+            registradoEn: string;
         };
         MyAccessResponse: {
             /** Format: date-time */
@@ -13648,6 +13676,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditVerificationResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PrivacyController_recordExport: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportAuditDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportAuditResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */

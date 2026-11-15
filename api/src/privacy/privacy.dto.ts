@@ -1,6 +1,15 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBooleanString, IsIn, IsInt, IsISO8601, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export const EXPORT_FORMATS = ['csv', 'xlsx', 'pdf'] as const;
+
+/** MA-SEG-05: a list exported from the web (the file is built in the browser; the API records who, what and how much). */
+export class ExportAuditDto {
+  @ApiProperty({ description: 'Lista exportada: el nombre del archivo, por ejemplo pacientes o fila-del-dia', pattern: '^[a-z0-9][a-z0-9-]{1,59}$' }) @IsString() @Matches(/^[a-z0-9][a-z0-9-]{1,59}$/) resource!: string;
+  @ApiProperty({ minimum: 0, maximum: 100000 }) @IsInt() @Min(0) @Max(100000) rows!: number;
+  @ApiProperty({ enum: EXPORT_FORMATS }) @IsIn(EXPORT_FORMATS) format!: (typeof EXPORT_FORMATS)[number];
+}
 
 export const AUDIT_SORTS = ['fecha', 'persona', 'rol', 'accion', 'entidad', 'paciente', 'resultado'] as const;
 

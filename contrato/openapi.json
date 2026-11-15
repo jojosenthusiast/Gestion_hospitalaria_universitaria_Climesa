@@ -12619,6 +12619,107 @@
         "x-permiso": "auditoria.ver"
       }
     },
+    "/api/v1/exportaciones": {
+      "post": {
+        "operationId": "PrivacyController_recordExport",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportAuditDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportAuditResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar en la auditoría una exportación de lista (CSV, Excel o PDF) hecha en la web",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "sesion.perfil"
+      }
+    },
     "/api/v1/me/accesos": {
       "get": {
         "operationId": "PrivacyController_mine",
@@ -22844,6 +22945,46 @@
           "integra",
           "revisados",
           "verificadoEn"
+        ]
+      },
+      "ExportAuditDto": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "string",
+            "description": "Lista exportada: el nombre del archivo, por ejemplo pacientes o fila-del-dia",
+            "pattern": "^[a-z0-9][a-z0-9-]{1,59}$"
+          },
+          "rows": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx",
+              "pdf"
+            ]
+          }
+        },
+        "required": [
+          "resource",
+          "rows",
+          "format"
+        ]
+      },
+      "ExportAuditResponse": {
+        "type": "object",
+        "properties": {
+          "registradoEn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "registradoEn"
         ]
       },
       "MyAccessResponse": {
