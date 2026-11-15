@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsUUID, Matches, Max, Min, ValidateNested } from 'class-validator';
 import { Text } from '../platform/dto';
 import { finalStates, milestoneTypes, priorities, serviceTypes } from './ambulance.rules';
@@ -62,7 +62,8 @@ export class PrehospitalDto {
 /** BL-05: cierre administrativo de un servicio activo; `version` es la del servicio. */
 export class CloseServiceDto {
   @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
-  @Text(10,500) reason!:string;
+  /** Trimmed before validation: the stored reason is the trimmed text, so padding cannot pass the minimum length. */
+  @Transform(({value}:{value:unknown})=>typeof value==='string'?value.trim():value) @Text(10,500) reason!:string;
 }
 export class LocationDto {
   @ApiProperty({minimum:-90,maximum:90}) @IsNumber() @Min(-90) @Max(90) latitude!:number;
