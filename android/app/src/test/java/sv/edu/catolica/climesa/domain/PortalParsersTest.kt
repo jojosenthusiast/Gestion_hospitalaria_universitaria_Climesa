@@ -35,11 +35,4 @@ class PortalParsersTest {
         assertTrue(PortalParsers.unit(idle)!!.driverOnDuty)
         assertFalse(PortalParsers.unit(JSONObject(idle.toString()).put("driverOnDuty", false))!!.driverOnDuty)
     }
-
-    @Test fun aShiftWithMalformedDatesOpensWithEmptyFieldsInsteadOfCrashing() {
-        val shift = PlannedShift("t1", "p1", "Persona", "a1", "Área", "no-es-fecha", "", "ordinario", "borrador", null, 1)
-        val form = ShiftPlanning.formOf(shift)
-        assertEquals("", form.startDate)
-        assertEquals("", form.endTime)
-    }
 }

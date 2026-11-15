@@ -21,6 +21,7 @@ import sv.edu.catolica.climesa.domain.AppointmentWorkPeriod
 import sv.edu.catolica.climesa.domain.DaySlot
 import sv.edu.catolica.climesa.domain.ReceptionScheduling
 import sv.edu.catolica.climesa.domain.PatientAppointment
+import sv.edu.catolica.climesa.domain.PatientAppointmentRules
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 import java.time.LocalDate
 
@@ -92,11 +93,7 @@ class PatientAppointmentsViewModel @Inject constructor(
         mutable.value = current.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
             try {
-                api.request("/citas/solicitudes", "POST", JSONObject()
-                    .put("doctorId", current.selectedDoctorId)
-                    .put("start", slot.start)
-                    .put("end", slot.end)
-                    .apply { if (reason.isNotBlank()) put("reason", reason.trim()) })
+                api.request("/citas/solicitudes", "POST", PatientAppointmentRules.requestBody(current.selectedDoctorId, slot, reason))
                 mutable.value = mutable.value.copy(saving = false, selectedSlot = null, slots = emptyList(), daySlots = emptyList(), notice = "Solicitud enviada. Recepción debe confirmarla.")
                 load()
             } catch (e: CancellationException) {

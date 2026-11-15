@@ -18,6 +18,8 @@ data class AccessProfile(
     val notice: String? = null,
     /** Expediente enlazado a la cuenta (`patientId` de `/auth/me`); nulo hasta que Recepción aprueba la vinculación (RN-39). */
     val patientId: String? = null,
+    /** Personal clínico enlazado a la cuenta (`staffId` de `/auth/me`): el médico tratante de sus propias indicaciones. */
+    val staffId: String? = null,
 )
 
 data class AuthenticatedAccount(
@@ -88,9 +90,7 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     SERVICE("A71", "Servicio", "ambulancia.operar", true),
     PREHOSPITAL_REPORT("A72", "Reporte prehospital", "ambulancia.reportar_prehospital", true),
     UNIDENTIFIED_PATIENT("A73", "Paciente sin identidad", "pacientes.registrar_provisional", true),
-    LOG("A74", "Mi bitácora", "ambulancia.ver_bitacora", true),
-    PLANNING("", "Planificación", "turnos.planificar", true),
-    STAFF("", "Personal", "personal.ver", true),
+    LOG("A74", "Bitácora", "ambulancia.ver_bitacora", true),
 }
 
 object AndroidSections {
@@ -108,7 +108,7 @@ object AndroidSections {
         "REC" to listOf(AndroidSection.HOME, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "AST" to careStation,
         "ENF" to careStation,
-        "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.UNIT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "PAR" to listOf(AndroidSection.HOME, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "PAC" to listOf(AndroidSection.HOME, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.LINK_RECORD, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
     )

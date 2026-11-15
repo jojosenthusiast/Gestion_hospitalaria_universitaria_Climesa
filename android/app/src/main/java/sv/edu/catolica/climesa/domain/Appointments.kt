@@ -1,5 +1,7 @@
 package sv.edu.catolica.climesa.domain
 
+import org.json.JSONObject
+
 data class PatientAppointment(
     val id: String,
     val doctorName: String,
@@ -27,3 +29,10 @@ data class AppointmentWorkPeriod(
     val start: String,
     val end: String,
 )
+
+/** `POST /citas/solicitudes`: the patient asks for a slot; Recepción confirms or rejects it. */
+object PatientAppointmentRules {
+    fun requestBody(doctorId: String, slot: AppointmentSlot, reason: String): JSONObject = JSONObject()
+        .put("doctorId", doctorId).put("start", slot.start).put("end", slot.end)
+        .apply { if (reason.isNotBlank()) put("reason", reason.trim()) }
+}

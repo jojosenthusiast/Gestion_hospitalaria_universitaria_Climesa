@@ -20,15 +20,6 @@
     <string name="dash_ayuda_pac">Tu próxima cita, tu turno en la fila y tus exámenes. Si ya tienes expediente vinculado verás todo aquí.</string>
 
     <!-- Turnos: filtros de estado, área y rol -->
-    <string name="filtro_titulo">Filtrar turnos</string>
-    <string name="filtro_ayuda">Combina estado, área y rol para ver solo lo que buscas. \"Todos\" quita el filtro.</string>
-    <string name="filtro_estado">Estado</string>
-    <string name="filtro_area">Área</string>
-    <string name="filtro_rol">Rol del personal</string>
-    <string name="filtro_mostrando">Mostrando %1$d de %2$d turnos</string>
-    <string name="filtro_limpiar">Quitar filtros</string>
-    <string name="filtro_sin_coincidencias">Ningún turno coincide</string>
-    <string name="filtro_sin_coincidencias_detalle">Prueba con otra combinación o quita los filtros.</string>
 
     <!-- Laboratorio: recorrido de la orden -->
     <string name="lab_ayuda">Cada orden avanza por pasos: Solicitada, Muestra, En proceso, Completada, Revisada y Visible al paciente. Abajo de cada una verás quién actúa ahora.</string>

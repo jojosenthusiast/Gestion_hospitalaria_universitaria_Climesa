@@ -138,6 +138,7 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             FormField("Indicaciones", instructions, { instructions = it.take(1000) }, singleLine = false)
             SecondaryButton("Emitir receta", { model.prescription(item, medication, dose, route, frequency, duration, instructions) { medication = ""; dose = ""; route = ""; frequency = ""; duration = ""; instructions = "" } }, enabled = !busy && listOf(medication, dose, route, frequency, duration).all { it.trim().isNotBlank() })
         }
+        AdmissionIndicationEntry(item, profile, enabled = !busy)
         if (item.consultationId != null && "laboratorio.ordenar" in permissions) {
             LaunchedEffect(item.consultationId) { model.loadLabCatalog() }
             val chosen = labExams.split(',').filter { it.isNotBlank() }.toSet()

@@ -76,22 +76,3 @@ internal fun SecondaryButton(
         contentPadding = ButtonPadding,
     ) { ButtonBody(text, icon, loading, MaterialTheme.colorScheme.primary) }
 }
-
-/** Destructive action (inactivar, cancelar, dar de baja). Always pair it with [ConfirmDialog]. */
-@Composable
-internal fun DangerButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    enabled: Boolean = true,
-    loading: Boolean = false,
-) {
-    Button(
-        onClick = onClick,
-        enabled = enabled && !loading,
-        modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
-        contentPadding = ButtonPadding,
-    ) { ButtonBody(text, icon, loading, MaterialTheme.colorScheme.onError) }
-}

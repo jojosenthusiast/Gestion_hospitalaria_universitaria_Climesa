@@ -34,7 +34,6 @@
     <string name="rec_leyenda_ocupado">Ocupado</string>
     <string name="rec_leyenda_sin_turno">Sin turno</string>
     <string name="rec_leyenda_pasado">Ya pasó</string>
-    <string name="rec_franja_no_disponible">%1$s, no disponible: %2$s</string>
     <!-- Vinculaciones (A33) -->
     <string name="rec_vinc_eyebrow">Pacientes / Cuentas</string>
     <string name="rec_vinc_titulo">Vinculaciones</string>
@@ -56,4 +55,11 @@
     <string name="rec_vinc_rechazo_titulo">Rechazar vinculación</string>
     <string name="rec_vinc_rechazo_mensaje">Cuenta: %1$s. El paciente verá este motivo.</string>
     <string name="rec_vinc_rechazo_motivo">Motivo del rechazo</string>
+    <string name="rec_cita_vencida">Vencida</string>
+    <string name="rec_cita_confirmar_titulo">¿Confirmar la solicitud?</string>
+    <string name="rec_cita_rechazar_titulo">Rechazar la solicitud</string>
+    <string name="rec_cita_cancelar_titulo">Cancelar la cita</string>
+    <string name="rec_cita_volver">Volver</string>
+    <string name="rec_cita_motivo">Motivo</string>
+    <string name="rec_cita_motivo_minimo">mínimo %1$d</string>
 </resources>
