@@ -23,7 +23,7 @@ private struct PrescriptionDraft: Identifiable {
 }
 
 /// I21 · Consulta: signos (de asistente), motivo, examen, diagnósticos CIE-10, receta, órdenes de laboratorio,
-/// indicación de hospitalización; guardar y firmar. La API decide las transiciones y exige la versión vigente.
+/// indicación de hospitalización (AdmissionIndicationCard); guardar y firmar. La API decide las transiciones y exige la versión vigente.
 struct ConsultationView: View {
     let origin: ConsultationOrigin
     let profile: AccessProfile
@@ -37,7 +37,6 @@ struct ConsultationView: View {
     @State private var diagnosing = Submission()
     @State private var prescribing = Submission()
     @State private var ordering = Submission()
-    @State private var admitting = Submission()
     @State private var signing = Submission()
     @State private var prefilledVersion: Int?
     @State private var reason = ""
@@ -52,10 +51,6 @@ struct ConsultationView: View {
     @State private var lineError: String?
     @State private var selectedExams: Set<String> = []
     @State private var priority: LabPriority = .rutina
-    @State private var category: RoomCategory = .semiprivada
-    @State private var isolation = false
-    @State private var admissionReason = ""
-    @State private var admissionError: String?
 
     init(origin: ConsultationOrigin, profile: AccessProfile) {
         self.origin = origin
@@ -95,7 +90,9 @@ struct ConsultationView: View {
         diagnosesSection(value, editable: editable)
         prescriptionSection(value, editable: editable && profile.hasPermission("recetas.emitir"))
         if editable && profile.hasPermission("laboratorio.ordenar") { labSection(value) }
-        if editable && profile.hasPermission("admision.solicitar") && profile.staffId != nil { admissionSection(value) }
+        if editable && profile.hasPermission("admision.solicitar"), let staffId = profile.staffId {
+            AdmissionIndicationCard(consultationId: value.consultation.id, patientId: value.consultation.patientId, staffId: staffId)
+        }
         if editable {
             WriteNotice(submission: signing, reload: loadDetail)
             ClimesaButton(title: L.text("consultation.sign"), loading: signing.busy) { Task { await sign(value) } }
@@ -223,22 +220,6 @@ struct ConsultationView: View {
         }
     }
 
-    @ViewBuilder private func admissionSection(_ value: ConsultationDetail) -> some View {
-        SectionCard(title: L.text("admission.title")) {
-            VStack(alignment: .leading, spacing: Spacing.s) {
-                Text("admission.category").font(Typo.label).foregroundStyle(Theme.ink)
-                Picker("admission.category", selection: $category) {
-                    Text(verbatim: RoomCategory.semiprivada.label).tag(RoomCategory.semiprivada)
-                    Text(verbatim: RoomCategory.vip.label).tag(RoomCategory.vip)
-                }.pickerStyle(.segmented)
-            }
-            Toggle("admission.isolation", isOn: $isolation).font(Typo.body).tint(Theme.primary)
-            MedicoTextArea(label: L.text("admission.reason"), text: $admissionReason, error: admissionError, lines: 2...4)
-            WriteNotice(submission: admitting, reload: loadDetail)
-            ClimesaButton(title: L.text("admission.submit"), loading: admitting.busy) { Task { await admit(value) } }
-        }
-    }
-
     // MARK: - Lecturas
 
     private func loadDetail() async {
@@ -313,17 +294,6 @@ struct ConsultationView: View {
             _ = try await account.client().send("POST", "/laboratorio/ordenes", body: body, key: key, as: LabOrderCreated.self)
         }
         if ok { selectedExams = [] }
-    }
-
-    private func admit(_ value: ConsultationDetail) async {
-        admissionError = DischargeRules.admissionReasonError(admissionReason)
-        guard admissionError == nil, let staffId = profile.staffId else { return }
-        let text = admissionReason.trimmingCharacters(in: .whitespacesAndNewlines)
-        let body = AdmissionBody(patientId: value.consultation.patientId, consultationId: value.consultation.id, category: category,
-                                 isolation: isolation, attendingDoctorId: staffId, reason: text.isEmpty ? nil : text)
-        await admitting.run(body: body, success: L.text("admission.done")) { key in
-            _ = try await account.client().send("POST", "/admisiones/indicaciones", body: body, key: key, as: AdmissionCommandResult.self)
-        }
     }
 
     private func sign(_ value: ConsultationDetail) async {

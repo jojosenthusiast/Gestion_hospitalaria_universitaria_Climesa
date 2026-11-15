@@ -1,7 +1,7 @@
 {
-  "operation": "POST /consultas",
-  "source": "ConsultationStartBody",
+  "method": "POST",
+  "path": "/api/v1/consultas",
   "body": {
-    "appointmentId": "5e4d3c2b-1a09-4f8e-b7d6-c5b4a3928170"
+    "appointmentId": "44444444-4444-4444-8444-444444444444"
   }
 }

@@ -1,10 +1,10 @@
 {
-  "operation": "POST /citas/solicitudes",
-  "source": "AppointmentRequestBody",
+  "method": "POST",
+  "path": "/api/v1/citas/solicitudes",
   "body": {
-    "doctorId": "3f9a8b7c-6d5e-4f3a-8b2c-1d0e9f8a7b6c",
-    "end": "2026-11-20T15:20:00Z",
-    "reason": "Dolor de garganta",
-    "start": "2026-11-20T15:00:00Z"
+    "doctorId": "33333333-3333-4333-8333-333333333333",
+    "start": "2026-11-20T15:00:00.000Z",
+    "end": "2026-11-20T15:30:00.000Z",
+    "reason": "Control de presión arterial"
   }
 }

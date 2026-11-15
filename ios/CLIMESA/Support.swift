@@ -64,6 +64,83 @@ final class Submission {
     }
 }
 
+extension Submission {
+    /// MOV-03: mensajes en español por campo del último rechazo (`errors[]` del problem+json), para mostrarlos junto al campo.
+    var fieldErrors: [String: String] { lastFailure?.fieldErrors ?? [:] }
+}
+
+/// Parte de un tablero que se pide por separado: si una lectura falla, solo esa tarjeta muestra el error con
+/// «Reintentar» y las demás siguen visibles (CH-02: un fallo nunca se ve como "no hay datos").
+enum Part<Value: Sendable>: Sendable {
+    case loaded(Value)
+    case failed(String)
+
+    var value: Value? { if case let .loaded(value) = self { return value }; return nil }
+    var error: String? { if case let .failed(message) = self { return message }; return nil }
+
+    /// Ejecuta la lectura y guarda su error en español en vez de ocultarlo. Una cancelación sigue cancelando.
+    static func load(_ fetch: () async throws -> Value) async throws -> Part<Value> {
+        do { return .loaded(try await fetch()) }
+        catch is CancellationError { throw CancellationError() }
+        catch { return .failed(error.userMessage) }
+    }
+}
+
+/// Parte de un tablero que falló, con el título de su tarjeta.
+struct PartFailure: Identifiable {
+    let title: String
+    let message: String?
+    var id: String { title }
+}
+
+/// Error de una parte del tablero, dentro de su tarjeta, con «Reintentar».
+struct PartError: View {
+    let message: String
+    let retry: () async -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(alignment: .top, spacing: Spacing.s) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.danger).accessibilityHidden(true)
+                Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+            }
+            ClimesaButton(title: L.text("ds.retry"), kind: .secondary) { Task { await retry() } }
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// Contador "123/500" bajo un campo con límite; en rojo fuera del rango permitido.
+struct CharacterCounter: View {
+    let count: Int
+    let range: ClosedRange<Int>
+    var body: some View {
+        let ok = count == 0 || range.contains(count)
+        Text(verbatim: "\(count)/\(range.upperBound)")
+            .font(Typo.caption).monospacedDigit()
+            .foregroundStyle(ok ? Theme.muted : Theme.danger)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .accessibilityLabel(Text(verbatim: "\(count) de \(range.upperBound) caracteres"))
+    }
+}
+
+/// Aviso fijo abajo mientras una llamada tarda más de 5 s: el servidor gratuito despierta (MA-OPS-01).
+struct ServerWakeBanner: View {
+    var body: some View {
+        if ServerWake.shared.waking {
+            HStack(spacing: Spacing.m) {
+                ProgressView().tint(Theme.warning)
+                Text(verbatim: ColdStartPolicy.wakingMessage).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(Spacing.l).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.warningSoft)
+            .overlay(alignment: .top) { Rectangle().fill(Theme.warning.opacity(0.4)).frame(height: 1) }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.updatesFrequently)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+}
+
 // MARK: - Componentes
 
 struct Card<Content: View>: View {

@@ -4,12 +4,13 @@ import UIKit
 // Pantallas del Paciente (docs/arquitectura/datos/pantallas.csv, I03 a I12). Solo llaman endpoints de
 // contrato/openapi.json; cada una vuelve a pedir sus datos cuando sube su contador de tiempo real.
 
+/// Cada tarjeta se pide por separado: la que falla muestra su error con «Reintentar» (CH-02); nil es "sin permiso".
 struct PatientHome: Sendable {
-    var ticket: QueueTicket?
-    var nextAppointment: Appointment?
-    var labs: [LabOrder]?
-    var room: Admission?
-    var notices: [PublicNotices.Notice]
+    var ticket: Part<QueueTicket?>?
+    var nextAppointment: Part<Appointment?>?
+    var labs: Part<[LabOrder]>?
+    var room: Part<Admission?>?
+    var notices: Part<[PublicNotices.Notice]>?
 }
 
 /// I04 · Inicio del paciente.
@@ -30,14 +31,27 @@ struct PatientHomeView: View {
                 }
             }
             LoadState(loader: loader, retry: load) { home in
-                HomeQueueCard(ticket: home.ticket) { go(.fila) }
-                HomeAppointmentCard(appointment: home.nextAppointment) { go(.citas) }
-                if let labs = home.labs { HomeLabCard(labs: labs) { go(.examenes) } }
-                if let room = home.room { RoomCard(admission: room) }
-                if !home.notices.isEmpty {
-                    SectionTitle("home.notices")
-                    ForEach(home.notices) { notice in
-                        SectionCard(title: notice.title) { Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink) }
+                if let ticket = home.ticket {
+                    if let error = ticket.error { failedCard("home.queue", error) } else { HomeQueueCard(ticket: ticket.value ?? nil) { go(.fila) } }
+                }
+                if let next = home.nextAppointment {
+                    if let error = next.error { failedCard("home.appointment", error) } else { HomeAppointmentCard(appointment: next.value ?? nil) { go(.citas) } }
+                }
+                if let labs = home.labs {
+                    if let error = labs.error { failedCard("home.labs", error) } else if let list = labs.value { HomeLabCard(labs: list) { go(.examenes) } }
+                }
+                if let room = home.room {
+                    if let error = room.error { failedCard("room.eyebrow", error) } else if let current = room.value ?? nil { RoomCard(admission: current) }
+                }
+                if let notices = home.notices {
+                    if let error = notices.error {
+                        SectionTitle("home.notices")
+                        SectionCard { PartError(message: error, retry: load) }
+                    } else if let list = notices.value, !list.isEmpty {
+                        SectionTitle("home.notices")
+                        ForEach(list) { notice in
+                            SectionCard(title: notice.title) { Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink) }
+                        }
                     }
                 }
             }
@@ -45,23 +59,38 @@ struct PatientHomeView: View {
         .task(id: live.snapshot.version([.queue, .appointments, .laboratory, .hospitalInfo, .admissions])) { await load() }
     }
 
+    @ViewBuilder private func failedCard(_ eyebrow: String, _ message: String) -> some View {
+        SectionCard(eyebrow: L.text(eyebrow)) { PartError(message: message, retry: load) }
+    }
+
     private func load() async {
         await loader.load {
             let api = try account.client()
-            var home = PatientHome(ticket: nil, nextAppointment: nil, labs: nil, room: nil, notices: [])
-            if profile.hasPermission("fila.ver"), let tickets = try? await api.get("/fila", as: [QueueTicket].self) {
-                home.ticket = QueueRules.activeTicket(tickets)
+            let patientId = profile.patientId
+            var home = PatientHome()
+            if profile.hasPermission("fila.ver") {
+                home.ticket = try await Part<QueueTicket?>.load {
+                    let tickets = try await api.get("/fila", as: [QueueTicket].self)
+                    return QueueRules.activeTicket(tickets)
+                }
             }
-            if profile.hasPermission("citas.ver"), let list = try? await api.get("/citas", as: [Appointment].self) {
-                home.nextAppointment = AppointmentRules.split(list, now: Date()).upcoming.first
+            if profile.hasPermission("citas.ver") {
+                home.nextAppointment = try await Part<Appointment?>.load {
+                    let list = try await api.get("/citas", as: [Appointment].self)
+                    return AppointmentRules.split(list, now: Date()).upcoming.first
+                }
             }
-            if profile.patientId != nil, profile.hasPermission("resultados.ver") {
-                home.labs = try? await api.get("/me/laboratorio", as: [LabOrder].self)
+            if patientId != nil, profile.hasPermission("resultados.ver") {
+                home.labs = try await Part<[LabOrder]>.load { try await api.get("/me/laboratorio", as: [LabOrder].self) }
             }
-            if profile.patientId != nil, profile.hasPermission("admision.ver"), let admissions = try? await api.get("/admisiones", as: [Admission].self) {
-                home.room = RoomRules.current(admissions, patientId: profile.patientId)
+            if patientId != nil, profile.hasPermission("admision.ver") {
+                home.room = try await Part<Admission?>.load {
+                    let admissions = try await api.get("/admisiones", as: [Admission].self)
+                    return RoomRules.current(admissions, patientId: patientId)
+                }
             }
-            home.notices = (try? await api.get("/publico/avisos", as: PublicNotices.self))?.notices ?? []
+            // MA-AVI-01: los avisos dirigidos a los roles de la persona además de los públicos.
+            home.notices = try await Part<[PublicNotices.Notice]>.load { try await api.get("/me/avisos", as: PublicNotices.self).notices }
             return home
         }
     }
@@ -190,15 +219,20 @@ struct PatientAppointmentsView: View {
             PatientSubmissionNotice(submission: submission)
             if submission.lastFailure?.code == "version_conflicto" { ConflictBanner { Task { submission.error = nil; await load() } } }
             LoadState(loader: loader, retry: load) { list in
-                let split = AppointmentRules.split(list, now: Date())
-                SectionTitle("appointments.upcoming")
-                if split.upcoming.isEmpty { EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar") }
-                ForEach(split.upcoming) { item in
-                    AppointmentRow(appointment: item, cancel: cancelAction(item))
+                // CITA-04: el reloj de interfaz (cada minuto) solo recalcula qué acciones siguen válidas; no pide datos.
+                TimelineView(.everyMinute) { context in
+                    let split = AppointmentRules.split(list, now: context.date)
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionTitle("appointments.upcoming")
+                        if split.upcoming.isEmpty { EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar") }
+                        ForEach(split.upcoming) { item in
+                            AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date) { cancelling = item }
+                        }
+                        SectionTitle("appointments.past")
+                        if split.past.isEmpty { EmptyStateView(title: L.text("appointments.past.none"), symbol: "clock.arrow.circlepath") }
+                        ForEach(split.past) { item in AppointmentRow(appointment: item, option: .hidden, now: context.date) {} }
+                    }
                 }
-                SectionTitle("appointments.past")
-                if split.past.isEmpty { EmptyStateView(title: L.text("appointments.past.none"), symbol: "clock.arrow.circlepath") }
-                ForEach(split.past) { item in AppointmentRow(appointment: item, cancel: nil) }
             }
         }
         .task(id: live.snapshot.version(.appointments)) { await load() }
@@ -210,15 +244,18 @@ struct PatientAppointmentsView: View {
 
     private func load() async { await loader.load { try await account.client().get("/citas", as: [Appointment].self) } }
 
-    private func cancelAction(_ item: Appointment) -> (() -> Void)? {
-        guard account.can("citas.cancelar"), AppointmentRules.canCancel(item, now: Date()) else { return nil }
-        return { cancelling = item }
+    private func cancelOption(_ item: Appointment, now: Date) -> AppointmentRules.CancelOption {
+        account.can("citas.cancelar") ? AppointmentRules.cancelOption(item, now: now) : .hidden
     }
 }
 
+/// Una cita con solo las acciones válidas para su estado y su hora (CITA-04): el plazo para cancelar se ve antes de
+/// tocar el botón y, dentro del plazo, el botón queda desactivado con el motivo.
 private struct AppointmentRow: View {
     let appointment: Appointment
-    let cancel: (() -> Void)?
+    let option: AppointmentRules.CancelOption
+    let now: Date
+    let cancel: () -> Void
     var body: some View {
         SectionCard {
             ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName, meta: appointment.reason) {
@@ -227,7 +264,16 @@ private struct AppointmentRow: View {
             if let rejection = appointment.rejectionReason, !rejection.isEmpty {
                 Text(verbatim: String(format: L.text("appointments.rejected.reason"), rejection)).font(Typo.small).foregroundStyle(Theme.danger)
             }
-            if let cancel { ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel) }
+            switch option {
+            case .hidden: EmptyView()
+            case let .allowed(deadline):
+                Label { Text(verbatim: AppointmentRules.cancelDeadlineText(deadline, now: now)) } icon: { Image(systemName: "clock") }
+                    .font(Typo.small).foregroundStyle(Theme.muted)
+                ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel)
+            case .tooLate:
+                ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel).disabled(true)
+                Text(verbatim: AppointmentRules.cancelTooLateText()).font(Typo.small).foregroundStyle(Theme.muted)
+            }
         }
     }
 }
@@ -247,7 +293,8 @@ private struct CancelAppointmentSheet: View {
                 SectionCard {
                     ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName)
                 }
-                PatientTextArea(label: L.text("appointments.cancel.reason"), text: $reason, lines: 3...6, error: fieldError)
+                PatientTextArea(label: L.text("appointments.cancel.reason"), text: $reason, lines: 3...6, error: fieldError ?? submission.fieldErrors["reason"])
+                CharacterCounter(count: reason.trimmingCharacters(in: .whitespacesAndNewlines).count, range: 10...500)
                 PatientSubmissionNotice(submission: submission)
                 if submission.lastFailure?.code == "version_conflicto" { ConflictBanner { Task { await reload(); dismiss() } } }
                 ClimesaButton(title: L.text("appointments.cancel.confirm"), kind: .destructive, loading: submission.busy) { Task { await send() } }
@@ -291,7 +338,9 @@ private struct RequestAppointmentSheet: View {
                         }
                     }.pickerStyle(.menu)
                 }
+                // El día de la cita es el de El Salvador, no el de la zona horaria del teléfono.
                 DatePicker("appointments.date", selection: $day, in: Date()..., displayedComponents: .date)
+                    .environment(\.timeZone, ClimesaDates.zone).environment(\.calendar, ClimesaDates.calendar)
                 if !doctorId.isEmpty {
                     SectionTitle("appointments.slots")
                     LoadState(loader: availability, retry: loadSlots) { value in
@@ -308,7 +357,7 @@ private struct RequestAppointmentSheet: View {
                         }
                     }
                 }
-                PatientTextArea(label: L.text("appointments.reason"), text: $reason, lines: 2...4, error: AppointmentRules.requestReasonError(reason))
+                PatientTextArea(label: L.text("appointments.reason"), text: $reason, lines: 2...4, error: AppointmentRules.requestReasonError(reason) ?? submission.fieldErrors["reason"])
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.submit"), loading: submission.busy) { Task { await send() } }
                     .disabled(slot == nil || AppointmentRules.requestReasonError(reason) != nil)

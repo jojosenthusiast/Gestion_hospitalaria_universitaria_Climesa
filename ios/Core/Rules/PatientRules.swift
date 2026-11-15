@@ -85,6 +85,36 @@ public enum AppointmentRules {
         return start > now && (appointment.state == .solicitada || appointment.state == .confirmada)
     }
 
+    /// RN-21 (política `citas.cancelacion_horas`): el paciente cancela hasta 2 h antes del inicio.
+    public static let patientCancelHours = 2
+
+    /// Qué puede hacer el paciente con "Cancelar" según estado y hora (CITA-04): no se ofrece lo que la API rechazaría.
+    public enum CancelOption: Equatable, Sendable {
+        /// Cita pasada, empezada o ya en un estado final: no se muestra la acción.
+        case hidden
+        /// Se puede cancelar hasta `deadline`.
+        case allowed(deadline: Date)
+        /// Faltan menos de `patientCancelHours`: la acción se muestra desactivada con el motivo.
+        case tooLate(deadline: Date)
+    }
+
+    public static func cancelOption(_ appointment: Appointment, now: Date, hours: Int = AppointmentRules.patientCancelHours) -> CancelOption {
+        guard canCancel(appointment, now: now), let start = ClimesaDates.parse(appointment.start) else { return .hidden }
+        let deadline = start.addingTimeInterval(-Double(hours) * 3600)
+        return now < deadline ? .allowed(deadline: deadline) : .tooLate(deadline: deadline)
+    }
+
+    /// "Puedes cancelar hasta las 08:00" (el mismo día) o "... hasta las 08:00 del 20 nov 2026", en hora de El Salvador.
+    public static func cancelDeadlineText(_ deadline: Date, now: Date) -> String {
+        let time = ClimesaDates.display(ClimesaDates.iso(deadline), .time)
+        if ClimesaDates.localDay(deadline) == ClimesaDates.localDay(now) { return "Puedes cancelar hasta las \(time)." }
+        return "Puedes cancelar hasta las \(time) del \(ClimesaDates.display(ClimesaDates.iso(deadline), .date))."
+    }
+
+    public static func cancelTooLateText(hours: Int = AppointmentRules.patientCancelHours) -> String {
+        "Ya no puedes cancelar desde la aplicación: faltan menos de \(hours) h para la cita. Comunícate con Recepción."
+    }
+
     /// `AppointmentCancelDto.reason`: de 10 a 500 caracteres.
     public static func cancelReasonError(_ reason: String) -> String? {
         let size = reason.trimmingCharacters(in: .whitespacesAndNewlines).count

@@ -1,15 +1,15 @@
 {
-  "operation": "POST /admisiones/{id}/alta",
-  "source": "DischargeBody",
+  "method": "POST",
+  "path": "/api/v1/admisiones/{id}/alta",
   "body": {
+    "type": "medica",
+    "version": 3,
+    "summary": "Evolución favorable; afebril 48 horas y saturación normal sin oxígeno.",
     "pending": [
       {
-        "description": "Control en consulta externa",
+        "description": "Control en consulta externa en 7 días",
         "responsible": "Paciente"
       }
-    ],
-    "summary": "Evolución favorable, afebril por 48 horas.",
-    "type": "medica",
-    "version": 3
+    ]
   }
 }
