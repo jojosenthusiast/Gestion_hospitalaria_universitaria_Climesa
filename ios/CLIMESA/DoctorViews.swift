@@ -348,7 +348,8 @@ private struct ReviewDetailView: View {
     }
 }
 
-/// I24 · Mis hospitalizados: paciente, cama y estado; firmar alta con pendientes y responsables.
+/// I24 · Mis hospitalizados: paciente, cama y estado; firmar o revocar el alta. Cada botón sale de `allowedActions`
+/// de la API (BL-03, MA-HOS-02); la solicitud de alta de Recepción y el alta firmada se muestran en la fila.
 struct HospitalizedView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
@@ -356,26 +357,76 @@ struct HospitalizedView: View {
 
     var body: some View {
         LoadState(loader: loader, retry: load) { admissions in
-            let current = DischargeRules.current(admissions)
-            if current.isEmpty { EmptyStateView(title: L.text("hospitalized.none"), symbol: "bed.double") }
-            ForEach(current) { admission in
-                SectionCard {
-                    ListRow(
-                        title: admission.patientName ?? L.text("day.patient.unknown"),
-                        subtitle: admission.bed.isEmpty ? L.text("hospitalized.noBed") : String(format: L.text("hospitalized.bed"), admission.bed),
-                        meta: admission.requestedCategory.label + (admission.isolation ? " · " + L.text("hospitalized.isolation") : "")
-                    ) { MedicoTag(admission.state.rawValue, label: admission.state.label) }
-                    if admission.state == .hospitalizado && account.can("alta.firmar") {
-                        NavigationLink { DischargeView(admission: admission, reload: load) } label: { Text("hospitalized.discharge") }
-                            .buttonStyle(ClimesaButtonStyle(kind: .secondary))
-                    }
-                }
+            let listed = DischargeRules.listed(admissions)
+            if listed.isEmpty { EmptyStateView(title: L.text("hospitalized.none"), symbol: "bed.double") }
+            ForEach(listed) { admission in
+                HospitalizedRow(admission: admission, actions: HospitalizedRowActions.of(admission), reload: load)
             }
         }
         .task(id: live.snapshot.version(.admissions)) { await load() }
     }
 
     private func load() async { await loader.load { try await account.client().get("/admisiones", as: [Admission].self) } }
+}
+
+private struct HospitalizedRow: View {
+    let admission: Admission
+    let actions: HospitalizedRowActions
+    let reload: () async -> Void
+
+    var body: some View {
+        SectionCard {
+            ListRow(
+                title: admission.patientName ?? L.text("day.patient.unknown"),
+                subtitle: admission.bed.isEmpty ? L.text("hospitalized.noBed") : String(format: L.text("hospitalized.bed"), admission.bed),
+                meta: admission.requestedCategory.label + (admission.isolation ? " · " + L.text("hospitalized.isolation") : "")
+            ) { MedicoTag(admission.state.rawValue, label: admission.state.label) }
+            if let name = admission.attendingDoctorName, !name.isEmpty {
+                Text(verbatim: String(format: L.text("hospitalized.attending"), name)).font(Typo.small).foregroundStyle(Theme.muted)
+            }
+            if let hint = actions.requestHint {
+                HStack(alignment: .top, spacing: Spacing.s) {
+                    Image(systemName: "bell.badge").foregroundStyle(Theme.warning).accessibilityHidden(true)
+                    Text(verbatim: hint).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(Spacing.s).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.warningSoft, in: RoundedRectangle(cornerRadius: 8))
+                .accessibilityElement(children: .combine)
+            }
+            if let discharge = actions.discharge { SignedDischarge(discharge: discharge) }
+            if actions.sign {
+                NavigationLink { DischargeView(admission: admission, reload: reload) } label: { Text("hospitalized.discharge") }
+                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+            }
+            if actions.revoke {
+                NavigationLink { RevokeDischargeView(admission: admission, reload: reload) } label: { Text("hospitalized.revoke") }
+                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+            }
+        }
+    }
+}
+
+/// Alta firmada vigente: tipo, quién y cuándo, y los pendientes con su responsable (RN-11).
+private struct SignedDischarge: View {
+    let discharge: Admission.Discharge
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text(verbatim: String(format: L.text("hospitalized.discharge.signed"), discharge.kind?.label ?? "—"))
+                .font(Typo.label).foregroundStyle(Theme.ink)
+            Text(verbatim: String(format: L.text("hospitalized.discharge.signedBy"), discharge.signedByName ?? "—", ClimesaDates.display(discharge.signedAt)))
+                .font(Typo.small).foregroundStyle(Theme.muted)
+            if discharge.pending.isEmpty {
+                Text("hospitalized.discharge.noPending").font(Typo.small).foregroundStyle(Theme.muted)
+            } else {
+                ForEach(Array(discharge.pending.enumerated()), id: \.offset) { _, item in
+                    Text(verbatim: String(format: L.text("hospitalized.discharge.pendingItem"), item.description, item.responsible))
+                        .font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
 }
 
 private struct PendingLine: Identifiable {
@@ -404,18 +455,25 @@ private struct DischargeView: View {
                     Text("discharge.type").font(Typo.label).foregroundStyle(Theme.ink)
                     Picker("discharge.type", selection: $type) {
                         ForEach(DischargeType.allCases, id: \.self) { Text(verbatim: $0.label).tag($0) }
-                    }.pickerStyle(.segmented)
+                    }.pickerStyle(.menu).tint(Theme.primary)
+                    FieldError(text: submission.fieldErrors["type"])
                 }
-                MedicoTextArea(label: L.text("discharge.summary"), text: $summary, error: errors["summary"] ?? submission.fieldErrors["summary"])
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    MedicoTextArea(label: L.text("discharge.summary"), text: $summary, error: errors["summary"] ?? submission.fieldErrors["summary"])
+                    CharacterCounter(count: summary.trimmingCharacters(in: .whitespacesAndNewlines).count, range: 10...2000)
+                }
                 if type == .voluntaria {
                     Toggle("discharge.consent", isOn: $consent).font(Typo.body).tint(Theme.primary)
-                    FieldError(text: errors["voluntaryConsent"])
+                    FieldError(text: errors["voluntaryConsent"] ?? submission.fieldErrors["voluntaryConsent"])
                 }
             }
             SectionCard(title: L.text("discharge.pending")) {
                 ForEach($pending) { $line in
                     FormField(label: L.text("discharge.pending.description"), text: $line.description)
                     FormField(label: L.text("discharge.pending.responsible"), text: $line.responsible)
+                    ClimesaButton(title: L.text("discharge.pending.remove"), kind: .secondary) {
+                        pending.removeAll { $0.id == line.id }
+                    }
                 }
                 FieldError(text: errors["pending"] ?? submission.fieldErrors["pending"])
                 ClimesaButton(title: L.text("discharge.pending.add"), kind: .secondary) { pending.append(PendingLine()) }
@@ -433,6 +491,47 @@ private struct DischargeView: View {
         let body = DischargeBody(type: type, version: admission.version, summary: text.isEmpty ? nil : text, voluntaryConsent: type == .voluntaria ? consent : nil, pending: lines)
         let ok = await submission.run(admission.id, body: body) { key in
             _ = try await account.client().send("POST", "/admisiones/\(admission.id)/alta", body: body, key: key, as: AdmissionCommandResult.self)
+        }
+        await reload()
+        if ok { dismiss() }
+    }
+}
+
+/// MA-HOS-02 · Revocar un alta firmada mientras no haya salida: vuelve a hospitalizado, con motivo (10 a 500).
+private struct RevokeDischargeView: View {
+    let admission: Admission
+    let reload: () async -> Void
+    @EnvironmentObject private var account: AccountModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var submission = Submission()
+    @State private var reason = ""
+    @State private var reasonError: String?
+
+    var body: some View {
+        ScreenFrame(title: "hospitalized.revoke") {
+            Text(verbatim: admission.patientName ?? L.text("day.patient.unknown")).font(Typo.heading).foregroundStyle(Theme.ink)
+            if let discharge = admission.discharge { SectionCard { SignedDischarge(discharge: discharge) } }
+            SectionCard {
+                Text("revoke.intro").font(Typo.small).foregroundStyle(Theme.muted)
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    MedicoTextArea(label: L.text("revoke.reason"), text: $reason, error: reasonError ?? submission.fieldErrors["reason"], lines: 3...6)
+                    CharacterCounter(count: DischargeRevocationRules.reasonCount(reason), range: DischargeRevocationRules.reasonRange)
+                }
+                .onChange(of: reason) { _, value in
+                    if reasonError != nil { reasonError = DischargeRevocationRules.reasonError(value) }
+                }
+            }
+            WriteNotice(submission: submission, reload: reload)
+            ClimesaButton(title: L.text("hospitalized.revoke"), loading: submission.busy) { Task { await revoke() } }
+        }
+    }
+
+    private func revoke() async {
+        reasonError = DischargeRevocationRules.reasonError(reason)
+        guard reasonError == nil else { return }
+        let body = DischargeRevocationBody(version: admission.version, reason: reason)
+        let ok = await submission.run(admission.id, body: body) { key in
+            _ = try await account.client().send("POST", "/admisiones/\(admission.id)/revocar-alta", body: body, key: key, as: AdmissionCommandResult.self)
         }
         await reload()
         if ok { dismiss() }

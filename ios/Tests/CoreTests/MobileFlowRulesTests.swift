@@ -15,8 +15,8 @@ final class FieldErrorTests: XCTestCase {
     func testElInglesDeClassValidatorNuncaSeMuestra() {
         let body = Data(#"{"type":"x","title":"Datos no válidos","status":400,"codigo":"validacion","detail":"motive must be longer than or equal to 10 characters","campo":"motive","requestId":"req-2"}"#.utf8)
         let failure = APIFailure.from(status: 400, body: body)
-        XCTAssertEqual(failure.message, "Revisa los datos e inténtalo de nuevo. (código de soporte: req-2)")
-        XCTAssertTrue(failure.fieldErrors.isEmpty)
+        XCTAssertEqual(failure.message, "Revisa el dato «motivo» e inténtalo de nuevo. (código de soporte: req-2)")
+        XCTAssertEqual(failure.fieldErrors, ["motive": "Revisa este dato."])
     }
 
     func testSinErroresPorCampoElDetalleEnEspanolVaAlCampoIndicado() {
@@ -43,12 +43,12 @@ final class AdmissionRulesTests: XCTestCase {
         XCTAssertEqual(AdmissionRules.motiveCount("  abc \n"), 3)
     }
 
-    func testElCuerpoLlevaLaConsultaComoOrigenYAlMedicoComoTratante() throws {
-        let body = AdmissionBody(patientId: "p", consultationId: "c", category: .vip, isolation: false, attendingDoctorId: "d", motive: " Motivo suficiente ")
+    func testElCuerpoLlevaLaConsultaComoOrigenYOmiteAlTratante() throws {
+        let body = AdmissionBody(patientId: "p", consultationId: "c", category: .vip, isolation: false, motive: " Motivo suficiente ")
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONBody.encode(body)) as? [String: Any])
         XCTAssertEqual(json["origin"] as? String, "consulta")
         XCTAssertEqual(json["originId"] as? String, "c")
-        XCTAssertEqual(json["attendingDoctorId"] as? String, "d")
+        XCTAssertNil(json["attendingDoctorId"])
         XCTAssertEqual(json["motive"] as? String, "Motivo suficiente")
         XCTAssertNil(json["reason"])
     }

@@ -107,12 +107,16 @@ public enum APIFailure: Error, Equatable, Sendable {
             case "version_conflicto": text = "Otra persona cambió este registro. Se cargó la versión actual: revísala y vuelve a intentar."
             case "idempotencia_conflicto": text = "Esta acción ya se había enviado con otros datos. Vuelve a intentar."
             case _ where isRouteNotFound: text = "Esta función todavía no está disponible en el servidor. Vuelve a intentar más tarde."
-            default: text = problem?.detail.flatMap { ProblemText.isShowable($0) ? $0 : nil } ?? APIFailure.fallback(status)
+            case let code?: text = showableDetail ?? ProblemText.codeMessage(code, field: problem?.field) ?? APIFailure.fallback(status)
+            default: text = showableDetail ?? APIFailure.fallback(status)
             }
             guard let id = problem?.requestId, !id.isEmpty else { return text }
             return "\(text) (código de soporte: \(id))"
         }
     }
+
+    /// `detail` del servidor solo si está en español.
+    private var showableDetail: String? { problem?.detail.flatMap { ProblemText.isShowable($0) ? $0 : nil } }
 
     /// Mensajes en español por campo del cuerpo (`motive`, `phone`...). La ruta `pending[0].description` queda también
     /// bajo su raíz (`pending`). Sin `errors[]`, el `campo` del problema recibe el `detail` si está en español.
@@ -126,7 +130,11 @@ public enum APIFailure: Error, Equatable, Sendable {
             if result[root] == nil { result[root] = message }
         }
         for issue in problem.errors { put(issue.field, issue.message) }
-        if result.isEmpty, let field = problem.field, !field.isEmpty, let detail = problem.detail { put(field, detail) }
+        if result.isEmpty, let field = problem.field, !field.isEmpty {
+            // Un `detail` en inglés no se muestra: el campo recibe un texto en español.
+            if let detail = problem.detail, ProblemText.isShowable(detail) { put(field, detail) }
+            else if problem.code == "validacion" { put(field, "Revisa este dato.") }
+        }
         return result
     }
 
@@ -150,6 +158,38 @@ public enum ProblemText {
     public static func isShowable(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return !trimmed.isEmpty && trimmed.range(of: english, options: .regularExpression) == nil
+    }
+
+    /// Texto en español por `codigo` cuando el `detail` falta o no se puede mostrar. Nil si el código no tiene uno propio.
+    public static func codeMessage(_ code: String, field: String?) -> String? {
+        switch code {
+        case "transicion_invalida": return "La admisión cambió de estado; vuelve a cargar."
+        case "validacion":
+            guard let field, let label = fieldLabel(field) else { return "Revisa los datos e inténtalo de nuevo." }
+            return "Revisa el dato «\(label)» e inténtalo de nuevo."
+        case "servicio_finalizado": return "El servicio ya terminó; vuelve a cargar."
+        case "sin_paramedico_de_turno": return "No hay paramédico con cuenta en la app con turno en curso."
+        case "conflicto": return "La operación no se pudo completar porque el registro cambió. Vuelve a cargar."
+        case "sin_permiso": return "No tienes permiso para esta acción."
+        default: return nil
+        }
+    }
+
+    /// Nombre en español de un campo del cuerpo (`pending[0].responsible` → "pendientes"); nil si no se conoce, para no
+    /// mostrar el identificador en inglés.
+    public static func fieldLabel(_ path: String) -> String? {
+        switch rootField(path) {
+        case "reason", "motive": return "motivo"
+        case "summary": return "resumen"
+        case "pending": return "pendientes"
+        case "voluntaryConsent": return "consentimiento"
+        case "type": return "tipo de alta"
+        case "version": return "versión"
+        case "requestedCategory": return "categoría"
+        case "attendingDoctorId": return "médico tratante"
+        case "note": return "nota"
+        default: return nil
+        }
     }
 
     /// `pending[0].description` → `pending`; `motive` → `motive`.

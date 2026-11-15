@@ -9,7 +9,7 @@ final class ContractFixtureTests: XCTestCase {
     private let doctor = "33333333-3333-4333-8333-333333333333"
 
     func testIndicacionDeHospitalizacionDesdeLaConsulta() throws {
-        let body = AdmissionBody(patientId: patient, consultationId: consultation, category: .semiprivada, isolation: true, attendingDoctorId: doctor,
+        let body = AdmissionBody(patientId: patient, consultationId: consultation, category: .semiprivada, isolation: true,
                                  motive: "  Neumonía con saturación de 88 %; requiere oxígeno y antibiótico intravenoso.\n")
         try assertMatches(body, fixture: "admission-indication")
     }

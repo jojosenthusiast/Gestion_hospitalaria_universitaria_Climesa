@@ -69,6 +69,8 @@ public enum DischargeRules {
         if pending.count > 50 { errors["pending"] = "Se admiten hasta 50 pendientes." }
         if pending.contains(where: { $0.description.trimmingCharacters(in: .whitespaces).isEmpty || $0.responsible.trimmingCharacters(in: .whitespaces).isEmpty }) {
             errors["pending"] = "Cada pendiente necesita descripción y responsable."
+        } else if pending.contains(where: { $0.description.count > 500 || $0.responsible.count > 200 }) {
+            errors["pending"] = "La descripción admite hasta 500 caracteres y el responsable hasta 200."
         }
         return errors
     }
@@ -76,5 +78,59 @@ public enum DischargeRules {
     /// Hospitalizados del médico: en cama o esperando una.
     public static func current(_ admissions: [Admission]) -> [Admission] {
         admissions.filter { $0.state == .hospitalizado || $0.state == .pendienteCama }
+    }
+
+    /// Lista de I24: además de los vigentes, las altas firmadas que aún no salen (para ver el alta y poder revocarla).
+    public static func listed(_ admissions: [Admission]) -> [Admission] {
+        admissions.filter { $0.state == .hospitalizado || $0.state == .pendienteCama || $0.state == .altaFirmada }
+    }
+}
+
+/// I24: qué muestra cada fila de hospitalizados. Todo botón sale de `allowedActions`.
+public struct HospitalizedRowActions: Equatable, Sendable {
+    public let sign: Bool
+    public let revoke: Bool
+    /// "Recepción pidió el alta hace 5 min" si hay una solicitud vigente.
+    public let requestHint: String?
+    /// Alta firmada vigente para mostrar (tipo y pendientes).
+    public let discharge: Admission.Discharge?
+
+    public static func of(_ admission: Admission, now: Date = Date()) -> HospitalizedRowActions {
+        let requested = ClimesaDates.parse(admission.dischargeRequestedAt)
+        return HospitalizedRowActions(
+            sign: admission.allows(.firmarAlta),
+            revoke: admission.allows(.revocarAlta),
+            requestHint: requested.map { "Recepción pidió el alta " + RelativeTime.text($0, now: now) + "." },
+            discharge: admission.discharge
+        )
+    }
+}
+
+/// Tiempo transcurrido en español ("hace un momento", "hace 5 min", "hace 2 h", "hace 3 días").
+public enum RelativeTime {
+    public static func text(_ date: Date, now: Date) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        if seconds < 60 { return "hace un momento" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "hace \(minutes) min" }
+        let hours = minutes / 60
+        if hours < 24 { return "hace \(hours) h" }
+        let days = hours / 24
+        return days == 1 ? "hace 1 día" : "hace \(days) días"
+    }
+}
+
+/// I24: revocar un alta firmada (`DischargeRevocationDto.reason`, de 10 a 500 caracteres).
+public enum DischargeRevocationRules {
+    public static let reasonRange = 10...500
+
+    public static func reasonCount(_ reason: String) -> Int { reason.trimmingCharacters(in: .whitespacesAndNewlines).count }
+
+    public static func reasonError(_ reason: String) -> String? {
+        let size = reasonCount(reason)
+        if size == 0 { return "Escribe el motivo para revocar el alta." }
+        if size < reasonRange.lowerBound { return "El motivo necesita al menos 10 caracteres (llevas \(size))." }
+        if size > reasonRange.upperBound { return "El motivo admite hasta 500 caracteres (llevas \(size))." }
+        return nil
     }
 }

@@ -3685,6 +3685,105 @@
           }
         }
       }
+    },
+    "hospitalized.revoke": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revocar alta"
+          }
+        }
+      }
+    },
+    "hospitalized.attending": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tratante: %@"
+          }
+        }
+      }
+    },
+    "hospitalized.discharge.signed": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alta firmada: %@"
+          }
+        }
+      }
+    },
+    "hospitalized.discharge.signedBy": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Firmó %@ · %@"
+          }
+        }
+      }
+    },
+    "hospitalized.discharge.noPending": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin pendientes al alta."
+          }
+        }
+      }
+    },
+    "hospitalized.discharge.pendingItem": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• %@ (responsable: %@)"
+          }
+        }
+      }
+    },
+    "discharge.pending.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar pendiente"
+          }
+        }
+      }
+    },
+    "revoke.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La admisión vuelve a hospitalizado mientras no haya salida. Escribe por qué revocas el alta."
+          }
+        }
+      }
+    },
+    "revoke.reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motivo de la revocación"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
