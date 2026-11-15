@@ -1413,7 +1413,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Notas de enfermería de la admisión, de la más reciente a la más antigua */
+        get: operations["HospitalizationController_notes"];
         put?: never;
         post: operations["HospitalizationController_note"];
         delete?: never;
@@ -1448,6 +1449,91 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["HospitalizationController_exit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admisiones/{id}/cancelar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancelar una admisión pendiente de cama, con motivo */
+        post: operations["HospitalizationController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admisiones/{id}/anular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Anular una hospitalización ingresada por error: cierra la ocupación y la cama pasa a limpieza */
+        post: operations["HospitalizationController_annul"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admisiones/{id}/tratante": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reasignar el médico tratante, con motivo */
+        post: operations["HospitalizationController_changeAttending"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admisiones/{id}/solicitar-alta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pedir al médico tratante que firme el alta (le llega un aviso en vivo) */
+        post: operations["HospitalizationController_requestDischarge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admisiones/{id}/revocar-alta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revocar un alta firmada antes de la salida física (el firmante o Jefatura) */
+        post: operations["HospitalizationController_revokeDischarge"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2047,6 +2133,23 @@ export interface paths {
         put?: never;
         /** Registrar hito en orden: salida, en escena, trasladando, en hospital, finalizado */
         post: operations["AmbulanceController_milestone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/servicios/{id}/cerrar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cierre administrativo de un servicio activo (Jefatura, con motivo): queda cancelado y la unidad vuelve a Disponible */
+        post: operations["AmbulanceController_close"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3698,6 +3801,8 @@ export interface components {
             name: string;
             specialty: string | null;
             available: boolean;
+            /** @description Tiene cuenta activa en la app: puede firmar el alta */
+            hasAccount: boolean;
             /** @description Motivo por el que no está disponible */
             reason: string | null;
         };
@@ -3743,6 +3848,21 @@ export interface components {
         OrigenAdmision: "cita" | "consulta" | "emergencia" | "ambulancia" | "programada";
         /** @enum {string} */
         TipoAislamiento: "contacto" | "gotitas" | "aerea" | "protector";
+        /** @enum {string} */
+        TipoAlta: "medica" | "voluntaria" | "traslado" | "defuncion";
+        DischargePendingResponse: {
+            description: string;
+            responsible: string;
+        };
+        AdmissionDischargeResponse: {
+            type: components["schemas"]["TipoAlta"];
+            /** Format: date-time */
+            signedAt: string;
+            signedByName: string | null;
+            pending: components["schemas"]["DischargePendingResponse"][];
+        };
+        /** @enum {string} */
+        AccionAdmision: "asignar_cama" | "autorizar" | "cancelar" | "anular" | "trasladar" | "firmar_alta" | "solicitar_alta" | "revocar_alta" | "registrar_salida" | "reasignar_tratante" | "nota_enfermeria";
         AdmissionResponse: {
             /** Format: uuid */
             id: string;
@@ -3771,6 +3891,20 @@ export interface components {
             postSurgical: boolean;
             visitorsAllowed: boolean;
             visitorsMax: number;
+            attendingDoctorName: string | null;
+            /** @description El médico tratante tiene cuenta activa en la app (puede firmar el alta) */
+            attendingDoctorHasAccount: boolean;
+            /** @description Categoría de la cama actual */
+            bedCategory: components["schemas"]["CategoriaHabitacion"] | null;
+            /** @description Jefatura autorizó una excepción de categoría */
+            authorized: boolean;
+            /**
+             * Format: date-time
+             * @description Última solicitud de alta al médico tratante
+             */
+            dischargeRequestedAt: string | null;
+            discharge: components["schemas"]["AdmissionDischargeResponse"] | null;
+            allowedActions: components["schemas"]["AccionAdmision"][];
         };
         AdmissionDto: {
             /** Format: uuid */
@@ -3880,6 +4014,32 @@ export interface components {
             /** Format: uuid */
             bedId: string;
             version: number;
+        };
+        NursingNoteEntryResponse: {
+            /** Format: uuid */
+            id: string;
+            text: string;
+            /** Format: date-time */
+            createdAt: string;
+            authorName: string | null;
+        };
+        AdmissionCloseDto: {
+            version: number;
+            reason: string;
+        };
+        AttendingChangeDto: {
+            /** Format: uuid */
+            attendingDoctorId: string;
+            version: number;
+            reason: string;
+        };
+        DischargeRequestDto: {
+            version: number;
+            note?: string;
+        };
+        DischargeRevocationDto: {
+            version: number;
+            reason: string;
         };
         AdmissionIndicationDto: {
             /** Format: uuid */
@@ -4624,6 +4784,8 @@ export interface components {
             staffId: string;
             role: components["schemas"]["FuncionTripulacion"];
             name: string;
+            /** @description Tiene cuenta activa en la app: puede registrar hitos */
+            hasAccount: boolean;
         };
         /** @enum {string} */
         HitoServicio: "salida" | "en_escena" | "trasladando" | "en_hospital" | "finalizado";
@@ -4638,6 +4800,11 @@ export interface components {
             /** Format: date-time */
             capturedAt: string;
         };
+        /**
+         * @description Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)
+         * @enum {string}
+         */
+        AccionServicioAmbulancia: "cerrar";
         ActiveServiceResponse: {
             /** Format: uuid */
             id: string;
@@ -4656,6 +4823,8 @@ export interface components {
             milestones: components["schemas"]["MilestoneEntryResponse"][];
             nextMilestones: components["schemas"]["HitoServicio"][];
             lastLocation: components["schemas"]["LocationPointResponse"] | null;
+            /** @description Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo) */
+            allowedActions: components["schemas"]["AccionServicioAmbulancia"][];
         };
         /** @enum {string} */
         MotivoBloqueoDespacho: "en_servicio" | "en_mantenimiento" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno";
@@ -4694,6 +4863,8 @@ export interface components {
             paramedicOnDuty: boolean;
             /** @description Hay motorista con turno en curso (RN-30 exige paramédico y motorista) */
             driverOnDuty: boolean;
+            /** @description Hay un paramédico con cuenta activa y turno en curso (BL-05: sin él no se despacha) */
+            paramedicWithAccountOnDuty: boolean;
             /** @description Por qué no se puede despachar ahora; null si se puede */
             dispatchBlock: components["schemas"]["DispatchBlockResponse"] | null;
             /** @description Solo con ambulancia.despachar */
@@ -4800,6 +4971,18 @@ export interface components {
             unitVersion: number;
             nextMilestones: components["schemas"]["HitoServicio"][];
         };
+        CloseServiceDto: {
+            version: number;
+            reason: string;
+        };
+        CloseServiceResponse: {
+            /** Format: uuid */
+            id: string;
+            finalState: components["schemas"]["EstadoFinalServicio"];
+            version: number;
+            unitState: components["schemas"]["EstadoAmbulancia"];
+            unitVersion: number;
+        };
         PrehospitalDto: {
             reason: string;
             /** @enum {string} */
@@ -4885,6 +5068,8 @@ export interface components {
             /** Format: date-time */
             finishedAt: string | null;
             finalState: components["schemas"]["EstadoFinalServicio"] | null;
+            /** @description Lo cerró Jefatura (cierre administrativo), no la tripulación */
+            administrativeClose: boolean;
             crew: components["schemas"]["ServiceLogCrewResponse"][];
             responseMinutes: number | null;
             milestones: components["schemas"]["MilestoneEntryResponse"][];
@@ -11478,6 +11663,72 @@ export interface operations {
             };
         };
     };
+    HospitalizationController_notes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NursingNoteEntryResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     HospitalizationController_note: {
         parameters: {
             query?: never;
@@ -11666,6 +11917,416 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdmissionExitResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    HospitalizationController_cancel: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdmissionCloseDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionCommandResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    HospitalizationController_annul: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdmissionCloseDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionCommandResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    HospitalizationController_changeAttending: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttendingChangeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionCommandResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    HospitalizationController_requestDischarge: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DischargeRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionCommandResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    HospitalizationController_revokeDischarge: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DischargeRevocationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdmissionCommandResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
@@ -14252,6 +14913,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MilestoneResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AmbulanceController_close: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseServiceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloseServiceResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
