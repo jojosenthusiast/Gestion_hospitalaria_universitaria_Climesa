@@ -159,7 +159,7 @@ create temp table personas_sobran on commit drop as
 delete from personal.persona p where p.id::text like 'de300000-%' and p.id not in (select id from personas_sobran);
 
 -- ---------------------------------------------------------------------------------------------------------
--- 7. Infraestructura: bloqueos, limpiezas, equipo y espacios de la Planta 4 (hijos antes que padres)
+-- 7. Infraestructura: bloqueos, limpiezas, equipo y espacios demo (hijos antes que padres). La semilla actual ya no crea la Planta 4 (BL-01); esto también borra la de una semilla anterior.
 -- ---------------------------------------------------------------------------------------------------------
 delete from infra.limpieza_cama where id::text like 'de300000-%' or cama_id::text like 'de300000-%';
 delete from infra.bloqueo_cama where id::text like 'de300000-%' or cama_id::text like 'de300000-%';

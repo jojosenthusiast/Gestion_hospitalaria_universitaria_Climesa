@@ -129,10 +129,16 @@ describe('Datos de demostración (tools/demo)', () => {
     expect(ordenes.some(o => o.estado === 'pendiente' && o.items.includes('HB'))).toBe(true);
     for (const estado of ['pendiente', 'en_proceso', 'completado', 'cancelado']) expect(ordenes.some(o => o.estado === estado)).toBe(true);
 
-    const camas = (await t.pg.query<{ estado: string }>(`SELECT DISTINCT estado FROM infra.v_estado_cama WHERE cama_id::text LIKE ${DEMO}`)).rows.map(r => r.estado).sort();
+    // BL-01: la demo ocupa las camas reales de hospitalización (HAB-201 a 206 y VIP-301 a 305), no una planta inventada.
+    const HOSPITAL = `cama_id IN (SELECT id FROM infra.espacio WHERE tipo = 'cama' AND (codigo LIKE 'HAB-20%' OR codigo LIKE 'VIP-30%'))`;
+    const camas = (await t.pg.query<{ estado: string }>(`SELECT DISTINCT estado FROM infra.v_estado_cama WHERE ${HOSPITAL}`)).rows.map(r => r.estado).sort();
     expect(camas).toEqual(['bloqueada', 'libre', 'limpieza', 'ocupada', 'reservada']);
-    const categorias = (await t.pg.query<{ categoria: string }>(`SELECT DISTINCT categoria FROM infra.v_estado_cama WHERE cama_id::text LIKE ${DEMO} AND estado = 'ocupada'`)).rows.map(r => r.categoria).sort();
+    const categorias = (await t.pg.query<{ categoria: string }>(`SELECT DISTINCT categoria FROM infra.v_estado_cama WHERE ${HOSPITAL} AND estado = 'ocupada'`)).rows.map(r => r.categoria).sort();
     expect(categorias).toEqual(['semiprivada', 'vip']);
+    expect(Number((await t.one<{ n: string }>(`SELECT count(*) AS n FROM infra.espacio WHERE codigo IN ('P4', 'P4-HOS') OR (id::text LIKE ${DEMO} AND tipo IN ('habitacion', 'cama'))`)).n)).toBe(0);
+    const fuera = (await t.pg.query<{ codigo: string }>(`SELECT DISTINCT e.codigo FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio e ON e.id = o.cama_id
+      WHERE o.id::text LIKE ${DEMO} AND NOT (e.codigo LIKE 'HAB-20%' OR e.codigo LIKE 'VIP-30%')`)).rows;
+    expect(fuera).toEqual([]);
 
     const citas = (await t.pg.query<{ estado: string }>(`SELECT DISTINCT estado FROM atencion.cita WHERE id::text LIKE ${DEMO}`)).rows.map(r => r.estado).sort();
     expect(citas).toEqual(['atendida', 'cancelada', 'confirmada', 'no_asistio', 'rechazada', 'solicitada']);
@@ -302,15 +308,15 @@ describe('Datos de demostración (tools/demo)', () => {
     const tipos = (await t.pg.query<{ tipo: string }>(`SELECT DISTINCT p.tipo FROM personal.turno u JOIN personal.persona p ON p.id = u.persona_id
       WHERE u.id::text LIKE ${DEMO} AND u.estado <> 'cancelado' AND lower(u.periodo) >= now() - interval '1 day'`)).rows.map(r => r.tipo).sort();
     expect(tipos).toEqual(['administrativo', 'asistente', 'enfermero', 'laboratorista', 'limpieza', 'medico', 'motorista', 'paramedico', 'recepcionista']);
-    for (const area of ['P1-REC', 'P1-CON', 'P1-LAB', 'P1-AMB', 'P2-HOS', 'P3-VIP', 'P4-HOS']) {
+    for (const area of ['P1-REC', 'P1-CON', 'P1-LAB', 'P1-AMB', 'P2-HOS', 'P3-VIP']) {
       const dias = Number((await t.one<{ n: string }>(`SELECT count(DISTINCT (lower(u.periodo) AT TIME ZONE 'America/El_Salvador')::date) AS n FROM personal.turno u
         JOIN infra.espacio e ON e.id = u.area_id WHERE e.codigo = '${area}' AND u.estado <> 'cancelado'
         AND (lower(u.periodo) AT TIME ZONE 'America/El_Salvador')::date BETWEEN (now() AT TIME ZONE 'America/El_Salvador')::date AND (now() AT TIME ZONE 'America/El_Salvador')::date + 13`)).n);
       expect({ area, dias }).toEqual({ area, dias: 14 });
     }
-    // Las noches del hospital las cubren dos personas alternas: toda noche de la Planta 4 tiene un turno nocturno.
+    // Las noches del hospital las cubren dos personas alternas: toda noche de la Planta 2 tiene un turno nocturno.
     const noches = Number((await t.one<{ n: string }>(`SELECT count(DISTINCT (lower(u.periodo) AT TIME ZONE 'America/El_Salvador')::date) AS n FROM personal.turno u
-      JOIN infra.espacio e ON e.id = u.area_id WHERE e.codigo = 'P4-HOS' AND u.tipo = 'nocturno' AND u.estado <> 'cancelado'
+      JOIN infra.espacio e ON e.id = u.area_id WHERE e.codigo = 'P2-HOS' AND u.tipo = 'nocturno' AND u.estado <> 'cancelado'
       AND (lower(u.periodo) AT TIME ZONE 'America/El_Salvador')::date BETWEEN (now() AT TIME ZONE 'America/El_Salvador')::date AND (now() AT TIME ZONE 'America/El_Salvador')::date + 13`)).n);
     expect(noches).toBe(14);
   });
