@@ -7,6 +7,7 @@ import { SessionExpiryWarning,useIdleSession } from './features/session';
 import { supabase } from './lib/supabase';
 import { demoAccounts } from './lib/demoLogin';
 import { useLive } from './lib/live';
+import { retryColdStart,SLOW_SERVER_MESSAGE,warmUpApi } from './lib/cold-start';
 import { LoginView,PatientSignupInfoView,StatusView } from './components/ui';
 import { HospitalShell } from './features/shell';
 import { PublicScreen } from './features/public-screen';
@@ -36,6 +37,8 @@ export default function App(){
 }
 function Login({notice,onAttempt}:{notice?:string;onAttempt:()=>void}){
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
+ // MA-OPS-01: wake the sleeping API while the person types, so the profile check after signing in answers quickly.
+ useEffect(()=>{if(import.meta.env.PROD)warmUpApi();},[]);
  async function submit(e:FormEvent){e.preventDefault();onAttempt();setBusy(true);setError(null);try{const {error}=await supabase!.auth.signInWithPassword({email:email.trim(),password});if(error)setError('Correo o contraseña incorrectos, o la cuenta todavía no está activa.');}catch{setError('No se pudo conectar. Revisa tu conexión e intenta de nuevo.');}finally{setBusy(false);}}
  return <LoginView {...{email,password,setEmail,setPassword,busy,error,notice,demoAccounts}} accepted={new URLSearchParams(location.search).get('invitacion')==='aceptada'} onSubmit={submit}/>;
 }
@@ -44,10 +47,11 @@ function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
  // recreate the client: pending intent keys survive and the views do not all reload on renewal.
  const token=useRef(session.access_token);token.current=session.access_token;
  const api=useMemo(()=>new IntentApi(async()=>{const {data}=await supabase!.auth.getSession();return data.session?.access_token??token.current;},()=>void supabase?.auth.signOut({scope:'local'})),[]);
- const [profile,setProfile]=useState<AccessProfile|null>(null),[error,setError]=useState<string|null>(null),[loading,setLoading]=useState(true);
- const load=useCallback(()=>{setLoading(true);setError(null);void api.request<AccessProfile>('/auth/me').then(setProfile).catch(e=>setError(e instanceof Error?e.message:'No se pudo verificar el acceso.')).finally(()=>setLoading(false));},[api]);
+ const [profile,setProfile]=useState<AccessProfile|null>(null),[error,setError]=useState<string|null>(null),[loading,setLoading]=useState(true),[slow,setSlow]=useState(false);
+ // MA-OPS-01: /auth/me is usually the request that wakes the API; it is retried and, after 5 s, the screen says why it waits.
+ const load=useCallback(()=>{setLoading(true);setError(null);setSlow(false);void retryColdStart(()=>api.request<AccessProfile>('/auth/me'),()=>setSlow(true)).then(setProfile).catch(e=>setError(e instanceof Error?e.message:'No se pudo verificar el acceso.')).finally(()=>{setLoading(false);setSlow(false);});},[api]);
  useEffect(load,[load]);
- if(loading&&!profile)return <StatusView title="Validando tu acceso" detail="Consultando los permisos vigentes de tu cuenta."/>;
+ if(loading&&!profile)return <StatusView title="Validando tu acceso" detail={slow?SLOW_SERVER_MESSAGE:'Consultando los permisos vigentes de tu cuenta.'}/>;
  if(error||!profile)return <div><StatusView title="No pudimos validar el acceso" detail={error??'Intenta nuevamente.'} action="Volver a intentar" onAction={load}/><button className="access-logout" onClick={()=>void supabase?.auth.signOut({scope:'local'})}>Cerrar sesión</button></div>;
  if(!profile.platforms.includes('web'))return <PlatformGuidanceScreen profile={profile} title="Tu rol no usa esta aplicación" action={{label:'Cerrar sesión',onClick:()=>void supabase?.auth.signOut({scope:'local'})}}/>;
  return <LivePortal {...{api,profile,session,onExpired}} refreshProfile={load}/>;
