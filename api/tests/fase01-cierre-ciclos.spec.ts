@@ -61,6 +61,12 @@ describe('Fase 0 · cierre del ciclo de la admisión', () => {
       expect(annulled.body.state).toBe('cancelada');
       expect(await t.one('SELECT motivo_fin FROM hospitalizacion.ocupacion_cama WHERE admision_id=$1', [admission.id])).toEqual({ motivo_fin: 'ingresado_por_error' });
       expect((await t.one('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1', [admission.bedId])).estado).toBe('limpieza');
+      // D-03 (MA-HOS-04): Jefatura registra la limpieza desde la Web; otra persona (Enfermería) la verifica.
+      const version = async () => (await t.one<{ version: number }>('SELECT version FROM infra.espacio WHERE id=$1', [admission.bedId])).version;
+      expect((await t.call('JOP', 'POST', `/camas/${admission.bedId}/limpieza/completar`, { version: await version(), reason: 'Limpieza terminal de la cama' })).status).toBe(201);
+      expect((await t.call('JOP', 'POST', `/camas/${admission.bedId}/limpieza/verificar`, { version: await version(), reason: 'Verificación de la limpieza' })).status).toBe(409);
+      expect((await t.call('ENF', 'POST', `/camas/${admission.bedId}/limpieza/verificar`, { version: await version(), reason: 'Verificación de la limpieza' })).status).toBe(201);
+      expect((await t.one('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1', [admission.bedId])).estado).toBe('libre');
     } finally { t.setNow(now); }
   });
 

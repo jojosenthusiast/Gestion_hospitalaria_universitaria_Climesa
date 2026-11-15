@@ -68,7 +68,7 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `camas.asignar` | Asignar cama a una admisión | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `camas.trasladar` | Trasladar a otra cama | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `camas.bloquear` | Bloquear o desbloquear una cama | · | ✔ | · | · | · | · | · | · | · | · |
-| `camas.registrar_limpieza` | Registrar limpieza de cama | · | · | · | · | ✔ | · | · | · | · | · |
+| `camas.registrar_limpieza` | Registrar limpieza de cama | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | `camas.verificar_limpieza` | Verificar limpieza (otra persona) | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | `recursos.gestionar` | Equipo médico por espacio y su estado | · | ✔ | · | · | · | · | · | · | · | · |
 | `recursos.configurar` | Tipos de equipo y catálogos de recursos | ✔ | · | · | · | · | · | · | · | · | · |
@@ -183,8 +183,8 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/camas` | `camas.ver_tablero` | Ocupante solo con camas.ver_ocupante | R | 2 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/camas/{id}/bloquear` | `camas.bloquear` | Motivo y versión obligatorios | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/camas/{id}/desbloquear` | `camas.bloquear` | Versión y motivo obligatorios | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
-| POST | `/api/v1/camas/{id}/limpieza` | `camas.registrar_limpieza` | Versión y motivo obligatorios | R | 4 | · | · | · | · | ✔ | · | · | · | · | · |
-| POST | `/api/v1/camas/{id}/limpieza/completar` | `camas.registrar_limpieza` | Versión y motivo obligatorios | R | 4 | · | · | · | · | ✔ | · | · | · | · | · |
+| POST | `/api/v1/camas/{id}/limpieza` | `camas.registrar_limpieza` | Versión y motivo obligatorios | R | 4 | · | ✔ | · | · | ✔ | · | · | · | · | · |
+| POST | `/api/v1/camas/{id}/limpieza/completar` | `camas.registrar_limpieza` | Versión y motivo obligatorios | R | 4 | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | POST | `/api/v1/camas/{id}/limpieza/verificar` | `camas.verificar_limpieza` | Distinta persona; versión y motivo obligatorios | R | 4 | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | GET | `/api/v1/recursos/equipos` | `recursos.gestionar` |  | E | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/recursos/equipos/{id}/estado` | `recursos.gestionar` |  | E | 4 | · | ✔ | · | · | · | · | · | · | · | · |
