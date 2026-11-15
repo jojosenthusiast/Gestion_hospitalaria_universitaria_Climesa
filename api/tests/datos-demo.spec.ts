@@ -64,7 +64,9 @@ const TABLAS: Record<string, string> = {
 };
 /** Tablas de negocio que la semilla no puebla a propósito (ver README.md, sección "Lo que no se siembra"). */
 const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acceso.dispositivo_push', 'acceso.administrador_principal',
-  'pacientes.busqueda_registro', 'plataforma.auditoria', 'plataforma.outbox', 'plataforma.inbox', 'plataforma.idempotencia'];
+  'pacientes.busqueda_registro', 'plataforma.auditoria', 'plataforma.outbox', 'plataforma.inbox', 'plataforma.idempotencia',
+  // Fase 0/1 (CITA-02): las solicitudes de reprogramación nacen solo del uso real.
+  'atencion.reprogramacion'];
 
 const MINIMOS: Record<string, number> = {
   'pacientes.paciente': 120, 'pacientes.identificador': 100, 'atencion.cita': 130, 'atencion.ticket_fila': 30, 'atencion.consulta': 70,

@@ -4,9 +4,11 @@
  */
 
 /** atencion.cita.estado (20261017000600_atencion.sql). */
-export const ESTADO_CITA = ['solicitada', 'confirmada', 'atendida', 'cancelada', 'rechazada', 'no_asistio'] as const;
+export const ESTADO_CITA = ['solicitada', 'confirmada', 'atendida', 'cancelada', 'rechazada', 'no_asistio', 'vencida', 'reprogramada'] as const;
 /** atencion.ticket_fila.estado (20261017000600_atencion.sql). */
-export const ESTADO_FILA = ['en_espera', 'llamado', 'en_atencion', 'atendido', 'no_se_presento'] as const;
+export const ESTADO_FILA = ['en_espera', 'llamado', 'en_atencion', 'atendido', 'no_se_presento', 'cerrado'] as const;
+/** atencion.reprogramacion.estado (20261120002000_citas_fila_fase01.sql). */
+export const ESTADO_REPROGRAMACION = ['pendiente', 'aceptada', 'rechazada', 'vencida'] as const;
 /** atencion.consulta.estado (20261017000600_atencion.sql). */
 export const ESTADO_CONSULTA = ['abierta', 'firmada', 'ingresada_por_error'] as const;
 /** laboratorio.orden.estado (20261017000700_laboratorio.sql). */

@@ -30,7 +30,10 @@ describe('Fase 0 · un número activo por paciente, servicio y día (W-07)', () 
   test('cuando el número anterior terminó, el paciente puede volver a la fila', async () => {
     const patientId = await t.patient();
     const first = await t.call('REC', 'POST', '/fila', { service: 'emergencia', patientId });
-    expect((await t.call('REC', 'POST', `/fila/${first.body.id}/no-se-presento`, { version: first.body.version, reason: 'No respondió a tres llamados' })).status).toBe(201);
+    // FILA-01: "No se presentó" only after three unanswered calls.
+    let version = first.body.version;
+    for (let i = 0; i < 3; i++) version = (await t.call('MED', 'POST', `/fila/${first.body.id}/llamar`, { version })).body.version;
+    expect((await t.call('REC', 'POST', `/fila/${first.body.id}/no-se-presento`, { version, reason: 'No respondió a tres llamados' })).status).toBe(201);
     expect((await t.call('REC', 'POST', '/fila', { service: 'emergencia', patientId })).status).toBe(201);
   });
 });

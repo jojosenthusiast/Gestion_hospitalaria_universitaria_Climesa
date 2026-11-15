@@ -5028,6 +5028,482 @@
         "x-permiso": "citas.cancelar"
       }
     },
+    "/api/v1/citas/{id}/reprogramar": {
+      "post": {
+        "operationId": "AttentionController_reschedule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentRescheduleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RescheduleCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reprogramar a una franja libre del mismo médico: recepción la aplica; el paciente deja una solicitud que la cita original conserva hasta que se acepta",
+        "tags": [
+          "attention"
+        ],
+        "x-permiso": "citas.agendar OR citas.solicitar"
+      }
+    },
+    "/api/v1/citas/reprogramaciones/{id}/aceptar": {
+      "post": {
+        "operationId": "AttentionController_acceptReschedule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RescheduleCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aceptar una solicitud de reprogramación (recepción o el médico de la cita)",
+        "tags": [
+          "attention"
+        ],
+        "x-permiso": "citas.agendar OR consulta.iniciar"
+      }
+    },
+    "/api/v1/citas/reprogramaciones/{id}/rechazar": {
+      "post": {
+        "operationId": "AttentionController_rejectReschedule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RescheduleCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rechazar una solicitud de reprogramación con motivo (recepción o el médico de la cita)",
+        "tags": [
+          "attention"
+        ],
+        "x-permiso": "citas.agendar OR consulta.iniciar"
+      }
+    },
+    "/api/v1/citas/{id}/no-asistio": {
+      "post": {
+        "operationId": "AttentionController_noShow",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentNoShowDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marcar que el paciente no asistió (la hora ya llegó y no hay consulta)",
+        "tags": [
+          "attention"
+        ],
+        "x-permiso": "citas.agendar"
+      }
+    },
     "/api/v1/consultas/agenda": {
       "get": {
         "operationId": "ConsultationController_agenda",
@@ -5093,6 +5569,77 @@
           }
         ],
         "summary": "Agenda propia del médico con estado de consulta",
+        "tags": [
+          "consultations"
+        ],
+        "x-permiso": "consulta.iniciar"
+      }
+    },
+    "/api/v1/consultas/sin-firmar": {
+      "get": {
+        "operationId": "ConsultationController_unsigned",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UnsignedConsultationResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Consultas abiertas propias de cualquier día, para reanudarlas y firmarlas",
         "tags": [
           "consultations"
         ],
@@ -5624,6 +6171,107 @@
           "queue"
         ],
         "x-permiso": "fila.emitir"
+      }
+    },
+    "/api/v1/fila/llamar-siguiente": {
+      "post": {
+        "operationId": "QueueController_callNext",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueCallNextDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueCallNextResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Llamar el siguiente número en espera del servicio (orden de llegada)",
+        "tags": [
+          "queue"
+        ],
+        "x-permiso": "fila.llamar"
       }
     },
     "/api/v1/fila/{id}/llamar": {
@@ -16138,7 +16786,9 @@
           "atendida",
           "cancelada",
           "rechazada",
-          "no_asistio"
+          "no_asistio",
+          "vencida",
+          "reprogramada"
         ]
       },
       "OrigenCita": {
@@ -16146,6 +16796,101 @@
         "enum": [
           "recepcion",
           "paciente"
+        ]
+      },
+      "EstadoReprogramacion": {
+        "type": "string",
+        "enum": [
+          "pendiente",
+          "aceptada",
+          "rechazada",
+          "vencida"
+        ]
+      },
+      "AppointmentRescheduleResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoReprogramacion"
+              }
+            ]
+          },
+          "origin": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrigenCita"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "rejectionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "start",
+          "end",
+          "state",
+          "origin",
+          "reason",
+          "rejectionReason",
+          "version"
+        ]
+      },
+      "AccionCita": {
+        "type": "string",
+        "enum": [
+          "confirmar",
+          "rechazar",
+          "cancelar",
+          "reprogramar",
+          "no_asistio",
+          "aceptar_reprogramacion",
+          "rechazar_reprogramacion",
+          "iniciar_consulta"
+        ],
+        "description": "Acciones que el servidor acepta ahora para quien lee"
+      },
+      "BlockedAppointmentActionResponse": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AccionCita"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Motivo en español para mostrar junto a la acción desactivada"
+          }
+        },
+        "required": [
+          "action",
+          "reason"
         ]
       },
       "AppointmentResponse": {
@@ -16202,6 +16947,48 @@
           },
           "version": {
             "type": "integer"
+          },
+          "rescheduledFromId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Cita original cuando esta nació de una reprogramación"
+          },
+          "rescheduledToId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Cita nueva cuando esta quedó reprogramada"
+          },
+          "reschedule": {
+            "nullable": true,
+            "description": "Última solicitud de reprogramación de la cita",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentRescheduleResponse"
+              }
+            ]
+          },
+          "cancelableUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hasta cuándo puede cancelar o reprogramar quien lee (RN-21: N h antes para el paciente)"
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "Acciones que el servidor acepta ahora para quien lee",
+            "items": {
+              "$ref": "#/components/schemas/AccionCita"
+            }
+          },
+          "blockedActions": {
+            "description": "Acciones del rol bloqueadas ahora, con su motivo",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockedAppointmentActionResponse"
+            }
           }
         },
         "required": [
@@ -16216,7 +17003,13 @@
           "state",
           "origin",
           "rejectionReason",
-          "version"
+          "version",
+          "rescheduledFromId",
+          "rescheduledToId",
+          "reschedule",
+          "cancelableUntil",
+          "allowedActions",
+          "blockedActions"
         ]
       },
       "AppointmentCreateDto": {
@@ -16337,6 +17130,104 @@
           "reason"
         ]
       },
+      "AppointmentRescheduleDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "start",
+          "end"
+        ]
+      },
+      "RescheduleCommandResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoCita"
+              }
+            ]
+          },
+          "rescheduleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rescheduleState": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoReprogramacion"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "state",
+          "rescheduleId",
+          "rescheduleState"
+        ]
+      },
+      "RescheduleDecisionDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "rejectionReason": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "AppointmentNoShowDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
       "EstadoConsulta": {
         "type": "string",
         "enum": [
@@ -16418,6 +17309,19 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "iniciar_consulta solo el día de la cita y sin consulta previa",
+            "items": {
+              "$ref": "#/components/schemas/AccionCita"
+            }
+          },
+          "blockedActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockedAppointmentActionResponse"
+            }
           }
         },
         "required": [
@@ -16435,7 +17339,57 @@
           "plan",
           "version",
           "startedAt",
-          "signedAt"
+          "signedAt",
+          "allowedActions",
+          "blockedActions"
+        ]
+      },
+      "UnsignedConsultationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientName": {
+            "type": "string",
+            "nullable": true
+          },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "ticketId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "patientId",
+          "patientName",
+          "appointmentId",
+          "ticketId",
+          "reason",
+          "startedAt",
+          "version"
         ]
       },
       "ConsultationStartDto": {
@@ -16606,7 +17560,37 @@
           "llamado",
           "en_atencion",
           "atendido",
+          "no_se_presento",
+          "cerrado"
+        ]
+      },
+      "AccionFila": {
+        "type": "string",
+        "enum": [
+          "llamar",
+          "atender",
+          "completar",
           "no_se_presento"
+        ],
+        "description": "Acciones que el servidor acepta ahora para quien lee"
+      },
+      "BlockedQueueActionResponse": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AccionFila"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "reason"
         ]
       },
       "QueueTicketResponse": {
@@ -16675,6 +17659,28 @@
                 "$ref": "#/components/schemas/EstadoConsulta"
               }
             ]
+          },
+          "maxCalls": {
+            "type": "integer",
+            "description": "Llamados máximos (política fila.llamados_maximos)"
+          },
+          "callsForAbsence": {
+            "type": "integer",
+            "description": "Llamados necesarios para marcar \"No se presentó\" (política fila.llamados_para_ausencia)"
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "Acciones que el servidor acepta ahora para quien lee",
+            "items": {
+              "$ref": "#/components/schemas/AccionFila"
+            }
+          },
+          "blockedActions": {
+            "description": "Acciones del rol bloqueadas ahora, con su motivo",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockedQueueActionResponse"
+            }
           }
         },
         "required": [
@@ -16690,7 +17696,11 @@
           "version",
           "issuedAt",
           "consultationId",
-          "consultationState"
+          "consultationState",
+          "maxCalls",
+          "callsForAbsence",
+          "allowedActions",
+          "blockedActions"
         ]
       },
       "QueueIssueDto": {
@@ -16763,6 +17773,64 @@
           "version",
           "serviceName",
           "patientId"
+        ]
+      },
+      "QueueCallNextDto": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "enum": [
+              "consulta_general",
+              "emergencia",
+              "laboratorio",
+              "admisiones"
+            ]
+          },
+          "officeId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "service"
+        ]
+      },
+      "QueueCallNextResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoFila"
+              }
+            ]
+          },
+          "llamados": {
+            "type": "integer"
+          },
+          "numero": {
+            "type": "integer"
+          },
+          "patientName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "state",
+          "llamados",
+          "numero",
+          "patientName"
         ]
       },
       "QueueTransitionDto": {
@@ -22664,6 +23732,11 @@
           "ticket_activo_existente",
           "fila_max_llamados",
           "consulta_ya_iniciada",
+          "cita_con_consulta",
+          "cita_fuera_de_dia",
+          "fila_llamados_insuficientes",
+          "fila_sin_espera",
+          "solicitudes_pendientes_max",
           "cuenta_no_verificada",
           "cuenta_ya_vinculada",
           "expediente_ya_vinculado",
