@@ -5,6 +5,8 @@ import Foundation
 public enum RealtimeProtocol {
     private static let prefix = "realtime:"
     public static let publicChannel = "publico"
+    /// Tamaño de página de `GET /eventos`: una página llena indica que puede haber más.
+    public static let catchUpPageSize = 200
 
     public static func topic(_ channel: String) -> String { prefix + channel }
 
@@ -39,6 +41,11 @@ public enum RealtimeProtocol {
         frame(topic: "phoenix", event: "heartbeat", payload: [String: Any](), ref: ref, joinRef: nil)
     }
 
+    /// Renueva el token en un canal ya unido (evento `access_token` de Phoenix), sin volver a unirse.
+    public static func accessToken(channel: String, ref: String, accessToken: String) -> String {
+        frame(topic: topic(channel), event: "access_token", payload: ["access_token": accessToken], ref: ref, joinRef: nil)
+    }
+
     private static func frame(topic: String, event: String, payload: [String: Any], ref: String, joinRef: String?) -> String {
         var object: [String: Any] = ["topic": topic, "event": event, "payload": payload, "ref": ref]
         if let joinRef { object["join_ref"] = joinRef }
@@ -50,8 +57,12 @@ public enum RealtimeProtocol {
     public static func parse(_ text: String) -> RealtimeFrame {
         guard let data = text.data(using: .utf8),
               let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              let topic = root["topic"] as? String,
-              topic.hasPrefix(prefix) else { return .ignored }
+              let topic = root["topic"] as? String else { return .ignored }
+        if topic == "phoenix" {
+            let ref = stringValue(root["ref"])
+            return (root["event"] as? String) == "phx_reply" && !ref.isEmpty ? .heartbeatReply(ref: ref) : .ignored
+        }
+        guard topic.hasPrefix(prefix) else { return .ignored }
         let channel = String(topic.dropFirst(prefix.count))
         let payload = root["payload"] as? [String: Any]
         switch (root["event"] as? String) ?? "" {
@@ -76,7 +87,10 @@ public enum RealtimeProtocol {
         let rows = (root["events"] as? [Any]) ?? []
         let events: [DomainEvent] = rows.compactMap { row in
             guard let item = row as? [String: Any] else { return nil }
-            return makeEvent(type: item["type"], entity: item["entity"], id: item["id"], version: item["version"])
+            // `tipo` y `entidad` son los nombres del contrato; `type` y `entity` son alias obsoletos que aún se aceptan.
+            let type = stringValue(item["tipo"]).isEmpty ? item["type"] : item["tipo"]
+            let entity = stringValue(item["entidad"]).isEmpty ? item["entity"] : item["entidad"]
+            return makeEvent(type: type, entity: entity, id: item["id"], version: item["version"])
         }
         let cursor = stringValue(root["cursor"])
         return CatchUp(cursor: cursor.isEmpty ? "0" : cursor, events: events)
