@@ -41,7 +41,10 @@ object StaffLabels {
         "laboratorista" to "Laboratorio", "paramedico" to "Paramédico", "motorista" to "Motorista", "limpieza" to "Limpieza",
         "administrativo" to "Administración", "otro" to "Otro",
     )
-    private val shiftStates = mapOf("borrador" to "Borrador", "publicado" to "Publicado", "cancelado" to "Cancelado")
+    private val shiftStates = mapOf(
+        "borrador" to "Borrador", "publicado" to "Publicado", "en_curso" to "En curso", "completado" to "Completado",
+        "cancelado" to "Cancelado", "ausente" to "Ausente",
+    )
 
     /** Función del personal (`type` de la API). */
     fun function(code: String) = functions[code] ?: code

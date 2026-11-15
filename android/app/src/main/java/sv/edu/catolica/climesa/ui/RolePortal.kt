@@ -47,6 +47,8 @@ fun interface RoleDataSource{
     /** Escritura del portal (por ahora, el mantenimiento de la unidad); por defecto no escribe. */
     suspend fun post(path:String,body:JSONObject):Any=throw UnsupportedOperationException("Este origen de datos es de solo lectura.")
 }
+/** Marcar la entrada de un turno propio (ASIS-01): `shiftId` es el turno en curso de la acción. */
+data class CheckInState(val shiftId:String?=null,val error:String?=null)
 /** Estado de la acción de mantenimiento: `conflict` es un 409 de versión (la unidad cambió y nada se guardó). */
 data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val conflict:Boolean=false,val saved:Boolean=false)
 @HiltViewModel class RoleViewModel @Inject constructor(private val source:RoleDataSource,realtime:RealtimeRepository):ViewModel(){
@@ -56,6 +58,19 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
     private val live=LiveSubscription(realtime)
     private val maintenanceMutable=MutableStateFlow(MaintenanceState());val maintenance=maintenanceMutable.asStateFlow()
     fun resetMaintenance(){maintenanceMutable.value=MaintenanceState()}
+    private val checkInMutable=MutableStateFlow(CheckInState());val checkIn=checkInMutable.asStateFlow()
+    /** `POST /turnos/{id}/entrada`; al terminar vuelve a pedir la sección abierta (la API decide si la acción sigue). */
+    fun checkIn(shift:MyShift){
+        if(checkInMutable.value.shiftId!=null)return
+        checkInMutable.value=CheckInState(shiftId=shift.id)
+        viewModelScope.launch{
+            try{source.post("/turnos/${shift.id}/entrada",MyShifts.checkInBody(shift));checkInMutable.value=CheckInState()}
+            catch(e:Exception){if(e is CancellationException)throw e
+                val failure=e as? sv.edu.catolica.climesa.data.AuthRequestException
+                checkInMutable.value=CheckInState(error=MyShifts.checkInError(failure?.code,failure?.statusCode,e.message))}
+            load(current,silent=true)
+        }
+    }
     /** `POST /ambulancia/mantenimiento`; el motivo se valida aquí por comodidad, la garantía es la API (regla 5). */
     fun setMaintenance(version:Int,inMaintenance:Boolean,reason:String){
         MaintenanceRules.reasonError(reason)?.let{maintenanceMutable.value=MaintenanceState(error=it);return}
@@ -146,7 +161,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
             }else if(page==AndroidSection.SHIFTS){
                 val shifts=MyShifts.parse(data.data)
                 if(shifts.isEmpty())item{EmptyState("No tienes turnos publicados.")}
-                else items(shifts){shift->MyShiftCard(shift)}
+                else{item{CheckInError(model)};items(shifts){shift->MyShiftCard(shift,model)}}
             }else item{EmptyState(stringResource(R.string.portal_seccion_no_disponible))}
         }
     }
@@ -163,14 +178,20 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         else{
             val shifts=MyShifts.parse(data.data)
             if(shifts.isEmpty())item{EmptyState(stringResource(R.string.turnos_vacio))}
-            else items(shifts){shift->MyShiftCard(shift)}
+            else{item{CheckInError(model)};items(shifts){shift->MyShiftCard(shift,model)}}
         }
     }
 }
-@Composable internal fun MyShiftCard(shift:MyShift){
+@Composable private fun CheckInError(model:RoleViewModel){
+    val state by model.checkIn.collectAsStateWithLifecycle()
+    state.error?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodyMedium)}
+}
+@Composable internal fun MyShiftCard(shift:MyShift,model:RoleViewModel?=null){
+    val checkIn=model?.checkIn?.collectAsStateWithLifecycle()?.value
     Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
         AreaChip(shift.area)
-        DataRow(shift.period,status={StatusTag(shift.state,label=StaffLabels.shiftState(shift.state))})
+        DataRow(shift.period,meta=MyShifts.attendanceLabel(shift),status={StatusTag(shift.state,label=StaffLabels.shiftState(shift.state))})
+        if(model!=null&&shift.canCheckIn)PrimaryButton(stringResource(if(checkIn?.shiftId==shift.id)R.string.turno_marcando_entrada else R.string.turno_marcar_entrada),{model.checkIn(shift)},icon=Icons.Default.CheckCircle,enabled=checkIn?.shiftId==null)
     }
 }
 /** Entrar o salir de mantenimiento; el motivo y el diálogo sobreviven al giro de pantalla. */
