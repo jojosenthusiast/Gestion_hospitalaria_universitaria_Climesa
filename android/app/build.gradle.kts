@@ -46,8 +46,8 @@ android {
         applicationId = "sv.edu.catolica.climesa"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0-core"
+        versionCode = 4
+        versionName = "1.0.0"
         buildConfigField("String", "SUPABASE_URL", buildConfigString(climesaSupabaseUrl))
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildConfigString(climesaSupabasePublishableKey))
         buildConfigField("String", "API_BASE_URL", buildConfigString(climesaApiBaseUrl))

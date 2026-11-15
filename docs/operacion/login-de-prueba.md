@@ -1,60 +1,42 @@
-# Login de prueba (temporal)
+# Login de prueba (temporal, solo desarrollo)
 
-Ayuda **temporal** para probar el sistema: en la pantalla de ingreso de web, Android e iOS aparece el aviso
-"Modo de prueba: cuentas ficticias" y un selector **Cuenta de prueba** con los roles ADM, DPD, JOP, REC, AST, ENF,
-MED, LAB, PAR y PAC. Al elegir un rol se llenan el correo y la contraseña de su cuenta ficticia; el usuario todavía
-pulsa "Iniciar sesión". El dueño del proyecto lo pidió aceptando el riesgo: quien abra la pantalla puede entrar con
-esas cuentas. Con la bandera apagada no se muestra nada y la app no lleva ninguna credencial.
+Ayuda **temporal** para probar el sistema en desarrollo: en la pantalla de ingreso aparece el aviso "Modo de prueba: cuentas ficticias" y un selector **Cuenta de prueba** con los roles ADM, DPD, JOP, REC, AST, ENF, MED, LAB, PAR y PAC. Al elegir un rol se llenan el correo y la contraseña de su cuenta ficticia; la persona todavía pulsa "Iniciar sesión". Con la bandera apagada no se muestra nada y la aplicación no lleva ninguna credencial.
+
+Este archivo no contiene contraseñas ni correos reales, y nunca debe contenerlos.
+
+## Estado actual (15-nov-2026)
+
+| Plataforma | Dónde puede activarse | Qué impide que llegue a la entrega |
+|---|---|---|
+| Web | `npm run dev` local, o una variable de Render | Con `VITE_DEMO_LOGIN` distinto de `true`, `web/vite.config.ts` compila `VITE_DEMO_CREDENTIALS` como texto vacío: `dist/` no lleva credenciales aunque la variable exista. |
+| Android | Solo builds **debug** | `android/app/build.gradle.kts` fija `DEMO_LOGIN=false` y `DEMO_CREDENTIALS=""` en `release`, y **falla el build** si se pide un release con `-PCLIMESA_DEMO_LOGIN=true` (B-02). |
+| iOS | Solo configuración **Debug** | `ios/Config/Release.xcconfig` fuerza `CLIMESA_DEMO_LOGIN = NO` y credenciales vacías; `Core/DemoLogin.swift` lee el selector solo bajo `#if DEBUG`. El job `ipa` de CI comprueba que el `Info.plist` del IPA no lleve el selector y ya no usa el secreto `CLIMESA_DEMO_CREDENTIALS`. |
 
 ## Credenciales
 
 - Viven en un solo archivo en la raíz del repositorio, `demo-credenciales.json`, que **no se sube** (está en `.gitignore`).
 - Forma: `[{"rol":"ADM","correo":"...","contrasena":"..."}, ...]`. Copia `demo-credenciales.example.json` y cambia los valores.
-- Las contraseñas nunca van en commits, en `render.yaml` ni en registros.
+- Las contraseñas nunca van en commits, en `render.yaml`, en secretos de CI ni en registros.
 
-## Cómo se activa
+## Cómo se activa en desarrollo
 
 | Plataforma | Bandera (apagada por defecto) | De dónde salen las credenciales |
 |---|---|---|
-| Web | `VITE_DEMO_LOGIN=true` | `VITE_DEMO_CREDENTIALS` (el JSON como texto). En local, si falta, `vite.config.ts` lee `../demo-credenciales.json`. |
-| Android | `CLIMESA_DEMO_LOGIN=true` (propiedad de Gradle) | `demo-credenciales.json` de la raíz, copiado a `BuildConfig` al compilar (debug y release). |
-| iOS | `CLIMESA_DEMO_LOGIN = YES` (xcconfig) | `ios/DemoLogin.xcconfig` (no se sube), generado desde `demo-credenciales.json`. |
-
-### Web
-
-- Local: en `web/.env.local` pon `VITE_DEMO_LOGIN=true` y ejecuta `npm run dev` (lee `../demo-credenciales.json`).
-- Render, sitio estático `sghu-web` (Environment): agrega estas dos variables y vuelve a desplegar:
-  - `VITE_DEMO_LOGIN` = `true`
-  - `VITE_DEMO_CREDENTIALS` = el contenido de `demo-credenciales.json` en una línea.
-  `render.yaml` solo declara las claves con `sync: false`; los valores se escriben a mano en el panel.
-- Con `VITE_DEMO_LOGIN` distinto de `true`, `vite.config.ts` define `VITE_DEMO_CREDENTIALS` como texto vacío: el
-  paquete de `dist/` no contiene ninguna credencial aunque la variable exista.
-
-### Android
+| Web | `VITE_DEMO_LOGIN=true` en `web/.env.local` | `vite.config.ts` lee `../demo-credenciales.json` al ejecutar `npm run dev`. |
+| Android | `-PCLIMESA_DEMO_LOGIN=true` (propiedad de Gradle) | `demo-credenciales.json` de la raíz, copiado a `BuildConfig` solo en debug. |
+| iOS | `sh ios/scripts/demo-login.sh` (en la Mac) | Genera `ios/DemoLogin.xcconfig` (no se sube); solo Debug lo incluye. `--off` lo borra. |
 
 ```powershell
 cd android
-.\gradlew.bat -PCLIMESA_DEMO_LOGIN=true assembleRelease   # o assembleDebug
+.\gradlew.bat -PCLIMESA_DEMO_LOGIN=true assembleDebug
 ```
 
-`android/gradle.properties` deja `CLIMESA_DEMO_LOGIN=false`. Con la bandera en `false` o sin el archivo, `BuildConfig.DEMO_LOGIN`
-es `false`, `BuildConfig.DEMO_CREDENTIALS` queda vacío y no aparece el selector.
+`android/gradle.properties` deja `CLIMESA_DEMO_LOGIN=false`.
 
-### iOS (en la Mac)
+## Antes de la entrega (acciones del responsable)
 
-```sh
-sh ios/scripts/demo-login.sh        # genera ios/DemoLogin.xcconfig; luego compila en Xcode
-sh ios/scripts/demo-login.sh --off  # lo borra y apaga el selector
-```
-
-`Config/Debug.xcconfig` y `Config/Release.xcconfig` dejan `CLIMESA_DEMO_LOGIN = NO` e incluyen `../DemoLogin.xcconfig` solo si existe,
-así que la integración continua compila sin el archivo. El JSON va en hexadecimal porque en xcconfig `//` inicia un comentario.
-
-## Antes de la entrega
-
-VITE_DEMO_LOGIN=false, CLIMESA_DEMO_LOGIN=false, cambiar contraseñas de las cuentas de prueba.
-
-1. Render `sghu-web`: `VITE_DEMO_LOGIN=false` (y borra `VITE_DEMO_CREDENTIALS`), luego vuelve a desplegar.
-2. Android: compila sin `-PCLIMESA_DEMO_LOGIN=true` (queda `false`).
-3. iOS: `sh ios/scripts/demo-login.sh --off` y vuelve a compilar.
-4. Cambia en Supabase las contraseñas de las cuentas de prueba: las anteriores estuvieron dentro de las apps de prueba.
+1. Render `sghu-web` → Environment: `VITE_DEMO_LOGIN=false` (o borrada) y `VITE_DEMO_CREDENTIALS` borrada; vuelve a desplegar.
+2. GitHub → Settings → Secrets: borra `CLIMESA_DEMO_CREDENTIALS` si todavía existe.
+3. En la máquina que compila el APK: `~/.gradle/gradle.properties` sin `CLIMESA_DEMO_LOGIN`. El APK de entrega es el release firmado.
+4. En la Mac: `sh ios/scripts/demo-login.sh --off`.
+5. Supabase → Authentication → Users: cambia las contraseñas de todas las cuentas que estuvieron en el selector (estuvieron dentro de builds de prueba) y **desactiva la cuenta ADM de prueba** desde la web (Personal → Desactivar) o bórrala en Supabase.
