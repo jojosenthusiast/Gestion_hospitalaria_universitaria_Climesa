@@ -47,18 +47,23 @@ export function allowedActions(shift: ShiftLike, now: number, policy: Attendance
 export const stateByClock = (start: number, end: number, now: number) => now >= end ? 'completado' : now >= start ? 'en_curso' : 'publicado';
 
 /**
- * Máximo de horas en cualquier ventana de 7 días (CARGA-01). El máximo de una ventana deslizante se alcanza cuando
- * empieza en el inicio de un intervalo o termina en el fin de uno, así que basta revisar esas ventanas.
+ * CARGA-01 al escribir un turno: revisa solo las ventanas de 7 días que tocan `next` (empiezan en el inicio de un turno o
+ * terminan en el fin de uno) y rechaza solo si la escritura le suma horas a una ventana sobre el tope. Una ventana que ya
+ * estaba sobre el tope (datos anteriores o una emergencia) no bloquea cambios que no le agregan horas. `previous` es el
+ * periodo que el turno ocupaba antes (al moverlo); la base aplica la misma regla (20261120003000).
  */
-export function maxRollingHours(intervals: [number, number][], windowMs = 7 * DAY): { hours: number; from: number } {
-  let best = { hours: 0, from: intervals[0]?.[0] ?? 0 };
-  const anchors = intervals.flatMap(([a, b]) => [a, b - windowMs]);
+export function windowLoad(existing: [number, number][], next: [number, number], previous: [number, number] | null, cap: number, windowMs = 7 * DAY): { hours: number; exceeds: boolean } {
+  const within = (intervals: [number, number][], from: number) =>
+    intervals.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, from + windowMs) - Math.max(a, from)), 0) / HOUR;
+  const after = [...existing, next], before = previous ? [...existing, previous] : existing;
+  const anchors = after.flatMap(([a, b]) => [a, b - windowMs]).filter(w => w > next[0] - windowMs && w < next[1]);
+  let hours = 0, exceeds = false;
   for (const from of anchors) {
-    const to = from + windowMs;
-    const hours = intervals.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, to) - Math.max(a, from)), 0) / HOUR;
-    if (hours > best.hours) best = { hours: Math.round(hours * 100) / 100, from };
+    const total = Math.round(within(after, from) * 100) / 100;
+    hours = Math.max(hours, total);
+    if (total > cap && total > Math.round(within(before, from) * 100) / 100) exceeds = true;
   }
-  return best;
+  return { hours, exceeds };
 }
 
 /** Días locales seguidos con turno que incluyen `day` (fechas `yyyy-MM-dd`). */

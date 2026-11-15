@@ -58,14 +58,21 @@ export async function createTestApp(start: Date) {
   const enroll = async (role: string, from = '2026-01-01', to = '2027-12-31') => {
     await pg.query(`INSERT INTO personal.inscripcion(persona_id,junta,numero,vigencia) VALUES($1,'JVPM',$2,daterange($3::date,$4::date,'[)'))`, [await staffOf(role), `N-${role}-${randomUUID().slice(0, 8)}`, from, to]);
   };
-  /** Coverage shift for the test clock; `excepcion_carga` keeps RN-13 and CARGA-01 (tested in their own specs) out of the way. */
+  /**
+   * Coverage shift for the test clock, inserted without triggers: it stands for a shift that already exists, so RN-13 and
+   * CARGA-01 (tested in turnos-asistencia-carga.spec.ts) do not get in the way of specs about other modules.
+   */
+  const coverage = (sql: string, params: unknown[]) => pg.transaction(async tx => {
+    await tx.exec('SET LOCAL session_replication_role = replica');
+    await tx.query(sql, params);
+  });
   const shift = async (role: string, from: Date, to: Date) => {
-    await pg.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado,excepcion_carga) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado','Turno de prueba para cubrir el reloj' FROM infra.espacio WHERE codigo='P1-CON'`, [await staffOf(role), from, to]);
+    await coverage(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado' FROM infra.espacio WHERE codigo='P1-CON'`, [await staffOf(role), from, to]);
   };
   /** Ambulance driver (motorista) with a published shift: RN-30 needs one on duty to dispatch or leave maintenance. */
   const driverShift = async (from: Date, to: Date) => {
     const driver = await one<{ id: string }>(`INSERT INTO personal.persona(nombres,apellidos,tipo,area_id) SELECT 'Motorista','Prueba ' || substr(md5(random()::text),1,6),'motorista',id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id`);
-    await pg.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado,excepcion_carga) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado','Turno de prueba para cubrir el reloj' FROM infra.espacio WHERE codigo='P1-CON'`, [driver.id, from, to]);
+    await coverage(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado' FROM infra.espacio WHERE codigo='P1-CON'`, [driver.id, from, to]);
     return driver.id;
   };
   /**
@@ -78,7 +85,7 @@ export async function createTestApp(start: Date) {
     const date = businessDate(current);
     const ticket = await one<{ id: string }>(`INSERT INTO atencion.ticket_fila(servicio,fecha,numero,paciente_id) SELECT 'emergencia',$1::date,coalesce(max(numero),0)+1,$2 FROM atencion.ticket_fila WHERE servicio='emergencia' AND fecha=$1::date RETURNING id`, [date, patientId]);
     const covered = await one(`SELECT 1 AS ok FROM personal.turno WHERE persona_id=$1 AND estado IN ('publicado','en_curso') AND periodo @> $2::timestamptz`, [doctorId, current]);
-    if (!covered) await pg.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado,excepcion_carga) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado','Turno de prueba para cubrir el reloj' FROM infra.espacio WHERE codigo='P1-CON'`, [doctorId, new Date(current.valueOf() - 239 * 60_000), new Date(current.valueOf() + 60_000)]);
+    if (!covered) await coverage(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado' FROM infra.espacio WHERE codigo='P1-CON'`, [doctorId, new Date(current.valueOf() - 239 * 60_000), new Date(current.valueOf() + 60_000)]);
     return { patientId, origin: 'emergencia', originId: ticket.id, attendingDoctorId: doctorId, motive: 'Ingreso de prueba por emergencia', ...extra };
   };
   /** Confirmed appointment inserted directly (the scheduling rules have their own tests). */

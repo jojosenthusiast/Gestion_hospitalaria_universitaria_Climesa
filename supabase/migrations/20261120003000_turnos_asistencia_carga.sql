@@ -55,6 +55,8 @@ declare
   tope numeric;
   ventana timestamptz;
   total numeric;
+  antes numeric;
+  anterior tstzrange;
   previo record;
   necesita numeric;
   cuenta boolean;
@@ -97,17 +99,17 @@ begin
       detail = 'La persona va en un servicio de ambulancia activo; no puede quedar ausente.';
   end if;
 
-  -- CARGA-01: descanso y tope semanal para los turnos que cuentan como trabajo.
-  cuenta := new.estado not in ('cancelado', 'ausente');
+  -- CARGA-01: descanso y tope semanal para los turnos que cuentan como trabajo. Un borrador no cuenta hasta que se
+  -- publica, y publicarlo (borrador -> publicado) pasa por estas mismas reglas.
+  cuenta := new.estado not in ('cancelado', 'ausente', 'borrador');
   if cuenta and (tg_op = 'INSERT' or new.periodo <> old.periodo or new.persona_id <> old.persona_id
-                 or old.estado in ('cancelado', 'ausente') or new.excepcion_carga is distinct from old.excepcion_carga) then
+                 or old.estado in ('cancelado', 'ausente', 'borrador') or new.excepcion_carga is distinct from old.excepcion_carga) then
+    -- RN-13 siempre, también con excepción de carga (igual que la API).
     descanso := plataforma.politica_vigente('turnos.descanso', lower(new.periodo));
-    -- La excepción de carga (emergencia auditada, 10+ caracteres) también cubre el descanso en la base; la API sigue
-    -- exigiendo RN-13 a la planificación normal.
-    if descanso is not null and new.excepcion_carga is null then
+    if descanso is not null then
       for previo in
         select lower(periodo) as ini, upper(periodo) as fin from personal.turno
-        where persona_id = new.persona_id and id <> new.id and estado not in ('cancelado', 'ausente')
+        where persona_id = new.persona_id and id <> new.id and estado not in ('cancelado', 'ausente', 'borrador')
           and periodo && tstzrange(lower(new.periodo) - interval '2 days', upper(new.periodo) + interval '2 days')
       loop
         if previo.fin <= lower(new.periodo) then
@@ -131,26 +133,41 @@ begin
     carga := plataforma.politica_vigente('turnos.carga', lower(new.periodo));
     tope := (carga->>'max_horas_7_dias')::numeric;
     if tope is not null and new.excepcion_carga is null then
-      -- El máximo de una ventana deslizante de 7 días se alcanza cuando la ventana empieza en el inicio de un turno
-      -- o termina en el fin de uno; basta revisar esas ventanas.
+      -- Periodo que el turno ya sumaba a la persona antes de esta escritura (al moverlo); null si no sumaba.
+      anterior := case when tg_op = 'UPDATE' and old.persona_id = new.persona_id
+                            and old.estado not in ('cancelado', 'ausente', 'borrador') then old.periodo end;
+      -- Solo las ventanas de 7 días que tocan el turno escrito. El máximo de una ventana deslizante se alcanza cuando
+      -- empieza en el inicio de un turno o termina en el fin de uno, así que basta revisar esas ventanas. Una ventana que
+      -- ya estaba sobre el tope (datos anteriores o una emergencia) solo rechaza la escritura si esta le suma horas.
       for ventana in
-        select lower(periodo) from personal.turno
-         where persona_id = new.persona_id and id <> new.id and estado not in ('cancelado', 'ausente')
-           and periodo && tstzrange(lower(new.periodo) - interval '7 days', upper(new.periodo) + interval '7 days')
-        union select upper(periodo) - interval '7 days' from personal.turno
-         where persona_id = new.persona_id and id <> new.id and estado not in ('cancelado', 'ausente')
-           and periodo && tstzrange(lower(new.periodo) - interval '7 days', upper(new.periodo) + interval '7 days')
-        union select lower(new.periodo) union select upper(new.periodo) - interval '7 days'
+        select w from (
+          select lower(periodo) as w from personal.turno
+           where persona_id = new.persona_id and id <> new.id and estado not in ('cancelado', 'ausente', 'borrador')
+             and periodo && tstzrange(lower(new.periodo) - interval '7 days', upper(new.periodo) + interval '7 days')
+          union select upper(periodo) - interval '7 days' from personal.turno
+           where persona_id = new.persona_id and id <> new.id and estado not in ('cancelado', 'ausente', 'borrador')
+             and periodo && tstzrange(lower(new.periodo) - interval '7 days', upper(new.periodo) + interval '7 days')
+          union select lower(new.periodo) union select upper(new.periodo) - interval '7 days'
+        ) anclas
+        where w > lower(new.periodo) - interval '7 days' and w < upper(new.periodo)
       loop
         select coalesce(sum(extract(epoch from (least(upper(p), ventana + interval '7 days') - greatest(lower(p), ventana))) / 3600), 0)
           into total
           from (select periodo as p from personal.turno
-                 where persona_id = new.persona_id and id <> new.id and estado not in ('cancelado', 'ausente')
+                 where persona_id = new.persona_id and id <> new.id and estado not in ('cancelado', 'ausente', 'borrador')
                    and periodo && tstzrange(ventana, ventana + interval '7 days')
                 union all select new.periodo where new.periodo && tstzrange(ventana, ventana + interval '7 days')) s;
         if total > tope then
-          raise exception 'carga_semanal_excedida' using errcode = 'P0001',
-            detail = format('CARGA-01: suma %s h en 7 días; el tope es %s h.', round(total, 2), tope);
+          select coalesce(sum(extract(epoch from (least(upper(p), ventana + interval '7 days') - greatest(lower(p), ventana))) / 3600), 0)
+            into antes
+            from (select periodo as p from personal.turno
+                   where persona_id = new.persona_id and id <> new.id and estado not in ('cancelado', 'ausente', 'borrador')
+                     and periodo && tstzrange(ventana, ventana + interval '7 days')
+                  union all select anterior where anterior is not null and anterior && tstzrange(ventana, ventana + interval '7 days')) s;
+          if round(total, 2) > round(antes, 2) then
+            raise exception 'carga_semanal_excedida' using errcode = 'P0001',
+              detail = format('CARGA-01: suma %s h en 7 días; el tope es %s h.', round(total, 2), tope);
+          end if;
         end if;
       end loop;
     end if;

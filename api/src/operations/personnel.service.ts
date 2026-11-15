@@ -6,7 +6,7 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
 import { Clock,businessDate,businessDayRange } from '../platform/clock';
 import { StaffDto, ShiftDto, RegistrationDto, PublishDto, AttendanceDto, CheckInDto } from './operations.dto';
-import { AttendancePolicy, LoadPolicy, allowedActions, attendanceOf, consecutiveDays, isLate, maxRollingHours, stateByClock } from './shift.rules';
+import { AttendancePolicy, LoadPolicy, allowedActions, attendanceOf, consecutiveDays, isLate, stateByClock, windowLoad } from './shift.rules';
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
 const HOUR=3600_000,DAY=24*HOUR,LOCAL_OFFSET=6*HOUR;
@@ -24,6 +24,8 @@ const STAFF_TYPE_NAMES:Record<string,string>={medico:'Médico',enfermero:'Enferm
 export type CoverageGap={areaId:string;area:string;role:string;start:string;end:string;required:number;actual:number};
 /** Turnos que trabajan: los cancelados y los ausentes no cuentan como cobertura, descanso ni carga (ASIS-01). */
 const WORKING="t.estado NOT IN ('cancelado','ausente')";
+/** CARGA-01: horas que cuentan para la carga; un borrador no cuenta hasta publicarse (y al publicarse se revisa). */
+const LOADED="t.estado NOT IN ('cancelado','ausente','borrador')";
 /** Reglas que la base aplica en `personal.validar_turno` (20261120003000) y su mensaje para quien planifica. */
 const DB_RULES:Record<string,string>={
   transicion_invalida:'El turno ya no admite ese cambio de estado.',
@@ -111,7 +113,18 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     const {start,end}=this.range(dto.from,dto.to);
     return this.commands.run(actor,'turnos.publicar:rango',key,dto,async c=>{
       const at=this.clock.now();
-      const rows=(await c.query("UPDATE personal.turno SET estado='publicado',publicado_por=$3,publicado_en=$4,version=version+1 WHERE estado='borrador' AND periodo && tstzrange($1,$2) AND ($5::uuid IS NULL OR area_id=$5) RETURNING id,persona_id,version",[start,end,actor.id,at,dto.areaId??null])).rows;
+      // CARGA-01: un borrador no contaba como carga; al publicarlo se revisan sus días seguidos aquí y el descanso y el
+      // tope de 7 días en la base, uno por uno y en orden, para que cada uno vea a los ya publicados.
+      const drafts=(await c.query("SELECT id,persona_id,lower(periodo) AS start FROM personal.turno WHERE estado='borrador' AND periodo && tstzrange($1,$2) AND ($3::uuid IS NULL OR area_id=$3) ORDER BY lower(periodo),id FOR UPDATE",[start,end,dto.areaId??null])).rows;
+      const rows:{id:string;persona_id:string;version:number}[]=[];
+      for(const draft of drafts){
+        const day=businessDate(new Date(draft.start));
+        const load=await this.policies.value<LoadPolicy>(c,'turnos.carga',new Date(draft.start));
+        const days=(await c.query(`SELECT DISTINCT to_char(lower(t.periodo) AT TIME ZONE 'America/El_Salvador','YYYY-MM-DD') AS day FROM personal.turno t WHERE t.persona_id=$1 AND t.id<>$2 AND ${LOADED} AND t.periodo && tstzrange($3::timestamptz-make_interval(days=>$4),$3::timestamptz+make_interval(days=>$4))`,[draft.persona_id,draft.id,draft.start,load.max_dias_seguidos+2])).rows.map(r=>r.day as string);
+        const inRow=consecutiveDays(new Set([...days,day]),day);
+        if(inRow>load.max_dias_seguidos)throw new ProblemException('dias_seguidos_excedidos',409,`Un borrador del ${day} haría trabajar ${inRow} días seguidos, más del máximo de ${load.max_dias_seguidos}. Muévelo o cancélalo antes de publicar.`,undefined,{diasSeguidos:inRow,limite:load.max_dias_seguidos,turnoId:draft.id});
+        rows.push((await dbRule(c.query("UPDATE personal.turno SET estado='publicado',publicado_por=$2,publicado_en=$3,version=version+1 WHERE id=$1 RETURNING id,persona_id,version",[draft.id,actor.id,at]))).rows[0]);
+      }
       const warnings=await this.gaps(c,start,end,dto.areaId);
       await this.commands.audit(c,actor,{action:'turnos.publicar',entity:'planificacion',entityId:`${dto.from}/${dto.to}`,permission:'turnos.publicar',detail:{desde:dto.from,hasta:dto.to,areaId:dto.areaId??null,publicados:rows.length,huecos:warnings.length}});
       await this.announce(c,'turno.publicado',rows);
@@ -271,10 +284,11 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       if(nearby.some(other=>businessDate(new Date(other.start))===businessDate(start)))throw new ProblemException('personal_jornada_ocupada',409,`La persona ya tiene un turno asignado para la jornada del ${businessDate(start)}.`,'staffId',{jornada:businessDate(start)});
       // CARGA-01/02: tope de horas en cualquier ventana de 7 días y de días seguidos; solo una emergencia escrita lo supera.
       const emergency=dto.emergencyReason?.trim()||null;
-      const span=(await c.query(`SELECT lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t WHERE t.persona_id=$1 AND ${WORKING} AND ($2::uuid IS NULL OR t.id<>$2) AND t.periodo && tstzrange($3::timestamptz-make_interval(days=>$5),$4::timestamptz+make_interval(days=>$5))`,[dto.staffId,id,start,end,Math.max(8,load.max_dias_seguidos+1)])).rows.map(o=>[new Date(o.start).valueOf(),new Date(o.end).valueOf()] as [number,number]);
-      const rolling=maxRollingHours([...span,[start.valueOf(),end.valueOf()]]);
+      const span=(await c.query(`SELECT lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t WHERE t.persona_id=$1 AND ${LOADED} AND ($2::uuid IS NULL OR t.id<>$2) AND t.periodo && tstzrange($3::timestamptz-make_interval(days=>$5),$4::timestamptz+make_interval(days=>$5))`,[dto.staffId,id,start,end,Math.max(8,load.max_dias_seguidos+1)])).rows.map(o=>[new Date(o.start).valueOf(),new Date(o.end).valueOf()] as [number,number]);
+      const previous:[number,number]|null=old&&old.persona_id===dto.staffId&&!['cancelado','ausente','borrador'].includes(old.estado)?[new Date(old.start).valueOf(),new Date(old.end).valueOf()]:null;
+      const rolling=windowLoad(span,[start.valueOf(),end.valueOf()],previous,load.max_horas_7_dias);
       const days=consecutiveDays(new Set([...span.map(([a])=>businessDate(new Date(a))),businessDate(start)]),businessDate(start));
-      if(!emergency&&rolling.hours>load.max_horas_7_dias)throw new ProblemException('carga_semanal_excedida',409,`La persona sumaría ${rolling.hours} h en 7 días, más del tope de ${load.max_horas_7_dias} h. Solo en una emergencia se asigna, indicando el motivo de la excepción.`,'emergencyReason',{horas7Dias:rolling.hours,limite:load.max_horas_7_dias});
+      if(!emergency&&rolling.exceeds)throw new ProblemException('carga_semanal_excedida',409,`La persona sumaría ${rolling.hours} h en 7 días, más del tope de ${load.max_horas_7_dias} h. Solo en una emergencia se asigna, indicando el motivo de la excepción.`,'emergencyReason',{horas7Dias:rolling.hours,limite:load.max_horas_7_dias});
       if(!emergency&&days>load.max_dias_seguidos)throw new ProblemException('dias_seguidos_excedidos',409,`La persona trabajaría ${days} días seguidos, más del máximo de ${load.max_dias_seguidos}. Solo en una emergencia se asigna, indicando el motivo de la excepción.`,'emergencyReason',{diasSeguidos:days,limite:load.max_dias_seguidos});
       // FR-103-07 / RN-14: aviso, no bloqueo, de más de 44 h diurnas por semana (lunes a domingo, 06:00-22:00 local); excederlas exige justificación.
       const warnings:{codigo:string;horasSemana:number;limite:number}[]=[];

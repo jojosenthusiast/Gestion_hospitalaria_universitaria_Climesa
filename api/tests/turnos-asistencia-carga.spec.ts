@@ -8,7 +8,7 @@ import { SupabaseService } from '../src/supabase/supabase.service';
 import { Clock } from '../src/platform/clock';
 import { PersonnelService } from '../src/operations/personnel.service';
 import { CREW_ROLES_ON_DUTY_SQL } from '../src/ambulance/ambulance.rules';
-import { allowedActions,attendanceOf,consecutiveDays,maxRollingHours } from '../src/operations/shift.rules';
+import { allowedActions,attendanceOf,consecutiveDays,windowLoad } from '../src/operations/shift.rules';
 import { createDatabase,userId } from './support/database';
 let current=new Date('2026-10-24T12:00:00Z');
 const issuer='https://gvmvmrusscsfbndnbvbr.supabase.co/auth/v1';
@@ -42,8 +42,14 @@ describe('Reglas puras de turnos (ASIS-01, CARGA-01, MA-TUR-03)',()=>{
  });
  test('ventana de 7 días y días seguidos',()=>{
   const H=3600_000,D=24*H,t0=Date.parse('2026-11-01T13:00:00Z');
-  expect(maxRollingHours([[t0,t0+24*H],[t0+2*D,t0+3*D],[t0+4*D,t0+5*D]]).hours).toBe(72);
-  expect(maxRollingHours([[t0,t0+24*H],[t0+2*D,t0+3*D],[t0+4*D,t0+5*D],[t0+6*D,t0+7*D]]).hours).toBe(96);
+  const guards:[number,number][]=[[t0,t0+24*H],[t0+2*D,t0+3*D],[t0+4*D,t0+5*D]];
+  expect(windowLoad(guards.slice(0,2),guards[2],null,72)).toEqual({hours:72,exceeds:false});
+  expect(windowLoad(guards,[t0+6*D,t0+7*D],null,72)).toEqual({hours:96,exceeds:true});
+  // Solo las ventanas que tocan el turno nuevo: la sobrecarga de 96 h quedó a más de 7 días.
+  expect(windowLoad([...guards,[t0+6*D,t0+7*D]],[t0+14*D,t0+14*D+8*H],null,72).exceeds).toBe(false);
+  // Mover un turno dentro de una ventana ya sobre el tope sin sumarle horas se permite; alargarlo no.
+  expect(windowLoad(guards,[t0+6*D,t0+6*D+20*H],[t0+6*D,t0+7*D],72).exceeds).toBe(false);
+  expect(windowLoad(guards,[t0+6*D-H,t0+7*D],[t0+6*D,t0+7*D],72).exceeds).toBe(true);
   expect(consecutiveDays(new Set(['2026-11-01','2026-11-02','2026-11-03','2026-11-05']),'2026-11-02')).toBe(3);
  });
 });
@@ -147,6 +153,49 @@ describe('Turnos · asistencia, carga, descansos y estados (ASIS, CARGA, MA-TUR)
   for(let d=20;d<26;d++)expect((await shift(p,local(`2026-11-${d}`,'22:00'),local(`2026-11-${d+1}`,'06:00'),{type:'nocturno'})).status).toBe(201);
   const seventh=await shift(p,local('2026-11-26','22:00'),local('2026-11-27','06:00'),{type:'nocturno'});
   expect(seventh.status).toBe(409);expect(seventh.body.codigo).toBe('dias_seguidos_excedidos');expect(seventh.body.diasSeguidos).toBe(7);
+ });
+
+ // Revisión del PR 114: solo cuentan las ventanas de 7 días que tocan el turno escrito, y una ventana que ya estaba
+ // sobre el tope (datos anteriores o una emergencia) no bloquea escrituras que no le suman horas.
+ const legacy=async(persona:string,rows:[string,string,string,string][])=>fixture.pg.transaction(async tx=>{
+  // Datos previos a esta regla (turnos ya cargados o borradores antiguos): se insertan sin disparadores.
+  await tx.exec('SET LOCAL session_replication_role = replica');
+  for(const [start,end,tipo,estado] of rows)await tx.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) VALUES($1,$2,tstzrange($3::timestamptz,$4::timestamptz,'[)'),$5,$6)`,[persona,areaId,start,end,tipo,estado]);
+ });
+ // 77 h entre el 1 y el 6 de diciembre: G1, G2 y G3 de 24 h y un turno corto de 5 h.
+ const cluster=(estado='publicado'):[string,string,string,string][]=>[
+  [local('2026-12-01','07:00'),local('2026-12-02','07:00'),'guardia',estado],
+  [local('2026-12-02','19:00'),local('2026-12-03','19:00'),'guardia',estado],
+  [local('2026-12-04','07:00'),local('2026-12-05','07:00'),'guardia',estado],
+  [local('2026-12-05','19:00'),local('2026-12-06','00:00'),'diurno',estado],
+ ];
+ test('CARGA-01: una sobrecarga previa fuera de las ventanas del turno nuevo no lo bloquea (API y base)',async()=>{
+  const p=await person('asistente'),q=await person('asistente');
+  await legacy(p,cluster());await legacy(q,cluster());
+  const api=await shift(p,local('2026-12-09','08:00'),local('2026-12-09','16:00'));
+  expect(api.body.codigo).toBeUndefined();expect(api.status).toBe(201);
+  expect(await sqlError(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) VALUES($1,$2,tstzrange($3::timestamptz,$4::timestamptz,'[)'),'diurno','publicado')`,[q,areaId,local('2026-12-09','08:00'),local('2026-12-09','16:00')])).toBeNull();
+  // Acortar un turno de la ventana sobre el tope no le suma horas: se permite. Alargarlo sí le suma: se rechaza.
+  const short=(await fixture.pg.query<any>("SELECT id FROM personal.turno WHERE persona_id=$1 AND tipo='diurno' AND lower(periodo)=$2::timestamptz",[q,local('2026-12-05','19:00')])).rows[0].id;
+  expect(await sqlError("UPDATE personal.turno SET periodo=tstzrange($2::timestamptz,$3::timestamptz,'[)') WHERE id=$1",[short,local('2026-12-05','19:00'),local('2026-12-05','23:30')])).toBeNull();
+  expect(await sqlError("UPDATE personal.turno SET periodo=tstzrange($2::timestamptz,$3::timestamptz,'[)') WHERE id=$1",[short,local('2026-12-05','19:00'),local('2026-12-06','00:30')])).toContain('carga_semanal_excedida');
+ });
+
+ test('CARGA-01: publicar borradores antiguos revisa el tope de 7 días (API y base)',async()=>{
+  const p=await person('asistente'),q=await person('asistente');
+  const drafts=cluster('borrador').map(([a,b,t,e]):[string,string,string,string]=>[a.replace('2026-12-0','2026-12-1'),b.replace('2026-12-0','2026-12-1'),t,e]);
+  await legacy(p,drafts);await legacy(q,drafts);
+  const published=await call('JOP','POST','/turnos/publicar',{from:'2026-12-11',to:'2026-12-15',areaId});
+  expect(published.status).toBe(409);expect(published.body.codigo).toBe('carga_semanal_excedida');
+  expect((await fixture.pg.query<any>("SELECT count(*)::int AS n FROM personal.turno WHERE persona_id=$1 AND estado='publicado'",[p])).rows[0].n).toBe(0);
+  expect(await sqlError("UPDATE personal.turno SET estado='publicado' WHERE persona_id=$1",[q])).toContain('carga_semanal_excedida');
+ });
+
+ test('CARGA-01: la excepción de carga no salta el descanso mínimo en la base',async()=>{
+  const p=await person('asistente');
+  const insert=(start:string,end:string)=>sqlError(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado,excepcion_carga) VALUES($1,$2,tstzrange($3::timestamptz,$4::timestamptz,'[)'),'diurno','publicado','Emergencia sin otra persona disponible')`,[p,areaId,start,end]);
+  expect(await insert(local('2026-12-20','07:00'),local('2026-12-20','15:00'))).toBeNull();
+  expect(await insert(local('2026-12-20','17:00'),local('2026-12-20','23:00'))).toContain('descanso_insuficiente');
  });
 
  test('MA-TUR-05 / CARGA-06: cancelar o mover el turno de un médico con citas responde 409 con las citas',async()=>{
