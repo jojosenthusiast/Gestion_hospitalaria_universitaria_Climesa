@@ -296,3 +296,18 @@ Decisión del dueño (2026-11-14): la ambulancia necesita paramédico **y** moto
 | Horario de Recepción y Laboratorio (RN-15, CARGA-03) | RN-15 dice "en horario de atención" sin horas. | Política `turnos.horario_servicios`: Recepción 07:00-19:00 y Laboratorio 07:00-17:00. Ajustable sin código. |
 | Borrador de turnos (D-10, MA-TUR-02) | D-10 recomienda quitar el estado y el permiso de borrador. | La API ya no crea borradores ni vuelve a borrador; la base no devuelve a borrador un turno en curso. El permiso `turnos.ver_borradores`, `turnos.publicar` y `POST /turnos/publicar` siguen para los borradores heredados de la semilla; retirarlos toca la matriz RBAC y la semilla demo. |
 | Reasignar citas de un médico ausente (ASIS-02) | No existe "reprogramar" ni "cambiar de médico" en Citas (CITA-02 es del flujo de citas). | La ausencia devuelve las citas afectadas y suplentes libres; Recepción las cancela o reprograma desde Citas. El turno no se cancela mientras tenga citas vivas. |
+
+## Citas y fila del día, fase 0/1 (rama `fix/citas-fila-fase01`)
+
+Decisiones del anexo 12 de la auditoría final (2026-11-14) tomadas con la opción recomendada; el responsable puede cambiar cada valor con una vigencia nueva en `plataforma.politica`, sin código.
+
+| Tema | Pregunta del responsable | Decisión conservadora tomada |
+|---|---|---|
+| Plazo de cancelación | ¿Se mantiene el plazo de 2 h? | Se mantiene `citas.cancelacion_horas = 2` (RN-21, solo el paciente). El mismo plazo vale para pedir una reprogramación. Recepción cancela o reprograma hasta la hora de inicio. |
+| Quién acepta reprogramaciones | ¿REC, el médico o cualquiera? | Cualquiera de los dos: REC con `citas.agendar` o el médico de la cita con `consulta.iniciar` (sin permiso nuevo). Si REC reprograma, se aplica directo. La cita original sigue vigente hasta aceptar; la solicitud vence sola cuando llega su franja o la hora de la cita original. |
+| Límite de reprogramaciones | ¿Cuántas por cita? | `citas.reprogramaciones_max = 2` por cadena de citas. |
+| Solicitudes simultáneas | ¿Cuántas solicitudes pendientes puede tener un paciente? | `citas.solicitudes_pendientes_max = 2` en total (no por especialidad: la cita no guarda especialidad). |
+| "No se presentó" en la fila | ¿Automático o manual, y después de cuántos llamados? | Manual, después de `fila.llamados_para_ausencia = 3` llamados (la base lo exige). Al cerrar el día, los números abiertos de días anteriores pasan solos a "no se presentó" (si tenían los llamados) o a "cerrado sin atender". |
+| "No asistió" en citas | ¿Manual o automático? | Ambos: REC lo marca desde la hora de inicio si no hay consulta; las citas confirmadas de días anteriores sin consulta pasan solas a "no asistió". |
+| Iniciar consulta | ¿Ventana configurable? | Solo el día local de la cita (sin ventana configurable). |
+| Addendum clínico (MA-CIT-04, D-06) | ¿Se implementa el addendum? | Pendiente: en esta rama solo se retiraron los mensajes de error que lo prometían. El permiso `consulta.corregir` y la fila del catálogo siguen sin endpoint. |
