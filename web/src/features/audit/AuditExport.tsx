@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../../components/ui';
-import { exportTable, type ExportFormat } from '../../lib/export';
+import { auditExport, exportTable, type ExportFormat } from '../../lib/export';
 import type { Api } from '../../lib/api';
 import { exportTableOf, type AuditPageData, type AuditRowData } from './query';
 
@@ -35,7 +35,11 @@ export function AuditExport({ api, queryFor, total, subtitle }: { api: Api; quer
         if (part.filas.length < BATCH) break;
       }
       const note = total > MAX_ROWS ? `${subtitle} · primeras ${MAX_ROWS} de ${total} filas` : subtitle;
-      await exportTable(format, exportTableOf(rows.slice(0, MAX_ROWS), note));
+      const table = exportTableOf(rows.slice(0, MAX_ROWS), note);
+      // MA-SEG-05: the reads above are audited as auditoria.exportar; the file itself is recorded like any other export.
+      try { await auditExport(format, table); }
+      catch { setError('No se pudo registrar la exportación. Intenta de nuevo.'); return; }
+      await exportTable(format, table);
       setOpen(false);
     } catch { setError('No se pudo generar el archivo. Intenta de nuevo.'); }
     finally { setBusy(null); }
