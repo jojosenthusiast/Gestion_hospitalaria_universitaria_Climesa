@@ -209,6 +209,11 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/fila/{id}/atender` | `fila.gestionar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | POST | `/api/v1/fila/{id}/completar` | `fila.gestionar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | POST | `/api/v1/fila/{id}/no-se-presento` | `fila.gestionar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/citas/{id}/reprogramar` | `citas.agendar` o `citas.solicitar` | REC la aplica; PAC solo propias, deja solicitud hasta N h antes | R | 4 | · | · | ✔ | · | · | · | · | · | · | propio |
+| POST | `/api/v1/citas/reprogramaciones/{id}/aceptar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
+| POST | `/api/v1/citas/reprogramaciones/{id}/rechazar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita, motivo | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
+| POST | `/api/v1/citas/{id}/no-asistio` | `citas.agendar` | Hora alcanzada y sin consulta | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/fila/llamar-siguiente` | `fila.llamar` | Primer número en espera del servicio | R | 4 | · | · | · | ✔ | · | ✔ | · | · | · | · |
 
 ### Spec 106
 
@@ -226,6 +231,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | PATCH | `/api/v1/consultas/{id}` | `consulta.registrar` | Versión y autor | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | GET | `/api/v1/consultas/{id}/detalle` | `expediente.ver` o `consulta.iniciar` | Relación clínica y auditoría | R | 3 | · | · | · | · | relación | relación / ✔ | · | · | · | propio revisado |
 | POST | `/api/v1/consultas/{id}/receta` | `recetas.emitir` | Inscripción vigente | R | 3 | · | · | · | · | · | relación | · | · | · | · |
+| GET | `/api/v1/consultas/sin-firmar` | `consulta.iniciar` | Solo propias | R | 4 | · | · | · | · | · | ✔ | · | · | · | · |
 
 ### Spec 107
 
