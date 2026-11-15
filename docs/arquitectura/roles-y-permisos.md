@@ -134,8 +134,22 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/cuentas/vinculaciones/{id}/rechazar` | `cuentas.verificar` | Motivo obligatorio | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/usuarios` | `usuarios.ver` |  | R | 2 | ✔ | · | · | · | · | · | · | · | ✔ | · |
 | POST | `/api/v1/usuarios/invitaciones` | `usuarios.invitar` |  | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/usuarios/{id}/invitacion/reenvio` | `usuarios.invitar` | Solo invitación pendiente | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/usuarios/{id}/invitacion/cancelacion` | `usuarios.invitar` | Solo invitación pendiente; desactiva la cuenta | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | PATCH | `/api/v1/usuarios/{id}/roles` | `usuarios.asignar_roles` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
 | PATCH | `/api/v1/usuarios/{id}/estado` | `usuarios.desactivar` | Nunca a sí mismo | R | 2 | ✔ | · | · | · | · | · | · | · | · | · |
+
+### Spec 110
+
+| Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| POST | `/api/v1/exportaciones` | `sesion.perfil` | Solo registra la exportación; el archivo se arma en la web | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| GET | `/api/v1/auditoria` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| POST | `/api/v1/auditoria/verificacion` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/auditoria/registros` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/auditoria/registros/{seq}` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/auditoria/opciones` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
+| GET | `/api/v1/me/accesos` | `auditoria.mis_accesos` | Propio | E | 5 | · | · | · | · | · | · | · | · | · | propio |
 
 ### Spec 102
 
@@ -221,7 +235,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | POST | `/api/v1/consultas` | `consulta.iniciar` | Desde número llamado (ticketId) o cita confirmada (appointmentId), uno solo | R | 3 | · | · | · | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/signos` | `signos.registrar` |  | R | 3 | · | · | · | ✔ | ✔ | ✔ | · | ✔ | · | · |
-| GET | `/api/v1/pacientes/{id}/signos` | `signos.registrar` | Contexto x; audita la lectura | R | 3 | · | · | · | ✔ | ✔ | ✔ | · | ✔ | · | · |
+| GET | `/api/v1/pacientes/{id}/signos` | `signos.registrar` | Contexto x más contexto de atención (relación; ingreso; ambulancia o actividad de hoy) (MA-SEG-07); audita la lectura | R | 3 | · | · | · | ✔ | ✔ | ✔ | · | ✔ | · | · |
 | POST | `/api/v1/pacientes/{id}/signos` | `signos.registrar` | Fuera de consulta; incluye dolor y glucemia; Idempotency-Key | R | 3 | · | · | · | ✔ | ✔ | ✔ | · | ✔ | · | · |
 | POST | `/api/v1/consultas/{id}/diagnosticos` | `consulta.registrar` | CIE-10 | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/firmar` | `consulta.registrar` | Inscripción vigente en el acto | R | 3 | · | · | · | · | · | relación | · | · | · | · |
@@ -289,17 +303,6 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/ambulancia/ubicacion` | `ambulancia.operar` | Solo con servicio activo | E | 5 | · | · | · | · | · | · | · | ✔ | · | · |
 | POST | `/api/v1/ambulancia/mantenimiento` | `ambulancia.mantenimiento` | Solo sin servicio activo | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/ambulancia/bitacora` | `ambulancia.ver_bitacora` | Datos del paciente ocultos sin relación | R | 4 | · | ✔ | ✔ | · | · | ✔ | · | propio | ✔ | · |
-
-### Spec 110
-
-| Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/auditoria` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| POST | `/api/v1/auditoria/verificacion` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| GET | `/api/v1/auditoria/registros` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| GET | `/api/v1/auditoria/registros/{seq}` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| GET | `/api/v1/auditoria/opciones` | `auditoria.ver` |  | R | 4 | · | · | · | · | · | · | · | · | ✔ | · |
-| GET | `/api/v1/me/accesos` | `auditoria.mis_accesos` | Propio | E | 5 | · | · | · | · | · | · | · | · | · | propio |
 
 ### Spec 111
 

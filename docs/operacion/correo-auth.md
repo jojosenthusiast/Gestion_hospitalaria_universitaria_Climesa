@@ -21,8 +21,8 @@ Un enlace vencido o ya usado muestra un aviso en español y una salida: reenviar
      - `https://sghu-web.onrender.com/aceptar-invitacion`
      - `https://sghu-web.onrender.com/restablecer`
      - Para desarrollo local, opcional: `http://localhost:5173/**`
-2. **Supabase → Authentication → Emails → SMTP Settings:** configura un SMTP propio. El servidor de correo incluido de Supabase solo envía unos pocos correos por hora y solo a direcciones del equipo del proyecto.
-3. **Supabase → Authentication → Emails → Templates:** no hace falta cambiarlas. Las plantillas de fábrica usan `{{ .ConfirmationURL }}`, que ya respeta la página de destino.
+2. **Supabase → Authentication → Emails → SMTP Settings:** configura un SMTP propio con dominio verificado (SPF y DKIM; DMARC recomendado) y remitente «CLIMESA» (D-15). El servidor de correo incluido de Supabase solo envía unos pocos correos por hora y solo a direcciones del equipo del proyecto.
+3. **Supabase → Authentication → Emails → Templates:** pega las cinco plantillas en español de `supabase/templates/` (confirmación, invitación, recuperación, enlace mágico y cambio de correo) con sus asuntos; la tabla está en `supabase/templates/README.md`. Las de fábrica salen en inglés y en texto plano. Todas usan `{{ .ConfirmationURL }}`, que ya respeta la página de destino.
 4. **Render → servicio `sghu-api` → Environment:** `WEB_APP_URL=https://sghu-web.onrender.com`. Desde este cambio la API no arranca en producción (`NODE_ENV=production`) si falta, si no es HTTPS o si apunta a localhost; así un correo de invitación nunca lleva a localhost.
 5. **Render → servicio `sghu-web`:** no hace falta tocar nada. El build copia `index.html` como `404.html`, y Render sirve ese archivo en cualquier ruta, así que los enlaces profundos cargan la aplicación aunque falte la regla de reescritura. Si se aplica `render.yaml` como Blueprint, su regla `/*` → `/index.html` hace lo mismo con estado 200.
 

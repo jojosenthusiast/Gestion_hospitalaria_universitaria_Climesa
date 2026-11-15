@@ -12,7 +12,8 @@ export class PatientCandidateResponse {
   @EnumProp(ESTADO_PACIENTE, 'EstadoPaciente') state!: string;
   @BoolProp() active!: boolean;
   @EnumProp(SEXO_PACIENTE, 'SexoPaciente') sex!: string;
-  @DateProp({ optional: true, nullable: true, description: 'Solo para roles que ven la fecha de nacimiento en la búsqueda' }) birth?: string | null;
+  @DateProp({ optional: true, nullable: true, description: 'Solo para roles que ven la fecha de nacimiento exacta (contexto x)' }) birth?: string | null;
+  @StrProp({ optional: true, nullable: true, description: 'Rango de edad en lugar de la fecha (contexto rango, por ejemplo Laboratorio): 30-39 o 90+' }) ageRange?: string | null;
   @IntProp() version!: number;
   @StrProp() matchReason!: string;
 }

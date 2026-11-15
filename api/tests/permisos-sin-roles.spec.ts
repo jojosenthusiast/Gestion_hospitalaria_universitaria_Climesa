@@ -46,7 +46,7 @@ describe('Decisiones por rol que ahora salen del catálogo de permisos',()=>{
  afterAll(async()=>{await app?.close();await fixture?.pg.close();});
 
  describe('fecha de nacimiento en la búsqueda de pacientes',()=>{
-  test.each([['JOP',false],['REC',true],['AST',true],['ENF',true],['MED',true],['LAB',true],['PAR',true]])('GET /pacientes como %s: fecha de nacimiento presente = %s',async(role,shown)=>{
+  test.each([['JOP',false],['REC',true],['AST',true],['ENF',true],['MED',true],['LAB',false],['PAR',true]])('GET /pacientes como %s: fecha de nacimiento presente = %s (LAB recibe ageRange, MA-SEG-06)',async(role,shown)=>{
    const result=await call(role,'GET','/pacientes?query=Marta');
    expect(result.status).toBe(200);
    const row=result.body.find((p:any)=>p.id===patientId);expect(row).toBeDefined();
@@ -59,7 +59,7 @@ describe('Decisiones por rol que ahora salen del catálogo de permisos',()=>{
     expect('birth' in row).toBe(true);
    }finally{await fixture.pg.query("DELETE FROM acceso.asignacion_rol WHERE usuario_id=$1 AND rol_codigo='MED'",[userId('JOP')]);}
   });
-  test.each([['JOP',false],['REC',true],['LAB',true]])('POST /pacientes/busquedas como %s: fecha de nacimiento presente = %s',async(role,shown)=>{
+  test.each([['JOP',false],['REC',true],['LAB',false]])('POST /pacientes/busquedas como %s: fecha de nacimiento presente = %s (LAB recibe ageRange, MA-SEG-06)',async(role,shown)=>{
    const result=await call(role,'POST','/pacientes/busquedas',{query:'Marta Ejemplo'});
    expect(result.status).toBe(201);
    const row=result.body.candidates.find((p:any)=>p.id===patientId);expect(row).toBeDefined();
@@ -98,12 +98,13 @@ describe('Decisiones por rol que ahora salen del catálogo de permisos',()=>{
    expect((await call('ADM','GET','/auth/me')).body.canInviteAdmin).toBe(true);
    for(const role of ['REC','MED','JOP'])expect((await call(role,'GET','/auth/me')).body.canInviteAdmin).toBe(false);
   });
-  test('los roles de trabajo exigen persona del directorio; ADM, JOP, DPD y PAC no',async()=>{
+  test('los roles de trabajo exigen persona del directorio; JOP y DPD no; PAC no se invita (MA-CTA-02)',async()=>{
    for(const role of ['REC','AST','ENF','MED','LAB','PAR']){
     const without=await invite('ADM',[role]);expect([role,without.status]).toEqual([role,400]);
     const withStaff=await invite('ADM',[role],await staff());expect([role,withStaff.status]).toEqual([role,201]);
    }
-   for(const role of ['JOP','DPD','PAC'])expect([role,(await invite('ADM',[role])).status]).toEqual([role,201]);
+   for(const role of ['JOP','DPD'])expect([role,(await invite('ADM',[role])).status]).toEqual([role,201]);
+   expect((await invite('ADM',['PAC'])).body.codigo).toBe('rol_no_invitable');
   });
   test('un rol de trabajo mezclado con uno que no lo exige sigue pidiendo persona',async()=>{
    expect((await invite('ADM',['JOP','MED'])).status).toBe(400);
@@ -116,7 +117,7 @@ describe('Decisiones por rol que ahora salen del catálogo de permisos',()=>{
    expect((await call('DPD','GET','/auth/me')).body.canInviteAdmin).toBe(false);
    expect((await call('ADM','GET','/auth/me')).body.canInviteAdmin).toBe(true);
    const denied=await invite('DPD',['ADM']);expect(denied.status).toBe(403);
-   expect((await invite('DPD',['PAC'])).status).toBe(201);
+   expect((await invite('DPD',['JOP'])).status).toBe(201);
   });
   test('asignar el rol ADM por cambio de roles: el principal sí; otro administrador no',async()=>{
    const version=async(role:string)=>(await fixture.pg.query<{version:number}>('SELECT version FROM acceso.usuario WHERE id=$1',[userId(role)])).rows[0].version;
@@ -124,9 +125,9 @@ describe('Decisiones por rol que ahora salen del catálogo de permisos',()=>{
    expect(denied.status).toBe(403);
    const allowed=await call('ADM','PATCH',`/usuarios/${userId('PAC')}/roles`,{roles:['PAC','ADM'],version:await version('PAC'),reason:'Prueba de jerarquía'});
    expect(allowed.status).toBe(200);
-   // Cambiar roles de una cuenta que ya es ADM no vuelve a pedir autoridad de principal (comportamiento actual).
+   // MA-CTA-03: una cuenta que ya es administradora solo la gestiona el principal.
    const onAdmin=await call('DPD','PATCH',`/usuarios/${userId('PAC')}/roles`,{roles:['PAC','ADM'],version:await version('PAC'),reason:'Cuenta que ya es administradora'});
-   expect(onAdmin.status).toBe(200);
+   expect(onAdmin.status).toBe(403);expect(onAdmin.body.codigo).toBe('jerarquia_administrador');
   });
  });
 });

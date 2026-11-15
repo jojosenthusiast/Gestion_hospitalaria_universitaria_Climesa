@@ -1,12 +1,12 @@
 import {StrictMode,useState,type FormEvent} from 'react';
 import {createRoot} from 'react-dom/client';
-import {ActivationView,Brand,LoginView,RegistrationView,StatusView} from './components/ui';
+import {ActivationView,Brand,LoginView,PatientSignupInfoView,StatusView} from './components/ui';
 import './styles.css';import './preview.css';
-const labels:Record<string,string>={login:'Ingreso','login-error':'Ingreso · error','login-success':'Ingreso · cuenta activada','session-expired':'Ingreso · sesión vencida',register:'Registro de paciente','register-error':'Registro · error','register-done':'Registro · confirmación',activation:'Crear contraseña','activation-error':'Activación · enlace vencido','password-error':'Activación · contraseñas distintas',loading:'Validando acceso','access-error':'Acceso no disponible'};
+const labels:Record<string,string>={login:'Ingreso','login-error':'Ingreso · error','login-success':'Ingreso · cuenta activada','session-expired':'Ingreso · sesión vencida',register:'Registro de paciente · solo en la app',activation:'Crear contraseña','activation-error':'Activación · enlace vencido','password-error':'Activación · contraseñas distintas',loading:'Validando acceso','access-error':'Acceso no disponible'};
 function Screen({name}:{name:string}){
- const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[displayName,setName]=useState(''),[notice,setNotice]=useState(false);
+ const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[notice,setNotice]=useState(false);
  const submit=(e:FormEvent)=>{e.preventDefault();setNotice(true);};const busy=false;
- if(name.startsWith('register'))return <RegistrationView name={displayName} {...{email,password,confirmation,setName,setEmail,setPassword,setConfirmation,busy}} done={name==='register-done'||notice} error={name==='register-error'?'No se pudo crear la cuenta. Revisa los datos o intenta iniciar sesión.':null} onSubmit={submit}/>;
+ if(name==='register')return <PatientSignupInfoView/>;
  if(name.startsWith('activation')||name==='password-error')return <ActivationView ready email={name==='activation-error'?undefined:'paciente@example.test'} {...{password,confirmation,setPassword,setConfirmation,busy}} error={name==='password-error'||notice?'Las contraseñas no coinciden.':null} onSubmit={submit}/>;
  if(name==='loading'||name==='access-error')return <StatusView title={name==='loading'?'Validando tu acceso':'No pudimos validar el acceso'} detail={name==='loading'?'Consultando los permisos vigentes de tu cuenta.':'El servicio no está disponible. Intenta nuevamente.'} action={name==='access-error'?'Volver a intentar':undefined} onAction={()=>setNotice(true)}/>;
  return <LoginView {...{email,password,setEmail,setPassword,busy}} accepted={name==='login-success'} notice={name==='session-expired'?'Tu sesión se cerró por inactividad. Ingresa nuevamente.':undefined} error={name==='login-error'||notice?'Correo o contraseña incorrectos, o la cuenta todavía no está activa.':null} onSubmit={submit}/>;

@@ -96,7 +96,7 @@ export class AttentionService {
         WHERE estado IN ('activo','provisional') AND id=$1::uuid
         ORDER BY primer_apellido,nombres,id
         LIMIT 1`, [actor.patientId])).rows;
-        // SEG-02: the catalog read is audited; the identifiers stay (privacidad.md §3.9).
+        // SEG-02: the catalog read is audited; the identifiers stay (privacidad.md §3.10).
         await this.commands.audit(c, actor, { action: 'citas.catalogo_leer', entity: 'paciente', permission: 'citas.solicitar', detail: { patientCount: rows.length, patientIds: rows.map(row => row.id) } });
         return rows;
       }),

@@ -120,7 +120,7 @@ export function ConfirmEmail() {
     {state.stage === 'done' && <>
       <Heading eyebrow="Confirmación de correo" title="Tu correo quedó confirmado." />
       {state.profile ? <><Notice kind="success">{state.web ? 'Tu cuenta está activa.' : `Ya puedes iniciar sesión en la app CLIMESA (${mobileOf(state.profile.platforms).map(p => PLATFORM_NAMES[p]).join('/') || 'Android/iOS'}).`}</Notice><PlatformGuidance profile={state.profile} /></> : <GenericGuidance patient />}
-      {state.web ? <a className="primary-button" href="/"><span>Ir al portal web</span><Icon name="arrow" size={18} /></a> : <a className="secondary-button" href="/"><Icon name="back" size={18} />Volver al inicio</a>}
+      {state.web ? <a className="primary-button" href="/"><span>Ir al portal web</span><Icon name="arrow" size={18} /></a> : <div className="platform-next"><h2>Abre la app CLIMESA</h2><p>Inicia sesión en tu teléfono con este mismo correo y tu contraseña. Ya puedes cerrar esta página.</p></div>}
     </>}
     {state.stage === 'problem' && <><Heading eyebrow="Confirmación de correo" title="No pudimos confirmar tu correo." /><Notice kind="error">{state.message} Si ya confirmaste tu correo, inicia sesión en la app. Si no, pide un enlace nuevo.</Notice><ResendConfirmation /><a className="auth-link" href="/">Volver al inicio</a></>}
   </div></AuthLayout>;

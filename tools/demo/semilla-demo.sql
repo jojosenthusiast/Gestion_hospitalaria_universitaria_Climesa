@@ -126,42 +126,21 @@ create or replace function pg_temp.persona(r text) returns uuid language sql sta
 $$ select persona_id from pg_temp.cuentas where rol = r $$;
 
 -- ---------------------------------------------------------------------------------------------------------
--- 2. Edificio: Planta 4 con camas en todos los estados (las plantas 1 a 3 vienen de seed.sql)
---    Las camas demo son las únicas que se ocupan, así nunca chocan con ocupaciones reales.
+-- 2. Edificio: las camas de la demo son las reales de hospitalización (HAB-201 a 206 en la Planta 2 y VIP-301 a 305
+--    en la Planta 3, de seed.sql). La demo no inventa plantas (BL-01): solo agrega dos bodegas de la Planta 1.
+--    Antes de sembrar, esas camas deben estar vacías: si hay ocupaciones reales, las restricciones de cama abortan la
+--    transacción completa y no queda nada a medias.
 -- ---------------------------------------------------------------------------------------------------------
-insert into infra.espacio (id, padre_id, tipo, codigo, nombre, nivel) values
-  (pg_temp.did('0020', 1), pg_temp.espacio('HOSP'), 'planta', 'P4', 'Planta 4', 4)
-on conflict do nothing;
-insert into infra.espacio (id, padre_id, tipo, codigo, nombre, nivel) values
-  (pg_temp.did('0020', 2), pg_temp.espacio('P4'), 'area', 'P4-HOS', 'Hospitalización ala norte', 4)
-on conflict do nothing;
 insert into infra.espacio (id, padre_id, tipo, codigo, nombre, nivel) values
   (pg_temp.did('0020', 3), pg_temp.espacio('P1'), 'bodega', 'BOD-URG', 'Bodega de urgencias', 1),
   (pg_temp.did('0020', 4), pg_temp.espacio('P1'), 'bodega', 'BOD-FAR', 'Farmacia hospitalaria', 1)
 on conflict do nothing;
 
-insert into infra.espacio (id, padre_id, tipo, codigo, nombre, categoria, capacidad, nivel)
-select pg_temp.did('0020', 10 + h.n), pg_temp.espacio('P4-HOS'), 'habitacion', h.cod, h.cod, h.cat, h.cap, 4
-from (values (1, 'HAB-401', 'semiprivada', 2), (2, 'HAB-402', 'semiprivada', 2), (3, 'HAB-403', 'semiprivada', 2),
-             (4, 'HAB-404', 'semiprivada', 2), (5, 'VIP-401', 'vip', 1), (6, 'VIP-402', 'vip', 1),
-             (7, 'HAB-405', 'semiprivada', 2), (8, 'HAB-406', 'semiprivada', 2), (9, 'HAB-407', 'semiprivada', 2),
-             (10, 'HAB-408', 'semiprivada', 2), (11, 'HAB-409', 'semiprivada', 2), (12, 'HAB-410', 'semiprivada', 2),
-             (13, 'VIP-403', 'vip', 1), (14, 'VIP-404', 'vip', 1), (15, 'VIP-405', 'vip', 1)) h(n, cod, cat, cap)
-on conflict do nothing;
-
-insert into infra.espacio (id, padre_id, tipo, codigo, nombre, nivel)
-select pg_temp.did('0020', 100 + (h.n - 1) * 2 + l.o), pg_temp.did('0020', 10 + h.n), 'cama', h.cod || '-' || l.letra, 'Cama ' || l.letra, 4
-from (values (1, 'HAB-401', 2), (2, 'HAB-402', 2), (3, 'HAB-403', 2), (4, 'HAB-404', 2), (5, 'VIP-401', 1), (6, 'VIP-402', 1),
-             (7, 'HAB-405', 2), (8, 'HAB-406', 2), (9, 'HAB-407', 2), (10, 'HAB-408', 2), (11, 'HAB-409', 2), (12, 'HAB-410', 2),
-             (13, 'VIP-403', 1), (14, 'VIP-404', 1), (15, 'VIP-405', 1)) h(n, cod, cap)
-join (values (1, 'A'), (2, 'B')) l(o, letra) on l.o <= h.cap
-on conflict do nothing;
-
 insert into infra.equipo (id, tipo, serie, espacio_id, estado) values
-  (pg_temp.did('0021', 1), 'monitor',  'DEMO-MON-401', pg_temp.did('0020', 11), 'operativo'),
-  (pg_temp.did('0021', 2), 'bomba',    'DEMO-BOM-402', pg_temp.did('0020', 12), 'mantenimiento'),
-  (pg_temp.did('0021', 3), 'oxigeno',  'DEMO-OXI-404', pg_temp.did('0020', 14), 'baja'),
-  (pg_temp.did('0021', 4), 'monitor',  'DEMO-MON-VIP', pg_temp.did('0020', 15), 'operativo')
+  (pg_temp.did('0021', 1), 'monitor',  'DEMO-MON-201', pg_temp.espacio('HAB-201'), 'operativo'),
+  (pg_temp.did('0021', 2), 'bomba',    'DEMO-BOM-202', pg_temp.espacio('HAB-202'), 'mantenimiento'),
+  (pg_temp.did('0021', 3), 'oxigeno',  'DEMO-OXI-204', pg_temp.espacio('HAB-204'), 'baja'),
+  (pg_temp.did('0021', 4), 'monitor',  'DEMO-MON-VIP', pg_temp.espacio('VIP-301'), 'operativo')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------------------------------------
@@ -194,16 +173,16 @@ from (values
   (33, 'Wilmer Ovidio',        'Sorto Benítez',      'enfermero',     null,                         'P2-HOS'),
   (34, 'Cindy Mariela',        'Rauda Serrano',      'enfermero',     null,                         'P3-VIP'),
   (35, 'Óscar Armando',        'Linares Pineda',     'enfermero',     null,                         'P3-VIP'),
-  (36, 'Ingrid Carolina',      'Meléndez Arévalo',   'enfermero',     null,                         'P4-HOS'),
-  (37, 'Jaime Alberto',        'Guevara Cáceres',    'enfermero',     null,                         'P4-HOS'),
-  (38, 'Luz Marina',           'Barrientos Amaya',   'enfermero',     null,                         'P4-HOS'),
-  (39, 'Ever Antonio',         'Recinos Magaña',     'enfermero',     null,                         'P4-HOS'),
+  (36, 'Ingrid Carolina',      'Meléndez Arévalo',   'enfermero',     null,                         'P2-HOS'),
+  (37, 'Jaime Alberto',        'Guevara Cáceres',    'enfermero',     null,                         'P2-HOS'),
+  (38, 'Luz Marina',           'Barrientos Amaya',   'enfermero',     null,                         'P2-HOS'),
+  (39, 'Ever Antonio',         'Recinos Magaña',     'enfermero',     null,                         'P2-HOS'),
   (40, 'Marlon Josué',         'Iraheta Villalobos', 'laboratorista', null,                         'P1-LAB'),
   (41, 'Evelyn Margarita',     'Palacios Mancía',    'paramedico',    null,                         'P1-AMB'),
   (42, 'Josué Daniel',         'Amaya Orellana',     'paramedico',    null,                         'P1-AMB'),
   (43, 'Santos Ismael',        'Henríquez Cortez',   'motorista',     null,                         'P1-AMB'),
   (44, 'Rosa Delmy',           'Ayala Escobar',      'limpieza',      null,                         'P3-VIP'),
-  (45, 'Jeovany Alexander',    'Argueta Rosales',    'limpieza',      null,                         'P4-HOS'),
+  (45, 'Jeovany Alexander',    'Argueta Rosales',    'limpieza',      null,                         'P2-HOS'),
   (46, 'Dina Marisela',        'Flores Aguirre',     'asistente',     null,                         'BOD-CEN'),
   (47, 'Gustavo Adolfo',       'Reyes Chávez',       'recepcionista', null,                         'P1-REC'),
   -- Motoristas de noche: RN-30 exige paramédico y motorista con turno en curso para despachar la ambulancia.
@@ -259,23 +238,23 @@ insert into plan_turno values
   (26, pg_temp.did('0002', 33), 'P2-HOS', 'N2B'),
   (27, pg_temp.did('0002', 34), 'P3-VIP', 'N2'),
   (28, pg_temp.did('0002', 35), 'P3-VIP', 'N2B'),
-  (29, pg_temp.did('0002', 36), 'P4-HOS', 'D7'),
-  (30, pg_temp.did('0002', 37), 'P4-HOS', 'T7'),
-  (31, pg_temp.did('0002', 38), 'P4-HOS', 'N2'),
-  (32, pg_temp.did('0002', 39), 'P4-HOS', 'N2B'),
+  (29, pg_temp.did('0002', 36), 'P2-HOS', 'D7'),
+  (30, pg_temp.did('0002', 37), 'P2-HOS', 'T7'),
+  (31, pg_temp.did('0002', 38), 'P2-HOS', 'N2'),
+  (32, pg_temp.did('0002', 39), 'P2-HOS', 'N2B'),
   (33, pg_temp.did('0002', 40), 'P1-LAB', 'N2'),
   (34, pg_temp.did('0002', 41), 'P1-AMB', 'N2'),
   (35, pg_temp.did('0002', 42), 'P1-AMB', 'N2B'),
   (36, pg_temp.did('0002', 43), 'P1-AMB', 'T7'),
   (37, pg_temp.did('0002', 44), 'P3-VIP', 'D5'),
-  (38, pg_temp.did('0002', 45), 'P4-HOS', 'T5'),
+  (38, pg_temp.did('0002', 45), 'P2-HOS', 'T5'),
   (39, pg_temp.did('0002', 46), 'BOD-CEN', 'D5'),
   (40, pg_temp.did('0002', 47), 'P1-REC', 'T7'),
   (41, pg_temp.did('0002', 48), 'P1-AMB', 'N2'),
   (42, pg_temp.did('0002', 49), 'P1-AMB', 'N2B');
 -- La cardióloga (persona demo 4) no tiene plan a propósito: en la agenda aparece como "Sin turno".
 
-insert into personal.turno (id, persona_id, area_id, periodo, tipo, estado, justificacion, publicado_por, publicado_en, creado_por)
+insert into personal.turno (id, persona_id, area_id, periodo, tipo, estado, justificacion, publicado_por, publicado_en, creado_por, excepcion_carga)
 select pg_temp.did('0003', b.idx * 100 + b.d + 2), b.persona, pg_temp.espacio(b.area),
        tstzrange(b.ini, b.fin, '[)'), b.tipo,
        case when (b.idx = 2 and b.d = 3) or (b.idx = 29 and b.d = 6) then 'cancelado'
@@ -290,9 +269,12 @@ select pg_temp.did('0003', b.idx * 100 + b.d + 2), b.persona, pg_temp.espacio(b.
             when b.idx = 5 and b.d = 0 then '[DEMO] Guardia médica de 24 h, el máximo que permite la política de turnos'
             when b.idx = 6 and b.d = 0 then '[DEMO] Turno nocturno de 12 h que termina al día siguiente'
             end,
-       pg_temp.actor('JOP'), now() - interval '1 day', pg_temp.actor('JOP')
+       pg_temp.actor('JOP'), now() - interval '1 day', pg_temp.actor('JOP'),
+       -- D7/T7 cover the area every day of the demo window with one person: written exception, so a later
+       -- consecutive-days rule in the database does not reject the demo plan.
+       case when b.patron in ('D7', 'T7') then '[DEMO] Plan de cobertura diaria de la demostración: excepción documentada a los días consecutivos' end
 from (
-  select p.idx, p.persona, p.area, d.d,
+  select p.idx, p.persona, p.area, p.patron, d.d,
          case when p.patron = 'D7' or (p.patron = 'D5' and extract(isodow from pg_temp.hoy() + d.d) <= 5)
                    or (p.patron = 'A2' and mod(mod(d.d, 2) + 2, 2) = 0) then pg_temp.ts(pg_temp.hoy() + d.d, 7)
               when (p.patron = 'T5' and extract(isodow from pg_temp.hoy() + d.d) <= 5) or p.patron = 'T7' then pg_temp.ts(pg_temp.hoy() + d.d, 13)
@@ -319,12 +301,12 @@ insert into pdemo values
   (4,  'Ana Cecilia',       'Portillo',   'Mejía',     'femenino',  '2001-01-22', 'Mejicanos',      'Col. Zacamil, Edif. 7',            'En espera en la fila de consulta general; tiene una cita también',         'activo',   'dui', true),
   (5,  'Carlos Eduardo',    'Mejía',      'Rivas',     'masculino', '1990-09-09', 'Ilopango',       'Col. San Felipe #44',              'Consulta abierta (borrador) con hemograma urgente pendiente',               'activo',   'dui', false),
   (6,  'Carlos Eduardo',    'Mejía',      'Rivas',     'masculino', '1990-09-09', 'Ilopango',       'Col. San Felipe #44',              'Posible duplicado de la ficha 5 (mismo nombre y fecha): ver Duplicados',   'activo',   null,  false),
-  (7,  'Lucía Fernanda',    'Guardado',   'Pineda',    'femenino',  '1982-05-18', 'Apopa',          'Col. Las Margaritas, Cl. 2 #5',    'Hospitalizada en semiprivada HAB-401, cama A',                              'activo',   'dui', true),
-  (8,  'Rosa Elena',        'Martínez',   'Orellana',  'femenino',  '1957-12-03', 'Ayutuxtepeque',  'Col. Sierra Morena III',           'Comparte HAB-401 con la ficha 7 (mismo sexo); fue trasladada de cama',      'activo',   'dui', false),
-  (9,  'Jorge Alberto',     'Cañas',      'Flores',    'masculino', '1969-08-21', 'Cuscatancingo',  'Col. Cuscatancingo, Pje. 6 #19',   'Hospitalizado con aislamiento en HAB-402; su cama B queda bloqueada',       'activo',   'dui', false),
-  (10, 'Mercedes del Carmen','Aguilar',   'Vásquez',   'femenino',  '1944-02-27', 'San Salvador',   'Col. Médica, Av. Dr. Emilio Álvarez','Alta firmada en VIP-401: la cama sigue ocupada hasta la salida física',    'activo',   'dui', false),
-  (11, 'Daniela Michelle',  'Ramos',      'Alfaro',    'femenino',  '1993-10-05', 'Antiguo Cuscatlán','Res. Madre Selva, Casa 21',      'Admisión programada en espera de cama VIP; la VIP-402 está reservada',      'activo',   'dui', true),
-  (12, 'Mauricio Antonio',  'Solís',      'Barrera',   'masculino', '1979-04-16', 'Soyapango',      'Col. Montes de San Bartolo',       'Egresado hoy: su cama HAB-403 A espera limpieza y verificación',            'activo',   'dui', false),
+  (7,  'Lucía Fernanda',    'Guardado',   'Pineda',    'femenino',  '1982-05-18', 'Apopa',          'Col. Las Margaritas, Cl. 2 #5',    'Hospitalizada en semiprivada HAB-201, cama A',                              'activo',   'dui', true),
+  (8,  'Rosa Elena',        'Martínez',   'Orellana',  'femenino',  '1957-12-03', 'Ayutuxtepeque',  'Col. Sierra Morena III',           'Comparte HAB-201 con la ficha 7 (mismo sexo); fue trasladada de cama',      'activo',   'dui', false),
+  (9,  'Jorge Alberto',     'Cañas',      'Flores',    'masculino', '1969-08-21', 'Cuscatancingo',  'Col. Cuscatancingo, Pje. 6 #19',   'Hospitalizado con aislamiento en HAB-202; su cama B queda bloqueada',       'activo',   'dui', false),
+  (10, 'Mercedes del Carmen','Aguilar',   'Vásquez',   'femenino',  '1944-02-27', 'San Salvador',   'Col. Médica, Av. Dr. Emilio Álvarez','Alta firmada en VIP-301: la cama sigue ocupada hasta la salida física',    'activo',   'dui', false),
+  (11, 'Daniela Michelle',  'Ramos',      'Alfaro',    'femenino',  '1993-10-05', 'Antiguo Cuscatlán','Res. Madre Selva, Casa 21',      'Admisión programada en espera de cama VIP; la VIP-302 está reservada',      'activo',   'dui', true),
+  (12, 'Mauricio Antonio',  'Solís',      'Barrera',   'masculino', '1979-04-16', 'Soyapango',      'Col. Montes de San Bartolo',       'Egresado hoy: su cama HAB-203 A espera limpieza y verificación',            'activo',   'dui', false),
   (13, 'Karla Patricia',    'Menéndez',   'Lara',      'femenino',  '1999-06-11', 'San Marcos',     'Col. Jardín, Cl. 4 #7',            'Pidió una cita desde la app: queda solicitada hasta que REC la confirme',   'activo',   'dui', true),
   (14, 'Óscar Armando',     'Villatoro',  'Peña',      'masculino', '1986-12-25', 'Santa Tecla',    'Col. Utila, Pje. 1 #3',            'Cita cancelada; su cuenta ya está vinculada (vinculación aprobada)',        'activo',   'dui', true),
   (15, 'Sandra Yanira',     'Escobar',    'Rauda',     'femenino',  '1971-09-14', 'Soyapango',      'Col. Cima II, Blq F',              'Cita rechazada con motivo; su solicitud de vinculación fue rechazada',      'activo',   'dui', false),
@@ -1259,17 +1241,17 @@ cross join lateral (select case a.origen when 'emergencia' then pg_temp.did('000
 where case a.tratante when 0 then pg_temp.persona('MED') else pg_temp.did('0002', a.tratante) end is not null
 on conflict do nothing;
 
--- Ocupaciones: abiertas (sin fin) o cerradas con su motivo. Un traslado: la admisión 2 pasó de HAB-403 B a HAB-401 B.
+-- Ocupaciones: abiertas (sin fin) o cerradas con su motivo. Un traslado: la admisión 2 pasó de HAB-203 B a HAB-201 B.
 insert into hospitalizacion.ocupacion_cama (id, admision_id, cama_id, habitacion_id, categoria, periodo, motivo_fin, asignado_por)
 select pg_temp.did('0061', o.n), pg_temp.did('0060', o.adm), pg_temp.espacio(o.cama), pg_temp.espacio(o.hab), o.cat,
        tstzrange(greatest(now() - o.desde, ad.creado_en), now() - o.hasta, '[)'), o.fin, pg_temp.actor('ENF')
 from (values
-  (1, 1, 'HAB-401-A', 'HAB-401', 'semiprivada', interval '2 days',  null::interval,         null),
-  (2, 2, 'HAB-403-B', 'HAB-403', 'semiprivada', interval '3 days',  interval '1 day',       'traslado'),
-  (3, 2, 'HAB-401-B', 'HAB-401', 'semiprivada', interval '1 day',   null::interval,         null),
-  (4, 3, 'HAB-402-A', 'HAB-402', 'semiprivada', interval '1 day',   null::interval,         null),
-  (5, 4, 'VIP-401-A', 'VIP-401', 'vip',         interval '4 days',  null::interval,         null),
-  (6, 6, 'HAB-403-A', 'HAB-403', 'semiprivada', interval '3 days',  interval '2 hours',     'egreso')
+  (1, 1, 'HAB-201-A', 'HAB-201', 'semiprivada', interval '2 days',  null::interval,         null),
+  (2, 2, 'HAB-203-B', 'HAB-203', 'semiprivada', interval '3 days',  interval '1 day',       'traslado'),
+  (3, 2, 'HAB-201-B', 'HAB-201', 'semiprivada', interval '1 day',   null::interval,         null),
+  (4, 3, 'HAB-202-A', 'HAB-202', 'semiprivada', interval '1 day',   null::interval,         null),
+  (5, 4, 'VIP-301-A', 'VIP-301', 'vip',         interval '4 days',  null::interval,         null),
+  (6, 6, 'HAB-203-A', 'HAB-203', 'semiprivada', interval '3 days',  interval '2 hours',     'egreso')
 ) o(n, adm, cama, hab, cat, desde, hasta, fin)
 join hospitalizacion.admision ad on ad.id = pg_temp.did('0060', o.adm)
 on conflict do nothing;
@@ -1283,14 +1265,14 @@ where exists (select 1 from hospitalizacion.ocupacion_cama where id = pg_temp.di
 on conflict do nothing;
 
 insert into hospitalizacion.reserva_cama (id, admision_id, cama_id, periodo, estado)
-select pg_temp.did('0062', 1), pg_temp.did('0060', 5), pg_temp.espacio('VIP-402-A'), tstzrange(now(), now() + interval '8 hours', '[)'), 'activa'
+select pg_temp.did('0062', 1), pg_temp.did('0060', 5), pg_temp.espacio('VIP-302-A'), tstzrange(now(), now() + interval '8 hours', '[)'), 'activa'
 where exists (select 1 from hospitalizacion.admision where id = pg_temp.did('0060', 5))
 on conflict do nothing;
 
 insert into hospitalizacion.alta (admision_id, tipo, firmada_por, firmada_en, resumen, pendientes)
 select pg_temp.did('0060', v.n), 'medica', pg_temp.actor('MED'), now() - v.hace, v.resumen, v.pend::jsonb
 from (values
-  (4, interval '3 hours', '[DEMO] Alta firmada: la cama VIP-401 sigue ocupada hasta la salida física del paciente',
+  (4, interval '3 hours', '[DEMO] Alta firmada: la cama VIP-301 sigue ocupada hasta la salida física del paciente',
       '[{"descripcion": "Control en consulta externa en siete días", "responsable": "Consulta general"}]'),
   (6, interval '3 hours', '[DEMO] Alta médica ya completada: el paciente salió y la cama pasó a limpieza', '[]')
 ) v(n, hace, resumen, pend)
@@ -1331,24 +1313,26 @@ on conflict do nothing;
 -- Camas: bloqueos, limpieza y equipo. Las camas ocupadas, la reservada y las libres salen de la vista infra.v_estado_cama.
 insert into infra.bloqueo_cama (id, cama_id, periodo, motivo, origen, creado_por)
 values
-  (pg_temp.did('0022', 1), pg_temp.espacio('HAB-402-B'),
+  (pg_temp.did('0022', 1), pg_temp.espacio('HAB-202-B'),
      tstzrange(coalesce((select lower(periodo) from hospitalizacion.ocupacion_cama where id = pg_temp.did('0061', 4)), now() - interval '1 day'), now() + interval '7 days', '[)'),
-     '[DEMO] Bloqueada por aislamiento del paciente de la cama HAB-402-A', 'aislamiento', pg_temp.actor('ENF')),
-  (pg_temp.did('0022', 2), pg_temp.espacio('HAB-404-A'), tstzrange(now() - interval '2 hours', now() + interval '3 days', '[)'),
+     '[DEMO] Bloqueada por aislamiento del paciente de la cama HAB-202-A', 'aislamiento', pg_temp.actor('ENF')),
+  (pg_temp.did('0022', 2), pg_temp.espacio('HAB-204-A'), tstzrange(now() - interval '2 hours', now() + interval '3 days', '[)'),
      '[DEMO] Mantenimiento de la toma de oxígeno: bloqueo manual con motivo', 'manual', pg_temp.actor('JOP'))
 on conflict do nothing;
 
 insert into infra.limpieza_cama (id, cama_id, pendiente_desde, limpiada_por, limpiada_en, lista, verificada_por, verificada_en)
 values
-  -- Abierta: la cama HAB-403-A está en limpieza; la limpia una persona y la verifica otra (D-013).
-  (pg_temp.did('0023', 1), pg_temp.espacio('HAB-403-A'), now() - interval '2 hours', null, null, null, null, null),
+  -- Abierta: la cama HAB-203-A está en limpieza; la limpia una persona y la verifica otra (D-013).
+  (pg_temp.did('0023', 1), pg_temp.espacio('HAB-203-A'), now() - interval '2 hours', null, null, null, null, null),
   -- Cerrada: historial de una limpieza ya verificada por otra persona.
-  (pg_temp.did('0023', 2), pg_temp.espacio('HAB-403-B'), now() - interval '1 day 2 hours', pg_temp.actor('ENF'), now() - interval '1 day 1 hour',
+  (pg_temp.did('0023', 2), pg_temp.espacio('HAB-203-B'), now() - interval '1 day 2 hours', pg_temp.actor('ENF'), now() - interval '1 day 1 hour',
      '{"nota": "[DEMO] Limpieza terminada y verificada por otra persona"}'::jsonb, pg_temp.actor('AST'), now() - interval '1 day')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------------------------------------
--- 9b. Volumen de hospitalización: 16 admisiones más (k 75 a 90) en las habitaciones nuevas de la Planta 4.
+-- 9b. Volumen de hospitalización: 16 admisiones más (k 75 a 90) en HAB-205, HAB-206 y VIP-303 a 305. Con solo 12 camas
+--     semiprivadas, los dos pacientes en aislamiento (79 y 80) esperan una habitación sola (pendiente_cama) y las
+--     historias cerradas usan camas que estaban libres en esas fechas.
 --     Reglas que respeta: cada ingreso apunta a un origen que existe y es anterior; una cama o un paciente nunca
 --     tienen dos ocupaciones a la vez; una semiprivada comparte solo pacientes del mismo sexo; quien está en
 --     aislamiento queda solo (la otra cama se bloquea); la VIP no se traslada; la categoría de la ocupación es la
@@ -1361,8 +1345,8 @@ insert into vadm values
   (76, 'emergencia', 176, 'semiprivada', null,      31, 'hospitalizado',  interval '0 minutes', null, 'Crisis hipertensiva en observación y ajuste de tratamiento', false, false, true, 1),
   (77, 'cita',       177, 'semiprivada', null,      30, 'hospitalizado',  interval '40 hours', null, 'Recuperación posoperatoria de colecistectomía programada', false, true, true, 2),
   (78, 'ambulancia', 7,   'semiprivada', null,      31, 'hospitalizado',  interval '24 hours', null, 'Politraumatismo por accidente de tránsito, vigilancia estrecha', true, false, false, 0),
-  (79, 'cita',       179, 'semiprivada', 'gotitas', 31, 'hospitalizado',  interval '2 days', null, 'Neumonía con aislamiento por gotitas mientras se descarta tuberculosis', false, false, false, 0),
-  (80, 'cita',       180, 'semiprivada', 'aerea',   31, 'hospitalizado',  interval '30 hours', null, 'Varicela en adulto con aislamiento aéreo', false, false, false, 0),
+  (79, 'cita',       179, 'semiprivada', 'gotitas', 31, 'pendiente_cama', interval '3 hours', interval '2 hours', 'Neumonía con aislamiento por gotitas; espera una habitación sola para aislarlo', false, false, false, 0),
+  (80, 'cita',       180, 'semiprivada', 'aerea',   31, 'pendiente_cama', interval '90 minutes', interval '4 hours', 'Varicela en adulto con aislamiento aéreo; espera una habitación sola', false, false, false, 0),
   (81, 'cita',       181, 'vip',         null,      30, 'hospitalizado',  interval '3 days', null, 'Control posoperatorio de histerectomía en habitación VIP', false, true, true, 2),
   (82, 'cita',       182, 'vip',         null,      1,  'alta_firmada',   interval '4 days', null, 'Tratamiento endovenoso de infección de tejidos blandos', false, false, true, 2),
   (83, 'cita',       183, 'semiprivada', null,      30, 'pendiente_cama', interval '2 hours', interval '3 hours', 'Ingreso programado para observación y estudios', false, false, true, 1),
@@ -1393,20 +1377,19 @@ on conflict do nothing;
 -- Ocupaciones. Inicio = 30 minutos después del ingreso (sin pasar de ahora); las cerradas terminan en el instante indicado.
 create temp table vocc (id int primary key, k int, cama text, hab text, cat text, fin timestamptz, motivo_fin text, ini_ref int) on commit drop;
 insert into vocc values
-  (175, 75, 'HAB-405-A', 'HAB-405', 'semiprivada', null, null, null),
-  (177, 77, 'HAB-405-B', 'HAB-405', 'semiprivada', null, null, null),
-  (176, 76, 'HAB-406-A', 'HAB-406', 'semiprivada', null, null, null),
-  (178, 78, 'HAB-406-B', 'HAB-406', 'semiprivada', null, null, null),
-  (179, 79, 'HAB-407-A', 'HAB-407', 'semiprivada', null, null, null),
-  (180, 80, 'HAB-408-A', 'HAB-408', 'semiprivada', null, null, null),
-  (181, 81, 'VIP-403-A', 'VIP-403', 'vip',         null, null, null),
-  (182, 82, 'VIP-404-A', 'VIP-404', 'vip',         null, null, null),
-  (187, 87, 'HAB-410-A', 'HAB-410', 'semiprivada', now() - interval '26 hours', 'traslado', null),
-  (287, 87, 'HAB-409-B', 'HAB-409', 'semiprivada', null, null, 187),
-  (185, 85, 'HAB-409-A', 'HAB-409', 'semiprivada', now() - interval '5 hours', 'egreso', null),
-  (188, 88, 'HAB-410-B', 'HAB-410', 'semiprivada', now() - interval '6 days', 'egreso', null),
-  (189, 89, 'HAB-405-A', 'HAB-405', 'semiprivada', now() - interval '9 days', 'egreso', null),
-  (190, 90, 'HAB-406-A', 'HAB-406', 'semiprivada', now() - interval '7 days', 'egreso', null);
+  (175, 75, 'HAB-205-A', 'HAB-205', 'semiprivada', null, null, null),
+  (177, 77, 'HAB-205-B', 'HAB-205', 'semiprivada', null, null, null),
+  (176, 76, 'HAB-206-A', 'HAB-206', 'semiprivada', null, null, null),
+  (178, 78, 'HAB-206-B', 'HAB-206', 'semiprivada', null, null, null),
+  (181, 81, 'VIP-303-A', 'VIP-303', 'vip',         null, null, null),
+  (182, 82, 'VIP-304-A', 'VIP-304', 'vip',         null, null, null),
+  -- 87 estuvo en HAB-206 B hasta antes de que llegara 78 y pasó a HAB-204 B, junto a la cama en mantenimiento.
+  (187, 87, 'HAB-206-B', 'HAB-206', 'semiprivada', now() - interval '26 hours', 'traslado', null),
+  (287, 87, 'HAB-204-B', 'HAB-204', 'semiprivada', null, null, 187),
+  (185, 85, 'HAB-204-A', 'HAB-204', 'semiprivada', now() - interval '5 hours', 'egreso', null),
+  (188, 88, 'HAB-201-A', 'HAB-201', 'semiprivada', now() - interval '6 days', 'egreso', null),
+  (189, 89, 'HAB-205-A', 'HAB-205', 'semiprivada', now() - interval '9 days', 'egreso', null),
+  (190, 90, 'HAB-206-A', 'HAB-206', 'semiprivada', now() - interval '7 days', 'egreso', null);
 
 insert into hospitalizacion.ocupacion_cama (id, admision_id, cama_id, habitacion_id, categoria, periodo, motivo_fin, asignado_por)
 select pg_temp.did('0061', o.id), a.id, pg_temp.espacio(o.cama), pg_temp.espacio(o.hab), o.cat,
@@ -1427,9 +1410,9 @@ on conflict do nothing;
 insert into hospitalizacion.reserva_cama (id, admision_id, cama_id, periodo, estado)
 select pg_temp.did('0062', 100 + v.k), pg_temp.did('0060', 100 + v.k), pg_temp.espacio(v.cama), v.periodo, v.estado
 from (values
-  (84, 'VIP-405-A',  tstzrange(now(), now() + interval '8 hours', '[)'), 'activa'),
-  (81, 'VIP-403-A',  tstzrange(now() - interval '3 days', now() - interval '3 days' + interval '30 minutes', '[)'), 'usada'),
-  (86, 'HAB-410-A',  tstzrange(now() - interval '11 hours', now() - interval '3 hours', '[)'), 'vencida')
+  (84, 'VIP-305-A',  tstzrange(now(), now() + interval '8 hours', '[)'), 'activa'),
+  (81, 'VIP-303-A',  tstzrange(now() - interval '3 days', now() - interval '3 days' + interval '30 minutes', '[)'), 'usada'),
+  (86, 'HAB-203-B',  tstzrange(now() - interval '11 hours', now() - interval '3 hours', '[)'), 'vencida')
 ) v(k, cama, periodo, estado)
 where exists (select 1 from hospitalizacion.admision where id = pg_temp.did('0060', 100 + v.k))
 on conflict do nothing;
@@ -1437,7 +1420,7 @@ on conflict do nothing;
 insert into hospitalizacion.alta (admision_id, tipo, firmada_por, firmada_en, resumen, pendientes, constancia_voluntaria)
 select pg_temp.did('0060', 100 + v.k), v.tipo, pg_temp.actor('MED'), v.cuando, v.resumen, v.pend::jsonb, v.tipo = 'voluntaria'
 from (values
-  (82, 'medica',     now() - interval '2 hours', '[DEMO] Alta firmada: la cama VIP-404 sigue ocupada hasta la salida física del paciente',
+  (82, 'medica',     now() - interval '2 hours', '[DEMO] Alta firmada: la cama VIP-304 sigue ocupada hasta la salida física del paciente',
       '[{"descripcion": "Control en consulta externa en siete días", "responsable": "Consulta general"}, {"descripcion": "Retiro de puntos en diez días", "responsable": "Enfermería de consulta externa"}]'),
   (85, 'medica',     now() - interval '5 hours' - interval '20 minutes', '[DEMO] Alta médica: salió a su casa con inhalador y cita de control; la cama pasó a limpieza', '[]'),
   (88, 'medica',     now() - interval '6 days' - interval '20 minutes',   '[DEMO] Alta médica completada sin pendientes', '[]'),
@@ -1490,16 +1473,12 @@ from hospitalizacion.admision a
 where a.id::text like 'de300000-%' and a.id >= pg_temp.did('0060', 100) and a.estado not in ('pendiente_cama', 'cancelada')
 on conflict do nothing;
 
--- Camas: bloqueos por aislamiento (la otra cama de la habitación queda sin usar) y uno manual ya vencido; limpiezas pendientes,
--- por verificar y terminadas; monitores en las habitaciones nuevas.
+-- Camas: un bloqueo manual ya vencido y limpiezas terminadas y verificadas (cada cama se limpió antes de volver a usarse);
+-- monitores en HAB-205, HAB-206 y VIP-303.
 insert into infra.bloqueo_cama (id, cama_id, periodo, motivo, origen, creado_por)
 select pg_temp.did('0022', v.n), pg_temp.espacio(v.cama), tstzrange(v.ini, v.fin, '[)'), v.motivo, v.origen, pg_temp.actor('ENF')
 from (values
-  (10, 'HAB-407-B', (select lower(periodo) from hospitalizacion.ocupacion_cama where id = pg_temp.did('0061', 179)), now() + interval '5 days',
-       '[DEMO] Bloqueada por aislamiento de gotitas del paciente de la cama HAB-407-A', 'aislamiento'),
-  (11, 'HAB-408-B', (select lower(periodo) from hospitalizacion.ocupacion_cama where id = pg_temp.did('0061', 180)), now() + interval '5 days',
-       '[DEMO] Bloqueada por aislamiento aéreo del paciente de la cama HAB-408-A', 'aislamiento'),
-  (12, 'HAB-410-B', now() - interval '20 days', now() - interval '15 days', '[DEMO] Pintura de la habitación: bloqueo manual ya terminado', 'manual')
+  (12, 'HAB-205-B', now() - interval '20 days', now() - interval '15 days', '[DEMO] Pintura de la habitación: bloqueo manual ya terminado', 'manual')
 ) v(n, cama, ini, fin, motivo, origen)
 where v.ini is not null
 on conflict do nothing;
@@ -1507,21 +1486,20 @@ on conflict do nothing;
 insert into infra.limpieza_cama (id, cama_id, pendiente_desde, limpiada_por, limpiada_en, lista, verificada_por, verificada_en)
 select pg_temp.did('0023', v.n), pg_temp.espacio(v.cama), v.pend, v.por, v.limpia, v.lista::jsonb, v.ver_por, v.ver
 from (values
-  -- HAB-409-A: acaba de egresar el paciente y espera limpieza.
-  (3, 'HAB-409-A', now() - interval '5 hours', null::uuid, null::timestamptz, null::text, null::uuid, null::timestamptz),
-  -- HAB-410-A: ya se limpió tras el traslado, falta que otra persona la verifique.
-  (4, 'HAB-410-A', now() - interval '26 hours', pg_temp.actor('ENF'), now() - interval '25 hours', '{"nota": "[DEMO] Limpiada; falta la verificación de otra persona"}', null::uuid, null::timestamptz),
-  -- HAB-410-B: limpieza terminada y verificada hace seis días.
-  (5, 'HAB-410-B', now() - interval '6 days', pg_temp.actor('ENF'), now() - interval '6 days' + interval '1 hour', '{"nota": "[DEMO] Limpieza terminada y verificada"}', pg_temp.actor('AST'), now() - interval '6 days' + interval '2 hours')
+  -- HAB-204-A: el paciente 85 egresó; se limpió y verificó antes del bloqueo por mantenimiento.
+  (3, 'HAB-204-A', now() - interval '5 hours', pg_temp.actor('ENF'), now() - interval '4 hours', '{"nota": "[DEMO] Limpiada tras el egreso"}', pg_temp.actor('AST'), now() - interval '3 hours'),
+  -- HAB-206-B: limpiada y verificada tras el traslado, antes de que la ocupara el paciente 78.
+  (4, 'HAB-206-B', now() - interval '26 hours', pg_temp.actor('ENF'), now() - interval '25 hours' - interval '30 minutes', '{"nota": "[DEMO] Limpiada tras el traslado"}', pg_temp.actor('AST'), now() - interval '25 hours'),
+  -- HAB-201-A: limpieza terminada y verificada hace seis días.
+  (5, 'HAB-201-A', now() - interval '6 days', pg_temp.actor('ENF'), now() - interval '6 days' + interval '1 hour', '{"nota": "[DEMO] Limpieza terminada y verificada"}', pg_temp.actor('AST'), now() - interval '6 days' + interval '2 hours')
 ) v(n, cama, pend, por, limpia, lista, ver_por, ver)
 on conflict do nothing;
 
 insert into infra.equipo (id, tipo, serie, espacio_id, estado) values
-  (pg_temp.did('0021', 5), 'monitor', 'DEMO-MON-405', pg_temp.did('0020', 17), 'operativo'),
-  (pg_temp.did('0021', 6), 'monitor', 'DEMO-MON-406', pg_temp.did('0020', 18), 'operativo'),
-  (pg_temp.did('0021', 7), 'bomba',   'DEMO-BOM-407', pg_temp.did('0020', 19), 'operativo'),
-  (pg_temp.did('0021', 8), 'oxigeno', 'DEMO-OXI-408', pg_temp.did('0020', 20), 'operativo'),
-  (pg_temp.did('0021', 9), 'monitor', 'DEMO-MON-VIP3', pg_temp.did('0020', 23), 'operativo')
+  (pg_temp.did('0021', 5), 'monitor', 'DEMO-MON-205', pg_temp.espacio('HAB-205'), 'operativo'),
+  (pg_temp.did('0021', 6), 'monitor', 'DEMO-MON-206', pg_temp.espacio('HAB-206'), 'operativo'),
+  (pg_temp.did('0021', 7), 'bomba',   'DEMO-BOM-203', pg_temp.espacio('HAB-203'), 'operativo'),
+  (pg_temp.did('0021', 9), 'monitor', 'DEMO-MON-VIP3', pg_temp.espacio('VIP-303'), 'operativo')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------------------------------------
@@ -1676,7 +1654,7 @@ insert into publico.aviso (id, titulo, cuerpo, vigencia, publicado_por, priorida
      '[DEMO] Aviso para pacientes: lleve su DUI y su carné de seguro, si tiene, cuando venga a un ingreso programado.',
      tstzrange(now() - interval '5 days', now() + interval '25 days', '[)'), pg_temp.actor('ADM'), 'atencion', true, array['PAC']),
   (pg_temp.did('0090', 16), 'Ocupación alta en hospitalización',
-     '[DEMO] Aviso crítico interno: la Planta 4 está casi llena; confirmar altas del día antes de aceptar nuevos ingresos.',
+     '[DEMO] Aviso crítico interno: la Planta 2 está casi llena; confirmar altas del día antes de aceptar nuevos ingresos.',
      tstzrange(now() - interval '2 hours', now() + interval '1 day', '[)'), pg_temp.actor('ADM'), 'critico', false, array['ADM','JOP','ENF'])
 on conflict do nothing;
 

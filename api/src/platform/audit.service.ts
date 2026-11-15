@@ -4,14 +4,14 @@ import { DatabaseService } from './database.service';
 import { canonical, fingerprint } from './command.service';
 
 export type ChainVerification = { ok: true; checked: number } | { ok: false; checked: number; seq: number; reason: string };
-type Row = { seq: string | number; evento_id: string; actor_id: string | null; permiso: string | null; accion: string; entidad: string; entidad_id: string | null; paciente_id: string | null; motivo: string | null; resultado: string; detalle: Record<string, unknown>; hash_previo: Uint8Array; hash: Uint8Array };
+type Row = { seq: string | number; evento_id: string; registrado_en: Date | string; actor_id: string | null; actor_rol: string | null; permiso: string | null; accion: string; entidad: string; entidad_id: string | null; paciente_id: string | null; motivo: string | null; resultado: string; detalle: Record<string, unknown>; hash_previo: Uint8Array; hash: Uint8Array };
 
 /** FR-100-07: recorre la cadena SHA-256 de `plataforma.auditoria` y señala la primera fila que no concuerda. */
 @Injectable()
 export class AuditService {
   constructor(private readonly db: DatabaseService) {}
   async verifyChain(): Promise<ChainVerification> {
-    const rows = await this.db.query<Row>('SELECT seq,evento_id,actor_id,permiso,accion,entidad,entidad_id,paciente_id,motivo,resultado,detalle,hash_previo,hash FROM plataforma.auditoria ORDER BY seq');
+    const rows = await this.db.query<Row>('SELECT seq,evento_id,registrado_en,actor_id,actor_rol,permiso,accion,entidad,entidad_id,paciente_id,motivo,resultado,detalle,hash_previo,hash FROM plataforma.auditoria ORDER BY seq');
     let previous = Buffer.alloc(32);
     let checked = 0;
     for (const row of rows) {
@@ -24,6 +24,9 @@ export class AuditService {
       const event = JSON.parse(canonicalEvent) as Record<string, unknown>;
       const columns: Record<string, unknown> = { id: row.evento_id, actorId: row.actor_id, permission: row.permiso, action: row.accion, entity: row.entidad, entityId: row.entidad_id, patientId: row.paciente_id, reason: row.motivo, result: row.resultado };
       for (const [name, value] of Object.entries(columns)) if ((event[name] ?? null) !== (value ?? null)) return fail(`la columna ${name} difiere del evento firmado`);
+      // MA-SEG-08: the DPD filters by role and date, so both columns must match what was signed ('' and null are the same empty role).
+      if ((event.actorRole || null) !== (row.actor_rol || null)) return fail('la columna actorRole difiere del evento firmado');
+      if (typeof event.at !== 'string' || new Date(event.at).getTime() !== new Date(row.registrado_en).getTime()) return fail('la columna at (registrado_en) difiere del evento firmado');
       // Current rows sign `detailHash`; rows written before 2026-11-14 carry the whole detail inside the event.
       const signedDetail = typeof event.detailHash === 'string' ? event.detailHash === fingerprint(detail) : canonical(detail) === canonical(event.detail ?? {});
       if (!signedDetail) return fail('el detalle difiere del evento firmado');

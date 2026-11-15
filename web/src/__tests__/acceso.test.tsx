@@ -109,41 +109,21 @@ describe('ingreso', () => {
   });
 });
 
-describe('registro de paciente en /registro', () => {
-  async function llenar(password: string, confirmation = password) {
-    await userEvent.type(await screen.findByLabelText('Nombre completo'), 'Paciente Ficticio');
-    await userEvent.type(screen.getByLabelText('Correo electrónico'), 'paciente@example.test');
-    await userEvent.type(screen.getByLabelText('Contraseña'), password);
-    await userEvent.type(screen.getByLabelText('Confirmar contraseña'), confirmation);
-    await userEvent.click(screen.getByRole('button', { name: /Crear cuenta de paciente/ }));
-  }
-
-  it('rechaza una contraseña débil antes de llamar a signUp', async () => {
-    irA('/registro');
+describe('registro de paciente (BL-06: solo en la app móvil)', () => {
+  it('el ingreso no enlaza a un registro web y orienta al paciente a la app', async () => {
     render(<App />);
-    await llenar('abcdefgh');
-    expect(await screen.findByText(/Usa al menos 8 caracteres, mayúscula, minúscula, número y símbolo/)).toBeTruthy();
-    expect(auth.signUp).not.toHaveBeenCalled();
+    expect(await screen.findByText('¿Eres paciente? Crea tu cuenta en la app CLIMESA para Android o iOS.')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Crear cuenta de paciente/ })).toBeNull();
+    expect(document.querySelector('a[href="/registro"]')).toBeNull();
   });
 
-  it('rechaza contraseñas que no coinciden sin llamar a signUp', async () => {
+  it('/registro es una página informativa sin formulario y nunca llama a signUp', async () => {
     irA('/registro');
     render(<App />);
-    await llenar('Clave#1234', 'Clave#12345');
-    expect(await screen.findByText('Las contraseñas no coinciden.')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Crea tu cuenta en la app CLIMESA para Android o iOS' })).toBeTruthy();
+    expect(screen.queryByLabelText('Contraseña')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Crear cuenta/ })).toBeNull();
+    expect(screen.getByRole('link', { name: /Volver al ingreso/ }).getAttribute('href')).toBe('/');
     expect(auth.signUp).not.toHaveBeenCalled();
-  });
-
-  it('con una contraseña fuerte llama a signUp una sola vez y confirma el registro', async () => {
-    auth.signUp.mockResolvedValue({ data: { session: null }, error: null });
-    irA('/registro');
-    render(<App />);
-    await llenar('Clave#1234');
-    await waitFor(() => expect(auth.signUp).toHaveBeenCalledTimes(1));
-    expect(auth.signUp).toHaveBeenCalledWith({
-      email: 'paciente@example.test', password: 'Clave#1234',
-      options: { data: { nombre: 'Paciente Ficticio' }, emailRedirectTo: `${location.origin}/confirmar-correo` },
-    });
-    expect(await screen.findByText(/Si el correo necesita confirmación/)).toBeTruthy();
   });
 });

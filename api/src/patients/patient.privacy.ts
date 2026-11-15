@@ -17,9 +17,21 @@ export function fichaFields(actor: Pick<Actor, 'permissions'>, owner: boolean): 
   return { birth, ageRange: !birth && birthContexts.includes('rango'), contact };
 }
 
-/** La búsqueda de pacientes devuelve la fecha de nacimiento solo a quien puede verla (exacta o por rango) en la ficha. */
+/** La búsqueda de pacientes da la edad (en el selector) a quien ve el nacimiento, exacto o por rango, en la ficha. */
 export function searchShowsBirth(actor: Actor): boolean {
   return hasPermission(actor, 'pacientes.ver_nacimiento');
+}
+
+/**
+ * MA-SEG-06 (H-03): la búsqueda sigue la misma política que la ficha. Con contexto x recibe la fecha exacta; con `rango`
+ * (Laboratorio) recibe solo el decenio de edad; sin el permiso, ninguno de los dos.
+ */
+export function searchBirthFields<T extends { birth?: string | null }>(actor: Actor, row: T, today: string): Omit<T, 'birth'> & { birth?: string | null; ageRange?: string | null } {
+  const { birth, ...rest } = row;
+  const fields = fichaFields(actor, false);
+  if (fields.birth) return { ...rest, birth };
+  if (fields.ageRange) return { ...rest, ageRange: birth ? ageRange(ageOn(birth, today)) : null };
+  return rest;
 }
 
 /** Años cumplidos de `birth` (yyyy-MM-dd) al día `today` (yyyy-MM-dd). */

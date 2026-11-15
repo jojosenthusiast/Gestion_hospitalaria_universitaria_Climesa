@@ -5,7 +5,7 @@ import { AuditService } from '../platform/audit.service';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
-import { AuditQueryDto } from './privacy.dto';
+import { AuditQueryDto, ExportAuditDto } from './privacy.dto';
 import { entityLabel, EXCEPTIONAL_REASON, isRecordAccess } from './privacy.rules';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -91,6 +91,12 @@ export class PrivacyService {
   }
 
   /** FR-110-07: walks the SHA-256 chain and points at the first row that does not match. */
+  /** MA-SEG-05: personal data leaves the system in exported files, so every export is audited like a read. */
+  async recordExport(actor: Actor, dto: ExportAuditDto) {
+    await this.db.transaction(c => this.commands.audit(c, actor, { action: 'datos.exportar', entity: dto.resource, permission: 'sesion.perfil', detail: { filas: dto.rows, formato: dto.format } }));
+    return { registradoEn: this.clock.now().toISOString() };
+  }
+
   async verify(actor: Actor) {
     const result = await this.chain.verifyChain();
     await this.db.transaction(c => this.commands.audit(c, actor, { action: 'auditoria.verificar', entity: 'auditoria', permission: 'auditoria.ver', result: 'exito', detail: { integra: result.ok, revisados: result.checked } }));

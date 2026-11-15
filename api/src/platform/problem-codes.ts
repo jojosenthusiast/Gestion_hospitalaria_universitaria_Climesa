@@ -21,7 +21,7 @@ export const PROBLEM_CODES = [
   'cita_con_consulta', 'cita_fuera_de_dia', 'fila_llamados_insuficientes', 'fila_sin_espera', 'solicitudes_pendientes_max',
   // Accounts, privacy and patients.
   'cuenta_no_verificada', 'cuenta_ya_vinculada', 'expediente_ya_vinculado', 'paciente_ya_vinculado', 'sin_vinculacion', 'vinculacion_pendiente', 'vinculacion_resuelta',
-  'sin_expediente',
+  'sin_expediente', 'rol_no_invitable', 'invitacion_no_pendiente', 'jerarquia_administrador', 'trabajo_abierto',
   // Inventory, public information and metrics.
   'existencia_insuficiente', 'aviso_con_datos_personales', 'indicador_desconocido',
   // Ambulance.

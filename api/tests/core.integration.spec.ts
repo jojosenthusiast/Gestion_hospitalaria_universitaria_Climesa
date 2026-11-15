@@ -62,10 +62,10 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   expect(hook.claims.app_roles).toBeUndefined();expect(hook.claims.app_canales).toEqual(expect.arrayContaining(['rol:REC','rol:LAB']));expect(hook.claims.app_canales).not.toContain('rol:ADM');expect(hook.claims.app_canales).toContain('ambulancia');
   await fixture.pg.query("DELETE FROM acceso.asignacion_rol WHERE usuario_id=$1 AND rol_codigo='LAB'",[userId('REC')]);
  });
- test('invita PAC con proveedor simulado; reintentar conserva una sola invitación',async()=>{
-  const key=randomUUID(),body={email:'Paciente.Nuevo@example.test',displayName:'Cuenta ficticia nueva',roles:['PAC']};
+ test('invita personal (JOP) con proveedor simulado; reintentar conserva una sola invitación (MA-CTA-02: PAC no se invita)',async()=>{
+  const key=randomUUID(),body={email:'Paciente.Nuevo@example.test',displayName:'Cuenta ficticia nueva',roles:['JOP']};
   const first=await call('ADM','POST','/usuarios/invitaciones',body,key);expect(first.status).toBe(201);
-  expect(first.body.roles).toEqual(['PAC']);expect((await call('ADM','POST','/usuarios/invitaciones',body,key)).body).toEqual(first.body);expect(inviteProvider).toHaveBeenCalledTimes(1);
+  expect(first.body.roles).toEqual(['JOP']);expect((await call('ADM','POST','/usuarios/invitaciones',body,key)).body).toEqual(first.body);expect(inviteProvider).toHaveBeenCalledTimes(1);
   expect(inviteProvider.mock.calls[0][0]).toBe('paciente.nuevo@example.test');
   expect((await call('ADM','POST','/usuarios/invitaciones',{email:'trabajo@example.test',displayName:'Personal ficticio',roles:['MED']})).status).toBe(400);
  });
@@ -83,7 +83,7 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
  });
  test('prohíbe autoasignarse roles y desactivar al último administrador',async()=>{
   const roles=await call('ADM','PATCH',`/usuarios/${userId('ADM')}/roles`,{roles:['PAC'],version:1,reason:'Prueba de autoasignación'});expect(roles.status).toBe(403);
-  const state=await call('ADM','PATCH',`/usuarios/${userId('ADM')}/estado`,{state:'desactivado',version:1,reason:'Prueba del último administrador'});expect(state.status).toBe(409);
+  const state=await call('ADM','PATCH',`/usuarios/${userId('ADM')}/estado`,{state:'desactivado',version:1,reason:'Prueba del último administrador'});expect(state.status).toBe(403); // MA-CTA-03: nadie se desactiva a sí mismo (el disparador del último ADM sigue en la base)
  });
  test('registra paciente con búsqueda; la misma petición no duplica ni paciente ni evento',async()=>{
   const search=await call('REC','POST','/pacientes/busquedas',{query:'Ana Lucía'});

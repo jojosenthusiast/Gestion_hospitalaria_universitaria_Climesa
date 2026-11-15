@@ -1217,7 +1217,7 @@
             "bearer": []
           }
         ],
-        "summary": "Cuentas, roles, estado y vínculo con personal",
+        "summary": "Cuentas, roles, estado, invitación y acciones permitidas a quien consulta",
         "tags": [
           "users"
         ],
@@ -1318,7 +1318,235 @@
             "bearer": []
           }
         ],
-        "summary": "Invitar paciente o personal con roles autorizados por el administrador",
+        "summary": "Invitar personal con roles autorizados por el administrador (el paciente se registra en la app)",
+        "tags": [
+          "users"
+        ],
+        "x-permiso": "usuarios.invitar"
+      }
+    },
+    "/api/v1/usuarios/{id}/invitacion/reenvio": {
+      "post": {
+        "operationId": "UsersController_resend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reenviar una invitación pendiente",
+        "tags": [
+          "users"
+        ],
+        "x-permiso": "usuarios.invitar"
+      }
+    },
+    "/api/v1/usuarios/{id}/invitacion/cancelacion": {
+      "post": {
+        "operationId": "UsersController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationCancelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar una invitación pendiente; desactiva la cuenta invitada",
         "tags": [
           "users"
         ],
@@ -12391,6 +12619,107 @@
         "x-permiso": "auditoria.ver"
       }
     },
+    "/api/v1/exportaciones": {
+      "post": {
+        "operationId": "PrivacyController_recordExport",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportAuditDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportAuditResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar en la auditoría una exportación de lista (CSV, Excel o PDF) hecha en la web",
+        "tags": [
+          "privacy"
+        ],
+        "x-permiso": "sesion.perfil"
+      }
+    },
     "/api/v1/me/accesos": {
       "get": {
         "operationId": "PrivacyController_mine",
@@ -14773,8 +15102,13 @@
           "birth": {
             "type": "string",
             "format": "date",
-            "description": "Solo para roles que ven la fecha de nacimiento en la búsqueda",
+            "description": "Solo para roles que ven la fecha de nacimiento exacta (contexto x)",
             "nullable": true
+          },
+          "ageRange": {
+            "type": "string",
+            "nullable": true,
+            "description": "Rango de edad en lugar de la fecha (contexto rango, por ejemplo Laboratorio): 30-39 o 90+"
           },
           "version": {
             "type": "integer"
@@ -15495,6 +15829,28 @@
           "desactivado"
         ]
       },
+      "EstadoInvitacion": {
+        "type": "string",
+        "enum": [
+          "enviada",
+          "aceptada",
+          "rechazada",
+          "expirada",
+          "cancelada"
+        ],
+        "description": "Última invitación; null si la cuenta nació por registro en la app"
+      },
+      "AccionCuenta": {
+        "type": "string",
+        "enum": [
+          "roles",
+          "desactivar",
+          "reactivar",
+          "reenviar_invitacion",
+          "cancelar_invitacion"
+        ],
+        "description": "Acciones que quien consulta puede hacer sobre esta cuenta (jerarquía, autogestión e invitación)"
+      },
       "UserAccountResponse": {
         "type": "object",
         "properties": {
@@ -15530,6 +15886,22 @@
             "items": {
               "type": "string"
             }
+          },
+          "invitationState": {
+            "nullable": true,
+            "description": "Última invitación; null si la cuenta nació por registro en la app",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoInvitacion"
+              }
+            ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "Acciones que quien consulta puede hacer sobre esta cuenta (jerarquía, autogestión e invitación)",
+            "items": {
+              "$ref": "#/components/schemas/AccionCuenta"
+            }
           }
         },
         "required": [
@@ -15539,7 +15911,9 @@
           "state",
           "version",
           "staffId",
-          "roles"
+          "roles",
+          "invitationState",
+          "allowedActions"
         ]
       },
       "InvitePatientDto": {
@@ -15556,6 +15930,7 @@
           },
           "roles": {
             "type": "array",
+            "description": "Roles de personal; PAC no se invita (rol_no_invitable)",
             "items": {
               "type": "string",
               "enum": [
@@ -15579,7 +15954,8 @@
         },
         "required": [
           "email",
-          "displayName"
+          "displayName",
+          "roles"
         ]
       },
       "EstadoEnvioInvitacion": {
@@ -15622,6 +15998,19 @@
           "roles",
           "role",
           "status"
+        ]
+      },
+      "InvitationCancelDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "UserRolesDto": {
@@ -22558,6 +22947,46 @@
           "verificadoEn"
         ]
       },
+      "ExportAuditDto": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "string",
+            "description": "Lista exportada: el nombre del archivo, por ejemplo pacientes o fila-del-dia",
+            "pattern": "^[a-z0-9][a-z0-9-]{1,59}$"
+          },
+          "rows": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx",
+              "pdf"
+            ]
+          }
+        },
+        "required": [
+          "resource",
+          "rows",
+          "format"
+        ]
+      },
+      "ExportAuditResponse": {
+        "type": "object",
+        "properties": {
+          "registradoEn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "registradoEn"
+        ]
+      },
       "MyAccessResponse": {
         "type": "object",
         "properties": {
@@ -24871,6 +25300,10 @@
           "vinculacion_pendiente",
           "vinculacion_resuelta",
           "sin_expediente",
+          "rol_no_invitable",
+          "invitacion_no_pendiente",
+          "jerarquia_administrador",
+          "trabajo_abierto",
           "existencia_insuficiente",
           "aviso_con_datos_personales",
           "indicador_desconocido",

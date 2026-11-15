@@ -48,9 +48,10 @@ Delegado de protección de datos: ve metadatos de auditoría (quién, cuándo, q
 2. Los mensajes de tiempo real nunca llevan datos personales ni clínicos (ADR-0005).
 3. Las notificaciones push dicen "Tienes un resultado revisado", nunca el resultado.
 4. Toda lectura de datos personales o clínicos genera auditoría con motivo implícito (relación de atención). El módulo de acceso excepcional (solicitar, aprobar, negar y urgencia) se retiró en la ronda 1 (observación 12): sin relación de atención no hay lectura clínica. Las filas de auditoría `acceso_excepcional.*` anteriores se conservan y se muestran como histórico.
-5. Las búsquedas de pacientes se auditan guardando un hash del texto buscado, no el texto.
-6. Sesión del personal con cierre por inactividad (15 min en web; 5 min en móvil en segundo plano con datos clínicos en pantalla).
-7. Los clientes no guardan datos clínicos en disco, salvo la cola cifrada del paramédico sin conexión, que se borra al enviarse.
-8. Datos de prueba y demostración siempre ficticios.
-9. Derechos del titular (LPDP Art. 16-25): el paciente puede ver su información y quién la consultó; las solicitudes de rectificación pasan por recepción con historial; el plazo de respuesta es 20 días hábiles (proceso fuera del alcance construido del curso, nivel F).
-10. Brecha de seguridad: el procedimiento de aviso en 72 h queda documentado para producción (nivel F).
+5. Las búsquedas de pacientes se auditan guardando un hash del texto buscado, no el texto. La búsqueda sigue la misma política de campos que la ficha: la fecha de nacimiento exacta solo con contexto `x`; con contexto `rango` (Laboratorio) llega solo `ageRange` (MA-SEG-06).
+6. Toda exportación de una lista (CSV, Excel o PDF) se registra antes en la auditoría como `datos.exportar`, con la lista, el número de filas y el formato, nunca con las filas; si el registro falla, no se descarga el archivo (MA-SEG-05).
+7. Sesión del personal con cierre por inactividad (15 min en web; 5 min en móvil en segundo plano con datos clínicos en pantalla).
+8. Los clientes no guardan datos clínicos en disco, salvo la cola cifrada del paramédico sin conexión, que se borra al enviarse.
+9. Datos de prueba y demostración siempre ficticios.
+10. Derechos del titular (LPDP Art. 16-25): el paciente puede ver su información y quién la consultó; las solicitudes de rectificación pasan por recepción con historial; el plazo de respuesta es 20 días hábiles (proceso fuera del alcance construido del curso, nivel F).
+11. Brecha de seguridad: el procedimiento de aviso en 72 h queda documentado para producción (nivel F).

@@ -10,3 +10,6 @@
 .platform-roles ul { margin: 0; padding-left: 18px; }
 .platform-roles p, .platform-note { margin: 0; color: var(--muted, #5b6474); font-size: .92rem; }
 .resend-form { display: grid; gap: 12px; }
+.platform-next { display: grid; gap: 4px; padding: 12px 14px; border-left: 4px solid var(--primary, #0043b2); border-radius: var(--radius-card, 12px); background: var(--soft, #f3f5f9); }
+.platform-next h2 { margin: 0; font-size: 1.1rem; }
+.platform-next p { margin: 0; color: var(--muted, #5b6474); }

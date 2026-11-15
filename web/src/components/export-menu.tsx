@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './ui';
-import { exportTable, type ExportFormat, type ExportTable } from '../lib/export';
+import { auditExport, exportTable, type ExportFormat, type ExportTable } from '../lib/export';
 
 const options: { format: ExportFormat; label: string; hint: string }[] = [
   { format: 'csv', label: 'CSV', hint: 'Para Excel y otras hojas de cálculo' },
@@ -24,7 +24,11 @@ export function ExportMenu({ table, label = 'Exportar', disabled = false }: { ta
   }, [open]);
   async function run(format: ExportFormat) {
     setBusy(format); setError(null);
-    try { await exportTable(format, table()); setOpen(false); }
+    const data = table();
+    // MA-SEG-05: the export is recorded in the audit first; if that fails, no file leaves the system.
+    try { await auditExport(format, data); }
+    catch { setError('No se pudo registrar la exportación. Intenta de nuevo.'); setBusy(null); return; }
+    try { await exportTable(format, data); setOpen(false); }
     catch { setError('No se pudo generar el archivo. Intenta de nuevo.'); }
     finally { setBusy(null); }
   }

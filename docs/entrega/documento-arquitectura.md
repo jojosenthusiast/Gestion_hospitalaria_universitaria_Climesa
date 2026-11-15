@@ -123,7 +123,7 @@ Estados: **Implementado** (API y al menos un cliente), **Parcial** (existe una p
 
 | Módulo | API | Web | Android | iOS | Estado |
 |---|---|---|---|---|---|
-| Identidad, sesión y perfil | `/auth/me`, `/inicio`, `/eventos` | Ingreso, registro, recuperar y restablecer contraseña, aceptar invitación | Ingreso; un 401 renueva la sesión una vez y, si falla, vuelve al ingreso | I01, I02, I12 | Implementado |
+| Identidad, sesión y perfil | `/auth/me`, `/inicio`, `/eventos` | Ingreso, recuperar y restablecer contraseña, aceptar invitación, aterrizajes de correo; `/registro` solo orienta a la app (D-04) | Ingreso; un 401 renueva la sesión una vez y, si falla, vuelve al ingreso | I01, I02, I12 | Implementado |
 | Usuarios, invitaciones y roles | `/usuarios/*` | Sí | — | — | Implementado |
 | Pacientes (búsqueda, registro, provisionales, duplicados, ficha filtrada) | `/pacientes/*`, `/me/paciente` | Sí | Pacientes (REC), Paciente sin identidad (PAR) | Expediente (MED, I22) | Implementado |
 | Personal e inscripciones | `/personal/*` | Sí | — | — | Implementado |
@@ -157,8 +157,8 @@ Fuentes: controladores en `api/src/**/*.controller.ts`, menú web en `web/src/fe
 - El menú depende solo del permiso (`web/src/features/shell.tsx`): cada módulo declara el permiso que lo abre; nunca se pregunta por el rol.
 - Tipos de la API generados desde `contrato/openapi.json` (`web/src/lib/generated/`).
 - Tiempo real con Supabase Realtime en `web/src/lib/live.ts` (sección 9).
-- Sesión del personal con cierre por inactividad a los 15 minutos (`docs/arquitectura/privacidad.md`, regla 6).
-- Rutas sin sesión: `/publico`, `/registro`, `/recuperar`, `/restablecer` y `/aceptar-invitacion` (`web/src/App.tsx`). Las rutas internas usan `#/<módulo>`. Para que estas rutas funcionen en producción, `render.yaml` reescribe `/*` a `/index.html` y define las cabeceras de seguridad (CSP, HSTS); esa configuración se sincroniza a mano en Render (sección 11).
+- Sesión del personal con cierre por inactividad a los 15 minutos (`docs/arquitectura/privacidad.md`, regla 7).
+- Rutas sin sesión: `/publico`, `/recuperar`, `/restablecer`, `/aceptar-invitacion` y `/confirmar-correo` (`web/src/App.tsx`). El paciente crea su cuenta solo en la app Android o iOS (BL-06, decisión D-04): la web no tiene formulario de registro y `/registro` es una página informativa que remite a la app, para que los enlaces viejos no den 404. `/confirmar-correo` termina con «Abre la app CLIMESA» cuando la cuenta no usa la web. Las rutas internas usan `#/<módulo>`. Para que estas rutas funcionen en producción, `render.yaml` reescribe `/*` a `/index.html` y define las cabeceras de seguridad (CSP, HSTS); esa configuración se sincroniza a mano en Render (sección 11).
 - ESLint 9 con `npm run lint` (`web/eslint.config.js`).
 
 ### 5.2 Android (`android/`)
@@ -443,7 +443,7 @@ flowchart LR
 | Base, Auth y Realtime | Proyecto Supabase "Gestion hospitalaria universitaria (Climesa)" | Migraciones aplicadas a mano en orden de fecha (`docs/desarrollo/ges-15-supabase-remoto.md`); no se usa `supabase db push` |
 
 - `autoDeploy: false` en ambos servicios: el despliegue es manual desde el panel de Render.
-- **Pendiente de la dueña del proyecto (Render).** `render.yaml` ya contiene la reescritura `/*` → `/index.html` y las cabeceras de seguridad, pero Render no las aplica solo: hay que sincronizarlas en el panel (Blueprint o reglas del sitio estático). Mientras no se haga, la producción responde 404 en `/publico`, `/recuperar`, `/restablecer`, `/registro` y `/aceptar-invitacion`.
+- **Pendiente de la dueña del proyecto (Render).** `render.yaml` ya contiene la reescritura `/*` → `/index.html` y las cabeceras de seguridad, pero Render no las aplica solo: hay que sincronizarlas en el panel (Blueprint o reglas del sitio estático). Mientras no se haga, la producción responde 404 en `/publico`, `/recuperar`, `/restablecer`, `/confirmar-correo` y `/aceptar-invitacion`.
 - **Base de datos de producción.** Todas las migraciones hasta `20261116002000_fase1_contrato_api.sql` están aplicadas, salvo `20261114000300_ticket_activo_unico.sql`, que se aplica pasada la medianoche local del 14-nov (depende de la fecha). Se aplican a mano; no se usa `supabase db push`.
 - Las variables secretas (`SUPABASE_SECRET_KEY`, `DATABASE_URL`) se escriben a mano en Render (`sync: false`).
 - La API se conecta por el *Session pooler* de Supabase porque la conexión directa es solo IPv6.
@@ -497,7 +497,7 @@ Archivos: `docs/decisiones/adr/ADR-0001-…` a `ADR-0008-…` y `docs/decisiones
 
 ## 15. Limitaciones conocidas
 
-1. **Despliegue manual y configuración de Render sin sincronizar.** Render no despliega solo ni espera a CI. Hasta que la dueña sincronice `render.yaml` (reescritura y cabeceras), producción da 404 en `/publico`, `/recuperar`, `/restablecer`, `/registro` y `/aceptar-invitacion`. Las migraciones de la nube se aplican a mano; `20261114000300` queda para después de la medianoche local del 14-nov.
+1. **Despliegue manual y configuración de Render sin sincronizar.** Render no despliega solo ni espera a CI. Hasta que la dueña sincronice `render.yaml` (reescritura y cabeceras), producción da 404 en `/publico`, `/recuperar`, `/restablecer`, `/confirmar-correo` y `/aceptar-invitacion`. Las migraciones de la nube se aplican a mano; `20261114000300` queda para después de la medianoche local del 14-nov.
 2. **Inicio de sesión de prueba.** Si se fusiona el selector temporal de rol (`docs/operacion/login-de-prueba.md`), debe desactivarse antes de la entrega.
 3. **iOS sin probar en dispositivo.** Compila y pasa `swift test` en CI, pero no se ejecutó en simulador ni iPhone con cuentas reales; no hay IPA ni TestFlight.
 4. **Sin notificaciones push.** FCM y APNs no están construidos; los cambios llegan solo con la app abierta (Realtime).

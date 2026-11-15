@@ -1,12 +1,14 @@
 import type { components } from './generated/openapi';
 export type AccessProfile={canInviteAdmin?:boolean;id:string;user:{id:string;email?:string};email:string;name:string;roles:string[];platforms:string[];rolePlatforms?:{role:string;platforms:string[]}[];permissions:{code:string;context:string}[];channels:string[];patientId:string|null;staffId:string|null};
-export type Patient={id:string;record:string;fullName:string;givenNames:string;surnames:string;state:string;active:boolean;sex:string;birth?:string|null;birthPrecision?:string;phone?:string|null;dui?:string|null;email?:string|null;address?:string|null;version:number;matchReason?:string;history?:{version:number;at:string;reason:string;changes:Record<string,{before:unknown;after:unknown}>}[]};
+export type Patient={id:string;record:string;fullName:string;givenNames:string;surnames:string;state:string;active:boolean;sex:string;birth?:string|null;ageRange?:string|null;birthPrecision?:string;phone?:string|null;dui?:string|null;email?:string|null;address?:string|null;version:number;matchReason?:string;history?:{version:number;at:string;reason:string;changes:Record<string,{before:unknown;after:unknown}>}[]};
 export type Registration={id:string;board:string;number:string;validFrom:string;validTo:string};
 export type Staff={id:string;givenNames:string;surnames:string;type:string;specialty?:string;areaId?:string;area?:string;phone?:string;dui?:string;active:boolean;version:number;registrations?:Registration[]};
 export type Space={id:string;parentId:string|null;type:string;code:string;name:string;category?:string;capacity?:number;level?:number;active:boolean;version:number;path:string;totalBeds:number;freeBeds:number};
 export type Bed={id:string;code:string;roomId:string;room:string;category:string;level:number;state:string;version:number;cleaningPending:boolean;cleaningCompleted:boolean;cleanedByCurrentUser:boolean;path:string;occupant?:string;occupantRestricted?:boolean;patientId?:string};
 export type Shift={id:string;staffId:string;person:string;areaId:string;area:string;start:string;end:string;type:string;state:string;justification?:string;version:number};
-export type UserAccount={id:string;email:string;name:string;roles:string[];state:string;staffId?:string;version:number};
+/** `allowedActions` comes from the API (MA-CTA-01/03): the UI offers only what the server will accept for this account. */
+export type AccountAction='roles'|'desactivar'|'reactivar'|'reenviar_invitacion'|'cancelar_invitacion';
+export type UserAccount={id:string;email:string;name:string;roles:string[];state:string;staffId?:string;version:number;invitationState?:string|null;allowedActions?:AccountAction[]};
 export type Appointment={id:string;patientId:string;patientName:string;doctorId:string;doctorName:string;start:string;end:string;reason?:string|null;state:string;origin:string;rejectionReason?:string|null;version:number};
 export type AuditRow={seq:string;at:string;role:string;actor:string;actorId?:string|null;permission?:string|null;action:string;entity:string;entityId:string;patientId?:string|null;patientRecord?:string|null;result:string;reason?:string};
 /** Spec 110 (hand-written until the contract is regenerated): `vista` is the state shown to people. */
@@ -48,7 +50,6 @@ export class HttpApi implements Api {
  }
 }
 export const getAccessProfile=(token:string)=>new HttpApi(async()=>token).request<AccessProfile>('/auth/me');
-export const invitePatient=(token:string,input:{email:string;displayName:string})=>new HttpApi(async()=>token).write<InvitationResult>('/usuarios/invitaciones',input);
 export const can=(profile:AccessProfile,permission:string)=>profile.permissions.some(p=>p.code===permission);
 /** Función del personal (`type` de la API) con su etiqueta en español. */
 export const staffTypeNames:Record<string,string>={medico:'Médico',enfermero:'Enfermería',asistente:'Asistencia',recepcionista:'Recepción',laboratorista:'Laboratorio',paramedico:'Paramédico',motorista:'Motorista',limpieza:'Limpieza',administrativo:'Administración',otro:'Otro'};

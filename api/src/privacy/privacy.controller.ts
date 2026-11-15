@@ -1,10 +1,10 @@
-import { Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { AuditQueryDto } from './privacy.dto';
+import { AuditQueryDto, ExportAuditDto } from './privacy.dto';
 import { PrivacyService } from './privacy.service';
-import { AuditDetailResponse, AuditEntryResponse, AuditOptionsResponse, AuditPageResponse, AuditVerificationResponse, MyAccessResponse } from './privacy.responses';
+import { AuditDetailResponse, AuditEntryResponse, AuditOptionsResponse, AuditPageResponse, AuditVerificationResponse, ExportAuditResponse, MyAccessResponse } from './privacy.responses';
 
 /** Spec 110: audit search and chain verification, and "who saw my record". */
 @ApiTags('privacy') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller()
@@ -25,6 +25,9 @@ export class PrivacyController {
 
   @Post('auditoria/verificacion') @RequirePermission('auditoria.ver') @ApiOperation({ summary: 'Verificar la integridad de la cadena de hash de la auditoría' }) @ApiCreatedResponse({ type: AuditVerificationResponse })
   verify(@Req() r: ActorRequest) { return this.privacy.verify(r.actor); }
+
+  @Post('exportaciones') @RequirePermission('sesion.perfil') @ApiOperation({ summary: 'Registrar en la auditoría una exportación de lista (CSV, Excel o PDF) hecha en la web' }) @ApiCreatedResponse({ type: ExportAuditResponse })
+  recordExport(@Req() r: ActorRequest, @Body() dto: ExportAuditDto) { return this.privacy.recordExport(r.actor, dto); }
 
   @Get('me/accesos') @RequirePermission('auditoria.mis_accesos') @ApiOperation({ summary: 'Quién vio mi expediente: fecha, rol y motivo, sin nombres del personal' }) @ApiOkResponse({ type: [MyAccessResponse] })
   mine(@Req() r: ActorRequest) { return this.privacy.myAccesses(r.actor); }
