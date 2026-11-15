@@ -82,6 +82,8 @@ export class InvitationsService {
       const existing=(await c.query(`SELECT u.id,${LAST_INVITATION_SQL} AS invitation FROM acceso.usuario u WHERE lower(u.correo)=$1`,[email])).rows[0];
       // MA-CTA-01: an invitation that was never accepted (sent, cancelled or expired) can be issued again for the same e-mail.
       if(existing&&!['enviada','cancelada','expirada'].includes(existing.invitation))throw new ConflictException('Esa cuenta ya existe. Utiliza la gestión de usuarios.');
+      // MA-CTA-03: re-inviting reactivates the account and replaces its roles, so an admin account stays with the principal.
+      if(existing)await this.assertCanManage(c,actor,existing.id);
       if(dto.staffId&&(await c.query('SELECT id FROM acceso.usuario WHERE persona_personal_id=$1 AND id IS DISTINCT FROM $2',[dto.staffId,existing?.id??null])).rowCount)throw new ConflictException('Esa persona ya tiene una cuenta vinculada.');
       const id=await this.sendInvitation(email,dto.displayName.trim());
       if(existing&&existing.id!==id)throw new BadGatewayException('El servicio de correo devolvió otra cuenta para ese correo. Revisa la cuenta en Supabase.');

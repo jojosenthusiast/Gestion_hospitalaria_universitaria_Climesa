@@ -105,6 +105,19 @@ describe('Fase 0/1 cuentas: invitaciones, jerarquía y trabajo abierto (MA-CTA-0
       expect(seen.allowedActions).not.toContain('desactivar');
     });
 
+    test('un administrador no principal no reactiva por reinvitación una cuenta de administración cancelada', async () => {
+      const sent = await invite('admin.cancelado@example.test', ['ADM']);
+      expect(sent.status).toBe(201);
+      expect((await t.call('ADM', 'POST', `/usuarios/${sent.body.userId}/invitacion/cancelacion`, { reason: 'Invitación de administración por error' })).status).toBe(201);
+      provider.mockImplementationOnce(async () => ({ data: { user: { id: sent.body.userId } }, error: null }));
+      const before = provider.mock.calls.length;
+      const again = await t.call('DPD', 'POST', '/usuarios/invitaciones', { email: 'admin.cancelado@example.test', displayName: 'Persona Ficticia', roles: ['JOP'] });
+      expect(again.status).toBe(403);
+      expect(again.body.codigo).toBe('jerarquia_administrador');
+      expect(provider.mock.calls.length).toBe(before);
+      expect(await account(sent.body.userId)).toMatchObject({ state: 'desactivado', invitationState: 'cancelada', roles: ['ADM'] });
+    });
+
     test('nadie se desactiva a sí mismo y la lista no lo ofrece', async () => {
       const state = await t.call('ADM', 'PATCH', `/usuarios/${userId('ADM')}/estado`, { state: 'desactivado', version: await version(userId('ADM')), reason: 'Intento de autodesactivación' });
       expect(state.status).toBe(403);
