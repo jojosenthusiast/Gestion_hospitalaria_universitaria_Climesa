@@ -77,6 +77,7 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
     }
     LaunchedEffect(Unit) { model.clearMessages(); model.open(AmbulanceMode.PARAMEDIC) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
+    LaunchedEffect(accountId) { model.bindUser(accountId) }
     // Solo repinta el «hace X min»; no consulta nada a la red.
     val now by produceState(Instant.now()) { while (true) { delay(30_000); value = Instant.now() } }
     val status = state.status
@@ -250,30 +251,31 @@ private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel,
     LaunchedEffect(state.busy, state.formError, state.queued, sending) {
         if (sending && !state.busy) { sending = false; if (state.formError == null) close() }
     }
+    LaunchedEffect(service?.id) { service?.id?.let(model::restorePrehospital) }
     SheetColumn {
         Text(stringResource(R.string.par_reporte), style = MaterialTheme.typography.titleLarge)
         state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
         state.queued?.let { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_en_cola)); SecondaryButton(stringResource(R.string.camas_reintentar), { model.retryQueued() }, enabled = !state.busy) }
         state.provisional?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_provisional_vinculara, it.record)) }
         if (service == null) { Text(stringResource(R.string.unidad_sin_servicio)); return@SheetColumn }
-        FormField(stringResource(R.string.amb_motivo), form.reason, { model.updatePrehospital(form.copy(reason = it.take(500))) }, singleLine = false)
+        FormField(stringResource(R.string.amb_motivo), form.reason, { model.updatePrehospital(form.copy(reason = it.take(500)), service?.id) }, singleLine = false)
         Text(stringResource(R.string.amb_prioridad), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            AmbulanceLabels.priorities.forEach { (value, label) -> FilterChip(selected = form.priority == value, onClick = { model.updatePrehospital(form.copy(priority = value)) }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp)) }
+            AmbulanceLabels.priorities.forEach { (value, label) -> FilterChip(selected = form.priority == value, onClick = { model.updatePrehospital(form.copy(priority = value), service?.id) }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp)) }
         }
         Text(stringResource(R.string.par_eta_titulo), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             ParamedicRules.etaChoices.forEach { minutes ->
-                FilterChip(selected = form.etaMinutes == minutes.toString(), onClick = { model.updatePrehospital(form.copy(etaMinutes = if (form.etaMinutes == minutes.toString()) "" else minutes.toString())) }, label = { Text(stringResource(R.string.par_eta_min, minutes)) }, modifier = Modifier.heightIn(min = 48.dp))
+                FilterChip(selected = form.etaMinutes == minutes.toString(), onClick = { model.updatePrehospital(form.copy(etaMinutes = if (form.etaMinutes == minutes.toString()) "" else minutes.toString()), service?.id) }, label = { Text(stringResource(R.string.par_eta_min, minutes)) }, modifier = Modifier.heightIn(min = 48.dp))
             }
         }
         Text(stringResource(R.string.par_signos), style = MaterialTheme.typography.labelLarge)
-        NumberField(stringResource(R.string.amb_fc), form.heartRate) { model.updatePrehospital(form.copy(heartRate = it)) }
-        NumberField(stringResource(R.string.amb_pas), form.systolic) { model.updatePrehospital(form.copy(systolic = it)) }
-        NumberField(stringResource(R.string.amb_pad), form.diastolic) { model.updatePrehospital(form.copy(diastolic = it)) }
-        NumberField(stringResource(R.string.amb_spo2), form.oxygenSaturation) { model.updatePrehospital(form.copy(oxygenSaturation = it)) }
-        NumberField(stringResource(R.string.amb_temperatura), form.temperature, decimal = true) { model.updatePrehospital(form.copy(temperature = it)) }
-        NumberField(stringResource(R.string.amb_glasgow), form.glasgow) { model.updatePrehospital(form.copy(glasgow = it)) }
+        NumberField(stringResource(R.string.amb_fc), form.heartRate) { model.updatePrehospital(form.copy(heartRate = it), service?.id) }
+        NumberField(stringResource(R.string.amb_pas), form.systolic) { model.updatePrehospital(form.copy(systolic = it), service?.id) }
+        NumberField(stringResource(R.string.amb_pad), form.diastolic) { model.updatePrehospital(form.copy(diastolic = it), service?.id) }
+        NumberField(stringResource(R.string.amb_spo2), form.oxygenSaturation) { model.updatePrehospital(form.copy(oxygenSaturation = it), service?.id) }
+        NumberField(stringResource(R.string.amb_temperatura), form.temperature, decimal = true) { model.updatePrehospital(form.copy(temperature = it), service?.id) }
+        NumberField(stringResource(R.string.amb_glasgow), form.glasgow) { model.updatePrehospital(form.copy(glasgow = it), service?.id) }
         PrimaryButton(stringResource(R.string.amb_enviar_reporte), { sending = true; model.sendPrehospital(service.id) }, icon = Icons.Default.Send, enabled = state.queued == null, loading = state.busy)
     }
 }

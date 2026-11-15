@@ -11,6 +11,8 @@ const SQL_CODES: Record<string, string> = { ultimo_administrador: 'ultimo_admini
 const CONSTRAINT_CODES: Record<string, { codigo: string; message: string }> = {
   cita_medico_id_horario_excl: { codigo: 'franja_ocupada', message: 'La franja ya no está disponible; vuelve a consultar la disponibilidad.' },
   cita_paciente_sin_traslape: { codigo: 'paciente_con_cita', message: 'El paciente ya tiene otra cita en ese horario.' },
+  // A concurrent start of the same queue number lost the race (20261119003000_consulta_ticket_unico.sql).
+  consulta_ticket_unico: { codigo: 'consulta_ya_iniciada', message: 'La consulta ya fue iniciada para este número.' },
 };
 
 /** FR-100-11: todo error sale como `application/problem+json` con `codigo` estable, mensaje en español y `requestId`; nunca trazas ni SQL. */

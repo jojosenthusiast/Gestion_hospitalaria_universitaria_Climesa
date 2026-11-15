@@ -16,6 +16,7 @@ class ProbeController {
   @Get('prohibido') forbidden() { throw new ForbiddenException('Tu cuenta no tiene permiso para esta operación.'); }
   @Get('conflicto') conflict() { throw new ConflictException('Ya existe.'); }
   @Get('sql') sql() { throw Object.assign(new Error('relation "paciente" violates SELECT * FROM x'), { code: '23505' }); }
+  @Get('consulta-duplicada') duplicatedConsultation() { throw Object.assign(new Error('duplicate key value violates unique constraint "consulta_ticket_unico"'), { code: '23505', constraint: 'consulta_ticket_unico' }); }
   @Post('boom') boom() { throw new Error('SELECT dui FROM pacientes.paciente'); }
 }
 @Module({ controllers: [ProbeController] })
@@ -60,6 +61,10 @@ describe('FR-100-11 errores uniformes (problem+json)', () => {
     const sql = await app.inject('/prueba/sql');
     expect(sql.json()).toMatchObject({ status: 409, codigo: 'conflicto' });
     expect(sql.body).not.toMatch(/SELECT|relation|stack/i);
+    const duplicated = await app.inject('/prueba/consulta-duplicada');
+    expect(duplicated.statusCode).toBe(409);
+    expect(duplicated.json()).toMatchObject({ status: 409, codigo: 'consulta_ya_iniciada', detail: 'La consulta ya fue iniciada para este número.' });
+    expect(duplicated.body).not.toMatch(/duplicate|constraint/i);
     const boom = await app.inject({ method: 'POST', url: '/prueba/boom', payload: {} });
     expect(boom.statusCode).toBe(500);
     expect(boom.json()).toMatchObject({ status: 500, codigo: 'error_interno' });

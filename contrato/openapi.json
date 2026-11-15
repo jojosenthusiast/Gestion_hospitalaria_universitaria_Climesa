@@ -15993,6 +15993,20 @@
           "issuedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "consultationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Consulta iniciada desde este número por quien consulta la fila; null si no hay o es de otro profesional"
+          },
+          "consultationState": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoConsulta"
+              }
+            ]
           }
         },
         "required": [
@@ -16006,7 +16020,9 @@
           "officeId",
           "llamados",
           "version",
-          "issuedAt"
+          "issuedAt",
+          "consultationId",
+          "consultationState"
         ]
       },
       "QueueIssueDto": {

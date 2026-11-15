@@ -12,6 +12,10 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.data.DraftStore
+import sv.edu.catolica.climesa.data.NoDraftStore
+import sv.edu.catolica.climesa.domain.ConsultationResume
+import sv.edu.catolica.climesa.domain.QueueConsultation
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.ConsultationEvents
@@ -30,14 +34,32 @@ data class ConsultationState(
     /** Active lab catalog, loaded once when a physician with `laboratorio.ordenar` opens a consultation. */
     val labCatalog: List<LabExam> = emptyList(),
     val labCatalogLoading: Boolean = false,
+    /** Called and in-attention numbers of the day (only with `fila.ver`), to start or resume their consultation. */
+    val queue: List<QueueConsultation> = emptyList(),
+    /** Consultation opened by id (from the queue or restored after process death). */
+    val resumed: MedicalAppointment? = null,
+    /** Ticket whose consultation is being started or opened. */
+    val opening: String? = null,
 )
 
 @HiltViewModel
-class ConsultationViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
+class ConsultationViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository, private val drafts: DraftStore = NoDraftStore) : ViewModel() {
     private val mutable = MutableStateFlow(ConsultationState())
     val state = mutable.asStateFlow()
     private val live = LiveSubscription(realtime)
     private var loadJob: Job? = null
+    private var userId: String? = null
+    private var withQueue = false
+
+    /** Signed-in user (drafts are kept per user) and whether the agenda also lists the day's queue. */
+    fun configure(userId: String, withQueue: Boolean) {
+        if (this.userId != userId) { this.userId = userId; drafts.retainOnly(userId) }
+        this.withQueue = withQueue
+    }
+
+    fun draft(consultationId: String) = userId?.let { drafts.load(it, "consulta:$consultationId") }
+    fun saveDraft(consultationId: String, value: JSONObject) = userId?.let { drafts.save(it, "consulta:$consultationId", value) } ?: false
+    fun clearDraft(consultationId: String) { userId?.let { drafts.clear(it, "consulta:$consultationId") } }
 
     /**
      * Loads the agenda. A [silent] reload (realtime invalidation, or after an action) keeps the shown agenda and
@@ -49,7 +71,8 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         loadJob = viewModelScope.launch {
             try {
                 val rows = parse(api.request("/consultas/agenda"))
-                mutable.value = mutable.value.copy(loading = false, appointments = rows)
+                val queue = if (withQueue) ConsultationResume.attendable(ConsultationResume.parseQueue(api.request("/fila"))) else emptyList()
+                mutable.value = mutable.value.copy(loading = false, appointments = rows, queue = queue)
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) }
         }
@@ -73,6 +96,42 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
             } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
     }
+
+    /**
+     * Starts the consultation of a called number, or resumes the doctor's own one: the id listed by `GET /fila`, or the
+     * `consultaId` of a 409 `consulta_ya_iniciada`. Another doctor's consultation answers 409 without the id: shown as error.
+     */
+    fun attend(ticket: QueueConsultation) {
+        ticket.consultationId?.let { open(it, ticket.number); return }
+        mutable.value = mutable.value.copy(opening = ticket.ticketId, error = null, notice = null)
+        viewModelScope.launch {
+            try {
+                val started = api.request("/consultas", "POST", JSONObject().put("ticketId", ticket.ticketId)) as JSONObject
+                mutable.value = mutable.value.copy(opening = null)
+                open(started.getString("id"), ticket.number)
+                load(silent = true)
+            } catch (e: CancellationException) { throw e
+            } catch (e: AuthRequestException) {
+                val own = ConsultationResume.resumableId(e.code, e.body)
+                mutable.value = mutable.value.copy(opening = null, error = if (own == null) message(e) else null)
+                own?.let { open(it, ticket.number) }
+            } catch (e: Exception) { mutable.value = mutable.value.copy(opening = null, error = message(e)) }
+        }
+    }
+
+    /** Loads a consultation by id (`GET /consultas/{id}/detalle`) into [ConsultationState.resumed]. */
+    fun open(consultationId: String, number: Int?) {
+        if (mutable.value.resumed?.consultationId == consultationId) return
+        viewModelScope.launch {
+            try {
+                val item = ConsultationResume.fromDetail(api.request("/consultas/$consultationId/detalle"), number) ?: error("No se pudo abrir la consulta.")
+                mutable.value = mutable.value.copy(resumed = item)
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) { mutable.value = mutable.value.copy(error = message(e)) }
+        }
+    }
+
+    fun closeResumed() { mutable.value = mutable.value.copy(resumed = null) }
 
     fun save(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, onDone: () -> Unit = {}) {
         if (reason.trim().isBlank()) { mutable.value = mutable.value.copy(error = "Escribe el motivo de consulta."); return }
@@ -98,6 +157,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
                 // The draft is already saved: keep its new version so a failed signature can be retried without a 409.
                 keepDraft(item, reason, physicalExam, plan, nextVersion)
                 api.request("/consultas/${item.consultationId}/firmar", "POST", JSONObject().put("version", nextVersion))
+                item.consultationId?.let(::clearDraft)
                 mutable.value = mutable.value.copy(saving = false, notice = "Consulta firmada y cita marcada como atendida.")
                 load(silent = true); onDone()
             } catch (e: CancellationException) { throw e
@@ -181,7 +241,8 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
 
     /** Stores the saved draft and its server version locally, without touching the saving flag or messages. */
     private fun keepDraft(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, version: Int) {
-        mutable.value = mutable.value.copy(appointments = mutable.value.appointments.map { current -> if (current.consultationId == item.consultationId) current.copy(consultationReason = reason, physicalExam = physicalExam, plan = plan, version = version) else current })
+        val update = { current: MedicalAppointment -> if (current.consultationId == item.consultationId) current.copy(consultationReason = reason, physicalExam = physicalExam, plan = plan, version = version) else current }
+        mutable.value = mutable.value.copy(appointments = mutable.value.appointments.map(update), resumed = mutable.value.resumed?.let(update))
     }
 
     private fun parse(value: Any): List<MedicalAppointment> {

@@ -38,6 +38,8 @@ struct RoleTabsView:View {
     let tabs:[AppTab]
     @EnvironmentObject private var account:AccountModel
     @State private var selection:AppTab
+    /// Pestaña elegida, guardada por escena: al volver tras cerrarse la app por el sistema se abre la misma.
+    @SceneStorage("workspace.tab") private var storedTab:String=""
     @State private var live=LiveViewModel()
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var shifts=ShiftModel()
@@ -75,6 +77,8 @@ struct RoleTabsView:View {
             if value == .background { live.sceneEnteredBackground() } else if value == .active { live.sceneBecameActive() }
         }
         .onChange(of:role) { _,_ in selection=tabs.first ?? .perfil }
+        .onAppear { if let saved=AppTab(rawValue:storedTab),tabs.contains(saved) { selection=saved } }
+        .onChange(of:selection) { _,tab in storedTab=tab.rawValue }
     }
 
     @ViewBuilder private func content(for tab:AppTab)->some View {

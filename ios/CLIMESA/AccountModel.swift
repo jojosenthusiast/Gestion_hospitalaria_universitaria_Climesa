@@ -28,6 +28,8 @@ final class LoginDraft {
     func sessionExpired() {
         guard profile != nil || pending else { return }
         revision+=1; profile=nil; pending=false; busy=false; loading=false; notice=nil
+        // Automatic sign-out: local clinical drafts do not outlive the session (DraftStore).
+        DraftStore.shared.clearAll()
         error="Tu sesión expiró. Vuelve a ingresar."
     }
     /// Al volver de segundo plano: con sesión abierta solo se verifica de nuevo el perfil (no se pierde lo que estaba en pantalla).
@@ -73,6 +75,8 @@ final class LoginDraft {
         guard stamp==revision else { throw CancellationError() }
         // Un rol sin iOS (por ejemplo Recepción) no es un error: la pantalla muestra "Tu rol no usa esta aplicación".
         draft.clear()
+        // After a successful sign-in or restore, drop drafts left by any other account on this device.
+        DraftStore.shared.retainOnly(user: verified.id)
         profile=verified; if let first=verified.allowedIOSRoles.first { role=verified.allowedIOSRoles.contains(role) ? role : first }; pending=false; error=nil; notice=nil
     }
     func signIn(email:String,password:String) async {
@@ -111,7 +115,9 @@ final class LoginDraft {
         }
         if stamp==revision { busy=false }
     }
-    func logout() async { draft.clear(); revision+=1; busy=true; loading=true; profile=nil; pending=false; notice=nil; error=nil; await auth?.signOut(); busy=false; loading=false }
+    /// Cerrar sesión borra también los borradores clínicos guardados en el dispositivo (DraftStore).
+    /// The 5-minute background sign-out in `CLIMESAApp` also ends here.
+    func logout() async { draft.clear(); DraftStore.shared.clearAll(); revision+=1; busy=true; loading=true; profile=nil; pending=false; notice=nil; error=nil; await auth?.signOut(); busy=false; loading=false }
 }
 struct Shift:Decodable,Identifiable {
     let id:String; let area:String; let start:String; let end:String; let state:String
