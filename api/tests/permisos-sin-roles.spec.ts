@@ -46,7 +46,7 @@ describe('Decisiones por rol que ahora salen del catálogo de permisos',()=>{
  afterAll(async()=>{await app?.close();await fixture?.pg.close();});
 
  describe('fecha de nacimiento en la búsqueda de pacientes',()=>{
-  test.each([['JOP',false],['REC',true],['AST',true],['ENF',true],['MED',true],['LAB',true],['PAR',true]])('GET /pacientes como %s: fecha de nacimiento presente = %s',async(role,shown)=>{
+  test.each([['JOP',false],['REC',true],['AST',true],['ENF',true],['MED',true],['LAB',false],['PAR',true]])('GET /pacientes como %s: fecha de nacimiento presente = %s (LAB recibe ageRange, MA-SEG-06)',async(role,shown)=>{
    const result=await call(role,'GET','/pacientes?query=Marta');
    expect(result.status).toBe(200);
    const row=result.body.find((p:any)=>p.id===patientId);expect(row).toBeDefined();
@@ -59,7 +59,7 @@ describe('Decisiones por rol que ahora salen del catálogo de permisos',()=>{
     expect('birth' in row).toBe(true);
    }finally{await fixture.pg.query("DELETE FROM acceso.asignacion_rol WHERE usuario_id=$1 AND rol_codigo='MED'",[userId('JOP')]);}
   });
-  test.each([['JOP',false],['REC',true],['LAB',true]])('POST /pacientes/busquedas como %s: fecha de nacimiento presente = %s',async(role,shown)=>{
+  test.each([['JOP',false],['REC',true],['LAB',false]])('POST /pacientes/busquedas como %s: fecha de nacimiento presente = %s (LAB recibe ageRange, MA-SEG-06)',async(role,shown)=>{
    const result=await call(role,'POST','/pacientes/busquedas',{query:'Marta Ejemplo'});
    expect(result.status).toBe(201);
    const row=result.body.candidates.find((p:any)=>p.id===patientId);expect(row).toBeDefined();
