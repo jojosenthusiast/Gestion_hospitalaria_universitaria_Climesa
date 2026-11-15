@@ -30,9 +30,26 @@ export class ShiftDto {
   @ApiProperty({format:'date-time'}) @IsISO8601({strict:true}) end!:string;
   @ApiProperty({enum:['diurno','nocturno','guardia']}) @IsIn(['diurno','nocturno','guardia']) type!:string;
   @Text(0,500,true) justification?:string;
-  @ApiPropertyOptional({enum:['borrador','cancelado']}) @IsOptional() @IsIn(['borrador','cancelado']) state?:string;
+  // MA-TUR-01/02 (D-10): los turnos nacen publicados; `state` solo sirve para cancelar un turno existente.
+  @ApiPropertyOptional({enum:['cancelado'],description:'Solo en PATCH, para cancelar un turno que no ha empezado'}) @IsOptional() @IsIn(['cancelado']) state?:string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) version?:number;
   @Text(10,500,true) reason?:string;
+  /** CARGA-01/02: motivo de emergencia para superar el tope de horas en 7 días o de días seguidos; queda en el turno y en la auditoría. */
+  @Text(10,500,true) emergencyReason?:string;
+}
+export const attendanceStates=['presente','ausente','pendiente'];
+export const absenceTypes=['justificada','injustificada'];
+/** ASIS-01/03: JOP marca la entrada, la ausencia (con tipo y motivo) o deshace una marca equivocada (`pendiente`, con motivo). */
+export class AttendanceDto {
+  @ApiProperty({enum:attendanceStates}) @IsIn(attendanceStates) state!:string;
+  @ApiPropertyOptional({enum:absenceTypes}) @IsOptional() @IsIn(absenceTypes) absenceType?:string;
+  @ApiPropertyOptional({format:'date-time',description:'Hora de entrada; por omisión, ahora. Obligatoria si el turno ya terminó'}) @IsOptional() @IsISO8601({strict:true}) at?:string;
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+  @Text(10,500,true) reason?:string;
+}
+/** ASIS-01: la persona marca su propia entrada desde su turno. */
+export class CheckInDto {
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
 }
 export class PublishDto {
   @ApiProperty({format:'date',example:'2026-11-10'}) @Matches(/^\d{4}-\d{2}-\d{2}$/) from!:string;

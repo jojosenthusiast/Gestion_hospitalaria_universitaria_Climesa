@@ -7,8 +7,8 @@ import { ActorRequest } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
-import { BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
-import { BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
+import { AttendanceDto, BedBlockDto, BedTransitionDto, CheckInDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
+import { BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftAttendanceResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpecialistWeekResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
 import { IdVersionResponse } from '../platform/responses';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
 export class OperationsController {
@@ -33,6 +33,12 @@ export class OperationsController {
   myShifts(@Req() r:ActorRequest){return this.people.shifts(r.actor,true);}
   @Get('turnos/cobertura') @RequirePermission('turnos.ver') @ApiOperation({summary:'Huecos de cobertura por área y hora frente al mínimo vigente'}) @ApiQuery({name:'from',type:String,description:'Primer día local, yyyy-MM-dd'}) @ApiQuery({name:'to',type:String,description:'Último día local, yyyy-MM-dd'}) @ApiQuery({name:'areaId',type:String,format:'uuid',required:false}) @ApiOkResponse({ type: CoverageResponse })
   coverage(@Query('from') from='',@Query('to') to='',@Query('areaId') areaId?:string){return this.people.coverage(from,to,areaId);}
+  @Get('turnos/especialistas') @RequirePermission('turnos.ver') @ApiOperation({summary:'Médicos de turno por día y especialidad durante 7 días (CARGA-04)'}) @ApiQuery({name:'from',type:String,description:'Primer día local, yyyy-MM-dd'}) @ApiOkResponse({ type: SpecialistWeekResponse })
+  specialists(@Query('from') from=''){return this.people.specialists(from);}
+  @Post('turnos/:id/entrada') @RequirePermission('turnos.ver') @ApiOperation({summary:'Marcar la entrada del turno propio (ASIS-01)'}) @ApiCreatedResponse({ type: ShiftAttendanceResponse })
+  checkIn(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:CheckInDto,@Headers('idempotency-key') k?:string){return this.people.checkIn(r.actor,id,d,k);}
+  @Post('turnos/:id/asistencia') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Marcar entrada, ausencia (con tipo y motivo) o deshacer la marca de un turno (ASIS-01 a ASIS-03)'}) @ApiCreatedResponse({ type: ShiftAttendanceResponse })
+  attendance(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:AttendanceDto,@Headers('idempotency-key') k?:string){return this.people.attendance(r.actor,id,d,k);}
   @Post('turnos/publicar') @RequirePermission('turnos.publicar') @ApiOperation({summary:'Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó'}) @ApiCreatedResponse({ type: PublishShiftsResponse })
   publishShifts(@Req() r:ActorRequest,@Body() d:PublishDto,@Headers('idempotency-key') k?:string){return this.people.publish(r.actor,d,k);}
   @Post('turnos') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Planificar turno con duración, traslapes y descanso'}) @ApiCreatedResponse({ type: ShiftSavedResponse })
