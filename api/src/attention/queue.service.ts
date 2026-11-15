@@ -6,7 +6,10 @@ import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
-import { QUEUE_SERVICES, QueueIssueDto, QueueTransitionDto } from './queue.dto';
+import { QUEUE_SERVICES, QueueCallNextDto, QueueIssueDto, QueueTransitionDto } from './queue.dto';
+import { PolicyRegistry } from '../platform/policy.registry';
+import { AttentionSweepService } from './attention-sweep.service';
+import { queueActions } from './attention.rules';
 
 type QueueRow = Record<string, any>;
 
@@ -22,7 +25,16 @@ const activeTicket = (number?: number) => new ProblemException('ticket_activo_ex
 
 @Injectable()
 export class QueueService {
-  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
+  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock, private readonly policies: PolicyRegistry, private readonly sweeper: AttentionSweepService) {}
+
+  private async queuePolicies(c: PoolClient) {
+    const now = this.clock.now();
+    const [max, absence] = await Promise.all([
+      this.policies.value<{ llamados: number }>(c, 'fila.llamados_maximos', now),
+      this.policies.value<{ llamados: number }>(c, 'fila.llamados_para_ausencia', now),
+    ]);
+    return { maxCalls: max.llamados, callsForAbsence: absence.llamados };
+  }
 
   private date(value?: string) {
     const date = value ?? this.clock.today();
@@ -58,6 +70,7 @@ export class QueueService {
     // SEG-01: una cuenta con solo `propio` y sin expediente vinculado no tiene número que ver.
     if (!whole && !actor.patientId) return [];
     const own = whole ? null : actor.patientId;
+    await this.sweeper.sweepSafely();
     return this.db.transaction(async c => { const rows = (await c.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       t.estado AS state,t.consultorio_id AS "officeId",t.llamados,t.version,t.emitido_en AS "issuedAt",
@@ -68,7 +81,9 @@ export class QueueService {
       ORDER BY t.servicio,t.numero`, [date, service ?? null, own, actor.staffId ?? null])).rows;
       // SEG-02: aggregated read audit with every patient listed.
       await this.commands.audit(c, actor, { action: 'fila.leer', entity: 'ticket_fila', permission: 'fila.ver', detail: { date, patientIds: [...new Set(rows.map(row => row.patientId).filter(Boolean))] } });
-      return rows;
+      const policies = await this.queuePolicies(c);
+      const abilities = { call: contextsOf(actor, 'fila.llamar').length > 0, manage: contextsOf(actor, 'fila.gestionar').length > 0 };
+      return rows.map(row => ({ ...row, ...policies, ...queueActions({ state: row.state, calls: row.llamados }, policies, abilities) }));
     });
   }
 
@@ -100,7 +115,8 @@ export class QueueService {
       const old = await this.ownTicket(c, actor, id);
       if (!['en_espera', 'llamado'].includes(old.state)) throw new ProblemException('transicion_invalida', 409, 'Solo se puede llamar un número en espera o ya llamado.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
-      if (old.llamados >= 3) throw new ProblemException('fila_max_llamados', 409, 'Este número ya alcanzó el máximo de llamados.');
+      const { maxCalls } = await this.queuePolicies(c);
+      if (old.llamados >= maxCalls) throw new ProblemException('fila_max_llamados', 409, `Este número ya se llamó ${maxCalls} veces.`);
       const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [id, dto.officeId ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.llamar', entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.llamar', detail: { officeId: dto.officeId ?? null } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));
@@ -112,13 +128,33 @@ export class QueueService {
     return this.commands.run(actor, `fila.gestionar:estado:${id}:${state}`, key, dto, async c => {
       const old = await this.ownTicket(c, actor, id);
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
-      const allowed: Record<string, string[]> = { en_atencion: ['llamado'], atendido: ['en_atencion'], no_se_presento: ['en_espera', 'llamado'] };
-      if (!allowed[state].includes(old.state)) throw new ProblemException('transicion_invalida', 409, `No se puede pasar de ${old.state} a ${state}.`);
+      const allowed: Record<string, string[]> = { en_atencion: ['llamado'], atendido: ['en_atencion'], no_se_presento: ['llamado'] };
+      const labels: Record<string, string> = { en_atencion: 'pasar a atención', atendido: 'completar', no_se_presento: 'marcar que no se presentó' };
+      if (!allowed[state].includes(old.state)) throw new ProblemException('transicion_invalida', 409, state === 'no_se_presento' && old.state === 'en_espera' ? 'Llama el número antes de marcar que no se presentó.' : `Este número ya no permite ${labels[state]}.`);
+      if (state === 'no_se_presento') {
+        // FILA-01: only after N unanswered calls (the trigger backs it).
+        const { callsForAbsence } = await this.queuePolicies(c);
+        if (old.llamados < callsForAbsence) throw new ProblemException('fila_llamados_insuficientes', 409, `Marca "No se presentó" después de ${callsForAbsence} llamados (van ${old.llamados}).`);
+      }
       const row = (await c.query(`UPDATE atencion.ticket_fila SET estado=$2,consultorio_id=COALESCE($3,consultorio_id),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state`, [id, state, dto.officeId ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: `fila.${state}`, entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.gestionar', reason: dto.reason, detail: { from: old.state, to: state } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));
       return row;
     });
   }
-}
 
+  /** FILA-02: calls the first waiting number of the service (arrival order) for today. */
+  async callNext(actor: Actor, dto: QueueCallNextDto, key?: string) {
+    return this.commands.run(actor, `fila.llamar:siguiente:${dto.service}`, key, dto, async c => {
+      const next = (await c.query(`SELECT t.id,t.numero,t.paciente_id AS "patientId",
+        coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName"
+        FROM atencion.ticket_fila t LEFT JOIN pacientes.paciente p ON p.id=t.paciente_id
+        WHERE t.fecha=$1::date AND t.servicio=$2 AND t.estado='en_espera' ORDER BY t.numero LIMIT 1 FOR UPDATE OF t SKIP LOCKED`, [this.clock.today(), dto.service])).rows[0];
+      if (!next) throw new ProblemException('fila_sin_espera', 409, 'No hay números en espera en este servicio.');
+      const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [next.id, dto.officeId ?? null])).rows[0];
+      await this.commands.audit(c, actor, { action: 'fila.llamar', entity: 'ticket_fila', entityId: next.id, patientId: next.patientId ?? undefined, permission: 'fila.llamar', detail: { officeId: dto.officeId ?? null, next: true } });
+      await this.commands.event(c, 'fila.actualizada', 'ticket_fila', next.id, row.version, await this.channels(c, next.patientId));
+      return { ...row, numero: next.numero, patientName: next.patientName };
+    });
+  }
+}

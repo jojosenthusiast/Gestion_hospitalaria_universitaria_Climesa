@@ -9,9 +9,13 @@ import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './li
 import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, serviceNames, sortColumn, waitLevel, waitMinutes, type BoardTicket, type Column } from './listas/queue-board';
 import './listas/lists.css';
 
-type QueueTicket = BoardTicket & { fecha: string; patientId?: string | null; officeId?: string | null; version: number; consultationId?: string | null; consultationState?: string | null };
+type QueueAction = 'llamar' | 'atender' | 'completar' | 'no_se_presento';
+/** FILA-01/CITA-04: the server says which actions the reader may take now (`allowedActions`) and why the others are blocked. */
+type QueueTicket = BoardTicket & { fecha: string; patientId?: string | null; officeId?: string | null; version: number; consultationId?: string | null; consultationState?: string | null;
+  maxCalls?: number; callsForAbsence?: number; allowedActions?: QueueAction[]; blockedActions?: { action: QueueAction; reason: string }[] };
 const services = Object.entries(serviceNames);
-const finalNames: Record<string, string> = { atendido: 'Atendido', no_se_presento: 'No se presentó' };
+const finalNames: Record<string, string> = { atendido: 'Atendido', no_se_presento: 'No se presentó', cerrado: 'Cerrado sin atender' };
+const actionPath: Record<QueueAction, string> = { llamar: 'llamar', atender: 'atender', completar: 'completar', no_se_presento: 'no-se-presento' };
 const minutesText = (minutes: number) => minutes >= 60 ? `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min` : `${minutes} min`;
 
 export function QueuePage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
@@ -22,6 +26,10 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const action = useAction(api);
   async function transition(ticket: QueueTicket, path: string, method = 'POST', extra: Record<string, unknown> = {}) {
     if (await action.run(`/fila/${ticket.id}/${path}`, { version: ticket.version, ...extra }, method)) data.refresh();
+  }
+  /** FILA-02: the server picks the first waiting number of the service (arrival order). */
+  async function callNext(serviceCode: string) {
+    if (await action.run('/fila/llamar-siguiente', { service: serviceCode })) data.refresh();
   }
   // El reloj se lee al pintar; cada evento en vivo vuelve a pintar el tablero (sin temporizadores).
   const now = Date.now();
@@ -38,10 +46,12 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
           <ListToolbar trailing={<ExportMenu table={exportTable} disabled={!visible.length} />}><LiveSearch label="Buscar en la fila" placeholder="Número o paciente" value={query} onChange={setQuery} /></ListToolbar>
           <div className="cl-filter-row"><span className="cl-filter-label">Servicio</span><ChipGroup label="Servicio" value={service} onChange={setService} options={[{ value: 'todos', label: 'Todos', count: all.length }, ...services.map(([value, label]) => ({ value, label, count: all.filter(t => t.service === value).length }))]} /></div>
           <ActiveFilters filters={filters} onClear={() => { setService('todos'); setQuery(''); }} />
+          {call && service !== 'todos' && <div className="row-actions"><button className="primary-button" disabled={action.busy || !all.some(t => t.service === service && t.state === 'en_espera')} onClick={() => void callNext(service)}><Icon name="arrow" size={18} />Llamar siguiente</button></div>}
+          {call && service === 'todos' && <p className="muted">Elige un servicio para llamar al siguiente número en espera.</p>}
           <div className="qb-counts" aria-label="Resumen de la fila">{COLUMNS.map(column => <div key={column} className={`qb-count tone-${COLUMN_TONE[column]}`}><strong>{summary.counts[column]}</strong><span>{COLUMN_LABEL[column]}</span></div>)}
             <div className="qb-count tone-muted"><strong>{summary.averageWait} min</strong><span>Espera promedio · máxima {minutesText(summary.longestWait)}</span></div></div>
           <WriteError error={action.error} onReload={data.refresh} reloadLabel="Recargar la fila" />
-          {visible.length ? <div className="qb-board">{COLUMNS.map(column => <Lane key={column} column={column} tickets={sortColumn(visible.filter(t => columnOf(t) === column), column)} now={now} busy={action.busy} call={call} manage={manage} onTransition={transition} />)}</div>
+          {visible.length ? <div className="qb-board">{COLUMNS.map(column => <Lane key={column} column={column} tickets={sortColumn(visible.filter(t => columnOf(t) === column), column)} now={now} busy={action.busy} call={call} onTransition={transition} />)}</div>
             : <Empty title={all.length ? 'Ningún número coincide con los filtros' : 'La fila está vacía'} description={all.length ? 'Quita algún filtro para ver todos los números del día.' : 'Los números emitidos para este día aparecerán aquí.'} />}
         </>;
       }}</RemoteState>
@@ -50,20 +60,36 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   </>;
 }
 
-function Lane({ column, tickets, now, busy, call, manage, onTransition }: { column: Column; tickets: QueueTicket[]; now: number; busy: boolean; call: boolean; manage: boolean; onTransition: (ticket: QueueTicket, path: string) => Promise<void> }) {
+const actionLabel = (ticket: QueueTicket, action: QueueAction) => ({ llamar: ticket.state === 'llamado' ? 'Llamar de nuevo' : 'Llamar', atender: 'Iniciar atención', completar: 'Completar', no_se_presento: 'No se presentó' })[action];
+const ACTION_ORDER: QueueAction[] = ['llamar', 'atender', 'completar', 'no_se_presento'];
+
+/** Actual state of the number: waiting, called N of M times, or in attention. */
+function stateText(ticket: QueueTicket, call: boolean) {
+  if (ticket.state === 'en_espera') return call ? 'En espera' : 'Esperando a que el médico llame';
+  if (ticket.state === 'llamado') return `Llamado ${ticket.llamados}${ticket.maxCalls ? ` de ${ticket.maxCalls}` : ''} ${ticket.llamados === 1 ? 'vez' : 'veces'}`;
+  if (ticket.state === 'en_atencion') return 'Presente, en atención';
+  return finalNames[ticket.state] ?? ticket.state;
+}
+
+function Lane({ column, tickets, now, busy, call, onTransition }: { column: Column; tickets: QueueTicket[]; now: number; busy: boolean; call: boolean; onTransition: (ticket: QueueTicket, path: string) => Promise<void> }) {
   return <section className="qb-column" aria-label={COLUMN_LABEL[column]}><h3><span>{COLUMN_LABEL[column]}</span><span className={`cl-stage tone-${COLUMN_TONE[column]}`}>{tickets.length}</span></h3>
-    {tickets.length ? <ul>{tickets.map(ticket => <li key={ticket.id} className="qb-ticket">
+    {tickets.length ? <ul>{tickets.map(ticket => {
+      const allowed = ticket.allowedActions ?? [];
+      const blocked = ticket.blockedActions ?? [];
+      return <li key={ticket.id} className="qb-ticket">
       <div className="qb-ticket-head"><strong className="qb-number mono-data">{ticket.numero}</strong>{waitLevel(ticket, now) !== 'none' ? <span className={`qb-wait sla-${waitLevel(ticket, now)}`}>Espera {minutesText(waitMinutes(ticket, now))}</span> : <span className="qb-wait sla-none">{formatDateTime(ticket.issuedAt)}</span>}</div>
       <span>{ticket.patientName || 'Paciente no identificado'}</span>
-      <small>{serviceNames[ticket.service] ?? ticket.service}{ticket.llamados ? ` · ${ticket.llamados} llamado(s)` : ''}</small>
+      <small>{serviceNames[ticket.service] ?? ticket.service} · {stateText(ticket, call)}</small>
       {column === 'cerrado' ? <Tag value={ticket.state} label={finalNames[ticket.state]} /> : null}
       <div className="row-actions">
-        {call && ['en_espera', 'llamado'].includes(ticket.state) && <button className="row-action" disabled={busy} onClick={() => void onTransition(ticket, 'llamar')}>{ticket.state === 'llamado' ? 'Llamar de nuevo' : 'Llamar'} <Icon name="arrow" size={16} /></button>}
-        {manage && ticket.state === 'llamado' && <button className="row-action" disabled={busy} onClick={() => void onTransition(ticket, 'atender')}>Iniciar atención</button>}
+        {ACTION_ORDER.map(name => allowed.includes(name)
+          ? <button key={name} className="row-action" disabled={busy} onClick={() => void onTransition(ticket, actionPath[name])}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</button>
+          : blocked.find(item => item.action === name) ? <button key={name} className="row-action" disabled title={blocked.find(item => item.action === name)!.reason}>{actionLabel(ticket, name)}</button> : null)}
         {ticket.state === 'en_atencion' && ticket.consultationId && ticket.consultationState === 'abierta' && <a className="row-action" href={`#/consultas?consulta=${ticket.consultationId}`}>Retomar consulta <Icon name="arrow" size={16} /></a>}
-        {manage && ticket.state === 'en_atencion' && <button className="row-action" disabled={busy} onClick={() => void onTransition(ticket, 'completar')}>Completar</button>}
-        {manage && ['en_espera', 'llamado'].includes(ticket.state) && <button className="row-action" disabled={busy} onClick={() => void onTransition(ticket, 'no-se-presento')}>No se presentó</button>}
-      </div></li>)}</ul> : <p className="muted">Nadie por ahora.</p>}</section>;
+      </div>
+      {blocked.map(item => <small key={item.action} className="form-hint">{actionLabel(ticket, item.action)}: {item.reason}</small>)}
+      </li>;
+    })}</ul> : <p className="muted">Nadie por ahora.</p>}</section>;
 }
 
 function IssueDialog({ api, profile, onClose, onSaved }: { api: Api; profile: AccessProfile; onClose: () => void; onSaved: () => void }) {

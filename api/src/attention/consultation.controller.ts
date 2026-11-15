@@ -4,7 +4,7 @@ import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { ConsultationSignDto, ConsultationStartDto, ConsultationUpdateDto } from './consultation.dto';
 import { ConsultationService } from './consultation.service';
-import { AgendaEntryResponse, ConsultationCommandResponse, ConsultationSignResponse, ConsultationStartResponse } from './attention.responses';
+import { AgendaEntryResponse, UnsignedConsultationResponse, ConsultationCommandResponse, ConsultationSignResponse, ConsultationStartResponse } from './attention.responses';
 
 @ApiTags('consultations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('consultas')
 export class ConsultationController {
@@ -12,6 +12,9 @@ export class ConsultationController {
 
   @Get('agenda') @RequirePermission('consulta.iniciar') @ApiOperation({ summary: 'Agenda propia del médico con estado de consulta' }) @ApiOkResponse({ type: [AgendaEntryResponse] })
   agenda(@Req() r: ActorRequest) { return this.consultations.agenda(r.actor); }
+
+  @Get('sin-firmar') @RequirePermission('consulta.iniciar') @ApiOperation({ summary: 'Consultas abiertas propias de cualquier día, para reanudarlas y firmarlas' }) @ApiOkResponse({ type: [UnsignedConsultationResponse] })
+  unsigned(@Req() r: ActorRequest) { return this.consultations.unsigned(r.actor); }
 
   @Post() @RequirePermission('consulta.iniciar') @ApiOperation({ summary: 'Iniciar una consulta desde una cita confirmada' }) @ApiCreatedResponse({ type: ConsultationStartResponse })
   start(@Req() r: ActorRequest, @Body() dto: ConsultationStartDto, @Headers('idempotency-key') key?: string) { return this.consultations.start(r.actor, dto, key); }

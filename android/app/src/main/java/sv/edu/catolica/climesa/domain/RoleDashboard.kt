@@ -19,6 +19,8 @@ data class DashboardKpi(
     val suffix: String? = null,
     val hint: String? = null,
     val target: AndroidSection? = null,
+    /** Verb the target section opens when the tile is tapped (for example the requests filter). */
+    val action: QuickAction? = null,
 )
 
 data class ChartSlice(val label: String, val value: Int, val tone: DashboardTone)
@@ -230,9 +232,11 @@ object RoleDashboard {
         when (role) {
             "REC" -> {
                 queueKpis()
-                val appointments = data[DashboardSource.APPOINTMENTS]?.let { states(it) }
-                val requested = appointments?.get("solicitada") ?: 0
-                appointments?.let { kpis += DashboardKpi("Citas por confirmar", requested.toString(), if (requested > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.APPOINTMENTS)) }
+                // Only requests still ahead in time: a past one is "vencida" (the server marks it) and nobody can confirm it.
+                val appointments = data[DashboardSource.APPOINTMENTS]?.let { rows(it) }
+                val requested = appointments?.count { it.optString("state") == "solicitada" && instant(text(it, "start"))?.isAfter(now) == true } ?: 0
+                val requestsAction = QuickAction.REVIEW_REQUESTS.takeIf { QuickActions.allowed(it, permissions) }
+                appointments?.let { kpis += DashboardKpi("Citas por confirmar", requested.toString(), if (requested > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.APPOINTMENTS), action = requestsAction) }
                 val links = data[DashboardSource.LINKS]?.let { rows(it).size }
                 links?.let { kpis += DashboardKpi("Vinculaciones por verificar", it.toString(), if (it > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.LINKING)) }
                 if (admissions != null) kpis += DashboardKpi("Admisiones sin cama", pendingBed.toString(), if (pendingBed > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.ADMISSION))
@@ -241,7 +245,7 @@ object RoleDashboard {
                 if (waiting > 0 && QuickActions.allowed(QuickAction.ISSUE_NUMBER, permissions)) {
                     attention += DashboardAttention("$waiting número(s) esperando", "Revisa la fila del día.", DashboardTone.WARNING, "Abrir fila", QuickActionRequest(AndroidSection.QUEUE))
                 }
-                if (requested > 0 && AndroidSection.APPOINTMENTS in sections) attention += DashboardAttention("$requested solicitud(es) de cita", "Confirma o reprograma las citas que pidieron los pacientes.", DashboardTone.WARNING, "Abrir citas", QuickActionRequest(AndroidSection.APPOINTMENTS))
+                if (requested > 0 && AndroidSection.APPOINTMENTS in sections) attention += DashboardAttention("$requested solicitud(es) de cita", "Confirma, rechaza o reprograma las solicitudes de los pacientes.", DashboardTone.WARNING, "Abrir citas", QuickActionRequest(AndroidSection.APPOINTMENTS, requestsAction))
                 if ((links ?: 0) > 0 && AndroidSection.LINKING in sections) attention += DashboardAttention("$links vinculación(es) por verificar", "Verifica la identidad antes de enlazar la cuenta con el expediente.", DashboardTone.WARNING, "Verificar", QuickActionRequest(AndroidSection.LINKING))
                 assignBedAttention()
                 ambulance?.pendingRequests?.size?.takeIf { it > 0 && QuickActions.allowed(QuickAction.DISPATCH, permissions) && AndroidSection.DISPATCH in sections }?.let {

@@ -12,6 +12,8 @@ internal object StatusCatalogPaciente {
         "rechazada" to "Rechazada",
         "atendida" to "Atendida",
         "no_asistio" to "No asistió",
+        "vencida" to "Vencida",
+        "reprogramada" to "Reprogramada",
     )
     private val tones: Map<String, StatusTone> = mapOf(
         "solicitada" to StatusTone.RESERVED,
@@ -20,6 +22,8 @@ internal object StatusCatalogPaciente {
         "rechazada" to StatusTone.DANGER,
         "atendida" to StatusTone.SUCCESS,
         "no_asistio" to StatusTone.WARNING,
+        "vencida" to StatusTone.NEUTRAL,
+        "reprogramada" to StatusTone.NEUTRAL,
     )
 
     fun label(code: String): String = labels[code] ?: code

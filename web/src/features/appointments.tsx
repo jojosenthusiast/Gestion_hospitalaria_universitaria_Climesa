@@ -6,10 +6,17 @@ import { APPOINTMENT_STATE_TONE, addDays, dayKey, dayLabel, groupAgenda, minutes
 import './listas/lists.css';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
 import { useQuickAction } from './personal/accion';
-import { can, type AccessProfile, type Api, type Appointment } from '../lib/api';
-import { Dialog, Empty, Heading, RemoteState, SaveButton, Select, Tag, WriteError, formatDateTime, useAction, useData } from './common';
+import { can, type AccessProfile, type Api, type Appointment as BaseAppointment } from '../lib/api';
+import { Dialog, Empty, Heading, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import './appointments.css';
 
+/** CITA-04: actions the server accepts now for the reader, and the blocked ones with their reason (contract `AccionCita`). */
+export type AppointmentAction = 'confirmar' | 'rechazar' | 'cancelar' | 'reprogramar' | 'no_asistio' | 'aceptar_reprogramacion' | 'rechazar_reprogramacion' | 'iniciar_consulta';
+type Reschedule = { id: string; start: string; end: string; state: string; origin: string; reason?: string | null; rejectionReason?: string | null; version: number };
+type Appointment = BaseAppointment & { allowedActions?: AppointmentAction[]; blockedActions?: { action: AppointmentAction; reason: string }[]; cancelableUntil?: string | null; reschedule?: Reschedule | null; rescheduledFromId?: string | null; rescheduledToId?: string | null };
+const ACTION_LABEL: Record<AppointmentAction, string> = { confirmar: 'Confirmar', rechazar: 'Rechazar', cancelar: 'Cancelar', reprogramar: 'Reprogramar', no_asistio: 'No asistió', aceptar_reprogramacion: 'Aceptar nuevo horario', rechazar_reprogramacion: 'Rechazar nuevo horario', iniciar_consulta: 'Iniciar consulta' };
+const ROW_ACTIONS: AppointmentAction[] = ['confirmar', 'rechazar', 'aceptar_reprogramacion', 'rechazar_reprogramacion', 'reprogramar', 'cancelar', 'no_asistio'];
+type Dialogued = 'rechazar' | 'cancelar' | 'reprogramar' | 'rechazar_reprogramacion';
 const localIso = (value: string) => new Date(`${value}-06:00`).toISOString();
 // La fecha inicial es hoy en El Salvador: abrir en mañana dejaba la cita "de hoy" para el día siguiente.
 const localInput = (date = new Date()) => {
@@ -25,7 +32,7 @@ const timeOnly = (value: string) => new Intl.DateTimeFormat('es-SV', { hour: '2-
 
 type Range = 'todas' | 'hoy' | 'semana' | 'dia';
 const todayKey = () => dayKey(new Date().toISOString());
-const STATE_FILTERS = [['activas', 'Activas'], ['solicitada', 'Solicitadas'], ['confirmada', 'Confirmadas'], ['atendida', 'Atendidas'], ['cancelada', 'Canceladas'], ['todas', 'Todas']] as const;
+const STATE_FILTERS = [['activas', 'Activas'], ['solicitada', 'Solicitadas'], ['confirmada', 'Confirmadas'], ['atendida', 'Atendidas'], ['no_asistio', 'No asistió'], ['vencida', 'Vencidas'], ['reprogramada', 'Reprogramadas'], ['cancelada', 'Canceladas'], ['todas', 'Todas']] as const;
 const isLive = (state: string) => state === 'solicitada' || state === 'confirmada';
 
 export function AppointmentsPage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
@@ -34,7 +41,14 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   // Acción rápida del tablero: #/citas?accion=agendar abre el formulario.
   const [quick, consumeQuick] = useQuickAction(), canSchedule = can(profile, 'citas.agendar');
   useEffect(() => { if (quick === 'agendar' && canSchedule) setCreate(true); if (quick) consumeQuick(); }, [quick, canSchedule, consumeQuick]);
-  const [selected, setSelected] = useState<Appointment | null>(null);
+  const [selected, setSelected] = useState<{ appointment: Appointment; action: Dialogued } | null>(null);
+  const direct = useAction(api);
+  /** One-click actions (CITA-06): confirm, no-show and accepting a reschedule need no form. */
+  async function runDirect(row: Appointment, name: AppointmentAction) {
+    const path = name === 'confirmar' ? `/citas/solicitudes/${row.id}/confirmar` : name === 'no_asistio' ? `/citas/${row.id}/no-asistio` : `/citas/reprogramaciones/${row.reschedule!.id}/aceptar`;
+    const body = name === 'aceptar_reprogramacion' ? { version: row.reschedule!.version } : { version: row.version };
+    if (await direct.run(path, body)) data.refresh();
+  }
   const [query, setQuery] = useState(''), [state, setState] = useState<string>('activas'), [range, setRange] = useState<Range>('todas'), [day, setDay] = useState(todayKey()), [doctor, setDoctor] = useState<PickerItem | null>(null);
   const reload = () => { setCreate(false); setSelected(null); data.refresh(); };
   const all = data.data ?? [];
@@ -66,6 +80,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
           {(range === 'dia' || range === 'semana') && <span className="cl-day-nav"><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana anterior' : 'Día anterior'} onClick={() => setDay(addDays(day, range === 'semana' ? -7 : -1))}>‹</button><Field label="Fecha de referencia" type="date" value={day} onChange={value => value && setDay(value)} /><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana siguiente' : 'Día siguiente'} onClick={() => setDay(addDays(day, range === 'semana' ? 7 : 1))}>›</button></span>}
         </div>
         <ActiveFilters filters={filters} onClear={clear} />
+        <WriteError error={direct.error} onReload={data.refresh} reloadLabel="Recargar las citas" />
         {rows.length ? <>
           <p className="cl-count" aria-live="polite">{rows.length} de {all.length} citas, agrupadas por día y por médico.</p>
           {agenda.map(group => <section className="ag-day" key={group.day} aria-label={dayLabel(group.day)}><h3>{dayLabel(group.day)}</h3>
@@ -74,12 +89,14 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
                 <span className="ag-time">{timeRange(row.start, row.end)}<small>{minutesBetween(row.start, row.end)} min</small></span>
                 <span><strong>{row.patientName}</strong>{row.reason && <small className="muted"> · {row.reason}</small>}</span>
                 <Tag value={row.state} />
-                <div className="row-actions">{can(profile, 'citas.cancelar') && ['solicitada', 'confirmada'].includes(row.state) && <button className="row-action" aria-label={`Cancelar la cita de ${row.patientName}`} onClick={() => setSelected(row)}>Cancelar</button>}{can(profile, 'citas.agendar') && row.state === 'solicitada' && <button className="row-action" aria-label={`Gestionar la solicitud de ${row.patientName}`} onClick={() => setSelected(row)}>Gestionar</button>}</div></div>)}</div>)}</section>)}</>
+                <AppointmentRowActions row={row} busy={direct.busy} onDirect={name => void runDirect(row, name)} onDialog={name => setSelected({ appointment: row, action: name })} /></div>)}</div>)}</section>)}</>
           : <Empty title={all.length ? 'Ninguna cita coincide con los filtros' : 'No hay citas en el rango actual'} description={all.length ? 'Quita algún filtro o cambia el rango.' : 'Las solicitudes o citas agendadas aparecerán aquí.'} />}
       </>}</RemoteState>
     </section>
     {create && <AppointmentForm api={api} version={version} onClose={() => setCreate(false)} onSaved={reload} />}
-    {selected && <AppointmentAction api={api} appointment={selected} canManage={can(profile, 'citas.agendar')} onClose={() => setSelected(null)} onSaved={reload} />}
+    {selected && (selected.action === 'reprogramar'
+      ? <RescheduleDialog api={api} appointment={selected.appointment} onClose={() => setSelected(null)} onSaved={reload} />
+      : <ReasonDialog api={api} appointment={selected.appointment} action={selected.action} onClose={() => setSelected(null)} onSaved={reload} />)}
   </>;
 }
 
@@ -129,10 +146,72 @@ function AppointmentForm({ api, version, onClose, onSaved }: { api: Api; version
     {availabilityError && <Notice kind="error">{availabilityError}</Notice>}{missing && <p className="form-hint" role="status">Para confirmar falta elegir {missing}.</p>}{selectedSlot && <Notice kind="info">Horario elegido: {timeOnly(selectedSlot.start)}–{timeOnly(selectedSlot.end)}. Si otra persona lo ocupa antes de confirmar, el sistema te pedirá seleccionar otro.</Notice>}<div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} disabled={!selectedSlot || !patient} label="Confirmar cita" /></div></form></Dialog>;
 }
 
-function AppointmentAction({ api, appointment, canManage, onClose, onSaved }: { api: Api; appointment: Appointment; canManage: boolean; onClose: () => void; onSaved: () => void }) {
-  const [status, setStatus] = useState(canManage && appointment.state === 'solicitada' ? 'confirmada' : 'cancelada'), [reason, setReason] = useState('');
+const isDialogued = (name: AppointmentAction): name is Dialogued => name === 'rechazar' || name === 'cancelar' || name === 'reprogramar' || name === 'rechazar_reprogramacion';
+
+/** CITA-04: buttons come from the server's `allowedActions`; blocked ones are shown disabled with their reason. */
+function AppointmentRowActions({ row, busy, onDirect, onDialog }: { row: Appointment; busy: boolean; onDirect: (name: AppointmentAction) => void; onDialog: (name: Dialogued) => void }) {
+  const allowed = row.allowedActions ?? [], blocked = row.blockedActions ?? [];
+  const pending = row.reschedule?.state === 'pendiente' ? row.reschedule : null;
+  return <div className="row-actions">
+    {pending && <small className="form-hint">Pide cambiar a {formatDateTime(pending.start)}{pending.reason ? ` · ${pending.reason}` : ''}</small>}
+    {row.reschedule?.state === 'rechazada' && <small className="form-hint">Reprogramación rechazada: {row.reschedule.rejectionReason}</small>}
+    {row.state === 'reprogramada' && <small className="form-hint">Se movió a otra franja.</small>}
+    {ROW_ACTIONS.map(name => allowed.includes(name)
+      ? <button key={name} className="row-action" disabled={busy} aria-label={`${ACTION_LABEL[name]} · ${row.patientName}`} onClick={() => isDialogued(name) ? onDialog(name) : onDirect(name)}>{ACTION_LABEL[name]}</button>
+      : null)}
+    {blocked.filter(item => ROW_ACTIONS.includes(item.action)).map(item => <small key={item.action} className="form-hint" title={item.reason}>{ACTION_LABEL[item.action]}: {item.reason}</small>)}
+  </div>;
+}
+
+/** CITA-08: live counter that only warns while characters are missing. */
+export function ReasonCounter({ value, min = 10, max = 500 }: { value: string; min?: number; max?: number }) {
+  const length = value.trim().length;
+  return <p className="form-hint" aria-live="polite">{length < min ? `Faltan ${min - length} caracteres (mínimo ${min}).` : `${length}/${max} ✓`}</p>;
+}
+
+function ReasonDialog({ api, appointment, action: kind, onClose, onSaved }: { api: Api; appointment: Appointment; action: 'rechazar' | 'cancelar' | 'rechazar_reprogramacion'; onClose: () => void; onSaved: () => void }) {
+  const [reason, setReason] = useState('');
   const action = useAction(api);
-  async function save(e: FormEvent) { e.preventDefault(); const result = status === 'cancelada' ? await action.run(`/citas/${appointment.id}/cancelar`, { version: appointment.version, reason }) : await action.run(`/citas/solicitudes/${appointment.id}/${status === 'confirmada' ? 'confirmar' : 'rechazar'}`, { version: appointment.version, rejectionReason: reason || undefined }); if (result) onSaved(); }
-  const needsReason = status !== 'confirmada';
-  return <Dialog title={status === 'cancelada' ? 'Cancelar cita' : 'Gestionar solicitud'} onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><p>Paciente: <strong>{appointment.patientName}</strong><br />Horario: {formatDateTime(appointment.start)}</p><WriteError error={action.error} onReload={onSaved} />{canManage && appointment.state === 'solicitada' && <Select label="Nuevo estado" value={status} onChange={setStatus}><option value="confirmada">Confirmar</option><option value="rechazada">Rechazar</option><option value="cancelada">Cancelar</option></Select>}<Field label={status === 'rechazada' ? 'Motivo del rechazo' : status === 'cancelada' ? 'Motivo de cancelación' : 'Comentario · opcional'} value={reason} onChange={setReason} minLength={needsReason ? 10 : undefined} maxLength={500} required={needsReason} autoFocus />{needsReason && <p className="form-hint">Indica al menos 10 caracteres.</p>}<div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Volver</button><SaveButton busy={action.busy} label={status === 'cancelada' ? 'Cancelar cita' : status === 'rechazada' ? 'Rechazar solicitud' : 'Confirmar solicitud'} /></div></form></Dialog>;
+  const title = kind === 'cancelar' ? 'Cancelar cita' : kind === 'rechazar' ? 'Rechazar solicitud' : 'Rechazar nuevo horario';
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    const result = kind === 'cancelar' ? await action.run(`/citas/${appointment.id}/cancelar`, { version: appointment.version, reason })
+      : kind === 'rechazar' ? await action.run(`/citas/solicitudes/${appointment.id}/rechazar`, { version: appointment.version, rejectionReason: reason })
+      : await action.run(`/citas/reprogramaciones/${appointment.reschedule!.id}/rechazar`, { version: appointment.reschedule!.version, rejectionReason: reason });
+    if (result) onSaved();
+  }
+  return <Dialog title={title} onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><p>Paciente: <strong>{appointment.patientName}</strong><br />Horario: {formatDateTime(appointment.start)}{kind === 'rechazar_reprogramacion' && appointment.reschedule && <><br />Pide: {formatDateTime(appointment.reschedule.start)}</>}</p><WriteError error={action.error} onReload={onSaved} />
+    <Field label={kind === 'cancelar' ? 'Motivo de cancelación' : 'Motivo del rechazo'} value={reason} onChange={setReason} minLength={10} maxLength={500} required autoFocus /><ReasonCounter value={reason} />
+    <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Volver</button><SaveButton busy={action.busy} disabled={reason.trim().length < 10} label={title} /></div></form></Dialog>;
+}
+
+/** CITA-02: a free slot of the same doctor; reception applies it, the patient's request waits for a decision. */
+function RescheduleDialog({ api, appointment, onClose, onSaved }: { api: Api; appointment: Appointment; onClose: () => void; onSaved: () => void }) {
+  const [date, setDate] = useState(dayKey(appointment.start)), [slot, setSlot] = useState('');
+  const [availability, setAvailability] = useState<Availability | null>(null), [error, setError] = useState<string | null>(null), [loading, setLoading] = useState(false);
+  const action = useAction(api);
+  useEffect(() => {
+    let active = true;
+    setSlot(''); setAvailability(null); setError(null); setLoading(true);
+    api.request<Availability>(`/citas/disponibilidad?doctorId=${encodeURIComponent(appointment.doctorId)}&date=${encodeURIComponent(date)}`)
+      .then(result => { if (active) setAvailability(result); })
+      .catch(err => { if (active) setError(err instanceof Error ? err.message : 'No se pudo consultar la disponibilidad.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [api, appointment.doctorId, date]);
+  const franjas = availability?.franjas ?? [];
+  const chosen = franjas.find(item => item.start === slot && item.estado === 'libre');
+  async function save(e: FormEvent) { e.preventDefault(); if (!chosen) return; if (await action.run(`/citas/${appointment.id}/reprogramar`, { version: appointment.version, start: chosen.start, end: chosen.end })) onSaved(); }
+  return <Dialog title="Reprogramar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
+    <p className="form-intro">Paciente: <strong>{appointment.patientName}</strong> · {appointment.doctorName}<br />Horario actual: {formatDateTime(appointment.start)}. Elige una franja libre del mismo médico.</p>
+    <WriteError error={action.error} onReload={onSaved} />
+    <Field label="Fecha" type="date" value={date} onChange={value => value && setDate(value)} required />
+    <section className="slot-section" aria-label="Horarios del día" aria-busy={loading}>
+      {loading ? <p className="form-hint" role="status">Consultando horarios…</p> : <div className="slot-grid" role="group" aria-label="Franjas del día">{franjas.map(item => item.estado === 'libre'
+        ? <button type="button" key={item.start} className={`slot slot-libre${item.start === slot ? ' is-selected' : ''}`} aria-pressed={item.start === slot} onClick={() => setSlot(item.start)}><strong>{timeOnly(item.start)}</strong><small>{slotNames.libre}</small></button>
+        : <button type="button" key={item.start} className={`slot slot-${item.estado}`} disabled aria-label={`${timeOnly(item.start)}, no disponible: ${item.motivo ?? slotNames[item.estado]}`}><strong>{timeOnly(item.start)}</strong><small>{item.motivo ?? slotNames[item.estado]}</small></button>)}</div>}
+      {!loading && franjas.length > 0 && !franjas.some(item => item.estado === 'libre') && <Notice kind="info">No quedan franjas libres este día. Prueba con otra fecha.</Notice>}
+    </section>
+    {error && <Notice kind="error">{error}</Notice>}
+    <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Volver</button><SaveButton busy={action.busy} disabled={!chosen} label="Reprogramar" /></div></form></Dialog>;
 }

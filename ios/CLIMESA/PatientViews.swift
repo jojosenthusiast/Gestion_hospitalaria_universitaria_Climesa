@@ -211,6 +211,7 @@ struct PatientAppointmentsView: View {
     @State private var loader = Loader<[Appointment]>()
     @State private var submission = Submission()
     @State private var cancelling: Appointment?
+    @State private var rescheduling: Appointment?
     @State private var requesting = false
 
     var body: some View {
@@ -226,11 +227,11 @@ struct PatientAppointmentsView: View {
                         SectionTitle("appointments.upcoming")
                         if split.upcoming.isEmpty { EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar") }
                         ForEach(split.upcoming) { item in
-                            AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date) { cancelling = item }
+                            AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date, cancel: { cancelling = item }, reschedule: { rescheduling = item })
                         }
                         SectionTitle("appointments.past")
                         if split.past.isEmpty { EmptyStateView(title: L.text("appointments.past.none"), symbol: "clock.arrow.circlepath") }
-                        ForEach(split.past) { item in AppointmentRow(appointment: item, option: .hidden, now: context.date) {} }
+                        ForEach(split.past) { item in AppointmentRow(appointment: item, option: .hidden, now: context.date, cancel: {}, reschedule: nil) }
                     }
                 }
             }
@@ -239,6 +240,7 @@ struct PatientAppointmentsView: View {
         .sheet(item: $cancelling) { item in
             CancelAppointmentSheet(appointment: item, submission: submission, reload: load)
         }
+        .sheet(item: $rescheduling) { item in RescheduleAppointmentSheet(appointment: item, reload: load) }
         .sheet(isPresented: $requesting) { RequestAppointmentSheet(reload: load) }
     }
 
@@ -256,6 +258,7 @@ private struct AppointmentRow: View {
     let option: AppointmentRules.CancelOption
     let now: Date
     let cancel: () -> Void
+    let reschedule: (() -> Void)?
     var body: some View {
         SectionCard {
             ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName, meta: appointment.reason) {
@@ -273,6 +276,20 @@ private struct AppointmentRow: View {
             case .tooLate:
                 ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel).disabled(true)
                 Text(verbatim: AppointmentRules.cancelTooLateText()).font(Typo.small).foregroundStyle(Theme.muted)
+            case let .blocked(reason):
+                ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel).disabled(true)
+                Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted)
+            }
+            // CITA-02: reprogramar solo si el servidor lo permite; si no, el motivo.
+            if let text = AppointmentRules.rescheduleText(appointment) {
+                Text(verbatim: text).font(Typo.small).foregroundStyle(appointment.reschedule?.state == .rechazada ? Theme.danger : Theme.muted)
+            }
+            if let reschedule {
+                if AppointmentRules.canReschedule(appointment) {
+                    ClimesaButton(title: L.text("appointments.reschedule"), kind: .secondary, action: reschedule)
+                } else if let reason = AppointmentRules.blockedReason(appointment, .reprogramar), appointment.reschedule?.state != .pendiente {
+                    Text(verbatim: "\(L.text("appointments.reschedule")): \(reason)").font(Typo.small).foregroundStyle(Theme.muted)
+                }
             }
         }
     }
@@ -312,6 +329,63 @@ private struct CancelAppointmentSheet: View {
         }
         await reload()
         if ok { dismiss() }
+    }
+}
+
+/// CITA-02: pedir otra franja libre del mismo médico; la cita actual sigue vigente hasta que la acepten.
+private struct RescheduleAppointmentSheet: View {
+    let appointment: Appointment
+    let reload: () async -> Void
+    @EnvironmentObject private var account: AccountModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var availability = Loader<Availability>()
+    @State private var submission = Submission()
+    @State private var day = Date()
+    @State private var slot: Period?
+
+    var body: some View {
+        NavigationStack {
+            ScreenFrame(title: "appointments.reschedule.title") {
+                SectionCard { ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName) }
+                Text("appointments.reschedule.intro").font(Typo.small).foregroundStyle(Theme.muted)
+                DatePicker("appointments.date", selection: $day, in: Date()..., displayedComponents: .date)
+                    .environment(\.timeZone, ClimesaDates.zone).environment(\.calendar, ClimesaDates.calendar)
+                SectionTitle("appointments.slots")
+                LoadState(loader: availability, retry: loadSlots) { value in
+                    let free = value.slots.filter { $0.start != appointment.start }
+                    if free.isEmpty { EmptyStateView(title: L.text("appointments.slots.none"), symbol: "calendar.badge.exclamationmark") }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 8) {
+                        ForEach(free, id: \.self) { period in
+                            Button { slot = period } label: {
+                                Text(verbatim: ClimesaDates.display(period.start, .time)).font(Typo.label).frame(maxWidth: .infinity, minHeight: Spacing.control)
+                                    .background(slot == period ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+                                    .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(slot == period ? Theme.primary : Theme.controlLine, lineWidth: 1))
+                                    .foregroundStyle(slot == period ? Theme.onPrimary : Theme.ink)
+                            }
+                        }
+                    }
+                }
+                PatientSubmissionNotice(submission: submission)
+                ClimesaButton(title: L.text("appointments.reschedule.submit"), loading: submission.busy) { Task { await send() } }.disabled(slot == nil)
+                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
+            }
+            .task(id: ClimesaDates.localDay(day)) { slot = nil; await loadSlots() }
+        }
+    }
+
+    private func loadSlots() async {
+        let path = "/citas/disponibilidad?doctorId=\(Query.encode(appointment.doctorId))&date=\(ClimesaDates.localDay(day))"
+        await availability.load { try await account.client().get(path, as: Availability.self) }
+    }
+
+    private func send() async {
+        guard let slot else { return }
+        let body = AppointmentRescheduleBody(version: appointment.version, start: slot.start, end: slot.end)
+        let ok = await submission.run(appointment.id, body: body, success: L.text("appointments.reschedule.sent")) { key in
+            _ = try await account.client().send("POST", "/citas/\(appointment.id)/reprogramar", body: body, key: key, as: AppointmentCommandResult.self)
+        }
+        if ok { await reload(); dismiss() }
+        else if submission.lastFailure?.code == "franja_ocupada" { self.slot = nil; await loadSlots() }
     }
 }
 

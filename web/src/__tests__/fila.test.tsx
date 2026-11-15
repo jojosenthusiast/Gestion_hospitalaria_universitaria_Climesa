@@ -12,7 +12,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const perfil = (permissions: string[]): AccessProfile => ({ id: 'u-1', user: { id: 'u-1' }, email: 'rec@example.test', name: 'Recepción Ficticia', roles: ['REC'], platforms: ['web'], permissions: permissions.map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId: 's-1' });
-const ticket = (state: string, numero = 7) => ({ id: `t-${numero}`, service: 'consulta_general', fecha: '2026-11-13', numero, patientName: 'Paciente Ficticio Uno', state, llamados: state === 'llamado' ? 1 : 0, version: 2, issuedAt: '2026-11-13T14:00:00Z' });
+const ticket = (state: string, numero = 7, allowedActions: string[] = [], blockedActions: { action: string; reason: string }[] = []) => ({ id: `t-${numero}`, service: 'consulta_general', fecha: '2026-11-13', numero, patientName: 'Paciente Ficticio Uno', state, llamados: state === 'llamado' ? 1 : 0, version: 2, issuedAt: '2026-11-13T14:00:00Z', maxCalls: 3, callsForAbsence: 3, allowedActions, blockedActions });
 
 function montar(permissions: string[], rows = [ticket('en_espera')], write: Api['write'] = vi.fn(async () => ({})) as Api['write']) {
   const api = {
@@ -25,8 +25,8 @@ function montar(permissions: string[], rows = [ticket('en_espera')], write: Api[
 
 describe('Fila del día (W29)', () => {
   it('llama al siguiente con la versión del número y recarga la fila', async () => {
-    const api = montar(['fila.ver', 'fila.llamar']);
-    await userEvent.click(await screen.findByRole('button', { name: /^Llamar/ }));
+    const api = montar(['fila.ver', 'fila.llamar'], [ticket('en_espera', 7, ['llamar'])]);
+    await userEvent.click(await screen.findByRole('button', { name: /^Llamar$/ }));
     expect(api.write).toHaveBeenCalledWith('/fila/t-7/llamar', { version: 2 }, 'POST');
     await vi.waitFor(() => expect(api.request.mock.calls.filter(([p]) => String(p).startsWith('/fila')).length).toBe(2));
   });
@@ -47,7 +47,7 @@ describe('Fila del día (W29)', () => {
   });
 
   it('un 409 de versión ofrece recargar la fila', async () => {
-    const api = montar(['fila.ver', 'fila.gestionar'], [ticket('llamado')], vi.fn(async () => { throw new ApiError('El número cambió.', 409, 'version_conflicto', 3); }) as Api['write']);
+    const api = montar(['fila.ver', 'fila.gestionar'], [ticket('llamado', 7, ['atender'])], vi.fn(async () => { throw new ApiError('El número cambió.', 409, 'version_conflicto', 3); }) as Api['write']);
     await userEvent.click(await screen.findByRole('button', { name: 'Iniciar atención' }));
     await userEvent.click(await screen.findByRole('button', { name: /Recargar la fila/ }));
     await vi.waitFor(() => expect(api.request.mock.calls.filter(([p]) => String(p).startsWith('/fila')).length).toBe(2));
@@ -73,5 +73,27 @@ describe('Fila del día (W29)', () => {
     expect(within(screen.getByRole('region', { name: 'En espera' })).getByText('Nadie por ahora.')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
     expect(within(screen.getByRole('region', { name: 'En espera' })).queryByText('Nadie por ahora.')).toBeNull();
+  });
+});
+
+describe('Fila del día · acciones según el servidor (FILA-01, FILA-02)', () => {
+  it('"No se presentó" aparece desactivado con el motivo hasta completar los llamados', async () => {
+    montar(['fila.ver', 'fila.gestionar'], [ticket('llamado', 7, ['atender'], [{ action: 'no_se_presento', reason: 'Disponible después de 3 llamados (van 1).' }])]);
+    expect((await screen.findByRole('button', { name: 'No se presentó' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/Disponible después de 3 llamados \(van 1\)/)).toBeTruthy();
+    expect(screen.getByText(/Llamado 1 de 3 vez/)).toBeTruthy();
+  });
+
+  it('recepción ve el estado real de quien espera y no tiene acciones que el servidor rechazaría', async () => {
+    montar(['fila.ver', 'fila.gestionar', 'fila.emitir'], [ticket('en_espera')]);
+    expect(await screen.findByText(/Esperando a que el médico llame/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /No se presentó|Llamar/ })).toBeNull();
+  });
+
+  it('llamar siguiente pide al servidor el primer número del servicio elegido', async () => {
+    const api = montar(['fila.ver', 'fila.llamar'], [ticket('en_espera', 7, ['llamar'])]);
+    await userEvent.click(await screen.findByRole('radio', { name: /Consulta general/ }).catch(() => screen.findByRole('button', { name: /Consulta general/ })));
+    await userEvent.click(await screen.findByRole('button', { name: /Llamar siguiente/ }));
+    expect(api.write).toHaveBeenCalledWith('/fila/llamar-siguiente', { service: 'consulta_general' }, 'POST');
   });
 });

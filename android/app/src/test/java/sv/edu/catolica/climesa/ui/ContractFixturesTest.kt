@@ -54,6 +54,7 @@ class ContractFixturesTest {
         const val DOCTOR = "44444444-4444-4444-8444-444444444444"
         const val APPOINTMENT = "55555555-5555-4555-8555-555555555555"
         const val ADMISSION = "66666666-6666-4666-8666-666666666666"
+        const val RESCHEDULE = "77777777-7777-4777-8777-777777777777"
         const val START = "2026-11-20T14:00:00Z"
         const val END = "2026-11-20T14:20:00Z"
     }
@@ -106,9 +107,23 @@ class ContractFixturesTest {
         assertContract("cita-cancelar", "POST", AppointmentActions.path(AppointmentAction.CANCEL, APPOINTMENT), AppointmentActions.body(AppointmentAction.CANCEL, 3, "El paciente pidió reprogramar"), APPOINTMENT)
     }
 
+    @Test fun appointmentRescheduleNoShowAndRescheduleDecisions() {
+        assertContract("cita-reprogramar", "POST", AppointmentActions.path(AppointmentAction.RESCHEDULE, APPOINTMENT), AppointmentActions.body(AppointmentAction.RESCHEDULE, 3, "", DaySlot(START, END, SlotStatus.FREE, null)), APPOINTMENT)
+        assertContract("cita-reprogramar", "POST", AppointmentActions.path(AppointmentAction.RESCHEDULE, APPOINTMENT),
+            PatientAppointmentRules.rescheduleBody(sv.edu.catolica.climesa.domain.PatientAppointment(APPOINTMENT, "Dr. Prueba", START, END, "confirmada", null, 3), AppointmentSlot(START, END)), APPOINTMENT)
+        assertContract("cita-no-asistio", "POST", AppointmentActions.path(AppointmentAction.NO_SHOW, APPOINTMENT), AppointmentActions.body(AppointmentAction.NO_SHOW, 3, "  "), APPOINTMENT)
+        assertContract("reprogramacion-aceptar", "POST", AppointmentActions.path(AppointmentAction.ACCEPT_RESCHEDULE, APPOINTMENT, RESCHEDULE), AppointmentActions.body(AppointmentAction.ACCEPT_RESCHEDULE, 1, ""), RESCHEDULE)
+        assertContract("reprogramacion-rechazar", "POST", AppointmentActions.path(AppointmentAction.REJECT_RESCHEDULE, APPOINTMENT, RESCHEDULE), AppointmentActions.body(AppointmentAction.REJECT_RESCHEDULE, 1, " El médico no tiene ese horario libre "), RESCHEDULE)
+    }
+
+    @Test fun queueCallNext() {
+        assertContract("fila-llamar-siguiente", "POST", "/fila/llamar-siguiente", sv.edu.catolica.climesa.domain.QueueRules.callNextBody("consulta_general"))
+    }
+
     private fun agenda() = JSONArray().put(JSONObject()
         .put("appointmentId", APPOINTMENT).put("patientId", PATIENT).put("patientName", "Ana Ejemplo")
-        .put("start", START).put("end", END).put("appointmentState", "confirmada").put("version", 1))
+        .put("start", START).put("end", END).put("appointmentState", "confirmada").put("version", 1)
+        .put("allowedActions", JSONArray().put("iniciar_consulta")))
 
     @Test fun consultationStartAndPrescription() = runTest(dispatcher) {
         val api = FakeGateway(agenda())

@@ -16,7 +16,14 @@ data class MedicalAppointment(
     val version: Int,
     /** Queue number when the consultation was started from the queue instead of an appointment. */
     val ticketNumber: Int? = null,
+    /** `allowedActions` / `blockedActions` of the agenda entry: `iniciar_consulta` only on the appointment's day. */
+    val allowedActions: List<AppointmentAction> = emptyList(),
+    val blockedActions: Map<AppointmentAction, String> = emptyMap(),
 ) {
+    /** A new consultation can be started from this appointment only when the API offers it. */
+    val canStart: Boolean get() = consultationId == null && AppointmentAction.START_CONSULTATION in allowedActions
+    val startBlockedReason: String? get() = blockedActions[AppointmentAction.START_CONSULTATION]
+
     /** Stable key of the row/dialog: the appointment, or `consulta:<id>:<number>` for a consultation opened by id. */
     val key: String get() = appointmentId.ifBlank { "consulta:$consultationId:${ticketNumber ?: ""}" }
 }
@@ -31,7 +38,39 @@ data class QueueConsultation(
     val consultationState: String?,
 )
 
+/** Own open consultation of any day (`GET /consultas/sin-firmar`, m-22), to resume and sign it. */
+data class UnsignedConsultation(
+    val id: String,
+    val patientId: String,
+    val patientName: String,
+    val appointmentId: String?,
+    val ticketId: String?,
+    val reason: String?,
+    val startedAt: String,
+    val version: Int,
+)
+
 object ConsultationResume {
+    fun parseUnsigned(value: Any): List<UnsignedConsultation> {
+        val rows = value as? org.json.JSONArray ?: return emptyList()
+        return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
+            val id = row.text("id") ?: return@let null
+            UnsignedConsultation(id, row.optString("patientId"), row.text("patientName") ?: "Paciente no identificado", row.text("appointmentId"), row.text("ticketId"), row.text("reason"), row.optString("startedAt"), row.optInt("version", 1))
+        } }
+    }
+
+    /** Agenda rows (`GET /consultas/agenda`) with the server's actions. */
+    fun parseAgenda(value: Any): List<MedicalAppointment> {
+        val rows = value as? org.json.JSONArray ?: return emptyList()
+        return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
+            MedicalAppointment(
+                row.optString("appointmentId"), row.optString("patientId"), row.text("patientName").orEmpty(), row.optString("start"), row.optString("end"), row.optString("appointmentState"),
+                row.text("reason"), row.text("consultationId"), row.text("consultationState"), row.text("consultationReason"), row.text("physicalExam"), row.text("plan"), row.optInt("version", 1),
+                allowedActions = ServerActions.appointmentAllowed(row), blockedActions = ServerActions.appointmentBlocked(row),
+            )
+        } }
+    }
+
     /** Called and in-attention numbers, ordered by number: the ones a doctor starts or resumes. */
     fun attendable(rows: List<QueueConsultation>) = rows.filter { it.state == "llamado" || it.state == "en_atencion" }.sortedBy { it.number }
 

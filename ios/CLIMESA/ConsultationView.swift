@@ -4,6 +4,8 @@ import SwiftUI
 enum ConsultationOrigin {
     case appointment(AgendaEntry)
     case ticket(QueueTicket)
+    /// m-22: una consulta propia abierta de cualquier día (`GET /consultas/sin-firmar`).
+    case resume(UnsignedConsultation)
 }
 
 private struct PrescriptionDraft: Identifiable {
@@ -87,6 +89,7 @@ struct ConsultationView: View {
         switch origin {
         case let .appointment(entry): _consultationId = State(initialValue: entry.consultationId)
         case let .ticket(ticket): _consultationId = State(initialValue: ticket.consultationId)
+        case let .resume(open): _consultationId = State(initialValue: open.id)
         }
     }
 
@@ -94,6 +97,7 @@ struct ConsultationView: View {
         switch origin {
         case let .appointment(entry): return entry.patientName ?? L.text("day.patient.unknown")
         case let .ticket(ticket): return ticket.patientName ?? String(format: L.text("consultation.ticket"), ticket.number)
+        case let .resume(open): return open.patientName ?? L.text("day.patient.unknown")
         }
     }
 
@@ -327,6 +331,10 @@ struct ConsultationView: View {
         switch origin {
         case let .appointment(entry): body = ConsultationStartBody(appointmentId: entry.appointmentId)
         case let .ticket(ticket): body = ConsultationStartBody(ticketId: ticket.id)
+        case let .resume(open):
+            // Ya existe: no se vuelve a iniciar.
+            consultationId = open.id
+            return
         }
         var started: ConsultationStartResult?
         let ok = await starting.run(body: body) { key in

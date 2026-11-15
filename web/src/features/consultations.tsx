@@ -24,7 +24,12 @@ export type Consultation = {
   signedAt?: string | null;
   /** Set when the consultation was started from a queue number instead of an appointment. */
   ticketNumber?: number | null;
+  /** MA-CIT-03: `iniciar_consulta` only on the appointment's day; otherwise blocked with its reason. */
+  allowedActions?: string[];
+  blockedActions?: { action: string; reason: string }[];
 };
+/** m-22: `GET /consultas/sin-firmar`, the doctor's own open consultations of any day. */
+type UnsignedConsultation = { id: string; patientId: string; patientName?: string | null; appointmentId?: string | null; ticketId?: string | null; reason?: string | null; startedAt: string; version: number };
 
 /** Row of `GET /fila`; `consultationId` is present only for the consultation this doctor started from the number. */
 export type QueueConsultationTicket = {
@@ -49,6 +54,7 @@ export function ConsultationsPage({ api, profile, version }: { api: Api; profile
   const historyAllowed = can(profile, 'expediente.ver');
   const queueAllowed = can(profile, 'consulta.iniciar') && can(profile, 'fila.ver');
   const queue = useData<QueueConsultationTicket[]>(api, '/fila', version, queueAllowed);
+  const unsigned = useData<UnsignedConsultation[]>(api, '/consultas/sin-firmar', version, can(profile, 'consulta.iniciar'));
   // `#/consultas?consulta=<id>` (from the queue board) reopens that consultation.
   const [resuming, setResuming] = useState<{ id: string; ticket?: QueueConsultationTicket } | null>(() => { const id = consultationFromHash(); return id ? { id } : null; });
   const [startError, setStartError] = useState<ApiError | null>(null), [starting, setStarting] = useState<string | null>(null);
@@ -73,13 +79,17 @@ export function ConsultationsPage({ api, profile, version }: { api: Api; profile
   return <>
     <Heading eyebrow="Atención / Medicina" title="Mi consultorio" description="Agenda propia, consultas abiertas y cierre clínico de cada cita." />
     <section className="data-workbench">
-      <RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Agenda del médico</caption><thead><tr><th>Horario</th><th>Paciente</th><th>Cita</th><th>Consulta</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.appointmentId}><td data-label="Horario"><strong>{formatDateTime(row.start)}</strong><small>{formatDateTime(row.end)}</small></td><td data-label="Paciente">{row.patientName}</td><td data-label="Cita"><Tag value={row.appointmentState} /></td><td data-label="Consulta"><Tag value={row.consultationState ?? 'pendiente'} /></td><td data-label="Acción"><div className="row-actions"><button className="row-action" onClick={() => setSelected(row)}>{row.consultationState === 'firmada' ? 'Ver consulta' : row.consultationId ? 'Continuar' : 'Iniciar consulta'} <Icon name="arrow" size={16} /></button>{historyAllowed && <button className="row-action" aria-label={`Historial clínico de ${row.patientName}`} onClick={() => setHistory(row)}>Historial</button>}</div></td></tr>)}</tbody></table> : <Empty title="No hay citas en tu agenda" description="Las citas confirmadas aparecerán aquí para iniciar su atención." />}</RemoteState>
+      <RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Agenda del médico</caption><thead><tr><th>Horario</th><th>Paciente</th><th>Cita</th><th>Consulta</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.appointmentId}><td data-label="Horario"><strong>{formatDateTime(row.start)}</strong><small>{formatDateTime(row.end)}</small></td><td data-label="Paciente">{row.patientName}</td><td data-label="Cita"><Tag value={row.appointmentState} /></td><td data-label="Consulta"><Tag value={row.consultationState ?? 'pendiente'} /></td><td data-label="Acción"><div className="row-actions">{!row.consultationId && row.allowedActions && !row.allowedActions.includes('iniciar_consulta') ? <small className="form-hint">{row.blockedActions?.find(item => item.action === 'iniciar_consulta')?.reason ?? 'Esta cita no admite iniciar consulta.'}</small> : <button className="row-action" onClick={() => setSelected(row)}>{row.consultationState === 'firmada' ? 'Ver consulta' : row.consultationId ? 'Continuar' : 'Iniciar consulta'} <Icon name="arrow" size={16} /></button>}{historyAllowed && <button className="row-action" aria-label={`Historial clínico de ${row.patientName}`} onClick={() => setHistory(row)}>Historial</button>}</div></td></tr>)}</tbody></table> : <Empty title="No hay citas en tu agenda" description="Las citas confirmadas aparecerán aquí para iniciar su atención." />}</RemoteState>
     </section>
     {queueAllowed && <section className="data-workbench" aria-labelledby="consultorio-fila"><h2 id="consultorio-fila">Fila del día: llamados y en atención</h2>
       <WriteError error={startError} onReload={queue.refresh} reloadLabel="Recargar la fila" />
       <RemoteState state={queue}>{rows => { const active = rows.filter(row => row.state === 'llamado' || row.state === 'en_atencion').sort((a, b) => a.numero - b.numero); return active.length ? <table className="record-table"><caption className="sr-only">Números llamados y en atención</caption><thead><tr><th>Número</th><th>Paciente</th><th>Fila</th><th>Consulta</th><th>Acción</th></tr></thead><tbody>{active.map(row => <tr key={row.id}><td data-label="Número"><strong className="mono-data">N.º {row.numero}</strong></td><td data-label="Paciente">{row.patientName || 'Paciente no identificado'}</td><td data-label="Fila"><Tag value={row.state} /></td><td data-label="Consulta"><Tag value={row.consultationState ?? 'pendiente'} /></td><td data-label="Acción"><button className="row-action" disabled={starting !== null} onClick={() => void attend(row)}>{starting === row.id ? 'Abriendo…' : row.consultationState === 'firmada' ? 'Ver consulta' : row.consultationId ? 'Retomar consulta' : 'Iniciar consulta'} <Icon name="arrow" size={16} /></button></td></tr>)}</tbody></table> : <Empty title="Nadie en atención" description="Los números llamados aparecerán aquí para iniciar o retomar su consulta." />; }}</RemoteState>
     </section>}
-    {resuming && <ResumedConsultation api={api} profile={profile} id={resuming.id} ticket={resuming.ticket} onClose={closeResumed} onSaved={() => { closeResumed(); queue.refresh(); data.refresh(); }} />}
+    {can(profile, 'consulta.iniciar') && <section className="data-workbench" aria-labelledby="consultorio-sin-firmar"><h2 id="consultorio-sin-firmar">Consultas sin firmar</h2>
+      <RemoteState state={unsigned}>{rows => rows.length ? <ul className="record-list">{rows.map(row => <li key={row.id}><strong>{row.patientName ?? 'Paciente'}</strong> <small>Iniciada {formatDateTime(row.startedAt)}{row.reason ? ` · ${row.reason}` : ''}</small> <button className="row-action" onClick={() => setResuming({ id: row.id })}>Reanudar <Icon name="arrow" size={16} /></button></li>)}</ul>
+        : <Empty title="No tienes consultas abiertas" description="Las consultas que inicies y no firmes, de cualquier día, aparecerán aquí para reanudarlas." />}</RemoteState>
+    </section>}
+    {resuming && <ResumedConsultation api={api} profile={profile} id={resuming.id} ticket={resuming.ticket} onClose={closeResumed} onSaved={() => { closeResumed(); queue.refresh(); data.refresh(); unsigned.refresh(); }} />}
     {history && <ClinicalHistoryDialog api={api} patientId={history.patientId} patientName={history.patientName} version={version} onClose={() => setHistory(null)} />}
     {selected && <ConsultationDialog api={api} profile={profile} item={selected} onClose={() => setSelected(null)} onSaved={() => { setSelected(null); data.refresh(); }} />}
   </>;

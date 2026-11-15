@@ -2,9 +2,9 @@ import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Patch, Post, Quer
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { SupabaseAuthGuard, PermissionGuard, RequirePermission } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { AppointmentCancelDto, AppointmentCreateDto, AppointmentDecisionDto, PatientAppointmentRequestDto } from './attention.dto';
+import { AppointmentCancelDto, AppointmentCreateDto, AppointmentDecisionDto, AppointmentNoShowDto, AppointmentRescheduleDto, PatientAppointmentRequestDto, RescheduleDecisionDto } from './attention.dto';
 import { AttentionService } from './attention.service';
-import { AppointmentCatalogsResponse, AppointmentCommandResponse, AppointmentResponse, AvailabilityResponse } from './attention.responses';
+import { AppointmentCatalogsResponse, AppointmentCommandResponse, AppointmentResponse, AvailabilityResponse, RescheduleCommandResponse } from './attention.responses';
 
 @ApiTags('attention') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('citas')
 export class AttentionController {
@@ -39,4 +39,16 @@ export class AttentionController {
 
   @Post(':id/cancelar') @RequirePermission('citas.cancelar') @ApiOperation({ summary: 'Cancelar una cita propia o gestionada por recepción' }) @ApiCreatedResponse({ type: AppointmentCommandResponse })
   cancel(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: AppointmentCancelDto, @Headers('idempotency-key') key?: string) { return this.attention.cancel(r.actor, id, d, key); }
+
+  @Post(':id/reprogramar') @RequirePermission('citas.agendar', 'citas.solicitar') @ApiOperation({ summary: 'Reprogramar a una franja libre del mismo médico: recepción la aplica; el paciente deja una solicitud que la cita original conserva hasta que se acepta' }) @ApiCreatedResponse({ type: RescheduleCommandResponse })
+  reschedule(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: AppointmentRescheduleDto, @Headers('idempotency-key') key?: string) { return this.attention.reschedule(r.actor, id, d, key); }
+
+  @Post('reprogramaciones/:id/aceptar') @RequirePermission('citas.agendar', 'consulta.iniciar') @ApiOperation({ summary: 'Aceptar una solicitud de reprogramación (recepción o el médico de la cita)' }) @ApiCreatedResponse({ type: RescheduleCommandResponse })
+  acceptReschedule(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: RescheduleDecisionDto, @Headers('idempotency-key') key?: string) { return this.attention.decideReschedule(r.actor, id, true, d, key); }
+
+  @Post('reprogramaciones/:id/rechazar') @RequirePermission('citas.agendar', 'consulta.iniciar') @ApiOperation({ summary: 'Rechazar una solicitud de reprogramación con motivo (recepción o el médico de la cita)' }) @ApiCreatedResponse({ type: RescheduleCommandResponse })
+  rejectReschedule(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: RescheduleDecisionDto, @Headers('idempotency-key') key?: string) { return this.attention.decideReschedule(r.actor, id, false, d, key); }
+
+  @Post(':id/no-asistio') @RequirePermission('citas.agendar') @ApiOperation({ summary: 'Marcar que el paciente no asistió (la hora ya llegó y no hay consulta)' }) @ApiCreatedResponse({ type: AppointmentCommandResponse })
+  noShow(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: AppointmentNoShowDto, @Headers('idempotency-key') key?: string) { return this.attention.noShow(r.actor, id, d, key); }
 }

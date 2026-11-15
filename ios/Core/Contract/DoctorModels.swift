@@ -15,7 +15,22 @@ public struct AgendaEntry: Decodable, Sendable, Identifiable, Equatable {
     public let consultationState: ConsultationState?
     public let version: Int?
     public let signedAt: String?
+    /// MA-CIT-03: `iniciar_consulta` solo el día de la cita; si no, viene bloqueada con su motivo.
+    public var allowedActions: [AppointmentAction]? = nil
+    public var blockedActions: [BlockedAction<AppointmentAction>]? = nil
     public var id: String { appointmentId }
+}
+
+/// `UnsignedConsultationResponse` de `GET /consultas/sin-firmar` (m-22): consultas abiertas propias de cualquier día.
+public struct UnsignedConsultation: Decodable, Sendable, Identifiable, Equatable {
+    public let id: String
+    public let patientId: String
+    public let patientName: String?
+    public let appointmentId: String?
+    public let ticketId: String?
+    public let reason: String?
+    public let startedAt: String
+    public let version: Int
 }
 
 /// `ConsultationStartResponse` de `POST /consultas`.

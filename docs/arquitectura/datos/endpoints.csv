@@ -139,3 +139,9 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 111,PUT,/api/v1/inventario/lotes/{id},inventario.configurar,Sin existencia para dar de baja,R,4,"Editar vencimiento, número o baja del lote"
 111,GET,/api/v1/inventario/lotes,inventario.ver,Según el contexto del rol,R,4,"Lotes de un artículo en una bodega, FEFO"
 111,GET,/api/v1/inventario/bodegas,inventario.ver,Según el contexto del rol,R,4,Bodegas donde el rol mueve existencias
+105,POST,/api/v1/citas/{id}/reprogramar,citas.agendar OR citas.solicitar,"REC la aplica; PAC solo propias, deja solicitud hasta N h antes",R,4,Reprogramar cita a franja libre del mismo médico
+105,POST,/api/v1/citas/reprogramaciones/{id}/aceptar,citas.agendar OR consulta.iniciar,REC o el médico de la cita,R,4,Aceptar solicitud de reprogramación
+105,POST,/api/v1/citas/reprogramaciones/{id}/rechazar,citas.agendar OR consulta.iniciar,"REC o el médico de la cita, motivo",R,4,Rechazar solicitud de reprogramación
+105,POST,/api/v1/citas/{id}/no-asistio,citas.agendar,Hora alcanzada y sin consulta,R,4,Marcar que el paciente no asistió
+105,POST,/api/v1/fila/llamar-siguiente,fila.llamar,Primer número en espera del servicio,R,4,Llamar el siguiente número
+106,GET,/api/v1/consultas/sin-firmar,consulta.iniciar,Solo propias,R,4,Consultas abiertas de cualquier día para reanudar

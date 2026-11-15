@@ -14,6 +14,7 @@ internal object OperacionStatus {
         "en_atencion" to StatusTone.PROCESS,
         "atendido" to StatusTone.SUCCESS,
         "no_se_presento" to StatusTone.BLOCKED,
+        "cerrado" to StatusTone.BLOCKED,
         "cancelada" to StatusTone.DANGER,
         "en_servicio" to StatusTone.PROCESS,
         "sin_traslado" to StatusTone.WARNING,
@@ -21,7 +22,7 @@ internal object OperacionStatus {
         "bajo_minimo" to StatusTone.DANGER,
         "vencido" to StatusTone.DANGER,
     )
-    private val labels = mapOf("atendido" to "Atendido")
+    private val labels = mapOf("atendido" to "Atendido", "cerrado" to "Cerrado sin atender")
 
     fun tone(code: String): StatusTone = tones[code] ?: StatusCatalog.tone(code)
     fun label(code: String): String = labels[code] ?: StatusCatalog.label(code)

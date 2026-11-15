@@ -25,8 +25,21 @@ data class DaySlot(val start: String, val end: String, val status: SlotStatus, v
 data class SchedulingDoctor(val id: String, val name: String, val specialty: String?, val hasShift: Boolean, val reason: String?) {
     val detail get() = specialty ?: "Medicina general"
 }
-/** Cita de `GET /citas` tal como la ve Recepción. */
-data class ReceptionAppointment(val id: String, val patientName: String, val doctorName: String, val start: String, val end: String, val state: String, val version: Int)
+/** Cita de `GET /citas` tal como la ve Recepción (o el médico, sus propias citas). Las acciones vienen del servidor. */
+data class ReceptionAppointment(
+    val id: String, val patientName: String, val doctorName: String, val start: String, val end: String, val state: String, val version: Int,
+    val doctorId: String = "",
+    val allowedActions: List<AppointmentAction> = emptyList(),
+    val blockedActions: Map<AppointmentAction, String> = emptyMap(),
+    val cancelableUntil: String? = null,
+    val rescheduledFromId: String? = null,
+    val rescheduledToId: String? = null,
+    val reschedule: RescheduleRequest? = null,
+) {
+    /** A patient's pending reschedule request that this reader can decide. */
+    val pendingReschedule get() = reschedule?.takeIf { it.pending }
+    val isRequest get() = state == "solicitada"
+}
 
 object ReceptionScheduling {
     /** Día con que abre el formulario de cita: hoy en El Salvador. Abrir en mañana dejaba la cita "de hoy" para el día siguiente. */
@@ -61,8 +74,20 @@ object ReceptionScheduling {
     }
 
     fun appointments(array: JSONArray) = array.objects().map {
-        ReceptionAppointment(it.optString("id"), it.optString("patientName"), it.optString("doctorName"), it.optString("start"), it.optString("end"), it.optString("state"), it.optInt("version", 1))
+        ReceptionAppointment(
+            it.optString("id"), it.text("patientName").orEmpty(), it.optString("doctorName"), it.optString("start"), it.optString("end"), it.optString("state"), it.optInt("version", 1),
+            doctorId = it.optString("doctorId"),
+            allowedActions = ServerActions.appointmentAllowed(it),
+            blockedActions = ServerActions.appointmentBlocked(it),
+            cancelableUntil = it.text("cancelableUntil"),
+            rescheduledFromId = it.text("rescheduledFromId"),
+            rescheduledToId = it.text("rescheduledToId"),
+            reschedule = ServerActions.reschedule(it),
+        )
     }
+
+    /** Rows whose pending reschedule request this reader may accept (MED: own appointments). */
+    fun rescheduleDecisions(rows: List<ReceptionAppointment>) = rows.filter { it.pendingReschedule != null && AppointmentAction.ACCEPT_RESCHEDULE in it.allowedActions }
 
     fun canConfirm(patient: PickerPatient?, doctor: SchedulingDoctor?, slot: DaySlot?) = patient != null && doctor != null && doctor.hasShift && slot != null && slot.selectable
 

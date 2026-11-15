@@ -1,6 +1,7 @@
-import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, DecimalProp, EnumProp, IntProp, NumProp, PeriodResponse, StrProp, UuidProp } from '../platform/responses';
-import { ESTADO_ADMISION, ESTADO_CITA, ESTADO_CONSULTA, ESTADO_FILA, ESTADO_ORDEN_LABORATORIO, MARCA_RESULTADO, PRIORIDAD_LABORATORIO } from '../platform/states';
+import { BoolProp, EnumArrayProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, DecimalProp, EnumProp, IntProp, NumProp, PeriodResponse, StrProp, UuidProp } from '../platform/responses';
+import { ESTADO_ADMISION, ESTADO_CITA, ESTADO_REPROGRAMACION, ESTADO_CONSULTA, ESTADO_FILA, ESTADO_ORDEN_LABORATORIO, MARCA_RESULTADO, PRIORIDAD_LABORATORIO } from '../platform/states';
 import { QUEUE_SERVICES } from './queue.dto';
+import { APPOINTMENT_ACTIONS, QUEUE_ACTIONS } from './attention.rules';
 
 export const ORIGEN_CITA = ['recepcion', 'paciente'] as const;
 export const ACCESO_HISTORIAL = ['propio', 'relacion'] as const;
@@ -50,6 +51,22 @@ export class AvailabilityResponse {
   @ClassArrayProp(SlotStateResponse, { description: 'Todas las franjas del día con su estado' }) franjas!: SlotStateResponse[];
 }
 
+export class BlockedAppointmentActionResponse {
+  @EnumProp(APPOINTMENT_ACTIONS, 'AccionCita') action!: string;
+  @StrProp({ description: 'Motivo en español para mostrar junto a la acción desactivada' }) reason!: string;
+}
+
+export class AppointmentRescheduleResponse {
+  @UuidProp() id!: string;
+  @DateTimeProp() start!: string;
+  @DateTimeProp() end!: string;
+  @EnumProp(ESTADO_REPROGRAMACION, 'EstadoReprogramacion') state!: string;
+  @EnumProp(ORIGEN_CITA, 'OrigenCita') origin!: string;
+  @StrProp({ nullable: true }) reason!: string | null;
+  @StrProp({ nullable: true }) rejectionReason!: string | null;
+  @IntProp() version!: number;
+}
+
 export class AppointmentResponse {
   @UuidProp() id!: string;
   @UuidProp() patientId!: string;
@@ -63,12 +80,23 @@ export class AppointmentResponse {
   @EnumProp(ORIGEN_CITA, 'OrigenCita') origin!: string;
   @StrProp({ nullable: true }) rejectionReason!: string | null;
   @IntProp() version!: number;
+  @UuidProp({ nullable: true, description: 'Cita original cuando esta nació de una reprogramación' }) rescheduledFromId!: string | null;
+  @UuidProp({ nullable: true, description: 'Cita nueva cuando esta quedó reprogramada' }) rescheduledToId!: string | null;
+  @ClassProp(AppointmentRescheduleResponse, { nullable: true, description: 'Última solicitud de reprogramación de la cita' }) reschedule!: AppointmentRescheduleResponse | null;
+  @DateTimeProp({ nullable: true, description: 'Hasta cuándo puede cancelar o reprogramar quien lee (RN-21: N h antes para el paciente)' }) cancelableUntil!: string | null;
+  @EnumArrayProp(APPOINTMENT_ACTIONS, 'AccionCita', { description: 'Acciones que el servidor acepta ahora para quien lee' }) allowedActions!: string[];
+  @ClassArrayProp(BlockedAppointmentActionResponse, { description: 'Acciones del rol bloqueadas ahora, con su motivo' }) blockedActions!: BlockedAppointmentActionResponse[];
 }
 
 export class AppointmentCommandResponse {
   @UuidProp() id!: string;
   @IntProp() version!: number;
   @EnumProp(ESTADO_CITA, 'EstadoCita') state!: string;
+}
+
+export class RescheduleCommandResponse extends AppointmentCommandResponse {
+  @UuidProp() rescheduleId!: string;
+  @EnumProp(ESTADO_REPROGRAMACION, 'EstadoReprogramacion') rescheduleState!: string;
 }
 
 // ---- Consultas (consultation.controller.ts) ----
@@ -89,6 +117,19 @@ export class AgendaEntryResponse {
   @IntProp({ nullable: true, description: 'Versión de la consulta; null si no se ha iniciado' }) version!: number | null;
   @DateTimeProp({ nullable: true }) startedAt!: string | null;
   @DateTimeProp({ nullable: true }) signedAt!: string | null;
+  @EnumArrayProp(APPOINTMENT_ACTIONS, 'AccionCita', { description: 'iniciar_consulta solo el día de la cita y sin consulta previa' }) allowedActions!: string[];
+  @ClassArrayProp(BlockedAppointmentActionResponse) blockedActions!: BlockedAppointmentActionResponse[];
+}
+
+export class UnsignedConsultationResponse {
+  @UuidProp() id!: string;
+  @UuidProp() patientId!: string;
+  @StrProp({ nullable: true }) patientName!: string | null;
+  @UuidProp({ nullable: true }) appointmentId!: string | null;
+  @UuidProp({ nullable: true }) ticketId!: string | null;
+  @StrProp({ nullable: true }) reason!: string | null;
+  @DateTimeProp() startedAt!: string;
+  @IntProp() version!: number;
 }
 
 export class ConsultationStartResponse {
@@ -285,6 +326,11 @@ export class ClinicalHistoryResponse {
 
 // ---- Fila (queue.controller.ts) ----
 
+export class BlockedQueueActionResponse {
+  @EnumProp(QUEUE_ACTIONS, 'AccionFila') action!: string;
+  @StrProp() reason!: string;
+}
+
 export class QueueTicketResponse {
   @UuidProp() id!: string;
   @EnumProp(QUEUE_SERVICES, 'ServicioFila') service!: string;
@@ -299,6 +345,10 @@ export class QueueTicketResponse {
   @DateTimeProp() issuedAt!: string;
   @UuidProp({ nullable: true, description: 'Consulta iniciada desde este número por quien consulta la fila; null si no hay o es de otro profesional' }) consultationId!: string | null;
   @EnumProp(ESTADO_CONSULTA, 'EstadoConsulta', { nullable: true }) consultationState!: string | null;
+  @IntProp({ description: 'Llamados máximos (política fila.llamados_maximos)' }) maxCalls!: number;
+  @IntProp({ description: 'Llamados necesarios para marcar "No se presentó" (política fila.llamados_para_ausencia)' }) callsForAbsence!: number;
+  @EnumArrayProp(QUEUE_ACTIONS, 'AccionFila', { description: 'Acciones que el servidor acepta ahora para quien lee' }) allowedActions!: string[];
+  @ClassArrayProp(BlockedQueueActionResponse, { description: 'Acciones del rol bloqueadas ahora, con su motivo' }) blockedActions!: BlockedQueueActionResponse[];
 }
 
 export class QueueIssuedResponse {
@@ -320,4 +370,9 @@ export class QueueTransitionResponse {
 
 export class QueueCallResponse extends QueueTransitionResponse {
   @IntProp() llamados!: number;
+}
+
+export class QueueCallNextResponse extends QueueCallResponse {
+  @IntProp() numero!: number;
+  @StrProp({ nullable: true }) patientName!: string | null;
 }

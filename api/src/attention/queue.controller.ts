@@ -2,9 +2,9 @@ import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query, Req,
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { QueueIssueDto, QueueTransitionDto } from './queue.dto';
+import { QueueCallNextDto, QueueIssueDto, QueueTransitionDto } from './queue.dto';
 import { QueueService } from './queue.service';
-import { QueueCallResponse, QueueIssuedResponse, QueueTicketResponse, QueueTransitionResponse } from './attention.responses';
+import { QueueCallNextResponse, QueueCallResponse, QueueIssuedResponse, QueueTicketResponse, QueueTransitionResponse } from './attention.responses';
 
 @ApiTags('queue') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('fila')
 export class QueueController {
@@ -16,6 +16,9 @@ export class QueueController {
 
   @Post() @RequirePermission('fila.emitir') @ApiOperation({ summary: 'Emitir un número para el paciente actual o indicado' }) @ApiCreatedResponse({ type: QueueIssuedResponse })
   issue(@Req() r: ActorRequest, @Body() dto: QueueIssueDto, @Headers('idempotency-key') key?: string) { return this.queue.issue(r.actor, dto, key); }
+
+  @Post('llamar-siguiente') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Llamar el siguiente número en espera del servicio (orden de llegada)' }) @ApiCreatedResponse({ type: QueueCallNextResponse })
+  callNext(@Req() r: ActorRequest, @Body() dto: QueueCallNextDto, @Headers('idempotency-key') key?: string) { return this.queue.callNext(r.actor, dto, key); }
 
   @Post(':id/llamar') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Llamar un número de fila' }) @ApiCreatedResponse({ type: QueueCallResponse })
   call(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: QueueTransitionDto, @Headers('idempotency-key') key?: string) { return this.queue.call(r.actor, id, dto, key); }

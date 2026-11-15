@@ -34,3 +34,22 @@ export class AppointmentCancelDto {
   @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
   @Text(10, 500) reason!: string;
 }
+
+/** CITA-02: new slot of the same doctor (20 minutes); reception applies it, the patient files a request. */
+export class AppointmentRescheduleDto {
+  @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
+  @ApiProperty({ format: 'date-time' }) @IsISO8601({ strict: true }) start!: string;
+  @ApiProperty({ format: 'date-time' }) @IsISO8601({ strict: true }) end!: string;
+  @Text(0, 500, true) reason?: string;
+}
+
+/** Version of the reschedule request; the reason is mandatory (10 or more characters) when rejecting. */
+export class RescheduleDecisionDto {
+  @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
+  @Text(0, 500, true) rejectionReason?: string;
+}
+
+export class AppointmentNoShowDto {
+  @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
+  @Text(0, 500, true) reason?: string;
+}

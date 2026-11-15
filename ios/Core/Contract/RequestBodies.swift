@@ -148,3 +148,24 @@ public enum JSONBody {
         return String(decoding: data, as: UTF8.self)
     }
 }
+
+/// `AppointmentRescheduleDto` de `POST /citas/{id}/reprogramar` (CITA-02).
+public struct AppointmentRescheduleBody: Encodable, Sendable, Equatable {
+    public let version: Int
+    public let start: String
+    public let end: String
+    public init(version: Int, start: String, end: String) { self.version = version; self.start = start; self.end = end }
+}
+
+/// `RescheduleDecisionDto` de aceptar o rechazar una solicitud de reprogramación.
+public struct RescheduleDecisionBody: Encodable, Sendable, Equatable {
+    public let version: Int
+    public let rejectionReason: String?
+    public init(version: Int, rejectionReason: String? = nil) { self.version = version; self.rejectionReason = rejectionReason }
+}
+
+/// `QueueCallNextDto` de `POST /fila/llamar-siguiente` (FILA-02).
+public struct QueueCallNextBody: Encodable, Sendable, Equatable {
+    public let service: String
+    public init(service: String) { self.service = service }
+}

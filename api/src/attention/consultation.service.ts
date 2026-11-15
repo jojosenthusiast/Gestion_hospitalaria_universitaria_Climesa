@@ -4,7 +4,8 @@ import { Actor, contextsOf } from '../platform/actor';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
-import { Clock } from '../platform/clock';
+import { businessDate, Clock } from '../platform/clock';
+import { appointmentActions } from './attention.rules';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { requireCurrentEnrollment } from '../platform/enrollment';
 import { ConsultationSignDto, ConsultationStartDto, ConsultationUpdateDto } from './consultation.dto';
@@ -41,6 +42,29 @@ export class ConsultationService {
       ORDER BY lower(c.horario),c.id`, [actor.staffId, this.clock.now()])).rows;
       // SEG-02: one aggregated read audit with every patient shown.
       await this.commands.audit(c, actor, { action: 'consulta.agenda_leer', entity: 'consulta', permission: 'consulta.iniciar', detail: { patientIds: [...new Set(rows.map(row => row.patientId))] } });
+      // CITA-04 / MA-CIT-03: the doctor's own actions (start the consultation only on the appointment's day).
+      const now = this.clock.now();
+      const abilities = { manage: false, cancelAny: false, cancelOwn: false, requestOwn: false, ownPatient: false, ownDoctor: true };
+      const policies = { cancelHours: 0, maxReschedules: 0 };
+      return rows.map(row => {
+        const start = new Date(row.start);
+        const facts = { state: row.appointmentState, start, now, startDate: businessDate(start), today: businessDate(now), hasConsultation: !!row.consultationId, pendingReschedule: false, reschedules: 0 };
+        const actions = appointmentActions(facts, policies, abilities);
+        return { ...row, allowedActions: actions.allowedActions.filter(a => a === 'iniciar_consulta'), blockedActions: actions.blockedActions.filter(a => a.action === 'iniciar_consulta') };
+      });
+    });
+  }
+
+  /** m-22: the doctor's own open consultations of any day (from an appointment or a queue number), oldest first. */
+  async unsigned(actor: Actor) {
+    this.requireDoctor(actor);
+    return this.db.transaction(async c => {
+      const rows = (await c.query(`SELECT k.id,k.paciente_id AS "patientId",
+        coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
+        k.cita_id AS "appointmentId",k.ticket_id AS "ticketId",k.motivo AS reason,k.iniciada_en AS "startedAt",k.version
+        FROM atencion.consulta k JOIN pacientes.paciente p ON p.id=k.paciente_id
+        WHERE k.medico_id=$1 AND k.estado='abierta' ORDER BY k.iniciada_en,k.id LIMIT 200`, [actor.staffId])).rows;
+      await this.commands.audit(c, actor, { action: 'consulta.sin_firmar_leer', entity: 'consulta', permission: 'consulta.iniciar', detail: { patientIds: [...new Set(rows.map(row => row.patientId))] } });
       return rows;
     });
   }
@@ -61,6 +85,9 @@ export class ConsultationService {
     if (!appointment) throw new NotFoundException('No se encontró la cita.');
     if (appointment.medico_id !== actor.staffId) throw new ForbiddenException('Solo puedes iniciar consultas de tu propia agenda.');
     if (appointment.estado !== 'confirmada') throw new ProblemException('transicion_invalida', 409, 'La cita debe estar confirmada para iniciar la consulta.');
+    // MA-CIT-03: the consultation starts on the appointment's day, never before (nor on a later day).
+    const day = businessDate(new Date((await c.query('SELECT lower(horario) AS start FROM atencion.cita WHERE id=$1', [id])).rows[0].start));
+    if (day !== this.clock.today()) throw new ProblemException('cita_fuera_de_dia', 409, day > this.clock.today() ? 'La consulta se inicia el día de la cita.' : 'La cita fue de un día anterior; ya no se puede iniciar.');
     await this.rejectStarted(c, actor, 'cita_id', id, 'La consulta ya fue iniciada para esta cita.');
     return { patientId: appointment.paciente_id as string, officeId: null as string | null };
   }
@@ -70,8 +97,10 @@ export class ConsultationService {
    * called (`llamado`) or already in attention; a called number moves to `en_atencion` in the same transaction.
    */
   private async fromTicket(c: PoolClient, actor: Actor, id: string) {
-    const ticket = (await c.query(`SELECT id,paciente_id,estado,consultorio_id,version FROM atencion.ticket_fila WHERE id=$1 FOR UPDATE`, [id])).rows[0] as Row | undefined;
+    const ticket = (await c.query(`SELECT id,paciente_id,estado,consultorio_id,version,fecha=$2::date AS today FROM atencion.ticket_fila WHERE id=$1 FOR UPDATE`, [id, this.clock.today()])).rows[0] as Row | undefined;
     if (!ticket) throw new NotFoundException('No se encontró el número de fila.');
+    // The day-end sweep may not have closed it yet (it skips while another one holds the lock).
+    if (!ticket.today) throw new ProblemException('transicion_invalida', 409, 'El número es de un día anterior; emite uno nuevo para hoy.');
     if (!ticket.paciente_id) throw new ProblemException('validacion', 400, 'El número de fila no tiene un paciente asociado.', 'ticketId');
     if (!['llamado', 'en_atencion'].includes(ticket.estado)) throw new ProblemException('transicion_invalida', 409, 'Llama el número antes de iniciar la consulta.');
     await this.rejectStarted(c, actor, 'ticket_id', id, 'La consulta ya fue iniciada para este número.');
@@ -103,7 +132,7 @@ export class ConsultationService {
       FROM atencion.consulta WHERE id=$1 FOR UPDATE`, [id])).rows[0] as Row | undefined;
     if (!row) throw new NotFoundException('No se encontró la consulta.');
     if (row.medico_id !== actor.staffId) throw new ForbiddenException('Solo puedes consultar tus propios registros clínicos.');
-    if (row.estado !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y solo admite un addendum.');
+    if (row.estado !== 'abierta') throw new ProblemException('consulta_firmada', 409, 'La consulta ya está firmada y no admite cambios.');
     return row;
   }
 
@@ -127,6 +156,9 @@ export class ConsultationService {
       await requireCurrentEnrollment(c, actor.staffId, this.clock.today());
       const row = (await c.query(`UPDATE atencion.consulta SET estado='firmada',firmada_en=$2,version=version+1 WHERE id=$1 RETURNING id,version,estado,firmada_en AS "signedAt"`, [id, this.clock.now()])).rows[0];
       const appointment = (await c.query(`UPDATE atencion.cita SET estado='atendida',version=version+1 WHERE id=(SELECT cita_id FROM atencion.consulta WHERE id=$1) AND estado='confirmada' RETURNING id,version`, [id])).rows[0];
+      // m-23: the queue number of the consultation closes in the same transaction.
+      const ticket = (await c.query(`UPDATE atencion.ticket_fila SET estado='atendido',version=version+1 WHERE id=(SELECT ticket_id FROM atencion.consulta WHERE id=$1) AND estado='en_atencion' RETURNING id,version`, [id])).rows[0];
+      if (ticket) await this.commands.event(c, 'fila.actualizada', 'ticket_fila', ticket.id, ticket.version, await channelsFor(c, ['fila.ver', 'fila.llamar', 'fila.gestionar'], { users: [await patientAccount(c, old.paciente_id)] }));
       // API-03: the appointment moved to `atendida`; agendas and the patient's appointments learn it.
       if (appointment) await this.commands.event(c, 'cita.actualizada', 'cita', appointment.id, appointment.version, await channelsFor(c, ['citas.ver'], { users: [await patientAccount(c, old.paciente_id)] }));
       await this.commands.audit(c, actor, { action: 'consulta.firmar', entity: 'consulta', entityId: id, patientId: old.paciente_id, permission: 'consulta.registrar' });

@@ -8,7 +8,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); rows = [appointment]; });
 
 // REC real: tiene citas.agendar y citas.cancelar, pero no personal.ver.
 const rec = (): AccessProfile => ({
@@ -26,12 +26,14 @@ const franjas = [
   { start: '2026-11-20T14:00:00Z', end: '2026-11-20T14:20:00Z', estado: 'ocupado', motivo: 'Ocupado' },
   { start: '2026-11-20T14:20:00Z', end: '2026-11-20T14:40:00Z', estado: 'libre', motivo: null },
 ];
-const appointment = { id: 'c-1', patientId: 'p-1', patientName: 'Paciente Ficticio Uno', doctorId: 'd-1', doctorName: 'Médica Ficticia', start: '2026-11-20T15:00:00Z', end: '2026-11-20T15:20:00Z', state: 'confirmada', origin: 'recepcion', version: 1 };
+const appointment = { id: 'c-1', patientId: 'p-1', patientName: 'Paciente Ficticio Uno', doctorId: 'd-1', doctorName: 'Médica Ficticia', start: '2026-11-20T15:00:00Z', end: '2026-11-20T15:20:00Z', state: 'confirmada', origin: 'recepcion', version: 1,
+  allowedActions: ['reprogramar', 'cancelar'], blockedActions: [{ action: 'no_asistio', reason: 'Disponible cuando llegue la hora de la cita.' }], cancelableUntil: '2026-11-20T15:00:00Z', reschedule: null };
+let rows: unknown[] = [appointment];
 
 function mount() {
   const api = {
     request: vi.fn(async (path: string) => {
-      if (path === '/citas') return [appointment];
+      if (path === '/citas') return rows;
       if (path.startsWith('/citas/catalogos')) return catalogs;
       if (path.startsWith('/pacientes/selector')) return { items: [{ id: 'p-1', record: 'EXP-000001', fullName: 'María Ficticia Uno', age: 34 }], offset: 0, limit: 10, hasMore: false };
       if (path.startsWith('/citas/disponibilidad')) return { durationMinutes: 20, workPeriods: [{ start: '2026-11-20T14:00:00Z', end: '2026-11-20T18:00:00Z' }], slots: [franjas[1]], franjas };
@@ -97,7 +99,7 @@ describe('W28 · agendar cita como Recepción (W-01)', () => {
 
   it('el botón del modal de cancelación dice lo que hace', async () => {
     mount();
-    await userEvent.click(await screen.findByRole('button', { name: /^Cancelar la cita de Paciente Ficticio Uno/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Cancelar · Paciente Ficticio Uno/ }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('button', { name: /Cancelar cita/ })).toBeTruthy();
     expect(within(dialog).queryByRole('button', { name: /Guardar estado/ })).toBeNull();
@@ -120,5 +122,41 @@ describe('agenda de citas (obs. 12)', () => {
     expect(await screen.findByText('Ninguna cita coincide con los filtros')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
     expect(await screen.findByText('09:00 – 09:20')).toBeTruthy();
+  });
+});
+
+describe('acciones de cita según el servidor (CITA-04, CITA-06, CITA-08)', () => {
+  it('una acción bloqueada no aparece como botón y muestra su motivo', async () => {
+    mount();
+    expect(await screen.findByText(/No asistió: Disponible cuando llegue la hora de la cita/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^No asistió ·/ })).toBeNull();
+  });
+
+  it('una solicitud vencida no ofrece Cancelar ni Gestionar', async () => {
+    rows = [{ ...appointment, state: 'vencida', allowedActions: [], blockedActions: [] }];
+    mount();
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Estado de la cita' })).getByRole('button', { name: /^Todas/ }));
+    await screen.findByText('Paciente Ficticio Uno');
+    expect(screen.queryByRole('button', { name: /Cancelar ·|Gestionar|Confirmar ·/ })).toBeNull();
+  });
+
+  it('confirmar es directo y rechazar pide motivo con contador en vivo', async () => {
+    rows = [{ ...appointment, state: 'solicitada', allowedActions: ['confirmar', 'rechazar'], blockedActions: [] }];
+    const api = mount();
+    await userEvent.click(await screen.findByRole('button', { name: /^Confirmar · Paciente Ficticio Uno/ }));
+    expect(api.write).toHaveBeenCalledWith('/citas/solicitudes/c-1/confirmar', { version: 1 }, 'POST');
+    await userEvent.click(screen.getByRole('button', { name: /^Rechazar · Paciente Ficticio Uno/ }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('textbox'), 'razonamiento');
+    expect(within(dialog).getByText('12/500 ✓')).toBeTruthy();
+  });
+
+  it('reprogramar envía la franja libre elegida del mismo médico', async () => {
+    const api = mount();
+    await userEvent.click(await screen.findByRole('button', { name: /^Reprogramar · Paciente Ficticio Uno/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Reprogramar cita' });
+    await userEvent.click(await within(dialog).findByRole('button', { pressed: false, name: /Libre/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reprogramar' }));
+    expect(api.write).toHaveBeenCalledWith('/citas/c-1/reprogramar', { version: 1, start: '2026-11-20T14:20:00Z', end: '2026-11-20T14:40:00Z' }, 'POST');
   });
 });

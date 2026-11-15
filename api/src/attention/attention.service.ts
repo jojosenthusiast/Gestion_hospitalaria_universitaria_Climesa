@@ -7,14 +7,17 @@ import { ProblemException, VersionConflictException } from '../platform/problem'
 import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { PolicyRegistry } from '../platform/policy.registry';
-import { AppointmentCancelDto, AppointmentCreateDto, AppointmentStatusDto, PatientAppointmentRequestDto } from './attention.dto';
+import { AppointmentCancelDto, AppointmentCreateDto, AppointmentNoShowDto, AppointmentRescheduleDto, AppointmentStatusDto, PatientAppointmentRequestDto, RescheduleDecisionDto } from './attention.dto';
+import { appointmentActions, AppointmentAbilities, cancelableUntil } from './attention.rules';
+import { AttentionSweepService } from './attention-sweep.service';
+import { businessDate } from '../platform/clock';
 
 type AppointmentRow = Record<string, any>;
 const SLOT_MS = 20 * 60_000;
 
 @Injectable()
 export class AttentionService {
-  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock, private readonly policies: PolicyRegistry) {}
+  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock, private readonly policies: PolicyRegistry, private readonly sweeper: AttentionSweepService) {}
 
   private instant(value: string, label: string) {
     if (!/(Z|[+-]\d\d:\d\d)$/.test(value)) throw new BadRequestException(`${label} debe incluir zona horaria.`);
@@ -195,6 +198,26 @@ export class AttentionService {
     return out.sort((a, b) => a.start.localeCompare(b.start));
   }
 
+  private abilities(actor: Actor, row: Record<string, any>): AppointmentAbilities {
+    const cancel = contextsOf(actor, 'citas.cancelar');
+    return {
+      manage: contextsOf(actor, 'citas.agendar').length > 0,
+      cancelAny: cancel.some(context => context !== 'propio'),
+      cancelOwn: cancel.includes('propio'),
+      requestOwn: contextsOf(actor, 'citas.solicitar').length > 0,
+      ownPatient: !!actor.patientId && actor.patientId === row.patientId,
+      ownDoctor: contextsOf(actor, 'consulta.iniciar').length > 0 && !!actor.staffId && actor.staffId === row.doctorId,
+    };
+  }
+
+  private async appointmentPolicies(c: PoolClient, at: Date) {
+    const [{ horas }, { maximo }] = await Promise.all([
+      this.policies.value<{ horas: number }>(c, 'citas.cancelacion_horas', at),
+      this.policies.value<{ maximo: number }>(c, 'citas.reprogramaciones_max', at),
+    ]);
+    return { cancelHours: horas, maxReschedules: maximo };
+  }
+
   async list(actor: Actor, from?: string, to?: string, patientId?: string, doctorId?: string) {
     const start = from ? this.instant(`${from}T00:00:00-06:00`, 'La fecha inicial') : new Date(this.clock.now().valueOf() - 7 * 86_400_000);
     const end = to ? this.instant(`${to}T23:59:59-06:00`, 'La fecha final') : new Date(this.clock.now().valueOf() + 31 * 86_400_000);
@@ -202,16 +225,56 @@ export class AttentionService {
     const ownPatient = contextsOf(actor, 'citas.ver').includes('propio') && actor.patientId ? actor.patientId : patientId ?? null;
     const ownDoctor = contextsOf(actor, 'citas.ver').includes('propio') && actor.staffId ? actor.staffId : doctorId ?? null;
     await this.allowedToSee(actor, ownPatient ?? undefined, ownDoctor ?? undefined);
+    await this.sweeper.sweepSafely();
     return this.db.transaction(async c => { const rows = (await c.query(`SELECT c.id,c.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       c.medico_id AS "doctorId",concat_ws(' ',m.nombres,m.apellidos) AS "doctorName",lower(c.horario) AS start,upper(c.horario) AS "end",
-      c.motivo AS reason,c.estado AS state,c.origen AS origin,c.motivo_rechazo AS "rejectionReason",c.version
+      c.motivo AS reason,c.estado AS state,c.origen AS origin,c.motivo_rechazo AS "rejectionReason",c.version,
+      c.reprogramada_de AS "rescheduledFromId",c.reprogramaciones AS reschedules,
+      (SELECT n.id FROM atencion.cita n WHERE n.reprogramada_de=c.id) AS "rescheduledToId",
+      atencion.cita_tiene_consulta(c.id) AS "hasConsultation",
+      EXISTS (SELECT 1 FROM personal.turno t WHERE t.persona_id=c.medico_id AND t.estado='ausente' AND t.periodo && c.horario) AS "doctorAbsent",
+      (SELECT json_build_object('id',r.id,'start',lower(r.horario),'end',upper(r.horario),'state',r.estado,'origin',r.origen,
+        'reason',r.motivo,'rejectionReason',r.motivo_rechazo,'version',r.version)
+        FROM atencion.reprogramacion r WHERE r.cita_id=c.id ORDER BY r.creado_en DESC LIMIT 1) AS reschedule
       FROM atencion.cita c JOIN pacientes.paciente p ON p.id=c.paciente_id JOIN personal.persona m ON m.id=c.medico_id
       WHERE c.horario && tstzrange($1,$2) AND ($3::uuid IS NULL OR c.paciente_id=$3) AND ($4::uuid IS NULL OR c.medico_id=$4)
       ORDER BY lower(c.horario),c.id`, [start, end, ownPatient, ownDoctor])).rows;
       // SEG-02: aggregated read audit with every patient listed.
       await this.commands.audit(c, actor, { action: 'citas.leer', entity: 'cita', permission: 'citas.ver', detail: { patientIds: [...new Set(rows.map(row => row.patientId))] } });
-      return rows;
+      const now = this.clock.now();
+      const policies = await this.appointmentPolicies(c, now);
+      const today = businessDate(now);
+      return rows.map(({ hasConsultation, doctorAbsent, reschedules, ...row }) => {
+        const startAt = new Date(row.start);
+        const facts = { state: row.state, start: startAt, now, startDate: businessDate(startAt), today, hasConsultation, doctorAbsent, pendingReschedule: row.reschedule?.state === 'pendiente', reschedules };
+        const abilities = this.abilities(actor, row);
+        const until = cancelableUntil(facts, policies, abilities);
+        return { ...row, reschedule: row.reschedule ? { ...row.reschedule, start: new Date(row.reschedule.start).toISOString(), end: new Date(row.reschedule.end).toISOString() } : null,
+          cancelableUntil: until ? until.toISOString() : null, ...appointmentActions(facts, policies, abilities) };
+      });
     });
+  }
+
+  /** Locks the appointment and computes the facts the action rules need, so a command rejects exactly what the list blocks. */
+  private async lockedFacts(c: PoolClient, id: string) {
+    const row = (await c.query(`SELECT c.id,c.paciente_id AS "patientId",c.medico_id AS "doctorId",lower(c.horario) AS start,upper(c.horario) AS "end",c.estado AS state,c.version,
+      c.reprogramaciones AS reschedules,c.motivo AS reason,
+      atencion.cita_tiene_consulta(c.id) AS "hasConsultation",
+      EXISTS (SELECT 1 FROM personal.turno t WHERE t.persona_id=c.medico_id AND t.estado='ausente' AND t.periodo && c.horario) AS "doctorAbsent",
+      (SELECT r.id FROM atencion.reprogramacion r WHERE r.cita_id=c.id AND r.estado='pendiente') AS "pendingId"
+      FROM atencion.cita c WHERE c.id=$1 FOR UPDATE OF c`, [id])).rows[0] as AppointmentRow | undefined;
+    return row;
+  }
+
+  private assertAction(actor: Actor, row: AppointmentRow, policies: { cancelHours: number; maxReschedules: number }, action: string) {
+    const now = this.clock.now();
+    const start = new Date(row.start);
+    const facts = { state: row.state, start, now, startDate: businessDate(start), today: businessDate(now), hasConsultation: row.hasConsultation, doctorAbsent: row.doctorAbsent, pendingReschedule: !!row.pendingId, reschedules: row.reschedules };
+    const result = appointmentActions(facts, policies, this.abilities(actor, row));
+    if (result.allowedActions.includes(action as any)) return;
+    const blocked = result.blockedActions.find(item => item.action === action);
+    const code = row.hasConsultation ? 'cita_con_consulta' : row.doctorAbsent && blocked?.reason.startsWith('El médico está ausente') ? 'medico_ausente' : action === 'cancelar' && blocked?.reason.startsWith('Solo hasta') ? 'cancelacion_fuera_de_plazo' : 'transicion_invalida';
+    throw new ProblemException(code, 409, blocked?.reason ?? 'La cita ya no admite esa acción.');
   }
 
   async create(actor: Actor, dto: AppointmentCreateDto | PatientAppointmentRequestDto, patientRequest: boolean, key?: string) {
@@ -225,6 +288,12 @@ export class AttentionService {
       await this.doctor(c, dto.doctorId);
       await this.doctorHasShift(c, dto.doctorId, start, end, true);
       await this.patientHasConflict(c, patientId, start, end);
+      if (patientRequest) {
+        // CITA-07: a patient cannot pile up simultaneous requests; they reschedule the one they already have.
+        const { maximo } = await this.policies.value<{ maximo: number }>(c, 'citas.solicitudes_pendientes_max', this.clock.now());
+        const pending = Number((await c.query(`SELECT count(*) AS n FROM atencion.cita WHERE paciente_id=$1 AND estado='solicitada' AND lower(horario)>$2::timestamptz`, [patientId, this.clock.now()])).rows[0].n);
+        if (pending >= maximo) throw new ProblemException('solicitudes_pendientes_max', 409, `Ya tienes ${pending} solicitudes pendientes; reprograma o cancela una antes de pedir otra.`);
+      }
       const row = (await c.query(`INSERT INTO atencion.cita(paciente_id,medico_id,horario,motivo,estado,origen,creado_por)
         VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7,$8) RETURNING id,version`, [patientId, dto.doctorId, start, end, dto.reason?.trim() || null, state, patientRequest ? 'paciente' : 'recepcion', actor.id])).rows[0];
       await this.commands.audit(c, actor, { action: patientRequest ? 'citas.solicitar' : 'citas.agendar', entity: 'cita', entityId: row.id, permission, detail: { patientId, doctorId: dto.doctorId, start: start.toISOString(), end: end.toISOString() } });
@@ -241,15 +310,23 @@ export class AttentionService {
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
       if (dto.status === 'rechazada' && (dto.rejectionReason?.trim().length ?? 0) < 10) throw new BadRequestException('Indica el motivo del rechazo.');
       if (old.estado !== 'solicitada') throw new ProblemException('transicion_invalida', 409, 'Solo se puede confirmar o rechazar una solicitud pendiente; para una cita confirmada usa cancelar.');
+      // The list blocks both once the time arrives (the sweep then marks the request `vencida`); the command matches it.
+      if (new Date(old.start) <= this.clock.now()) throw new ProblemException('transicion_invalida', 409, 'La hora de la cita ya pasó.');
       if (dto.status === 'confirmada') {
         await this.doctorHasShift(c, old.medico_id, new Date(old.start), new Date(old.end), false);
         await this.patientHasConflict(c, old.paciente_id, new Date(old.start), new Date(old.end), id);
       }
       const row = (await c.query('UPDATE atencion.cita SET estado=$2,motivo_rechazo=$3,version=version+1 WHERE id=$1 RETURNING version', [id, dto.status, dto.rejectionReason?.trim() || null])).rows[0];
+      if (dto.status === 'rechazada') await this.expirePendingReschedules(c, id);
       await this.commands.audit(c, actor, { action: 'citas.estado', entity: 'cita', entityId: id, permission: 'citas.agendar', detail: { from: old.estado, to: dto.status } });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, old.paciente_id));
       return { id, version: row.version, state: dto.status };
     });
+  }
+
+  /** A request to move an appointment that just closed has nothing left to move; it expires in the same transaction. */
+  private async expirePendingReschedules(c: PoolClient, id: string) {
+    await c.query(`UPDATE atencion.reprogramacion SET estado='vencida',version=version+1 WHERE cita_id=$1 AND estado='pendiente'`, [id]);
   }
 
   async cancel(actor: Actor, id: string, dto: AppointmentCancelDto, key?: string) {
@@ -262,8 +339,13 @@ export class AttentionService {
       if (!old) throw new NotFoundException('No se encontró la cita.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
       if (!['solicitada', 'confirmada'].includes(old.estado)) throw new ProblemException('transicion_invalida', 409, 'Solo se pueden cancelar citas solicitadas o confirmadas.');
+      // CITA-06: reception rejects a request (it does not cancel it); only the patient withdraws their own request.
+      const ownRequest = contextsOf(actor, 'citas.cancelar').includes('propio') && !!actor.patientId && actor.patientId === old.paciente_id;
+      if (old.estado === 'solicitada' && !ownRequest) throw new ProblemException('transicion_invalida', 409, 'Una solicitud no se cancela: recházala indicando el motivo.');
       const now = this.clock.now();
       const start = new Date(old.start);
+      // MA-CIT-03: an appointment whose consultation already started is not cancelled (the trigger backs it).
+      if ((await c.query('SELECT atencion.cita_tiene_consulta($1) AS has', [id])).rows[0].has) throw new ProblemException('cita_con_consulta', 409, 'La consulta ya empezó; la cita no se puede cancelar.');
       if (start <= now) throw new ProblemException('transicion_invalida', 409, 'La cita ya empezó o pasó; no se puede cancelar.');
       // RN-21: the patient cancels up to N hours before (policy `citas.cancelacion_horas`); reception is not bound by it.
       if (onlyOwn) {
@@ -271,9 +353,101 @@ export class AttentionService {
         if (start.valueOf() - now.valueOf() < horas * 3_600_000) throw new ProblemException('cancelacion_fuera_de_plazo', 409, `Solo puedes cancelar tu cita hasta ${horas} h antes; comunícate con recepción.`);
       }
       const row = (await c.query("UPDATE atencion.cita SET estado='cancelada',version=version+1 WHERE id=$1 RETURNING version", [id])).rows[0];
+      await this.expirePendingReschedules(c, id);
       await this.commands.audit(c, actor, { action: 'citas.cancelar', entity: 'cita', entityId: id, permission: 'citas.cancelar', reason: dto.reason });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, old.paciente_id));
       return { id, version: row.version, state: 'cancelada' };
+    });
+  }
+  /**
+   * CITA-02: reschedule to a free slot of the same doctor. Reception applies it at once; the patient files a request
+   * that reception or the doctor accepts or rejects, and the original appointment stays valid until then.
+   */
+  async reschedule(actor: Actor, id: string, dto: AppointmentRescheduleDto, key?: string) {
+    const { start, end } = this.range(dto.start, dto.end);
+    const manage = contextsOf(actor, 'citas.agendar').length > 0;
+    const permission = manage ? 'citas.agendar' : 'citas.solicitar';
+    const scope = manage ? `citas.agendar:reprogramar:${id}` : `citas.solicitar:reprogramar:${id}`;
+    return this.commands.run(actor, scope, key, dto, async c => {
+      const old = await this.lockedFacts(c, id);
+      if (!manage && (!old || !actor.patientId || actor.patientId !== old.patientId)) throw new ForbiddenException('Solo puedes reprogramar tus propias citas.');
+      if (!old) throw new NotFoundException('No se encontró la cita.');
+      if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
+      const policies = await this.appointmentPolicies(c, this.clock.now());
+      this.assertAction(actor, old, policies, 'reprogramar');
+      if (start.valueOf() === new Date(old.start).valueOf()) throw new ProblemException('validacion', 400, 'Elige una franja distinta de la actual.', 'start');
+      await this.doctorHasShift(c, old.doctorId, start, end, true);
+      const busy = (await c.query(`SELECT 1 FROM atencion.cita WHERE medico_id=$1 AND id<>$4 AND estado IN ('solicitada','confirmada') AND horario && tstzrange($2::timestamptz,$3::timestamptz,'[)') LIMIT 1`, [old.doctorId, start, end, id])).rowCount;
+      if (busy) throw new ProblemException('franja_ocupada', 409, 'La franja ya no está disponible; vuelve a consultar la disponibilidad.', 'start');
+      await this.patientHasConflict(c, old.patientId, start, end, id);
+      const request = (await c.query(`INSERT INTO atencion.reprogramacion(cita_id,medico_id,horario,origen,motivo,solicitado_por)
+        VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7) RETURNING id`, [id, old.doctorId, start, end, manage ? 'recepcion' : 'paciente', dto.reason?.trim() || null, actor.id])).rows[0];
+      await this.commands.audit(c, actor, { action: 'citas.reprogramar_solicitar', entity: 'cita', entityId: id, patientId: old.patientId, permission, reason: dto.reason, detail: { requestId: request.id, start: start.toISOString(), end: end.toISOString() } });
+      if (manage) return this.applyReschedule(c, actor, request.id, permission);
+      const bumped = (await c.query('UPDATE atencion.cita SET version=version+1 WHERE id=$1 RETURNING version', [id])).rows[0];
+      await this.commands.event(c, 'cita.actualizada', 'cita', id, bumped.version, await this.doctorAndPatientChannels(c, old.patientId, old.doctorId));
+      return { id, version: bumped.version, state: old.state, rescheduleId: request.id, rescheduleState: 'pendiente' };
+    });
+  }
+
+  private async doctorAndPatientChannels(c: PoolClient, patientId: string, doctorId: string) {
+    const doctorAccounts = (await c.query('SELECT id FROM acceso.usuario WHERE persona_personal_id=$1', [doctorId])).rows.map(row => `usuario:${row.id}`);
+    return [...new Set([...(await this.channels(c, patientId)), ...doctorAccounts])];
+  }
+
+  /** Moves the appointment: the original becomes `reprogramada` and the new one keeps its state, linked and counted. */
+  private async applyReschedule(c: PoolClient, actor: Actor, requestId: string, permission: string) {
+    const request = (await c.query(`SELECT r.id,r.cita_id,lower(r.horario) AS start,upper(r.horario) AS "end",c.paciente_id,c.medico_id,c.motivo,c.estado,c.origen,c.reprogramaciones
+      FROM atencion.reprogramacion r JOIN atencion.cita c ON c.id=r.cita_id WHERE r.id=$1`, [requestId])).rows[0];
+    const original = (await c.query(`UPDATE atencion.cita SET estado='reprogramada',version=version+1 WHERE id=$1 RETURNING version`, [request.cita_id])).rows[0];
+    const created = (await c.query(`INSERT INTO atencion.cita(paciente_id,medico_id,horario,motivo,estado,origen,creado_por,reprogramada_de,reprogramaciones)
+      VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7,$8,$9,$10) RETURNING id,version,estado`,
+      [request.paciente_id, request.medico_id, request.start, request.end, request.motivo, request.estado, request.origen, actor.id, request.cita_id, request.reprogramaciones + 1])).rows[0];
+    await c.query(`UPDATE atencion.reprogramacion SET estado='aceptada',decidido_por=$2,decidido_en=$3,cita_nueva_id=$4,version=version+1 WHERE id=$1`, [requestId, actor.id, this.clock.now(), created.id]);
+    await this.commands.audit(c, actor, { action: 'citas.reprogramar', entity: 'cita', entityId: request.cita_id, patientId: request.paciente_id, permission, detail: { requestId, newAppointmentId: created.id } });
+    const channels = await this.doctorAndPatientChannels(c, request.paciente_id, request.medico_id);
+    await this.commands.event(c, 'cita.actualizada', 'cita', request.cita_id, original.version, channels);
+    await this.commands.event(c, 'cita.actualizada', 'cita', created.id, created.version, channels);
+    return { id: created.id, version: created.version, state: created.estado, rescheduleId: requestId, rescheduleState: 'aceptada' };
+  }
+
+  /** Reception (`citas.agendar`) or the appointment's own doctor (`consulta.iniciar`) accepts or rejects a pending request. */
+  async decideReschedule(actor: Actor, requestId: string, accept: boolean, dto: RescheduleDecisionDto, key?: string) {
+    const permission = contextsOf(actor, 'citas.agendar').length ? 'citas.agendar' : 'consulta.iniciar';
+    const decision = accept ? 'aceptar' : 'rechazar';
+    const scope = permission === 'citas.agendar' ? `citas.agendar:reprogramacion:${requestId}:${decision}` : `consulta.iniciar:reprogramacion:${requestId}:${decision}`;
+    return this.commands.run(actor, scope, key, dto, async c => {
+      const request = (await c.query(`SELECT r.id,r.cita_id,r.estado,r.version,r.medico_id,lower(r.horario) AS start,upper(r.horario) AS "end",c.paciente_id
+        FROM atencion.reprogramacion r JOIN atencion.cita c ON c.id=r.cita_id WHERE r.id=$1 FOR UPDATE OF r,c`, [requestId])).rows[0];
+      if (!request) throw new NotFoundException('No se encontró la solicitud de reprogramación.');
+      if (permission === 'consulta.iniciar' && request.medico_id !== actor.staffId) throw new ForbiddenException('Solo el médico de la cita o recepción deciden la reprogramación.');
+      if (request.version !== dto.version) throw new VersionConflictException(request.version, 'La solicitud cambió; vuelve a abrirla.');
+      if (request.estado !== 'pendiente') throw new ProblemException('transicion_invalida', 409, 'La solicitud ya fue decidida o venció.');
+      if (new Date(request.start) <= this.clock.now()) throw new ProblemException('transicion_invalida', 409, 'La franja pedida ya pasó; la solicitud venció.');
+      if (!accept) {
+        if ((dto.rejectionReason?.trim().length ?? 0) < 10) throw new ProblemException('validacion', 400, 'Indica el motivo del rechazo (10 caracteres o más).', 'rejectionReason');
+        await c.query(`UPDATE atencion.reprogramacion SET estado='rechazada',motivo_rechazo=$2,decidido_por=$3,decidido_en=$4,version=version+1 WHERE id=$1`, [requestId, dto.rejectionReason!.trim(), actor.id, this.clock.now()]);
+        const bumped = (await c.query('UPDATE atencion.cita SET version=version+1 WHERE id=$1 RETURNING version,estado', [request.cita_id])).rows[0];
+        await this.commands.audit(c, actor, { action: 'citas.reprogramacion_rechazar', entity: 'cita', entityId: request.cita_id, patientId: request.paciente_id, permission, reason: dto.rejectionReason, detail: { requestId } });
+        await this.commands.event(c, 'cita.actualizada', 'cita', request.cita_id, bumped.version, await this.doctorAndPatientChannels(c, request.paciente_id, request.medico_id));
+        return { id: request.cita_id, version: bumped.version, state: bumped.estado, rescheduleId: requestId, rescheduleState: 'rechazada' };
+      }
+      await this.doctorHasShift(c, request.medico_id, new Date(request.start), new Date(request.end), false);
+      return this.applyReschedule(c, actor, requestId, permission);
+    });
+  }
+
+  /** MA-CIT-02 / ASIS-05: reception marks a confirmed appointment as a no-show once its time arrived and nobody started a consultation. */
+  async noShow(actor: Actor, id: string, dto: AppointmentNoShowDto, key?: string) {
+    return this.commands.run(actor, `citas.agendar:no_asistio:${id}`, key, dto, async c => {
+      const old = await this.lockedFacts(c, id);
+      if (!old) throw new NotFoundException('No se encontró la cita.');
+      if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La cita cambió; vuelve a abrirla.');
+      this.assertAction(actor, old, await this.appointmentPolicies(c, this.clock.now()), 'no_asistio');
+      const row = (await c.query("UPDATE atencion.cita SET estado='no_asistio',version=version+1 WHERE id=$1 RETURNING version", [id])).rows[0];
+      await this.commands.audit(c, actor, { action: 'citas.no_asistio', entity: 'cita', entityId: id, patientId: old.patientId, permission: 'citas.agendar', reason: dto.reason });
+      await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, old.patientId));
+      return { id, version: row.version, state: 'no_asistio' };
     });
   }
 }

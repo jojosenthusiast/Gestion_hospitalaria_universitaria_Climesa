@@ -24,6 +24,9 @@ import sv.edu.catolica.climesa.domain.LabOrderRules
 import sv.edu.catolica.climesa.data.AuthRequestException
 import sv.edu.catolica.climesa.domain.MedicalAppointment
 import sv.edu.catolica.climesa.domain.RealtimeSignal
+import sv.edu.catolica.climesa.domain.ReceptionAppointment
+import sv.edu.catolica.climesa.domain.ReceptionScheduling
+import sv.edu.catolica.climesa.domain.UnsignedConsultation
 
 data class ConsultationState(
     val loading: Boolean = true,
@@ -40,6 +43,10 @@ data class ConsultationState(
     val resumed: MedicalAppointment? = null,
     /** Ticket whose consultation is being started or opened. */
     val opening: String? = null,
+    /** m-22: own open consultations of any day (`GET /consultas/sin-firmar`). */
+    val unsigned: List<UnsignedConsultation> = emptyList(),
+    /** Own appointments with a patient's reschedule request the doctor can decide (`GET /citas`). */
+    val reschedules: List<ReceptionAppointment> = emptyList(),
 )
 
 @HiltViewModel
@@ -50,11 +57,18 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     private var loadJob: Job? = null
     private var userId: String? = null
     private var withQueue = false
+    private var withUnsigned = false
+    private var withReschedules = false
 
-    /** Signed-in user (drafts are kept per user) and whether the agenda also lists the day's queue. */
-    fun configure(userId: String, withQueue: Boolean) {
+    /**
+     * Signed-in user (drafts are kept per user) and what the screen also lists: the day's queue, the own unsigned
+     * consultations and the patients' reschedule requests of the own appointments.
+     */
+    fun configure(userId: String, withQueue: Boolean, withUnsigned: Boolean = false, withReschedules: Boolean = false) {
         if (this.userId != userId) { this.userId = userId; drafts.retainOnly(userId) }
         this.withQueue = withQueue
+        this.withUnsigned = withUnsigned
+        this.withReschedules = withReschedules
     }
 
     fun draft(consultationId: String) = userId?.let { drafts.load(it, "consulta:$consultationId") }
@@ -70,9 +84,12 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             try {
-                val rows = parse(api.request("/consultas/agenda"))
+                val rows = ConsultationResume.parseAgenda(api.request("/consultas/agenda"))
                 val queue = if (withQueue) ConsultationResume.attendable(ConsultationResume.parseQueue(api.request("/fila"))) else emptyList()
-                mutable.value = mutable.value.copy(loading = false, appointments = rows, queue = queue)
+                // Secondary lists: a failure leaves them as they were instead of hiding the agenda.
+                val unsigned = if (withUnsigned) optional { ConsultationResume.parseUnsigned(api.request("/consultas/sin-firmar")) } ?: mutable.value.unsigned else emptyList()
+                val reschedules = if (withReschedules) optional { ReceptionScheduling.rescheduleDecisions(ReceptionScheduling.appointments(api.request("/citas") as? JSONArray ?: JSONArray())) } ?: mutable.value.reschedules else emptyList()
+                mutable.value = mutable.value.copy(loading = false, appointments = rows, queue = queue, unsigned = unsigned, reschedules = reschedules)
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) }
         }
@@ -86,6 +103,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     }
 
     fun start(item: MedicalAppointment, reason: String) {
+        if (!item.canStart) { mutable.value = mutable.value.copy(error = item.startBlockedReason ?: "La consulta no se puede iniciar ahora."); return }
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
             try {
@@ -130,6 +148,9 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
             } catch (e: Exception) { mutable.value = mutable.value.copy(error = message(e)) }
         }
     }
+
+    /** "Reanudar" an unsigned consultation: opens it by id like the queue does. */
+    fun resume(consultation: UnsignedConsultation) { open(consultation.id, null) }
 
     fun closeResumed() { mutable.value = mutable.value.copy(resumed = null) }
 
@@ -245,13 +266,8 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         mutable.value = mutable.value.copy(appointments = mutable.value.appointments.map(update), resumed = mutable.value.resumed?.let(update))
     }
 
-    private fun parse(value: Any): List<MedicalAppointment> {
-        val rows = value as? JSONArray ?: return emptyList()
-        return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
-            MedicalAppointment(row.optString("appointmentId"), row.optString("patientId"), row.optString("patientName"), row.optString("start"), row.optString("end"), row.optString("appointmentState"), row.optString("reason").takeIf(String::isNotBlank), row.optString("consultationId").takeIf(String::isNotBlank), row.optString("consultationState").takeIf(String::isNotBlank), row.optString("consultationReason").takeIf(String::isNotBlank), row.optString("physicalExam").takeIf(String::isNotBlank), row.optString("plan").takeIf(String::isNotBlank), row.optInt("version", 1))
-        } }
-    }
+    private suspend fun <T> optional(block: suspend () -> T): T? = try { block() } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
 
-    private fun message(error: Exception) = when (error) { is AuthRequestException -> error.message ?: "No se pudo completar la operación."; else -> error.message ?: "No se pudo completar la operación." }
+    private fun message(error: Exception) = businessMessage(error, "No se pudo completar la operación.")
     private fun number(value: String): Double? = value.trim().toDoubleOrNull()
 }

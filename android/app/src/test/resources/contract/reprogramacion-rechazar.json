@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/api/v1/citas/reprogramaciones/{id}/rechazar",
+  "body": {
+    "version": 1,
+    "rejectionReason": "El médico no tiene ese horario libre"
+  }
+}

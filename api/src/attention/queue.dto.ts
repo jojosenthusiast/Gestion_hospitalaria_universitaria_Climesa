@@ -16,3 +16,7 @@ export class QueueTransitionDto {
   @Text(0, 500, true) reason?: string;
 }
 
+export class QueueCallNextDto {
+  @ApiProperty({ enum: QUEUE_SERVICES }) @IsIn(QUEUE_SERVICES) service!: QueueService;
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() officeId?: string;
+}

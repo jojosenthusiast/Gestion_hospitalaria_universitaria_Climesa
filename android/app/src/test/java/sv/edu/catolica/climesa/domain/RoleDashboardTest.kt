@@ -62,12 +62,23 @@ class RoleDashboardTest {
         val model = RoleDashboard.build(
             "REC", everything,
             mapOf(
-                DashboardSource.APPOINTMENTS to rows(row("state" to "solicitada"), row("state" to "confirmada")),
+                DashboardSource.APPOINTMENTS to rows(
+                    row("state" to "solicitada", "start" to "2026-11-15T15:00:00Z"),
+                    // A request whose time already passed is "vencida" on the server; a stale "solicitada" in the past is not pending either.
+                    row("state" to "solicitada", "start" to "2026-11-14T13:00:00Z"),
+                    row("state" to "vencida", "start" to "2026-11-14T13:00:00Z"),
+                    row("state" to "confirmada", "start" to "2026-11-15T15:00:00Z"),
+                ),
                 DashboardSource.LINKS to rows(row("id" to "a"), row("id" to "b")),
             ),
             now = now,
         )
-        assertEquals("1", model.kpis.first { it.label == "Citas por confirmar" }.value)
+        val pending = model.kpis.first { it.label == "Citas por confirmar" }
+        assertEquals("1", pending.value)
+        assertEquals(AndroidSection.APPOINTMENTS, pending.target)
+        assertEquals(QuickAction.REVIEW_REQUESTS, pending.action)
+        assertEquals(QuickAction.REVIEW_REQUESTS, model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.request.action)
+        assertTrue(model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.detail.contains("reprograma"))
         assertEquals("2", model.kpis.first { it.label == "Vinculaciones por verificar" }.value)
         assertTrue(model.attention.any { it.request.section == AndroidSection.LINKING })
         assertTrue(model.attention.any { it.request.section == AndroidSection.APPOINTMENTS })
