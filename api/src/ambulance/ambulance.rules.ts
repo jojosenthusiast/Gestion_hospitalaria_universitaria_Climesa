@@ -11,17 +11,19 @@ export const priorities = ['roja', 'naranja', 'amarilla', 'verde'] as const;
 export type CrewBlockCode = 'sin_paramedico_de_turno' | 'sin_motorista_de_turno' | 'sin_tripulacion_de_turno';
 export type DispatchBlock = { code: 'en_servicio' | 'en_mantenimiento' | CrewBlockCode; message: string; action: string };
 /** Quién falta de la tripulación mínima (RN-30: paramédico y motorista con turno en curso); null si están los dos. */
-export function missingCrew(paramedicOnDuty: boolean, driverOnDuty: boolean): { code: CrewBlockCode; who: string; shift: string } | null {
+export function missingCrew(paramedicOnDuty: boolean, driverOnDuty: boolean, paramedicWithAccount = paramedicOnDuty): { code: CrewBlockCode; who: string; shift: string } | null {
   if (!paramedicOnDuty && !driverOnDuty) return { code: 'sin_tripulacion_de_turno', who: 'paramédico ni motorista', shift: 'un turno de paramédico y otro de motorista que cubran' };
   if (!paramedicOnDuty) return { code: 'sin_paramedico_de_turno', who: 'paramédico', shift: 'un turno de paramédico que cubra' };
   if (!driverOnDuty) return { code: 'sin_motorista_de_turno', who: 'motorista', shift: 'un turno de motorista que cubra' };
+  // BL-05: sin un paramédico con cuenta activa nadie de la tripulación puede registrar los hitos ni finalizar el servicio.
+  if (!paramedicWithAccount) return { code: 'sin_paramedico_de_turno', who: 'paramédico con cuenta en la app', shift: 'un turno de un paramédico con cuenta activa que cubra' };
   return null;
 }
 /** Texto del error 409 cuando falta tripulación al salir de mantenimiento o al despachar. */
 export const missingCrewDetail = (who: string, when: string) => `No hay ${who} con turno en curso; ${when}`;
-export function dispatchBlock(state: UnitState, paramedicOnDuty: boolean, driverOnDuty: boolean): DispatchBlock | null {
-  if (state === 'en_servicio') return { code: 'en_servicio', message: 'La unidad tiene un servicio activo.', action: 'Espera a que la tripulación finalice el servicio; después podrás despachar.' };
-  const missing = missingCrew(paramedicOnDuty, driverOnDuty);
+export function dispatchBlock(state: UnitState, paramedicOnDuty: boolean, driverOnDuty: boolean, paramedicWithAccount = paramedicOnDuty): DispatchBlock | null {
+  if (state === 'en_servicio') return { code: 'en_servicio', message: 'La unidad tiene un servicio activo.', action: 'Espera a que la tripulación finalice el servicio o pide a Jefatura su cierre administrativo; después podrás despachar.' };
+  const missing = missingCrew(paramedicOnDuty, driverOnDuty, paramedicWithAccount);
   if (state === 'en_mantenimiento') {
     return missing
       ? { code: 'en_mantenimiento', message: `La unidad está en mantenimiento y no hay ${missing.who} con turno en curso.`, action: `Publica ${missing.shift} la hora actual y luego saca la unidad de mantenimiento (RN-30).` }
@@ -76,6 +78,6 @@ export const canReportAfter = (finishedAt: Date | null, now: Date) => !finishedA
  * Turno en curso (RN-30): personas paramédicas y motoristas activas con turno publicado o en curso que contiene el instante dado.
  * No usa `personal.v_turno_en_curso` porque esa vista lee `now()` de la base y aquí el reloj es sustituible.
  */
-export const CREW_ROLES_ON_DUTY_SQL = "SELECT bool_or(p.tipo='paramedico') AS paramedic, bool_or(p.tipo='motorista') AS driver FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";
-/** Tripulación asignada al despachar: paramédicos y motoristas activos con turno en curso. */
-export const CREW_ON_DUTY_SQL = "SELECT DISTINCT p.id,p.tipo FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";
+export const CREW_ROLES_ON_DUTY_SQL = "SELECT bool_or(p.tipo='paramedico') AS paramedic, bool_or(p.tipo='motorista') AS driver, bool_or(p.tipo='paramedico' AND EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo')) AS \"paramedicWithAccount\" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";
+/** Tripulación asignada al despachar: paramédicos y motoristas activos con turno en curso; `hasAccount` si puede operar en la app. */
+export const CREW_ON_DUTY_SQL = "SELECT DISTINCT p.id,p.tipo,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS \"hasAccount\" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";

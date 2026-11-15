@@ -6,7 +6,7 @@ import { Clock, businessDayRange } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
-import { AmbulanceRequestDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
+import { AmbulanceRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
 import { CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, UnitState, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, nextMilestones, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
 
 type Unit = { id: string; estado: UnitState; version: number };
@@ -27,8 +27,8 @@ export class AmbulanceService {
   }
   /** Quién de la tripulación mínima tiene turno en curso en el instante dado (RN-30: paramédico y motorista). */
   private async onDuty(c: { query: (sql: string, args: unknown[]) => Promise<{ rows: unknown[] }> }, at: Date) {
-    const row = (await c.query(CREW_ROLES_ON_DUTY_SQL, [at])).rows[0] as { paramedic: boolean | null; driver: boolean | null } | undefined;
-    return { paramedic: row?.paramedic === true, driver: row?.driver === true };
+    const row = (await c.query(CREW_ROLES_ON_DUTY_SQL, [at])).rows[0] as { paramedic: boolean | null; driver: boolean | null; paramedicWithAccount: boolean | null } | undefined;
+    return { paramedic: row?.paramedic === true, driver: row?.driver === true, paramedicWithAccount: row?.paramedicWithAccount === true };
   }
   private async setUnit(c: PoolClient, actor: Actor, unit: Unit, target: UnitState, reason: string | null) {
     const version = (await c.query<{ version: number }>('UPDATE ambulancia.unidad SET estado=$2,version=version+1 WHERE id=$1 RETURNING version', [unit.id, target])).rows[0].version;
@@ -52,15 +52,17 @@ export class AmbulanceService {
         FROM ambulancia.servicio s WHERE unidad_id=$1 AND finalizado_en IS NULL`, [unit.id])).rows[0];
       let activeService = null;
       if (service) {
-        const crew = (await c.query(`SELECT t.persona_id AS "staffId",t.funcion AS role,p.nombres||' '||p.apellidos AS name FROM ambulancia.tripulacion t JOIN personal.persona p ON p.id=t.persona_id WHERE t.servicio_id=$1 ORDER BY t.funcion,p.apellidos`, [service.id])).rows;
+        const crew = (await c.query(`SELECT t.persona_id AS "staffId",t.funcion AS role,p.nombres||' '||p.apellidos AS name,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=t.persona_id AND u.estado='activo') AS "hasAccount" FROM ambulancia.tripulacion t JOIN personal.persona p ON p.id=t.persona_id WHERE t.servicio_id=$1 ORDER BY t.funcion,p.apellidos`, [service.id])).rows;
         const milestones = (await c.query('SELECT tipo AS type,ocurrido_en AS "occurredAt" FROM ambulancia.hito WHERE servicio_id=$1 ORDER BY ocurrido_en,registrado_en', [service.id])).rows;
         const location = (await c.query('SELECT latitud::float AS latitude,longitud::float AS longitude,capturada_en AS "capturedAt" FROM ambulancia.ubicacion WHERE servicio_id=$1 ORDER BY capturada_en DESC LIMIT 1', [service.id])).rows[0] ?? null;
-        activeService = { ...service, crew, milestones, nextMilestones: nextMilestones(milestones.map((m: { type: string }) => m.type)), lastLocation: location };
+        // BL-05: Jefatura cierra administrativamente un servicio que la tripulación no puede finalizar.
+        const allowedActions = hasPermission(actor, 'ambulancia.mantenimiento') ? ['cerrar'] : [];
+        activeService = { ...service, crew, milestones, nextMilestones: nextMilestones(milestones.map((m: { type: string }) => m.type)), lastLocation: location, allowedActions };
       }
       const duty = await this.onDuty(c, this.clock.now());
       const change = (await c.query<{ motivo: string | null; en: Date }>('SELECT motivo,en FROM ambulancia.cambio_estado WHERE unidad_id=$1 AND hacia=$2 ORDER BY id DESC LIMIT 1', [unit.id, unit.state])).rows[0];
       Object.assign(unit, { stateReason: change?.motivo ?? null, stateSince: change?.en ?? null });
-      const result: Record<string, unknown> = { unit, activeService, paramedicOnDuty: duty.paramedic, driverOnDuty: duty.driver, dispatchBlock: dispatchBlock(unit.state, duty.paramedic, duty.driver) };
+      const result: Record<string, unknown> = { unit, activeService, paramedicOnDuty: duty.paramedic, driverOnDuty: duty.driver, paramedicWithAccountOnDuty: duty.paramedicWithAccount, dispatchBlock: dispatchBlock(unit.state, duty.paramedic, duty.driver, duty.paramedicWithAccount) };
       if (hasPermission(actor, 'ambulancia.despachar')) {
         const pending = (await c.query(`SELECT s.id,s.canal AS channel,s.direccion AS address,s.municipio AS municipality,s.latitud::float AS latitude,s.longitud::float AS longitude,s.motivo AS reason,s.telefono_contacto AS "contactPhone",s.creada_en AS "createdAt",s.version,s.paciente_id AS patient,
             s.solicitante_nombre AS "callerName",p.expediente AS "patientRecord",
@@ -86,7 +88,7 @@ export class AmbulanceService {
         target = 'en_mantenimiento';
       } else {
         if (unit.estado !== 'en_mantenimiento') throw new ConflictException('La unidad no está en mantenimiento.');
-        const duty = await this.onDuty(c, this.clock.now()), missing = missingCrew(duty.paramedic, duty.driver);
+        const duty = await this.onDuty(c, this.clock.now()), missing = missingCrew(duty.paramedic, duty.driver, duty.paramedicWithAccount);
         if (missing) throw new ProblemException(missing.code, 409, missingCrewDetail(missing.who, 'la unidad no puede quedar Disponible (RN-30).'));
         target = 'disponible';
       }
@@ -143,8 +145,8 @@ export class AmbulanceService {
       if (unit.estado === 'en_servicio') throw new ProblemException('ambulancia_ya_despachada', 409, 'La ambulancia ya fue despachada.');
       if (unit.estado === 'en_mantenimiento') throw new ProblemException('unidad_en_mantenimiento', 409, 'La ambulancia está en mantenimiento; no se puede despachar.');
       if (unit.version !== dto.version) throw new VersionConflictException(unit.version, 'La unidad cambió; vuelve a consultar su estado.');
-      const crew = (await c.query<{ id: string; tipo: string }>(CREW_ON_DUTY_SQL, [now])).rows;
-      const missing = missingCrew(crew.some(p => p.tipo === 'paramedico'), crew.some(p => p.tipo === 'motorista'));
+      const crew = (await c.query<{ id: string; tipo: string; hasAccount: boolean }>(CREW_ON_DUTY_SQL, [now])).rows;
+      const missing = missingCrew(crew.some(p => p.tipo === 'paramedico'), crew.some(p => p.tipo === 'motorista'), crew.some(p => p.tipo === 'paramedico' && p.hasAccount));
       if (missing) throw new ProblemException(missing.code, 409, missingCrewDetail(missing.who, 'no se puede despachar el servicio (RN-30).'));
       let origin = dto.origin?.trim() || null, municipality = dto.municipality?.trim() || null, patientId: string | null = null, account: string | null = null;
       if (dto.requestId) {
@@ -204,6 +206,29 @@ export class AmbulanceService {
         await this.commands.event(c, 'ambulancia.estado_cambiado', 'unidad', unit.id, unitVersion, ['ambulancia']);
       }
       return { id, type: dto.type, occurredAt, version, finalState, unitState, unitVersion, nextMilestones: nextMilestones([...done, dto.type]) };
+    });
+  }
+
+  /**
+   * BL-05: cierre administrativo de un servicio activo por Jefatura, con motivo (`estado_final = 'cancelado'`). Devuelve la
+   * única unidad a Disponible en la misma transacción, como el hito `finalizado` de la tripulación.
+   */
+  async close(actor: Actor, id: string, dto: CloseServiceDto, key?: string) {
+    return this.commands.run(actor, `ambulancia.mantenimiento:servicio:${id}:cerrar`, key, dto, async c => {
+      const now = this.clock.now();
+      const unit = await this.lockUnit(c);
+      const service = (await c.query<Service>('SELECT id,unidad_id,solicitud_id,paciente_id,finalizado_en,version FROM ambulancia.servicio WHERE id=$1 FOR UPDATE', [id])).rows[0];
+      if (!service) throw new NotFoundException('El servicio no existe.');
+      if (service.finalizado_en) throw new ProblemException('servicio_finalizado', 409, 'El servicio ya finalizó.');
+      if (service.version !== dto.version) throw new VersionConflictException(service.version, 'El servicio cambió; vuelve a consultar el estado de la ambulancia.');
+      const reason = dto.reason.trim();
+      const version = (await c.query<{ version: number }>("UPDATE ambulancia.servicio SET finalizado_en=$2,estado_final='cancelado',motivo_final=$3,cerrado_por=$4,version=version+1 WHERE id=$1 RETURNING version", [id, now, reason, actor.id])).rows[0].version;
+      const unitVersion = unit.estado === 'en_servicio' ? await this.setUnit(c, actor, unit, 'disponible', `Cierre administrativo: ${reason}`) : unit.version;
+      const account = await this.requesterAccount(c, service.solicitud_id);
+      await this.commands.audit(c, actor, { action: 'ambulancia.cerrar', entity: 'servicio', entityId: id, patientId: service.paciente_id ?? undefined, permission: 'ambulancia.mantenimiento', reason, detail: { finalState: 'cancelado' } });
+      await this.commands.event(c, 'ambulancia.hito', 'servicio', id, version, ['ambulancia', ...(account ? [`usuario:${account}`] : [])]);
+      await this.commands.event(c, 'ambulancia.estado_cambiado', 'unidad', unit.id, unitVersion, ['ambulancia']);
+      return { id, finalState: 'cancelado', version, unitState: 'disponible', unitVersion };
     });
   }
 
@@ -274,7 +299,7 @@ export class AmbulanceService {
       if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1440) throw new ProblemException('validacion', 400, 'El umbral de respuesta debe ser de 0 a 1440 minutos.', 'minResponseMinutes');
       add("(SELECT min(h.ocurrido_en) FROM ambulancia.hito h WHERE h.servicio_id=s.id AND h.tipo='en_escena')-s.despachado_en>=make_interval(mins=>?::int)", minutes);
     }
-    const rows = await this.db.query<{ dispatchedAt: Date; onScene: Date | null; record: string | null; origin: string; destination: string; municipality: string | null; crew: { name: string }[] }>(`SELECT s.id,s.tipo AS type,s.prioridad AS priority,s.origen AS origin,s.destino AS destination,s.municipio AS municipality,s.despachado_en AS "dispatchedAt",s.finalizado_en AS "finishedAt",s.estado_final AS "finalState",
+    const rows = await this.db.query<{ dispatchedAt: Date; onScene: Date | null; record: string | null; origin: string; destination: string; municipality: string | null; crew: { name: string }[] }>(`SELECT s.id,s.tipo AS type,s.prioridad AS priority,s.origen AS origin,s.destino AS destination,s.municipio AS municipality,s.despachado_en AS "dispatchedAt",s.finalizado_en AS "finishedAt",s.estado_final AS "finalState",(s.cerrado_por IS NOT NULL) AS "administrativeClose",
         (SELECT min(h.ocurrido_en) FROM ambulancia.hito h WHERE h.servicio_id=s.id AND h.tipo='en_escena') AS "onScene",
         (SELECT pa.expediente FROM pacientes.paciente pa WHERE pa.id=s.paciente_id) AS "record",
         coalesce((SELECT json_agg(json_build_object('type',h.tipo,'occurredAt',h.ocurrido_en) ORDER BY h.ocurrido_en,h.registrado_en) FROM ambulancia.hito h WHERE h.servicio_id=s.id),'[]'::json) AS milestones,

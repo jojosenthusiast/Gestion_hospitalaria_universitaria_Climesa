@@ -59,6 +59,11 @@ export class PrehospitalDto {
   @ApiProperty({format:'date-time',description:'Hora en que el teléfono capturó el reporte'}) @IsISO8601({strict:true}) capturedAt!:string;
   @ApiPropertyOptional({format:'uuid',description:'Paciente del servicio, por ejemplo uno provisional (FR-109-12)'}) @IsOptional() @IsUUID() patientId?:string;
 }
+/** BL-05: cierre administrativo de un servicio activo; `version` es la del servicio. */
+export class CloseServiceDto {
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+  @Text(10,500) reason!:string;
+}
 export class LocationDto {
   @ApiProperty({minimum:-90,maximum:90}) @IsNumber() @Min(-90) @Max(90) latitude!:number;
   @ApiProperty({minimum:-180,maximum:180}) @IsNumber() @Min(-180) @Max(180) longitude!:number;
