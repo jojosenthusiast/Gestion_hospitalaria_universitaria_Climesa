@@ -17,11 +17,10 @@ const FOLDERS = ['android/app/src/test/resources/contract', 'ios/Tests/CoreTests
  * Bodies that today drift from the contract. Each entry must FAIL validation; once the client is fixed the entry
  * must be removed (the test fails if a listed fixture becomes valid, so the list never goes stale).
  */
-const KNOWN_DRIFT: Record<string, string> = {
-  'ios/Tests/CoreTests/Fixtures/contract/admission-indication.json': 'AdmissionBody no envía `motive` (obligatorio, 10-500) y manda `reason` en su lugar.',
-};
+const KNOWN_DRIFT: Record<string, string> = {};
 
-type Fixture = { operation: string; source?: string; body: unknown };
+/** One format for every mobile suite: `{ method, path, body }`, with `path` exactly as in the contract (`/api/v1/...`). */
+type Fixture = { method: string; path: string; body: unknown };
 const fixtures: [string, Fixture][] = FOLDERS.filter(dir => existsSync(resolve(repo, dir))).flatMap(dir =>
   readdirSync(resolve(repo, dir)).filter(name => name.endsWith('.json')).sort()
     .map(name => [`${dir}/${name}`, JSON.parse(readFileSync(resolve(repo, dir, name), 'utf8').replace(/^﻿/, ''))] as [string, Fixture]));
@@ -39,14 +38,13 @@ const ajv = new Ajv({ strict: false, allErrors: true });
 addFormats(ajv);
 ajv.addSchema({ $id: 'contrato', components: close(contract.components) });
 
-function requestSchema(operation: string) {
-  const [method, path] = operation.split(' ');
-  const op = contract.paths[`/api/v1${path}`]?.[method.toLowerCase()];
+function requestSchema(method: string, path: string) {
+  const op = contract.paths[path]?.[method.toLowerCase()];
   return op?.requestBody?.content?.['application/json']?.schema as Record<string, unknown> | undefined;
 }
 function problems(fixture: Fixture) {
-  const schema = requestSchema(fixture.operation);
-  if (!schema) return [`la operación ${fixture.operation} no existe en el contrato o no recibe cuerpo JSON`];
+  const schema = requestSchema(fixture.method, fixture.path);
+  if (!schema) return [`la operación ${fixture.method} ${fixture.path} no existe en el contrato o no recibe cuerpo JSON`];
   const validate = ajv.compile(close(schema) as object);
   return validate(fixture.body) ? [] : (validate.errors ?? []).map(e => `${e.instancePath || '/'} ${e.message}${e.params && 'additionalProperty' in e.params ? `: ${e.params.additionalProperty}` : ''}`);
 }
@@ -56,8 +54,10 @@ describe('MOV-04 cuerpos móviles contra contrato/openapi.json', () => {
     for (const dir of FOLDERS) expect(fixtures.some(([file]) => file.startsWith(dir))).toBe(true);
   });
 
-  it.each(fixtures)('%s tiene operación y cuerpo', (_file, fixture) => {
-    expect(fixture.operation).toMatch(/^(POST|PUT|PATCH|DELETE) \/\S+$/);
+  it.each(fixtures)('%s tiene método, ruta y cuerpo, sin otras claves', (_file, fixture) => {
+    expect(Object.keys(fixture).sort()).toEqual(['body', 'method', 'path']);
+    expect(fixture.method).toMatch(/^(POST|PUT|PATCH|DELETE)$/);
+    expect(fixture.path).toMatch(/^\/api\/v1\/\S+$/);
     expect(fixture.body).toBeDefined();
   });
 
@@ -65,18 +65,22 @@ describe('MOV-04 cuerpos móviles contra contrato/openapi.json', () => {
     expect(problems(fixture)).toEqual([]);
   });
 
-  it.each(fixtures.filter(([file]) => KNOWN_DRIFT[file]))('%s sigue desalineado (quítalo de KNOWN_DRIFT al corregirlo)', (file, fixture) => {
-    expect({ file, drift: KNOWN_DRIFT[file], problems: problems(fixture) }).toEqual({ file, drift: KNOWN_DRIFT[file], problems: expect.arrayContaining([expect.any(String)]) });
-  });
+  const drifting = fixtures.filter(([file]) => KNOWN_DRIFT[file]);
+  if (drifting.length) {
+    it.each(drifting)('%s sigue desalineado (quítalo de KNOWN_DRIFT al corregirlo)', (file, fixture) => {
+      expect({ file, drift: KNOWN_DRIFT[file], problems: problems(fixture) }).toEqual({ file, drift: KNOWN_DRIFT[file], problems: expect.arrayContaining([expect.any(String)]) });
+    });
+  }
 
   it('el validador detecta campos faltantes, de más, con formato o tipo inválido', () => {
+    const cancel = { method: 'POST', path: '/api/v1/citas/{id}/cancelar' };
     const body = { version: 2, reason: 'No podré asistir ese día' };
-    expect(problems({ operation: 'POST /citas/{id}/cancelar', body })).toEqual([]);
-    expect(problems({ operation: 'POST /citas/{id}/cancelar', body: { version: 2 } })).toEqual(["/ must have required property 'reason'"]);
-    expect(problems({ operation: 'POST /citas/{id}/cancelar', body: { ...body, motivo: 'x' } })).toEqual(['/ must NOT have additional properties: motivo']);
-    expect(problems({ operation: 'POST /citas/{id}/cancelar', body: { ...body, version: '2' } })).toEqual(['/version must be number']);
-    expect(problems({ operation: 'POST /consultas', body: { appointmentId: 'no-uuid' } })).toEqual(['/appointmentId must match format "uuid"']);
-    expect(problems({ operation: 'POST /no/existe', body })).toHaveLength(1);
+    expect(problems({ ...cancel, body })).toEqual([]);
+    expect(problems({ ...cancel, body: { version: 2 } })).toEqual(["/ must have required property 'reason'"]);
+    expect(problems({ ...cancel, body: { ...body, motivo: 'x' } })).toEqual(['/ must NOT have additional properties: motivo']);
+    expect(problems({ ...cancel, body: { ...body, version: '2' } })).toEqual(['/version must be number']);
+    expect(problems({ method: 'POST', path: '/api/v1/consultas', body: { appointmentId: 'no-uuid' } })).toEqual(['/appointmentId must match format "uuid"']);
+    expect(problems({ method: 'POST', path: '/api/v1/no/existe', body })).toHaveLength(1);
   });
 
   it('KNOWN_DRIFT solo nombra fixtures que existen', () => {

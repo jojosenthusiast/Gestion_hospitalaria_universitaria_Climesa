@@ -1,6 +1,6 @@
 {
-  "operation": "POST /admisiones/{id}/alta",
-  "source": "HospitalizationRules.dischargeBody",
+  "method": "POST",
+  "path": "/api/v1/admisiones/{id}/alta",
   "body": {
     "type": "medica",
     "version": 3,

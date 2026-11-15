@@ -1,6 +1,6 @@
 {
-  "operation": "POST /consultas/{id}/receta",
-  "source": "ConsultationViewModel.prescription",
+  "method": "POST",
+  "path": "/api/v1/consultas/{id}/receta",
   "body": {
     "items": [
       {

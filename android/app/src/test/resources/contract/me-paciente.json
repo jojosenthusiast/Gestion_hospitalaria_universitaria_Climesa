@@ -1,6 +1,6 @@
 {
-  "operation": "PATCH /me/paciente",
-  "source": "MyDataViewModel.save",
+  "method": "PATCH",
+  "path": "/api/v1/me/paciente",
   "body": {
     "version": 4,
     "phone": "7000-0000",

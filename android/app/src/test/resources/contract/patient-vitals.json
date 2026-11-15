@@ -1,6 +1,6 @@
 {
-  "operation": "POST /pacientes/{id}/signos",
-  "source": "VitalsRules.body",
+  "method": "POST",
+  "path": "/api/v1/pacientes/{id}/signos",
   "body": {
     "temperature": 37.2,
     "heartRate": 88,

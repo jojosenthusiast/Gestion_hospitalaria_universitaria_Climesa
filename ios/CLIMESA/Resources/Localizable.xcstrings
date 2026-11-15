@@ -766,7 +766,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Motivo (opcional, 10 a 500 caracteres)"
+            "value": "Motivo de la hospitalización (10 a 500 caracteres)"
           }
         }
       }
@@ -789,6 +789,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hospitalización"
+          }
+        }
+      }
+    },
+    "admission.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se indica desde esta consulta y a tu nombre como médico tratante. Admisiones asignará la cama."
+          }
+        }
+      }
+    },
+    "admission.later": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no"
           }
         }
       }
@@ -1570,6 +1592,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "resultados por revisar"
+          }
+        }
+      }
+    },
+    "day.results.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultados por revisar"
           }
         }
       }

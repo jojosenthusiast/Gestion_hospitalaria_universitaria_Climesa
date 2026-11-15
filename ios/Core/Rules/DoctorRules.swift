@@ -43,7 +43,23 @@ public enum ConsultationRules {
     public static func isEditable(_ state: ConsultationState) -> Bool { state == .abierta }
 }
 
-/// I24: alta (`DischargeDto`) e indicación de hospitalización (`AdmissionDto`).
+/// I21: indicación de hospitalización desde la consulta (`AdmissionDto.motive`, de 10 a 500 caracteres).
+public enum AdmissionRules {
+    public static let motiveRange = 10...500
+
+    /// Caracteres que cuentan para el límite (sin espacios al inicio ni al final), para el contador del formulario.
+    public static func motiveCount(_ motive: String) -> Int { motive.trimmingCharacters(in: .whitespacesAndNewlines).count }
+
+    public static func motiveError(_ motive: String) -> String? {
+        let size = motiveCount(motive)
+        if size == 0 { return "Escribe el motivo de la hospitalización." }
+        if size < motiveRange.lowerBound { return "El motivo necesita al menos 10 caracteres (llevas \(size))." }
+        if size > motiveRange.upperBound { return "El motivo admite hasta 500 caracteres (llevas \(size))." }
+        return nil
+    }
+}
+
+/// I24: alta (`DischargeDto`).
 public enum DischargeRules {
     public static func errors(type: DischargeType, summary: String, voluntaryConsent: Bool, pending: [DischargePendingBody]) -> [String: String] {
         var errors: [String: String] = [:]
@@ -60,10 +76,5 @@ public enum DischargeRules {
     /// Hospitalizados del médico: en cama o esperando una.
     public static func current(_ admissions: [Admission]) -> [Admission] {
         admissions.filter { $0.state == .hospitalizado || $0.state == .pendienteCama }
-    }
-
-    public static func admissionReasonError(_ reason: String) -> String? {
-        let size = reason.trimmingCharacters(in: .whitespacesAndNewlines).count
-        return size == 0 || (10...500).contains(size) ? nil : "El motivo va de 10 a 500 caracteres."
     }
 }

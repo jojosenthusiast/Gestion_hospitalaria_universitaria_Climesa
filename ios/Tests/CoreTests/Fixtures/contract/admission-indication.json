@@ -1,13 +1,13 @@
 {
-  "operation": "POST /admisiones/indicaciones",
-  "source": "AdmissionBody (ConsultationView.admit)",
+  "method": "POST",
+  "path": "/api/v1/admisiones/indicaciones",
   "body": {
-    "attendingDoctorId": "3f9a8b7c-6d5e-4f3a-8b2c-1d0e9f8a7b6c",
-    "isolation": false,
+    "patientId": "11111111-1111-4111-8111-111111111111",
     "origin": "consulta",
-    "originId": "7c6b5a49-3829-4716-a5b4-c3d2e1f0a9b8",
-    "patientId": "0b7e2d1c-4a5f-4e8b-9c3d-1a2b3c4d5e6f",
-    "reason": "Neumonía que requiere observación",
-    "requestedCategory": "semiprivada"
+    "originId": "22222222-2222-4222-8222-222222222222",
+    "requestedCategory": "semiprivada",
+    "isolation": true,
+    "attendingDoctorId": "33333333-3333-4333-8333-333333333333",
+    "motive": "Neumonía con saturación de 88 %; requiere oxígeno y antibiótico intravenoso."
   }
 }

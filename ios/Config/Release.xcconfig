@@ -1,9 +1,8 @@
 // URL de la API para Release: la API desplegada (pública, HTTPS; la misma que usan web y Android).
 // No contiene claves. Config.xcconfig (local, no se sube) puede reemplazarla.
 CLIMESA_API_BASE_URL = https:/$()/sghu-api.onrender.com/api/v1
-// TEMPORAL (docs/operacion/login-de-prueba.md): selector de cuentas de prueba. NO en lo que se sube; lo activa
-// ios/DemoLogin.xcconfig (no se sube), generado con sh ios/scripts/demo-login.sh. Antes de la entrega: --off.
+// B-02: Release (IPA de entrega) nunca lleva el selector de cuentas de prueba ni sus contraseñas. Solo Debug incluye
+// ios/DemoLogin.xcconfig; aquí se fuerzan en vacío después de Config.xcconfig para que nada los vuelva a activar.
+#include? "../Config.xcconfig"
 CLIMESA_DEMO_LOGIN = NO
 CLIMESA_DEMO_CREDENTIALS =
-#include? "../Config.xcconfig"
-#include? "../DemoLogin.xcconfig"

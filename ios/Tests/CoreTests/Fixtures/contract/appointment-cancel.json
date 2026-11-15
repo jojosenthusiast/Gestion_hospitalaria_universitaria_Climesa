@@ -1,8 +1,8 @@
 {
-  "operation": "POST /citas/{id}/cancelar",
-  "source": "AppointmentCancelBody",
+  "method": "POST",
+  "path": "/api/v1/citas/{id}/cancelar",
   "body": {
-    "reason": "No podré asistir ese día",
-    "version": 2
+    "version": 2,
+    "reason": "No podré asistir por un compromiso de trabajo."
   }
 }

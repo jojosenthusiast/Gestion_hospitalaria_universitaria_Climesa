@@ -100,18 +100,19 @@ public struct LabOrderBody: Encodable, Sendable, Equatable {
     }
 }
 
-/// `AdmissionDto` para `POST /admisiones/indicaciones` desde una consulta.
+/// `AdmissionDto` para `POST /admisiones/indicaciones` desde una consulta: el origen es la consulta abierta,
+/// el médico tratante es quien la indica y `motive` (10 a 500 caracteres) explica por qué se hospitaliza.
 public struct AdmissionBody: Encodable, Sendable, Equatable {
     public let patientId: String
     public let origin: String
-    public let originId: String?
+    public let originId: String
     public let requestedCategory: String
     public let isolation: Bool
     public let attendingDoctorId: String
-    public let reason: String?
-    public init(patientId: String, consultationId: String?, category: RoomCategory, isolation: Bool, attendingDoctorId: String, reason: String?) {
+    public let motive: String
+    public init(patientId: String, consultationId: String, category: RoomCategory, isolation: Bool, attendingDoctorId: String, motive: String) {
         self.patientId = patientId; self.origin = "consulta"; self.originId = consultationId; self.requestedCategory = category.rawValue
-        self.isolation = isolation; self.attendingDoctorId = attendingDoctorId; self.reason = reason
+        self.isolation = isolation; self.attendingDoctorId = attendingDoctorId; self.motive = motive.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
