@@ -52,4 +52,24 @@ class DraftStoreTest {
         root.walkTopDown().filter { it.isFile }.forEach { it.writeText("{no es json") }
         assertNull(drafts.load("u-1", "k"))
     }
+
+    @Test fun endingTheSessionByHandOrByInactivityDropsEveryDraft() {
+        val drafts = store()
+        val session = SessionDrafts(drafts)
+        drafts.save("u-1", "consulta:c1", JSONObject().put("plan", "a"))
+        drafts.save("u-2", "signos", JSONObject().put("fc", "80"))
+        session.ended()
+        assertNull(drafts.load("u-1", "consulta:c1"))
+        assertNull(drafts.load("u-2", "signos"))
+    }
+
+    @Test fun signingInKeepsOnlyTheDraftsOfThatAccount() {
+        val drafts = store()
+        val session = SessionDrafts(drafts)
+        drafts.save("u-1", "consulta:c1", JSONObject().put("plan", "de otra cuenta"))
+        drafts.save("u-2", "consulta:c2", JSONObject().put("plan", "propia"))
+        session.signedIn("u-2")
+        assertNull(drafts.load("u-1", "consulta:c1"))
+        assertEquals("propia", drafts.load("u-2", "consulta:c2")?.getString("plan"))
+    }
 }

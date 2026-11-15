@@ -18,7 +18,9 @@ import sv.edu.catolica.climesa.domain.*
 class LoginDraft(var email:String="",var password:String="")
 data class AuthUiState(val checkingSession:Boolean=true,val signingIn:Boolean=false,val signingOut:Boolean=false,val account:AuthenticatedAccount?=null,val fieldErrors:Map<String,String> = emptyMap(),val error:String?=null,val accessPending:Boolean=false,val registrationMessage:String?=null)
 @HiltViewModel
-class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,private val backend:BackendAccessRepository,realtime:RealtimeRepository,private val expiry:SessionExpiry):ViewModel() {
+class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,private val backend:BackendAccessRepository,realtime:RealtimeRepository,private val expiry:SessionExpiry,drafts:DraftStore):ViewModel() {
+    /** Local drafts hold clinical text: they never outlive the session nor reach another account (see [SessionDrafts]). */
+    private val sessionDrafts=SessionDrafts(drafts)
     private val mutableState=MutableStateFlow(AuthUiState());val state=mutableState.asStateFlow()
     private var pending:AuthSession?=null
     val draft=LoginDraft()
@@ -30,11 +32,12 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
         apply={account->pending=account.session;mutableState.update{it.copy(account=account)}},
         onLost={retryAccess(silent=true)})
     private var expiryWatch:Job?=null
-    private fun track(account:AuthenticatedAccount?){if(account==null)liveProfile.stop() else {liveProfile.start(viewModelScope,account.profile.channels);watchExpiry()}}
+    private fun track(account:AuthenticatedAccount?){if(account==null)liveProfile.stop() else {sessionDrafts.signedIn(account.session.userId);liveProfile.start(viewModelScope,account.profile.channels);watchExpiry()}}
     /** A 401 that survived one renewal (see `authorizedCall`) ends the session and shows the login with the reason. */
     private fun watchExpiry(){if(expiryWatch?.isActive==true)return;expiryWatch=viewModelScope.launch{expiry.expired.collect{message->if(mutableState.value.account!=null&&!mutableState.value.signingOut)expireSession(message)}}}
     private fun expireSession(message:String){
         liveProfile.stop()
+        sessionDrafts.ended()
         auth.clearLocalSession();pending=null;draft.password=""
         mutableState.value=AuthUiState(checkingSession=false,error=message)
     }
@@ -60,9 +63,11 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
         viewModelScope.launch{mutableState.update{it.copy(signingIn=true,error=null,fieldErrors=emptyMap())};try{val session=auth.signUp(name,email,password);pending=session;if(session!=null){val profile=backend.profile(session);val account=AuthenticatedAccount(session,profile);mutableState.update{it.copy(signingIn=false,account=account)};track(account)}else mutableState.update{it.copy(signingIn=false,registrationMessage="Revisa tu correo para confirmar la cuenta. Después podrás ingresar.")}}catch(e:Exception){if(e is CancellationException)throw e;mutableState.update{it.copy(signingIn=false,error="No se pudo crear la cuenta. Revisa los datos o intenta iniciar sesión.",accessPending=pending!=null)}}}
     }
     fun clearRegistration(){mutableState.update{it.copy(registrationMessage=null,fieldErrors=emptyMap(),error=null)}}
+    /** Manual sign-out and the 5-minute inactivity sign-out (`MainActivity.onStart`) both end here. */
     fun signOut(){
         val session=mutableState.value.account?.session?:pending
         liveProfile.stop()
+        sessionDrafts.ended()
         viewModelScope.coroutineContext.cancelChildren()
         mutableState.value=AuthUiState(checkingSession=true,signingOut=true)
         auth.clearLocalSession()

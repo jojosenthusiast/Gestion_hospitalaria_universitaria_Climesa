@@ -19,6 +19,15 @@ interface DraftStore {
     fun clearAll()
 }
 
+/**
+ * Drops drafts when the session changes: every draft when it ends (manual sign-out, the 5-minute inactivity
+ * sign-out in `MainActivity`, or an expired session) and every other account's drafts when one signs in.
+ */
+class SessionDrafts(private val drafts: DraftStore) {
+    fun signedIn(userId: String) = drafts.retainOnly(userId)
+    fun ended() = drafts.clearAll()
+}
+
 /** Never stores anything; the default for ViewModels built without a store (JVM tests, previews). */
 object NoDraftStore : DraftStore {
     override fun save(userId: String, key: String, value: JSONObject) = false
