@@ -110,8 +110,9 @@ describe('W-consultorio · retomar la consulta propia desde la fila', () => {
   it('un número en atención con consulta propia muestra Retomar consulta y la abre sin volver a iniciarla', async () => {
     const api = mount(['consulta.iniciar', 'fila.ver', 'consulta.registrar'], { '/fila': [ticket({ consultationId: 'cons-9', consultationState: 'abierta' })], '/consultas/cons-9/detalle': detail });
     await userEvent.click(await screen.findByRole('button', { name: /Retomar consulta/ }));
-    const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText(/Número de fila N.º 7/)).toBeTruthy();
+    // Find the ticket number first: an earlier dialog element may exist before the resumed consultation renders.
+    const dialog = (await screen.findByText(/Número de fila N.º 7/, undefined, { timeout: 5000 })).closest('dialog') as HTMLElement;
+    expect(dialog).toBeTruthy();
     expect((within(dialog).getByLabelText('Motivo de consulta') as HTMLInputElement).value).toBe('Dolor de cabeza');
     expect(api.write).not.toHaveBeenCalled();
   });
@@ -120,8 +121,9 @@ describe('W-consultorio · retomar la consulta propia desde la fila', () => {
     const write = vi.fn(async () => { throw new ApiError('La consulta ya fue iniciada para este número.', 409, 'consulta_ya_iniciada', undefined, { consultaId: 'cons-9' }); });
     mount(['consulta.iniciar', 'fila.ver'], { '/fila': [ticket()], '/consultas/cons-9/detalle': detail }, write as unknown as Api['write']);
     await userEvent.click(await screen.findByRole('button', { name: /Iniciar consulta/ }));
-    const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText(/Número de fila N.º 7/)).toBeTruthy();
+    // Find the ticket number first: an earlier dialog element may exist before the resumed consultation renders.
+    const dialog = (await screen.findByText(/Número de fila N.º 7/, undefined, { timeout: 5000 })).closest('dialog') as HTMLElement;
+    expect(dialog).toBeTruthy();
     expect(write).toHaveBeenCalledWith('/consultas', { ticketId: 'tk-1' }, 'POST');
   });
 
