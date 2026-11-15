@@ -12,7 +12,8 @@ export const SYSTEM_ACTOR = { id: '00000000-0000-0000-0000-000000000000', roles:
  * Automatic closures that depend only on the clock (audit CITA-05, CITA-02, MA-CIT-02/ASIS-05, FILA-03/ASIS-04):
  * - a request nobody handled before its time becomes `vencida`;
  * - a pending reschedule request expires when its slot or the original appointment starts;
- * - a confirmed appointment from a previous day without a consultation becomes `no_asistio`;
+ * - a confirmed appointment from a previous day without a consultation becomes `no_asistio` (`cancelada` when the
+ *   doctor was marked absent over it);
  * - the queue numbers of a previous day still open close (`no_se_presento` after N calls, `atendido` with a signed
  *   consultation, `cerrado` otherwise); a number whose consultation is still open stays in attention.
  * It runs every minute (like the shift states) and before the appointment and queue reads, so the lists never show
@@ -67,9 +68,17 @@ export class AttentionSweepService implements OnModuleInit, OnModuleDestroy {
         changed += reschedules.length;
       }
 
+      // #114: when the doctor was marked absent the patient is not at fault; the appointment is cancelled instead.
+      const absentClause = `EXISTS (SELECT 1 FROM personal.turno t WHERE t.persona_id=c.medico_id AND t.estado='ausente' AND t.periodo && c.horario)`;
+      const doctorAbsent = (await c.query(`UPDATE atencion.cita c SET estado='cancelada',version=version+1
+        WHERE c.estado='confirmada' AND lower(c.horario)<$1::timestamptz
+          AND NOT atencion.cita_tiene_consulta(c.id) AND ${absentClause}
+        RETURNING id,paciente_id,version`, [todayStart])).rows;
+      changed += await this.announceAppointments(c, doctorAbsent, 'citas.cancelar_medico_ausente');
+
       const noShows = (await c.query(`UPDATE atencion.cita c SET estado='no_asistio',version=version+1
         WHERE c.estado='confirmada' AND lower(c.horario)<$1::timestamptz
-          AND NOT atencion.cita_tiene_consulta(c.id)
+          AND NOT atencion.cita_tiene_consulta(c.id) AND NOT ${absentClause}
         RETURNING id,paciente_id,version`, [todayStart])).rows;
       changed += await this.announceAppointments(c, noShows, 'citas.no_asistio_automatico');
 

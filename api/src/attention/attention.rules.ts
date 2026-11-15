@@ -22,6 +22,8 @@ export type AppointmentFacts = {
   hasConsultation: boolean;
   pendingReschedule: boolean;
   reschedules: number;
+  /** The doctor's shift over the slot is marked `ausente` (#114, ASIS-01). */
+  doctorAbsent?: boolean;
 };
 
 export type AppointmentPolicies = { cancelHours: number; maxReschedules: number };
@@ -61,9 +63,10 @@ export function appointmentActions(facts: AppointmentFacts, policies: Appointmen
   const patientLate = `Solo hasta ${policies.cancelHours} h antes (${hhmm(new Date(facts.start.valueOf() - policies.cancelHours * HOUR))}); comunícate con recepción.`;
   const passed = 'La hora de la cita ya pasó.';
   const consultation = 'La consulta ya empezó.';
+  const absent = 'El médico está ausente en ese horario; reprográmala o cancélala.';
 
   if (facts.state === 'solicitada' && abilities.manage) {
-    add('confirmar', started ? passed : null);
+    add('confirmar', started ? passed : facts.doctorAbsent ? absent : null);
     add('rechazar', started ? passed : null);
   }
 
@@ -91,7 +94,8 @@ export function appointmentActions(facts: AppointmentFacts, policies: Appointmen
   }
 
   if (facts.state === 'confirmada' && abilities.manage) {
-    add('no_asistio', facts.hasConsultation ? consultation : started ? null : 'Disponible cuando llegue la hora de la cita.');
+    // The patient is not at fault when the doctor did not come; reception cancels or reschedules instead.
+    add('no_asistio', facts.hasConsultation ? consultation : facts.doctorAbsent ? absent : started ? null : 'Disponible cuando llegue la hora de la cita.');
   }
 
   if (facts.state === 'confirmada' && abilities.ownDoctor && !facts.hasConsultation) {

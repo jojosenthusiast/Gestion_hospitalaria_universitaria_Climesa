@@ -232,6 +232,7 @@ export class AttentionService {
       c.reprogramada_de AS "rescheduledFromId",c.reprogramaciones AS reschedules,
       (SELECT n.id FROM atencion.cita n WHERE n.reprogramada_de=c.id) AS "rescheduledToId",
       atencion.cita_tiene_consulta(c.id) AS "hasConsultation",
+      EXISTS (SELECT 1 FROM personal.turno t WHERE t.persona_id=c.medico_id AND t.estado='ausente' AND t.periodo && c.horario) AS "doctorAbsent",
       (SELECT json_build_object('id',r.id,'start',lower(r.horario),'end',upper(r.horario),'state',r.estado,'origin',r.origen,
         'reason',r.motivo,'rejectionReason',r.motivo_rechazo,'version',r.version)
         FROM atencion.reprogramacion r WHERE r.cita_id=c.id ORDER BY r.creado_en DESC LIMIT 1) AS reschedule
@@ -243,9 +244,9 @@ export class AttentionService {
       const now = this.clock.now();
       const policies = await this.appointmentPolicies(c, now);
       const today = businessDate(now);
-      return rows.map(({ hasConsultation, reschedules, ...row }) => {
+      return rows.map(({ hasConsultation, doctorAbsent, reschedules, ...row }) => {
         const startAt = new Date(row.start);
-        const facts = { state: row.state, start: startAt, now, startDate: businessDate(startAt), today, hasConsultation, pendingReschedule: row.reschedule?.state === 'pendiente', reschedules };
+        const facts = { state: row.state, start: startAt, now, startDate: businessDate(startAt), today, hasConsultation, doctorAbsent, pendingReschedule: row.reschedule?.state === 'pendiente', reschedules };
         const abilities = this.abilities(actor, row);
         const until = cancelableUntil(facts, policies, abilities);
         return { ...row, reschedule: row.reschedule ? { ...row.reschedule, start: new Date(row.reschedule.start).toISOString(), end: new Date(row.reschedule.end).toISOString() } : null,
@@ -259,6 +260,7 @@ export class AttentionService {
     const row = (await c.query(`SELECT c.id,c.paciente_id AS "patientId",c.medico_id AS "doctorId",lower(c.horario) AS start,upper(c.horario) AS "end",c.estado AS state,c.version,
       c.reprogramaciones AS reschedules,c.motivo AS reason,
       atencion.cita_tiene_consulta(c.id) AS "hasConsultation",
+      EXISTS (SELECT 1 FROM personal.turno t WHERE t.persona_id=c.medico_id AND t.estado='ausente' AND t.periodo && c.horario) AS "doctorAbsent",
       (SELECT r.id FROM atencion.reprogramacion r WHERE r.cita_id=c.id AND r.estado='pendiente') AS "pendingId"
       FROM atencion.cita c WHERE c.id=$1 FOR UPDATE OF c`, [id])).rows[0] as AppointmentRow | undefined;
     return row;
@@ -267,11 +269,11 @@ export class AttentionService {
   private assertAction(actor: Actor, row: AppointmentRow, policies: { cancelHours: number; maxReschedules: number }, action: string) {
     const now = this.clock.now();
     const start = new Date(row.start);
-    const facts = { state: row.state, start, now, startDate: businessDate(start), today: businessDate(now), hasConsultation: row.hasConsultation, pendingReschedule: !!row.pendingId, reschedules: row.reschedules };
+    const facts = { state: row.state, start, now, startDate: businessDate(start), today: businessDate(now), hasConsultation: row.hasConsultation, doctorAbsent: row.doctorAbsent, pendingReschedule: !!row.pendingId, reschedules: row.reschedules };
     const result = appointmentActions(facts, policies, this.abilities(actor, row));
     if (result.allowedActions.includes(action as any)) return;
     const blocked = result.blockedActions.find(item => item.action === action);
-    const code = row.hasConsultation ? 'cita_con_consulta' : action === 'cancelar' && blocked?.reason.startsWith('Solo hasta') ? 'cancelacion_fuera_de_plazo' : 'transicion_invalida';
+    const code = row.hasConsultation ? 'cita_con_consulta' : row.doctorAbsent && blocked?.reason.startsWith('El médico está ausente') ? 'medico_ausente' : action === 'cancelar' && blocked?.reason.startsWith('Solo hasta') ? 'cancelacion_fuera_de_plazo' : 'transicion_invalida';
     throw new ProblemException(code, 409, blocked?.reason ?? 'La cita ya no admite esa acción.');
   }
 

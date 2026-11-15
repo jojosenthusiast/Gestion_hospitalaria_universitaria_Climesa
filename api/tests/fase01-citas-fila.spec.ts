@@ -298,6 +298,27 @@ describe('Fase 0/1 · fila y citas guiadas por el servidor', () => {
       expect((await t.one('SELECT estado FROM atencion.reprogramacion WHERE id=$1', [asked.rescheduleId])).estado).toBe('vencida');
     });
 
+    test('#114 · con el médico ausente no se confirma ni se marca "no asistió"; el barrido cancela en vez de culpar al paciente', async () => {
+      const absent = await t.shift('MED', new Date('2026-11-20T14:00:00Z'), new Date('2026-11-20T23:00:00Z'));
+      await t.shift('MED', new Date('2026-11-21T14:00:00Z'), new Date('2026-11-21T23:00:00Z'));
+      const confirmed = await t.appointment(await t.patient(), new Date('2026-11-20T15:00:00Z'));
+      const request = await t.appointment(await t.patient(), new Date('2026-11-20T16:00:00Z'), 'solicitada');
+      const stale = await t.appointment(await t.patient(), new Date('2026-11-20T17:00:00Z'));
+      await t.pg.query(`UPDATE personal.turno SET estado='ausente',ausencia_tipo='justificada',asistencia_motivo='Incapacidad médica del día' WHERE persona_id=$1 AND lower(periodo)='2026-11-20T14:00:00Z'`, [doctorId]);
+      const reason = 'El médico está ausente en ese horario; reprográmala o cancélala.';
+      expect((await appointmentOf('REC', request)).blockedActions).toContainEqual({ action: 'confirmar', reason });
+      expect((await appointmentOf('REC', confirmed)).blockedActions).toContainEqual({ action: 'no_asistio', reason });
+      const confirm = await t.call('REC', 'POST', `/citas/solicitudes/${request}/confirmar`, { version: 1 });
+      expect(confirm.status).toBe(409);
+      const moved = await t.call('REC', 'POST', `/citas/${confirmed}/reprogramar`, { version: 1, ...slot(new Date('2026-11-21T15:00:00Z')) });
+      expect(moved.status).toBe(201);
+      t.setNow(new Date('2026-11-21T15:30:00Z'));
+      await t.call('REC', 'GET', '/citas');
+      expect((await t.one('SELECT estado FROM atencion.cita WHERE id=$1', [stale])).estado).toBe('cancelada');
+      expect((await t.audits('citas.cancelar_medico_ausente')).some(a => a.detalle.ids.includes(stale))).toBe(true);
+      void absent;
+    });
+
     test('si el barrido falla, la fila y las citas se leen igual', async () => {
       const sweeper = t.app.get(AttentionSweepService);
       const spy = jest.spyOn(sweeper, 'sweep').mockRejectedValue(new Error('canceling statement due to lock timeout'));
