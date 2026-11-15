@@ -123,7 +123,7 @@ describe('Fase 1 · seguridad (SEG-03, SEG-08, SEG-09, API-19)', () => {
 });
 
 describe('Fase 1 · configuración (API-19, SEG-08)', () => {
-  const complete = { NODE_ENV: 'production', SUPABASE_URL: 'https://proyecto.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_x', SUPABASE_SECRET_KEY: 'sb_secret_x', DATABASE_URL: 'postgresql://sghu_api@db.example.invalid/postgres' };
+  const complete = { NODE_ENV: 'production', SUPABASE_URL: 'https://proyecto.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_x', SUPABASE_SECRET_KEY: 'sb_secret_x', DATABASE_URL: 'postgresql://sghu_api@db.example.invalid/postgres', WEB_APP_URL: 'https://sghu-web.onrender.com' };
   test('producción completa no tiene problemas; fuera de producción no se exige nada', () => {
     expect(productionEnvironmentProblems(complete)).toEqual([]);
     expect(productionEnvironmentProblems({ NODE_ENV: 'development' })).toEqual([]);
@@ -135,6 +135,11 @@ describe('Fase 1 · configuración (API-19, SEG-08)', () => {
     expect(productionEnvironmentProblems({ ...complete, SUPABASE_URL: 'http://proyecto.supabase.co' })).toContain('Supabase requiere HTTPS en producción.');
     expect(productionEnvironmentProblems({ ...complete, SUPABASE_SECRET_KEY: '' }).join(' ')).toContain('SUPABASE_SECRET_KEY');
     expect(productionEnvironmentProblems({ ...complete, SUPABASE_SECRET_KEY: '', SUPABASE_SERVICE_ROLE_KEY: 'llave' })).toEqual([]);
+  });
+  test('producción exige WEB_APP_URL pública: sin ella la invitación apunta a localhost', () => {
+    expect(productionEnvironmentProblems({ ...complete, WEB_APP_URL: '' }).join(' ')).toContain('Falta la variable WEB_APP_URL');
+    expect(productionEnvironmentProblems({ ...complete, WEB_APP_URL: 'http://localhost:5173' }).join(' ')).toContain('no localhost');
+    expect(productionEnvironmentProblems({ ...complete, WEB_APP_URL: 'https://localhost:5173' }).join(' ')).toContain('no localhost');
   });
   test('límite y saltos de proxy: valores inválidos vuelven al valor seguro', () => {
     expect(rateLimitPerMinute(undefined)).toBe(300);

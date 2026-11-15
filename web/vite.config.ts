@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const deployedApiOrigin = 'https://sghu-api.onrender.com';
@@ -16,8 +17,22 @@ function demoCredentials(mode: string): string {
   return existsSync(file) ? readFileSync(file, 'utf8') : '';
 }
 
+// SPA fallback without touching the Render dashboard: a static host serves `404.html` for an unknown path, so a deep link
+// such as the e-mail landing `/aceptar-invitacion` renders the app instead of a 404 page (docs/operacion/correo-auth.md).
+// render.yaml also declares the `/*` -> `/index.html` rewrite; this copy keeps working when that rewrite is not applied.
+export function spaFallback(): Plugin {
+  return {
+    name: 'sghu-spa-404-fallback',
+    apply: 'build',
+    writeBundle(options) {
+      const dir = options.dir ?? 'dist';
+      if (existsSync(join(dir, 'index.html'))) copyFileSync(join(dir, 'index.html'), join(dir, '404.html'));
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [react()],
+  plugins: [react(), spaFallback()],
   define: { 'import.meta.env.VITE_DEMO_CREDENTIALS': JSON.stringify(demoCredentials(mode)) },
   server: {
     host: '127.0.0.1',
@@ -36,7 +51,7 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: mode === 'design'
         ? { app: 'index.html', design: 'design-preview.html', modules: 'work-preview.html' }
-        : { app: 'index.html' },
+        : { app: 'index.html' } as Record<string, string>,
     },
   },
 }));

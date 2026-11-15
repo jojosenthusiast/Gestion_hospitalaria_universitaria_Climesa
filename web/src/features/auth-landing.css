@@ -1,0 +1,12 @@
+/* E-mail landing pages (features/auth-landing.tsx): where the account can sign in. */
+.platform-guidance { display: grid; gap: 14px; }
+.platform-summary { margin: 0; font-weight: 600; }
+.platform-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.platform-item { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line, #d7dce5); border-radius: var(--radius-card, 12px); }
+.platform-item svg { flex: none; margin-top: 2px; color: var(--primary, #0043b2); }
+.platform-item div { display: grid; gap: 2px; min-width: 0; }
+.platform-item span { color: var(--muted, #5b6474); font-size: .92rem; }
+.platform-roles { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--radius-card, 12px); background: var(--soft, #f3f5f9); }
+.platform-roles ul { margin: 0; padding-left: 18px; }
+.platform-roles p, .platform-note { margin: 0; color: var(--muted, #5b6474); font-size: .92rem; }
+.resend-form { display: grid; gap: 12px; }

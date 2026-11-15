@@ -12,6 +12,10 @@ export function productionEnvironmentProblems(env: NodeJS.ProcessEnv): string[] 
   const problems = REQUIRED_IN_PRODUCTION.filter(name => !value(name)).map(name => `Falta la variable ${name}.`);
   if (value('SUPABASE_URL') && !value('SUPABASE_URL').startsWith('https://')) problems.push('Supabase requiere HTTPS en producción.');
   if (!value('SUPABASE_SECRET_KEY') && !value('SUPABASE_SERVICE_ROLE_KEY')) problems.push('Falta la variable SUPABASE_SECRET_KEY (o SUPABASE_SERVICE_ROLE_KEY).');
+  // The invitation e-mail links to `${WEB_APP_URL}/aceptar-invitacion`: without it the link would point to localhost (docs/operacion/correo-auth.md).
+  const web = value('WEB_APP_URL');
+  if (!web) problems.push('Falta la variable WEB_APP_URL (URL pública de la web: CORS y enlaces de los correos de invitación).');
+  else if (!web.startsWith('https://') || /^https:\/\/(localhost|127\.0\.0\.1)([:/]|$)/.test(web)) problems.push('WEB_APP_URL debe ser la URL pública HTTPS de la web, no localhost.');
   return problems;
 }
 
