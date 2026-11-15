@@ -140,7 +140,7 @@ describe('W-consultorio · borrador local de la consulta', () => {
     let dialog = await openConsultation();
     await userEvent.type(within(dialog).getByLabelText('Examen físico'), 'Abdomen blando');
     expect(await within(dialog).findByText('Borrador guardado en este equipo.')).toBeTruthy();
-    expect(JSON.parse(localStorage.getItem('climesa:borrador:med-1:consulta:cons-1') ?? '{}').physicalExam).toBe('Abdomen blando');
+    expect(JSON.parse(localStorage.getItem('climesa:borrador:med-1:consulta:cons-1') ?? '{}').value.physicalExam).toBe('Abdomen blando');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     dialog = await openConsultation();
