@@ -254,7 +254,7 @@ insert into plan_turno values
   (42, pg_temp.did('0002', 49), 'P1-AMB', 'N2B');
 -- La cardióloga (persona demo 4) no tiene plan a propósito: en la agenda aparece como "Sin turno".
 
-insert into personal.turno (id, persona_id, area_id, periodo, tipo, estado, justificacion, publicado_por, publicado_en, creado_por)
+insert into personal.turno (id, persona_id, area_id, periodo, tipo, estado, justificacion, publicado_por, publicado_en, creado_por, excepcion_carga)
 select pg_temp.did('0003', b.idx * 100 + b.d + 2), b.persona, pg_temp.espacio(b.area),
        tstzrange(b.ini, b.fin, '[)'), b.tipo,
        case when (b.idx = 2 and b.d = 3) or (b.idx = 29 and b.d = 6) then 'cancelado'
@@ -269,9 +269,12 @@ select pg_temp.did('0003', b.idx * 100 + b.d + 2), b.persona, pg_temp.espacio(b.
             when b.idx = 5 and b.d = 0 then '[DEMO] Guardia médica de 24 h, el máximo que permite la política de turnos'
             when b.idx = 6 and b.d = 0 then '[DEMO] Turno nocturno de 12 h que termina al día siguiente'
             end,
-       pg_temp.actor('JOP'), now() - interval '1 day', pg_temp.actor('JOP')
+       pg_temp.actor('JOP'), now() - interval '1 day', pg_temp.actor('JOP'),
+       -- D7/T7 cover the area every day of the demo window with one person: written exception, so a later
+       -- consecutive-days rule in the database does not reject the demo plan.
+       case when b.patron in ('D7', 'T7') then '[DEMO] Plan de cobertura diaria de la demostración: excepción documentada a los días consecutivos' end
 from (
-  select p.idx, p.persona, p.area, d.d,
+  select p.idx, p.persona, p.area, p.patron, d.d,
          case when p.patron = 'D7' or (p.patron = 'D5' and extract(isodow from pg_temp.hoy() + d.d) <= 5)
                    or (p.patron = 'A2' and mod(mod(d.d, 2) + 2, 2) = 0) then pg_temp.ts(pg_temp.hoy() + d.d, 7)
               when (p.patron = 'T5' and extract(isodow from pg_temp.hoy() + d.d) <= 5) or p.patron = 'T7' then pg_temp.ts(pg_temp.hoy() + d.d, 13)

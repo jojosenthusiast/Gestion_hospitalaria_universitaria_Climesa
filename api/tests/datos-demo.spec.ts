@@ -321,6 +321,19 @@ describe('Datos de demostración (tools/demo)', () => {
     expect(noches).toBe(14);
   });
 
+  test('los planes de 7 días seguidos llevan excepcion_carga con motivo (preparado para una regla de días consecutivos)', async () => {
+    // Islands of consecutive local days per person; every shift in a run longer than 6 days must carry the exception.
+    const sinExcepcion = Number((await t.one<{ n: string }>(`WITH d AS (
+        SELECT DISTINCT u.persona_id, (lower(u.periodo) AT TIME ZONE 'America/El_Salvador')::date AS dia FROM personal.turno u
+        WHERE u.id::text LIKE ${DEMO} AND u.estado <> 'cancelado'),
+      g AS (SELECT persona_id, dia, dia - (row_number() OVER (PARTITION BY persona_id ORDER BY dia))::int AS isla FROM d),
+      largas AS (SELECT persona_id, isla FROM g GROUP BY persona_id, isla HAVING count(*) > 6)
+      SELECT count(*) AS n FROM personal.turno u JOIN g ON g.persona_id = u.persona_id AND g.dia = (lower(u.periodo) AT TIME ZONE 'America/El_Salvador')::date
+      JOIN largas l ON l.persona_id = g.persona_id AND l.isla = g.isla
+      WHERE u.id::text LIKE ${DEMO} AND u.estado <> 'cancelado' AND (u.excepcion_carga IS NULL OR length(btrim(u.excepcion_carga)) < 10)`)).n);
+    expect(sinExcepcion).toBe(0);
+  });
+
   test('la API lee lo sembrado: la búsqueda "maria" sin tilde encuentra a las dos María', async () => {
     const encontrados = await t.call('REC', 'GET', '/pacientes?query=maria');
     expect(encontrados.status).toBe(200);
