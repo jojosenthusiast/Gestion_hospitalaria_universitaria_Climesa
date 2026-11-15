@@ -357,7 +357,12 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         if (AdmissionAction.SIGN_DISCHARGE in actions) row.dischargeRequestedAt?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_alta_solicitada, localTime(it))) }
         HospitalizationRules.waitingDischargeHint(row)?.let { NoticeBanner(if (row.attendingDoctorHasAccount) NoticeKind.INFO else NoticeKind.WARNING, it) }
         row.discharge?.takeIf { row.state == "alta_firmada" }?.let { d ->
-            Text(stringResource(R.string.hosp_alta_firmada, d.type?.label?.lowercase() ?: "", d.signedByName ?: stringResource(R.string.hosp_alta_firmante_desconocido), localTime(d.signedAt)), style = MaterialTheme.typography.bodySmall)
+            val signer = d.signedByName ?: stringResource(R.string.hosp_alta_firmante_desconocido)
+            Text(
+                d.type?.let { stringResource(R.string.hosp_alta_firmada, it.label.lowercase(), signer, localTime(d.signedAt)) }
+                    ?: stringResource(R.string.hosp_alta_firmada_sin_tipo, signer, localTime(d.signedAt)),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         if (AdmissionAction.ASSIGN_BED in actions) PrimaryButton(stringResource(R.string.hosp_asignar_cama), { model.open(row) }, icon = Icons.Default.Bed, enabled = !busy)
         if (AdmissionAction.SIGN_DISCHARGE in actions) PrimaryButton(stringResource(R.string.hosp_firmar_alta), { model.openDischarge(row) }, enabled = !busy)
@@ -442,9 +447,14 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
             admission.discharge?.let { d ->
+                if (d.specialHandling) NoticeBanner(NoticeKind.WARNING, stringResource(R.string.hosp_salida_tramite_especial))
                 Text(stringResource(R.string.hosp_pendientes_alta), style = MaterialTheme.typography.labelLarge)
-                if (d.pending.isEmpty()) Text(stringResource(R.string.hosp_sin_pendientes), style = MaterialTheme.typography.bodySmall)
-                else d.pending.forEach { Text(stringResource(R.string.hosp_pendiente_linea, it.description, it.responsible), style = MaterialTheme.typography.bodySmall) }
+                val pending = d.pending
+                when {
+                    pending == null && d.pendingCount > 0 -> Text(if (d.pendingCount == 1) stringResource(R.string.hosp_pendiente_sin_detalle) else stringResource(R.string.hosp_pendientes_sin_detalle, d.pendingCount), style = MaterialTheme.typography.bodySmall)
+                    pending.isNullOrEmpty() -> Text(stringResource(R.string.hosp_sin_pendientes), style = MaterialTheme.typography.bodySmall)
+                    else -> pending.forEach { Text(stringResource(R.string.hosp_pendiente_linea, it.description, it.responsible), style = MaterialTheme.typography.bodySmall) }
+                }
             }
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             FormField(stringResource(R.string.hosp_salida_motivo), state.exitReason, model::onExitReason, hint = stringResource(R.string.hosp_contador_motivo, HospitalizationRules.counter(state.exitReason, ChangeReason.MAX)), enabled = !state.busy, singleLine = false)

@@ -33,6 +33,18 @@ class HospitalizationRulesTest {
         assertEquals("only the actions Android offers; unknown and web-only ones are dropped", setOf(AdmissionAction.SIGN_DISCHARGE, AdmissionAction.TRANSFER), a.allowedActions)
     }
 
+    @Test fun withoutACareRelationshipTheDischargeIsOperationalOnly() {
+        val rows = JSONArray().put(row(
+            "id" to "ad2", "state" to "alta_firmada",
+            "discharge" to row("type" to null, "signedAt" to "2026-11-14T11:00:00Z", "signedByName" to "Dra. López", "pending" to null, "pendingCount" to 2, "specialHandling" to true),
+        ))
+        val d = AdmissionParser.admissions(rows).single().discharge!!
+        assertNull("D-031: the type is clinical", d.type)
+        assertNull("D-031: the pending descriptions are clinical", d.pending)
+        assertEquals(2, d.pendingCount)
+        assertTrue(d.specialHandling)
+    }
+
     @Test fun anOlderRowWithoutTheNewFieldsOffersNoAction() {
         val a = AdmissionParser.admissions(JSONArray().put(row("id" to "ad1", "state" to "hospitalizado", "dischargeRequestedAt" to null, "discharge" to null))).single()
         assertTrue(a.allowedActions.isEmpty())

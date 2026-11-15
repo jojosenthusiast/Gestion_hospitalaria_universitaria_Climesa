@@ -38,8 +38,19 @@ enum class DischargeType(val value: String, val label: String) {
     }
 }
 
-/** The current signed discharge of an admission (`discharge` of `GET /admisiones`), without the clinical summary. */
-data class AdmissionDischarge(val type: DischargeType?, val signedAt: String, val signedByName: String?, val pending: List<DischargePending>)
+/**
+ * The current signed discharge of an admission (`discharge` of `GET /admisiones`), without the clinical summary.
+ * D-031: [type] and [pending] are null for readers without a care relationship (Recepción); [pendingCount] and
+ * [specialHandling] always come.
+ */
+data class AdmissionDischarge(
+    val type: DischargeType?,
+    val signedAt: String,
+    val signedByName: String?,
+    val pending: List<DischargePending>?,
+    val pendingCount: Int = pending?.size ?: 0,
+    val specialHandling: Boolean = false,
+)
 
 /** One row of `GET /admisiones`. */
 data class HospitalAdmission(
@@ -93,7 +104,9 @@ object AdmissionParser {
                     DischargeType.fromWire(d.optString("type")),
                     d.textOrNull("signedAt").orEmpty(),
                     d.textOrNull("signedByName"),
-                    objects(d.optJSONArray("pending")).map { DischargePending(it.optString("description"), it.optString("responsible")) },
+                    if (d.isNull("pending")) null else objects(d.optJSONArray("pending")).map { DischargePending(it.optString("description"), it.optString("responsible")) },
+                    d.optInt("pendingCount", d.optJSONArray("pending")?.length() ?: 0),
+                    d.optBoolean("specialHandling"),
                 )
             },
             allowedActions = (0 until (actions?.length() ?: 0)).mapNotNull { i -> actions?.optString(i)?.let(AdmissionAction::fromWire) }.toSet(),

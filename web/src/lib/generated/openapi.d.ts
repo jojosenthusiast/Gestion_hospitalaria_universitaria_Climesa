@@ -3855,11 +3855,15 @@ export interface components {
             responsible: string;
         };
         AdmissionDischargeResponse: {
-            type: components["schemas"]["TipoAlta"];
+            type: components["schemas"]["TipoAlta"] | null;
             /** Format: date-time */
             signedAt: string;
             signedByName: string | null;
-            pending: components["schemas"]["DischargePendingResponse"][];
+            pending: components["schemas"]["DischargePendingResponse"][] | null;
+            /** @description Cantidad de pendientes del alta. */
+            pendingCount: number;
+            /** @description La salida necesita un trámite especial (defunción o traslado a otro centro); no revela el tipo. */
+            specialHandling: boolean;
         };
         /** @enum {string} */
         AccionAdmision: "asignar_cama" | "autorizar" | "cancelar" | "anular" | "trasladar" | "firmar_alta" | "solicitar_alta" | "revocar_alta" | "registrar_salida" | "reasignar_tratante" | "nota_enfermeria";

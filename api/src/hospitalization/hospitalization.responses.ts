@@ -13,12 +13,18 @@ export class DischargePendingResponse {
   @StrProp() responsible!: string;
 }
 
-/** The current (not revoked) signed discharge; without the clinical summary (it lives in the record). */
+/**
+ * The current (not revoked) signed discharge; without the clinical summary (it lives in the record).
+ * D-031: `type` and `pending` are clinical and come null to readers without a care relationship (Recepción, Jefatura);
+ * `pendingCount` and `specialHandling` are the operational part every reader gets.
+ */
 export class AdmissionDischargeResponse {
-  @EnumProp(TIPO_ALTA, 'TipoAlta') type!: string;
+  @EnumProp(TIPO_ALTA, 'TipoAlta', { nullable: true }) type!: string | null;
   @DateTimeProp() signedAt!: string;
   @StrProp({ nullable: true }) signedByName!: string | null;
-  @ClassArrayProp(DischargePendingResponse) pending!: DischargePendingResponse[];
+  @ClassArrayProp(DischargePendingResponse, { nullable: true }) pending!: DischargePendingResponse[] | null;
+  @IntProp({ description: 'Cantidad de pendientes del alta.' }) pendingCount!: number;
+  @BoolProp({ description: 'La salida necesita un trámite especial (defunción o traslado a otro centro); no revela el tipo.' }) specialHandling!: boolean;
 }
 
 export class AdmissionResponse {

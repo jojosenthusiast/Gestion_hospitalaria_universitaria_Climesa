@@ -99,6 +99,10 @@
     <string name="hosp_tratante">Médico tratante</string>
     <string name="hosp_alta_firmada">Alta %1$s firmada por %2$s el %3$s.</string>
     <string name="hosp_alta_firmante_desconocido">el médico</string>
+    <string name="hosp_alta_firmada_sin_tipo">Alta firmada por %1$s el %2$s.</string>
+    <string name="hosp_salida_tramite_especial">Esta salida requiere un trámite especial; coordínalo con el médico tratante antes de registrarla.</string>
+    <string name="hosp_pendiente_sin_detalle">Hay 1 pendiente registrado por el médico; el detalle es clínico y lo ve el equipo tratante.</string>
+    <string name="hosp_pendientes_sin_detalle">Hay %1$d pendientes registrados por el médico; el detalle es clínico y lo ve el equipo tratante.</string>
     <string name="hosp_pendientes_alta">Pendientes del alta</string>
     <string name="hosp_sin_pendientes">El alta no dejó pendientes.</string>
     <string name="hosp_pendiente_linea">%1$s · responsable: %2$s</string>

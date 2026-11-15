@@ -412,17 +412,23 @@ private struct SignedDischarge: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text(verbatim: String(format: L.text("hospitalized.discharge.signed"), discharge.kind?.label ?? "—"))
+            Text(verbatim: discharge.kind.map { String(format: L.text("hospitalized.discharge.signed"), $0.label) } ?? L.text("hospitalized.discharge.signedNoType"))
                 .font(Typo.label).foregroundStyle(Theme.ink)
             Text(verbatim: String(format: L.text("hospitalized.discharge.signedBy"), discharge.signedByName ?? "—", ClimesaDates.display(discharge.signedAt)))
                 .font(Typo.small).foregroundStyle(Theme.muted)
-            if discharge.pending.isEmpty {
-                Text("hospitalized.discharge.noPending").font(Typo.small).foregroundStyle(Theme.muted)
-            } else {
-                ForEach(Array(discharge.pending.enumerated()), id: \.offset) { _, item in
+            if discharge.specialHandling {
+                Text("hospitalized.discharge.specialHandling").font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+            }
+            if let pending = discharge.pending, !pending.isEmpty {
+                ForEach(Array(pending.enumerated()), id: \.offset) { _, item in
                     Text(verbatim: String(format: L.text("hospitalized.discharge.pendingItem"), item.description, item.responsible))
                         .font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 }
+            } else if discharge.pending == nil, discharge.pendingCount > 0 {
+                Text(verbatim: String(format: L.text("hospitalized.discharge.pendingCount"), discharge.pendingCount))
+                    .font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("hospitalized.discharge.noPending").font(Typo.small).foregroundStyle(Theme.muted)
             }
         }
         .accessibilityElement(children: .combine)

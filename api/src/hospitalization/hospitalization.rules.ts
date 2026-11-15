@@ -44,3 +44,6 @@ export function admissionActions(actor: Actor, row: AdmissionActionInput): strin
   }
   return actions;
 }
+
+/** D-031: discharge types whose physical exit needs special handling; readers without a care relationship get only this flag. */
+export const SPECIAL_EXIT: readonly string[] = ['defuncion', 'traslado'];

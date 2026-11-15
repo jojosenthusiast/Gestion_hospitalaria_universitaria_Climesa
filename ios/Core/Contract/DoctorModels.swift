@@ -154,22 +154,29 @@ public struct Admission: Decodable, Sendable, Identifiable, Equatable {
             public let responsible: String
         }
         /// `TipoAlta` como texto; `kind` es nil si la API trae un tipo que esta versión no conoce.
-        public let type: String
+        /// D-031: `type` y `pending` llegan nulos a quien no tiene relación de atención; `pendingCount` y
+        /// `specialHandling` llegan siempre.
+        public let type: String?
         public let signedAt: String?
         public let signedByName: String?
-        public let pending: [Pending]
-        public var kind: DischargeType? { DischargeType(rawValue: type) }
+        public let pending: [Pending]?
+        public let pendingCount: Int
+        public let specialHandling: Bool
+        public var kind: DischargeType? { type.flatMap(DischargeType.init(rawValue:)) }
 
-        enum CodingKeys: String, CodingKey { case type, signedAt, signedByName, pending }
-        public init(type: String, signedAt: String?, signedByName: String?, pending: [Pending]) {
+        enum CodingKeys: String, CodingKey { case type, signedAt, signedByName, pending, pendingCount, specialHandling }
+        public init(type: String?, signedAt: String?, signedByName: String?, pending: [Pending]?, pendingCount: Int? = nil, specialHandling: Bool = false) {
             self.type = type; self.signedAt = signedAt; self.signedByName = signedByName; self.pending = pending
+            self.pendingCount = pendingCount ?? pending?.count ?? 0; self.specialHandling = specialHandling
         }
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            type = try container.decode(String.self, forKey: .type)
-            signedAt = try? container.decodeIfPresent(String.self, forKey: .signedAt)
+            type = (try? container.decodeIfPresent(String.self, forKey: .type)) ?? nil
+            signedAt = try container.decode(String.self, forKey: .signedAt)
             signedByName = try? container.decodeIfPresent(String.self, forKey: .signedByName)
-            pending = ((try? container.decodeIfPresent([Pending].self, forKey: .pending)) ?? nil) ?? []
+            pending = (try? container.decodeIfPresent([Pending].self, forKey: .pending)) ?? nil
+            pendingCount = ((try? container.decodeIfPresent(Int.self, forKey: .pendingCount)) ?? nil) ?? pending?.count ?? 0
+            specialHandling = ((try? container.decodeIfPresent(Bool.self, forKey: .specialHandling)) ?? nil) ?? false
         }
     }
 

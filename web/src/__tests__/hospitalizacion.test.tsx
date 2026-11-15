@@ -19,7 +19,7 @@ const base = { attendingDoctorName: 'Dra. Ficticia Tratante', attendingDoctorHas
 const admissionsFixture = () => [
   { ...base, id: 'a-1', patientId: 'p-1', patientName: 'Paciente Ficticio Uno', origin: 'programada', requestedCategory: 'semiprivada', state: 'pendiente_cama', isolation: false, bed: '', version: 1, allowedActions: ['asignar_cama', 'cancelar'] },
   { ...base, id: 'a-2', patientId: 'p-2', patientName: 'Paciente Ficticio Dos', origin: 'emergencia', requestedCategory: 'semiprivada', state: 'hospitalizado', isolation: true, bed: 'C-201', bedCategory: 'semiprivada', version: 2, occupationId: 'o-2', dischargeRequestedAt: tenMinutesAgo(), allowedActions: ['solicitar_alta', 'trasladar'] },
-  { ...base, id: 'a-3', patientId: 'p-3', patientName: 'Paciente Ficticio Tres', origin: 'consulta', requestedCategory: 'vip', state: 'alta_firmada', isolation: false, bed: 'C-301', bedCategory: 'vip', version: 4, occupationId: 'o-3', discharge: { type: 'voluntaria', signedAt: '2026-11-14T15:00:00.000Z', signedByName: 'Dra. Ficticia Tratante', pending: [{ description: 'Entregar receta de alta', responsible: 'Enfermería' }] }, allowedActions: ['registrar_salida'] },
+  { ...base, id: 'a-3', patientId: 'p-3', patientName: 'Paciente Ficticio Tres', origin: 'consulta', requestedCategory: 'vip', state: 'alta_firmada', isolation: false, bed: 'C-301', bedCategory: 'vip', version: 4, occupationId: 'o-3', discharge: { type: 'voluntaria', signedAt: '2026-11-14T15:00:00.000Z', signedByName: 'Dra. Ficticia Tratante', pending: [{ description: 'Entregar receta de alta', responsible: 'Enfermería' }], pendingCount: 1, specialHandling: false }, allowedActions: ['registrar_salida'] },
   { ...base, id: 'a-4', patientId: 'p-4', patientName: 'Paciente Ficticio Cuatro', origin: 'cita', requestedCategory: 'semiprivada', state: 'hospitalizado', isolation: false, bed: 'C-204', bedCategory: 'semiprivada', version: 6, occupationId: 'o-4', attendingDoctorName: 'Dr. Ficticio Sin Cuenta', attendingDoctorHasAccount: false, allowedActions: [] },
 ];
 
@@ -111,7 +111,7 @@ describe('W13 · admisiones con acciones según allowedActions (D-02)', () => {
   });
 
   it('revoca un alta firmada con motivo', async () => {
-    const api = mount(['admision.ver'], {}, async () => ({ id: 'a-9', state: 'hospitalizado', version: 8 }), jopRow(['revocar_alta', 'registrar_salida'], { state: 'alta_firmada', discharge: { type: 'medica', signedAt: '2026-11-14T15:00:00.000Z', signedByName: 'Dra. Ficticia Tratante', pending: [] } }));
+    const api = mount(['admision.ver'], {}, async () => ({ id: 'a-9', state: 'hospitalizado', version: 8 }), jopRow(['revocar_alta', 'registrar_salida'], { state: 'alta_firmada', discharge: { type: 'medica', signedAt: '2026-11-14T15:00:00.000Z', signedByName: 'Dra. Ficticia Tratante', pending: [], pendingCount: 0, specialHandling: false } }));
     await userEvent.click(within(await rowOf('Paciente Ficticio Nueve')).getByRole('button', { name: /Revocar alta/ }));
     const dialog = screen.getByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText(/^Motivo/), 'El paciente presentó fiebre antes de salir.');
@@ -143,6 +143,16 @@ describe('W13 · admisiones con acciones según allowedActions (D-02)', () => {
     await userEvent.type(within(dialog).getByLabelText(/^Motivo/), 'El tratante actual no tiene cuenta.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reasignar' }));
     expect(api.write).toHaveBeenCalledWith('/admisiones/a-9/tratante', { attendingDoctorId: 'd-2', version: 7, reason: 'El tratante actual no tiene cuenta.' }, 'POST');
+  });
+
+  it('sin relación de atención (D-031) la salida muestra solo datos operativos: firma, cantidad de pendientes y trámite especial', async () => {
+    mount(['admision.ver'], {}, async () => ({}), jopRow(['registrar_salida'], { state: 'alta_firmada', discharge: { type: null, signedAt: '2026-11-14T15:00:00.000Z', signedByName: 'Dra. Ficticia Tratante', pending: null, pendingCount: 2, specialHandling: true } }));
+    await userEvent.click(within(await rowOf('Paciente Ficticio Nueve')).getByRole('button', { name: /Registrar salida/ }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/firmada por Dra. Ficticia Tratante/)).toBeTruthy();
+    expect(within(dialog).getByText(/Hay 2 pendientes registrados por el médico/)).toBeTruthy();
+    expect(within(dialog).getByText(/requiere un trámite especial/)).toBeTruthy();
+    expect(within(dialog).queryByText(/Defunción|Traslado a otro centro|Médica|Voluntaria/)).toBeNull();
   });
 
   it('registra la salida mostrando el tipo de alta y sus pendientes con responsable', async () => {

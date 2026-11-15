@@ -23,6 +23,16 @@ final class DischargeCycleTests: XCTestCase {
         XCTAssertEqual(admission.discharge?.pending, [Admission.Discharge.Pending(description: "Control en 7 días", responsible: "Paciente")])
     }
 
+    func testSinRelacionDeAtencionElAltaLlegaSoloConDatosOperativos() throws {
+        let list = try decode(#"[{"# + base + #","state":"alta_firmada","discharge":{"type":null,"signedAt":"2026-11-15T10:00:00.000Z","signedByName":"Dra. Ficticia","pending":null,"pendingCount":2,"specialHandling":true}}]"#)
+        let discharge = try XCTUnwrap(list.first?.discharge)
+        XCTAssertNil(discharge.type)
+        XCTAssertNil(discharge.kind)
+        XCTAssertNil(discharge.pending)
+        XCTAssertEqual(discharge.pendingCount, 2)
+        XCTAssertTrue(discharge.specialHandling)
+    }
+
     func testUnServidorAnteriorOCamposMalFormadosNoRompenLaLista() throws {
         let old = try decode(#"[{"# + base + #","state":"hospitalizado"}]"#)
         XCTAssertEqual(old.first?.allowedActions, [])

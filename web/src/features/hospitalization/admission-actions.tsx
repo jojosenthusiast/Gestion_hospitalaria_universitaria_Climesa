@@ -11,7 +11,8 @@ export type Admission = {
   occupationId?: string | null; scheduledAt?: string | null; motive?: string | null; unstable?: boolean; postSurgical?: boolean; visitorsAllowed?: boolean; visitorsMax?: number;
   attendingDoctorName?: string | null; attendingDoctorHasAccount?: boolean; bedCategory?: 'vip' | 'semiprivada' | null; authorized?: boolean;
   dischargeRequestedAt?: string | null;
-  discharge?: { type: string; signedAt: string; signedByName: string; pending: DischargePending[] } | null;
+  /** D-031: `type` and `pending` come null without a care relationship; `pendingCount` and `specialHandling` always come. */
+  discharge?: { type: string | null; signedAt: string; signedByName: string | null; pending: DischargePending[] | null; pendingCount: number; specialHandling: boolean } | null;
   /** D-02: the API decides which actions this person may run on this row; the page never infers them from role permissions. */
   allowedActions?: string[];
 };
@@ -86,8 +87,11 @@ export function ExitDialog({ api, admission, onClose, onSaved }: DialogProps) {
   return <Dialog title="Registrar salida física" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
     <p className="form-intro">Paciente: <strong>{admission.patientName}</strong> · cama {admission.bed || 'sin cama'}. La cama queda pendiente de limpieza.</p>
     {discharge && <section className="admission-discharge" aria-label="Alta firmada">
-      <p>Alta <strong>{dischargeTypeNames[discharge.type] ?? discharge.type}</strong> · firmada por {discharge.signedByName} el {formatDateTime(discharge.signedAt)}.</p>
-      {discharge.pending.length ? <><h3>Pendientes al salir</h3><ul>{discharge.pending.map((p, i) => <li key={i}>{p.description} <small>Responsable: {p.responsible}</small></li>)}</ul></> : <p className="muted">Sin pendientes registrados.</p>}
+      <p>{discharge.type ? <>Alta <strong>{dischargeTypeNames[discharge.type] ?? discharge.type}</strong></> : 'Alta'} · firmada por {discharge.signedByName ?? 'el médico tratante'} el {formatDateTime(discharge.signedAt)}.</p>
+      {discharge.specialHandling && <p className="refresh-hint">Esta salida requiere un trámite especial; coordínalo con el médico tratante antes de registrarla.</p>}
+      {discharge.pending
+        ? discharge.pending.length ? <><h3>Pendientes al salir</h3><ul>{discharge.pending.map((p, i) => <li key={i}>{p.description} <small>Responsable: {p.responsible}</small></li>)}</ul></> : <p className="muted">Sin pendientes registrados.</p>
+        : <p className="muted">{discharge.pendingCount ? `${discharge.pendingCount === 1 ? 'Hay 1 pendiente registrado' : `Hay ${discharge.pendingCount} pendientes registrados`} por el médico; el detalle es clínico y lo ve el equipo tratante.` : 'Sin pendientes registrados.'}</p>}
     </section>}
     <WriteError error={spanishProblem(action.error)} onReload={onSaved} />
     <Field label="Motivo o detalle de la salida" value={reason} onChange={setReason} required minLength={MIN_REASON} maxLength={500} hint="Al menos 10 caracteres." autoFocus />

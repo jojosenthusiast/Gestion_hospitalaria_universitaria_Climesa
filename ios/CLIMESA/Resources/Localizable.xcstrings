@@ -3730,6 +3730,39 @@
         }
       }
     },
+    "hospitalized.discharge.signedNoType": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alta firmada"
+          }
+        }
+      }
+    },
+    "hospitalized.discharge.specialHandling": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta salida requiere un trámite especial."
+          }
+        }
+      }
+    },
+    "hospitalized.discharge.pendingCount": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pendientes registrados: %ld; el detalle lo ve el equipo tratante."
+          }
+        }
+      }
+    },
     "hospitalized.discharge.noPending": {
       "extractionState": "manual",
       "localizations": {

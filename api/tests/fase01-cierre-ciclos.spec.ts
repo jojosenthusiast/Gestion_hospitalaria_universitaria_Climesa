@@ -87,7 +87,9 @@ describe('Fase 0 · cierre del ciclo de la admisión', () => {
     const signed = await t.call('MED', 'POST', `/admisiones/${admission.id}/alta`, { type: 'medica', version: med.version, pending: [{ description: 'Control en siete días', responsible: 'Consulta externa' }] });
     expect(signed.status).toBe(201);
     const after = await row('REC', admission.id);
-    expect(after).toMatchObject({ state: 'alta_firmada', dischargeRequestedAt: null, discharge: { type: 'medica', pending: [{ description: 'Control en siete días', responsible: 'Consulta externa' }] } });
+    // D-031: Recepción no tiene relación de atención; solo ve los datos operativos del alta.
+    expect(after).toMatchObject({ state: 'alta_firmada', dischargeRequestedAt: null, discharge: { type: null, pending: null, pendingCount: 1, specialHandling: false, signedAt: expect.any(String), signedByName: expect.any(String) } });
+    expect((await row('MED', admission.id)).discharge).toMatchObject({ type: 'medica', pendingCount: 1, specialHandling: false, pending: [{ description: 'Control en siete días', responsible: 'Consulta externa' }] });
     expect(after.allowedActions).toEqual(expect.arrayContaining(['registrar_salida']));
     t.setNow(new Date(now.valueOf() + 2 * MINUTE));
     try {
@@ -149,6 +151,30 @@ describe('Fase 0 · cierre del ciclo de la admisión', () => {
     expect(byJop.status).toBe(201);
   });
 
+  test('D-031: Jefatura y Recepción no ven el tipo ni los pendientes de un alta por defunción; el tratante sí', async () => {
+    const admission = await hospitalize('HAB-206-A');
+    const signed = await t.call('MED', 'POST', `/admisiones/${admission.id}/alta`, { type: 'defuncion', version: admission.version, pending: [{ description: 'Entrega del cuerpo a la familia', responsible: 'Trabajo social' }] });
+    expect(signed.status).toBe(201);
+    for (const role of ['JOP', 'REC']) {
+      const operational = (await row(role, admission.id)).discharge;
+      expect(operational).toEqual({ type: null, pending: null, pendingCount: 1, specialHandling: true, signedAt: expect.any(String), signedByName: expect.any(String) });
+      expect(JSON.stringify(operational)).not.toMatch(/defuncion|cuerpo/);
+    }
+    expect((await row('MED', admission.id)).discharge).toMatchObject({ type: 'defuncion', specialHandling: true, pending: [{ description: 'Entrega del cuerpo a la familia', responsible: 'Trabajo social' }] });
+  });
+
+  test('los motivos se validan sin espacios al borde: relleno con espacios es 400 validacion en reason', async () => {
+    const admission = await admit();
+    const padded = { version: admission.version, reason: '   corto      ' };
+    for (const [role, path, extra] of [['REC', 'cancelar', {}], ['JOP', 'anular', {}], ['JOP', 'tratante', { attendingDoctorId: await t.staffOf('MED') }], ['MED', 'revocar-alta', {}]] as const) {
+      const res = await t.call(role, 'POST', `/admisiones/${admission.id}/${path}`, { ...padded, ...extra });
+      expect([path, res.status, res.body.codigo, res.body.campo]).toEqual([path, 400, 'validacion', 'reason']);
+    }
+    const cancelled = await t.call('REC', 'POST', `/admisiones/${admission.id}/cancelar`, { version: admission.version, reason: '  Admisión registrada dos veces  ' });
+    expect(cancelled.status).toBe(201);
+    expect((await t.one('SELECT motivo_cierre FROM hospitalizacion.admision WHERE id=$1', [admission.id])).motivo_cierre).toBe('Admisión registrada dos veces');
+  });
+
   test('MA-HOS-05: Enfermería lee las notas de una admisión de su área; sin turno en el área no', async () => {
     const admission = await hospitalize('HAB-204-A');
     expect((await t.call('ENF', 'GET', `/admisiones/${admission.id}/notas-enfermeria`)).status).toBe(403);
@@ -190,6 +216,8 @@ describe('Fase 0 · cierre administrativo de la ambulancia', () => {
     expect((await t.call('REC', 'GET', '/ambulancia')).body.activeService.allowedActions).toEqual([]);
     expect((await t.call('REC', 'POST', `/ambulancia/servicios/${service.body.id}/cerrar`, { version: service.body.version, reason: 'Tripulación sin teléfono para cerrar' })).status).toBe(403);
     expect((await t.call('JOP', 'POST', `/ambulancia/servicios/${service.body.id}/cerrar`, { version: service.body.version, reason: 'corto' })).status).toBe(400);
+    const padded = await t.call('JOP', 'POST', `/ambulancia/servicios/${service.body.id}/cerrar`, { version: service.body.version, reason: '   corto      ' });
+    expect([padded.status, padded.body.codigo, padded.body.campo]).toEqual([400, 'validacion', 'reason']);
     const closed = await t.call('JOP', 'POST', `/ambulancia/servicios/${service.body.id}/cerrar`, { version: service.body.version, reason: 'Tripulación sin teléfono para cerrar' });
     expect(closed.status).toBe(201);
     expect(closed.body).toMatchObject({ finalState: 'cancelado', unitState: 'disponible' });

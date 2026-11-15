@@ -10,7 +10,7 @@ import { requireCurrentEnrollment } from '../platform/enrollment';
 import { AdmissionIntakeService } from './admission-intake.service';
 import { Category, visitorError, visitorPolicy } from './admission-intake.rules';
 import { AdmissionCloseDto, AdmissionDto, AdmissionIndicationDto, AttendingChangeDto, AuthorizationDto, BedAssignmentDto, BedSuggestionQuery, DischargeDto, DischargeRequestDto, DischargeRevocationDto, ExitDto, NursingNoteDto, TransferDto } from './hospitalization.dto';
-import { admissionActions } from './hospitalization.rules';
+import { admissionActions, SPECIAL_EXIT } from './hospitalization.rules';
 
 type Row = Record<string, any>;
 
@@ -135,11 +135,20 @@ export class HospitalizationService {
           OR (cardinality($5::uuid[])>0 AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=oc.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($5::uuid[])))) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,ownDoctor ? actor.staffId : null,ownPatient ? actor.patientId : null,areas,actor.staffId ?? null])).rows;
       const enrolled = hasPermission(actor, 'alta.firmar') && !!actor.staffId && (await c.query('SELECT personal.inscrito($1::uuid,$2::date) AS ok', [actor.staffId, this.clock.today()])).rows[0]?.ok === true;
       for (const row of rows) await this.commands.audit(c, actor, { action: 'admision.leer', entity: 'admision', entityId: row.id, patientId: row.patientId, permission: 'admision.ver' });
-      return rows.map(({ dischargeType, dischargeSignedAt, dischargeSignedBy, dischargePending, dischargeSignedByName, related, ...row }) => ({
-        ...row,
-        discharge: dischargeType ? { type: dischargeType, signedAt: dischargeSignedAt, signedByName: dischargeSignedByName ?? null, pending: ((dischargePending ?? []) as Array<{ descripcion: string; responsable: string }>).map(item => ({ description: item.descripcion, responsible: item.responsable })) } : null,
-        allowedActions: admissionActions(actor, { ...row, related, enrolled, dischargeSignedBy: dischargeSignedBy ?? null }),
-      }));
+      return rows.map(({ dischargeType, dischargeSignedAt, dischargeSignedBy, dischargePending, dischargeSignedByName, related, ...row }) => {
+        // D-031: without a care relationship (global context: Recepción, Jefatura) the discharge is operational only;
+        // its type and pending descriptions are clinical. Non-global readers only see rows through a care context.
+        const clinical = !global || (!!ownDoctor && (row.attendingDoctorId === actor.staffId || related === true));
+        const pending = ((dischargePending ?? []) as Array<{ descripcion: string; responsable: string }>).map(item => ({ description: item.descripcion, responsible: item.responsable }));
+        return {
+          ...row,
+          discharge: dischargeType ? {
+            type: clinical ? dischargeType : null, signedAt: dischargeSignedAt, signedByName: dischargeSignedByName ?? null,
+            pending: clinical ? pending : null, pendingCount: pending.length, specialHandling: SPECIAL_EXIT.includes(dischargeType as string),
+          } : null,
+          allowedActions: admissionActions(actor, { ...row, related, enrolled, dischargeSignedBy: dischargeSignedBy ?? null }),
+        };
+      });
     });
   }
 

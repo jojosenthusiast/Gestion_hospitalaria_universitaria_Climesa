@@ -20572,6 +20572,7 @@
         "type": "object",
         "properties": {
           "type": {
+            "nullable": true,
             "allOf": [
               {
                 "$ref": "#/components/schemas/TipoAlta"
@@ -20587,17 +20588,28 @@
             "nullable": true
           },
           "pending": {
+            "nullable": true,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DischargePendingResponse"
             }
+          },
+          "pendingCount": {
+            "type": "integer",
+            "description": "Cantidad de pendientes del alta."
+          },
+          "specialHandling": {
+            "type": "boolean",
+            "description": "La salida necesita un trámite especial (defunción o traslado a otro centro); no revela el tipo."
           }
         },
         "required": [
           "type",
           "signedAt",
           "signedByName",
-          "pending"
+          "pending",
+          "pendingCount",
+          "specialHandling"
         ]
       },
       "AccionAdmision": {
