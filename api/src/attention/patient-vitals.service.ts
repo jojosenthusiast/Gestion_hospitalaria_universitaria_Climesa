@@ -4,7 +4,7 @@ import { channelsFor } from '../platform/channels';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ageOn, searchShowsBirth } from '../patients/patient.privacy';
-import { Clock } from '../platform/clock';
+import { Clock, businessDate, businessDayRange } from '../platform/clock';
 import { PatientVitalsDto } from './patient-vitals.dto';
 
 const MEASURES = ['systolic', 'diastolic', 'heartRate', 'respiratoryRate', 'temperature', 'oxygenSaturation', 'weightKg', 'heightCm', 'pain', 'glucoseMgDl'] as const;
@@ -28,10 +28,29 @@ export class PatientVitalsService {
     return row as { id: string; record: string; birth: string | null; name: string };
   }
 
+  /**
+   * MA-SEG-07: reading the history needs a care context, not only the role. Any of: an active care relationship, an open
+   * consultation or treating admission of the actor; a current admission; an ambulance service in progress or of today;
+   * or activity of the patient in the hospital today (queue number, appointment, consultation or a vitals take).
+   */
+  private async hasCareContext(c: { query: (sql: string, values?: unknown[]) => Promise<{ rowCount: number | null }> }, actor: Actor, patientId: string) {
+    const now = this.clock.now(), { start, end } = businessDayRange(businessDate(now));
+    const found = await c.query(`SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz
+      UNION ALL SELECT 1 FROM atencion.consulta WHERE paciente_id=$1 AND (estado='abierta' OR iniciada_en >= $4)
+      UNION ALL SELECT 1 FROM hospitalizacion.admision WHERE paciente_id=$1 AND estado IN ('pendiente_cama','hospitalizado','alta_firmada')
+      UNION ALL SELECT 1 FROM ambulancia.servicio WHERE paciente_id=$1 AND (finalizado_en IS NULL OR finalizado_en >= $4)
+      UNION ALL SELECT 1 FROM atencion.ticket_fila WHERE paciente_id=$1 AND fecha=$6::date
+      UNION ALL SELECT 1 FROM atencion.cita WHERE paciente_id=$1 AND estado IN ('confirmada','atendida') AND horario && tstzrange($4,$5,'[)')
+      UNION ALL SELECT 1 FROM atencion.signos_vitales WHERE paciente_id=$1 AND tomado_en >= $4 LIMIT 1`, [patientId, actor.staffId, now, start, end, businessDate(now)]);
+    return !!found.rowCount;
+  }
+
   async history(actor: Actor, patientId: string, limit = 30) {
     this.requireCare(actor);
     return this.db.transaction(async c => {
       const patient = await this.patient(c, patientId);
+      // The 403 is audited as a denial by the error filter.
+      if (!(await this.hasCareContext(c, actor, patientId))) throw new ForbiddenException('Solo puedes ver los signos de un paciente que atiendes: con relación de atención, ingresado, en ambulancia o con actividad hoy.');
       const stay = (await c.query(`SELECT a.id AS "admissionId",coalesce(o.codigo,'') AS bed FROM hospitalizacion.admision a LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $2::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id WHERE a.paciente_id=$1 AND a.estado IN ('pendiente_cama','hospitalizado') ORDER BY a.id LIMIT 1`, [patientId, this.clock.now()])).rows[0];
       const rows = (await c.query(`SELECT s.id,s.tomado_en AS "takenAt",s.tomado_por AS "takenBy",
         nullif(concat_ws(' ',p.nombres,p.apellidos),'') AS "takenByName",s.consulta_id AS "consultationId",s.admision_id AS "admissionId",

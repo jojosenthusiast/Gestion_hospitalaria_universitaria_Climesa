@@ -1,4 +1,5 @@
 import { AuditService } from '../src/platform/audit.service';
+import { businessDate } from '../src/platform/clock';
 import { createTestApp, type TestApp } from './support/app';
 
 jest.setTimeout(120000);
@@ -60,6 +61,24 @@ describe('Fase 0/1 seguridad y privacidad', () => {
       expect((await t.call('REC', 'POST', '/exportaciones', { resource: 'pacientes', rows: 1, format: 'docx' })).status).toBe(400);
       expect((await t.call('REC', 'POST', '/exportaciones', { resource: '../x', rows: 1, format: 'csv' })).status).toBe(400);
       expect((await t.audits('datos.exportar')).length).toBe(before);
+    });
+  });
+  describe('MA-SEG-07: el historial de signos exige un contexto de atención', () => {
+    const DAY = 86_400_000;
+    const oldVitals = async (patientId: string) => t.pg.query('INSERT INTO atencion.signos_vitales(paciente_id,tomado_por,tomado_en,fc) VALUES($1,$2,$3,70)', [patientId, await t.staffOf('ENF'), new Date(now.valueOf() - 3 * DAY)]);
+    test('sin relación, ingreso, ambulancia ni actividad del día responde 403', async () => {
+      const patientId = await t.patient();
+      await oldVitals(patientId);
+      for (const role of ['AST', 'ENF', 'MED', 'PAR']) expect({ role, status: (await t.call(role, 'GET', `/pacientes/${patientId}/signos`)).status }).toEqual({ role, status: 403 });
+    });
+    test('con un número de fila de hoy o un ingreso vigente sí se lee', async () => {
+      const queued = await t.patient();
+      await oldVitals(queued);
+      await t.pg.query("INSERT INTO atencion.ticket_fila(servicio,fecha,numero,paciente_id,estado) VALUES('consulta_general',$2::date,987,$1,'en_espera')", [queued, businessDate(now)]);
+      expect((await t.call('AST', 'GET', `/pacientes/${queued}/signos`)).status).toBe(200);
+      const admitted = await t.patient();
+      expect((await t.call('REC', 'POST', '/admisiones', await t.admissionBody(admitted, { requestedCategory: 'semiprivada', isolation: false }))).status).toBe(201);
+      expect((await t.call('ENF', 'GET', `/pacientes/${admitted}/signos`)).status).toBe(200);
     });
   });
 });
