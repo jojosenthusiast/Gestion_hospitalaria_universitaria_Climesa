@@ -48,7 +48,13 @@ struct AuthView:View {
     // TEMPORARY testing aid (docs/operacion/login-de-prueba.md): empty unless the build was made with CLIMESA_DEMO_LOGIN = YES.
     private let demoAccounts = DemoLogin.accounts(info: Bundle.main.infoDictionary)
     @State private var demoRole:String?
+    @State private var resetting=false
     var body:some View {
+        if let confirmation=account.confirmationEmail { CheckEmailView(email:confirmation) }
+        else if resetting { PasswordResetView(email:$email) { resetting=false; account.clearEmailFlow() } }
+        else { form }
+    }
+    private var form:some View {
         ScrollView {
             BrandHeader()
             VStack(alignment:.leading,spacing:24) {
@@ -57,6 +63,7 @@ struct AuthView:View {
                 Text(LocalizedStringKey(registering ? "auth.sub.register":"auth.sub.login")).font(Brand.body()).foregroundStyle(.secondary)
                 if let error=account.error { Notice(text:error,failure:true) }
                 if let notice=account.notice { Notice(text:notice) }
+                if !registering, let unconfirmed=account.unconfirmedEmail { ResendConfirmationButton(email:unconfirmed) }
                 if !registering && !demoAccounts.isEmpty {
                     Notice(text:L.text("auth.demo.banner"))
                     Menu {
@@ -71,7 +78,8 @@ struct AuthView:View {
                     VStack(alignment:.leading,spacing:10) { Text("auth.password").font(Brand.body(13)); SecureField("auth.password.placeholder",text:$password).textContentType(registering ? .newPassword:.password); Divider() }
                     if registering { VStack(alignment:.leading,spacing:10) { Text("auth.confirm").font(Brand.body(13)); SecureField("auth.confirm.placeholder",text:$confirmation).textContentType(.newPassword); Divider() }; Text("auth.password.hint").font(Brand.body(12)).foregroundStyle(.secondary) }
                 }.padding(22).background(.white)
-                PrimaryButton(title:LocalizedStringKey(registering ? "auth.submit.register":"auth.submit.login"),busy:account.busy) { Task { if registering { await account.register(name:name,email:email,password:password,confirmation:confirmation); if account.notice != nil { password=""; confirmation=""; registering=false } } else { await account.signIn(email:email,password:password) } } }.disabled(email.isEmpty || password.isEmpty || account.auth==nil)
+                PrimaryButton(title:LocalizedStringKey(registering ? "auth.submit.register":"auth.submit.login"),busy:account.busy) { Task { if registering { await account.register(name:name,email:email,password:password,confirmation:confirmation); if account.confirmationEmail != nil { password=""; confirmation=""; registering=false } } else { await account.signIn(email:email,password:password) } } }.disabled(email.isEmpty || password.isEmpty || account.auth==nil)
+                if !registering { Button("auth.forgot") { account.clearEmailFlow(); resetting=true }.font(Brand.body(14)) }
                 Button(LocalizedStringKey(registering ? "auth.switch.register":"auth.switch.login")) { registering.toggle(); account.error=nil; account.notice=nil; password=""; confirmation="" }.font(Brand.body(14))
                 Divider(); Text("auth.footer").font(Brand.body(12)).foregroundStyle(.secondary)
             }.padding(24).frame(maxWidth:560,alignment:.leading).frame(maxWidth:.infinity)
@@ -82,4 +90,61 @@ struct AuthView:View {
             .onChange(of:confirmation) { _,value in account.draft.confirmation=value }
     }
     func field(_ label:LocalizedStringKey,value:Binding<String>,type:UITextContentType)->some View { VStack(alignment:.leading,spacing:10) { Text(label).font(Brand.body(13)); TextField(label,text:value).textContentType(type); Divider() } }
+}
+/// Reenvía el correo de confirmación con cuenta regresiva (reloj solo de interfaz, no refresca datos).
+struct ResendConfirmationButton:View {
+    @EnvironmentObject private var account:AccountModel
+    let email:String
+    var body:some View {
+        TimelineView(.periodic(from:.now,by:1)) { context in
+            let seconds=ResendCooldown.remainingSeconds(until:account.resendAvailableAt,now:context.date)
+            Button { Task { await account.resendConfirmation(email:email) } } label: {
+                HStack(spacing:10) {
+                    if account.sendingEmail { ProgressView() } else { Image(systemName:"envelope") }
+                    if account.sendingEmail { Text("auth.resend.sending") } else if seconds>0 { Text(verbatim:"Reenviar correo en \(seconds) s") } else { Text("auth.resend") }
+                }.font(Brand.body(15)).frame(maxWidth:.infinity).padding(15).foregroundStyle(Brand.blue).overlay(Rectangle().stroke(Brand.blue,lineWidth:1))
+            }.disabled(account.sendingEmail || seconds>0).opacity(account.sendingEmail || seconds>0 ? 0.6:1)
+        }
+    }
+}
+/// Tras registrarse: la cuenta existe, pero Supabase espera el enlace del correo antes de permitir el ingreso.
+struct CheckEmailView:View {
+    @EnvironmentObject private var account:AccountModel
+    let email:String
+    var body:some View {
+        ScrollView {
+            BrandHeader()
+            VStack(alignment:.leading,spacing:20) {
+                Image(systemName:"envelope.badge").font(.system(size:40)).foregroundStyle(Brand.blue).accessibilityHidden(true)
+                Text("auth.check.headline").font(Brand.bold(38)).fixedSize(horizontal:false,vertical:true)
+                Text("auth.check.sent").font(Brand.body())
+                Text(verbatim:email).font(Brand.bold(18)).textSelection(.enabled)
+                Text("auth.check.body").font(Brand.body(15)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+                if let error=account.error { Notice(text:error,failure:true) }
+                if let notice=account.notice { Notice(text:notice) }
+                ResendConfirmationButton(email:email)
+                PrimaryButton(title:"auth.check.done") { account.finishConfirmation() }
+            }.padding(24).frame(maxWidth:560,alignment:.leading).frame(maxWidth:.infinity)
+        }.background(Brand.paper)
+    }
+}
+/// "¿Olvidaste tu contraseña?": pide el correo; el enlace abre la página de la web que crea la contraseña nueva.
+struct PasswordResetView:View {
+    @EnvironmentObject private var account:AccountModel
+    @Binding var email:String
+    let back:()->Void
+    var body:some View {
+        ScrollView {
+            BrandHeader()
+            VStack(alignment:.leading,spacing:22) {
+                Text("auth.reset.headline").font(Brand.bold(38)).fixedSize(horizontal:false,vertical:true)
+                Text("auth.reset.sub").font(Brand.body()).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+                if let error=account.error { Notice(text:error,failure:true) }
+                if let notice=account.notice { Notice(text:notice) }
+                VStack(alignment:.leading,spacing:10) { Text("auth.email").font(Brand.body(13)); TextField("auth.email.placeholder",text:$email).keyboardType(.emailAddress).textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled(); Divider() }.padding(22).background(.white)
+                PrimaryButton(title:"auth.reset.submit",busy:account.sendingEmail) { Task { await account.requestPasswordReset(email:email) } }.disabled(email.isEmpty)
+                Button("auth.reset.back",action:back).font(Brand.body(14))
+            }.padding(24).frame(maxWidth:560,alignment:.leading).frame(maxWidth:.infinity)
+        }.background(Brand.paper).scrollDismissesKeyboard(.interactively)
+    }
 }

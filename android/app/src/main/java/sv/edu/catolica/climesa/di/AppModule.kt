@@ -17,7 +17,7 @@ import sv.edu.catolica.climesa.domain.RealtimeProtocol
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-    @Provides @Singleton fun auth(@ApplicationContext context:Context)=SupabaseAuthRepository(BuildConfig.SUPABASE_URL,BuildConfig.SUPABASE_PUBLISHABLE_KEY,SecureSessionStore(context))
+    @Provides @Singleton fun auth(@ApplicationContext context:Context)=SupabaseAuthRepository(BuildConfig.SUPABASE_URL,BuildConfig.SUPABASE_PUBLISHABLE_KEY,SecureSessionStore(context),BuildConfig.WEB_URL)
     @Provides @Singleton fun backend()=BackendAccessRepository(BuildConfig.API_BASE_URL)
     /** One "session expired" signal for the whole app: ApiClient emits it and AuthViewModel returns to login. */
     @Provides @Singleton fun sessionExpiry()=SessionExpiry()
