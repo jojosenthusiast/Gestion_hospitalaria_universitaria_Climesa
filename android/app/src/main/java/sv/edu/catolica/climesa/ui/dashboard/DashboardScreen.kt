@@ -108,7 +108,7 @@ private fun LazyListScope.dashboardContent(dashboard: DashboardModel, onAction: 
         item { Text(stringResource(R.string.dash_resumen), style = MaterialTheme.typography.titleLarge) }
         items(dashboard.kpis.chunked(2)) { pair ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                pair.forEach { kpi -> KpiTile(kpi, Modifier.weight(1f).heightIn(min = 112.dp)) { kpi.target?.let { onAction(QuickActionRequest(it)) } } }
+                pair.forEach { kpi -> KpiTile(kpi, Modifier.weight(1f).heightIn(min = 112.dp)) { kpi.target?.let { onAction(QuickActionRequest(it, kpi.action)) } } }
                 if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }

@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/api/v1/citas/{id}/reprogramar",
+  "body": {
+    "version": 3,
+    "start": "2026-11-20T14:00:00Z",
+    "end": "2026-11-20T14:20:00Z"
+  }
+}

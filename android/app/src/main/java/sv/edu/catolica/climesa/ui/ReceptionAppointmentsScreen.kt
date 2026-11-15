@@ -58,12 +58,12 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     val actionState by actions.state.collectAsStateWithLifecycle()
     LaunchedEffect(actionState.done) { if (actionState.done != null) model.load() }
     AppointmentActionDialog(actionState, actions)
-    val now = remember(state.appointments) { Instant.now() }
     var query by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels) }
     LaunchedEffect(quickAction) {
         if (quickAction == null) return@LaunchedEffect
         if (quickAction == QuickAction.SCHEDULE_APPOINTMENT && canSchedule) model.openScheduling()
+        if (quickAction == QuickAction.REVIEW_REQUESTS) model.showRequests(true)
         onQuickActionHandled()
     }
     if (state.scheduling) { SchedulingForm(state, model, modifier); return }
@@ -76,60 +76,106 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
             state.appointments.isEmpty() -> item { EmptyState(stringResource(R.string.rec_citas_vacio), detail = stringResource(R.string.rec_citas_vacio_detalle), icon = Icons.Default.CalendarMonth) }
             else -> {
-                val visible = state.appointments.filter { sv.edu.catolica.climesa.domain.matchesQuery(query, it.patientName, it.doctorName) }
+                val visible = state.shown.filter { sv.edu.catolica.climesa.domain.matchesQuery(query, it.patientName, it.doctorName) }
                 item { LiveSearchField(query, { query = it }, stringResource(R.string.rec_citas_buscar)) }
+                item { ChipRow(listOf(Triple(false, stringResource(R.string.cita_todas), state.appointments.size), Triple(true, stringResource(R.string.cita_solo_solicitudes), state.appointments.count { it.isRequest })), state.requestsOnly, model::showRequests) }
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.listas_sin_coincidencias), detail = stringResource(R.string.listas_sin_coincidencias_detalle)) }
                 // Por día y, dentro del día, por hora: cada cita en una sola línea con su rango "08:00 – 08:20".
                 sv.edu.catolica.climesa.domain.AppointmentAgenda.groupByDay(visible) { it.start }.forEach { (day, rows) ->
                     item(key = "d-$day") { Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(day), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                    items(rows, key = { it.id }) { row -> AppointmentRow(row, now, permissions) { action -> actions.open(row, action) } }
+                    items(rows, key = { it.id }) { row -> AppointmentRow(row) { action -> actions.open(row, action) } }
                 }
             }
         }
     }
 }
 
-/** One appointment: its state (an unmanaged past request reads "Vencida") and only the actions the API accepts now (CITA-04). */
-@Composable private fun AppointmentRow(a: ReceptionAppointment, now: Instant, permissions: Collection<String>, onAction: (AppointmentAction) -> Unit) {
-    val shown = AppointmentActions.displayState(a, now)
+/** One appointment: its state, a pending reschedule request, and one button per action the API accepts now (CITA-04). */
+@Composable private fun AppointmentRow(a: ReceptionAppointment, onAction: (AppointmentAction) -> Unit) {
     Column {
         DataRow(a.patientName.ifBlank { "Paciente" }, subtitle = "${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(a.start, a.end)} · ${a.doctorName}",
-            status = { if (shown == AppointmentActions.EXPIRED) StatusPill(stringResource(R.string.rec_cita_vencida), StatusTone.NEUTRAL) else StatusTag(a.state) })
-        val available = AppointmentActions.available(a, permissions, now)
-        if (available.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(bottom = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            available.forEach { action ->
-                if (action == AppointmentAction.CONFIRM) androidx.compose.material3.Button(onClick = { onAction(action) }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(action.label) }
-                else OutlinedButton(onClick = { onAction(action) }, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(action.label) }
+            status = { AppointmentStateTag(a.state) })
+        a.pendingReschedule?.let { Text(stringResource(R.string.cita_pide_cambiar, formatShort(it.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+        if (a.state == AppointmentActions.EXPIRED) Text(stringResource(R.string.cita_vencida_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (a.state == AppointmentActions.RESCHEDULED) Text(stringResource(R.string.cita_reprogramada_a), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AppointmentActionButtons(AppointmentActions.available(a), AppointmentActions.blocked(a), onAction)
+    }
+}
+
+/** States the server adds (vencida, reprogramada) labelled in Spanish; the rest use the shared catalog. */
+@Composable internal fun AppointmentStateTag(state: String) = when (state) {
+    AppointmentActions.EXPIRED -> StatusPill(stringResource(R.string.rec_cita_vencida), StatusTone.NEUTRAL)
+    AppointmentActions.RESCHEDULED -> StatusPill(stringResource(R.string.cita_reprogramada), StatusTone.NEUTRAL)
+    else -> StatusTag(state)
+}
+
+/** Allowed actions as buttons, two per line; blocked ones disabled with the server's reason under them. */
+@Composable internal fun AppointmentActionButtons(allowed: List<AppointmentAction>, blocked: List<Pair<AppointmentAction, String>>, onAction: (AppointmentAction) -> Unit) {
+    val buttons = allowed.map { it to null as String? } + blocked.map { (a, r) -> a to r }
+    buttons.chunked(2).forEach { pair ->
+        Row(Modifier.fillMaxWidth().padding(bottom = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            pair.forEach { (action, reason) ->
+                Column(Modifier.weight(1f)) {
+                    val positive = action == AppointmentAction.CONFIRM || action == AppointmentAction.ACCEPT_RESCHEDULE
+                    if (positive) androidx.compose.material3.Button(onClick = { onAction(action) }, enabled = reason == null, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(action.label) }
+                    else OutlinedButton(onClick = { onAction(action) }, enabled = reason == null, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        colors = if (action.needsReason || action == AppointmentAction.CANCEL) androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error) else androidx.compose.material3.ButtonDefaults.outlinedButtonColors()) { Text(action.label) }
+                    reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
             }
+            if (pair.size == 1) Spacer(Modifier.weight(1f))
         }
     }
 }
 
+/** Dialog of one appointment command: reason with live counter, or the slot grid of the same doctor for a reschedule. */
 @Composable
-private fun AppointmentActionDialog(state: AppointmentActionState, model: AppointmentActionViewModel) {
+internal fun AppointmentActionDialog(state: AppointmentActionState, model: AppointmentActionViewModel) {
     val target = state.target ?: return
     val action = state.action ?: return
+    var datePicker by rememberSaveable { mutableStateOf(false) }
     val title = when (action) {
         AppointmentAction.CONFIRM -> stringResource(R.string.rec_cita_confirmar_titulo)
         AppointmentAction.REJECT -> stringResource(R.string.rec_cita_rechazar_titulo)
         AppointmentAction.CANCEL -> stringResource(R.string.rec_cita_cancelar_titulo)
+        AppointmentAction.RESCHEDULE -> stringResource(R.string.cita_reprogramar_titulo)
+        AppointmentAction.NO_SHOW -> stringResource(R.string.cita_no_asistio_titulo)
+        AppointmentAction.ACCEPT_RESCHEDULE -> stringResource(R.string.cita_aceptar_reprog_titulo)
+        AppointmentAction.REJECT_RESCHEDULE -> stringResource(R.string.cita_rechazar_reprog_titulo)
+        AppointmentAction.START_CONSULTATION -> action.label
     }
+    val requested = target.reschedule?.takeIf { action == AppointmentAction.ACCEPT_RESCHEDULE || action == AppointmentAction.REJECT_RESCHEDULE }
     ConfirmDialog(
         title = title,
         confirmLabel = action.label,
         onConfirm = model::submit,
         onDismiss = model::close,
-        message = "${target.patientName.ifBlank { "Paciente" }} · ${formatInstant(target.start)} · ${target.doctorName}",
+        message = "${target.patientName.ifBlank { "Paciente" }} · ${formatInstant(target.start)} · ${target.doctorName}" + (requested?.let { " → " + formatInstant(it.start) } ?: ""),
         dismissLabel = stringResource(R.string.rec_cita_volver),
-        destructive = action != AppointmentAction.CONFIRM,
+        destructive = action.needsReason || action == AppointmentAction.CANCEL || action == AppointmentAction.NO_SHOW,
         busy = state.busy,
+        confirmEnabled = state.canSubmit,
     ) {
         state.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
-        if (action.needsReason) {
-            val length = state.reason.trim().length
-            FormField(stringResource(R.string.rec_cita_motivo), state.reason, model::reason, singleLine = false, enabled = !state.busy, error = state.reasonError,
-                hint = "$length/${AppointmentActions.REASON_MAX}" + if (length < AppointmentActions.REASON_MIN) " · " + stringResource(R.string.rec_cita_motivo_minimo, AppointmentActions.REASON_MIN) else " ✓")
+        if (action == AppointmentAction.RESCHEDULE) {
+            OutlinedButton(onClick = { datePicker = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(Icons.Default.CalendarMonth, null); Spacer(Modifier.padding(4.dp)); Text(stringResource(R.string.cita_fecha, state.date.format(dayFormat))) }
+            when {
+                state.loadingSlots -> LoadingState()
+                state.slots.isEmpty() -> Text(stringResource(R.string.cita_sin_franjas), style = MaterialTheme.typography.bodySmall)
+                else -> { Text(stringResource(R.string.cita_elige_franja), style = MaterialTheme.typography.bodySmall); DaySlotGrid(state.slots, state.slot, model::pickSlot) }
+            }
         }
+        if (action.needsReason) {
+            FormField(stringResource(R.string.rec_cita_motivo), state.reason, model::reason, singleLine = false, enabled = !state.busy, error = state.reasonError, hint = AppointmentActions.counter(state.reason))
+        } else if (action == AppointmentAction.NO_SHOW) {
+            FormField(stringResource(R.string.cita_comentario), state.reason, model::reason, singleLine = false, enabled = !state.busy, error = state.reasonError, hint = AppointmentActions.counter(state.reason, required = false))
+        }
+    }
+    if (datePicker) {
+        val picker = rememberDatePickerState(initialSelectedDateMillis = state.date.atStartOfDay(zone).toInstant().toEpochMilli())
+        DatePickerDialog(onDismissRequest = { datePicker = false },
+            confirmButton = { TextButton(onClick = { picker.selectedDateMillis?.let { model.selectDate(Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate()) }; datePicker = false }) { Text("Aceptar") } },
+            dismissButton = { TextButton(onClick = { datePicker = false }) { Text(stringResource(R.string.ui_cancelar)) } }) { DatePicker(state = picker) }
     }
 }
 
@@ -222,4 +268,6 @@ private fun SlotSection(state: ReceptionAppointmentsState, model: ReceptionAppoi
     }
 }
 
+private val shortFormat = DateTimeFormatter.ofPattern("dd/MM HH:mm")
+internal fun formatShort(value: String) = runCatching { shortFormat.format(Instant.parse(value).atZone(zone)) }.getOrDefault(value)
 private fun formatInstant(value: String) = runCatching { dateTimeFormat.format(Instant.parse(value).atZone(zone)) }.getOrDefault(value)

@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.domain
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 data class PatientAppointment(
@@ -10,7 +11,17 @@ data class PatientAppointment(
     val state: String,
     val reason: String?,
     val version: Int,
-)
+    val doctorId: String = "",
+    val allowedActions: List<AppointmentAction> = emptyList(),
+    val blockedActions: Map<AppointmentAction, String> = emptyMap(),
+    /** CITA-01: last moment the patient may cancel or reschedule; null when the API gives no deadline. */
+    val cancelableUntil: String? = null,
+    val rescheduledToId: String? = null,
+    val reschedule: RescheduleRequest? = null,
+) {
+    fun allows(action: AppointmentAction) = action in allowedActions
+    fun blockedReason(action: AppointmentAction) = blockedActions[action]
+}
 
 data class AppointmentDoctor(
     val id: String,
@@ -32,6 +43,28 @@ data class AppointmentWorkPeriod(
 
 /** `POST /citas/solicitudes`: the patient asks for a slot; Recepción confirms or rejects it. */
 object PatientAppointmentRules {
+    fun parse(value: Any): List<PatientAppointment> {
+        val rows = value as? JSONArray ?: return emptyList()
+        return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
+            PatientAppointment(
+                row.optString("id"), row.optString("doctorName"), row.optString("start"), row.optString("end"), row.optString("state"),
+                ServerActions.text(row, "reason"), row.optInt("version", 1),
+                doctorId = row.optString("doctorId"),
+                allowedActions = ServerActions.appointmentAllowed(row),
+                blockedActions = ServerActions.appointmentBlocked(row),
+                cancelableUntil = ServerActions.text(row, "cancelableUntil"),
+                rescheduledToId = ServerActions.text(row, "rescheduledToId"),
+                reschedule = ServerActions.reschedule(row),
+            )
+        } }
+    }
+
+    /** Body of `POST /citas/{id}/reprogramar` for the patient (a request that Recepción or the doctor decides). */
+    fun rescheduleBody(appointment: PatientAppointment, slot: AppointmentSlot): JSONObject =
+        JSONObject().put("version", appointment.version).put("start", slot.start).put("end", slot.end)
+
+    fun cancelBody(appointment: PatientAppointment, reason: String): JSONObject = JSONObject().put("version", appointment.version).put("reason", reason.trim())
+
     fun requestBody(doctorId: String, slot: AppointmentSlot, reason: String): JSONObject = JSONObject()
         .put("doctorId", doctorId).put("start", slot.start).put("end", slot.end)
         .apply { if (reason.isNotBlank()) put("reason", reason.trim()) }

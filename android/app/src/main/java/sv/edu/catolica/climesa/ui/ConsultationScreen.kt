@@ -51,13 +51,16 @@ private val sanSalvador = ZoneId.of("America/El_Salvador")
 private val appointmentFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 
 @Composable
-fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modifier, userId: String? = null, model: ConsultationViewModel = viewModel()) {
+fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modifier, userId: String? = null, model: ConsultationViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
+    val actionState by actions.state.collectAsStateWithLifecycle()
+    LaunchedEffect(actionState.done) { if (actionState.done != null) model.load(silent = true) }
+    AppointmentActionDialog(actionState, actions)
     // The open consultation survives rotation and process death (saved instance state); its fields survive leaving
     // the screen or closing the app as a local draft (DraftStore).
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     val permissions = profile?.permissions.orEmpty()
-    LaunchedEffect(userId) { userId?.let { model.configure(it, "fila.ver" in permissions && "consulta.iniciar" in permissions) }; model.load() }
+    LaunchedEffect(userId) { userId?.let { model.configure(it, "fila.ver" in permissions && "consulta.iniciar" in permissions, withUnsigned = "consulta.iniciar" in permissions, withReschedules = "citas.ver" in permissions && "consulta.iniciar" in permissions) }; model.load() }
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
     // A consultation opened by id (queue): reopen it after process death, and select it when it arrives.
     LaunchedEffect(selected) { selected?.takeIf { it.startsWith("consulta:") }?.split(':')?.let { parts -> model.open(parts[1], parts.getOrNull(2)?.toIntOrNull()) } }
@@ -68,6 +71,27 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     PageList(modifier) {
         item { SectionIntro("Medicina / Atención", "Mi consultorio", "Agenda propia y registro clínico conectado a cada cita confirmada.") }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        actionState.done?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        if (state.unsigned.isNotEmpty()) {
+            item { Text(stringResource(R.string.clin_sin_firmar_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
+            items(state.unsigned, key = { "sf-${it.id}" }) { c ->
+                SectionCard(c.patientName) {
+                    Text(stringResource(R.string.clin_sin_firmar_item, formatDateTime(c.startedAt)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    c.reason?.let { Text(stringResource(R.string.clin_consulta_motivo, it), style = MaterialTheme.typography.bodySmall) }
+                    PrimaryButton(stringResource(R.string.clin_reanudar), { model.clearMessages(); model.resume(c) })
+                }
+            }
+        }
+        if (state.reschedules.isNotEmpty()) {
+            item { Text(stringResource(R.string.clin_reprog_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
+            items(state.reschedules, key = { "rp-${it.id}" }) { a ->
+                SectionCard(a.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) }) {
+                    Text(stringResource(R.string.clin_reprog_detalle, formatDateTime(a.start), a.pendingReschedule?.let { formatDateTime(it.start) }.orEmpty()), style = MaterialTheme.typography.bodySmall)
+                    val decisions = listOf(sv.edu.catolica.climesa.domain.AppointmentAction.ACCEPT_RESCHEDULE, sv.edu.catolica.climesa.domain.AppointmentAction.REJECT_RESCHEDULE)
+                    AppointmentActionButtons(decisions.filter { it in a.allowedActions }, decisions.filter { it !in a.allowedActions }.mapNotNull { d -> a.blockedActions[d]?.let { d to it } }) { actions.open(a, it) }
+                }
+            }
+        }
         when {
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
             state.error != null && state.appointments.isEmpty() -> item { ErrorState(state.error, retry) }
@@ -157,6 +181,7 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
     AlertDialog(onDismissRequest = { if (!busy) leave() }, shape = MaterialTheme.shapes.large, title = { Text(if (signed) "Consulta firmada" else if (item.consultationId == null) "Iniciar consulta" else "Continuar consulta", style = MaterialTheme.typography.titleLarge) }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) { LabeledValue("Paciente", item.patientName, Modifier.weight(1f)); if (item.ticketNumber != null) LabeledValue("Número", stringResource(R.string.clin_fila_numero, item.ticketNumber), Modifier.weight(1f)) else if (item.appointmentId.isNotBlank()) LabeledValue("Cita", formatDateTime(item.start), Modifier.weight(1f)) }
         error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        if (item.consultationId == null && !item.canStart) NoticeBanner(NoticeKind.INFO, item.startBlockedReason ?: "La consulta no se puede iniciar ahora.")
         if (stored != null && !signed) NoticeBanner(NoticeKind.INFO, stringResource(R.string.borrador_recuperado))
         when (draftStatus) {
             DraftStatus.SAVED -> Text(stringResource(R.string.borrador_guardado), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -198,7 +223,7 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(labUrgent, { labUrgent = it }, enabled = !busy); Text(stringResource(R.string.lab_orden_urgente)) }
             SecondaryButton(stringResource(R.string.lab_orden_emitir), { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty())
         }
-    } }, confirmButton = { if (!signed) TextButton(onClick = { if (item.consultationId == null) model.start(item, reason) else model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(if (busy) stringResource(R.string.ui_un_momento) else if (item.consultationId == null) "Iniciar consulta" else "Guardar borrador", style = MaterialTheme.typography.labelLarge) } }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (!signed && item.consultationId != null) TextButton(onClick = { model.sign(item, reason, physicalExam, plan, onClose) }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) { Text("Firmar", style = MaterialTheme.typography.labelLarge) }; TextButton(onClick = leave, enabled = !busy) { Text("Cerrar", style = MaterialTheme.typography.labelLarge) } } })
+    } }, confirmButton = { if (!signed && (item.consultationId != null || item.canStart)) TextButton(onClick = { if (item.consultationId == null) model.start(item, reason) else model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(if (busy) stringResource(R.string.ui_un_momento) else if (item.consultationId == null) "Iniciar consulta" else "Guardar borrador", style = MaterialTheme.typography.labelLarge) } }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (!signed && item.consultationId != null) TextButton(onClick = { model.sign(item, reason, physicalExam, plan, onClose) }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) { Text("Firmar", style = MaterialTheme.typography.labelLarge) }; TextButton(onClick = leave, enabled = !busy) { Text("Cerrar", style = MaterialTheme.typography.labelLarge) } } })
 }
 
 private fun appointmentState(value: String) = mapOf("confirmada" to "Confirmada", "atendida" to "Atendida")[value] ?: value

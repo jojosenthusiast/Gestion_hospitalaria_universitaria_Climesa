@@ -11,8 +11,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import sv.edu.catolica.climesa.data.ApiClient
-import sv.edu.catolica.climesa.data.AuthRequestException
+import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.data.SubmissionIntent
+import sv.edu.catolica.climesa.domain.AppointmentAction
+import sv.edu.catolica.climesa.domain.AppointmentActions
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.domain.AppointmentEvents
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
@@ -40,23 +42,35 @@ data class PatientAppointmentsState(
     val saving: Boolean = false,
     val error: String? = null,
     val notice: String? = null,
-)
+    /** Reschedule request in progress (CITA-01): the appointment, the day of the grid, its slots and the chosen one. */
+    val rescheduleId: String? = null,
+    val rescheduleDate: LocalDate = ReceptionScheduling.today(),
+    val rescheduleSlots: List<DaySlot> = emptyList(),
+    val rescheduleSlot: DaySlot? = null,
+    val loadingRescheduleSlots: Boolean = false,
+) {
+    val rescheduleTarget get() = appointments.firstOrNull { it.id == rescheduleId }
+}
 
 @HiltViewModel
 class PatientAppointmentsViewModel @Inject constructor(
-    private val api: ApiClient,
+    private val api: ApiGateway,
     realtime: RealtimeRepository,
 ) : ViewModel() {
     private val mutable = MutableStateFlow(PatientAppointmentsState())
     val state = mutable.asStateFlow()
     private val live = LiveSubscription(realtime)
     private var availabilityJob: Job? = null
+    private var rescheduleJob: Job? = null
+    private val cancelIntent = SubmissionIntent()
+    private val rescheduleIntent = SubmissionIntent()
+    private val requestIntent = SubmissionIntent()
 
     fun load() {
         viewModelScope.launch {
             mutable.updateLoading(true)
             try {
-                val appointments = parseAppointments(api.request("/citas"))
+                val appointments = PatientAppointmentRules.parse(api.request("/citas"))
                 val doctors = parseDoctors(api.request("/citas/catalogos?date=${mutable.value.selectedDate}"))
                 mutable.value = mutable.value.copy(loading = false, appointments = appointments, doctors = doctors, error = null)
                 if (mutable.value.selectedDoctorId.isNotBlank()) loadAvailability()
@@ -94,7 +108,7 @@ class PatientAppointmentsViewModel @Inject constructor(
         mutable.value = current.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
             try {
-                api.request("/citas/solicitudes", "POST", PatientAppointmentRules.requestBody(current.selectedDoctorId, slot, reason))
+                requestIntent.send { api.request("/citas/solicitudes", "POST", PatientAppointmentRules.requestBody(current.selectedDoctorId, slot, reason)) }
                 mutable.value = mutable.value.copy(saving = false, selectedSlot = null, slots = emptyList(), daySlots = emptyList(), notice = "Solicitud enviada. Recepción debe confirmarla.")
                 load()
             } catch (e: CancellationException) {
@@ -105,23 +119,87 @@ class PatientAppointmentsViewModel @Inject constructor(
         }
     }
 
+    /** Cancels through one [SubmissionIntent]; the API decides whether the deadline (`cancelableUntil`) still allows it. */
     fun cancel(appointment: PatientAppointment, reason: String) {
-        if (reason.trim().length < 10) {
-            mutable.value = mutable.value.copy(error = "Escribe un motivo de al menos 10 caracteres.")
+        if (AppointmentActions.reasonError(AppointmentAction.CANCEL, reason) != null) {
+            mutable.value = mutable.value.copy(error = "Escribe un motivo de al menos ${AppointmentActions.REASON_MIN} caracteres.")
             return
         }
+        if (mutable.value.saving) return
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
             try {
-                api.request("/citas/${appointment.id}/cancelar", "POST", JSONObject()
-                    .put("version", appointment.version)
-                    .put("reason", reason.trim()))
+                cancelIntent.send { api.request(AppointmentActions.path(AppointmentAction.CANCEL, appointment.id), "POST", PatientAppointmentRules.cancelBody(appointment, reason)) }
                 mutable.value = mutable.value.copy(saving = false, notice = "Cita cancelada.")
                 load()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 mutable.value = mutable.value.copy(saving = false, error = message(e))
+            }
+        }
+    }
+
+    /** Opens the reschedule dialog on the day of the appointment (or today) with the same doctor's slots. */
+    fun openReschedule(appointment: PatientAppointment) {
+        if (!appointment.allows(AppointmentAction.RESCHEDULE)) return
+        rescheduleIntent.reset()
+        val day = runCatching { java.time.Instant.parse(appointment.start).atZone(java.time.ZoneId.of("America/El_Salvador")).toLocalDate() }.getOrNull()
+        val date = if (day != null && !day.isBefore(ReceptionScheduling.today())) day else ReceptionScheduling.today()
+        mutable.value = mutable.value.copy(rescheduleId = appointment.id, rescheduleDate = date, rescheduleSlots = emptyList(), rescheduleSlot = null, error = null, notice = null)
+        loadRescheduleSlots()
+    }
+
+    fun closeReschedule() {
+        if (mutable.value.saving) return
+        rescheduleJob?.cancel(); rescheduleIntent.reset()
+        mutable.value = mutable.value.copy(rescheduleId = null, rescheduleSlots = emptyList(), rescheduleSlot = null)
+    }
+
+    fun selectRescheduleDate(date: LocalDate) {
+        mutable.value = mutable.value.copy(rescheduleDate = date, rescheduleSlots = emptyList(), rescheduleSlot = null, error = null)
+        loadRescheduleSlots()
+    }
+
+    fun pickRescheduleSlot(slot: DaySlot) { if (slot.selectable) mutable.value = mutable.value.copy(rescheduleSlot = slot) }
+
+    private fun loadRescheduleSlots() {
+        val current = mutable.value
+        val target = current.rescheduleTarget ?: return
+        if (target.doctorId.isBlank()) return
+        rescheduleJob?.cancel()
+        mutable.value = current.copy(loadingRescheduleSlots = true)
+        rescheduleJob = viewModelScope.launch {
+            try {
+                val slots = ReceptionScheduling.daySlots(api.request("/citas/disponibilidad?doctorId=${target.doctorId}&date=${current.rescheduleDate}") as JSONObject)
+                mutable.value = mutable.value.copy(loadingRescheduleSlots = false, rescheduleSlots = slots)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(loadingRescheduleSlots = false, rescheduleSlots = emptyList(), error = message(e))
+            }
+        }
+    }
+
+    /** `POST /citas/{id}/reprogramar`: for the patient it creates a pending request that Recepción or the doctor decides. */
+    fun reschedule() {
+        val current = mutable.value
+        val target = current.rescheduleTarget ?: return
+        val slot = current.rescheduleSlot?.takeIf { it.selectable } ?: return
+        if (current.saving) return
+        mutable.value = current.copy(saving = true, error = null, notice = null)
+        viewModelScope.launch {
+            try {
+                val result = rescheduleIntent.send { api.request(AppointmentActions.path(AppointmentAction.RESCHEDULE, target.id), "POST", PatientAppointmentRules.rescheduleBody(target, AppointmentSlot(slot.start, slot.end))) }
+                val pending = (result as? JSONObject)?.optString("rescheduleState") != "aceptada"
+                mutable.value = mutable.value.copy(saving = false, rescheduleId = null, rescheduleSlots = emptyList(), rescheduleSlot = null,
+                    notice = if (pending) "Solicitud de reprogramación enviada. Te avisaremos cuando la revisen." else "Cita reprogramada.")
+                load()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(saving = false, rescheduleSlot = null, error = message(e))
+                loadRescheduleSlots()
             }
         }
     }
@@ -159,13 +237,6 @@ class PatientAppointmentsViewModel @Inject constructor(
         }
     }
 
-    private fun parseAppointments(value: Any): List<PatientAppointment> {
-        val rows = value as? JSONArray ?: return emptyList()
-        return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
-            PatientAppointment(row.optString("id"), row.optString("doctorName"), row.optString("start"), row.optString("end"), row.optString("state"), row.optString("reason").takeIf(String::isNotBlank), row.optInt("version", 1))
-        } }
-    }
-
     private fun parseDoctors(value: Any): List<AppointmentDoctor> {
         val doctors = (value as? JSONObject)?.optJSONArray("doctors") ?: return emptyList()
         return (0 until doctors.length()).mapNotNull { i -> doctors.optJSONObject(i)?.let { row ->
@@ -174,14 +245,12 @@ class PatientAppointmentsViewModel @Inject constructor(
         } }
     }
 
-    private fun message(error: Exception): String = when (error) {
-        is AuthRequestException -> error.message ?: "No se pudo completar la operación."
-        else -> error.message ?: "No se pudo completar la operación."
-    }
+    private fun message(error: Exception): String = businessMessage(error, "No se pudo completar la operación.")
 
-    override fun onCleared() { live.stop(); availabilityJob?.cancel(); super.onCleared() }
+    override fun onCleared() { live.stop(); availabilityJob?.cancel(); rescheduleJob?.cancel(); super.onCleared() }
 }
 
+/** A reload after a command keeps its notice ("Cita cancelada."); "Reintentar" clears messages itself. */
 private fun MutableStateFlow<PatientAppointmentsState>.updateLoading(loading: Boolean) {
-    value = value.copy(loading = loading, error = null, notice = null)
+    value = value.copy(loading = loading, error = null)
 }

@@ -26,7 +26,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sv.edu.catolica.climesa.domain.AccessProfile
-import sv.edu.catolica.climesa.domain.QueueFlow
+import sv.edu.catolica.climesa.domain.QueueAction
+import sv.edu.catolica.climesa.domain.QueueRules
 import sv.edu.catolica.climesa.domain.QueueLabels
 import sv.edu.catolica.climesa.domain.QuickAction
 import sv.edu.catolica.climesa.domain.QueueTicket
@@ -47,7 +48,7 @@ fun QueueScreen(
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     var issueOpen by rememberSaveable { mutableStateOf(false) }
-    var callNextId by rememberSaveable { mutableStateOf<String?>(null) }
+    var callNextOpen by rememberSaveable { mutableStateOf(false) }
     val canIssue = "fila.emitir" in profile.permissions
     val canCall = "fila.llamar" in profile.permissions
     val canManage = "fila.gestionar" in profile.permissions
@@ -60,22 +61,20 @@ fun QueueScreen(
     LaunchedEffect(quickAction, state.loading, state.tickets) {
         if (quickAction == null || state.loading) return@LaunchedEffect
         if (quickAction == QuickAction.ISSUE_NUMBER && canIssue) issueOpen = true
-        if (quickAction == QuickAction.CALL_NEXT && canCall) QueueFlow.nextToCall(state.tickets)?.let { callNextId = it.id }
+        if (quickAction == QuickAction.CALL_NEXT && canCall) callNextOpen = true
         onQuickActionHandled()
     }
-    val callNext = callNextId?.let { id -> state.tickets.firstOrNull { it.id == id } }
-    if (callNext != null) ConfirmDialog(
-        title = "Llamar siguiente",
-        confirmLabel = "Llamar",
-        onConfirm = { callNextId = null; model.call(callNext) },
-        onDismiss = { callNextId = null },
-        message = "Se llamará al N.º ${callNext.number} (${QueueLabels.service(callNext.service)}): ${callNext.patientName}.",
-        busy = state.busy,
+    // The API picks the first waiting number of the service; the app never chooses it locally.
+    if (callNextOpen) QueueServiceDialog(
+        title = stringResource(R.string.fila_llamar_siguiente), confirmLabel = "Llamar", initial = QueueRules.callNextService(state.tickets, service), busy = state.busy,
+        message = { stringResource(R.string.fila_llamar_siguiente_mensaje, QueueLabels.service(it)) },
+        onClose = { callNextOpen = false }, onSubmit = { chosen -> callNextOpen = false; model.callNext(chosen) },
     )
-    if (issueOpen) QueueIssueDialog(busy = state.busy, onClose = { issueOpen = false }, onSubmit = { service -> issueOpen = false; model.issue(service) })
+    if (issueOpen) QueueServiceDialog(title = "Emitir número", confirmLabel = "Emitir", initial = QueueLabels.services.first().first, busy = state.busy, message = { "Selecciona el servicio de llegada." }, onClose = { issueOpen = false }, onSubmit = { service -> issueOpen = false; model.issue(service) })
     PageList(modifier) {
         item { SectionIntro("Atención / Llegada", "Fila del día", "El número se emite al llegar y avanza sin alterar la hora de la cita.") }
         if (canIssue) item { PrimaryButton("Emitir número", { issueOpen = true }, icon = Icons.Default.Add, enabled = !state.busy) }
+        if (canCall) item { SecondaryButton(stringResource(R.string.fila_llamar_siguiente), { model.clearMessages(); callNextOpen = true }, icon = Icons.Default.Phone, enabled = !state.busy) }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         if (state.error != null && state.tickets.isNotEmpty()) item { NoticeBanner(NoticeKind.ERROR, state.error!!) }
         when {
@@ -108,7 +107,7 @@ fun QueueScreen(
                     val inColumn = QueueBoard.sorted(visible.filter { QueueBoard.column(it) == column })
                     if (inColumn.isNotEmpty()) {
                         item(key = "h-${column.name}") { Text("${column.label} (${inColumn.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                        items(inColumn, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, canManage, state.busy, model, now) }
+                        items(inColumn, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, state.busy, model, now) }
                     }
                 }
             }
@@ -117,30 +116,41 @@ fun QueueScreen(
 }
 
 @Composable
-private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, busy: Boolean, model: QueueViewModel, now: Long) {
+private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, busy: Boolean, model: QueueViewModel, now: Long) {
     SectionCard("N.º ${ticket.number}", eyebrow = QueueLabels.service(ticket.service), action = { OperacionStatusTag(ticket.state, label = QueueLabels.state(ticket.state)) }) {
         Text(ticket.patientName, style = MaterialTheme.typography.bodyLarge)
-        Text("Llamados: ${ticket.calls}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(QueueLabels.progress(ticket, canCall), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         QueueBoard.waitMinutes(ticket, now)?.takeIf { QueueBoard.waitLevel(ticket, now) != SlaLevel.NONE }?.let { minutes ->
             Text(stringResource(R.string.fila_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(QueueBoard.waitLevel(ticket, now)))
         }
-        if (canCall && ticket.state in listOf("en_espera", "llamado")) SecondaryButton(if (ticket.state == "llamado") "Llamar de nuevo" else "Llamar", { model.call(ticket) }, icon = Icons.Default.Phone, enabled = !busy)
-        if (canManage && ticket.state == "llamado") PrimaryButton("Atender", { model.attend(ticket) }, enabled = !busy)
-        if (canManage && ticket.state == "en_atencion") PrimaryButton("Completar", { model.complete(ticket) }, enabled = !busy)
-        if (canManage && ticket.state in listOf("en_espera", "llamado")) SecondaryButton("No se presentó", { model.absent(ticket) }, enabled = !busy)
+        // Buttons come from the API (`allowedActions`); a blocked one stays visible, disabled, with its reason.
+        QueueActionButton(ticket, QueueAction.CALL, if (ticket.state == "llamado") "Llamar de nuevo" else "Llamar", busy, primary = false) { model.call(ticket) }
+        QueueActionButton(ticket, QueueAction.ATTEND, "Atender", busy, primary = true) { model.attend(ticket) }
+        QueueActionButton(ticket, QueueAction.COMPLETE, "Completar", busy, primary = true) { model.complete(ticket) }
+        QueueActionButton(ticket, QueueAction.ABSENT, "No se presentó", busy, primary = false) { model.absent(ticket) }
     }
 }
 
 @Composable
-private fun QueueIssueDialog(busy: Boolean, onClose: () -> Unit, onSubmit: (String) -> Unit) {
-    var service by rememberSaveable { mutableStateOf(QueueLabels.services.first().first) }
+private fun QueueActionButton(ticket: QueueTicket, action: QueueAction, label: String, busy: Boolean, primary: Boolean, onClick: () -> Unit) {
+    if (!ticket.shows(action)) return
+    val enabled = ticket.allows(action) && !busy
+    if (primary) PrimaryButton(label, onClick, enabled = enabled)
+    else SecondaryButton(label, onClick, icon = if (action == QueueAction.CALL) Icons.Default.Phone else null, enabled = enabled)
+    if (!ticket.allows(action)) ticket.blockedActions[action]?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+}
+
+/** Service picker dialog shared by "Emitir número" and "Llamar siguiente". */
+@Composable
+private fun QueueServiceDialog(title: String, confirmLabel: String, initial: String, busy: Boolean, message: @Composable (String) -> String, onClose: () -> Unit, onSubmit: (String) -> Unit) {
+    var service by rememberSaveable { mutableStateOf(initial) }
     ConfirmDialog(
-        title = "Emitir número",
-        confirmLabel = "Emitir",
+        title = title,
+        confirmLabel = confirmLabel,
         onConfirm = { onSubmit(service) },
         onDismiss = onClose,
         busy = busy,
-        message = "Selecciona el servicio de llegada.",
+        message = message(service),
         body = {
             Column {
                 QueueLabels.services.forEach { (value, label) ->

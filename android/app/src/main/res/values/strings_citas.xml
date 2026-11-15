@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cita_reprogramada">Reprogramada</string>
+    <string name="cita_reprogramar_titulo">Reprogramar la cita</string>
+    <string name="cita_no_asistio_titulo">¿Marcar que no asistió?</string>
+    <string name="cita_aceptar_reprog_titulo">¿Aceptar el nuevo horario?</string>
+    <string name="cita_rechazar_reprog_titulo">Rechazar el nuevo horario</string>
+    <string name="cita_pide_cambiar">Pide cambiar a %1$s</string>
+    <string name="cita_reprog_pendiente">Solicitud de reprogramación pendiente: %1$s</string>
+    <string name="cita_reprog_rechazada">Tu solicitud de reprogramación fue rechazada: %1$s</string>
+    <string name="cita_reprog_rechazada_sin_motivo">Tu solicitud de reprogramación fue rechazada.</string>
+    <string name="cita_reprogramada_a">Esta cita se movió a otro horario.</string>
+    <string name="cita_plazo">Puedes cancelar o reprogramar hasta las %1$s</string>
+    <string name="cita_fecha">Fecha: %1$s</string>
+    <string name="cita_elige_franja">Toca una franja libre de 20 minutos del mismo médico.</string>
+    <string name="cita_sin_franjas">No hay franjas para esta fecha.</string>
+    <string name="cita_comentario">Comentario · opcional</string>
+    <string name="cita_solo_solicitudes">Solo solicitudes</string>
+    <string name="cita_todas">Todas</string>
+    <string name="cita_vencida_detalle">No se atendió antes de su hora.</string>
+    <string name="cita_paciente_reprogramar">Solicitar reprogramación</string>
+    <string name="fila_esperando_medico">Esperando a que el médico llame</string>
+    <string name="fila_llamado_n_de_m">Llamado %1$d de %2$d</string>
+    <string name="fila_presente">Presente, en atención</string>
+    <string name="fila_llamar_siguiente">Llamar siguiente</string>
+    <string name="fila_llamar_siguiente_mensaje">Se llamará al primer número en espera de %1$s.</string>
+    <string name="clin_sin_firmar_titulo">Consultas sin firmar</string>
+    <string name="clin_sin_firmar_item">Iniciada %1$s</string>
+    <string name="clin_reanudar">Reanudar</string>
+    <string name="clin_reprog_titulo">Solicitudes de reprogramación</string>
+    <string name="clin_reprog_detalle">Ahora: %1$s · Pide: %2$s</string>
+</resources>

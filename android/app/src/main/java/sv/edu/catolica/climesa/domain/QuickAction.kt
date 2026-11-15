@@ -7,6 +7,8 @@ package sv.edu.catolica.climesa.domain
 enum class QuickAction(val verb: String) {
     REGISTER_PATIENT("registrar"),
     SCHEDULE_APPOINTMENT("agendar"),
+    /** Open the appointments filtered to the patients' requests (dashboard "Citas por confirmar"). */
+    REVIEW_REQUESTS("solicitudes"),
     REQUEST_APPOINTMENT("solicitar"),
     ISSUE_NUMBER("emitir"),
     CALL_NEXT("llamar"),
@@ -76,6 +78,7 @@ object QuickActions {
     fun permissionFor(action: QuickAction): String = when (action) {
         QuickAction.REGISTER_PATIENT -> "pacientes.registrar"
         QuickAction.SCHEDULE_APPOINTMENT -> "citas.agendar"
+        QuickAction.REVIEW_REQUESTS -> "citas.ver"
         QuickAction.REQUEST_APPOINTMENT -> "citas.solicitar"
         QuickAction.ISSUE_NUMBER -> "fila.emitir"
         QuickAction.CALL_NEXT -> "fila.llamar"

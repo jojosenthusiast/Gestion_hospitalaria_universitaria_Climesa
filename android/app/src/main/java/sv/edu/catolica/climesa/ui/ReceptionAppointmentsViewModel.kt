@@ -45,8 +45,11 @@ data class ReceptionAppointmentsState(
     val saving: Boolean = false,
     val error: String? = null,
     val notice: String? = null,
+    /** Dashboard "Citas por confirmar": only the patients' requests are listed. */
+    val requestsOnly: Boolean = false,
 ) {
     val canConfirm get() = !saving && ReceptionScheduling.canConfirm(patient, doctor, slot)
+    val shown get() = if (requestsOnly) appointments.filter { it.isRequest } else appointments
 }
 
 /** A32: Recepción agenda citas buscando al paciente, viendo médicos con y sin turno y todas las franjas del día. */
@@ -83,7 +86,7 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
     }
 
     fun openScheduling() {
-        mutable.update { ReceptionAppointmentsState(loading = it.loading, appointments = it.appointments, scheduling = true, date = it.date) }
+        mutable.update { ReceptionAppointmentsState(loading = it.loading, appointments = it.appointments, scheduling = true, date = it.date, requestsOnly = it.requestsOnly) }
         loadDoctors()
     }
     fun closeScheduling() { searchJob?.cancel(); slotsJob?.cancel(); doctorsJob?.cancel(); mutable.update { it.copy(scheduling = false, error = null) } }
@@ -169,6 +172,8 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
             }
         }
     }
+
+    fun showRequests(only: Boolean) { mutable.update { it.copy(requestsOnly = only) } }
 
     fun clearMessages() { mutable.update { it.copy(error = null, notice = null) } }
     override fun onCleared() { live.stop(); searchJob?.cancel(); slotsJob?.cancel(); doctorsJob?.cancel(); super.onCleared() }

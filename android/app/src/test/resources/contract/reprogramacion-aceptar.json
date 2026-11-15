@@ -1,0 +1,7 @@
+{
+  "method": "POST",
+  "path": "/api/v1/citas/reprogramaciones/{id}/aceptar",
+  "body": {
+    "version": 1
+  }
+}
