@@ -70,6 +70,7 @@ describe('/confirmar-correo', () => {
     expect(screen.getByText(/El portal web no está habilitado/)).toBeTruthy();
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
     expect(screen.queryByRole('link', { name: /Ir al portal web/ })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Abre la app CLIMESA' })).toBeTruthy();
   });
 
   it('cuenta con web: conserva la sesión y ofrece entrar al portal', async () => {
@@ -91,6 +92,7 @@ describe('/confirmar-correo', () => {
     expect(screen.getByText(/Ya puedes iniciar sesión en la app CLIMESA \(Android\/iOS\) con tu correo/)).toBeTruthy();
     expect(auth.exchangeCodeForSession).toHaveBeenCalledWith('codigo-de-la-app');
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Abre la app CLIMESA' })).toBeTruthy();
     expect(location.search).toBe('');
   });
 

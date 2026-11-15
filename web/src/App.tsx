@@ -7,10 +7,10 @@ import { SessionExpiryWarning,useIdleSession } from './features/session';
 import { supabase } from './lib/supabase';
 import { demoAccounts } from './lib/demoLogin';
 import { useLive } from './lib/live';
-import { LoginView,RegistrationView,StatusView } from './components/ui';
+import { LoginView,PatientSignupInfoView,StatusView } from './components/ui';
 import { HospitalShell } from './features/shell';
 import { PublicScreen } from './features/public-screen';
-import { PasswordRecoveryView,strongPassword } from './features/password';
+import { PasswordRecoveryView } from './features/password';
 import { ConfirmEmail,LANDING_PATHS,PlatformGuidanceScreen,SetPasswordLanding } from './features/auth-landing';
 import './modules.css';
 /** La ruta del hash pertenece a la sesión: al salir se limpia para que la siguiente cuenta no herede una sección ajena (obs. 15). */
@@ -25,7 +25,8 @@ export default function App(){
  // E-mail landing pages (docs/operacion/correo-auth.md): every platform's Supabase links redirect to these web paths.
  if(location.pathname===LANDING_PATHS.confirm)return <ConfirmEmail/>;
  if(location.pathname===LANDING_PATHS.invite)return <SetPasswordLanding/>;
- if(location.pathname==='/registro')return <Register/>;
+ // BL-06 (D-04): patient sign-up lives only in the mobile apps; old /registro links land on guidance.
+ if(location.pathname==='/registro')return <PatientSignupInfoView/>;
  // WEB-13: the recovery e-mail links to /restablecer (Supabase redirect URL, owner setting).
  if(location.pathname==='/recuperar')return <PasswordRecoveryView onRequest={async email=>{await supabase!.auth.resetPasswordForEmail(email,{redirectTo:`${location.origin}${LANDING_PATHS.reset}`});}}/>;
  if(location.pathname===LANDING_PATHS.reset)return <SetPasswordLanding reset/>;
@@ -66,8 +67,3 @@ const changePassword=(email:string)=>async(current:string,next:string):Promise<s
  if(error.code==='reauthentication_needed')return 'Por seguridad, cierra sesión y usa «¿Olvidaste tu contraseña?» para cambiarla.';
  return 'No se pudo cambiar la contraseña. Intenta nuevamente.';
 };
-function Register(){
- const [name,setName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[done,setDone]=useState(false);
- async function submit(e:FormEvent){e.preventDefault();if(!strongPassword(password))return setError('Usa al menos 8 caracteres, mayúscula, minúscula, número y símbolo.');if(password!==confirmation)return setError('Las contraseñas no coinciden.');setBusy(true);setError(null);try{const result=await supabase!.auth.signUp({email:email.trim(),password,options:{data:{nombre:name.trim()},emailRedirectTo:`${location.origin}${LANDING_PATHS.confirm}`}});if(result.error)setError('No se pudo crear la cuenta. Revisa los datos o intenta iniciar sesión.');else{if(result.data.session)await supabase!.auth.signOut({scope:'local'});setDone(true);}}catch{setError('No se pudo conectar. Intenta nuevamente.');}finally{setBusy(false);}}
- return <RegistrationView {...{name,email,password,confirmation,setName,setEmail,setPassword,setConfirmation,busy,error,done}} onSubmit={submit}/>;
-}

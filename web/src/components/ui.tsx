@@ -140,7 +140,7 @@ export function LoginView({ email, password, setEmail, setPassword, busy, error,
         {(problems.email || problems.password) && <p className="sr-only" role="alert">Revisa los campos marcados.</p>}
         <SubmitButton busy={busy}>Iniciar sesión</SubmitButton>
         <a className="auth-link auth-forgot" href="/recuperar">¿Olvidaste tu contraseña?</a>
-        <div className="auth-help"><span>¿Primera vez aquí?</span><p>El personal ingresa con una invitación del hospital.</p><a className="auth-link" href="/registro">Crear cuenta de paciente</a></div>
+        <div className="auth-help"><span>¿Primera vez aquí?</span><p>El personal ingresa con una invitación del hospital.</p><p>¿Eres paciente? Crea tu cuenta en la app CLIMESA para Android o iOS.</p></div>
       </form>
     </AuthLayout>
   );
@@ -162,42 +162,6 @@ export function PortalLayout({ email, roles, onLogout, children, accountMenuOpen
       <main className="portal-content" id="main-content">{children}</main>
       <footer className="portal-footer"><Brand /><span>Hospital universitario CLIMESA</span><span><Icon name="lock" size={13} /> Sesión protegida</span></footer>
     </div>
-  );
-}
-
-export function InvitationView({ displayName, email, setDisplayName, setEmail, busy, message, onSubmit }: { displayName: string; email: string; setDisplayName: (s: string) => void; setEmail: (s: string) => void; busy: boolean; message: { kind: 'success' | 'error'; text: string } | null; onSubmit: (e: FormEvent) => void }) {
-  const initials = displayName.trim() ? displayName.trim().split(/\s+/).slice(0, 2).map(n => n[0]).join('').toUpperCase() : '—';
-  return (
-    <>
-      <section className="page-heading">
-        <div><span className="eyebrow">Administración / Cuentas</span><h1>Accesos<span>.</span></h1><p>Gestiona la entrada de tus pacientes a CLIMESA.</p></div>
-        <a className="outline-link" href="#account-activation">Cómo se activa una cuenta <Icon name="arrow" size={18} /></a>
-      </section>
-      <section className="access-workbench" aria-labelledby="invite-title">
-        <div className="workbench-heading"><span className="section-number">01</span><div><h2 id="invite-title">Invita a un paciente.</h2><p>Un correo es todo lo que necesita para empezar.</p></div><span className="access-tag"><span />Acceso personal</span></div>
-        <form className="invite-form" onSubmit={onSubmit}>
-          {message && <Notice kind={message.kind}>{message.text}</Notice>}
-          <div className="invite-fields">
-            <Field required label="Nombre completo" placeholder="Nombre y apellidos" value={displayName} onChange={setDisplayName} minLength={2} maxLength={120} autoComplete="name" disabled={busy} />
-            <Field required label="Correo electrónico" type="email" placeholder="paciente@correo.com" value={email} onChange={setEmail} autoComplete="email" disabled={busy} hint="Aquí recibirá su enlace de activación." />
-          </div>
-          <div className="identity-strip">
-            <span className="identity-avatar" aria-hidden="true">{initials}</span>
-            <div className="identity-person"><strong>{displayName.trim() || 'La próxima cuenta de tu paciente'}</strong><span>{email.trim() || 'Completa sus datos para preparar la invitación.'}</span></div>
-            <span className="patient-type"><Icon name="user" size={17} />Paciente</span>
-          </div>
-          <div className="form-action"><p><Icon name="lock" size={16} />El paciente crea su propia contraseña.</p><SubmitButton busy={busy} disabled={displayName.trim().length < 2 || !email.includes('@')}>Enviar invitación</SubmitButton></div>
-        </form>
-      </section>
-      <section className="activation-flow" id="account-activation" aria-labelledby="activation-title">
-        <div className="flow-heading"><h2 id="activation-title">Del correo a su cuenta.</h2><span className="mono-label">Tres pasos. Un acceso personal.</span></div>
-        <ol className="flow-steps">
-          <li><span className="flow-number">01</span><div><h3>Recibe la invitación</h3><p>Un enlace personal llega a su correo electrónico.</p></div></li>
-          <li><span className="flow-number">02</span><div><h3>Crea su contraseña</h3><p>Activa su cuenta desde el enlace recibido.</p></div></li>
-          <li><span className="flow-number">03</span><div><h3>Ya puede ingresar</h3><p>Utiliza su cuenta en el portal y la aplicación.</p></div></li>
-        </ol>
-      </section>
-    </>
   );
 }
 
@@ -242,6 +206,7 @@ export function StatusView({ title, detail, action, onAction }: { title: string;
   );
 }
 
-export function RegistrationView({name,email,password,confirmation,setName,setEmail,setPassword,setConfirmation,busy,error,done,onSubmit}:{name:string;email:string;password:string;confirmation:string;setName:(s:string)=>void;setEmail:(s:string)=>void;setPassword:(s:string)=>void;setConfirmation:(s:string)=>void;busy:boolean;error:string|null;done:boolean;onSubmit:(e:FormEvent)=>void}){
- return <AuthLayout><form onSubmit={onSubmit} className="auth-form"><div className="form-heading"><span className="eyebrow">Cuenta de paciente</span><h1>Tu acceso personal.</h1><p>Crea tu cuenta para utilizar la aplicación móvil de CLIMESA.</p></div>{done?<><Notice kind="success">Si el correo necesita confirmación, recibirás un enlace para activarlo. Después podrás ingresar en Android o iOS.</Notice><a className="secondary-button" href="/">Volver al ingreso</a></>:<>{error&&<Notice kind="error">{error}</Notice>}<Field label="Nombre completo" value={name} onChange={setName} required minLength={2} maxLength={120} autoComplete="name"/><Field label="Correo electrónico" type="email" value={email} onChange={setEmail} required maxLength={254} autoComplete="email"/><Field label="Contraseña" type="password" value={password} onChange={setPassword} required minLength={8} autoComplete="new-password"/><Field label="Confirmar contraseña" type="password" value={confirmation} onChange={setConfirmation} required minLength={8} autoComplete="new-password"/><SubmitButton busy={busy}>Crear cuenta de paciente</SubmitButton><a className="auth-link" href="/">Ya tengo cuenta</a></>}</form></AuthLayout>;
+/** BL-06 (D-04): patients create their account only in the mobile apps; `/registro` stays as guidance so old links do not break. */
+export function PatientSignupInfoView(){
+ return <AuthLayout><div className="auth-form"><div className="form-heading"><span className="eyebrow">Cuenta de paciente</span><h1>Crea tu cuenta en la app CLIMESA para Android o iOS</h1><p>El registro de pacientes se hace solo en la app móvil. Descárgala, elige «Crear cuenta» y confirma tu correo desde el enlace que te enviaremos.</p></div><Notice kind="info">El portal web es para el personal del hospital. Con tu cuenta de paciente ingresas en la app.</Notice><a className="secondary-button" href="/"><Icon name="back" size={18}/>Volver al ingreso</a></div></AuthLayout>;
 }

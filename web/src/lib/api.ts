@@ -48,7 +48,6 @@ export class HttpApi implements Api {
  }
 }
 export const getAccessProfile=(token:string)=>new HttpApi(async()=>token).request<AccessProfile>('/auth/me');
-export const invitePatient=(token:string,input:{email:string;displayName:string})=>new HttpApi(async()=>token).write<InvitationResult>('/usuarios/invitaciones',input);
 export const can=(profile:AccessProfile,permission:string)=>profile.permissions.some(p=>p.code===permission);
 /** Función del personal (`type` de la API) con su etiqueta en español. */
 export const staffTypeNames:Record<string,string>={medico:'Médico',enfermero:'Enfermería',asistente:'Asistencia',recepcionista:'Recepción',laboratorista:'Laboratorio',paramedico:'Paramédico',motorista:'Motorista',limpieza:'Limpieza',administrativo:'Administración',otro:'Otro'};
