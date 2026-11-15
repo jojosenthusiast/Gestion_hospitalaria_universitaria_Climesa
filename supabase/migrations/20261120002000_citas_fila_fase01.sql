@@ -62,6 +62,17 @@ where not exists (select 1 from plataforma.politica p where p.clave = v.clave);
 --   solicitada -> confirmada | rechazada | cancelada | vencida | reprogramada
 --   confirmada -> atendida | cancelada | no_asistio | reprogramada
 -- Con una consulta vigente (no anulada) la cita ya no se cancela, ni pasa a no_asistio ni a reprogramada (MA-CIT-03).
+-- La consulta cuenta si se inició desde la cita o desde un número de fila del mismo paciente el día de la cita
+-- (el paciente con cita que se atiende por la fila no queda como "no asistió").
+create or replace function atencion.cita_tiene_consulta(p_cita uuid) returns boolean language sql stable set search_path = '' as $$
+  select exists (
+    select 1 from atencion.cita c
+      join atencion.consulta k on k.paciente_id = c.paciente_id and k.estado <> 'ingresada_por_error'
+      left join atencion.ticket_fila t on t.id = k.ticket_id
+    where c.id = p_cita
+      and (k.cita_id = c.id or t.fecha = (lower(c.horario) at time zone 'America/El_Salvador')::date))
+$$;
+
 create or replace function atencion.validar_cita() returns trigger language plpgsql set search_path = '' as $$
 begin
   if old.estado <> new.estado then
@@ -70,8 +81,7 @@ begin
       or (old.estado = 'confirmada' and new.estado in ('atendida', 'cancelada', 'no_asistio', 'reprogramada'))) then
       raise exception 'transicion_invalida % -> %', old.estado, new.estado using errcode = 'P0001';
     end if;
-    if new.estado in ('cancelada', 'no_asistio', 'reprogramada') and exists (
-        select 1 from atencion.consulta k where k.cita_id = new.id and k.estado <> 'ingresada_por_error') then
+    if new.estado in ('cancelada', 'no_asistio', 'reprogramada') and atencion.cita_tiene_consulta(new.id) then
       raise exception 'cita_con_consulta' using errcode = 'P0001';
     end if;
   end if;
@@ -164,4 +174,5 @@ end $$;
 -- alter table atencion.ticket_fila drop constraint ticket_fila_estado_valido;
 -- alter table atencion.ticket_fila add check (estado in ('en_espera','llamado','en_atencion','atendido','no_se_presento'));
 -- (y las funciones validar_cita y validar_ticket de 20261116002000 y 20261017000600)
+-- drop function if exists atencion.cita_tiene_consulta(uuid);   -- después de restaurar validar_cita
 -- delete from plataforma.politica where clave in ('fila.llamados_para_ausencia','citas.reprogramaciones_max','citas.solicitudes_pendientes_max');

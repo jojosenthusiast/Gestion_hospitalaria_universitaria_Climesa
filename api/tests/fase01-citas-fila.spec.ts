@@ -1,3 +1,4 @@
+import { AttentionSweepService } from '../src/attention/attention-sweep.service';
 import { createTestApp, TestApp } from './support/app';
 
 jest.setTimeout(240000);
@@ -243,6 +244,67 @@ describe('Fase 0/1 · fila y citas guiadas por el servidor', () => {
       expect(cancel.status).toBe(409);
       expect(cancel.body.codigo).toBe('cita_con_consulta');
       await expect(t.pg.query("UPDATE atencion.cita SET estado='cancelada' WHERE id=$1", [today])).rejects.toThrow(/cita_con_consulta/);
+    });
+  });
+  // Revisión independiente del PR #115.
+  describe('revisión PR #115 · bordes del barrido y de los comandos', () => {
+    test('una cita cuyo paciente se atendió desde la fila ese día cuenta como atendida', async () => {
+      const patientId = await t.patient();
+      const id = await t.appointment(patientId, new Date('2026-11-16T17:30:00Z'));
+      const issued = (await t.call('REC', 'POST', '/fila', { service: 'consulta_general', patientId })).body;
+      await t.call('MED', 'POST', `/fila/${issued.id}/llamar`, { version: issued.version });
+      expect((await t.call('MED', 'POST', '/consultas', { ticketId: issued.id })).status).toBe(201);
+      const row = await appointmentOf('REC', id);
+      expect(row.allowedActions).not.toContain('cancelar');
+      expect(row.blockedActions).toContainEqual({ action: 'cancelar', reason: 'La consulta ya empezó.' });
+      const cancel = await t.call('REC', 'POST', `/citas/${id}/cancelar`, { version: 1, reason: 'Prueba de cancelación' });
+      expect(cancel.body.codigo).toBe('cita_con_consulta');
+      await expect(t.pg.query("UPDATE atencion.cita SET estado='no_asistio' WHERE id=$1", [id])).rejects.toThrow(/cita_con_consulta/);
+      // Al día siguiente el barrido no la marca "no asistió" ni cierra el número con la consulta abierta.
+      t.setNow(new Date('2026-11-17T15:00:00Z'));
+      await t.call('REC', 'GET', '/citas');
+      await t.call('REC', 'GET', '/fila');
+      expect((await t.one('SELECT estado FROM atencion.cita WHERE id=$1', [id])).estado).toBe('confirmada');
+      expect((await t.one('SELECT estado FROM atencion.ticket_fila WHERE id=$1', [issued.id])).estado).toBe('en_atencion');
+    });
+
+    test('no se inicia una consulta con un número de un día anterior', async () => {
+      const old = await t.one(`INSERT INTO atencion.ticket_fila(servicio,fecha,numero,paciente_id,estado,llamados) VALUES('consulta_general','2026-11-15',950,$1,'llamado',1) RETURNING id`, [await t.patient()]);
+      const started = await t.call('MED', 'POST', '/consultas', { ticketId: old.id });
+      expect(started.status).toBe(409);
+      expect(started.body.codigo).toBe('transicion_invalida');
+    });
+
+    test('una solicitud cuya hora ya llegó no se confirma ni se rechaza', async () => {
+      const id = await t.appointment(await t.patient(), at(-10), 'solicitada');
+      const confirm = await t.call('REC', 'POST', `/citas/solicitudes/${id}/confirmar`, { version: 1 });
+      expect(confirm.status).toBe(409);
+      const reject = await t.call('REC', 'POST', `/citas/solicitudes/${id}/rechazar`, { version: 1, rejectionReason: 'Sin cupo para esa hora' });
+      expect(reject.status).toBe(409);
+    });
+
+    test('CITA-06 · recepción no cancela una solicitud; la rechaza', async () => {
+      const id = await t.appointment(await t.patient(), new Date('2026-11-19T15:00:00Z'), 'solicitada');
+      const cancel = await t.call('REC', 'POST', `/citas/${id}/cancelar`, { version: 1, reason: 'Prueba de cancelación' });
+      expect(cancel.status).toBe(409);
+      expect(cancel.body.codigo).toBe('transicion_invalida');
+    });
+
+    test('cancelar vence la solicitud de reprogramación pendiente', async () => {
+      const patientId = await t.patient({ linkPac: true });
+      const id = await t.appointment(patientId, new Date('2026-11-18T14:20:00Z'));
+      const asked = (await t.call('PAC', 'POST', `/citas/${id}/reprogramar`, { version: 1, ...slot(new Date('2026-11-18T14:40:00Z')) })).body;
+      expect((await t.call('PAC', 'POST', `/citas/${id}/cancelar`, { version: asked.version, reason: 'Ya no necesito la cita' })).status).toBe(201);
+      expect((await t.one('SELECT estado FROM atencion.reprogramacion WHERE id=$1', [asked.rescheduleId])).estado).toBe('vencida');
+    });
+
+    test('si el barrido falla, la fila y las citas se leen igual', async () => {
+      const sweeper = t.app.get(AttentionSweepService);
+      const spy = jest.spyOn(sweeper, 'sweep').mockRejectedValue(new Error('canceling statement due to lock timeout'));
+      try {
+        expect((await t.call('REC', 'GET', '/fila')).status).toBe(200);
+        expect((await t.call('REC', 'GET', '/citas')).status).toBe(200);
+      } finally { spy.mockRestore(); }
     });
   });
 });

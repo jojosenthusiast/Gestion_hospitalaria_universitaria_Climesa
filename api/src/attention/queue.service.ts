@@ -70,7 +70,7 @@ export class QueueService {
     // SEG-01: una cuenta con solo `propio` y sin expediente vinculado no tiene número que ver.
     if (!whole && !actor.patientId) return [];
     const own = whole ? null : actor.patientId;
-    await this.sweeper.sweep();
+    await this.sweeper.sweepSafely();
     return this.db.transaction(async c => { const rows = (await c.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       t.estado AS state,t.consultorio_id AS "officeId",t.llamados,t.version,t.emitido_en AS "issuedAt",

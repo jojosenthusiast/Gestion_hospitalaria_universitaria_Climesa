@@ -97,8 +97,10 @@ export class ConsultationService {
    * called (`llamado`) or already in attention; a called number moves to `en_atencion` in the same transaction.
    */
   private async fromTicket(c: PoolClient, actor: Actor, id: string) {
-    const ticket = (await c.query(`SELECT id,paciente_id,estado,consultorio_id,version FROM atencion.ticket_fila WHERE id=$1 FOR UPDATE`, [id])).rows[0] as Row | undefined;
+    const ticket = (await c.query(`SELECT id,paciente_id,estado,consultorio_id,version,fecha=$2::date AS today FROM atencion.ticket_fila WHERE id=$1 FOR UPDATE`, [id, this.clock.today()])).rows[0] as Row | undefined;
     if (!ticket) throw new NotFoundException('No se encontró el número de fila.');
+    // The day-end sweep may not have closed it yet (it skips while another one holds the lock).
+    if (!ticket.today) throw new ProblemException('transicion_invalida', 409, 'El número es de un día anterior; emite uno nuevo para hoy.');
     if (!ticket.paciente_id) throw new ProblemException('validacion', 400, 'El número de fila no tiene un paciente asociado.', 'ticketId');
     if (!['llamado', 'en_atencion'].includes(ticket.estado)) throw new ProblemException('transicion_invalida', 409, 'Llama el número antes de iniciar la consulta.');
     await this.rejectStarted(c, actor, 'ticket_id', id, 'La consulta ya fue iniciada para este número.');

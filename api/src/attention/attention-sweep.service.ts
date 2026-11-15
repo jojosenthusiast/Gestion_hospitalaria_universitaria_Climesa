@@ -13,7 +13,8 @@ export const SYSTEM_ACTOR = { id: '00000000-0000-0000-0000-000000000000', roles:
  * - a request nobody handled before its time becomes `vencida`;
  * - a pending reschedule request expires when its slot or the original appointment starts;
  * - a confirmed appointment from a previous day without a consultation becomes `no_asistio`;
- * - the queue numbers of a previous day still open close (`no_se_presento` after N calls, `cerrado` otherwise).
+ * - the queue numbers of a previous day still open close (`no_se_presento` after N calls, `atendido` with a signed
+ *   consultation, `cerrado` otherwise); a number whose consultation is still open stays in attention.
  * It runs every minute (like the shift states) and before the appointment and queue reads, so the lists never show
  * stale states. Each closure is audited and announced on the realtime outbox.
  */
@@ -31,12 +32,26 @@ export class AttentionSweepService implements OnModuleInit, OnModuleDestroy {
 
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
 
+  /**
+   * The request-path sweep: the timer is the primary path, so a failure here (a lock or statement timeout) is logged
+   * and the read goes on with the states as they are.
+   */
+  async sweepSafely() {
+    try { return await this.sweep(); } catch (e) {
+      new Logger(AttentionSweepService.name).warn(`No se pudo cerrar citas o fila vencidas antes de la lectura: ${e}`);
+      return 0;
+    }
+  }
+
   async sweep() {
     const now = this.clock.now();
     const todayStart = businessDayRange(this.clock.today()).start;
     return this.db.transaction(async c => {
       // Only one sweep at a time; a concurrent one simply skips.
       if (!(await c.query('SELECT pg_try_advisory_xact_lock(671020) AS ok')).rows[0].ok) return 0;
+      // Short limits: the sweep never holds a read waiting on a busy row.
+      await c.query("SET LOCAL lock_timeout = '2s'");
+      await c.query("SET LOCAL statement_timeout = '10s'");
       let changed = 0;
       const expired = (await c.query(`UPDATE atencion.cita SET estado='vencida',version=version+1
         WHERE estado='solicitada' AND lower(horario)<=$1::timestamptz RETURNING id,paciente_id,version`, [now])).rows;
@@ -54,7 +69,7 @@ export class AttentionSweepService implements OnModuleInit, OnModuleDestroy {
 
       const noShows = (await c.query(`UPDATE atencion.cita c SET estado='no_asistio',version=version+1
         WHERE c.estado='confirmada' AND lower(c.horario)<$1::timestamptz
-          AND NOT EXISTS (SELECT 1 FROM atencion.consulta k WHERE k.cita_id=c.id AND k.estado<>'ingresada_por_error')
+          AND NOT atencion.cita_tiene_consulta(c.id)
         RETURNING id,paciente_id,version`, [todayStart])).rows;
       changed += await this.announceAppointments(c, noShows, 'citas.no_asistio_automatico');
 
@@ -64,6 +79,8 @@ export class AttentionSweepService implements OnModuleInit, OnModuleDestroy {
                       ELSE 'cerrado' END,
           version=version+1
         WHERE t.fecha<$1::date AND t.estado IN ('en_espera','llamado','en_atencion')
+          -- A consultation still open across days (m-22) keeps its number in attention; signing it closes the number.
+          AND NOT EXISTS (SELECT 1 FROM atencion.consulta k WHERE k.ticket_id=t.id AND k.estado='abierta')
         RETURNING id,paciente_id,estado,version`, [this.clock.today()])).rows;
       if (tickets.length) {
         await this.commands.audit(c, SYSTEM_ACTOR, { action: 'fila.cierre_del_dia', entity: 'ticket_fila', detail: { ids: tickets.map(t => t.id), states: tickets.map(t => t.estado) } });
