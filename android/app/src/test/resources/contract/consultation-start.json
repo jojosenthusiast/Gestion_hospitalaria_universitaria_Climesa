@@ -1,6 +1,6 @@
 {
-  "operation": "POST /consultas",
-  "source": "ConsultationViewModel.start",
+  "method": "POST",
+  "path": "/api/v1/consultas",
   "body": {
     "appointmentId": "5e4d3c2b-1a09-4f8e-b7d6-c5b4a3928170",
     "reason": "Dolor de garganta"

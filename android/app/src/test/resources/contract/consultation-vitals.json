@@ -1,6 +1,6 @@
 {
-  "operation": "POST /consultas/{id}/signos",
-  "source": "ConsultationViewModel.vitals",
+  "method": "POST",
+  "path": "/api/v1/consultas/{id}/signos",
   "body": {
     "systolic": 120,
     "diastolic": 80,

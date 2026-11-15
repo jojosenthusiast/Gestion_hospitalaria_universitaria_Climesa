@@ -3,10 +3,10 @@
 Cada archivo `*.json` de esta carpeta es un cuerpo de escritura real de la app, con esta forma:
 
 ```json
-{ "operation": "POST /admisiones/indicaciones", "source": "<función o tipo que arma el cuerpo>", "body": { } }
+{ "method": "POST", "path": "/api/v1/admisiones/indicaciones", "body": { } }
 ```
 
-- `operation`: método y ruta tal como están en `contrato/openapi.json`, sin el prefijo `/api/v1` y con los parámetros como plantilla (`/consultas/{id}/receta`).
+- `method` y `path`: método HTTP y ruta exactamente como están en `contrato/openapi.json`, con el prefijo `/api/v1` y los parámetros como plantilla (`/api/v1/consultas/{id}/receta`). No lleva otras claves: Android, iOS y la API leen este mismo formato.
 - `body`: el JSON exacto que la app envía, con datos ficticios.
 
 Dos pruebas lo mantienen honesto:
