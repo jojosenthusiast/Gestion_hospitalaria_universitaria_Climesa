@@ -267,7 +267,6 @@ Decisión del dueño (2026-11-14): la ambulancia necesita paramédico **y** moto
 | Indicación desde consulta | `POST /admisiones/indicaciones` exigía `attendingDoctorId` aunque solo puede ser el propio médico. | Ahora es opcional (`AdmissionIndicationDto`) y por omisión es el médico que indica; la consulta de `originId` debe ser del paciente y de ese médico (403 si es de otro). |
 | Deriva móvil | ¿Qué cuerpos móviles no cumplen hoy el contrato? | `api/tests/contrato-movil.spec.ts` los listaría en `KNOWN_DRIFT`; hoy está vacío: iOS ya envía `motive` y Android ya arma la indicación de hospitalización. Android, iOS y la API leen un solo formato de fixture: `{ method, path, body }`, con `path` como en el contrato (`/api/v1/...`). |
 
-| Deriva móvil | ¿Qué cuerpos móviles no cumplen hoy el contrato? | `api/tests/contrato-movil.spec.ts` los lista en `KNOWN_DRIFT` (hoy: iOS `AdmissionBody` sin `motive`); Android aún no tiene la indicación de hospitalización. |
 
 ## Tiempo real entre plataformas (rama `feat/tiempo-real`)
 
