@@ -19,10 +19,52 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     /// Consulta iniciada desde este número por el médico que lee la fila; `nil` si no hay o es de otro profesional.
     public let consultationId: String?
     public let consultationState: ConsultationState?
+    /// FILA-01: acciones que el servidor acepta ahora y las bloqueadas con su motivo.
+    public var allowedActions: [QueueAction]? = nil
+    public var blockedActions: [BlockedAction<QueueAction>]? = nil
+    public var maxCalls: Int? = nil
+    public var callsForAbsence: Int? = nil
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
-        case consultationId, consultationState
+        case consultationId, consultationState, allowedActions, blockedActions, maxCalls, callsForAbsence
     }
+}
+
+/// Acción bloqueada por estado u hora, con el motivo en español para mostrar.
+public struct BlockedAction<Action: ContractEnum & Decodable>: Decodable, Sendable, Equatable {
+    public let action: Action
+    public let reason: String
+    public init(action: Action, reason: String) { self.action = action; self.reason = reason }
+}
+
+/// `AppointmentRescheduleResponse`: última solicitud de reprogramación de una cita (CITA-02).
+public struct AppointmentReschedule: Decodable, Sendable, Equatable {
+    public let id: String
+    public let start: String
+    public let end: String
+    public let state: RescheduleState
+    public let origin: String
+    public let reason: String?
+    public let rejectionReason: String?
+    public let version: Int
+}
+
+/// `QueueTransitionResponse` de atender, completar y "no se presentó".
+public struct QueueTransitionResult: Decodable, Sendable, Equatable {
+    public let id: String
+    public let version: Int
+    public let state: QueueState
+}
+
+/// `QueueCallNextResponse` de `POST /fila/llamar-siguiente`.
+public struct QueueCallNextResult: Decodable, Sendable, Equatable {
+    public let id: String
+    public let version: Int
+    public let state: QueueState
+    public let calls: Int
+    public let number: Int
+    public let patientName: String?
+    enum CodingKeys: String, CodingKey { case id, version, state, calls = "llamados", number = "numero", patientName }
 }
 
 /// `QueueCallResponse` de `POST /fila/{id}/llamar`.
@@ -63,6 +105,12 @@ public struct Appointment: Decodable, Sendable, Identifiable, Equatable {
     public let origin: String
     public let rejectionReason: String?
     public let version: Int
+    /// CITA-04 y CITA-01: acciones válidas ahora, bloqueadas con motivo y hasta cuándo se puede cancelar o reprogramar.
+    public var allowedActions: [AppointmentAction]? = nil
+    public var blockedActions: [BlockedAction<AppointmentAction>]? = nil
+    public var cancelableUntil: String? = nil
+    public var reschedule: AppointmentReschedule? = nil
+    public var rescheduledToId: String? = nil
 }
 
 /// `AppointmentCommandResponse` de solicitar y cancelar una cita.

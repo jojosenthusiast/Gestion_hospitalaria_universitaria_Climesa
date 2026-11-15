@@ -3542,6 +3542,149 @@
           }
         }
       }
+    },
+    "appointments.reschedule": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprogramar"
+          }
+        }
+      }
+    },
+    "appointments.reschedule.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprogramar cita"
+          }
+        }
+      }
+    },
+    "appointments.reschedule.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige otra franja libre del mismo médico. Tu cita actual sigue vigente hasta que Recepción o tu médico acepten el cambio."
+          }
+        }
+      }
+    },
+    "appointments.reschedule.submit": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pedir el cambio"
+          }
+        }
+      }
+    },
+    "appointments.reschedule.sent": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solicitud enviada. Te avisaremos cuando la acepten o la rechacen."
+          }
+        }
+      }
+    },
+    "day.unsigned": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consultas sin firmar"
+          }
+        }
+      }
+    },
+    "day.unsigned.resume": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reanudar"
+          }
+        }
+      }
+    },
+    "day.reschedules": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solicitudes de reprogramación"
+          }
+        }
+      }
+    },
+    "day.reschedules.accept": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aceptar nuevo horario"
+          }
+        }
+      }
+    },
+    "day.reschedules.reject": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechazar"
+          }
+        }
+      }
+    },
+    "day.reschedules.reject.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechazar nuevo horario"
+          }
+        }
+      }
+    },
+    "day.reschedules.reject.reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motivo del rechazo"
+          }
+        }
+      }
+    },
+    "day.queue.callAgain": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Llamar de nuevo"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

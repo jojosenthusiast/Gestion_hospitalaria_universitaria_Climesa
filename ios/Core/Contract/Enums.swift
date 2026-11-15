@@ -32,7 +32,7 @@ extension QueueService: Decodable { public init(from decoder: Decoder) throws { 
 
 /// `EstadoFila`
 public enum QueueState: String, ContractEnum {
-    case enEspera = "en_espera", llamado, enAtencion = "en_atencion", atendido, noSePresento = "no_se_presento", desconocido
+    case enEspera = "en_espera", llamado, enAtencion = "en_atencion", atendido, noSePresento = "no_se_presento", cerrado, desconocido
     public static var fallback: QueueState { .desconocido }
     public var label: String {
         switch self {
@@ -41,6 +41,7 @@ public enum QueueState: String, ContractEnum {
         case .enAtencion: return "En atención"
         case .atendido: return "Atendido"
         case .noSePresento: return "No se presentó"
+        case .cerrado: return "Cerrado sin atender"
         case .desconocido: return "Sin estado"
         }
     }
@@ -51,7 +52,7 @@ extension QueueState: Decodable { public init(from decoder: Decoder) throws { se
 
 /// `EstadoCita`
 public enum AppointmentState: String, ContractEnum {
-    case solicitada, confirmada, atendida, cancelada, rechazada, noAsistio = "no_asistio", desconocido
+    case solicitada, confirmada, atendida, cancelada, rechazada, noAsistio = "no_asistio", vencida, reprogramada, desconocido
     public static var fallback: AppointmentState { .desconocido }
     public var label: String {
         switch self {
@@ -61,6 +62,8 @@ public enum AppointmentState: String, ContractEnum {
         case .cancelada: return "Cancelada"
         case .rechazada: return "Rechazada"
         case .noAsistio: return "No asistió"
+        case .vencida: return "Vencida"
+        case .reprogramada: return "Reprogramada"
         case .desconocido: return "Sin estado"
         }
     }
@@ -235,3 +238,56 @@ public enum DischargeType: String, CaseIterable, Sendable {
         }
     }
 }
+
+/// `AccionCita` (CITA-04): lo que el servidor acepta ahora para quien lee la cita.
+public enum AppointmentAction: String, ContractEnum {
+    case confirmar, rechazar, cancelar, reprogramar, noAsistio = "no_asistio", aceptarReprogramacion = "aceptar_reprogramacion"
+    case rechazarReprogramacion = "rechazar_reprogramacion", iniciarConsulta = "iniciar_consulta", desconocido
+    public static var fallback: AppointmentAction { .desconocido }
+    public var label: String {
+        switch self {
+        case .confirmar: return "Confirmar"
+        case .rechazar: return "Rechazar"
+        case .cancelar: return "Cancelar"
+        case .reprogramar: return "Reprogramar"
+        case .noAsistio: return "No asistió"
+        case .aceptarReprogramacion: return "Aceptar nuevo horario"
+        case .rechazarReprogramacion: return "Rechazar nuevo horario"
+        case .iniciarConsulta: return "Iniciar consulta"
+        case .desconocido: return "Acción"
+        }
+    }
+}
+extension AppointmentAction: Decodable { public init(from decoder: Decoder) throws { self = try Self.decodeLenient(decoder) } }
+
+/// `AccionFila` (FILA-01): lo que el servidor acepta ahora para quien lee el número.
+public enum QueueAction: String, ContractEnum {
+    case llamar, atender, completar, noSePresento = "no_se_presento", desconocido
+    public static var fallback: QueueAction { .desconocido }
+    public var label: String {
+        switch self {
+        case .llamar: return "Llamar"
+        case .atender: return "Iniciar atención"
+        case .completar: return "Completar"
+        case .noSePresento: return "No se presentó"
+        case .desconocido: return "Acción"
+        }
+    }
+}
+extension QueueAction: Decodable { public init(from decoder: Decoder) throws { self = try Self.decodeLenient(decoder) } }
+
+/// `EstadoReprogramacion`
+public enum RescheduleState: String, ContractEnum {
+    case pendiente, aceptada, rechazada, vencida, desconocido
+    public static var fallback: RescheduleState { .desconocido }
+    public var label: String {
+        switch self {
+        case .pendiente: return "Pendiente"
+        case .aceptada: return "Aceptada"
+        case .rechazada: return "Rechazada"
+        case .vencida: return "Vencida"
+        case .desconocido: return "Sin estado"
+        }
+    }
+}
+extension RescheduleState: Decodable { public init(from decoder: Decoder) throws { self = try Self.decodeLenient(decoder) } }

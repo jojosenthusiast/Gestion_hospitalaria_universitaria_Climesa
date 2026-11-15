@@ -8,6 +8,10 @@ struct DoctorDay: Sendable {
     var tickets: Part<[QueueTicket]>?
     var pendingResults: Part<Int>?
     var hospitalized: Part<Int>?
+    /// m-22: consultas propias abiertas de cualquier día.
+    var unsigned: Part<[UnsignedConsultation]>?
+    /// CITA-02: citas propias con una solicitud de reprogramación que el médico puede decidir.
+    var reschedules: Part<[Appointment]>?
 }
 
 /// I20 · Mi día: citas del día, números de la fila, resultados por revisar y hospitalizados.
@@ -18,18 +22,56 @@ struct DoctorDayView: View {
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<DoctorDay>()
     @State private var calling = Submission()
+    @State private var deciding = Submission()
+    @State private var rejecting: Appointment?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
             LoadState(loader: loader, retry: load) { day in
                 summary(day)
                 partErrors(day)
+                if let open = day.unsigned?.value, !open.isEmpty { unsignedSection(open) }
+                if let pending = day.reschedules?.value, !pending.isEmpty { rescheduleSection(pending) }
                 if let tickets = day.tickets?.value { queueSection(tickets) }
                 if let agenda = day.agenda { agendaSection(agenda) }
                 moreSection(day)
             }
         }
         .task(id: live.snapshot.version([.appointments, .consultations, .queue, .laboratory, .admissions])) { await load() }
+        .sheet(item: $rejecting) { item in RejectRescheduleSheet(appointment: item, submission: deciding) { await load() } }
+    }
+
+    @ViewBuilder private func unsignedSection(_ open: [UnsignedConsultation]) -> some View {
+        SectionCard(title: L.text("day.unsigned")) {
+            ForEach(open) { item in
+                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.display(item.startedAt))
+                NavigationLink { ConsultationView(origin: .resume(item), profile: profile) } label: { Text("day.unsigned.resume") }
+                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+            }
+        }
+    }
+
+    @ViewBuilder private func rescheduleSection(_ pending: [Appointment]) -> some View {
+        SectionCard(title: L.text("day.reschedules")) {
+            WriteNotice(submission: deciding, reload: load)
+            ForEach(pending) { item in
+                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.display(item.start),
+                        meta: item.reschedule.map { "→ \(ClimesaDates.display($0.start))" })
+                HStack(spacing: Spacing.m) {
+                    ClimesaButton(title: L.text("day.reschedules.accept"), loading: deciding.busy) { Task { await accept(item) } }
+                    ClimesaButton(title: L.text("day.reschedules.reject"), kind: .secondary) { rejecting = item }
+                }
+            }
+        }
+    }
+
+    private func accept(_ item: Appointment) async {
+        guard let request = item.reschedule else { return }
+        let body = RescheduleDecisionBody(version: request.version)
+        await deciding.run(request.id, body: body, success: L.text("day.reschedules.accept")) { key in
+            _ = try await account.client().send("POST", "/citas/reprogramaciones/\(request.id)/aceptar", body: body, key: key, as: AppointmentCommandResult.self)
+        }
+        await load()
     }
 
     @ViewBuilder private func summary(_ day: DoctorDay) -> some View {
@@ -61,8 +103,9 @@ struct DoctorDayView: View {
         let waiting = tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count
         SectionCard(title: L.text("day.queue")) {
             Text(verbatim: String(format: L.text("day.queue.waiting"), waiting)).font(Typo.body).foregroundStyle(Theme.ink)
-            if account.can("fila.llamar"), let next = QueueRules.nextToCall(tickets) {
-                ClimesaButton(title: L.text("day.queue.callNext"), loading: calling.busy) { Task { await call(next) } }
+            // FILA-02: el servidor elige el siguiente número en espera del servicio.
+            if account.can("fila.llamar"), QueueRules.nextToCall(tickets) != nil {
+                ClimesaButton(title: L.text("day.queue.callNext"), loading: calling.busy) { Task { await callNext() } }
             }
             WriteNotice(submission: calling, reload: load)
         }
@@ -71,6 +114,17 @@ struct DoctorDayView: View {
             SectionCard {
                 ListRow(title: ticket.patientName ?? ticket.service.label, subtitle: String(format: L.text("consultation.ticket"), ticket.number)) {
                     MedicoTag(ticket.state.rawValue, label: ticket.state.label)
+                }
+                // FILA-01: volver a llamar o "No se presentó" solo cuando el servidor lo permite; si no, su motivo.
+                let allowed = ticket.allowedActions ?? []
+                if allowed.contains(.llamar) || allowed.contains(.noSePresento) {
+                    HStack(spacing: Spacing.m) {
+                        if allowed.contains(.llamar) { ClimesaButton(title: L.text("day.queue.callAgain"), kind: .secondary, loading: calling.busy) { Task { await call(ticket) } } }
+                        if allowed.contains(.noSePresento) { ClimesaButton(title: QueueAction.noSePresento.label, kind: .secondary, loading: calling.busy) { Task { await absent(ticket) } } }
+                    }
+                }
+                ForEach(ticket.blockedActions ?? [], id: \.action) { item in
+                    Text(verbatim: "\(item.action.label): \(item.reason)").font(Typo.small).foregroundStyle(Theme.muted)
                 }
                 if account.can("consulta.iniciar") {
                     // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
@@ -94,9 +148,12 @@ struct DoctorDayView: View {
                     else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
                 }
                 HStack(spacing: Spacing.m) {
-                    if account.can("consulta.iniciar") && entry.appointmentState == .confirmada || entry.consultationId != nil {
+                    // MA-CIT-03: iniciar solo el día de la cita (lo decide el servidor con `allowedActions`).
+                    if entry.consultationId != nil || (account.can("consulta.iniciar") && (entry.allowedActions?.contains(.iniciarConsulta) ?? (entry.appointmentState == .confirmada))) {
                         NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: { Text("day.consultation") }
                             .buttonStyle(ClimesaButtonStyle())
+                    } else if let reason = entry.blockedActions?.first(where: { $0.action == .iniciarConsulta })?.reason {
+                        Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted)
                     }
                     if account.can("expediente.ver") {
                         NavigationLink {
@@ -140,6 +197,14 @@ struct DoctorDayView: View {
                 let entries = try await api.get("/consultas/agenda", as: [AgendaEntry].self)
                 day.agenda = entries.filter { ClimesaDates.parse($0.start).map(ClimesaDates.localDay) == today }.sorted { $0.start < $1.start }
             }
+            if profile.hasPermission("consulta.iniciar") {
+                day.unsigned = try await Part<[UnsignedConsultation]>.load { try await api.get("/consultas/sin-firmar", as: [UnsignedConsultation].self) }
+            }
+            if profile.hasPermission("citas.ver") {
+                day.reschedules = try await Part<[Appointment]>.load {
+                    try await api.get("/citas", as: [Appointment].self).filter { $0.allowedActions?.contains(.aceptarReprogramacion) ?? false }
+                }
+            }
             if profile.hasPermission("fila.ver") { day.tickets = try await Part<[QueueTicket]>.load { try await api.get("/fila", as: [QueueTicket].self) } }
             if profile.hasPermission("resultados.ver") {
                 day.pendingResults = try await Part<Int>.load {
@@ -155,6 +220,24 @@ struct DoctorDayView: View {
             }
             return day
         }
+    }
+
+    private func callNext() async {
+        let body = QueueCallNextBody(service: QueueService.consultaGeneral.rawValue)
+        var called: QueueCallNextResult?
+        await calling.run("siguiente", body: body) { key in
+            called = try await account.client().send("POST", "/fila/llamar-siguiente", body: body, key: key, as: QueueCallNextResult.self)
+        }
+        if let called { calling.notice = String(format: L.text("day.queue.called"), called.number) }
+        await load()
+    }
+
+    private func absent(_ ticket: QueueTicket) async {
+        let body = VersionBody(version: ticket.version)
+        await calling.run(ticket.id, body: body, success: QueueState.noSePresento.label) { key in
+            _ = try await account.client().send("POST", "/fila/\(ticket.id)/no-se-presento", body: body, key: key, as: QueueTransitionResult.self)
+        }
+        await load()
     }
 
     private func call(_ ticket: QueueTicket) async {
@@ -419,5 +502,44 @@ private struct PrehospitalReportCard: View {
                 }
             }
         }
+    }
+}
+
+/// CITA-02: el médico rechaza el cambio de horario pedido por el paciente, con motivo (10 a 500 caracteres).
+private struct RejectRescheduleSheet: View {
+    let appointment: Appointment
+    let submission: Submission
+    let reload: () async -> Void
+    @EnvironmentObject private var account: AccountModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var reason = ""
+
+    private var trimmed: String { reason.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        NavigationStack {
+            ScreenFrame(title: "day.reschedules.reject.title") {
+                SectionCard {
+                    ListRow(title: appointment.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.display(appointment.start),
+                            meta: appointment.reschedule.map { "→ \(ClimesaDates.display($0.start))" })
+                }
+                TextField(L.text("day.reschedules.reject.reason"), text: $reason, axis: .vertical).lineLimit(3...6).textFieldStyle(.roundedBorder)
+                CharacterCounter(count: trimmed.count, range: 10...500)
+                WriteNotice(submission: submission, reload: reload)
+                ClimesaButton(title: L.text("day.reschedules.reject"), kind: .destructive, loading: submission.busy) { Task { await send() } }
+                    .disabled(!(10...500).contains(trimmed.count))
+                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
+            }
+        }
+    }
+
+    private func send() async {
+        guard let request = appointment.reschedule else { return }
+        let body = RescheduleDecisionBody(version: request.version, rejectionReason: trimmed)
+        let ok = await submission.run(request.id, body: body, success: L.text("day.reschedules.reject")) { key in
+            _ = try await account.client().send("POST", "/citas/reprogramaciones/\(request.id)/rechazar", body: body, key: key, as: AppointmentCommandResult.self)
+        }
+        await reload()
+        if ok { dismiss() }
     }
 }

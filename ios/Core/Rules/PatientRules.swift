@@ -96,9 +96,20 @@ public enum AppointmentRules {
         case allowed(deadline: Date)
         /// Faltan menos de `patientCancelHours`: la acción se muestra desactivada con el motivo.
         case tooLate(deadline: Date)
+        /// El servidor la bloquea (`blockedActions`) con un motivo propio que se muestra tal cual.
+        case blocked(reason: String)
     }
 
+    /// Cuando la API manda `allowedActions` (CITA-04), ella decide; el cálculo local queda para respuestas anteriores.
     public static func cancelOption(_ appointment: Appointment, now: Date, hours: Int = AppointmentRules.patientCancelHours) -> CancelOption {
+        if let allowed = appointment.allowedActions {
+            if allowed.contains(.cancelar) {
+                let deadline = appointment.cancelableUntil.flatMap(ClimesaDates.parse) ?? ClimesaDates.parse(appointment.start) ?? now
+                return .allowed(deadline: deadline)
+            }
+            if let reason = blockedReason(appointment, .cancelar) { return .blocked(reason: reason) }
+            return .hidden
+        }
         guard canCancel(appointment, now: now), let start = ClimesaDates.parse(appointment.start) else { return .hidden }
         let deadline = start.addingTimeInterval(-Double(hours) * 3600)
         return now < deadline ? .allowed(deadline: deadline) : .tooLate(deadline: deadline)
@@ -113,6 +124,28 @@ public enum AppointmentRules {
 
     public static func cancelTooLateText(hours: Int = AppointmentRules.patientCancelHours) -> String {
         "Ya no puedes cancelar desde la aplicación: faltan menos de \(hours) h para la cita. Comunícate con Recepción."
+    }
+
+    /// Motivo del servidor para una acción bloqueada, si la hay.
+    public static func blockedReason(_ appointment: Appointment, _ action: AppointmentAction) -> String? {
+        appointment.blockedActions?.first { $0.action == action }?.reason
+    }
+
+    /// CITA-02: el paciente puede pedir otra franja solo si el servidor lo permite ahora.
+    public static func canReschedule(_ appointment: Appointment) -> Bool {
+        appointment.allowedActions?.contains(.reprogramar) ?? false
+    }
+
+    /// Texto de la última solicitud de reprogramación, para el paciente.
+    public static func rescheduleText(_ appointment: Appointment) -> String? {
+        guard let request = appointment.reschedule else { return nil }
+        let when = ClimesaDates.display(request.start)
+        switch request.state {
+        case .pendiente: return "Pediste cambiar a \(when). Tu cita actual sigue vigente hasta que Recepción o tu médico respondan."
+        case .rechazada: return "No se aceptó el cambio a \(when)\(request.rejectionReason.map { ": \($0)" } ?? ".")"
+        case .vencida: return "Tu solicitud de cambio a \(when) venció sin respuesta."
+        case .aceptada, .desconocido: return nil
+        }
     }
 
     /// `AppointmentCancelDto.reason`: de 10 a 500 caracteres.
