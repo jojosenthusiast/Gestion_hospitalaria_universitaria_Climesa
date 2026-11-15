@@ -1,8 +1,25 @@
-import { BoolProp, ClassArrayProp, DateTimeProp, EnumProp, IntProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, ClassProp, DateTimeProp, EnumArrayProp, EnumProp, IntProp, StrProp, UuidProp } from '../platform/responses';
 import { CATEGORIA_HABITACION, ESTADO_ADMISION, ESTADO_CAMA, SEXO_PACIENTE } from '../platform/states';
 
 export const ORIGEN_ADMISION = ['cita', 'consulta', 'emergencia', 'ambulancia', 'programada'] as const;
 export const TIPO_AISLAMIENTO = ['contacto', 'gotitas', 'aerea', 'protector'] as const;
+
+/** Actions the actor can take on an admission now (state and permissions); the clients draw their buttons from this list. */
+export const ACCION_ADMISION = ['asignar_cama', 'autorizar', 'cancelar', 'anular', 'trasladar', 'firmar_alta', 'solicitar_alta', 'revocar_alta', 'registrar_salida', 'reasignar_tratante', 'nota_enfermeria'] as const;
+export const TIPO_ALTA = ['medica', 'voluntaria', 'traslado', 'defuncion'] as const;
+
+export class DischargePendingResponse {
+  @StrProp() description!: string;
+  @StrProp() responsible!: string;
+}
+
+/** The current (not revoked) signed discharge; without the clinical summary (it lives in the record). */
+export class AdmissionDischargeResponse {
+  @EnumProp(TIPO_ALTA, 'TipoAlta') type!: string;
+  @DateTimeProp() signedAt!: string;
+  @StrProp({ nullable: true }) signedByName!: string | null;
+  @ClassArrayProp(DischargePendingResponse) pending!: DischargePendingResponse[];
+}
 
 export class AdmissionResponse {
   @UuidProp() id!: string;
@@ -24,6 +41,20 @@ export class AdmissionResponse {
   @BoolProp() postSurgical!: boolean;
   @BoolProp() visitorsAllowed!: boolean;
   @IntProp() visitorsMax!: number;
+  @StrProp({ nullable: true }) attendingDoctorName!: string | null;
+  @BoolProp({ description: 'El médico tratante tiene cuenta activa en la app (puede firmar el alta)' }) attendingDoctorHasAccount!: boolean;
+  @EnumProp(CATEGORIA_HABITACION, 'CategoriaHabitacion', { nullable: true, description: 'Categoría de la cama actual' }) bedCategory!: string | null;
+  @BoolProp({ description: 'Jefatura autorizó una excepción de categoría' }) authorized!: boolean;
+  @DateTimeProp({ nullable: true, description: 'Última solicitud de alta al médico tratante' }) dischargeRequestedAt!: string | null;
+  @ClassProp(AdmissionDischargeResponse, { nullable: true }) discharge!: AdmissionDischargeResponse | null;
+  @EnumArrayProp(ACCION_ADMISION, 'AccionAdmision') allowedActions!: string[];
+}
+
+export class NursingNoteEntryResponse {
+  @UuidProp() id!: string;
+  @StrProp() text!: string;
+  @DateTimeProp() createdAt!: string;
+  @StrProp({ nullable: true }) authorName!: string | null;
 }
 
 export class AdmissionCommandResponse {
@@ -88,6 +119,7 @@ export class DoctorAvailabilityResponse {
   @StrProp() name!: string;
   @StrProp({ nullable: true }) specialty!: string | null;
   @BoolProp() available!: boolean;
+  @BoolProp({ description: 'Tiene cuenta activa en la app: puede firmar el alta' }) hasAccount!: boolean;
   @StrProp({ nullable: true, description: 'Motivo por el que no está disponible' }) reason!: string | null;
 }
 

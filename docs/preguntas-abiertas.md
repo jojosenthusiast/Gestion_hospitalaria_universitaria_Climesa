@@ -311,3 +311,10 @@ Decisiones del anexo 12 de la auditoría final (2026-11-14) tomadas con la opci�
 | "No asistió" en citas | ¿Manual o automático? | Ambos: REC lo marca desde la hora de inicio si no hay consulta; las citas confirmadas de días anteriores sin consulta pasan solas a "no asistió". |
 | Iniciar consulta | ¿Ventana configurable? | Solo el día local de la cita (sin ventana configurable). |
 | Addendum clínico (MA-CIT-04, D-06) | ¿Se implementa el addendum? | Pendiente: en esta rama solo se retiraron los mensajes de error que lo prometían. El permiso `consulta.corregir` y la fila del catálogo siguen sin endpoint. |
+## Cierre de ciclos de hospitalización y ambulancia (rama `fix/hospitalizacion-ambulancia-fase01`)
+
+| Tema | Situación | Decisión conservadora |
+|---|---|---|
+| Permisos de las acciones nuevas | Cancelar, solicitar alta, anular, reasignar tratante, revocar alta y cierre administrativo de ambulancia no tenían permiso propio; crear uno exige tocar `tools/generar_docs.py` (fuera del alcance de esta rama). | Se reutilizan permisos existentes: `admision.crear` (REC, JOP) para cancelar y solicitar alta; `admision.autorizar` (JOP) para anular y reasignar tratante; `alta.firmar` (solo el firmante) o `admision.autorizar` para revocar el alta; `ambulancia.mantenimiento` (JOP) para el cierre administrativo. Si el equipo quiere permisos propios, se agregan con su migración generada. |
+| Limpieza de camas en la Web (D-03, MA-HOS-04) | La recomendación es dar `camas.registrar_limpieza` a JOP; requiere `ADICIONES_ROL` en `tools/generar_docs.py`, `permisos.csv` y una migración generada. | Pendiente: queda fuera del alcance de esta rama. Mientras tanto, Enfermería registra la limpieza en Android y Jefatura la verifica. |
+| MED que ve admisiones | El alta la firma el tratante o quien tiene relación de atención vigente, pero el listado solo mostraba al tratante. | El listado de MED incluye tratante y relación de atención vigente (no el área del turno: ver la admisión sin poder firmarla no cierra el ciclo; Jefatura reasigna el tratante). |

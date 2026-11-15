@@ -267,6 +267,12 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/admisiones/{id}/alta` | `alta.firmar` | Pendientes con responsable; inscripción vigente | R | 4 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/admisiones/{id}/salida` | `admision.registrar_salida` | Cama pasa a limpieza | R | 4 | · | · | ✔ | · | ✔ | · | · | · | · | · |
 | POST | `/api/v1/admisiones/indicaciones` | `admision.solicitar` |  | R | 4 | · | · | · | · | · | relación | · | · | · | · |
+| GET | `/api/v1/admisiones/{id}/notas-enfermeria` | `enfermeria.registrar` | Mismo contexto de área que al escribir; lectura auditada | R | 6 | · | · | · | · | área | · | · | · | · | · |
+| POST | `/api/v1/admisiones/{id}/cancelar` | `admision.crear` | Solo pendiente de cama; motivo de 10 caracteres o más | R | 6 | · | ✔ | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/admisiones/{id}/anular` | `admision.autorizar` | Solo hospitalizado; ocupación cerrada como ingresado por error y cama a limpieza | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/admisiones/{id}/tratante` | `admision.autorizar` | Médico activo con cuenta; motivo; historial en cambio_tratante | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/admisiones/{id}/solicitar-alta` | `admision.crear` | Solo hospitalizado; aviso en vivo a la cuenta del médico tratante (D-02) | R | 6 | · | ✔ | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/admisiones/{id}/revocar-alta` | `alta.firmar` o `admision.autorizar` | El firmante o Jefatura; antes de la salida física; motivo | R | 6 | · | ✔ | · | · | · | relación | · | · | · | · |
 
 ### Spec 109
 
@@ -277,6 +283,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/ambulancia/solicitudes/{id}/descartar` | `ambulancia.despachar` | Motivo | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios` | `ambulancia.despachar` | Solo si Disponible; bloqueo de fila | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/hitos` | `ambulancia.operar` | Orden de hitos | R | 4 | · | · | · | · | · | · | · | ✔ | · | · |
+| POST | `/api/v1/ambulancia/servicios/{id}/cerrar` | `ambulancia.mantenimiento` | Solo servicio activo; motivo; estado final cancelado; unidad a Disponible | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.reportar_prehospital` | Funciona sin conexión con reintento | E | 4 | · | · | · | · | · | · | · | ✔ | · | · |
 | GET | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.recibir_prehospital` |  | E | 4 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/ambulancia/ubicacion` | `ambulancia.operar` | Solo con servicio activo | E | 5 | · | · | · | · | · | · | · | ✔ | · | · |
