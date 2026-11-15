@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api, type Shift, type Staff } from '../lib/api';
 import { ShiftsPage } from '../features/personnel';
-import type { ShiftCatalog } from '../features/shifts/rules';
+import type { ShiftCatalog, ShiftRow } from '../features/shifts/rules';
 import { StaffFicha } from '../features/personnel-ficha';
 
 // jsdom no implementa <dialog>: lo abrimos con el atributo para que sus campos sean accesibles.
@@ -21,8 +21,10 @@ const jefatura = perfil(['turnos.ver', 'turnos.planificar', 'turnos.publicar', '
 const soloLectura = perfil(['turnos.ver']);
 
 const ana: Staff = { id: 's-1', givenNames: 'Ana', surnames: 'Ficticia Prueba', type: 'medico', areaId: 'a-1', area: 'Emergencia', active: true, version: 3 };
-const turno = (id: string, state: string, version = 2): Shift => ({
+// `allowedActions` como lo calcula la API para JOP: editar y cancelar solo antes de que el turno empiece (MA-TUR-03).
+const turno = (id: string, state: string, version = 2, over: Partial<ShiftRow> = {}): ShiftRow => ({
   id, staffId: 's-1', person: 'Ana Ficticia Prueba', areaId: 'a-1', area: 'Emergencia', start: '2026-11-10T14:00:00.000Z', end: '2026-11-10T22:00:00.000Z', type: 'diurno', state, version,
+  allowedActions: ['publicado', 'borrador'].includes(state) ? ['editar', 'cancelar'] : [], ...over,
 });
 
 const catalogo: ShiftCatalog = {

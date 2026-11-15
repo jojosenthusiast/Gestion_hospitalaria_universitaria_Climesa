@@ -6,11 +6,39 @@ export type CatalogArea = { id: string; parentId: string | null; type: string; c
 export type CatalogStaff = { id: string; name: string; type: string; specialty: string | null; areaId: string | null; area: string | null; registrations: { validFrom: string; validTo: string }[] };
 export type ShiftCatalog = { roles: CatalogRole[]; areas: CatalogArea[]; staff: CatalogStaff[] };
 
+/** Acciones que la API permite ahora sobre un turno (`allowedActions`): la pantalla no ofrece otras. */
+export type ShiftAction = 'editar' | 'cancelar' | 'marcar_entrada' | 'marcar_presente' | 'marcar_ausente' | 'deshacer_asistencia';
+/** `GET /turnos` con la asistencia (ASIS-01) y las acciones permitidas para quien consulta. */
+export type ShiftRow = Shift & {
+  staffType?: string;
+  attendance?: 'pendiente' | 'presente' | 'sin_confirmar' | 'ausente' | null;
+  presentSince?: string | null;
+  late?: boolean;
+  absenceType?: 'justificada' | 'injustificada' | null;
+  attendanceReason?: string | null;
+  emergencyReason?: string | null;
+  allowedActions?: ShiftAction[];
+};
+export const can = (shift: ShiftRow, action: ShiftAction) => Boolean(shift.allowedActions?.includes(action));
+
+/** Texto de la asistencia para la persona que lee (nunca el código). */
+export function attendanceLabel(shift: ShiftRow): string | null {
+  switch (shift.attendance) {
+    case 'presente': return shift.late ? 'Presente · llegó tarde' : 'Presente';
+    case 'sin_confirmar': return 'Sin entrada marcada';
+    case 'ausente': return shift.absenceType === 'justificada' ? 'Ausencia justificada' : 'Ausencia injustificada';
+    case 'pendiente': return 'Entrada pendiente';
+    default: return null;
+  }
+}
+
 export const HOUR = 3600_000;
 const DAY = 24 * HOUR;
 /** Política vigente `turnos.duracion` y `turnos.descanso` (D-054). La API es la que decide; aquí solo se avisa antes de enviar. */
 export const DURATION = { min: 4, max: 12, maxLong: 24 } as const;
 export const REST = { min: 8, afterLong: 12 } as const;
+/** Política vigente `turnos.carga` (CARGA-01): tope de horas en 7 días y de días seguidos. */
+export const LOAD = { maxHours7Days: 72, maxDaysInRow: 6 } as const;
 
 export type ShiftKind = 'diurno' | 'nocturno' | 'guardia';
 export const KIND_LABEL: Record<string, string> = { diurno: 'Diurno', nocturno: 'Nocturno', guardia: 'Guardia / 24 h' };
@@ -47,44 +75,61 @@ export function durationProblem(startMs: number, endMs: number, kind: string): s
   return null;
 }
 
-/** Descanso obligatorio tras un turno de 24 h o nocturno que cruza la medianoche: hasta el fin del día en que termina. */
-export function mandatoryRestUntil(startMs: number, endMs: number, kind: string): number | null {
-  const hours = hoursBetween(startMs, endMs);
-  const sameDay = localDay(startMs) === localDay(endMs - 1);
-  const startsAtNight = Number(localTime(startMs).slice(0, 2)) >= 18;
-  if (hours < 24 && (sameDay || (!startsAtNight && kind !== 'nocturno'))) return null;
-  return localMs(localDay(endMs), '00:00') + DAY;
+/**
+ * RN-13 (MA-TUR-04): después de cualquier turno, 8 h de descanso; después de una guardia de 24 h, 12 h y hasta el fin
+ * del día en que termina. Devuelve el instante desde el que la persona puede volver a trabajar.
+ */
+export function restUntil(startMs: number, endMs: number): number {
+  const long = hoursBetween(startMs, endMs) >= 24;
+  const until = endMs + (long ? REST.afterLong : REST.min) * HOUR;
+  return long ? Math.max(until, localMs(localDay(endMs), '00:00') + DAY) : until;
+}
+
+/** Turnos que trabajan: los cancelados y las ausencias no cuentan para descanso ni carga (ASIS-01). */
+const works = (s: Shift) => s.state !== 'cancelado' && s.state !== 'ausente';
+
+/**
+ * CARGA-07: carga de una persona alrededor de un horario propuesto: máximo de horas en cualquier ventana de 7 días y
+ * días seguidos con turno, contando el turno propuesto. La API y la base aplican el tope; esto solo lo anticipa.
+ */
+export function loadFor(personId: string, startMs: number, endMs: number, shifts: Shift[], ignoreId?: string): { hours7Days: number; daysInRow: number } {
+  const mine: [number, number][] = shifts.filter(s => s.staffId === personId && s.id !== ignoreId && works(s)).map(s => [Date.parse(s.start), Date.parse(s.end)]);
+  if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) mine.push([startMs, endMs]);
+  const window = 7 * DAY;
+  let hours = 0;
+  for (const from of mine.flatMap(([a, b]) => [a, b - window])) {
+    const total = mine.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, from + window) - Math.max(a, from)), 0) / HOUR;
+    hours = Math.max(hours, total);
+  }
+  const days = new Set(mine.map(([a]) => localDay(a)));
+  let daysInRow = 0;
+  if (Number.isFinite(startMs)) {
+    const day = localDay(startMs), step = (d: string, n: number) => localDay(localMs(d, '12:00') + n * DAY);
+    if (days.has(day)) { daysInRow = 1; for (let d = step(day, -1); days.has(d); d = step(d, -1)) daysInRow++; for (let d = step(day, 1); days.has(d); d = step(d, 1)) daysInRow++; }
+  }
+  return { hours7Days: Math.round(hours * 10) / 10, daysInRow };
 }
 
 export type Conflict = { code: 'traslape' | 'descanso' | 'jornada' | 'inscripcion'; text: string };
 const stamp = (ms: number) => new Intl.DateTimeFormat('es-SV', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/El_Salvador' }).format(new Date(ms));
 
 /** Conflictos de una persona con un horario propuesto, calculados con los turnos cargados. La base de datos sigue siendo la garantía. */
-export function conflictsFor(person: CatalogStaff | undefined, startMs: number, endMs: number, kind: string, shifts: Shift[], ignoreId?: string): Conflict[] {
+export function conflictsFor(person: CatalogStaff | undefined, startMs: number, endMs: number, _kind: string, shifts: Shift[], ignoreId?: string): Conflict[] {
   if (!person || !Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return [];
   const out: Conflict[] = [];
   if (['medico', 'enfermero'].includes(person.type)) {
     const day = localDay(startMs);
     if (!person.registrations.some(r => r.validFrom <= day && day <= r.validTo)) out.push({ code: 'inscripcion', text: 'Sin inscripción profesional vigente en esa fecha' });
   }
-  const dayStart = localMs(localDay(startMs), '00:00'), dayEnd = dayStart + DAY;
   for (const item of shifts) {
     if (item.staffId !== person.id || item.id === ignoreId || item.state === 'cancelado') continue;
     const a = Date.parse(item.start), b = Date.parse(item.end);
     if (a < endMs && b > startMs) { out.push({ code: 'traslape', text: `Se traslapa con otro turno (${stamp(a)} a ${stamp(b)})` }); continue; }
-    if (b <= startMs) {
-      const until = mandatoryRestUntil(a, b, item.type);
-      if (until && startMs < until) { out.push({ code: 'descanso', text: `Descanso obligatorio hasta ${stamp(until)}` }); continue; }
-      const need = item.type === 'guardia' && hoursBetween(a, b) >= 24 ? REST.afterLong : REST.min;
-      if (hoursBetween(b, startMs) < need) { out.push({ code: 'descanso', text: `Necesita ${need} h de descanso tras su turno anterior` }); continue; }
-    }
-    if (a >= endMs) {
-      const until = mandatoryRestUntil(startMs, endMs, kind);
-      if (until && a < until) { out.push({ code: 'descanso', text: `Debe descansar tras este turno; su siguiente turno es el ${stamp(a)}` }); continue; }
-      const need = ['guardia', 'nocturno'].includes(kind) && hoursBetween(startMs, endMs) >= 24 ? REST.afterLong : REST.min;
-      if (hoursBetween(endMs, a) < need) { out.push({ code: 'descanso', text: `Necesita ${need} h de descanso antes de su siguiente turno` }); continue; }
-    }
-    if (a < dayEnd && b > dayStart) out.push({ code: 'jornada', text: 'Ya tiene un turno en esa jornada' });
+    if (!works(item)) continue;
+    if (b <= startMs && startMs < restUntil(a, b)) { out.push({ code: 'descanso', text: `Descanso obligatorio hasta ${stamp(restUntil(a, b))}` }); continue; }
+    if (a >= endMs && a < restUntil(startMs, endMs)) { out.push({ code: 'descanso', text: `Debe descansar tras este turno; su siguiente turno es el ${stamp(a)}` }); continue; }
+    // Un turno por jornada: la jornada es el día en que empieza (una noche no ocupa el día siguiente).
+    if (localDay(a) === localDay(startMs)) out.push({ code: 'jornada', text: 'Ya tiene un turno en esa jornada' });
   }
   return out;
 }

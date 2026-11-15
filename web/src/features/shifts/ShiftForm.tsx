@@ -4,10 +4,14 @@ import { SearchPicker, type PickerItem } from '../../components/search-picker';
 import { Field, Notice } from '../../components/ui';
 import type { Api, Shift, ShiftInput } from '../../lib/api';
 import { Dialog, SaveButton, WriteError, useAction } from '../common';
-import { DURATION, KIND_LABEL, conflictsFor, durationProblem, eligibleFor, endOf, hoursBetween, localDay, localMs, localTime, suggestKind, type CatalogStaff, type ShiftCatalog, type ShiftKind } from './rules';
+import { DURATION, KIND_LABEL, LOAD, conflictsFor, durationProblem, eligibleFor, endOf, hoursBetween, loadFor, localDay, localMs, localTime, suggestKind, type CatalogStaff, type ShiftCatalog, type ShiftKind } from './rules';
 import './shifts.css';
 
-type Props = { api: Api; shift: Shift | null; catalog: ShiftCatalog; shifts: Shift[]; onClose: () => void; onSaved: () => void };
+/** `draft` prellena un turno nuevo con lo que la pantalla ya sabe (por ejemplo, el suplente de una ausencia). */
+export type ShiftDraft = { areaId: string; start: string; end: string; type: string; staffId: string };
+type Props = { api: Api; shift: Shift | null; draft?: ShiftDraft; catalog: ShiftCatalog; shifts: Shift[]; onClose: () => void; onSaved: () => void };
+/** Códigos con los que la API pide un motivo de emergencia para superar la carga (CARGA-01/02). */
+const LOAD_CODES = ['carga_semanal_excedida', 'dias_seguidos_excedidos'];
 
 const KINDS: ShiftKind[] = ['diurno', 'nocturno', 'guardia'];
 
@@ -16,20 +20,22 @@ const KINDS: ShiftKind[] = ['diurno', 'nocturno', 'guardia'];
  * El personal se busca escribiendo; las personas con conflicto aparecen apagadas con su motivo y los conflictos de
  * la persona elegida se listan en línea. La API vuelve a validar todo (traslape, descanso, 4–24 h, inscripción).
  */
-export function ShiftForm({ api, shift, catalog, shifts, onClose, onSaved }: Props) {
+export function ShiftForm({ api, shift, draft, catalog, shifts, onClose, onSaved }: Props) {
   const action = useAction(api);
-  const [areaId, setAreaId] = useState(shift?.areaId ?? '');
-  const [date, setDate] = useState(shift ? localDay(Date.parse(shift.start)) : '');
-  const [startTime, setStartTime] = useState(shift ? localTime(Date.parse(shift.start)) : '');
-  const [endTime, setEndTime] = useState(shift ? localTime(Date.parse(shift.end)) : '');
-  const [kind, setKind] = useState<ShiftKind>((shift?.type as ShiftKind) ?? 'diurno');
-  const [kindTouched, setKindTouched] = useState(Boolean(shift));
-  const [staffId, setStaffId] = useState(shift?.staffId ?? '');
+  const base = shift ?? draft;
+  const [areaId, setAreaId] = useState(base?.areaId ?? '');
+  const [date, setDate] = useState(base ? localDay(Date.parse(base.start)) : '');
+  const [startTime, setStartTime] = useState(base ? localTime(Date.parse(base.start)) : '');
+  const [endTime, setEndTime] = useState(base ? localTime(Date.parse(base.end)) : '');
+  const [kind, setKind] = useState<ShiftKind>((base?.type as ShiftKind) ?? 'diurno');
+  const [kindTouched, setKindTouched] = useState(Boolean(base));
+  const [staffId, setStaffId] = useState(base?.staffId ?? '');
   const [role, setRole] = useState('todos');
   const [others, setOthers] = useState(false);
   const [note, setNote] = useState(shift?.justification ?? '');
   const [reason, setReason] = useState('');
-  const [cancel, setCancel] = useState(shift?.state === 'cancelado');
+  const [emergency, setEmergency] = useState('');
+  const askEmergency = LOAD_CODES.includes(action.error?.code ?? '') || emergency.length > 0;
 
   const startMs = date && startTime ? localMs(date, startTime) : NaN;
   const endMs = date && startTime && endTime ? endOf(date, startTime, endTime) : NaN;
@@ -51,14 +57,19 @@ export function ShiftForm({ api, shift, catalog, shifts, onClose, onSaved }: Pro
   const chosenConflicts = chosen ? conflictsOf(chosen) : [];
   const incomplete = !areaId || !date || !startTime || !endTime || !staffId || (Boolean(shift) && reason.trim().length < 10);
   const missing = [!areaId && 'el área', !date && 'la fecha', !startTime && 'la hora de inicio', !endTime && 'la hora de fin', !staffId && 'la persona', Boolean(shift) && reason.trim().length < 10 && 'el motivo del cambio (10 caracteres)'].filter(Boolean).join(', ');
-  const blocked = incomplete || Boolean(durationIssue) || (!cancel && chosenConflicts.length > 0);
+  const load = chosen ? loadFor(chosen.id, startMs, endMs, shifts, shift?.id) : null;
+  const overLoad = Boolean(load && (load.hours7Days > LOAD.maxHours7Days || load.daysInRow > LOAD.maxDaysInRow));
+  const emergencyMissing = askEmergency && emergency.trim().length < 10;
+  const blocked = incomplete || Boolean(durationIssue) || chosenConflicts.length > 0 || emergencyMissing;
 
   async function save(event: FormEvent) {
     event.preventDefault();
     if (blocked) return;
-    const body: ShiftInput & { version?: number; reason?: string; state?: string } = {
+    // Cancelar se hace con su propio diálogo (PATCH con state=cancelado, que no mueve el turno).
+    const body: ShiftInput & { version?: number; reason?: string; emergencyReason?: string } = {
       staffId, areaId, start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString(), type: chosenKind, ...(note.trim() ? { justification: note.trim() } : {}),
-      ...(shift ? { version: shift.version, reason: reason.trim(), ...(cancel ? { state: 'cancelado' } : {}) } : {}),
+      ...(emergency.trim() ? { emergencyReason: emergency.trim() } : {}),
+      ...(shift ? { version: shift.version, reason: reason.trim() } : {}),
     };
     if (await action.run(shift ? `/turnos/${shift.id}` : '/turnos', body, shift ? 'PATCH' : 'POST')) onSaved();
   }
@@ -104,16 +115,25 @@ export function ShiftForm({ api, shift, catalog, shifts, onClose, onSaved }: Pro
         {chosen && <p className="shift-summary"><RoleChip code={chosen.type} />{chosen.area && <AreaChip name={chosen.area} />}{chosen.specialty && <span className="shift-specialty">{chosen.specialty}</span>}</p>}
         {chosenConflicts.length > 0 && <Notice kind="error">{chosenConflicts.map(c => c.text).join('. ')}. Elige otra persona u otro horario.</Notice>}
         {chosen && chosenConflicts.length === 0 && Number.isFinite(endMs) && <Notice kind="success">Sin conflictos de traslape ni descanso con los turnos cargados.</Notice>}
+        {load && Number.isFinite(endMs) && <p className={`shift-load${overLoad ? ' is-error' : ''}`} role="status">
+          Carga con este turno: <strong>{load.hours7Days} h</strong> de {LOAD.maxHours7Days} h en 7 días · <strong>{load.daysInRow}</strong> {load.daysInRow === 1 ? 'día seguido' : 'días seguidos'} de {LOAD.maxDaysInRow}
+          {overLoad && '. Supera el tope: solo se asigna en una emergencia, con su motivo.'}
+        </p>}
         <Field label="Observación · opcional" value={note} onChange={setNote} maxLength={500} hint="Si la persona supera las 44 h diurnas semanales, la API pide aquí una justificación de al menos 10 caracteres." />
       </fieldset>
 
+      {(askEmergency || overLoad) && <fieldset className="shift-step">
+        <legend>Excepción por emergencia</legend>
+        <Field label="Motivo de la emergencia" value={emergency} onChange={setEmergency} minLength={10} maxLength={500} required={askEmergency}
+          hint="Queda en el turno y en la auditoría. Úsalo solo si no hay otra persona disponible." />
+      </fieldset>}
+
       {shift && <fieldset className="shift-step">
         <legend>Cambio de un turno existente</legend>
-        <label className="check-field"><input type="checkbox" checked={cancel} onChange={event => setCancel(event.target.checked)} />Cancelar este turno</label>
         <Field label="Motivo del cambio" value={reason} onChange={setReason} minLength={10} maxLength={500} required />
       </fieldset>}
 
-      {missing && <p className="form-hint" role="status">Para guardar falta indicar {missing}.</p>}
+      {(missing || emergencyMissing) && <p className="form-hint" role="status">Para guardar falta indicar {[missing, emergencyMissing && 'el motivo de la emergencia (10 caracteres)'].filter(Boolean).join(', ')}.</p>}
       <div className="dialog-actions">
         <button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button>
         <SaveButton busy={action.busy} label={shift ? 'Guardar turno' : 'Asignar turno'} disabled={blocked} />
