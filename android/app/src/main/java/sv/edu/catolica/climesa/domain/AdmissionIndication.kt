@@ -4,7 +4,8 @@ import org.json.JSONObject
 
 /**
  * MOV-02: what the consultation already knows when a physician indicates hospitalization. It is filled by the screen and
- * locked: the patient and the consultation of the open dialog, and the physician's own staff record (`staffId` of `/auth/me`).
+ * locked: the patient and the consultation of the open dialog. The attending is the signed-in physician: the API resolves it
+ * (`AdmissionIndicationDto` has no `attendingDoctorId`), so [doctorStaffId] is informative only.
  */
 data class IndicationContext(val patientId: String?, val patientName: String, val consultationId: String?, val doctorStaffId: String?, val doctorName: String)
 
@@ -30,7 +31,6 @@ object AdmissionIndication {
     fun contextError(c: IndicationContext): String? = when {
         c.patientId.isNullOrBlank() -> "No se identificó al paciente de la consulta. Cierra y vuelve a abrir la consulta."
         c.consultationId.isNullOrBlank() -> "Inicia la consulta antes de indicar la hospitalización."
-        c.doctorStaffId.isNullOrBlank() -> "Tu cuenta no está vinculada a un médico del personal; pide a Administración que la vincule."
         else -> null
     }
 
@@ -48,11 +48,10 @@ object AdmissionIndication {
         if (contextError(c) != null || fieldErrors(d).isNotEmpty()) return null
         val patientId = c.patientId ?: return null
         val consultationId = c.consultationId ?: return null
-        val doctor = c.doctorStaffId ?: return null
         val category = d.category ?: return null
         return JSONObject()
             .put("patientId", patientId).put("origin", OriginKind.CONSULTATION.wire).put("originId", consultationId)
-            .put("attendingDoctorId", doctor).put("motive", d.motive.trim()).put("requestedCategory", category)
+            .put("motive", d.motive.trim()).put("requestedCategory", category)
             .put("isolation", d.isolation).put("unstable", d.unstable).put("postSurgical", d.postSurgical)
             .apply { if (d.isolation && d.isolationType != null) put("isolationType", d.isolationType.wire) }
     }

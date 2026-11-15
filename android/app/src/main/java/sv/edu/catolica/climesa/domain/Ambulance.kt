@@ -35,6 +35,8 @@ data class AmbulanceStatus(val unit: AmbulanceUnit, val activeService: Ambulance
 data class AmbulanceLogEntry(
     val id: String, val type: String, val priority: String, val origin: String, val destination: String, val dispatchedAt: String, val finalState: String?, val responseMinutes: Int?,
     val municipality: String = "", val crew: List<String> = emptyList(), val milestones: List<AmbulanceMilestone> = emptyList(), val patientRef: String = "",
+    /** BL-05: Jefatura closed the service administratively (`POST /ambulancia/servicios/{id}/cerrar`). */
+    val administrativeClose: Boolean = false,
 )
 /** Búsqueda y filtros de la bitácora; vacío significa «todos». */
 data class LogFilters(val query: String = "", val priority: String = "", val finalState: String = "", val type: String = "") {
@@ -58,6 +60,7 @@ data class PrehospitalForm(
 )
 
 object AmbulanceLabels {
+    const val ADMINISTRATIVE_CLOSE = "Cierre administrativo"
     val priorities = listOf("roja" to "Roja", "naranja" to "Naranja", "amarilla" to "Amarilla", "verde" to "Verde")
     val types = listOf("emergencia_domicilio" to "Emergencia a domicilio", "traslado_interhospitalario" to "Traslado interhospitalario")
     /** Estados finales permitidos antes de llegar al hospital (RN-32): siempre con motivo. */
@@ -205,6 +208,7 @@ object AmbulanceParser {
         AmbulanceLogEntry(
             it.text("id"), it.text("type"), it.text("priority"), it.text("origin"), it.text("destination"), it.text("dispatchedAt"), it.text("finalState").ifBlank { null }, if (it.isNull("responseMinutes")) null else it.optInt("responseMinutes"),
             it.text("municipality"), objects(it.optJSONArray("crew")).map { c -> c.text("name") }, objects(it.optJSONArray("milestones")).map { m -> AmbulanceMilestone(m.text("type"), m.text("occurredAt")) }, it.text("patientRef"),
+            it.optBoolean("administrativeClose"),
         )
     }
 

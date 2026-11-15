@@ -55,8 +55,8 @@
     <string name="hosp_motivo_opcional_ayuda">Si lo escribes, de 10 a 500 caracteres. Quedará en el historial.</string>
     <string name="hosp_motivo_ayuda">De 10 a 500 caracteres. Quedará en el historial.</string>
     <string name="hosp_alta_tipo">Tipo de alta</string>
-    <string name="hosp_alta_resumen">Resumen del alta</string>
-    <string name="hosp_alta_resumen_ayuda">Mínimo 10 caracteres. Lo redacta quien firma el alta.</string>
+    <string name="hosp_alta_resumen">Resumen del alta (opcional)</string>
+    <string name="hosp_alta_resumen_ayuda">Si lo escribes, mínimo 10 caracteres. Lo redacta quien firma el alta.</string>
     <string name="hosp_alta_constancia">El paciente firmó la constancia de alta voluntaria.</string>
     <string name="hosp_alta_pendientes">Pendientes y responsables</string>
     <string name="hosp_alta_pendiente">Pendiente</string>

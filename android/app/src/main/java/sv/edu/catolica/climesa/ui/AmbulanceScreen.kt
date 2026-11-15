@@ -252,6 +252,7 @@ private fun LazyListScope.logContent(state: AmbulanceUiState, model: AmbulanceVi
 private fun LogCard(entry: AmbulanceLogEntry) {
     val final = entry.finalState ?: "en_curso"
     SectionCard("${AmbulanceLabels.type(entry.type)} · ${AmbulanceLabels.priority(entry.priority)}", eyebrow = localTime(entry.dispatchedAt), action = { OperacionStatusTag(final, label = AmbulanceLabels.finalState(entry.finalState)) }) {
+        if (entry.administrativeClose) StatusPill(AmbulanceLabels.ADMINISTRATIVE_CLOSE, StatusTone.WARNING)
         Text(AmbulanceRules.narrate(entry), style = MaterialTheme.typography.bodyMedium)
         entry.milestones.forEach { Text("${AmbulanceLabels.milestone(it.type)}: ${localTime(it.occurredAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.success) }
         Text(entry.responseMinutes?.let { stringResource(R.string.amb_respuesta_min, it) } ?: stringResource(R.string.amb_sin_llegada), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -3,11 +3,24 @@ package sv.edu.catolica.climesa.domain
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Actions on an admission; each one needs its own permission from `/auth/me` (rule 8), not a role. */
-enum class AdmissionAction(val permission: String, val state: String) {
-    ASSIGN_BED("camas.asignar", "pendiente_cama"),
-    SIGN_DISCHARGE("alta.firmar", "hospitalizado"),
-    REGISTER_EXIT("admision.registrar_salida", "alta_firmada"),
+/**
+ * Actions Android offers on an admission. The API computes `allowedActions` per row from the state, the actor's permissions
+ * and the care relationship; every button comes from that list (never from a role or a local permission guess). Web-only
+ * actions (`autorizar`, `anular`, `reasignar_tratante`) are not mapped and therefore never drawn.
+ */
+enum class AdmissionAction(val wire: String) {
+    ASSIGN_BED("asignar_cama"),
+    CANCEL("cancelar"),
+    TRANSFER("trasladar"),
+    SIGN_DISCHARGE("firmar_alta"),
+    REQUEST_DISCHARGE("solicitar_alta"),
+    REVOKE_DISCHARGE("revocar_alta"),
+    REGISTER_EXIT("registrar_salida"),
+    NURSING_NOTE("nota_enfermeria");
+
+    companion object {
+        fun fromWire(value: String): AdmissionAction? = entries.firstOrNull { it.wire == value }
+    }
 }
 
 /** One pending item of a discharge: what is left to do and who is responsible for it. */
@@ -18,7 +31,86 @@ enum class DischargeType(val value: String, val label: String) {
     MEDICAL("medica", "Médica"),
     VOLUNTARY("voluntaria", "Voluntaria"),
     TRANSFER("traslado", "Traslado"),
-    DEATH("defuncion", "Defunción"),
+    DEATH("defuncion", "Defunción");
+
+    companion object {
+        fun fromWire(value: String): DischargeType? = entries.firstOrNull { it.value == value }
+    }
+}
+
+/** The current signed discharge of an admission (`discharge` of `GET /admisiones`), without the clinical summary. */
+data class AdmissionDischarge(val type: DischargeType?, val signedAt: String, val signedByName: String?, val pending: List<DischargePending>)
+
+/** One row of `GET /admisiones`. */
+data class HospitalAdmission(
+    val id: String,
+    val patientName: String,
+    val state: String,
+    val bed: String,
+    val category: String,
+    val isolation: Boolean,
+    val version: Int,
+    val occupationId: String? = null,
+    val bedCategory: String? = null,
+    val authorized: Boolean = false,
+    val attendingDoctorName: String? = null,
+    val attendingDoctorHasAccount: Boolean = false,
+    val dischargeRequestedAt: String? = null,
+    val discharge: AdmissionDischarge? = null,
+    val allowedActions: Set<AdmissionAction> = emptySet(),
+)
+
+data class HospitalBedSuggestion(val id: String, val version: Int, val code: String, val room: String, val category: String, val reason: String)
+
+/** A bed of `GET /camas` as the transfer picker needs it. */
+data class TransferBed(val id: String, val code: String, val room: String, val category: String, val state: String)
+
+/** One entry of `GET /admisiones/{id}/notas-enfermeria`, newest first. */
+data class NursingNote(val id: String, val text: String, val createdAt: String, val authorName: String?)
+
+object AdmissionParser {
+    private fun JSONObject.textOrNull(name: String): String? = if (isNull(name)) null else optString(name).takeIf { it.isNotBlank() }
+    private fun objects(array: JSONArray?): List<JSONObject> = (0 until (array?.length() ?: 0)).mapNotNull { array?.optJSONObject(it) }
+
+    fun admissions(value: Any?): List<HospitalAdmission> = objects(value as? JSONArray).map { row ->
+        val actions = row.optJSONArray("allowedActions")
+        HospitalAdmission(
+            id = row.optString("id"),
+            patientName = row.textOrNull("patientName") ?: "Paciente",
+            state = row.optString("state"),
+            bed = row.textOrNull("bed").orEmpty(),
+            category = row.textOrNull("requestedCategory").orEmpty(),
+            isolation = row.optBoolean("isolation"),
+            version = row.optInt("version", 1),
+            occupationId = row.textOrNull("occupationId"),
+            bedCategory = row.textOrNull("bedCategory"),
+            authorized = row.optBoolean("authorized"),
+            attendingDoctorName = row.textOrNull("attendingDoctorName"),
+            attendingDoctorHasAccount = row.optBoolean("attendingDoctorHasAccount"),
+            dischargeRequestedAt = row.textOrNull("dischargeRequestedAt"),
+            discharge = if (row.isNull("discharge")) null else row.optJSONObject("discharge")?.let { d ->
+                AdmissionDischarge(
+                    DischargeType.fromWire(d.optString("type")),
+                    d.textOrNull("signedAt").orEmpty(),
+                    d.textOrNull("signedByName"),
+                    objects(d.optJSONArray("pending")).map { DischargePending(it.optString("description"), it.optString("responsible")) },
+                )
+            },
+            allowedActions = (0 until (actions?.length() ?: 0)).mapNotNull { i -> actions?.optString(i)?.let(AdmissionAction::fromWire) }.toSet(),
+        )
+    }
+
+    fun suggestions(value: Any?): List<HospitalBedSuggestion> = objects(value as? JSONArray).map { row ->
+        HospitalBedSuggestion(row.optString("id"), row.optInt("version", 1), row.optString("code"), row.optString("room"), row.optString("category"), row.optString("reason"))
+    }
+
+    fun beds(value: Any?): List<TransferBed> = objects(value as? JSONArray).map { row ->
+        TransferBed(row.optString("id"), row.optString("code"), row.optString("room"), row.optString("category"), row.optString("state"))
+    }
+
+    fun notes(value: Any?): List<NursingNote> = objects(value as? JSONArray).map { row ->
+        NursingNote(row.optString("id"), row.optString("text"), row.optString("createdAt"), row.textOrNull("authorName"))
+    }
 }
 
 /**
@@ -28,9 +120,11 @@ enum class DischargeType(val value: String, val label: String) {
 object HospitalizationRules {
     const val SUMMARY_MIN = 10
     const val SUMMARY_MAX = 2000
+    const val NOTE_MAX = 4000
+    const val REQUEST_NOTE_MAX = 500
 
-    fun actions(state: String, permissions: Collection<String>): Set<AdmissionAction> =
-        AdmissionAction.entries.filter { it.state == state && it.permission in permissions }.toSet()
+    /** "12/500": live counter under a reason field (trimmed length, as the API counts it). */
+    fun counter(text: String, max: Int): String = "${text.trim().length}/$max"
 
     /** The bed assignment reason is optional in the API, but when written it must have 10 to 500 characters. */
     fun assignReasonError(reason: String): String? = if (reason.isBlank()) null else ChangeReason.error(reason)
@@ -38,8 +132,9 @@ object HospitalizationRules {
     fun assignBody(bedId: String, bedVersion: Int, reason: String): JSONObject =
         JSONObject().put("bedId", bedId).put("version", bedVersion).apply { if (reason.isNotBlank()) put("reason", reason.trim()) }
 
+    /** The summary is optional (`@Text(10, 2000, true)`); when written it must have 10 to 2000 characters. */
     fun dischargeError(type: DischargeType, summary: String, pending: List<DischargePending>, voluntaryConsent: Boolean): String? = when {
-        summary.trim().length < SUMMARY_MIN -> "Escribe el resumen del alta, de al menos $SUMMARY_MIN caracteres."
+        summary.isNotBlank() && summary.trim().length < SUMMARY_MIN -> "Si escribes el resumen del alta, que tenga al menos $SUMMARY_MIN caracteres."
         summary.trim().length > SUMMARY_MAX -> "El resumen no puede pasar de $SUMMARY_MAX caracteres."
         pending.any { it.description.isNotBlank() != it.responsible.isNotBlank() } -> "Cada pendiente necesita descripción y responsable."
         type == DischargeType.VOLUNTARY && !voluntaryConsent -> "El alta voluntaria necesita la constancia del paciente."
@@ -51,12 +146,60 @@ object HospitalizationRules {
         val items = JSONArray()
         pending.filter { it.description.isNotBlank() && it.responsible.isNotBlank() }
             .forEach { items.put(JSONObject().put("description", it.description.trim()).put("responsible", it.responsible.trim())) }
-        return JSONObject().put("type", type.value).put("version", admissionVersion).put("summary", summary.trim()).put("pending", items)
+        return JSONObject().put("type", type.value).put("version", admissionVersion).put("pending", items)
+            .apply { if (summary.isNotBlank()) put("summary", summary.trim()) }
             .apply { if (type == DischargeType.VOLUNTARY) put("voluntaryConsent", voluntaryConsent) }
     }
 
     fun exitReasonError(reason: String): String? = ChangeReason.error(reason)
 
-    fun exitBody(admissionVersion: Int, reason: String): JSONObject =
-        JSONObject().put("version", admissionVersion).put("reason", reason.trim())
+    fun exitBody(admissionVersion: Int, reason: String): JSONObject = reasonBody(admissionVersion, reason)
+
+    /** Cancel, revoke discharge and transfer: a 10 to 500 character reason. */
+    fun reasonError(reason: String): String? = ChangeReason.error(reason)
+
+    fun reasonBody(admissionVersion: Int, reason: String): JSONObject = JSONObject().put("version", admissionVersion).put("reason", reason.trim())
+
+    /** `POST /admisiones/{id}/solicitar-alta`: the note is optional (0 to 500). */
+    fun dischargeRequestError(note: String): String? = if (note.trim().length > REQUEST_NOTE_MAX) "La nota no puede pasar de $REQUEST_NOTE_MAX caracteres." else null
+
+    fun dischargeRequestBody(admissionVersion: Int, note: String): JSONObject =
+        JSONObject().put("version", admissionVersion).apply { if (note.isNotBlank()) put("note", note.trim()) }
+
+    /**
+     * For a hospitalized patient whose discharge this person cannot sign: who signs it, or why nobody can yet. Null for the
+     * signer (they see "Firmar alta") and outside `hospitalizado`.
+     */
+    fun waitingDischargeHint(admission: HospitalAdmission): String? = when {
+        admission.state != "hospitalizado" || AdmissionAction.SIGN_DISCHARGE in admission.allowedActions -> null
+        !admission.attendingDoctorHasAccount -> "El médico tratante no tiene cuenta en la app; pide a Jefatura que reasigne el tratante."
+        else -> "Esperando alta médica: la firma ${admission.attendingDoctorName ?: "el médico tratante"} desde la app."
+    }
+
+    /** Free beds of the current bed's category, except the bed the patient is in (`POST /ocupaciones/{id}/traslado`). */
+    fun transferCandidates(beds: List<TransferBed>, admission: HospitalAdmission): List<TransferBed> {
+        val category = admission.bedCategory ?: admission.category
+        return beds.filter { it.state == "libre" && it.category == category && it.code != admission.bed }
+    }
+
+    fun transferBody(bedId: String, admissionVersion: Int, reason: String): JSONObject =
+        JSONObject().put("bedId", bedId).put("version", admissionVersion).put("reason", reason.trim())
+
+    fun noteError(text: String): String? = when {
+        text.isBlank() -> "Escribe la nota antes de guardarla."
+        text.trim().length > NOTE_MAX -> "La nota no puede pasar de $NOTE_MAX caracteres."
+        else -> null
+    }
+
+    fun noteBody(text: String): JSONObject = JSONObject().put("text", text.trim())
+
+    /** Spanish text of a failed hospitalization write: stable codes first, then the API `detail` (already Spanish). */
+    fun problemMessage(code: String?, message: String?): String = when (code) {
+        "transicion_invalida" -> "La admisión cambió de estado; vuelve a cargar."
+        "version_conflicto" -> "La admisión cambió mientras la mirabas. Actualizamos la lista; revisa e intenta de nuevo."
+        else -> message?.takeIf { it.isNotBlank() } ?: "No se pudo completar la operación."
+    }
+
+    /** Codes after which the shown list is stale and must be fetched again. */
+    fun staleCode(code: String?): Boolean = code == "transicion_invalida" || code == "version_conflicto"
 }

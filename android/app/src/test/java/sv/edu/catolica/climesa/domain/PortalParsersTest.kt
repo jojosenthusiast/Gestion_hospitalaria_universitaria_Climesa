@@ -35,4 +35,11 @@ class PortalParsersTest {
         assertTrue(PortalParsers.unit(idle)!!.driverOnDuty)
         assertFalse(PortalParsers.unit(JSONObject(idle.toString()).put("driverOnDuty", false))!!.driverOnDuty)
     }
+
+    @Test fun readsTheDispatchBlockMessageForReadOnlyViewers() {
+        val idle = JSONObject().put("unit", JSONObject().put("plate", "P-000-001").put("state", "disponible").put("version", 4)).put("paramedicOnDuty", true)
+        assertNull(PortalParsers.unit(idle)!!.dispatchBlock)
+        val blocked = JSONObject(idle.toString()).put("dispatchBlock", JSONObject().put("code", "sin_paramedico_de_turno").put("message", "No hay paramédico con cuenta en la app con turno en curso."))
+        assertEquals("No hay paramédico con cuenta en la app con turno en curso.", PortalParsers.unit(blocked)!!.dispatchBlock)
+    }
 }

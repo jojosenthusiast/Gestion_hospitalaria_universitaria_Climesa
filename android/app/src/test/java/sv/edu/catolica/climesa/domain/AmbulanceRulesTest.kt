@@ -75,6 +75,10 @@ class AmbulanceRulesTest {
             .put("crew", org.json.JSONArray().put(JSONObject().put("name", "Ana Ficticia"))).put("milestones", org.json.JSONArray().put(JSONObject().put("type", "salida").put("occurredAt", "2026-11-15T14:05:00Z")))))
         assertEquals("La ambulancia salió de Colonia Ficticia (Soyapango) hacia Hospital CLIMESA — paciente con expediente *******042, con Ana Ficticia, completado.", AmbulanceRules.narrate(entry.single()))
         assertTrue(AmbulanceRules.narrate(entry.single().copy(patientRef = "", milestones = emptyList(), finalState = null)).endsWith("sin paciente vinculado, con Ana Ficticia, en curso."))
+        assertFalse(entry.single().administrativeClose)
+        val closed = AmbulanceParser.log(org.json.JSONArray().put(JSONObject().put("id", "s2").put("finalState", "cancelado").put("administrativeClose", true))).single()
+        assertTrue(closed.administrativeClose)
+        assertEquals("Cierre administrativo", AmbulanceLabels.ADMINISTRATIVE_CLOSE)
     }
 
     @Test fun elEstadoSeLeeSinServicioActivo() {

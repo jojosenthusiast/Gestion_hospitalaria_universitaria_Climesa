@@ -154,6 +154,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){Text(stringResource(R.string.unidad_estado),style=MaterialTheme.typography.labelSmall);StatusTag(unit?.state.orEmpty(),label=unitStates[unit?.state])}
                     LabeledValue(stringResource(R.string.unidad_paramedico_turno),stringResource(if(unit?.paramedicOnDuty==true)R.string.unidad_si else R.string.unidad_no))
                     LabeledValue(stringResource(R.string.unidad_motorista_turno),stringResource(if(unit?.driverOnDuty!=false)R.string.unidad_si else R.string.unidad_no))
+                    unit?.dispatchBlock?.let{NoticeBanner(NoticeKind.WARNING,it)}
                     HorizontalDivider()
                     if(unit?.hasService!=true)Text(stringResource(R.string.unidad_sin_servicio),style=MaterialTheme.typography.bodyMedium) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${unit.serviceOrigin.orEmpty()} → ${unit.serviceDestination.orEmpty()}")}
                 }}
