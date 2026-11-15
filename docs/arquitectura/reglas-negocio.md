@@ -26,11 +26,14 @@ Una sola lista de las reglas que el sistema hace cumplir. Cada spec las referenc
 
 ## Turnos del personal (D-054)
 - **RN-12** Sin traslape por persona. Duración 4 a 12 h; guardia médica hasta 24 h.
-- **RN-13** Descanso mínimo 8 h entre turnos; 12 h después de una guardia de 24 h.
+- **RN-13** Descanso mínimo 8 h entre cualquier par de turnos; 12 h después de una guardia de 24 h (y hasta el fin del día en que termina). Dos noches seguidas con 12 h entre ellas se permiten. Un turno pertenece a la jornada del día en que empieza. La base lo garantiza (`descanso_insuficiente`, 20261120003000).
+- **RN-13a** Carga (CARGA-01): máximo 72 h en cualquier ventana de 7 días y 6 días seguidos (política `turnos.carga`). Solo se supera con un motivo de emergencia de 10 caracteres o más, que queda en el turno y en la auditoría. La base aplica el tope de horas (`carga_semanal_excedida`).
 - **RN-14** Más de 44 h semanales diurnas genera aviso (Código de Trabajo Art. 161), no bloqueo; se exige justificación.
 - **RN-15** Cobertura mínima: Emergencia 1 médico y 1 enfermero las 24 h; 1 enfermero por planta con camas ocupadas; 1 recepcionista en horario de atención; 1 laboratorista en horario de laboratorio. Publicar con huecos muestra advertencia y queda registrado quién publicó.
 - **RN-16** Roles clínicos solo con inscripción vigente durante todo el turno.
 - **RN-17** Médicos de turno se publican como información pública: nombre, especialidad, área.
+- **RN-17a** Asistencia (ASIS-01): "de turno" es un turno publicado o en curso que **no** está `ausente`. La persona marca su entrada desde 30 min antes del inicio (o JOP la marca); pasado el margen de 15 min sin entrada, el turno queda "sin entrada marcada" y se avisa a JOP en vivo (política `turnos.asistencia`). JOP registra la ausencia con tipo (justificada o injustificada) y motivo; un turno ausente no cuenta para la agenda de citas, la fila, los médicos de turno, el contexto de área, RN-30 (paramédico y motorista) ni la cobertura. La base rechaza citas en el horario de un médico ausente (`medico_ausente`) y una persona ausente en una tripulación (`tripulante_ausente`).
+- **RN-17b** Estados del turno (MA-TUR-01 a 05): un turno nace publicado; solo se mueve o cancela antes de empezar (`turno_iniciado`); cancelar no lo mueve a la vez; el turno de un médico con citas vivas no se cancela ni se mueve fuera de ellas (`turno_con_citas`, las citas se reprograman o cancelan primero). Nadie devuelve a borrador un turno en curso.
 
 ## Fila del día y citas
 - **RN-18** El número de fila es único por servicio y día, empieza en 1 cada día y no tiene huecos (D-035).

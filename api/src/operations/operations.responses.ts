@@ -1,9 +1,16 @@
-import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, EnumProp, IntProp, NumProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, EnumArrayProp, EnumProp, IntProp, NumProp, StrProp, UuidProp } from '../platform/responses';
 import { CATEGORIA_HABITACION, ESTADO_CAMA, ESTADO_TURNO } from '../platform/states';
 
 export const TIPO_PERSONAL = ['medico', 'enfermero', 'asistente', 'recepcionista', 'laboratorista', 'paramedico', 'motorista', 'limpieza', 'administrativo', 'otro'] as const;
 export const JUNTA_PROFESIONAL = ['JVPM', 'JVPE', 'JVPL', 'JVPO', 'otra'] as const;
 export const TIPO_TURNO = ['diurno', 'nocturno', 'guardia'] as const;
+/** Estados de `personal.turno.estado`, con `ausente` de 20261120003000_turnos_asistencia_carga.sql (ASIS-01). */
+export const ESTADO_TURNO_ASISTENCIA = [...ESTADO_TURNO, 'ausente'] as const;
+/** Asistencia derivada: `sin_confirmar` = pasó el margen de la política `turnos.asistencia` sin marcar entrada. */
+export const ASISTENCIA_TURNO = ['pendiente', 'presente', 'sin_confirmar', 'ausente'] as const;
+export const TIPO_AUSENCIA = ['justificada', 'injustificada'] as const;
+/** Acciones que el servidor permite a quien consulta, según su permiso, el estado y la hora (la UI no ofrece otras). */
+export const ACCION_TURNO = ['editar', 'cancelar', 'marcar_entrada', 'marcar_presente', 'marcar_ausente', 'deshacer_asistencia'] as const;
 export const TIPO_ESPACIO = ['hospital', 'planta', 'area', 'habitacion', 'cama', 'consultorio', 'cubiculo', 'bodega', 'bahia'] as const;
 
 // ---- Inicio ----
@@ -111,9 +118,57 @@ export class ShiftResponse {
   @DateTimeProp() start!: string;
   @DateTimeProp() end!: string;
   @EnumProp(TIPO_TURNO, 'TipoTurno') type!: string;
-  @EnumProp(ESTADO_TURNO, 'EstadoTurno') state!: string;
+  @EnumProp(ESTADO_TURNO_ASISTENCIA, 'EstadoTurno') state!: string;
   @StrProp({ nullable: true }) justification!: string | null;
   @IntProp() version!: number;
+  @EnumProp(ASISTENCIA_TURNO, 'AsistenciaTurno', { nullable: true, description: 'Null en turnos cancelados o en borrador' }) attendance!: string | null;
+  @DateTimeProp({ nullable: true, description: 'Hora de entrada marcada por la persona o por JOP' }) presentSince!: string | null;
+  @BoolProp({ description: 'Marcó la entrada después del margen de la política turnos.asistencia' }) late!: boolean;
+  @EnumProp(TIPO_AUSENCIA, 'TipoAusencia', { nullable: true }) absenceType!: string | null;
+  @StrProp({ optional: true, nullable: true, description: 'Motivo de la ausencia; solo con turnos.planificar' }) attendanceReason?: string | null;
+  @StrProp({ optional: true, nullable: true, description: 'Motivo de emergencia que permitió superar el tope de carga; solo con turnos.planificar' }) emergencyReason?: string | null;
+  @EnumArrayProp(ACCION_TURNO, 'AccionTurno', { description: 'Acciones que quien consulta puede hacer ahora sobre este turno' }) allowedActions!: string[];
+}
+
+export class AffectedAppointmentResponse {
+  @UuidProp() id!: string;
+  @DateTimeProp() start!: string;
+  @DateTimeProp() end!: string;
+  @StrProp() state!: string;
+}
+
+export class SubstituteResponse {
+  @UuidProp() id!: string;
+  @StrProp() name!: string;
+  @EnumProp(TIPO_PERSONAL, 'TipoPersonal') type!: string;
+  @StrProp({ nullable: true }) specialty!: string | null;
+  @StrProp({ nullable: true }) area!: string | null;
+}
+
+export class ShiftAttendanceResponse {
+  @UuidProp() id!: string;
+  @IntProp() version!: number;
+  @EnumProp(ESTADO_TURNO_ASISTENCIA, 'EstadoTurno') state!: string;
+  @EnumProp(ASISTENCIA_TURNO, 'AsistenciaTurno', { nullable: true }) attendance!: string | null;
+  @BoolProp() late!: boolean;
+  @ClassArrayProp(AffectedAppointmentResponse, { description: 'ASIS-02: citas vivas del médico ausente que hay que reprogramar o cancelar' }) affectedAppointments!: AffectedAppointmentResponse[];
+  @ClassArrayProp(SubstituteResponse, { description: 'ASIS-02: personal de la misma función (y especialidad) libre y con descanso cumplido' }) substitutes!: SubstituteResponse[];
+}
+
+export class SpecialistShiftResponse {
+  @DateProp() date!: string;
+  @StrProp() specialty!: string;
+  @StrProp() name!: string;
+  @StrProp() area!: string;
+  @DateTimeProp() start!: string;
+  @DateTimeProp() end!: string;
+  @EnumProp(ASISTENCIA_TURNO, 'AsistenciaTurno', { nullable: true }) attendance!: string | null;
+}
+
+export class SpecialistWeekResponse {
+  @DateProp() from!: string;
+  @DateProp() to!: string;
+  @ClassArrayProp(SpecialistShiftResponse) items!: SpecialistShiftResponse[];
 }
 
 export class CoverageGapResponse {
@@ -151,6 +206,7 @@ export class ShiftSavedResponse {
   @UuidProp() id!: string;
   @IntProp() version!: number;
   @ClassArrayProp(ShiftWarningResponse) advertencias!: ShiftWarningResponse[];
+  @ClassArrayProp(CoverageGapResponse, { optional: true, description: 'Al cancelar: huecos de cobertura que deja el turno (RN-15)' }) huecos?: CoverageGapResponse[];
 }
 
 // ---- Espacios y camas ----

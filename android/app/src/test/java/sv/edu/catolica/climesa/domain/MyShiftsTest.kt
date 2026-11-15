@@ -35,4 +35,27 @@ class MyShiftsTest {
         assertTrue(MyShifts.parse(JSONObject()).isEmpty())
         assertTrue(MyShifts.parse(null).isEmpty())
     }
+
+    // ASIS-01: la entrada solo se ofrece cuando la API la incluye en allowedActions; nunca se muestra un código crudo.
+    @Test fun checkInFollowsAllowedActionsAndAttendanceIsSpanish() {
+        val rows = JSONArray()
+            .put(JSONObject().put("id", "t-1").put("version", 3).put("area", "Consulta").put("start", "2026-11-13T14:00:00Z").put("end", "2026-11-13T20:00:00Z")
+                .put("state", "en_curso").put("attendance", "sin_confirmar").put("late", false).put("allowedActions", JSONArray().put("marcar_entrada")))
+            .put(JSONObject().put("id", "t-2").put("version", 1).put("area", "Consulta").put("start", "2026-11-14T14:00:00Z").put("end", "2026-11-14T20:00:00Z")
+                .put("state", "completado").put("attendance", "presente").put("late", true).put("allowedActions", JSONArray()))
+        val (open, done) = MyShifts.parse(rows)
+        assertTrue(open.canCheckIn)
+        assertEquals(false, done.canCheckIn)
+        assertEquals("Sin entrada marcada", MyShifts.attendanceLabel(open))
+        assertEquals("Entrada marcada · tarde", MyShifts.attendanceLabel(done))
+        assertEquals(3, MyShifts.checkInBody(open).getInt("version"))
+        assertEquals("En curso", StaffLabels.shiftState("en_curso"))
+        assertEquals("Ausente", StaffLabels.shiftState("ausente"))
+    }
+
+    @Test fun refusedCheckInIsExplainedByCode() {
+        assertEquals("Ya marcaste la entrada de este turno.", MyShifts.checkInError("asistencia_ya_marcada", 409, "x"))
+        assertEquals("Solo puedes marcar la entrada de tus propios turnos.", MyShifts.checkInError("turno_ajeno", 403, "x"))
+        assertEquals("No se pudo marcar la entrada. Intenta de nuevo.", MyShifts.checkInError(null, null, null))
+    }
 }

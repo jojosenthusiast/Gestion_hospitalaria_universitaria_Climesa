@@ -119,7 +119,8 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   current=new Date('2026-11-20T12:00:00Z');// 06:00 local, antes del inicio
   await app.get(PersonnelService).advanceStates();
   expect((await state()).estado).toBe('publicado');
-  current=new Date('2026-11-20T14:00:00Z');// 08:00 local
+  // 07:10 local: dentro del margen de entrada (turnos.asistencia), así que aún no hay aviso de "sin entrada" (ASIS-01).
+  current=new Date('2026-11-20T13:10:00Z');
   await app.get(PersonnelService).advanceStates();
   expect(await state()).toEqual({estado:'en_curso',version:2});
   await app.get(PersonnelService).advanceStates();

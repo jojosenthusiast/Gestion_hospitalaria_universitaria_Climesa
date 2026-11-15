@@ -417,6 +417,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/turnos/especialistas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Médicos de turno por día y especialidad durante 7 días (CARGA-04) */
+        get: operations["OperationsController_specialists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/turnos/{id}/entrada": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marcar la entrada del turno propio (ASIS-01) */
+        post: operations["OperationsController_checkIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/turnos/{id}/asistencia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marcar entrada, ausencia (con tipo y motivo) o deshacer la marca de un turno (ASIS-01 a ASIS-03) */
+        post: operations["OperationsController_attendance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/turnos/publicar": {
         parameters: {
             query?: never;
@@ -2347,7 +2398,19 @@ export interface components {
         /** @enum {string} */
         TipoTurno: "diurno" | "nocturno" | "guardia";
         /** @enum {string} */
-        EstadoTurno: "borrador" | "publicado" | "en_curso" | "completado" | "cancelado";
+        EstadoTurno: "borrador" | "publicado" | "en_curso" | "completado" | "cancelado" | "ausente";
+        /**
+         * @description Null en turnos cancelados o en borrador
+         * @enum {string}
+         */
+        AsistenciaTurno: "pendiente" | "presente" | "sin_confirmar" | "ausente";
+        /** @enum {string} */
+        TipoAusencia: "justificada" | "injustificada";
+        /**
+         * @description Acciones que quien consulta puede hacer ahora sobre este turno
+         * @enum {string}
+         */
+        AccionTurno: "editar" | "cancelar" | "marcar_entrada" | "marcar_presente" | "marcar_ausente" | "deshacer_asistencia";
         ShiftResponse: {
             /** Format: uuid */
             id: string;
@@ -2367,6 +2430,22 @@ export interface components {
             state: components["schemas"]["EstadoTurno"];
             justification: string | null;
             version: number;
+            /** @description Null en turnos cancelados o en borrador */
+            attendance: components["schemas"]["AsistenciaTurno"] | null;
+            /**
+             * Format: date-time
+             * @description Hora de entrada marcada por la persona o por JOP
+             */
+            presentSince: string | null;
+            /** @description Marcó la entrada después del margen de la política turnos.asistencia */
+            late: boolean;
+            absenceType: components["schemas"]["TipoAusencia"] | null;
+            /** @description Motivo de la ausencia; solo con turnos.planificar */
+            attendanceReason?: string | null;
+            /** @description Motivo de emergencia que permitió superar el tope de carga; solo con turnos.planificar */
+            emergencyReason?: string | null;
+            /** @description Acciones que quien consulta puede hacer ahora sobre este turno */
+            allowedActions: components["schemas"]["AccionTurno"][];
         };
         ShiftCatalogRoleResponse: {
             code: components["schemas"]["TipoPersonal"];
@@ -2428,6 +2507,79 @@ export interface components {
             to: string;
             gaps: components["schemas"]["CoverageGapResponse"][];
         };
+        SpecialistShiftResponse: {
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            date: string;
+            specialty: string;
+            name: string;
+            area: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            attendance: components["schemas"]["AsistenciaTurno"] | null;
+        };
+        SpecialistWeekResponse: {
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            from: string;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            to: string;
+            items: components["schemas"]["SpecialistShiftResponse"][];
+        };
+        CheckInDto: {
+            version: number;
+        };
+        AffectedAppointmentResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            state: string;
+        };
+        SubstituteResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            type: components["schemas"]["TipoPersonal"];
+            specialty: string | null;
+            area: string | null;
+        };
+        ShiftAttendanceResponse: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            state: components["schemas"]["EstadoTurno"];
+            attendance: components["schemas"]["AsistenciaTurno"] | null;
+            late: boolean;
+            /** @description ASIS-02: citas vivas del médico ausente que hay que reprogramar o cancelar */
+            affectedAppointments: components["schemas"]["AffectedAppointmentResponse"][];
+            /** @description ASIS-02: personal de la misma función (y especialidad) libre y con descanso cumplido */
+            substitutes: components["schemas"]["SubstituteResponse"][];
+        };
+        AttendanceDto: {
+            /** @enum {string} */
+            state: "presente" | "ausente" | "pendiente";
+            /** @enum {string} */
+            absenceType?: "justificada" | "injustificada";
+            /**
+             * Format: date-time
+             * @description Hora de entrada; por omisión, ahora. Obligatoria si el turno ya terminó
+             */
+            at?: string;
+            version: number;
+            reason?: string;
+        };
         PublishDto: {
             /**
              * Format: date
@@ -2472,10 +2624,14 @@ export interface components {
             /** @enum {string} */
             type: "diurno" | "nocturno" | "guardia";
             justification?: string;
-            /** @enum {string} */
-            state?: "borrador" | "cancelado";
+            /**
+             * @description Solo en PATCH, para cancelar un turno que no ha empezado
+             * @enum {string}
+             */
+            state?: "cancelado";
             version?: number;
             reason?: string;
+            emergencyReason?: string;
         };
         ShiftWarningResponse: {
             /** @description Código de la advertencia, por ejemplo horas_semanales_excedidas */
@@ -2488,6 +2644,8 @@ export interface components {
             id: string;
             version: number;
             advertencias: components["schemas"]["ShiftWarningResponse"][];
+            /** @description Al cancelar: huecos de cobertura que deja el turno (RN-15) */
+            huecos?: components["schemas"]["CoverageGapResponse"][];
         };
         /** @enum {string} */
         CategoriaHabitacion: "vip" | "semiprivada";
@@ -4514,7 +4672,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "existencia_insuficiente" | "aviso_con_datos_personales" | "indicador_desconocido" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "asistencia_ya_marcada" | "sin_asistencia_marcada" | "sin_ficha_personal" | "turno_ajeno" | "fuera_de_horario" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "existencia_insuficiente" | "aviso_con_datos_personales" | "indicador_desconocido" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -6429,6 +6587,228 @@ export interface operations {
             };
             /** @description Sin permiso (`sin_permiso`) o regla de acceso */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_specialists: {
+        parameters: {
+            query: {
+                /** @description Primer día local, yyyy-MM-dd */
+                from: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialistWeekResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_checkIn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftAttendanceResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_attendance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttendanceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftAttendanceResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,5 +1,51 @@
 import Foundation
 
+/// "Mis turnos" (I26): estado, asistencia y la entrada propia (ASIS-01). Solo se ofrece marcar la entrada cuando la API
+/// lo incluye en `allowedActions` (`marcar_entrada`); la API sigue siendo la garantía.
+public enum ShiftAttendanceRules {
+    public static let checkInAction = "marcar_entrada"
+
+    public static func canCheckIn(_ allowedActions: [String]?) -> Bool { allowedActions?.contains(checkInAction) == true }
+
+    /// Nombre del estado del turno; nunca el código crudo.
+    public static func stateLabel(_ state: String) -> String {
+        switch state {
+        case "publicado": return "Publicado"
+        case "en_curso": return "En curso"
+        case "completado": return "Completado"
+        case "cancelado": return "Cancelado"
+        case "ausente": return "Ausente"
+        case "borrador": return "Borrador"
+        default: return state.replacingOccurrences(of: "_", with: " ")
+        }
+    }
+
+    /// Texto de la asistencia para la persona, o `nil` si el turno no se trabaja.
+    public static func attendanceLabel(_ attendance: String?, late: Bool) -> String? {
+        switch attendance {
+        case "presente": return late ? "Entrada marcada · tarde" : "Entrada marcada"
+        case "sin_confirmar": return "Sin entrada marcada"
+        case "ausente": return "Ausencia registrada"
+        case "pendiente": return "Entrada pendiente"
+        default: return nil
+        }
+    }
+
+    /// Mensaje para una entrada rechazada, por `codigo` (el texto de la API queda de respaldo).
+    public static func checkInError(code: String?, status: Int?, fallback: String?) -> String {
+        switch code {
+        case "version_conflicto": return "Tu turno cambió. Actualizamos la lista; vuelve a intentarlo."
+        case "asistencia_ya_marcada": return "Ya marcaste la entrada de este turno."
+        case "fuera_de_horario": return "Puedes marcar la entrada desde 30 minutos antes del inicio y hasta el fin del turno."
+        case "transicion_invalida": return "Este turno ya no admite marcar la entrada. Si es un error, comunícate con la jefatura de operaciones."
+        default:
+            if status == 403 { return "Solo puedes marcar la entrada de tus propios turnos." }
+            if let fallback, !fallback.isEmpty { return fallback }
+            return "No se pudo marcar la entrada. Intenta de nuevo."
+        }
+    }
+}
+
 /// Filtro por estado de los exámenes del paciente (Pendiente / En proceso / Completado).
 public enum LabFilter: String, CaseIterable, Sendable, Hashable {
     case all, pendiente, enProceso, completado

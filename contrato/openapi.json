@@ -2614,6 +2614,322 @@
         "x-permiso": "turnos.ver"
       }
     },
+    "/api/v1/turnos/especialistas": {
+      "get": {
+        "operationId": "OperationsController_specialists",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Primer día local, yyyy-MM-dd",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialistWeekResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Médicos de turno por día y especialidad durante 7 días (CARGA-04)",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.ver"
+      }
+    },
+    "/api/v1/turnos/{id}/entrada": {
+      "post": {
+        "operationId": "OperationsController_checkIn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckInDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftAttendanceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marcar la entrada del turno propio (ASIS-01)",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.ver"
+      }
+    },
+    "/api/v1/turnos/{id}/asistencia": {
+      "post": {
+        "operationId": "OperationsController_attendance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftAttendanceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marcar entrada, ausencia (con tipo y motivo) o deshacer la marca de un turno (ASIS-01 a ASIS-03)",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
     "/api/v1/turnos/publicar": {
       "post": {
         "operationId": "OperationsController_publishShifts",
@@ -14425,8 +14741,38 @@
           "publicado",
           "en_curso",
           "completado",
-          "cancelado"
+          "cancelado",
+          "ausente"
         ]
+      },
+      "AsistenciaTurno": {
+        "type": "string",
+        "enum": [
+          "pendiente",
+          "presente",
+          "sin_confirmar",
+          "ausente"
+        ],
+        "description": "Null en turnos cancelados o en borrador"
+      },
+      "TipoAusencia": {
+        "type": "string",
+        "enum": [
+          "justificada",
+          "injustificada"
+        ]
+      },
+      "AccionTurno": {
+        "type": "string",
+        "enum": [
+          "editar",
+          "cancelar",
+          "marcar_entrada",
+          "marcar_presente",
+          "marcar_ausente",
+          "deshacer_asistencia"
+        ],
+        "description": "Acciones que quien consulta puede hacer ahora sobre este turno"
       },
       "ShiftResponse": {
         "type": "object",
@@ -14485,6 +14831,50 @@
           },
           "version": {
             "type": "integer"
+          },
+          "attendance": {
+            "nullable": true,
+            "description": "Null en turnos cancelados o en borrador",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AsistenciaTurno"
+              }
+            ]
+          },
+          "presentSince": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hora de entrada marcada por la persona o por JOP"
+          },
+          "late": {
+            "type": "boolean",
+            "description": "Marcó la entrada después del margen de la política turnos.asistencia"
+          },
+          "absenceType": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoAusencia"
+              }
+            ]
+          },
+          "attendanceReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo de la ausencia; solo con turnos.planificar"
+          },
+          "emergencyReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo de emergencia que permitió superar el tope de carga; solo con turnos.planificar"
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "Acciones que quien consulta puede hacer ahora sobre este turno",
+            "items": {
+              "$ref": "#/components/schemas/AccionTurno"
+            }
           }
         },
         "required": [
@@ -14499,7 +14889,12 @@
           "type",
           "state",
           "justification",
-          "version"
+          "version",
+          "attendance",
+          "presentSince",
+          "late",
+          "absenceType",
+          "allowedActions"
         ]
       },
       "ShiftCatalogRoleResponse": {
@@ -14723,6 +15118,239 @@
           "gaps"
         ]
       },
+      "SpecialistShiftResponse": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd"
+          },
+          "specialty": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "area": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attendance": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AsistenciaTurno"
+              }
+            ]
+          }
+        },
+        "required": [
+          "date",
+          "specialty",
+          "name",
+          "area",
+          "start",
+          "end",
+          "attendance"
+        ]
+      },
+      "SpecialistWeekResponse": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpecialistShiftResponse"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "items"
+        ]
+      },
+      "CheckInDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "AffectedAppointmentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "start",
+          "end",
+          "state"
+        ]
+      },
+      "SubstituteResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoPersonal"
+              }
+            ]
+          },
+          "specialty": {
+            "type": "string",
+            "nullable": true
+          },
+          "area": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "specialty",
+          "area"
+        ]
+      },
+      "ShiftAttendanceResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoTurno"
+              }
+            ]
+          },
+          "attendance": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AsistenciaTurno"
+              }
+            ]
+          },
+          "late": {
+            "type": "boolean"
+          },
+          "affectedAppointments": {
+            "description": "ASIS-02: citas vivas del médico ausente que hay que reprogramar o cancelar",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AffectedAppointmentResponse"
+            }
+          },
+          "substitutes": {
+            "description": "ASIS-02: personal de la misma función (y especialidad) libre y con descanso cumplido",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubstituteResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "state",
+          "attendance",
+          "late",
+          "affectedAppointments",
+          "substitutes"
+        ]
+      },
+      "AttendanceDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "presente",
+              "ausente",
+              "pendiente"
+            ]
+          },
+          "absenceType": {
+            "type": "string",
+            "enum": [
+              "justificada",
+              "injustificada"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hora de entrada; por omisión, ahora. Obligatoria si el turno ya terminó"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "state",
+          "version"
+        ]
+      },
       "PublishDto": {
         "type": "object",
         "properties": {
@@ -14821,14 +15449,19 @@
           "state": {
             "type": "string",
             "enum": [
-              "borrador",
               "cancelado"
-            ]
+            ],
+            "description": "Solo en PATCH, para cancelar un turno que no ha empezado"
           },
           "version": {
             "type": "number"
           },
           "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          },
+          "emergencyReason": {
             "type": "string",
             "minLength": 10,
             "maxLength": 500
@@ -14876,6 +15509,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ShiftWarningResponse"
+            }
+          },
+          "huecos": {
+            "description": "Al cancelar: huecos de cobertura que deja el turno (RN-15)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverageGapResponse"
             }
           }
         },
@@ -22003,6 +22643,19 @@
           "horas_semanales_excedidas",
           "inscripcion_no_vigente",
           "capacidad_bajo_ocupacion",
+          "turno_iniciado",
+          "turno_con_citas",
+          "descanso_insuficiente",
+          "carga_semanal_excedida",
+          "dias_seguidos_excedidos",
+          "tripulante_en_servicio",
+          "asistencia_ya_marcada",
+          "sin_asistencia_marcada",
+          "sin_ficha_personal",
+          "turno_ajeno",
+          "fuera_de_horario",
+          "medico_ausente",
+          "tripulante_ausente",
           "franja_desalineada",
           "franja_ocupada",
           "medico_sin_jornada",

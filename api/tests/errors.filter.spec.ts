@@ -17,6 +17,7 @@ class ProbeController {
   @Get('conflicto') conflict() { throw new ConflictException('Ya existe.'); }
   @Get('sql') sql() { throw Object.assign(new Error('relation "paciente" violates SELECT * FROM x'), { code: '23505' }); }
   @Get('consulta-duplicada') duplicatedConsultation() { throw Object.assign(new Error('duplicate key value violates unique constraint "consulta_ticket_unico"'), { code: '23505', constraint: 'consulta_ticket_unico' }); }
+  @Get('medico-ausente') absentDoctor() { throw Object.assign(new Error('medico_ausente'), { code: 'P0001' }); }
   @Post('boom') boom() { throw new Error('SELECT dui FROM pacientes.paciente'); }
 }
 @Module({ controllers: [ProbeController] })
@@ -56,6 +57,10 @@ describe('FR-100-11 errores uniformes (problem+json)', () => {
     expect(forbidden.json()).toMatchObject({ status: 403, codigo: 'sin_permiso' });
     expect((await app.inject('/prueba/no-existe')).json()).toMatchObject({ status: 404, codigo: 'no_encontrado' });
     expect((await app.inject('/prueba/conflicto')).json()).toMatchObject({ status: 409, codigo: 'conflicto' });
+  });
+  // ASIS-01: el disparador de citas rechaza a un médico ausente con un código estable y un mensaje en español.
+  test('una regla P0001 de asistencia responde con su código', async () => {
+    expect((await app.inject('/prueba/medico-ausente')).json()).toMatchObject({ status: 409, codigo: 'medico_ausente', detail: expect.stringMatching(/ausencia/) });
   });
   test('errores inesperados y de SQL no exponen trazas ni SQL', async () => {
     const sql = await app.inject('/prueba/sql');
