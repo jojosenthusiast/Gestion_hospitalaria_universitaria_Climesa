@@ -9467,6 +9467,94 @@
           "hospitalization"
         ],
         "x-permiso": "enfermeria.registrar"
+      },
+      "get": {
+        "operationId": "HospitalizationController_notes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NursingNoteEntryResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Notas de enfermería de la admisión, de la más reciente a la más antigua",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "enfermeria.registrar"
       }
     },
     "/api/v1/admisiones/{id}/alta": {
@@ -9703,6 +9791,601 @@
           "hospitalization"
         ],
         "x-permiso": "admision.registrar_salida"
+      }
+    },
+    "/api/v1/admisiones/{id}/cancelar": {
+      "post": {
+        "operationId": "HospitalizationController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdmissionCloseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar una admisión pendiente de cama, con motivo",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "admision.crear"
+      }
+    },
+    "/api/v1/admisiones/{id}/anular": {
+      "post": {
+        "operationId": "HospitalizationController_annul",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdmissionCloseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Anular una hospitalización ingresada por error: cierra la ocupación y la cama pasa a limpieza",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "admision.autorizar"
+      }
+    },
+    "/api/v1/admisiones/{id}/tratante": {
+      "post": {
+        "operationId": "HospitalizationController_changeAttending",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendingChangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reasignar el médico tratante, con motivo",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "admision.autorizar"
+      }
+    },
+    "/api/v1/admisiones/{id}/solicitar-alta": {
+      "post": {
+        "operationId": "HospitalizationController_requestDischarge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DischargeRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pedir al médico tratante que firme el alta (le llega un aviso en vivo)",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "admision.crear"
+      }
+    },
+    "/api/v1/admisiones/{id}/revocar-alta": {
+      "post": {
+        "operationId": "HospitalizationController_revokeDischarge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DischargeRevocationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revocar un alta firmada antes de la salida física (el firmante o Jefatura)",
+        "tags": [
+          "hospitalization"
+        ],
+        "x-permiso": "alta.firmar OR admision.autorizar"
       }
     },
     "/api/v1/admisiones/indicaciones": {
@@ -13441,6 +14124,125 @@
           "ambulancia"
         ],
         "x-permiso": "ambulancia.operar"
+      }
+    },
+    "/api/v1/ambulancia/servicios/{id}/cerrar": {
+      "post": {
+        "operationId": "AmbulanceController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseServiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseServiceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cierre administrativo de un servicio activo (Jefatura, con motivo): queda cancelado y la unidad vuelve a Disponible",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.mantenimiento"
       }
     },
     "/api/v1/ambulancia/servicios/{id}/prehospital": {
@@ -19549,6 +20351,10 @@
           "available": {
             "type": "boolean"
           },
+          "hasAccount": {
+            "type": "boolean",
+            "description": "Tiene cuenta activa en la app: puede firmar el alta"
+          },
           "reason": {
             "type": "string",
             "nullable": true,
@@ -19560,6 +20366,7 @@
           "name",
           "specialty",
           "available",
+          "hasAccount",
           "reason"
         ]
       },
@@ -19737,6 +20544,78 @@
           "protector"
         ]
       },
+      "TipoAlta": {
+        "type": "string",
+        "enum": [
+          "medica",
+          "voluntaria",
+          "traslado",
+          "defuncion"
+        ]
+      },
+      "DischargePendingResponse": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "responsible": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "responsible"
+        ]
+      },
+      "AdmissionDischargeResponse": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoAlta"
+              }
+            ]
+          },
+          "signedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "signedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DischargePendingResponse"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "signedAt",
+          "signedByName",
+          "pending"
+        ]
+      },
+      "AccionAdmision": {
+        "type": "string",
+        "enum": [
+          "asignar_cama",
+          "autorizar",
+          "cancelar",
+          "anular",
+          "trasladar",
+          "firmar_alta",
+          "solicitar_alta",
+          "revocar_alta",
+          "registrar_salida",
+          "reasignar_tratante",
+          "nota_enfermeria"
+        ]
+      },
       "AdmissionResponse": {
         "type": "object",
         "properties": {
@@ -19826,6 +20705,48 @@
           },
           "visitorsMax": {
             "type": "integer"
+          },
+          "attendingDoctorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "attendingDoctorHasAccount": {
+            "type": "boolean",
+            "description": "El médico tratante tiene cuenta activa en la app (puede firmar el alta)"
+          },
+          "bedCategory": {
+            "nullable": true,
+            "description": "Categoría de la cama actual",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoriaHabitacion"
+              }
+            ]
+          },
+          "authorized": {
+            "type": "boolean",
+            "description": "Jefatura autorizó una excepción de categoría"
+          },
+          "dischargeRequestedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Última solicitud de alta al médico tratante"
+          },
+          "discharge": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AdmissionDischargeResponse"
+              }
+            ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccionAdmision"
+            }
           }
         },
         "required": [
@@ -19847,7 +20768,14 @@
           "unstable",
           "postSurgical",
           "visitorsAllowed",
-          "visitorsMax"
+          "visitorsMax",
+          "attendingDoctorName",
+          "attendingDoctorHasAccount",
+          "bedCategory",
+          "authorized",
+          "dischargeRequestedAt",
+          "discharge",
+          "allowedActions"
         ]
       },
       "AdmissionDto": {
@@ -20241,6 +21169,108 @@
           "state",
           "bedId",
           "version"
+        ]
+      },
+      "NursingNoteEntryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "createdAt",
+          "authorName"
+        ]
+      },
+      "AdmissionCloseDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "reason"
+        ]
+      },
+      "AttendingChangeDto": {
+        "type": "object",
+        "properties": {
+          "attendingDoctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "attendingDoctorId",
+          "version",
+          "reason"
+        ]
+      },
+      "DischargeRequestDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "note": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "DischargeRevocationDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "reason"
         ]
       },
       "AdmissionIndicationDto": {
@@ -22666,12 +23696,17 @@
           },
           "name": {
             "type": "string"
+          },
+          "hasAccount": {
+            "type": "boolean",
+            "description": "Tiene cuenta activa en la app: puede registrar hitos"
           }
         },
         "required": [
           "staffId",
           "role",
-          "name"
+          "name",
+          "hasAccount"
         ]
       },
       "HitoServicio": {
@@ -22723,6 +23758,13 @@
           "longitude",
           "capturedAt"
         ]
+      },
+      "AccionServicioAmbulancia": {
+        "type": "string",
+        "enum": [
+          "cerrar"
+        ],
+        "description": "Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)"
       },
       "ActiveServiceResponse": {
         "type": "object",
@@ -22796,6 +23838,13 @@
                 "$ref": "#/components/schemas/LocationPointResponse"
               }
             ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)",
+            "items": {
+              "$ref": "#/components/schemas/AccionServicioAmbulancia"
+            }
           }
         },
         "required": [
@@ -22812,7 +23861,8 @@
           "crew",
           "milestones",
           "nextMilestones",
-          "lastLocation"
+          "lastLocation",
+          "allowedActions"
         ]
       },
       "MotivoBloqueoDespacho": {
@@ -22956,6 +24006,10 @@
             "type": "boolean",
             "description": "Hay motorista con turno en curso (RN-30 exige paramédico y motorista)"
           },
+          "paramedicWithAccountOnDuty": {
+            "type": "boolean",
+            "description": "Hay un paramédico con cuenta activa y turno en curso (BL-05: sin él no se despacha)"
+          },
           "dispatchBlock": {
             "nullable": true,
             "description": "Por qué no se puede despachar ahora; null si se puede",
@@ -22979,6 +24033,7 @@
           "activeService",
           "paramedicOnDuty",
           "driverOnDuty",
+          "paramedicWithAccountOnDuty",
           "dispatchBlock"
         ]
       },
@@ -23375,6 +24430,60 @@
           "nextMilestones"
         ]
       },
+      "CloseServiceDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "reason"
+        ]
+      },
+      "CloseServiceResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "finalState": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoFinalServicio"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "unitState": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoAmbulancia"
+              }
+            ]
+          },
+          "unitVersion": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "finalState",
+          "version",
+          "unitState",
+          "unitVersion"
+        ]
+      },
       "PrehospitalDto": {
         "type": "object",
         "properties": {
@@ -23643,6 +24752,10 @@
               }
             ]
           },
+          "administrativeClose": {
+            "type": "boolean",
+            "description": "Lo cerró Jefatura (cierre administrativo), no la tripulación"
+          },
           "crew": {
             "type": "array",
             "items": {
@@ -23675,6 +24788,7 @@
           "dispatchedAt",
           "finishedAt",
           "finalState",
+          "administrativeClose",
           "crew",
           "responseMinutes",
           "milestones",
