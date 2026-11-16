@@ -84,7 +84,7 @@ Punto para explicar: la doble asignación la impide PostgreSQL con `EXCLUDE USIN
 | 1 | Web · JOP | **Turnos**: filtrar por área y rol | Se ven las asignaciones del día |
 | 2 | Web · JOP | Asignar un turno nocturno 18:00–07:00 a una persona y luego intentar asignarla el día en que termina | La API rechaza el turno por descanso insuficiente e indica desde cuándo está disponible |
 | 3 | Web · JOP | Asignar un turno que deje a la persona sobre 72 horas en 7 días | El formulario muestra la carga; la API lo rechaza salvo con "Motivo de la emergencia", que queda auditado |
-| 4 | Android · MED | **Mis turnos → Marcar mi entrada** | La entrada queda registrada |
+| 4 | Android · MED | **Mis turnos** | Los turnos aparecen por día (Hoy, Mañana…); el turno en curso ya tiene la entrada confirmada sola |
 | 5 | Web · JOP | **Asistencia** de otro turno: marcar ausencia injustificada | La persona deja de contar como de turno; aparecen "Suplentes disponibles" con **Asignar turno** |
 
 ## Bloque 6 · Ambulancia (6 minutos)

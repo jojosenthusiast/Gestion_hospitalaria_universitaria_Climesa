@@ -22,7 +22,7 @@ AST y ENF comparten un catálogo de estación de cuidado; cada cuenta ve solo la
 
 ## Mis turnos
 
-Tus turnos publicados. **Marcar mi entrada** aparece cuando el turno lo permite. Si no la marcas a tiempo, Jefatura recibe una alerta.
+Tus turnos publicados, agrupados por día (Hoy, Mañana, día y fecha) y por hora. La entrada se confirma sola a la hora de inicio; si no vas a llegar, avisa a Jefatura para que registre la ausencia.
 
 ## Inicio y Hospital
 

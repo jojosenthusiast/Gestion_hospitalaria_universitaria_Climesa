@@ -13,22 +13,23 @@ export type AttendanceResult = {
 type Choice = 'presente' | 'ausente' | 'pendiente';
 
 /**
- * JOP marca la entrada o la ausencia de un turno, o deshace una marca equivocada. Solo se ofrece lo que la API permite
- * (`allowedActions`). Tras una ausencia lista las citas que hay que reprogramar y suplentes libres (ASIS-02).
+ * La entrada se confirma sola a la hora de inicio. JOP marca la ausencia (tipo y motivo), corrige la hora real de entrada
+ * (también de alguien marcado ausente que sí llegó) o deshace una ausencia equivocada; siempre con motivo. Solo se ofrece
+ * lo que la API permite (`allowedActions`). Tras una ausencia lista las citas que hay que reprogramar y suplentes libres (ASIS-02).
  */
 export function AttendanceDialog({ api, shift, onClose, onSaved, onAssignSubstitute }: {
   api: Api; shift: ShiftRow; onClose: () => void; onSaved: () => void;
   onAssignSubstitute?: (staffId: string) => void;
 }) {
+  const absent = shift.state === 'ausente';
   const options: [Choice, string][] = [
-    ...(shift.allowedActions?.includes('marcar_presente') ? [['presente', 'Marcar entrada'] as [Choice, string]] : []),
     ...(shift.allowedActions?.includes('marcar_ausente') ? [['ausente', 'Marcar ausencia'] as [Choice, string]] : []),
-    ...(shift.allowedActions?.includes('deshacer_asistencia') ? [['pendiente', 'Deshacer la marca'] as [Choice, string]] : []),
+    ...(shift.allowedActions?.includes('marcar_presente') ? [['presente', absent ? 'Sí llegó: registrar entrada' : 'Corregir hora de entrada'] as [Choice, string]] : []),
+    ...(shift.allowedActions?.includes('deshacer_asistencia') ? [['pendiente', 'Deshacer la ausencia'] as [Choice, string]] : []),
   ];
-  const ended = Date.now() >= Date.parse(shift.end);
   const startDay = localDay(Date.parse(shift.start));
-  const [choice, setChoice] = useState<Choice>(options[0]?.[0] ?? 'presente');
-  const [time, setTime] = useState(ended ? localTime(Date.parse(shift.start)) : '');
+  const [choice, setChoice] = useState<Choice>(options[0]?.[0] ?? 'ausente');
+  const [time, setTime] = useState('');
   const [absenceType, setAbsenceType] = useState<'justificada' | 'injustificada' | ''>('');
   const [reason, setReason] = useState(''), [problem, setProblem] = useState('');
   const [result, setResult] = useState<AttendanceResult | null>(null);
@@ -37,8 +38,8 @@ export function AttendanceDialog({ api, shift, onClose, onSaved, onAssignSubstit
   async function save(event: FormEvent) {
     event.preventDefault();
     if (choice === 'ausente' && !absenceType) { setProblem('Indica si la ausencia es justificada o injustificada.'); return; }
-    if (choice !== 'presente' && reason.trim().length < 10) { setProblem('Indica el motivo, de al menos 10 caracteres.'); return; }
-    if (choice === 'presente' && ended && !time) { setProblem('El turno ya terminó: indica la hora de entrada.'); return; }
+    if (choice === 'presente' && !time) { setProblem('Indica la hora real de entrada.'); return; }
+    if (reason.trim().length < 10) { setProblem('Indica el motivo, de al menos 10 caracteres.'); return; }
     setProblem('');
     const at = choice === 'presente' && time ? new Date(localMs(localTime(Date.parse(shift.start)) <= time ? startDay : localDay(Date.parse(shift.end)), time)).toISOString() : undefined;
     const body = { state: choice, version: shift.version, ...(choice === 'ausente' ? { absenceType } : {}), ...(at ? { at } : {}), ...(reason.trim() ? { reason: reason.trim() } : {}) };
@@ -73,12 +74,15 @@ export function AttendanceDialog({ api, shift, onClose, onSaved, onAssignSubstit
       {options.length > 1 && <fieldset className="shift-filter-group"><legend>Qué quieres registrar</legend><div className="shift-pills">
         {options.map(([code, label]) => <button key={code} type="button" className="shift-pill" aria-pressed={choice === code} onClick={() => { setChoice(code); setProblem(''); }}>{label}</button>)}
       </div></fieldset>}
-      {choice === 'presente' && <Field label={ended ? 'Hora de entrada' : 'Hora de entrada · opcional'} type="time" value={time} onChange={setTime} required={ended} hint={ended ? undefined : 'Si la dejas vacía se registra la hora actual.'} />}
+      <p className="muted">{absent ? 'Está marcado ausente.' : Date.now() >= Date.parse(shift.start) ? `La entrada se confirmó sola a las ${localTime(Date.parse(shift.start))}.` : `La entrada se confirmará sola a las ${localTime(Date.parse(shift.start))}.`} Solo registra aquí lo que fue distinto.</p>
+
+      {choice === 'presente' && <Field label="Hora real de entrada" type="time" value={time} onChange={setTime} required hint="Queda en el turno y en la auditoría; si pasa del margen, se marca como llegada tarde." />}
       {choice === 'ausente' && <fieldset className="shift-filter-group"><legend>Tipo de ausencia</legend><div className="shift-pills">
         <button type="button" className="shift-pill" aria-pressed={absenceType === 'justificada'} onClick={() => setAbsenceType('justificada')}>Justificada (incapacidad, permiso)</button>
         <button type="button" className="shift-pill" aria-pressed={absenceType === 'injustificada'} onClick={() => setAbsenceType('injustificada')}>Injustificada</button>
       </div></fieldset>}
-      {choice !== 'presente' && <Field label={choice === 'ausente' ? 'Motivo de la ausencia' : 'Por qué deshaces la marca'} value={reason} onChange={setReason} required minLength={10} maxLength={500} />}
+      <Field label={choice === 'ausente' ? 'Motivo de la ausencia' : choice === 'presente' ? 'Motivo de la corrección' : 'Por qué deshaces la ausencia'} value={reason} onChange={setReason} required minLength={10} maxLength={500} />
+
       {problem && <Notice kind="error">{problem}</Notice>}
       <div className="dialog-actions">
         <button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Volver</button>

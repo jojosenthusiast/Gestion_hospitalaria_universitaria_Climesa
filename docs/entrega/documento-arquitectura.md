@@ -128,7 +128,7 @@ Estados: **Implementado** (API y al menos un cliente), **Parcial** (existe una p
 | Pacientes (búsqueda, registro, provisionales, duplicados, ficha filtrada) | `/pacientes/*`, `/me/paciente` | Pacientes (REC, JOP, LAB) | Pacientes (REC), Paciente sin identidad (PAR) | Pacientes (MED), Mis datos (PAC) | Implementado |
 | Personal e inscripciones | `/personal/*` | Personal | — | — | Implementado |
 | Turnos del personal | `/turnos/*`, `/turnos/especialistas`, `/turnos/cobertura` | Turnos (JOP planifica) | Mis turnos | Turnos (MED) | Implementado |
-| Asistencia y carga de turnos | `POST /turnos/{id}/entrada`, `POST /turnos/{id}/asistencia` | Asistencia, suplentes disponibles, carga del turno y motivo de emergencia (JOP) | Marcar mi entrada | Marcar mi entrada | Implementado. Máximo 72 h en 7 días y 6 días seguidos; descanso de 8 h (12 h tras 24 h); solo `ausente` saca de turno (`20261120003000_turnos_asistencia_carga.sql`) |
+| Asistencia y carga de turnos | `POST /turnos/{id}/asistencia` | Asistencia, suplentes disponibles, carga del turno y motivo de emergencia (JOP) | Mis turnos por día (entrada automática) | Mis turnos por día (entrada automática) | Implementado. Máximo 72 h en 7 días y 6 días seguidos; descanso de 8 h (12 h tras 24 h); solo `ausente` saca de turno (`20261120003000_turnos_asistencia_carga.sql`) |
 | Edificio y espacios | `/espacios/*` | Edificio (ADM configura) | — | Información del hospital | Implementado |
 | Camas (tablero, bloqueo, limpieza) | `/camas/*` | Camas (JOP bloquea y limpia) | Tablero de camas (REC), Limpieza de camas (ENF) | — | Implementado |
 | Citas de 20 minutos | `/citas/*`, `/citas/{id}/reprogramar`, `/citas/reprogramaciones/{id}/aceptar` y `/rechazar`, `/citas/{id}/no-asistio` | Citas (REC) | Citas (REC), Mis citas (PAC) | Citas (PAC); solicitudes de reprogramación en Mi día (MED) | Implementado. Máximo 2 reprogramaciones por cadena y 2 solicitudes pendientes por paciente; el paciente cancela hasta 2 h antes (`20261120002000_citas_fila_fase01.sql`) |
@@ -572,8 +572,7 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 | GET | `/turnos/mios` | `turnos.ver` | Turnos publicados de la persona vinculada a la cuenta |
 | GET | `/turnos/cobertura` | `turnos.ver` | Huecos de cobertura por área y hora frente al mínimo vigente |
 | GET | `/turnos/especialistas` | `turnos.ver` | Médicos de turno por día y especialidad durante 7 días (CARGA-04) |
-| POST | `/turnos/{id}/entrada` | `turnos.ver` | Marcar la entrada del turno propio (ASIS-01) |
-| POST | `/turnos/{id}/asistencia` | `turnos.planificar` | Marcar entrada, ausencia (con tipo y motivo) o deshacer la marca de un turno (ASIS-01 a ASIS-03) |
+| POST | `/turnos/{id}/asistencia` | `turnos.planificar` | Ausencia (con tipo y motivo), corregir la hora real de entrada o deshacer una ausencia; la entrada es automática al inicio (ASIS-01 a ASIS-03) |
 | POST | `/turnos/publicar` | `turnos.publicar` | Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó |
 | PATCH | `/turnos/{id}` | `turnos.planificar` | Mover o cancelar turno con versión y motivo |
 | GET | `/espacios` | `espacios.ver` | Árbol, rutas y disponibilidad recursiva por espacio |

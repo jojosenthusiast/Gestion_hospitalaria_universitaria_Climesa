@@ -7,11 +7,11 @@ export type CatalogStaff = { id: string; name: string; type: string; specialty: 
 export type ShiftCatalog = { roles: CatalogRole[]; areas: CatalogArea[]; staff: CatalogStaff[] };
 
 /** Acciones que la API permite ahora sobre un turno (`allowedActions`): la pantalla no ofrece otras. */
-export type ShiftAction = 'editar' | 'cancelar' | 'marcar_entrada' | 'marcar_presente' | 'marcar_ausente' | 'deshacer_asistencia';
-/** `GET /turnos` con la asistencia (ASIS-01) y las acciones permitidas para quien consulta. */
+export type ShiftAction = 'editar' | 'cancelar' | 'marcar_presente' | 'marcar_ausente' | 'deshacer_asistencia';
+/** `GET /turnos` con la asistencia (ASIS-01: automática al inicio) y las acciones permitidas para quien consulta. */
 export type ShiftRow = Shift & {
   staffType?: string;
-  attendance?: 'pendiente' | 'presente' | 'sin_confirmar' | 'ausente' | null;
+  attendance?: 'pendiente' | 'presente' | 'ausente' | null;
   presentSince?: string | null;
   late?: boolean;
   absenceType?: 'justificada' | 'injustificada' | null;
@@ -25,9 +25,9 @@ export const can = (shift: ShiftRow, action: ShiftAction) => Boolean(shift.allow
 export function attendanceLabel(shift: ShiftRow): string | null {
   switch (shift.attendance) {
     case 'presente': return shift.late ? 'Presente · llegó tarde' : 'Presente';
-    case 'sin_confirmar': return 'Sin entrada marcada';
     case 'ausente': return shift.absenceType === 'justificada' ? 'Ausencia justificada' : 'Ausencia injustificada';
-    case 'pendiente': return 'Entrada pendiente';
+    case 'pendiente': return 'Se confirma al iniciar';
+
     default: return null;
   }
 }

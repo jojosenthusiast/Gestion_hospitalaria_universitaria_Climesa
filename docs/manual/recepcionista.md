@@ -85,5 +85,5 @@ Inicio, Emitir número, Pacientes, Citas, Vinculaciones, Admisión y cama, Table
 | Admisión y cama | **Ingresar paciente**, **Asignar cama** → **Confirmar cama**, **Cancelar admisión** |
 | Tablero de camas | Estado de las camas |
 | Despacho | **Confirmar y despachar** o **Descartar** (con motivo). En el despacho eliges tipo (emergencia a domicilio o traslado interhospitalario), prioridad (roja, naranja, amarilla o verde), destino y **Tripulación**. Un paramédico sin cuenta aparece marcado "sin cuenta en la app" y no se puede elegir como único paramédico |
-| Mis turnos | Tus turnos publicados y **Marcar mi entrada** cuando el turno lo permite |
+| Mis turnos | Tus turnos publicados por día y hora; la entrada se confirma sola al iniciar |
 | Hospital | Información pública del hospital |
