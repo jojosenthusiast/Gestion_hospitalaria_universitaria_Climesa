@@ -1,7 +1,7 @@
 import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, DecimalProp, EnumArrayProp, EnumProp, IntProp, NumProp, StrProp, UuidProp } from '../platform/responses';
 import { ESTADO_ORDEN_LABORATORIO, MARCA_RESULTADO, PRIORIDAD_LABORATORIO } from '../platform/states';
-import { RANGE_SEXES } from './laboratory.dto';
-import { LAB_ORDER_ACTIONS } from './laboratory.rules';
+import { ATTACHMENT_TYPES, RANGE_SEXES } from './laboratory.dto';
+import { LAB_EXTERNAL_ACTIONS, LAB_ORDER_ACTIONS } from './laboratory.rules';
 
 export const TIPO_RESULTADO = ['numerico', 'texto'] as const;
 
@@ -19,6 +19,8 @@ export class LabItemResultResponse {
   @StrProp({ nullable: true }) text!: string | null;
   @EnumProp(MARCA_RESULTADO, 'MarcaResultado') mark!: string;
   @IntProp() version!: number;
+  @StrProp({ nullable: true, description: 'S10: observación del laboratorio' }) observation!: string | null;
+  @BoolProp({ description: 'S10: la observación es relevante (abrió un pendiente para el médico)' }) relevant!: boolean;
 }
 
 export class LabOrderItemResponse {
@@ -51,6 +53,23 @@ export class LabOrderResponse {
   @StrProp({ nullable: true, description: 'Médico que ordenó los estudios' }) doctorName!: string | null;
   @ClassArrayProp(LabOrderItemResponse) items!: LabOrderItemResponse[];
   @EnumArrayProp(LAB_ORDER_ACTIONS, 'AccionOrdenLaboratorio', { description: 'Acciones que el servidor acepta ahora para quien lee' }) allowedActions!: string[];
+  @BoolProp({ description: 'S10: el examen se realiza en otro sitio' }) external!: boolean;
+  @StrProp({ nullable: true, description: 'S10: dónde se realiza la orden externa' }) externalPlace!: string | null;
+  @StrProp({ nullable: true, description: 'S10: instrucciones para el paciente de la orden externa' }) externalInstructions!: string | null;
+  @EnumArrayProp(LAB_EXTERNAL_ACTIONS, 'AccionExternaLaboratorio', { description: 'S10: acciones del camino externo que el servidor acepta ahora para quien lee' }) externalActions!: string[];
+}
+
+/** S10: reference of the photo or PDF of an external result. `stored` is false while the clinical Storage is not built. */
+export class LabAttachmentResponse {
+  @UuidProp() id!: string;
+  @StrProp() fileName!: string;
+  @EnumProp(ATTACHMENT_TYPES, 'TipoAdjuntoLaboratorio') mimeType!: string;
+  @IntProp() sizeBytes!: number;
+  @StrProp({ nullable: true }) sha256!: string | null;
+  @BoolProp({ description: 'El archivo está guardado en el almacenamiento clínico (hoy siempre false: solo la referencia)' }) stored!: boolean;
+  @StrProp({ nullable: true }) note!: string | null;
+  @DateTimeProp() uploadedAt!: string;
+  @StrProp({ nullable: true }) uploadedByName!: string | null;
 }
 
 export class LabResultHistoryResponse {
@@ -68,6 +87,66 @@ export class LabResultHistoryResponse {
 export class LabOrderDetailResponse extends LabOrderResponse {
   @StrProp({ nullable: true }) cancellationReason!: string | null;
   @ClassArrayProp(LabResultHistoryResponse, { description: 'Vacío para quien no ve valores' }) history!: LabResultHistoryResponse[];
+  @ClassArrayProp(LabAttachmentResponse, { description: 'S10: adjuntos del resultado externo; vacío para quien no ve valores' }) attachments!: LabAttachmentResponse[];
+}
+
+export const MOTIVO_PENDIENTE_LABORATORIO = ['critico', 'observacion'] as const;
+export const ESTADO_PENDIENTE_LABORATORIO = ['pendiente', 'revisado'] as const;
+export const ESTADO_PROPUESTA_CITA = ['propuesta', 'confirmada', 'descartada'] as const;
+
+/** S10: one item of the doctor's "Resultados por revisar". */
+export class LabFollowUpResponse {
+  @UuidProp() id!: string;
+  @UuidProp() orderId!: string;
+  @UuidProp() patientId!: string;
+  @StrProp({ nullable: true }) patientName!: string | null;
+  @StrProp({ nullable: true }) patientRecord!: string | null;
+  @EnumProp(MOTIVO_PENDIENTE_LABORATORIO, 'MotivoPendienteLaboratorio') reason!: string;
+  @StrProp({ description: 'Exámenes y hallazgo en palabras («Hemoglobina: Crítico bajo»)' }) detail!: string;
+  @EnumProp(ESTADO_PENDIENTE_LABORATORIO, 'EstadoPendienteLaboratorio') state!: string;
+  @EnumProp(ESTADO_ORDEN_LABORATORIO, 'EstadoOrdenLaboratorio') orderState!: string;
+  @EnumProp(PRIORIDAD_LABORATORIO, 'PrioridadLaboratorio') priority!: string;
+  @BoolProp() external!: boolean;
+  @DateTimeProp() createdAt!: string;
+  @DateTimeProp() updatedAt!: string;
+  @IntProp() version!: number;
+}
+
+export class LabFollowUpStateResponse {
+  @UuidProp() id!: string;
+  @EnumProp(ESTADO_PENDIENTE_LABORATORIO, 'EstadoPendienteLaboratorio') state!: string;
+  @IntProp() version!: number;
+  @DateTimeProp() reviewedAt!: string;
+}
+
+/** S10: follow-up appointment the system proposes when an order's results arrive; reception confirms it. No values. */
+export class LabProposalResponse {
+  @UuidProp() id!: string;
+  @UuidProp() orderId!: string;
+  @UuidProp() patientId!: string;
+  @StrProp({ nullable: true }) patientName!: string | null;
+  @StrProp({ nullable: true }) patientRecord!: string | null;
+  @UuidProp() doctorId!: string;
+  @StrProp({ nullable: true }) doctorName!: string | null;
+  @EnumProp(ESTADO_PROPUESTA_CITA, 'EstadoPropuestaCita') state!: string;
+  @EnumProp(PRIORIDAD_LABORATORIO, 'PrioridadLaboratorio') priority!: string;
+  @DateTimeProp() resultsAt!: string;
+  @DateTimeProp() createdAt!: string;
+  @IntProp() version!: number;
+}
+
+export class LabProposalStateResponse {
+  @UuidProp() id!: string;
+  @EnumProp(ESTADO_PROPUESTA_CITA, 'EstadoPropuestaCita') state!: string;
+  @IntProp() version!: number;
+  @UuidProp({ nullable: true }) appointmentId!: string | null;
+}
+
+export class LabExternalSentResponse {
+  @UuidProp() id!: string;
+  @EnumProp(ESTADO_ORDEN_LABORATORIO, 'EstadoOrdenLaboratorio') state!: string;
+  @IntProp() version!: number;
+  @BoolProp() external!: boolean;
 }
 
 export class LabOrderCreatedResponse {

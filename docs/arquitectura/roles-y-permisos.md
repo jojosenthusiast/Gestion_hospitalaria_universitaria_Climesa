@@ -256,6 +256,13 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/laboratorio/ordenes` | `laboratorio.ordenar` | Consulta propia | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/resultados` | `laboratorio.procesar` | Marca calculada en servidor | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/enmendar` | `laboratorio.validar` | Solo Completado; motivo de 10 o más; vuelve a revisión médica | R | 4 | · | · | · | · | · | · | ✔ | · | · | · |
+| POST | `/api/v1/laboratorio/ordenes/{id}/externa` | `laboratorio.procesar` o `laboratorio.ordenar` | Solo Pendiente; laboratorio o médico que pidió; lugar e instrucciones para el paciente | R | 4 | · | · | · | · | · | relación | ✔ | · | · | · |
+| POST | `/api/v1/laboratorio/ordenes/{id}/resultado-externo` | `laboratorio.procesar` o `laboratorio.revisar` | Solo orden externa Pendiente; referencia del adjunto y valor de cada examen; completa la orden | R | 4 | · | · | · | · | · | relación | ✔ | · | · | · |
+| GET | `/api/v1/laboratorio/pendientes` | `laboratorio.revisar` | Órdenes que pidió quien lee; crítico primero | R | 4 | · | · | · | · | · | relación | · | · | · | · |
+| POST | `/api/v1/laboratorio/pendientes/{id}/revisar` | `laboratorio.revisar` | Médico que pidió o revisor; con versión | R | 4 | · | · | · | · | · | relación | · | · | · | · |
+| GET | `/api/v1/laboratorio/seguimientos` | `citas.agendar` | Sin exámenes ni valores | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/laboratorio/seguimientos/{id}/confirmar` | `citas.agendar` | Cita del mismo paciente y médico creada con POST /citas | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/laboratorio/seguimientos/{id}/descartar` | `citas.agendar` | Motivo de 10 o más | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/catalogo/examenes` | `catalogo.configurar` | Activos e inactivos, con componentes y rangos vigentes | R | 3 | ✔ | · | · | · | · | · | · | · | · | · |
 
 ### Spec 108

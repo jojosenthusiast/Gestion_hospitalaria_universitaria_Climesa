@@ -68,7 +68,9 @@ const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acc
   // Fase 0/1 (CITA-02): las solicitudes de reprogramación nacen solo del uso real.
   'atencion.reprogramacion',
   // Historial de cambios de médico tratante (BL-03): nace de una acción de Jefatura, la demo no lo siembra.
-  'hospitalizacion.cambio_tratante'];
+  'hospitalizacion.cambio_tratante',
+  // Fase 2, flujo C (S10): pendientes del médico, propuestas de cita y adjuntos externos nacen del uso real.
+  'laboratorio.pendiente_medico', 'laboratorio.propuesta_cita', 'laboratorio.adjunto'];
 
 const MINIMOS: Record<string, number> = {
   'pacientes.paciente': 120, 'pacientes.identificador': 100, 'atencion.cita': 130, 'atencion.ticket_fila': 30, 'atencion.consulta': 70,
