@@ -85,6 +85,31 @@ class DraftStoreTest {
         assertTrue(!session.hasPendingWrites("par-1"))
     }
 
+    /** Re-review of #117: pending writes hold clinical data; they expire 24 h after their last write, on app start or any sign-in. */
+    @Test fun pendingWritesExpireAfterOneDay() {
+        val root = Files.createTempDirectory("borradores").toFile()
+        val drafts = FileDraftStore(root)
+        var clock = 0L
+        val session = SessionDrafts(drafts) { clock }
+        drafts.save("par-1", "hitos:cola", JSONObject().put("items", org.json.JSONArray().put(JSONObject().put("type", "en_escena"))))
+        drafts.save("par-1", "prehospital:cola", JSONObject().put("serviceId", "s1"))
+        drafts.save("par-2", "prehospital:cola", JSONObject().put("serviceId", "s2"))
+        val files = root.walkTopDown().filter { it.isFile }.toList()
+        files.forEach { it.setLastModified(1_000_000L) }
+        files.first { it.parentFile?.name == "par-2" }.setLastModified(1_000_000L + 3_600_000L)
+        clock = 1_000_000L + SessionDrafts.PENDING_WRITES_TTL_MS - 1
+        session.appStarted()
+        assertTrue(session.hasPendingWrites("par-1"))
+        clock = 1_000_000L + SessionDrafts.PENDING_WRITES_TTL_MS + 1
+        session.signedIn("enf-1")
+        assertTrue(!session.hasPendingWrites("par-1"))
+        assertNull(drafts.load("par-1", "prehospital:cola"))
+        assertEquals("s2", drafts.load("par-2", "prehospital:cola")?.getString("serviceId"))
+        clock += 3_600_000L
+        session.appStarted()
+        assertNull(drafts.load("par-2", "prehospital:cola"))
+    }
+
     @Test fun signingInKeepsOnlyTheDraftsOfThatAccount() {
         val drafts = store()
         val session = SessionDrafts(drafts)

@@ -46,6 +46,8 @@ data class AmbulanceUiState(
     val logFilters: LogFilters = LogFilters(),
     val arrival: PrehospitalView? = null,
     val arrivalServiceId: String? = null,
+    /** MA-AMB-04: services to receive (arrived without handover first, then the active one); the screen lets the user pick. */
+    val arrivals: List<sv.edu.catolica.climesa.domain.ArrivalCandidate> = emptyList(),
     /** MA-AMB-05: the patient's requests as the server keeps them; null until the first read answers. */
     val ownRequests: List<OwnAmbulanceRequest>? = null,
     val prehospital: PrehospitalForm = PrehospitalForm(),
@@ -131,18 +133,26 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         if (recent != null) mutable.value = mutable.value.copy(log = recent)
     }
 
-    /** MED tiene `ambulancia.ver_estado` y encuentra el servicio activo; ENF lo conoce por el evento `ambulancia.prehospital`. */
+    /**
+     * MA-AMB-04: the API lists what to receive: services that arrived without a handover first (even after the unit left on
+     * another one), then the active one. The screen shows the chosen one (or an event's), else the first of the list.
+     */
     private suspend fun loadArrival() {
-        if (readsStatus) {
-            val status = AmbulanceParser.status(api.request("/ambulancia"))
-            status?.activeService?.id?.let { mutable.value = mutable.value.copy(arrivalServiceId = it) }
-            mutable.value = mutable.value.copy(status = status)
-        }
-        // MA-AMB-04: without an event (Enfermería opens the screen) or after the crew finished, the API says which arrival to receive.
-        val id = mutable.value.arrivalServiceId ?: (api.request("/ambulancia/llegada") as? JSONObject)?.takeUnless { it.isNull("serviceId") }?.optString("serviceId")?.ifBlank { null }
-        if (id != null && mutable.value.arrivalServiceId == null) mutable.value = mutable.value.copy(arrivalServiceId = id)
+        if (readsStatus) mutable.value = mutable.value.copy(status = AmbulanceParser.status(api.request("/ambulancia")))
+        val arrivals = AmbulanceParser.arrivals(api.request("/ambulancia/llegada"))
+        val chosen = mutable.value.arrivalServiceId
+        // The chosen one while it is still listed; else the first; with nothing listed, the last one shown (its handover stays visible).
+        val id = chosen?.takeIf { c -> arrivals.any { it.serviceId == c } } ?: arrivals.firstOrNull()?.serviceId ?: chosen
+        mutable.value = mutable.value.copy(arrivals = arrivals, arrivalServiceId = id)
         val view = id?.let { AmbulanceParser.prehospital(api.request("/ambulancia/servicios/$it/prehospital")) }
         mutable.value = mutable.value.copy(loading = false, arrival = view)
+    }
+
+    /** MA-AMB-04: shows another service of the arrival list. */
+    fun selectArrival(serviceId: String) {
+        if (mutable.value.arrivalServiceId == serviceId) return
+        mutable.value = mutable.value.copy(arrivalServiceId = serviceId)
+        load(silent = false)
     }
 
     /** Idempotente por lista de canales. Un evento de ambulancia vuelve a pedir; al reconectar se reenvía el prehospital en cola. */
@@ -351,6 +361,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             "solicitud_resuelta" -> "Despacho ya atendió la solicitud; ya no se puede cancelar. Si necesitas ayuda, llama al 911."
             "sin_llegada_hospital" -> "La entrega se marca cuando la ambulancia registra la llegada al hospital."
             "entrega_registrada" -> "Otra persona ya marcó recibido al paciente; se actualizó la entrega."
+            "hito_hora_invalida" -> "La hora del hito es anterior al último registrado o tiene más de 24 horas."
             "tripulante_sin_turno" -> "Alguien de la tripulación elegida ya no tiene turno en curso. Se actualizó la lista; elige de nuevo."
             "servicio_cerrado" -> "Pasaron más de 24 horas desde que terminó el servicio."
             else -> error.message ?: "No se pudo completar la operación."

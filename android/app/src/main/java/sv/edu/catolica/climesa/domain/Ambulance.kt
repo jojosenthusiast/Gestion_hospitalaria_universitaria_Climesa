@@ -57,6 +57,9 @@ data class PrehospitalView(
     val canReceive get() = "recibir" in allowedActions
 }
 
+/** MA-AMB-04: a service the hospital receives or waits for (`GET /ambulancia/llegada`), without clinical data. */
+data class ArrivalCandidate(val serviceId: String, val dispatchedAt: String, val active: Boolean, val arrived: Boolean)
+
 /** MA-AMB-05: progress of the service dispatched for the patient's own request (no crew, no location). */
 data class OwnRequestService(val dispatchedAt: String, val milestones: List<AmbulanceMilestone>, val finalState: String?)
 /** MA-AMB-05: the patient's own request as the server keeps it (`GET /ambulancia/solicitudes/mias`). */
@@ -340,6 +343,11 @@ object AmbulanceParser {
         val handover = root.optJSONObject("handover")?.let { Handover(it.text("receivedAt"), it.text("receivedByName")) }
         return PrehospitalView(root.text("serviceId"), root.optBoolean("active"), root.optBoolean("clinical"), reports, root.optInt("version", 1), root.optBoolean("arrived"), handover, strings(root.optJSONArray("allowedActions")))
     }
+
+    /** Arrived-but-unreceived services first, then the one on its way (the server's order). */
+    fun arrivals(value: Any?): List<ArrivalCandidate> = objects((value as? JSONObject)?.optJSONArray("services")).map {
+        ArrivalCandidate(it.text("serviceId"), it.text("dispatchedAt"), it.optBoolean("active"), it.optBoolean("arrived"))
+    }.filter { it.serviceId.isNotBlank() }
 
     fun ownRequests(value: Any?): List<OwnAmbulanceRequest> = objects(value as? JSONArray).map {
         val service = it.optJSONObject("service")?.let { s -> OwnRequestService(s.text("dispatchedAt"), objects(s.optJSONArray("milestones")).map { m -> AmbulanceMilestone(m.text("type"), m.text("occurredAt")) }, s.text("finalState").ifBlank { null }) }

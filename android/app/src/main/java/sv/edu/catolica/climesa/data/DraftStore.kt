@@ -19,6 +19,8 @@ interface DraftStore {
     fun retainOnly(userId: String, keep: Set<String> = emptySet())
     /** Drops every draft except the [keep] keys of each account. */
     fun clearAll(keep: Set<String> = emptySet())
+    /** Drops the [keys] of every account last written before [before] (epoch millis). */
+    fun expire(keys: Set<String>, before: Long)
 }
 
 /**
@@ -26,16 +28,22 @@ interface DraftStore {
  * sign-out in `MainActivity`, or an expired session) and every other account's drafts when one signs in.
  * Pending writes ([PENDING_WRITES]: the paramedic's offline milestone and prehospital queues and the provisional patient)
  * are not drafts: they stay in their owner's folder, are only read by that account and are sent when it signs in again.
+ * They hold clinical data, so they live at most [PENDING_WRITES_TTL_MS] after their last write: older ones are purged on
+ * app start and on any sign-in (the API no longer accepts a milestone older than that either).
  */
-class SessionDrafts(private val drafts: DraftStore) {
-    fun signedIn(userId: String) = drafts.retainOnly(userId, PENDING_WRITES)
+class SessionDrafts(private val drafts: DraftStore, private val now: () -> Long = System::currentTimeMillis) {
+    fun appStarted() = purgeStale()
+    fun signedIn(userId: String) { purgeStale(); drafts.retainOnly(userId, PENDING_WRITES) }
     fun ended() = drafts.clearAll(PENDING_WRITES)
+    private fun purgeStale() = drafts.expire(PENDING_WRITES, now() - PENDING_WRITES_TTL_MS)
     /** True when [userId] still has milestones or a prehospital report waiting for signal (sign-out warns about it). */
     fun hasPendingWrites(userId: String) =
         (drafts.load(userId, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.length() ?: 0) > 0 || drafts.load(userId, FormDrafts.PREHOSPITAL_QUEUE) != null
 
     companion object {
         val PENDING_WRITES = setOf(FormDrafts.MILESTONE_QUEUE, FormDrafts.PREHOSPITAL_QUEUE, FormDrafts.PROVISIONAL_PATIENT)
+        /** 24 h, the API's `PREHOSPITAL_GRACE_MS`: after it the server rejects the milestone and the report is no longer received. */
+        const val PENDING_WRITES_TTL_MS = 24 * 3_600_000L
     }
 }
 
@@ -46,6 +54,7 @@ object NoDraftStore : DraftStore {
     override fun clear(userId: String, key: String) = Unit
     override fun retainOnly(userId: String, keep: Set<String>) = Unit
     override fun clearAll(keep: Set<String>) = Unit
+    override fun expire(keys: Set<String>, before: Long) = Unit
 }
 
 /**
@@ -78,6 +87,16 @@ class FileDraftStore(private val root: File) : DraftStore {
     }
 
     @Synchronized override fun clearAll(keep: Set<String>) { runCatching { root.listFiles()?.forEach { dropExcept(it, keep) } } }
+
+    @Synchronized override fun expire(keys: Set<String>, before: Long) {
+        val names = keys.map { safe(it) + ".json" }.toSet()
+        runCatching {
+            root.listFiles()?.filter { it.isDirectory }?.forEach { folder ->
+                folder.listFiles()?.filter { it.name in names && it.lastModified() < before }?.forEach { it.delete() }
+                if (folder.listFiles().isNullOrEmpty()) folder.delete()
+            }
+        }
+    }
 
     /** Deletes a user folder except the files of the [keep] keys; the folder goes too when nothing is left. */
     private fun dropExcept(folder: File, keep: Set<String>) {

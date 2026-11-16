@@ -179,7 +179,10 @@
     <string name="amb_marcar_recibido">Marcar recibido</string>
     <string name="amb_marcar_recibido_detalle">Confirmas que recibiste al paciente de la ambulancia. Queda registrado con tu nombre y la hora de ahora.</string>
     <string name="amb_entrega_espera">Podrás marcar recibido al paciente cuando la ambulancia registre su llegada al hospital.</string>
-    <string name="amb_entrega_sin_permiso">La ambulancia llegó. La entrega la marca el personal clínico que recibe al paciente.</string>
+    <string name="amb_entrega_sin_permiso">La ambulancia llegó. La entrega la marca el personal de turno en Emergencia o con relación de atención con el paciente.</string>
+    <string name="amb_por_recibir">Servicios por recibir</string>
+    <string name="amb_llego_sin_entrega">Despachado %1$s · llegó, falta la entrega</string>
+    <string name="amb_en_camino">Despachado %1$s · en camino</string>
     <string name="amb_tripulacion">Tripulación</string>
     <string name="amb_sin_tripulacion_turno">No hay paramédicos ni motoristas con turno en curso.</string>
     <string name="amb_sin_cuenta">sin cuenta en la app</string>

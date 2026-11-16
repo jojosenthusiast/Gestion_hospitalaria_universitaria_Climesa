@@ -322,6 +322,19 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
 
 /** A54 y A25: reporte prehospital en vivo; el contenido clínico solo si la API lo entrega. MA-AMB-04: marcar recibido. */
 private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: AmbulanceViewModel) {
+    // MA-AMB-04: a service that arrived without a handover stays listed while the unit is out on another one.
+    if (state.arrivals.size > 1) item {
+        SectionCard(stringResource(R.string.amb_por_recibir)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                state.arrivals.forEach { candidate ->
+                    FilterChip(
+                        selected = candidate.serviceId == state.arrivalServiceId, onClick = { model.selectArrival(candidate.serviceId) },
+                        label = { Text(stringResource(if (candidate.arrived) R.string.amb_llego_sin_entrega else R.string.amb_en_camino, localTime(candidate.dispatchedAt))) },
+                    )
+                }
+            }
+        }
+    }
     val view = state.arrival
     if (view == null) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
     item { HandoverCard(view, state.busy, model) }

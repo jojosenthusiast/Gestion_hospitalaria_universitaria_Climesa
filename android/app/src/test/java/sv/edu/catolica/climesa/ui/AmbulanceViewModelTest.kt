@@ -214,12 +214,33 @@ class AmbulanceViewModelTest {
     /** MA-AMB-04: Enfermería opens the arrival without an event or a prehospital report: the API says which service it is. */
     @Test fun laLlegadaSeEncuentraSinEventoNiReporte() = runTest(dispatcher) {
         val api = FakeGateway()
-        api.responses["/ambulancia/llegada"] = JSONObject().put("serviceId", "s1")
+        api.responses["/ambulancia/llegada"] = arrivals("s1" to true)
         api.responses["/ambulancia/servicios/s1/prehospital"] = JSONObject().put("serviceId", "s1").put("active", false).put("arrived", true).put("clinical", true).put("reports", JSONArray()).put("handover", JSONObject.NULL).put("allowedActions", JSONArray().put("recibir"))
         val vm = AmbulanceViewModel(api, AmbulanceBus())
         vm.open(AmbulanceMode.ARRIVAL, canReadStatus = false); runCurrent()
         assertTrue(vm.state.value.arrival!!.canReceive)
     }
+
+    /** Re-review of #117: a finished service still to receive stays first and listed while the unit is out on another one. */
+    @Test fun laLlegadaSinEntregaNoSeOcultaCuandoLaUnidadSaleAOtroServicio() = runTest(dispatcher) {
+        val api = FakeGateway()
+        api.responses["/ambulancia"] = status(withService = true)
+        api.responses["/ambulancia/llegada"] = arrivals("a1" to true, "s1" to false)
+        api.responses["/ambulancia/servicios/a1/prehospital"] = JSONObject().put("serviceId", "a1").put("active", false).put("arrived", true).put("clinical", true).put("reports", JSONArray()).put("allowedActions", JSONArray().put("recibir"))
+        api.responses["/ambulancia/servicios/s1/prehospital"] = JSONObject().put("serviceId", "s1").put("active", true).put("arrived", false).put("clinical", true).put("reports", JSONArray())
+        val vm = AmbulanceViewModel(api, AmbulanceBus())
+        vm.open(AmbulanceMode.ARRIVAL, canReadStatus = true); runCurrent()
+        assertEquals("a1", vm.state.value.arrival!!.serviceId)
+        assertEquals(listOf("a1" to true, "s1" to false), vm.state.value.arrivals.map { it.serviceId to it.arrived })
+        vm.selectArrival("s1"); runCurrent()
+        assertEquals("s1", vm.state.value.arrival!!.serviceId)
+        vm.load(); runCurrent()
+        assertEquals("la elección se mantiene al recargar", "s1", vm.state.value.arrival!!.serviceId)
+    }
+
+    private fun arrivals(vararg services: Pair<String, Boolean>) = JSONObject().put("serviceId", services.first().first).put("services", JSONArray().apply {
+        services.forEach { (id, arrived) -> put(JSONObject().put("serviceId", id).put("dispatchedAt", "2026-11-15T14:00:00Z").put("active", !arrived).put("arrived", arrived)) }
+    })
 
     private fun queuedTwo(store: sv.edu.catolica.climesa.data.DraftStore, api: FakeGateway, failure: Exception): AmbulanceViewModel {
         api.responses["/ambulancia"] = status(withService = true)
@@ -262,6 +283,18 @@ class AmbulanceViewModelTest {
         assertTrue(vm.state.value.queuedMilestones.isEmpty())
         assertNull(store.load("par-1", sv.edu.catolica.climesa.domain.FormDrafts.MILESTONE_QUEUE))
         assertEquals("No se registró «En escena». Ese hito no sigue al último registrado. Se actualizó el servicio. Los hitos siguientes de este servicio se descartaron; revísalo y regístralos de nuevo.", vm.state.value.formError)
+    }
+
+    /** Re-review of #117: the API rejects a queued milestone older than the last recorded one or than 24 h; the message is in Spanish. */
+    @Test fun unHitoConHoraInvalidaSeDescartaConSuMensaje() = runTest(dispatcher) {
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile())
+        val api = FakeGateway()
+        val vm = queuedTwo(store, api, AuthRequestException("Sin conexión.")); runCurrent()
+        vm.advance(vm.state.value.status!!.activeService!!, "en_escena", at = Instant.parse("2026-11-15T14:12:00Z")); runCurrent()
+        api.failures["/ambulancia/servicios/s1/hitos"] = AuthRequestException("La hora del hito tiene más de 24 horas.", 409, "hito_hora_invalida")
+        vm.retryMilestones(); runCurrent()
+        assertTrue(vm.state.value.queuedMilestones.isEmpty())
+        assertEquals("No se registró «En escena». La hora del hito es anterior al último registrado o tiene más de 24 horas. Los hitos siguientes de este servicio se descartaron; revísalo y regístralos de nuevo.", vm.state.value.formError)
     }
 
     @Test fun sinSenalLosHitosQuedanEnColaConSuHoraSobrevivenALaAppYSeEnvianEnOrden() = runTest(dispatcher) {

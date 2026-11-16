@@ -49,7 +49,7 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
         auth.clearLocalSession();pending=null;draft.password=""
         mutableState.value=AuthUiState(checkingSession=false,error=message)
     }
-    init { retryAccess() }
+    init { sessionDrafts.appStarted(); retryAccess() }
     /**
      * Verifies the session against `/auth/me`. `silent` is for returning from the background or a lost live channel: it never swaps the
      * screen for the loading one, ignores a call while another is in flight, and keeps the current account when the answer is only a
