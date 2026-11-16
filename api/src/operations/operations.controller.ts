@@ -48,7 +48,7 @@ export class OperationsController {
   validateBatch(@Req() r:ActorRequest,@Body() d:ShiftBatchDto){return this.people.validateBatch(r.actor,d);}
   @Post('turnos/lote') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Crear un lote de turnos como borradores, todo o nada: con un solo conflicto no se crea ninguno (409 lote_con_conflictos con el resultado de cada turno)'}) @ApiCreatedResponse({ type: BatchCreatedResponse })
   createBatch(@Req() r:ActorRequest,@Body() d:ShiftBatchDto,@Headers('idempotency-key') k?:string){return this.people.createBatch(r.actor,d,k);}
-  @Post('turnos/generar') @HttpCode(200) @RequirePermission('turnos.planificar') @ApiOperation({summary:'Vista previa de una rotación (rotativo, 12x36, 24x72 o personalizado) con descanso, tope de 7 días y cobertura; no guarda nada'}) @ApiOkResponse({ type: RotationPreviewResponse })
+  @Post('turnos/generar') @HttpCode(200) @RequirePermission('turnos.planificar') @ApiOperation({summary:'Vista previa de una rotación (rotativo, 12x36, 24x72 o personalizado) con descanso y tope de 7 días; llena la cobertura mínima del área y marca los huecos que quedan con su motivo; no guarda nada'}) @ApiOkResponse({ type: RotationPreviewResponse })
   generate(@Req() r:ActorRequest,@Body() d:RotationDto){return this.people.generate(r.actor,d);}
   @Get('turnos/plantillas') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Plantillas de semana vigentes por área'}) @ApiOkResponse({ type: [WeekTemplateResponse] })
   templates(){return this.people.templates();}

@@ -80,6 +80,23 @@ export function rotationSlots(people: number, days: string[], options: RotationO
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime) || a.person - b.person);
 }
 
+/** One shift of the pattern's day: local start time, length in hours and kind. */
+export type RotationShape = { startTime: string; hours: number; type: ShiftKind };
+
+/**
+ * The shifts a pattern uses in a day, the same start, length and kind that `rotationSlots` gives. The coverage fill
+ * (L13) only places shifts of these shapes, so a filled gap looks like the rest of the rotation.
+ */
+export function rotationShapes(options: RotationOptions): RotationShape[] {
+  const start = options.startTime;
+  switch (options.pattern) {
+    case 'rotativo': return [0, 8, 16].map(h => { const time = addMinutes(start, h * 60); return { startTime: time, hours: 8, type: kindFor(time, 8) }; });
+    case '12x36': return [{ startTime: start, hours: 12, type: 'diurno' }, { startTime: addMinutes(start, 12 * 60), hours: 12, type: 'nocturno' }];
+    case '24x72': return [{ startTime: start, hours: 24, type: 'guardia' }];
+    case 'personalizado': { const hours = options.hours ?? 8; return [{ startTime: start, hours, type: kindFor(start, hours) }]; }
+  }
+}
+
 /** Start and end instants (ISO, UTC) of a local day and time in El Salvador (UTC-6, no daylight saving). */
 export function slotRange(date: string, startTime: string, hours: number): { start: string; end: string } {
   const start = Date.parse(`${date}T${startTime}:00-06:00`);

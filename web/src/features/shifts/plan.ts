@@ -14,9 +14,10 @@ const SNAP = SNAP_MINUTES * 60_000;
 export type BatchItem = { staffId: string; areaId: string; start: string; end: string; type: string };
 /** Resultado de un turno del lote: el mismo código y mensaje que daría un turno suelto. */
 export type BatchResult = { index: number; ok: boolean; codigo?: string; mensaje?: string; advertencias?: { codigo: string; horasSemana: number; limite: number }[] };
-export type BatchGap = { areaId: string; area: string; role: string; start: string; end: string; required: number; actual: number };
+/** Coverage gap; the rotation generator adds why it could not fill it (`motivo` code and `mensaje`). */
+export type BatchGap = { areaId: string; area: string; role: string; start: string; end: string; required: number; actual: number; motivo?: string; mensaje?: string };
 /** Elemento de la vista previa: el turno, quién es y, si ya se validó, su resultado. */
-export type PreviewItem = BatchItem & { key: string; person: string; result?: BatchResult; replaces?: string };
+export type PreviewItem = BatchItem & { key: string; person: string; result?: BatchResult; replaces?: string; fill?: boolean };
 export type WeekTemplate = { id: string; areaId: string; area: string; name: string; version: number; shifts: { day: number; startTime: string; hours: number; type: string; staffId: string }[] };
 
 export const snap = (ms: number) => Math.round(ms / SNAP) * SNAP;
