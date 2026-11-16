@@ -2,7 +2,7 @@ import { useState } from 'react';
 import './laboratory.css';
 import { Field } from '../components/ui';
 import { can, type AccessProfile, type Api } from '../lib/api';
-import { Empty, Heading, RemoteState, SaveButton, Select, Tag, WriteError, useAction, useData } from './common';
+import { Empty, CompactHeader, RemoteState, SaveButton, Select, Tag, WriteError, useAction, useData } from './common';
 import { LiveSearch, ListToolbar, matches } from './listas/chips';
 import './listas/lists.css';
 
@@ -20,7 +20,7 @@ export function LabCatalogPage({ api, profile, version }: { api: Api; profile: A
   const data = useData<CatalogExam[]>(api, '/catalogo/examenes', version, can(profile, 'catalogo.configurar'));
   const [query, setQuery] = useState(''), [selectedId, setSelectedId] = useState<string | null>(null);
   return <>
-    <Heading eyebrow="Configuración / Laboratorio" title="Catálogo de laboratorio" description="Exámenes y paneles que Medicina puede ordenar, con su unidad y sus rangos de referencia" />
+    <CompactHeader breadcrumb="Configuración / Laboratorio" title="Catálogo de laboratorio"/>
     <section className="data-workbench" aria-label="Catálogo de exámenes"><RemoteState state={data}>{all => {
       const rows = all.filter(exam => matches(query, exam.code, exam.name));
       const selected = rows.find(exam => exam.id === selectedId) ?? rows[0] ?? null;

@@ -3,7 +3,7 @@ import './laboratory.css';
 import { Field, Icon } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
 import { can, type AccessProfile, type Api } from '../lib/api';
-import { Dialog, Empty, Heading, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData } from './common';
+import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import { useQuickAction } from './personal/accion';
 import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
 import { STAGE_LABEL, STAGE_TONE, elapsedMinutes, formatElapsed, isCritical, slaLevel, sortOrders, stageOf, type Stage, type WorkSort } from './listas/lab-worklist';
@@ -87,7 +87,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
     rows: rows.map(o => [o.priority === 'urgente' ? 'Urgente' : 'Rutina', o.patientName, o.patientRecord ?? '', o.patientAge ?? o.patientAgeRange ?? '', o.patientSex ? sexShort[o.patientSex] ?? '' : '', o.items.map(i => i.name).join('; '), o.doctorName ?? '', formatDateTime(o.createdAt), formatElapsed(elapsedMinutes(o, now)), STAGE_LABEL[stageOf(o)], isCritical(o) ? 'Sí' : 'No']),
   });
   return <>
-    <Heading eyebrow="Atención / Diagnóstico" title="Laboratorio" description="Cada orden pasa de la solicitud a la muestra, los valores, la revisión y la liberación al paciente" />
+    <CompactHeader breadcrumb="Atención / Diagnóstico" title="Laboratorio"/>
     <section className="data-workbench" aria-label="Lista de trabajo de laboratorio"><RemoteState state={data}>{() => <>
       <ListToolbar trailing={<><label className="cl-sort">Ordenar<select value={sort} onChange={event => setSort(event.target.value as WorkSort)}>{(Object.keys(SORT_NAMES) as WorkSort[]).map(key => <option key={key} value={key}>{SORT_NAMES[key]}</option>)}</select></label><ExportMenu table={exportTable} disabled={!rows.length} /></>}>
         <LiveSearch label="Buscar órdenes" placeholder="Paciente, expediente, examen o médico" value={query} onChange={setQuery} />

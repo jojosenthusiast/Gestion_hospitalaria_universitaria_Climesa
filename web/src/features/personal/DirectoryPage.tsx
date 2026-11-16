@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Field, Icon } from '../../components/ui';
 import { can, roleNames, staffTypeNames, type AccessProfile, type Api, type Space, type Staff, type UserAccount, type AccountAction } from '../../lib/api';
-import { Empty, Heading, RemoteState, Select, Tag, useData, type Remote } from '../common';
+import { CompactHeader, Empty, RemoteState, Select, Tag, useData, type Remote } from '../common';
 import { StaffFicha } from '../personnel-ficha';
 import { InvitationActionForm, InviteForm, RolesForm, StateForm } from './account-forms';
 import { useQuickAction } from './accion';
@@ -75,7 +75,7 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   const nameOf = (row: Row) => row.staff ? `${row.staff.givenNames} ${row.staff.surnames}` : row.account?.name || 'Sin nombre registrado';
 
   return <>
-    <Heading eyebrow={accountsOnly ? 'Protección de datos / Cuentas' : 'Administración / Equipo'} title="Personal" description={accountsOnly ? 'Cuentas de acceso del hospital y sus roles, en solo lectura' : "El equipo del hospital y su acceso: ficha, función, roles, invitación y estado de la cuenta"}
+    <CompactHeader breadcrumb={accountsOnly ? 'Protección de datos / Cuentas' : 'Administración / Equipo'} title="Personal"
       actions={<>{manage && <button className="primary-button" onClick={() => { setEdit(null); setStaffOpen(true); }}><Icon name="plus" size={18} />Registrar personal</button>}{canInvite && <button className={manage ? 'secondary-button' : 'primary-button'} onClick={() => setInvite({ person: null })}><Icon name="mail" size={18} />Invitar persona</button>}</>} />
     {canStaff && canAccounts && <div className="number-strip"><div><strong>{rows.filter(r => r.staff && r.staff.active).length}</strong><span>Personal activo</span></div><div><strong>{withAccount}</strong><span>Con cuenta de acceso</span></div><div><strong>{withoutAccount}</strong><span>Sin cuenta todavía</span></div></div>}
     <section className="data-workbench">

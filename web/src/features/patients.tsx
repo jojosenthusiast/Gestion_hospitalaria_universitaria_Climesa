@@ -11,7 +11,7 @@ import type { ShiftCatalog } from './shifts/rules';
 import { useHashFilters } from '../lib/hash-params';
 import { useQuickAction } from './personal/accion';
 import { can,type AccessProfile,type Api,type ApiError,type Appointment,type Patient,type PatientInput,type SearchReceipt } from '../lib/api';
-import { Dialog,Empty,Heading,RemoteState,SaveButton,Select,Tag,WriteError,formatDate,formatDateTime,isVersionConflict,useAction,useData } from './common';
+import { Dialog,Empty,CompactHeader,RemoteState,SaveButton,Select,Tag,WriteError,formatDate,formatDateTime,isVersionConflict,useAction,useData } from './common';
 const sexNames:Record<string,string>={femenino:'Femenino',masculino:'Masculino',indeterminado:'Indeterminado',no_registrado:'No registrado'};
 const fieldNames:Record<string,string>={nombres:'Nombres',primer_apellido:'Apellidos',segundo_apellido:'Segundo apellido',sexo:'Sexo',nacimiento:'Nacimiento',precision_nacimiento:'Precisión del nacimiento',telefono:'Teléfono',correo:'Correo',direccion:'Dirección',dui:'DUI',estado:'Estado'};
 const expiredText='La búsqueda venció; vuelve a buscar.';
@@ -77,7 +77,7 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  ];
  const empty=patientEmptyState(filters,{area:areaName,medico:doctorName});
  const exportTable=()=>({filename:'pacientes',title:'Pacientes',subtitle:`${rows.length} expedientes${active.length?` · ${active.map(f=>f.label).join(' · ')}`:''}`,columns:['Expediente','Paciente','Sexo','Nacimiento','Estado'],rows:rows.map(p=>[p.record,p.fullName,sexNames[p.sex]??p.sex,p.birth?formatDate(p.birth):p.ageRange?`${p.ageRange} años`:'',p.active?'Activo':'Inactivo'])});
- return <><Heading eyebrow="Pacientes / Registro compartido" title="Pacientes" description="Busca primero y registra solo si la persona no existe, para no duplicar expedientes" actions={register&&<button className="primary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={18}/>Registrar paciente</button>}/>
+ return <><CompactHeader breadcrumb="Pacientes / Registro compartido" title="Pacientes" actions={register&&<button className="primary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={18}/>Registrar paciente</button>}/>
  <section className="data-workbench" aria-label="Registro de pacientes"><ListToolbar trailing={<ExportMenu table={exportTable} disabled={!rows.length}/>}><form className="search-form" onSubmit={find}><Field label="Nombre, DUI o expediente" placeholder="Escribe al menos dos caracteres" value={query} onChange={v=>{setQuery(v);setReceipt(null);}} minLength={2} maxLength={100} required/><button className="primary-button" disabled={search.busy} type="submit"><Icon name="search" size={18}/>{search.busy?'Buscando…':'Buscar'}</button></form></ListToolbar>
  <div className="cl-filter-row"><span className="cl-filter-label">Expediente</span><ChipGroup label="Estado del expediente" value={filters.estado} onChange={estado=>setFilters({estado})} options={patientStateOptions.map(o=>({...o}))}/></div>
  {situations.length>0&&<div className="cl-filter-row"><span className="cl-filter-label">Hoy</span><ChipGroup label="Situación de hoy" value={filters.situacion} onChange={situacion=>setFilters({situacion})} options={[{value:'',label:'Cualquiera'},...situations.map(s=>({value:s.value,label:s.label}))]}/></div>}

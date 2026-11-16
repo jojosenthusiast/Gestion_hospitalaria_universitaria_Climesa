@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Field, Icon } from '../components/ui';
 import { can, type AccessProfile, type Api, type Bed, type Space, type SpaceInput } from '../lib/api';
-import { Dialog, Heading, RemoteState, SaveButton, Select, WriteError, useAction, useData } from './common';
+import { Dialog, CompactHeader, RemoteState, SaveButton, Select, WriteError, useAction, useData } from './common';
 import { useQuickAction } from './personal/accion';
 import { BuildingBoard } from './spaces/BuildingBoard';
 import { spaceTypeNames, spacesFromBeds } from './spaces/building';
@@ -19,8 +19,7 @@ export function SpacesPage({ api, profile, version }: { api: Api; profile: Acces
   const rows = data.data ?? [];
   const refresh = () => { data.refresh(); beds.refresh(); };
   return <>
-    <Heading eyebrow="Hospital / Edificio" title="Espacios" description="El mapa del hospital: plantas, áreas, habitaciones y camas en un solo lugar."
-      actions={configure && <button className="primary-button" onClick={() => setForm({ space: null })}><Icon name="plus" size={18} />Crear espacio</button>} />
+    <CompactHeader breadcrumb="Hospital / Edificio" title="Espacios" actions={configure && <button className="primary-button" onClick={() => setForm({ space: null })}><Icon name="plus" size={18}/>Crear espacio</button>}/>
     <p className="form-intro space-guide">Asignar espacios es decidir dónde está cada cosa: cada planta contiene áreas, cada área sus habitaciones o consultorios y cada habitación sus camas. Con esa estructura, Recepción y Operaciones asignan camas a los pacientes. Toca una cama o un espacio del plano para ver su detalle{configure ? ' y editarlo' : ''}.</p>
     <section className="data-workbench">
       <RemoteState state={data}>{() => <BuildingBoard api={api} profile={profile} version={version} spaces={rows} beds={beds.data} focus="estructura" onRefresh={refresh} onEdit={(space, parent) => setForm({ space, parent })} />}</RemoteState>
@@ -74,7 +73,7 @@ export function BedsPage({ api, profile, version }: { api: Api; profile: AccessP
   const spaces = useMemo(() => spacesFromBeds(data.data ?? []), [data.data]);
   const all = data.data ?? [];
   return <>
-    <Heading eyebrow="Operaciones / Disponibilidad" title="Camas" description="Estado, asignación, bloqueo y limpieza de cada cama sobre el plano del hospital." />
+    <CompactHeader breadcrumb="Operaciones / Disponibilidad" title="Camas"/>
     <div className="number-strip"><div><strong>{all.length}</strong><span>Camas de hospitalización</span></div><div><strong>{all.filter(b => b.state === 'libre').length}</strong><span>Libres</span></div><div><strong>{all.filter(b => b.state === 'ocupada').length}</strong><span>Ocupadas</span></div></div>
     <section className="data-workbench">
       <RemoteState state={data}>{beds => <BuildingBoard api={api} profile={profile} version={version} spaces={spaces} beds={beds} focus="camas" onRefresh={data.refresh} />}</RemoteState>

@@ -47,10 +47,73 @@
   --radius-panel: 16px;
   --shadow-float: 0 18px 50px rgb(14 27 51 / 0.12);
   --shadow-soft: 0 8px 24px rgb(14 27 51 / 0.07);
+  /* Fase 2 (docs/diseno/fase2/02-sistema.md): movimiento solo de feedback, entre 100 y 200 ms. */
   --motion-instant: 100ms;
   --motion-fast: 160ms;
-  --motion-standard: 240ms;
-  --motion-emphasis: 320ms;
+  --motion-standard: 200ms;
+  --motion-emphasis: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Tipografía: una familia en web, Android e iOS; cifras tabulares en tablas y contadores. */
+  --font-sans: "Atkinson Hyperlegible Next", Arial, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono", monospace;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-base: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  /* Espaciado (múltiplos de 4). Radio interno = radio externo − padding. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --radius-chip: 4px;
+
+  /* Áreas: tinte suave de fondo + color fuerte para la franja y el código. Ninguna usa el rojo crítico. */
+  --area-emg: #9b2c6f;
+  --area-emg-soft: #faeaf3;
+  --area-con: #0b6b63;
+  --area-con-soft: #e0f2ef;
+  --area-lab: #5a3ea6;
+  --area-lab-soft: #eeeafa;
+  --area-hos: #1d5c9a;
+  --area-hos-soft: #e4eef8;
+  --area-rec: #2d6b33;
+  --area-rec-soft: #e4f1e5;
+  --area-amb: #5c6213;
+  --area-amb-soft: #f0f2da;
+  --area-gen: #4a5865;
+  --area-gen-soft: #edf0f2;
+  --on-area: #ffffff;
+
+  /* Estados: el color acompaña al ícono, la etiqueta y el patrón; nunca va solo. */
+  --status-espera: #6a45a6;
+  --status-espera-soft: #f1ebfa;
+  --status-llamado: #8a5300;
+  --status-llamado-soft: #fff2d9;
+  --status-atencion: #1f55a3;
+  --status-atencion-soft: #e8eff9;
+  --status-listo: #1d7444;
+  --status-listo-soft: #e7f4ec;
+  --status-cerrado: #4a5865;
+  --status-cerrado-soft: #edf0f2;
+  --on-status: #ffffff;
+
+  /* Prioridad. El rojo crítico es exclusivo de emergencia y de valores críticos. */
+  --critical: #b71c1c;
+  --critical-soft: #fceaea;
+  --priority-urgente: #a3480a;
+  --priority-urgente-soft: #fdebdd;
+  --priority-rutina: #55617a;
+  --priority-rutina-soft: #eef1f5;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -88,6 +151,38 @@
     --outline: #8db3fa;
     --shadow-float: 0 18px 50px rgb(0 0 0 / 0.35);
     --shadow-soft: 0 8px 24px rgb(0 0 0 / 0.2);
+    --area-emg: #f09ac9;
+    --area-emg-soft: #3a1a2d;
+    --area-con: #6fd1c3;
+    --area-con-soft: #10302c;
+    --area-lab: #bba8f2;
+    --area-lab-soft: #2a2142;
+    --area-hos: #8db9ec;
+    --area-hos-soft: #16273d;
+    --area-rec: #8ccf93;
+    --area-rec-soft: #172f1a;
+    --area-amb: #ccd27a;
+    --area-amb-soft: #2c2e12;
+    --area-gen: #aab7c1;
+    --area-gen-soft: #222b36;
+    --on-area: #0c1220;
+    --status-espera: #bca3ee;
+    --status-espera-soft: #2b2140;
+    --status-llamado: #e8b25e;
+    --status-llamado-soft: #33260e;
+    --status-atencion: #8cb2f0;
+    --status-atencion-soft: #18284a;
+    --status-listo: #6ccb92;
+    --status-listo-soft: #13301f;
+    --status-cerrado: #aab7c1;
+    --status-cerrado-soft: #222b36;
+    --on-status: #0c1220;
+    --critical: #f2918a;
+    --critical-soft: #3a1a17;
+    --priority-urgente: #f0a36b;
+    --priority-urgente-soft: #3a2314;
+    --priority-rutina: #9aa6ba;
+    --priority-rutina-soft: #1b2538;
   }
 }
 
@@ -118,6 +213,8 @@ select:focus-visible {
 .mono-label, .eyebrow, .role-label, .section-number, .flow-number { font-family: "Atkinson Hyperlegible Mono", monospace; }
 .eyebrow { display: block; color: var(--primary-text); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; line-height: 1.4; text-transform: uppercase; }
 .mono-label { font-size: 12px; letter-spacing: 0.03em; line-height: 1.5; }
+/* Fase 2: cifras tabulares en tablas, contadores, horas y códigos, para que las columnas no bailen. */
+table, time, .tabular, .mono-data, .number-strip strong, .hospital-clock-time, .status-badge, .priority-badge, .area-tag { font-variant-numeric: tabular-nums; }
 
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--ink); white-space: nowrap; }
 .brand-mark { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-card); background: var(--primary); color: var(--on-primary); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16); }

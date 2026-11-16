@@ -7,7 +7,7 @@ import './listas/lists.css';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
 import { useQuickAction } from './personal/accion';
 import { can, type AccessProfile, type Api, type Appointment as BaseAppointment } from '../lib/api';
-import { Dialog, Empty, Heading, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData } from './common';
+import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import './appointments.css';
 
 /** CITA-04: actions the server accepts now for the reader, and the blocked ones with their reason (contract `AccionCita`). */
@@ -67,8 +67,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   const agenda = groupAgenda(rows);
   const exportTable = () => ({ filename: 'citas', title: 'Citas', subtitle: `${rows.length} citas`, columns: ['Fecha', 'Horario', 'Paciente', 'Médico', 'Estado', 'Motivo'], rows: rows.map(a => [dayLabel(dayKey(a.start)), timeRange(a.start, a.end), a.patientName, a.doctorName, stateName(a.state), a.reason ?? '']) });
   return <>
-    <Heading eyebrow="Atención / Agenda" title="Citas" description="Agenda, solicitudes y cancelaciones con estados claros para cada participante."
-      actions={can(profile, 'citas.agendar') && <button className="primary-button" onClick={() => setCreate(true)}><Icon name="plus" size={18} />Agendar cita</button>} />
+    <CompactHeader breadcrumb="Atención / Agenda" title="Citas" actions={can(profile, 'citas.agendar') && <button className="primary-button" onClick={() => setCreate(true)}><Icon name="plus" size={18}/>Agendar cita</button>}/>
     <section className="data-workbench" aria-label="Agenda de citas">
       <RemoteState state={data}>{() => <>
         <ListToolbar trailing={<ExportMenu table={exportTable} disabled={!rows.length} />}>

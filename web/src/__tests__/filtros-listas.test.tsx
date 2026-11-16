@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile, Api, Patient, Staff, UserAccount } from '../lib/api';
 import { PatientsPage } from '../features/patients';
 import { PersonnelPage } from '../features/personnel';
-import { Heading, headerText } from '../features/common';
+import { CompactHeader, headerText } from '../features/common';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
 
 afterEach(() => { cleanup(); location.hash = ''; });
@@ -137,10 +137,10 @@ describe('Cabecera de módulo', () => {
     expect(headerText('Cargando…')).toBe('Cargando…');
   });
 
-  it('un solo h1 sin punto y la acción principal junto al título', () => {
-    render(<Heading eyebrow="Hospital" title="Camas." description="Estado de cada cama." actions={<button className="primary-button">Asignar</button>} />);
+  it('un solo h1 sin punto y la acción principal junto al título, sin descripción (Fase 2, S1)', () => {
+    render(<CompactHeader breadcrumb="Hospital" title="Camas." actions={<button className="primary-button">Asignar</button>} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Camas' })).toBeTruthy();
-    expect(screen.getByText('Estado de cada cama')).toBeTruthy();
+    expect(screen.getByRole('banner').querySelector('p')).toBeNull();
     expect(screen.getByRole('banner').querySelector('.heading-actions button')?.textContent).toBe('Asignar');
   });
 });
