@@ -9,7 +9,6 @@ vi.mock('../lib/supabase', () => ({ supabase: { channel: realtime.channel, remov
 
 import { PublicScreen } from '../features/public-screen';
 import { NoticesPage, localToIso } from '../features/notices';
-import { NoticesPanel } from '../features/avisos/NoticesPanel';
 import { INVALIDATION_BATCH_MS } from '../lib/live';
 
 beforeEach(() => {
@@ -131,28 +130,14 @@ describe('W25 · avisos generales', () => {
     expect(api.write.mock.calls[1][1]).toEqual(expect.objectContaining({ confirmarDatosPersonales: true }));
   });
 
-  it('sin avisos.publicar no ofrece el formulario', async () => {
-    const api = apiDe();
+  it('sin avisos.publicar no ofrece el formulario ni lee lo publicado: solo su bandeja (S11)', async () => {
+    const api = { request: vi.fn(async () => ({ actualizadoEn: '', avisos: [], noLeidos: 0, criticos: 0, recordatorioHoras: 4, proximoCambio: null })), write: vi.fn() };
     render(<NoticesPage api={api as unknown as Api} profile={jop([])} version={0} />);
+    expect(await screen.findByText('Estás al día')).toBeTruthy();
     expect(screen.queryByLabelText('Nuevo aviso')).toBeNull();
-    expect(api.request).not.toHaveBeenCalled();
+    expect(api.request.mock.calls.map(c => (c as unknown[])[0])).toEqual(['/me/avisos/bandeja']);
   });
 });
 
-describe('Avisos en el tablero de inicio', () => {
-  it('muestra los avisos del rol por prioridad y se calla si no hay', async () => {
-    const aviso = (id: string, titulo: string, prioridad: string) => ({ id, titulo, cuerpo: 'Texto.', desde: null, hasta: '2026-11-20T12:00:00.000Z', prioridad, publico: true, roles: [] });
-    const api = { request: vi.fn(async () => ({ actualizadoEn: '', avisos: [aviso('1', 'Corte de agua', 'critico'), aviso('2', 'Visitas', 'atencion'), aviso('3', 'Otro', 'atencion')], proximoCambio: null })), write: vi.fn() };
-    const { unmount } = render(<NoticesPanel api={api as unknown as Api} version={0} />);
-    expect(await screen.findByText('Corte de agua')).toBeTruthy();
-    expect(api.request).toHaveBeenCalledWith('/me/avisos', expect.anything());
-    expect(screen.queryByText('Otro')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: /Ver los 3 avisos/ }));
-    expect(screen.getByText('Otro')).toBeTruthy();
-    unmount();
-    const vacio = { request: vi.fn(async () => ({ actualizadoEn: '', avisos: [], proximoCambio: null })), write: vi.fn() };
-    const { container } = render(<NoticesPanel api={vacio as unknown as Api} version={0} />);
-    await waitFor(() => expect(vacio.request).toHaveBeenCalled());
-    expect(container.textContent).toBe('');
-  });
-});
+// S11: el tablero de inicio ya no lista avisos; solo muestra el crítico dirigido a la cuenta (avisos-area.test.tsx).
+
