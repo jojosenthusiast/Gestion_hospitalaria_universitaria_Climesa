@@ -33,11 +33,21 @@ export type Consultation = {
 /** m-22: `GET /consultas/sin-firmar`, the doctor's own open consultations of any day. */
 type UnsignedConsultation = { id: string; patientId: string; patientName?: string | null; appointmentId?: string | null; ticketId?: string | null; reason?: string | null; startedAt: string; version: number };
 
-/** Row of `GET /fila`; `consultationId` is present only for the consultation this doctor started from the number. */
+/**
+ * Row of `GET /fila`; `consultationId` is present only for the consultation this doctor started from the number.
+ * `calledByMe` (T10f) says whether this doctor made the last call; `calledByColleague` whether another clinician
+ * (an account that can start consultations) made it. The API never says who called.
+ */
 export type QueueConsultationTicket = {
   id: string; numero: number; service: string; state: string; patientId?: string | null; patientName?: string | null; issuedAt: string;
-  consultationId?: string | null; consultationState?: string | null;
+  consultationId?: string | null; consultationState?: string | null; calledByMe?: boolean; calledByColleague?: boolean;
 };
+
+/**
+ * A called number without an own consultation is another office's only when another clinician called it. A call by
+ * reception or an assistant, or one with no recorded caller, stays actionable for the doctor.
+ */
+export const calledElsewhere = (ticket: QueueConsultationTicket) => ticket.state === 'llamado' && !ticket.consultationId && ticket.calledByColleague === true;
 
 type ConsultationDetail = { consultation: { id: string; patientId: string; appointmentId?: string | null; reason?: string | null; physicalExam?: string | null; plan?: string | null; state: string; version: number; patientName?: string | null } };
 
@@ -88,7 +98,7 @@ export function ConsultationsPage({ api, profile, version }: { api: Api; profile
     </section>
     {queueAllowed && <section className="data-workbench" aria-labelledby="consultorio-fila"><h2 id="consultorio-fila">Fila del día: llamados y en atención</h2>
       <WriteError error={startError} onReload={queue.refresh} reloadLabel="Recargar la fila" />
-      <RemoteState state={queue}>{rows => { const active = rows.filter(row => row.state === 'llamado' || row.state === 'en_atencion').sort((a, b) => a.numero - b.numero); return active.length ? <table className="record-table"><caption className="sr-only">Números llamados y en atención</caption><thead><tr><th>Número</th><th>Paciente</th><th>Fila</th><th>Consulta</th><th>Acción</th></tr></thead><tbody>{active.map(row => <tr key={row.id}><td data-label="Número"><strong className="mono-data">N.º {row.numero}</strong></td><td data-label="Paciente">{row.patientName || 'Paciente no identificado'}</td><td data-label="Fila"><Tag value={row.state} /></td><td data-label="Consulta"><Tag value={row.consultationState ?? 'pendiente'} /></td><td data-label="Acción"><button className="row-action" disabled={starting !== null} onClick={() => void attend(row)}>{starting === row.id ? 'Abriendo…' : row.consultationState === 'firmada' ? 'Ver consulta' : row.consultationId ? 'Retomar consulta' : 'Iniciar consulta'} <Icon name="arrow" size={16} /></button></td></tr>)}</tbody></table> : <Empty title="Nadie en atención" description="Los números llamados aparecerán aquí para iniciar o retomar su consulta." />; }}</RemoteState>
+      <RemoteState state={queue}>{rows => { const active = rows.filter(row => row.state === 'llamado' || row.state === 'en_atencion').sort((a, b) => a.numero - b.numero); return active.length ? <table className="record-table"><caption className="sr-only">Números llamados y en atención</caption><thead><tr><th>Número</th><th>Paciente</th><th>Fila</th><th>Consulta</th><th>Acción</th></tr></thead><tbody>{active.map(row => <tr key={row.id}><td data-label="Número"><strong className="mono-data">N.º {row.numero}</strong></td><td data-label="Paciente">{row.patientName || 'Paciente no identificado'}</td><td data-label="Fila"><Tag value={row.state} /></td><td data-label="Consulta"><Tag value={row.consultationState ?? 'pendiente'} /></td><td data-label="Acción">{calledElsewhere(row) ? <small className="form-hint">Llamado desde otro consultorio</small> : <button className="row-action" disabled={starting !== null} onClick={() => void attend(row)}>{starting === row.id ? 'Abriendo…' : row.consultationState === 'firmada' ? 'Ver consulta' : row.consultationId ? 'Retomar consulta' : 'Iniciar consulta'} <Icon name="arrow" size={16} /></button>}</td></tr>)}</tbody></table> : <Empty title="Nadie en atención" description="Los números llamados aparecerán aquí para iniciar o retomar su consulta." />; }}</RemoteState>
     </section>}
     {can(profile, 'consulta.iniciar') && <section className="data-workbench" aria-labelledby="consultorio-sin-firmar"><h2 id="consultorio-sin-firmar">Consultas sin firmar</h2>
       <RemoteState state={unsigned}>{rows => rows.length ? <ul className="record-list">{rows.map(row => <li key={row.id}><strong>{row.patientName ?? 'Paciente'}</strong> <small>Iniciada {formatDateTime(row.startedAt)}{row.reason ? ` · ${row.reason}` : ''}</small> <button className="row-action" onClick={() => setResuming({ id: row.id })}>Reanudar <Icon name="arrow" size={16} /></button></li>)}</ul>

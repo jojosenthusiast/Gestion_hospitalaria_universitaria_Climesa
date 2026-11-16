@@ -23495,6 +23495,14 @@
               }
             ]
           },
+          "calledByMe": {
+            "type": "boolean",
+            "description": "true si quien consulta la fila hizo el último llamado de este número; false si lo llamó otra persona, nadie o se deshizo el llamado. Nunca se expone quién lo llamó"
+          },
+          "calledByColleague": {
+            "type": "boolean",
+            "description": "true si el último llamado lo hizo otro profesional que puede iniciar consultas (permiso consulta.iniciar); false si lo llamó quien consulta, recepción, un asistente, nadie o no consta quién. Nunca se expone quién lo llamó"
+          },
           "maxCalls": {
             "type": "integer",
             "description": "Llamados máximos (política fila.llamados_maximos)"
@@ -23538,6 +23546,8 @@
           "undoActions",
           "consultationId",
           "consultationState",
+          "calledByMe",
+          "calledByColleague",
           "maxCalls",
           "callsForAbsence",
           "allowedActions",

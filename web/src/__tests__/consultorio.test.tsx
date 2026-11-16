@@ -136,6 +136,30 @@ describe('W-consultorio · retomar la consulta propia desde la fila', () => {
   });
 });
 
+describe('W-consultorio · llamado propio o de otro consultorio (T10f)', () => {
+  it('un número que llamó este médico ofrece Iniciar consulta', async () => {
+    mount(['consulta.iniciar', 'fila.ver'], { '/fila': [ticket({ state: 'llamado', calledByMe: true, calledByColleague: false })] });
+    expect(await screen.findByRole('button', { name: /Iniciar consulta/ })).toBeTruthy();
+  });
+
+  it('un número que llamó otro médico solo muestra su estado, sin acción', async () => {
+    mount(['consulta.iniciar', 'fila.ver'], { '/fila': [ticket({ state: 'llamado', calledByMe: false, calledByColleague: true })] });
+    expect(await screen.findByText('Llamado desde otro consultorio')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Iniciar consulta/ })).toBeNull();
+  });
+
+  it('un número que llamó recepción (o sin quién llamó registrado) conserva Iniciar consulta', async () => {
+    mount(['consulta.iniciar', 'fila.ver'], { '/fila': [ticket({ id: 'tk-rec', state: 'llamado', calledByMe: false, calledByColleague: false }), ticket({ id: 'tk-old', numero: 8, state: 'llamado' })] });
+    expect(await screen.findAllByRole('button', { name: /Iniciar consulta/ })).toHaveLength(2);
+    expect(screen.queryByText('Llamado desde otro consultorio')).toBeNull();
+  });
+
+  it('un número en atención conserva su regla: sigue ofreciendo su acción', async () => {
+    mount(['consulta.iniciar', 'fila.ver'], { '/fila': [ticket({ calledByMe: false, calledByColleague: true })] });
+    expect(await screen.findByRole('button', { name: /Iniciar consulta/ })).toBeTruthy();
+  });
+});
+
 describe('W-consultorio · borrador local de la consulta', () => {
   it('guarda lo escrito en este equipo por usuario y consulta, y lo recupera al volver', async () => {
     mount(['consulta.iniciar', 'consulta.registrar']);
