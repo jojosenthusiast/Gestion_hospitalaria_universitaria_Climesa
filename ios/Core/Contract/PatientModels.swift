@@ -163,9 +163,18 @@ public struct LabOrderItem: Decodable, Sendable, Identifiable, Equatable {
     public let code: String
     public let name: String
     public let result: LabItemResult?
+    /// Unidad del examen (`mg/dL`); nula si el examen no la tiene o el servidor es anterior.
+    public let unit: String?
 }
 
-/// `LabOrderResponse` de `GET /me/laboratorio` y `GET /laboratorio/ordenes`.
+/// Acciones que la API permite al lector sobre una orden (`LabOrderResponse.allowedActions`, `AccionOrdenLaboratorio`).
+/// Los botones salen solo de esta lista, nunca del rol ni del estado.
+public enum LabOrderAction: String, Sendable, CaseIterable {
+    case tomarMuestra = "tomar_muestra", capturar, completar, revisar, cancelar, enmendar
+}
+
+/// `LabOrderResponse` de `GET /me/laboratorio` y `GET /laboratorio/ordenes`. `allowedActions` y `amendedAt` se leen
+/// con tolerancia: en un servidor anterior quedan vacíos y no se muestra ninguna acción.
 public struct LabOrder: Decodable, Sendable, Identifiable, Equatable {
     public let id: String
     public let consultationId: String
@@ -180,6 +189,37 @@ public struct LabOrder: Decodable, Sendable, Identifiable, Equatable {
     public let version: Int
     public let patientName: String?
     public let items: [LabOrderItem]
+    /// Un laboratorista enmendó un resultado de la orden completada; volvió a la revisión del médico.
+    public let amendedAt: String?
+    /// Siempre vacío para el paciente.
+    public let allowedActions: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id, consultationId, patientId, doctorId, priority, state, createdAt, sampleTakenAt, completedAt, reviewedAt, version, patientName, items
+        case amendedAt, allowedActions
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        consultationId = try container.decode(String.self, forKey: .consultationId)
+        patientId = try container.decode(String.self, forKey: .patientId)
+        doctorId = try container.decode(String.self, forKey: .doctorId)
+        priority = try container.decode(LabPriority.self, forKey: .priority)
+        state = try container.decode(LabOrderState.self, forKey: .state)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        sampleTakenAt = try container.decodeIfPresent(String.self, forKey: .sampleTakenAt)
+        completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
+        reviewedAt = try container.decodeIfPresent(String.self, forKey: .reviewedAt)
+        version = try container.decode(Int.self, forKey: .version)
+        patientName = try container.decodeIfPresent(String.self, forKey: .patientName)
+        items = try container.decode([LabOrderItem].self, forKey: .items)
+        amendedAt = (try? container.decodeIfPresent(String.self, forKey: .amendedAt)) ?? nil
+        allowedActions = ((try? container.decodeIfPresent([String].self, forKey: .allowedActions)) ?? nil) ?? []
+    }
+
+    /// La API permite esta acción al usuario actual.
+    public func allows(_ action: LabOrderAction) -> Bool { allowedActions.contains(action.rawValue) }
 }
 
 /// `PatientDetailResponse` de `GET /me/paciente` (solo lo que usa la app).

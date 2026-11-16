@@ -23,6 +23,11 @@ final class ContractFixtureTests: XCTestCase {
         try assertMatches(AppointmentCancelBody(version: 2, reason: "No podré asistir por un compromiso de trabajo."), fixture: "appointment-cancel")
     }
 
+    func testCancelacionDeOrdenDeLaboratorio() throws {
+        XCTAssertEqual(LabCancelRules.path("o1"), "/laboratorio/ordenes/o1/cancelar")
+        try assertMatches(LabCancelRules.body(version: 2, reason: "  El paciente no se presentó a la toma "), fixture: "lab-order-cancel")
+    }
+
     func testInicioDeConsultaDesdeUnaCita() throws {
         try assertMatches(ConsultationStartBody(appointmentId: "44444444-4444-4444-8444-444444444444"), fixture: "consultation-start")
     }

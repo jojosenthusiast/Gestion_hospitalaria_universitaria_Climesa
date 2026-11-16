@@ -90,6 +90,13 @@ public struct PrescriptionBody: Encodable, Sendable, Equatable {
     public init(items: [PrescriptionItemBody]) { self.items = items }
 }
 
+/// `LabCancelDto` de `POST /laboratorio/ordenes/{id}/cancelar`: versión de la orden y motivo (MA-LAB-05).
+public struct LabOrderCancelBody: Encodable, Sendable, Equatable {
+    public let version: Int
+    public let reason: String
+    public init(version: Int, reason: String) { self.version = version; self.reason = reason }
+}
+
 /// `LabOrderDto`
 public struct LabOrderBody: Encodable, Sendable, Equatable {
     public let consultationId: String
