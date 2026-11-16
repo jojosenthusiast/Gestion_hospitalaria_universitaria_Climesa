@@ -88,6 +88,15 @@ describe('área de un código de espacio (02-sistema §1)', () => {
     expect(areaOf(null)).toBe('GEN');
   });
 
+  it('los códigos numerados del edificio toman el área de su prefijo: E-01 es EMG, HAB-201-A es HOS', () => {
+    expect(areaOf('E-01')).toBe('EMG');
+    expect(areaOf('HAB-201')).toBe('HOS');
+    expect(areaOf('HAB-201-A')).toBe('HOS');
+    // Only a number after the prefix counts: C-ABC or E-X are not rooms.
+    expect(areaOf('C-ABC')).toBe('GEN');
+    expect(areaOf('E-X')).toBe('GEN');
+  });
+
   it('el número de fila atendido es de la familia "listo", como en Android e iOS', () => {
     render(<StatusBadge value="atendido" />);
     expect(screen.getByText('Atendido')).toBeTruthy();

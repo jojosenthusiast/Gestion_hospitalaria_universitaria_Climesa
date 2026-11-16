@@ -21,7 +21,7 @@ Seis tonos de área y un neutro. Cada uno tiene un **tinte suave** (fondo de tar
 
 Regla de uso: tarjeta o celda = `area-surface` (tinte + borde de 1 px al 35 % + franja superior fuerte) y el chip
 `AreaTag` con el código. Las camas y habitaciones usan el mismo sistema. El filtro por área y la leyenda usan el mismo
-`AreaTag`. Función de apoyo: `areaOf('P3-VIP')` devuelve `HOS`.
+`AreaTag`. Función de apoyo: `areaOf('P3-VIP')` devuelve `HOS`. Los códigos numerados toman el área de su prefijo: `C-101` es CON, `E-01` es EMG y `HAB-201` o `HAB-201-A` es HOS; solo cuenta si después del prefijo viene un número (`C-ABC` cae en GEN).
 
 ## 2. Estados
 
