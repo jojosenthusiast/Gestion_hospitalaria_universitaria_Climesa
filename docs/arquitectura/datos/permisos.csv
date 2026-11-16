@@ -34,7 +34,7 @@ camas.registrar_limpieza,Registrar limpieza de cama,,x,,,x,,,,,
 camas.verificar_limpieza,Verificar limpieza (otra persona),,x,,,x,,,,,
 fila.emitir,Emitir número de fila,,,x,,,,,,,
 fila.ver,Ver la fila del día,,x,x,x,,x,,,,propio
-fila.llamar,Llamar un número,,,,x,,x,,,,
+fila.llamar,Llamar un número,,,x,x,,x,,,,
 fila.gestionar,Cambiar estado de un número,,,x,x,,x,,,,
 citas.ver,Ver citas,,x,x,x,,propio,,,,propio
 citas.agendar,Agendar y confirmar citas,,,x,,,,,,,

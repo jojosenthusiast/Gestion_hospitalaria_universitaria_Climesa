@@ -72,7 +72,7 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `camas.verificar_limpieza` | Verificar limpieza (otra persona) | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | `fila.emitir` | Emitir número de fila | · | · | ✔ | · | · | · | · | · | · | · |
 | `fila.ver` | Ver la fila del día | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
-| `fila.llamar` | Llamar un número | · | · | · | ✔ | · | ✔ | · | · | · | · |
+| `fila.llamar` | Llamar un número | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | `fila.gestionar` | Cambiar estado de un número | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | `citas.ver` | Ver citas | · | ✔ | ✔ | ✔ | · | propio | · | · | · | propio |
 | `citas.agendar` | Agendar y confirmar citas | · | · | ✔ | · | · | · | · | · | · | · |
@@ -212,7 +212,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/citas/catalogos` | `citas.agendar` o `citas.solicitar` | Médicos activos con turno del día; pacientes solo el propio de PAC (REC busca con /pacientes/selector) | R | 3 | · | · | ✔ | · | · | · | · | · | · | propio |
 | GET | `/api/v1/fila` | `fila.ver` | Filtra según relación | R | 3 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
 | POST | `/api/v1/fila` | `fila.emitir` | Número único por servicio y día | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
-| POST | `/api/v1/fila/{id}/llamar` | `fila.llamar` | Transición válida | R | 3 | · | · | · | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/{id}/llamar` | `fila.llamar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | POST | `/api/v1/fila/{id}/atender` | `fila.gestionar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | POST | `/api/v1/fila/{id}/completar` | `fila.gestionar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | POST | `/api/v1/fila/{id}/no-se-presento` | `fila.gestionar` | Transición válida | R | 3 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
@@ -220,7 +220,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/citas/reprogramaciones/{id}/aceptar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/citas/reprogramaciones/{id}/rechazar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita, motivo | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/citas/{id}/no-asistio` | `citas.agendar` | Hora alcanzada y sin consulta | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
-| POST | `/api/v1/fila/llamar-siguiente` | `fila.llamar` | Primer número en espera del servicio | R | 4 | · | · | · | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/llamar-siguiente` | `fila.llamar` | Primer número en espera del servicio | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 
 ### Spec 106
 

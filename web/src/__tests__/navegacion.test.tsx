@@ -246,7 +246,10 @@ describe('pantallas de solo lectura según el permiso', () => {
   });
 
   it('Turnos para LAB solo lista: sin planificar, publicar, editar ni cancelar', async () => {
-    const turno = { id: 't-1', staffId: 's-1', person: 'Persona Ficticia', areaId: 'a-1', area: 'Laboratorio', start: '2026-11-10T14:00:00.000Z', end: '2026-11-10T22:00:00.000Z', type: 'diurno', state: 'publicado', version: 1 };
+    // Shift relative to today: a fixed date drifts into the folded "past days" group of the list and the test starts failing.
+    const day = new Date(); day.setHours(8, 0, 0, 0);
+    const start = day.toISOString(), end = new Date(day.valueOf() + 8 * 3_600_000).toISOString();
+    const turno = { id: 't-1', staffId: 's-1', person: 'Persona Ficticia', areaId: 'a-1', area: 'Laboratorio', start, end, type: 'diurno', state: 'publicado', version: 1 };
     await entrar(perfil('LAB'), { '/turnos': () => json([turno]), '/espacios': () => json([]) }, '#/turnos');
     expect((await screen.findAllByText('Persona Ficticia')).length).toBeGreaterThan(0);
     for (const nombre of [/Planificar turno/, /Publicar planificación/, /Editar/, /Cancelar turno/]) {

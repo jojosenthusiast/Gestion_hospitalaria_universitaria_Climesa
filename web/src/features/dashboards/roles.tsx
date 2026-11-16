@@ -189,6 +189,7 @@ const rec: RoleDashboard = {
     { id: 'registrar', label: 'Registrar paciente', hint: 'Busca primero y registra si no existe', icon: 'userPlus', href: '#/pacientes?accion=registrar', permission: 'pacientes.registrar' },
     { id: 'agendar', label: 'Agendar cita', hint: 'Paciente, médico y horario disponible', icon: 'calendar', href: '#/citas?accion=agendar', permission: 'citas.agendar' },
     { id: 'emitir', label: 'Emitir número', hint: 'Número de fila para quien llega', icon: 'queue', href: '#/fila?accion=emitir', permission: 'fila.emitir' },
+    { id: 'llamar', label: 'Llamar siguiente', hint: 'Llama al próximo número en espera', icon: 'queue', href: '#/fila?accion=llamar', permission: 'fila.llamar' },
     { id: 'ambulancia', label: 'Solicitar ambulancia', hint: 'Registrar una solicitud de traslado', icon: 'ambulance', href: '#/ambulancia?accion=solicitud', permission: 'ambulancia.solicitar' },
   ],
   render: ({ d }) => <>
