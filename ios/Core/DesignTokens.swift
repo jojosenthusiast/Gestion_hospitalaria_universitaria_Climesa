@@ -102,6 +102,8 @@ public enum AreaCode: String, CaseIterable, Sendable {
         let parts = (code ?? "").uppercased().split(separator: "-").map { $0.trimmingCharacters(in: .whitespaces) }
         // A real area code wins over an alias: `BOD-LAB` is LAB, `BOD-CEN` falls back to the BOD alias (GEN).
         if let area = parts.lazy.compactMap({ AreaCode(rawValue: $0) }).first { return area }
+        // Consulting rooms are coded `C-101`: 02-sistema section 1 lists them under CON.
+        if parts.first == "C" && parts.count > 1 { return .con }
         return parts.lazy.compactMap({ aliases[$0] }).first ?? .gen
     }
 }

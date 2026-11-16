@@ -73,6 +73,7 @@ final class DesignTokensTests: XCTestCase {
         XCTAssertEqual(AreaCode.of("P1-EMG"), .emg)
         XCTAssertEqual(AreaCode.of("p1-lab"), .lab)
         XCTAssertEqual(AreaCode.of("BOD-LAB"), .lab)
+        XCTAssertEqual(AreaCode.of("C-101"), .con)
         XCTAssertEqual(AreaCode.of("P1-CON"), .con)
         XCTAssertEqual(AreaCode.of("P2-HOS"), .hos)
         XCTAssertEqual(AreaCode.of("P3-VIP"), .hos)
