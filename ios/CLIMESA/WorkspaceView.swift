@@ -139,18 +139,14 @@ struct ShiftsContent:View {
             if model.loading && model.shifts.isEmpty { LoadingStateView(message:L.text("shifts.loading")) }
             else if let error=model.error { ErrorStateView(message:error) { Task { await model.load(api:account.api) } } }
             else if model.shifts.isEmpty { EmptyStateView(title:L.text("shifts.empty"),symbol:"calendar") }
-            if let error=model.checkInError { Text(verbatim:error).font(Typo.small).foregroundStyle(Theme.danger) }
-            ForEach(model.shifts) { shift in
-                SectionCard(title:shift.area) {
-                    Text(verbatim:Shift.display(shift.start)).font(Typo.body).foregroundStyle(Theme.ink)
-                    Text(verbatim:String(format:L.text("shifts.until"),Shift.display(shift.end))).font(Typo.small).foregroundStyle(Theme.muted)
-                    StatusTag(shift.state,label:ShiftAttendanceRules.stateLabel(shift.state))
-                    if let attendance=ShiftAttendanceRules.attendanceLabel(shift.attendance,late:shift.late ?? false) { Text(verbatim:attendance).font(Typo.small).foregroundStyle(Theme.muted) }
-                    if ShiftAttendanceRules.canCheckIn(shift.allowedActions) {
-                        Button { Task { await model.checkIn(shift,api:account.api) } } label: {
-                            Label(model.checkingIn == shift.id ? "Marcando entrada…" : "Marcar mi entrada",systemImage:"checkmark.circle")
-                        }
-                        .buttonStyle(.borderedProminent).disabled(model.checkingIn != nil)
+            // Por día asignado (Hoy, Mañana, día y fecha) y por hora de inicio; la entrada se confirma sola (ASIS-01).
+            ForEach(Array(ShiftAttendanceRules.byDay(model.shifts,start:{ ShiftAttendanceRules.date($0.start) },today:Date()).enumerated()),id:\.offset) { _, day in
+                Text(verbatim:day.title).font(Typo.heading).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
+                ForEach(day.items) { shift in
+                    SectionCard(title:shift.area) {
+                        Text(verbatim:ShiftAttendanceRules.hours(start:ShiftAttendanceRules.date(shift.start),end:ShiftAttendanceRules.date(shift.end),type:shift.type)).font(Typo.body).foregroundStyle(Theme.ink)
+                        StatusTag(shift.state,label:ShiftAttendanceRules.stateLabel(shift.state))
+                        if let attendance=ShiftAttendanceRules.attendanceLabel(shift.attendance,late:shift.late ?? false) { Text(verbatim:attendance).font(Typo.small).foregroundStyle(Theme.muted) }
                     }
                 }
             }

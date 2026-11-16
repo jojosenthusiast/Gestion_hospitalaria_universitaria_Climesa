@@ -36,26 +36,44 @@ class MyShiftsTest {
         assertTrue(MyShifts.parse(null).isEmpty())
     }
 
-    // ASIS-01: la entrada solo se ofrece cuando la API la incluye en allowedActions; nunca se muestra un código crudo.
-    @Test fun checkInFollowsAllowedActionsAndAttendanceIsSpanish() {
+    // ASIS-01: la entrada se confirma sola al inicio; la app no ofrece marcarla y nunca muestra un código crudo.
+    @Test fun attendanceIsAutomaticAndSpanish() {
         val rows = JSONArray()
             .put(JSONObject().put("id", "t-1").put("version", 3).put("area", "Consulta").put("start", "2026-11-13T14:00:00Z").put("end", "2026-11-13T20:00:00Z")
-                .put("state", "en_curso").put("attendance", "sin_confirmar").put("late", false).put("allowedActions", JSONArray().put("marcar_entrada")))
+                .put("state", "en_curso").put("attendance", "presente").put("late", false).put("allowedActions", JSONArray()))
             .put(JSONObject().put("id", "t-2").put("version", 1).put("area", "Consulta").put("start", "2026-11-14T14:00:00Z").put("end", "2026-11-14T20:00:00Z")
                 .put("state", "completado").put("attendance", "presente").put("late", true).put("allowedActions", JSONArray()))
-        val (open, done) = MyShifts.parse(rows)
-        assertTrue(open.canCheckIn)
-        assertEquals(false, done.canCheckIn)
-        assertEquals("Sin entrada marcada", MyShifts.attendanceLabel(open))
-        assertEquals("Entrada marcada · tarde", MyShifts.attendanceLabel(done))
-        assertEquals(3, MyShifts.checkInBody(open).getInt("version"))
+            .put(JSONObject().put("id", "t-3").put("version", 1).put("area", "Consulta").put("start", "2026-11-15T14:00:00Z").put("end", "2026-11-15T20:00:00Z")
+                .put("state", "publicado").put("attendance", "pendiente").put("late", false).put("allowedActions", JSONArray()))
+        val (open, late, next) = MyShifts.parse(rows)
+        assertEquals("Entrada confirmada", MyShifts.attendanceLabel(open))
+        assertEquals("Entrada corregida · llegó tarde", MyShifts.attendanceLabel(late))
+        assertEquals("Se confirma sola al iniciar", MyShifts.attendanceLabel(next))
         assertEquals("En curso", StaffLabels.shiftState("en_curso"))
         assertEquals("Ausente", StaffLabels.shiftState("ausente"))
     }
 
-    @Test fun refusedCheckInIsExplainedByCode() {
-        assertEquals("Ya marcaste la entrada de este turno.", MyShifts.checkInError("asistencia_ya_marcada", 409, "x"))
-        assertEquals("Solo puedes marcar la entrada de tus propios turnos.", MyShifts.checkInError("turno_ajeno", 403, "x"))
-        assertEquals("No se pudo marcar la entrada. Intenta de nuevo.", MyShifts.checkInError(null, null, null))
+    // Obs. orden: "mis turnos" agrupa por el día asignado (el día en que empieza) con Hoy / Mañana / día y fecha.
+    @Test fun groupsByAssignedDayInStartOrder() {
+        val row = { id: String, start: String, end: String, type: String -> JSONObject().put("id", id).put("area", "Emergencia").put("start", start).put("end", end).put("type", type).put("state", "publicado") }
+        val rows = JSONArray()
+            .put(row("tarde", "2026-11-12T21:00:00Z", "2026-11-13T03:00:00Z", "diurno"))
+            .put(row("guardia", "2026-11-10T13:00:00Z", "2026-11-11T13:00:00Z", "guardia"))
+            .put(row("manana", "2026-11-11T14:00:00Z", "2026-11-11T20:00:00Z", "diurno"))
+            .put(row("temprano", "2026-11-12T13:00:00Z", "2026-11-12T19:00:00Z", "diurno"))
+        val days = MyShifts.byDay(MyShifts.parse(rows), java.time.LocalDate.of(2026, 11, 10))
+        assertEquals(listOf("Hoy · martes, 10 de noviembre", "Mañana · miércoles, 11 de noviembre", "Jueves, 12 de noviembre"), days.map { it.title })
+        assertEquals(listOf(listOf("guardia"), listOf("manana"), listOf("temprano", "tarde")), days.map { d -> d.shifts.map { it.id } })
+        assertEquals("07:00 a 07:00 del día siguiente · Guardia 24 h", days[0].shifts[0].hours)
+        assertEquals("15:00 a 21:00", days[2].shifts[1].hours)
+    }
+
+    @Test fun shiftsWithoutDateGoLastAndNeverThrow() {
+        val rows = JSONArray()
+            .put(JSONObject().put("id", "x").put("area", "Planta").put("start", JSONObject.NULL).put("state", "publicado"))
+            .put(JSONObject().put("id", "y").put("area", "Planta").put("start", "2026-11-12T13:00:00Z").put("end", "2026-11-12T19:00:00Z").put("state", "publicado"))
+        val days = MyShifts.byDay(MyShifts.parse(rows), java.time.LocalDate.of(2026, 11, 10))
+        assertEquals(listOf("Jueves, 12 de noviembre", "Sin fecha"), days.map { it.title })
+        assertEquals(MyShifts.MISSING_TIME, days[1].shifts[0].hours)
     }
 }

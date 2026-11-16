@@ -46,8 +46,6 @@
     <string name="mantenimiento_cerrar">Cerrar y recargar</string>    <string name="unidad_no">No</string>
     <string name="cerrar_sesion">Cerrar sesión</string>
     <string name="turnos_vacio">No tienes turnos publicados.</string>
-    <string name="turno_marcar_entrada">Marcar mi entrada</string>
-    <string name="turno_marcando_entrada">Marcando entrada…</string>
     <string name="hosp_asignar_cama">Asignar cama</string>
     <string name="hosp_firmar_alta">Firmar alta</string>
     <string name="hosp_registrar_salida">Registrar salida</string>
