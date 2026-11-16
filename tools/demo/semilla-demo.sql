@@ -16,7 +16,7 @@
 --
 -- Cómo se reconoce lo sembrado (marca de borrado):
 --   * Todos los ids empiezan con  de300000-  (UUID fijo).
---   * Pacientes: expediente 99000nn-d (rango 9900001 a 9900199) y DUI 9000nnnn-d (los menores no llevan DUI).
+--   * Pacientes: expediente 99nnnnn-d (rango 9900001 a 9900330) y DUI 9000nnnn-d (los menores no llevan DUI).
 --   * Texto libre: empieza con "[DEMO]" donde la columna existe.
 --   * Lo que no tiene id propio (ambulancia.cambio_estado) lleva "[DEMO]" en el motivo.
 -- Para quitar todo: tools/demo/limpiar-demo.sql
@@ -191,6 +191,66 @@ from (values
 ) v(idx, nombres, apellidos, tipo, especialidad, area)
 on conflict do nothing;
 
+-- Escala de un hospital real (Fase 2, S6: "diseña para 45+ médicos, cientos de pacientes y decenas de turnos por día"):
+-- 74 personas más (idx 100 a 173), sin cuenta en Supabase Auth: 40 médicos de todas las especialidades que las
+-- categorías de cita sugieren, 20 de enfermería, 6 asistentes, 4 de recepción y 4 de laboratorio. Cada una rota cinco
+-- días de cada siete, de mañana (07-14, idx par) o de tarde (13-20, idx impar), así cada día trabajan unas 50.
+-- La emergencia sigue sin nadie nuevo de noche: sus huecos de cobertura se conservan a propósito.
+create temp table staff2 (idx int primary key, tipo text, esp text, area text, patron text) on commit drop;
+insert into staff2
+select idx, g.tipo, g.esp, g.area, case when idx % 2 = 0 then 'R5M' else 'R5T' end
+from (values
+  (100, 109, 'medico',        'Medicina general',           'P1-CON'),
+  (110, 111, 'medico',        'Medicina interna',           'P1-CON'),
+  (112, 113, 'medico',        'Medicina interna',           'P2-HOS'),
+  (114, 117, 'medico',        'Pediatría',                  'P1-CON'),
+  (118, 120, 'medico',        'Ginecología y obstetricia',  'P1-CON'),
+  (121, 122, 'medico',        'Cirugía general',            'P1-CON'),
+  (123, 127, 'medico',        'Emergencias',                'P1-EMG'),
+  (128, 129, 'medico',        'Traumatología y ortopedia',  'P1-CON'),
+  (130, 130, 'medico',        'Cardiología',                'P1-CON'),
+  (131, 131, 'medico',        'Neurología',                 'P1-CON'),
+  (132, 132, 'medico',        'Dermatología',               'P1-CON'),
+  (133, 133, 'medico',        'Oftalmología',               'P1-CON'),
+  (134, 134, 'medico',        'Otorrinolaringología',       'P1-CON'),
+  (135, 135, 'medico',        'Psiquiatría',                'P1-CON'),
+  (136, 136, 'medico',        'Urología',                   'P1-CON'),
+  (137, 137, 'medico',        'Gastroenterología',          'P1-CON'),
+  (138, 138, 'medico',        'Alergología',                'P1-CON'),
+  (139, 139, 'medico',        'Medicina general',           'P1-CON'),
+  (140, 145, 'enfermero',     'Emergencias',                'P1-EMG'),
+  (146, 151, 'enfermero',     'Hospitalización',            'P2-HOS'),
+  (152, 153, 'enfermero',     'Hospitalización',            'P3-VIP'),
+  (154, 157, 'enfermero',     'Consulta externa',           'P1-CON'),
+  (158, 159, 'enfermero',     'Pediatría',                  'P1-CON'),
+  (160, 165, 'asistente',     null,                         'P1-CON'),
+  (166, 169, 'recepcionista', null,                         'P1-REC'),
+  (170, 173, 'laboratorista', null,                         'P1-LAB')
+) g(desde, hasta, tipo, esp, area)
+cross join generate_series(g.desde, g.hasta) idx;
+
+insert into personal.persona (id, nombres, apellidos, tipo, especialidad, area_id, telefono, dui, activo)
+select pg_temp.did('0002', s.idx),
+       case when s.idx % 3 = 0
+            then (array['Claudia Patricia','Ana Gabriela','Karla Vanessa','Mónica Beatriz','Evelyn Johanna','Sandra Elizabeth','Roxana Ivette',
+              'Wendy Carolina','Andrea Lisseth','Nathaly Alejandra','Gloria Esperanza','Diana Marcela','Lorena Guadalupe','Tatiana Michelle',
+              'Fátima del Rosario','Yanira Elizabeth','Susana Margarita','Lidia Esther','Ruth Noemí','Sofía Valentina','Paola Andrea',
+              'Elena Beatriz','Carolina Ivonne','Marcela Alejandra','Rocío del Carmen'])[1 + mod(s.idx * 7, 25)]
+            else (array['José Alfredo','Carlos Humberto','Luis Ernesto','Mario Roberto','Jorge Alberto','Óscar René','Rafael Antonio',
+              'Hugo Ernesto','Francisco Antonio','Ricardo José','Fernando Javier','Raúl Alexander','Edgar Mauricio','Guillermo Arturo',
+              'Pablo Andrés','David Ernesto','Javier Orlando','Alejandro José','Sergio Iván','Daniel Eduardo','Andrés Felipe',
+              'Gerardo Antonio','Emilio José','René Alberto','Marcos Vinicio'])[1 + mod(s.idx * 11, 25)] end,
+       (array['Aguilar','Ayala','Batres','Bonilla','Calderón','Campos','Castro','Contreras','Durán','Echeverría','Fuentes','Galdámez',
+          'Guzmán','Interiano','Jovel','Lara','Machuca','Marroquín','Miranda','Montoya','Navas','Ochoa','Orantes','Paz','Quinteros',
+          'Rivera','Romero','Saravia','Tejada','Urrutia','Valle','Zamora'])[1 + mod(s.idx * 5, 32)]
+         || ' ' ||
+       (array['Alvarado','Ascencio','Barrera','Carranza','Cienfuegos','Deras','Escalante','Figueroa','Granados','Herrera','Jiménez',
+          'Leiva','Lemus','Molina','Monterrosa','Nolasco','Pacas','Platero','Rodas','Salinas','Trigueros','Umaña','Vides','Zepeda'])[1 + mod(s.idx * 7 + 3, 24)],
+       s.tipo, s.esp, pg_temp.espacio(s.area),
+       '7100' || lpad(s.idx::text, 4, '0'), pg_temp.dui('8000' || lpad(s.idx::text, 4, '0')), true
+from staff2 s
+on conflict do nothing;
+
 -- Inscripción profesional vigente (D-012) para todo el personal médico y de enfermería, sembrado o de cuenta.
 insert into personal.inscripcion (id, persona_id, junta, numero, vigencia)
 select ('de300000-0031-4000-8000-' || substr(p.id::text, 25))::uuid, p.id,
@@ -252,6 +312,9 @@ insert into plan_turno values
   (40, pg_temp.did('0002', 47), 'P1-REC', 'T7'),
   (41, pg_temp.did('0002', 48), 'P1-AMB', 'N2'),
   (42, pg_temp.did('0002', 49), 'P1-AMB', 'N2B');
+-- Escala (S6): R5M y R5T rotan cinco días de cada siete (descansa cuando (d + idx) mod 7 es 5 o 6); nunca más de cinco
+-- días seguidos ni 35 h en siete días, así que no necesitan excepción de carga. El plan usa el mismo idx que la persona.
+insert into plan_turno select s.idx, pg_temp.did('0002', s.idx), s.area, s.patron from staff2 s;
 -- La cardióloga (persona demo 4) no tiene plan a propósito: en la agenda aparece como "Sin turno".
 
 insert into personal.turno (id, persona_id, area_id, periodo, tipo, estado, justificacion, publicado_por, publicado_en, creado_por, excepcion_carga)
@@ -276,12 +339,14 @@ select pg_temp.did('0003', b.idx * 100 + b.d + 2), b.persona, pg_temp.espacio(b.
 from (
   select p.idx, p.persona, p.area, p.patron, d.d,
          case when p.patron = 'D7' or (p.patron = 'D5' and extract(isodow from pg_temp.hoy() + d.d) <= 5)
-                   or (p.patron = 'A2' and mod(mod(d.d, 2) + 2, 2) = 0) then pg_temp.ts(pg_temp.hoy() + d.d, 7)
-              when (p.patron = 'T5' and extract(isodow from pg_temp.hoy() + d.d) <= 5) or p.patron = 'T7' then pg_temp.ts(pg_temp.hoy() + d.d, 13)
+                   or (p.patron = 'A2' and mod(mod(d.d, 2) + 2, 2) = 0)
+                   or (p.patron = 'R5M' and mod(mod(d.d + p.idx, 7) + 7, 7) < 5) then pg_temp.ts(pg_temp.hoy() + d.d, 7)
+              when (p.patron = 'T5' and extract(isodow from pg_temp.hoy() + d.d) <= 5) or p.patron = 'T7'
+                   or (p.patron = 'R5T' and mod(mod(d.d + p.idx, 7) + 7, 7) < 5) then pg_temp.ts(pg_temp.hoy() + d.d, 13)
               when (p.patron = 'N2' and mod(mod(d.d, 2) + 2, 2) = 0) or (p.patron = 'N2B' and mod(mod(d.d, 2) + 2, 2) = 1) then pg_temp.ts(pg_temp.hoy() + d.d, 19)
               when p.patron = 'G4' and mod(mod(d.d, 4) + 4, 4) = 0 then pg_temp.ts(pg_temp.hoy() + d.d, 7) end as ini,
-         case when p.patron in ('D7', 'D5', 'A2') then pg_temp.ts(pg_temp.hoy() + d.d, 14)
-              when p.patron in ('T5', 'T7') then pg_temp.ts(pg_temp.hoy() + d.d, 20)
+         case when p.patron in ('D7', 'D5', 'A2', 'R5M') then pg_temp.ts(pg_temp.hoy() + d.d, 14)
+              when p.patron in ('T5', 'T7', 'R5T') then pg_temp.ts(pg_temp.hoy() + d.d, 20)
               when p.patron in ('N2', 'N2B', 'G4') then pg_temp.ts(pg_temp.hoy() + d.d + 1, 7) end as fin,
          case when p.patron in ('N2', 'N2B') then 'nocturno' when p.patron = 'G4' then 'guardia' else 'diurno' end as tipo
   from plan_turno p cross join generate_series(-1, 13) d(d)
@@ -632,6 +697,115 @@ from (select n, row_number() over (partition by med, dd order by k) - 1 as slot 
 where c.n = s.n and c.tipo = 'fut';
 
 -- ---------------------------------------------------------------------------------------------------------
+-- 4d. Escala (Fase 2, S6): 210 pacientes más (fichas 121 a 330), generados con arreglos fijos (mismo resultado siempre).
+--       121-300  citas con los 33 médicos nuevos de consulta externa (hoy y los próximos 13 días) y algunos en la fila
+--       301-330  solicitudes de cita por categoría (bandeja de recepción), en los cuatro estados
+--     grupo: nino (menores de 15, van a pediatría), mujer (18 a 45, van también a ginecología) y adulto (el resto).
+-- ---------------------------------------------------------------------------------------------------------
+create temp table vol2 (n int primary key, sexo text, edad int, nac date, nombres text, ap1 text, ap2 text, municipio text, calle text,
+  nota text, ident text, correo boolean, grupo text) on commit drop;
+insert into vol2
+select n, x.sexo, x.edad,
+       (pg_temp.hoy() - (x.edad || ' years')::interval - (mod(n * 41, 340) || ' days')::interval)::date,
+       case when x.sexo = 'femenino'
+            then pg_temp.pick(array['Ana María','Blanca Lidia','Cecilia Beatriz','Dalia Marisol','Elisa Fernanda','Flor de María','Gabriela Ivonne',
+              'Heidy Johana','Iris Yamileth','Jenny Paola','Karen Lisbeth','Laura Cristina','Mercedes Aracely','Noemí Elizabeth','Orquídea del Carmen',
+              'Priscila Abigail','Raquel Esmeralda','Sara Elena','Tania Marisela','Úrsula Gabriela','Vanessa Carolina','Ximena Daniela','Yolanda Margarita',
+              'Zulma Esperanza','Alba Luz','Bessy Arely','Carla Michelle','Delmy Yaneth','Erika Mariela','Gilma Concepción'], n * 13)
+            else pg_temp.pick(array['Abel Antonio','Benjamín Isaac','Camilo Ernesto','Diego Alejandro','Eduardo Enrique','Fabio Antonio','Gustavo Adolfo',
+              'Héctor Manuel','Ismael Eliseo','Julio César','Kevin Alexander','Leonel Arturo','Moisés Efraín','Nelson Geovany','Omar Alexis',
+              'Pedro Pablo','Reynaldo Josué','Sergio Armando','Timoteo Ulises','Ulises Antonio','Vladimir Ernesto','William Enrique','Yeferson Adonay',
+              'Zacarías Ezequiel','Álvaro José','Bryan Alexis','Christian Josué','Denis Omar','Elías Benjamín','Giovanni Alberto'], n * 13) end,
+       pg_temp.pick(array['Hernández','Martínez','López','García','González','Pérez','Rodríguez','Ramírez','Flores','Gómez','Sánchez','Morales','Castillo',
+         'Reyes','Cruz','Ortiz','Rivas','Torres','Vásquez','Mejía','Aguilar','Ayala','Batres','Calderón','Contreras','Durán','Fuentes','Guzmán','Lara',
+         'Machuca','Marroquín','Miranda','Navas','Ochoa','Paz','Quinteros','Romero','Saravia','Tejada','Valle'], n * 7 + 5),
+       pg_temp.pick(array['Alvarado','Ascencio','Barrera','Carranza','Cienfuegos','Deras','Escalante','Figueroa','Granados','Herrera','Jiménez','Leiva',
+         'Lemus','Molina','Monterrosa','Nolasco','Pacas','Platero','Rodas','Salinas','Trigueros','Umaña','Vides','Zepeda','Campos','Mena','Rauda'], n * 11 + 3),
+       pg_temp.pick(array['San Salvador','Soyapango','Santa Tecla','Mejicanos','Apopa','Ilopango','Ciudad Delgado','San Marcos','Cuscatancingo',
+         'Antiguo Cuscatlán','Nejapa','Ayutuxtepeque','San Martín','Tonacatepeque','Zaragoza','Colón','Quezaltepeque','Panchimalco'], n * 5),
+       pg_temp.pick(array['Col. Escalón','Col. Miramonte','Res. Altos de la Cima','Col. San Luis','Col. Layco','Col. Flor Blanca','Col. Santa Marta',
+         'Col. Zacamil','Res. Villas del Sol','Col. Las Brisas','Col. Monserrat','Col. Atlacatl','Col. El Roble','Col. Vista Hermosa',
+         'Res. Los Héroes','Col. Médica','Col. Satélite','Urb. Buenos Aires'], n * 3) || ', Pje. ' || (1 + n % 15) || ' #' || (1 + (n * 7) % 95),
+       case when n > 300 then 'Pidió cita por categoría desde la app: REC la ve en la bandeja de solicitudes'
+            else 'Demo a escala: citas con los médicos y especialistas nuevos; mira Citas y Mi día' end,
+       case when x.edad < 18 then 'partida' else 'dui' end,
+       n % 4 = 0,
+       case when x.edad < 15 then 'nino' when x.sexo = 'femenino' and x.edad between 18 and 45 then 'mujer' else 'adulto' end
+from generate_series(121, 330) n
+cross join lateral (select case when mod(n / 2, 2) = 0 then 'femenino' else 'masculino' end as sexo,
+                           case when n % 6 = 3 then 1 + mod(n * 7, 14) else 15 + mod(n * 37, 74) end as edad) x;
+
+insert into pacientes.paciente (id, expediente, estado, nombres, primer_apellido, segundo_apellido, sexo, nacimiento, precision_nacimiento,
+  telefono, correo, direccion, municipio, contacto_emergencia, busqueda_normalizada, fon_apellido, fon_nombres, creado_por, version)
+select pg_temp.did('0001', v.n), pg_temp.expediente(9900000 + v.n), 'activo', v.nombres, v.ap1, v.ap2, v.sexo, v.nac, 'exacta',
+       '7000' || lpad(v.n::text, 4, '0'),
+       case when v.correo then lower(replace(pg_temp.norm(v.nombres || ' ' || v.ap1), ' ', '.')) || '.' || v.n || '.demo@example.test' end,
+       v.calle || '. [DEMO] ' || v.nota, v.municipio,
+       jsonb_build_object('nombre', pg_temp.pick(case when v.sexo = 'femenino' then array['Carlos','Mario','José','Roberto'] else array['María','Ana','Rosa','Carmen'] end, v.n)
+                                    || ' ' || v.ap1,
+                          'telefono', '7001' || lpad(v.n::text, 4, '0'),
+                          'parentesco', case when v.edad < 18 then case when v.n % 2 = 1 then 'madre' else 'padre' end
+                                             else pg_temp.pick(array['esposo/a','hijo/a','hermano/a','madre'], v.n) end),
+       pg_temp.norm(concat_ws(' ', v.nombres, concat_ws(' ', v.ap1, v.ap2),
+         case when v.ident = 'dui' then pg_temp.dui('9000' || lpad(v.n::text, 4, '0')) end, v.nac::text)),
+       pg_temp.fon(concat_ws(' ', v.ap1, v.ap2)), pg_temp.fon(v.nombres), pg_temp.actor('REC'), 1
+from vol2 v
+on conflict do nothing;
+
+insert into pacientes.identificador (id, paciente_id, tipo, emisor, valor_original, valor_normalizado, estado, exclusivo)
+select pg_temp.did('0013', v.n), pg_temp.did('0001', v.n),
+       case v.ident when 'dui' then 'dui' else 'partida_nacimiento' end,
+       case v.ident when 'dui' then 'RNPN' else 'municipio' end,
+       case v.ident when 'dui' then substr(pg_temp.dui('9000' || lpad(v.n::text, 4, '0')), 1, 8) || '-' || right(pg_temp.dui('9000' || lpad(v.n::text, 4, '0')), 1)
+                    else 'PN-DEMO-' || lpad(v.n::text, 4, '0') end,
+       case v.ident when 'dui' then pg_temp.dui('9000' || lpad(v.n::text, 4, '0')) else 'PN-DEMO-' || lpad(v.n::text, 4, '0') end,
+       case when v.n % 2 = 0 then 'verificado' else 'sin_verificar' end, v.ident = 'dui'
+from vol2 v
+on conflict do nothing;
+
+-- Citas de los médicos nuevos de consulta externa, siempre dentro de su turno publicado (sale de personal.turno, no se
+-- recalcula): hoy cuatro por médico (07:20, 08:20, 09:20 y 10:20, o 13:20 a 16:20 de tarde) y una por día en los próximos
+-- 13 días. Pediatría solo ve niños y ginecología solo mujeres de 18 a 45. Lo de hoy que ya pasó queda atendido (uno de
+-- cada nueve no llegó); lo futuro queda confirmado, con algunas solicitadas por la app, canceladas y rechazadas.
+create temp table vcita2 (n int primary key, pac int, med int, dd int, hora time, estado text, origen text, motivo text, rechazo text) on commit drop;
+insert into vcita2
+with turnos as (
+  select s.idx, s.esp, d.d, u.periodo,
+         case s.esp when 'Pediatría' then 'nino' when 'Ginecología y obstetricia' then 'mujer' else 'adulto' end as grupo
+  from staff2 s
+  cross join generate_series(0, 13) d(d)
+  join personal.turno u on u.id = pg_temp.did('0003', s.idx * 100 + d.d + 2) and u.estado in ('publicado', 'en_curso', 'completado')
+  where s.tipo = 'medico' and s.area = 'P1-CON'),
+cuadros as (
+  select t.*, q.q, (lower(t.periodo) at time zone 'America/El_Salvador')::time + (20 + 60 * q.q) * interval '1 minute' as hora
+  from turnos t cross join generate_series(0, 3) q(q)
+  where t.d = 0 or q.q = mod(t.idx + t.d, 4)),
+numerados as (
+  select c.*, row_number() over (order by c.d, c.q, c.idx) as rn, row_number() over (partition by c.grupo order by c.d, c.q, c.idx) as rg
+  from cuadros c),
+grupos as (
+  select n, grupo, row_number() over (partition by grupo order by n) as pos, count(*) over (partition by grupo) as total
+  from vol2 where n <= 300)
+select 1000 + x.rn, g.n, x.idx, x.d, x.hora, e.estado,
+       case when e.estado in ('solicitada', 'rechazada') or x.rn % 3 = 0 then 'paciente' else 'recepcion' end,
+       '[DEMO] ' || x.esp || ': ' || pg_temp.pick(case x.grupo
+           when 'nino' then array['control de niño sano', 'fiebre y tos de varios días', 'control de crecimiento y vacunas', 'dolor de oído']
+           when 'mujer' then array['control ginecológico anual', 'control prenatal', 'planificación familiar', 'revisión de exámenes']
+           else array['control de seguimiento', 'primera consulta por referencia', 'revisión de exámenes de laboratorio', 'molestia que no mejora',
+                      'control después del tratamiento'] end, x.rn::int),
+       case when e.estado = 'rechazada' then '[DEMO] El especialista no atiende ese motivo; se orientó a medicina general' end
+from numerados x
+join grupos g on g.grupo = x.grupo and g.pos = 1 + mod(x.rg - 1, g.total)
+cross join lateral (select case
+    when x.d = 0 and pg_temp.tl(pg_temp.hoy(), x.hora) + interval '50 minutes' <= now()
+      then case when x.rn % 9 = 0 then 'no_asistio' else 'atendida' end
+    when x.d = 0 then 'confirmada'
+    when x.rn % 10 = 0 then 'solicitada'
+    when x.rn % 10 = 5 then 'cancelada'
+    when x.rn % 29 = 7 then 'rechazada'
+    else 'confirmada' end as estado) e;
+
+-- ---------------------------------------------------------------------------------------------------------
 -- 5. Citas en todos los estados (la hora es local; "dd" son días desde hoy)
 -- ---------------------------------------------------------------------------------------------------------
 create temp table cdemo (n int primary key, pac int, med int, dd int, hora time, estado text, origen text, motivo text, rechazo text)
@@ -673,6 +847,8 @@ insert into cdemo values
 
 -- Volumen: las citas generadas en 4c entran a la misma tabla de trabajo.
 insert into cdemo select n, pac, med, dd, hora, estado, origen, motivo, rechazo from vcita;
+-- Escala (S6): las citas de los médicos nuevos (4d).
+insert into cdemo select n, pac, med, dd, hora, estado, origen, motivo, rechazo from vcita2;
 
 insert into atencion.cita (id, paciente_id, medico_id, horario, motivo, estado, origen, motivo_rechazo, creado_por, creado_en)
 select pg_temp.did('0004', c.n), pg_temp.did('0001', c.pac),
@@ -687,6 +863,70 @@ cross join lateral (select case when c.estado in ('atendida', 'no_asistio')
                                 then least(pg_temp.tl(pg_temp.hoy() + c.dd, c.hora), now() - interval '30 minutes' - (c.n % 5) * interval '20 minutes')
                                 else pg_temp.tl(pg_temp.hoy() + c.dd, c.hora) end as t) h
 where case c.med when 0 then pg_temp.persona('MED') else pg_temp.did('0002', c.med) end is not null
+on conflict do nothing;
+
+-- ---------------------------------------------------------------------------------------------------------
+-- 5b. Solicitudes de cita por categoría (Fase 2, flujo A; S6): 30 pacientes (fichas 301 a 330) piden cita por motivo,
+--     sin elegir médico. Recepción las ve en su bandeja: 16 pendientes (la más antigua primero, algunas con dos
+--     categorías, nota o médico preferido), 7 asignadas (cada una con su cita confirmada con un especialista de esa
+--     categoría, dentro de su turno), 4 rechazadas con motivo y 3 canceladas por el paciente.
+-- ---------------------------------------------------------------------------------------------------------
+create temp table sol (r int primary key, pac int, cats text[], franja text, nota text, estado text, creado timestamptz, resuelta timestamptz,
+  rechazo text) on commit drop;
+insert into sol
+select r, v.n,
+       case when v.grupo = 'nino' then array['ninos']
+            when v.grupo = 'mujer' and r % 2 = 0 then array['mujer_embarazo']
+            else array_remove(array[c.uno, case when r % 4 = 0 then c.dos end], null) end,
+       pg_temp.pick(array['manana', 'tarde', 'cualquiera'], r),
+       case when r % 3 = 0 then '[DEMO] ' || pg_temp.pick(array['Prefiero después de las 2 de la tarde por el trabajo', 'Ya tengo exámenes recientes, los llevo impresos',
+         'Es la primera vez que vengo al hospital', 'Me acompaña mi hija porque no veo bien', 'El dolor empezó hace dos semanas y no mejora'], r) end,
+       e.estado,
+       case when e.estado = 'pendiente' then now() - r * interval '85 minutes' else now() - (1 + r % 4) * interval '1 day' - r * interval '10 minutes' end,
+       case when e.estado = 'pendiente' then null else now() - (1 + r % 4) * interval '1 day' - r * interval '10 minutes' + interval '3 hours' end,
+       case when e.estado = 'rechazada' then '[DEMO] ' || pg_temp.pick(array['El motivo es una urgencia: se le indicó acudir a emergencia hoy',
+         'Ya tiene una cita confirmada con ese especialista la próxima semana', 'Se necesita referencia del médico general antes del especialista',
+         'No hay especialista de esa área esta quincena; se le llamará cuando haya cupo'], r) end
+from generate_series(1, 30) r
+join vol2 v on v.n = 300 + r
+cross join lateral (select pg_temp.pick(array['consulta_general', 'corazon', 'huesos', 'piel', 'ojos', 'oido_garganta', 'salud_mental',
+                             'cabeza_nervios', 'digestivo', 'rinon_urinario', 'alergias', 'cirugia'], r) as uno,
+                           pg_temp.pick(array['consulta_general', 'corazon', 'huesos', 'piel', 'ojos', 'oido_garganta', 'salud_mental',
+                             'cabeza_nervios', 'digestivo', 'rinon_urinario', 'alergias', 'cirugia'], r + 5) as dos) c
+cross join lateral (select case when r <= 16 then 'pendiente' when r <= 23 then 'asignada' when r <= 27 then 'rechazada' else 'cancelada' end as estado) e;
+
+-- La cita de cada solicitud asignada: un médico nuevo de la especialidad que sugiere la categoría, en un turno publicado de
+-- los próximos 1 a 6 días, al final del turno (las citas de volumen usan solo las primeras cuatro horas: no chocan).
+insert into atencion.cita (id, paciente_id, medico_id, horario, motivo, estado, origen, creado_por, creado_en)
+select pg_temp.did('0004', 3000 + s.r), pg_temp.did('0001', s.pac), t.persona_id,
+       tstzrange(upper(t.periodo) - (s.r - 15) * interval '20 minutes', upper(t.periodo) - (s.r - 16) * interval '20 minutes', '[)'),
+       '[DEMO] ' || (select string_agg(k.nombre, ', ' order by array_position(s.cats, k.codigo)) from atencion.categoria_cita k where k.codigo = any (s.cats))
+         || ' · asignada por recepción desde la solicitud por categoría',
+       'confirmada', 'recepcion', pg_temp.actor('REC'), s.resuelta
+from sol s
+cross join lateral (
+  select u.persona_id, u.periodo from staff2 m
+  join atencion.categoria_cita k on k.codigo = s.cats[1] and m.esp = any (k.especialidades)
+  cross join generate_series(1, 6) d(d)
+  join personal.turno u on u.id = pg_temp.did('0003', m.idx * 100 + d.d + 2) and u.estado = 'publicado'
+  where m.tipo = 'medico' and m.area = 'P1-CON'
+  order by d.d, m.idx offset s.r % 3 limit 1) t
+where s.estado = 'asignada'
+on conflict do nothing;
+
+insert into atencion.solicitud_cita (id, paciente_id, categorias, medico_preferido_id, franja, nota, estado, cita_id, motivo_rechazo,
+  creado_por, creado_en, resuelta_por, resuelta_en)
+select pg_temp.did('0007', s.r), pg_temp.did('0001', s.pac), s.cats,
+       -- Uno de cada cinco prefiere a un médico de la especialidad de su primera categoría (preferencia, no obligación).
+       case when s.r % 5 = 0 then (select pg_temp.did('0002', m.idx) from staff2 m join atencion.categoria_cita k on k.codigo = s.cats[1]
+                                   where m.tipo = 'medico' and m.esp = any (k.especialidades) order by m.idx limit 1) end,
+       s.franja, s.nota, s.estado,
+       case when s.estado = 'asignada' then pg_temp.did('0004', 3000 + s.r) end, s.rechazo,
+       null, s.creado,
+       case when s.estado in ('asignada', 'rechazada') then pg_temp.actor('REC') end, s.resuelta
+from sol s
+-- Una asignada sin su cita (por ejemplo, si un dato real ocupó ese horario) no se siembra: la base exige la cita.
+where s.estado <> 'asignada' or exists (select 1 from atencion.cita c where c.id = pg_temp.did('0004', 3000 + s.r))
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------------------------------------
@@ -731,6 +971,31 @@ insert into tdemo values
   (120, 'laboratorio',      47,  'en_espera',      null,    0, '07:40'),
   (130, 'laboratorio',      57,  'atendido',       null,    1, '06:45');
 
+-- Prioridad del número (Fase 2, S9): la emergencia trae casos graves y urgentes; el resto es rutina salvo excepciones.
+alter table tdemo add column prioridad text not null default 'rutina';
+update tdemo set prioridad = 'emergencia' where n in (7, 174);
+update tdemo set prioridad = 'urgente' where n in (9, 172);
+
+-- Escala (S6): 44 números más (n 201 a 244), una sala llena: 20 de consulta externa, 10 de emergencia, 10 de laboratorio y
+-- 4 de admisiones. En cada servicio los primeros ya pasaron (atendidos, uno no se presentó), uno o dos están llamados y el
+-- resto espera. Los pacientes son las fichas 125 a 297 (uno por número), varios con cita hoy: citados y sin cita.
+insert into tdemo (n, servicio, pac, estado, consultorio, llamados, hora, prioridad)
+select 200 + j, x.servicio, 121 + 4 * j, x.estado,
+       case when x.estado in ('atendido', 'llamado') and x.servicio = 'consulta_general' then 'C-10' || (1 + j % 4)
+            when x.estado in ('atendido', 'llamado') and x.servicio = 'emergencia' then 'E-0' || (1 + j % 3) end,
+       case x.estado when 'en_espera' then 0 when 'no_se_presento' then 3 else 1 end,
+       time '06:00' + (j * 6) * interval '1 minute',
+       case when x.servicio = 'emergencia' and j in (24, 27) then 'emergencia'
+            when x.servicio = 'emergencia' and j in (21, 25, 26, 28) then 'urgente'
+            when x.servicio <> 'emergencia' and j in (7, 14, 36) then 'urgente'
+            else 'rutina' end
+from generate_series(1, 44) j
+cross join lateral (select case when j <= 20 then 'consulta_general' when j <= 30 then 'emergencia' when j <= 40 then 'laboratorio' else 'admisiones' end as servicio,
+                           case when j in (1, 2, 3, 4, 21, 22, 31, 32, 33, 41) then 'atendido'
+                                when j in (5, 34) then 'no_se_presento'
+                                when j in (6, 7, 23, 35) then 'llamado'
+                                else 'en_espera' end as estado) x;
+
 do $$
 declare
   t record;
@@ -740,10 +1005,10 @@ begin
   for t in select * from tdemo order by n loop
     continue when exists (select 1 from atencion.ticket_fila where id = pg_temp.did('0005', t.n));
     v_numero := atencion.emitir_numero(t.servicio, v_fecha);
-    insert into atencion.ticket_fila (id, servicio, fecha, numero, paciente_id, estado, consultorio_id, llamados, emitido_por, emitido_en)
+    insert into atencion.ticket_fila (id, servicio, fecha, numero, paciente_id, estado, consultorio_id, llamados, emitido_por, emitido_en, prioridad)
     values (pg_temp.did('0005', t.n), t.servicio, v_fecha, v_numero, pg_temp.did('0001', t.pac), t.estado,
             case when t.consultorio is not null then pg_temp.espacio(t.consultorio) end, t.llamados,
-            pg_temp.actor('REC'), least(now() - interval '1 minute', pg_temp.tl(v_fecha, t.hora)))
+            pg_temp.actor('REC'), least(now() - interval '1 minute', pg_temp.tl(v_fecha, t.hora)), t.prioridad)
     on conflict do nothing;
   end loop;
 end $$;

@@ -159,6 +159,9 @@ alter table atencion.signos_vitales enable trigger signos_consulta_abierta;
 delete from atencion.addendum where id::text like 'de300000-%' or consulta_id::text like 'de300000-%';
 delete from atencion.relacion_atencion where id::text like 'de300000-%' or origen_id::text like 'de300000-%';
 delete from atencion.consulta where id::text like 'de300000-%';
+-- Solicitudes de cita por categoría demo (S6) antes que sus citas asignadas. Las solicitudes reales se quedan, aunque
+-- sean de un paciente demo o prefieran a un médico demo (esos se conservan con el NOTICE de abajo).
+delete from atencion.solicitud_cita where id::text like 'de300000-%';
 -- Cita o número usados por una consulta real se conservan (la consulta real los referencia); igual una cita que asignó una
 -- solicitud por motivo (atencion.solicitud_cita.cita_id).
 delete from atencion.ticket_fila t where t.id::text like 'de300000-%' and not exists (select 1 from atencion.consulta c where c.ticket_id = t.id);
