@@ -58,6 +58,9 @@ import sv.edu.catolica.climesa.domain.AmbulanceLogEntry
 import sv.edu.catolica.climesa.domain.AndroidSection
 import sv.edu.catolica.climesa.domain.LogFilters
 import sv.edu.catolica.climesa.domain.ParamedicRules
+import sv.edu.catolica.climesa.domain.AmbulancePrefill
+import sv.edu.catolica.climesa.domain.RequestDraft
+import sv.edu.catolica.climesa.domain.RequestField
 
 /** Secciones de Android de la spec 109 que resuelve [AmbulanceScreen]. A70 (Unidad) sigue en [RolePortal]. */
 val ambulanceSections = setOf(
@@ -115,7 +118,7 @@ private fun LazyListScope.requestContent(state: AmbulanceUiState, model: Ambulan
     item { NoticeBanner(NoticeKind.WARNING, AmbulanceRules.NOTICE_911) }
     val requests = state.ownRequests ?: return
     val active = AmbulanceRules.activeRequest(requests)
-    if (active == null) item { RequestForm(state.busy, model) }
+    if (active == null) item { RequestForm(state.busy, state.requestPrefill, model) }
     else item { OwnRequestCard(active, state.busy, model) }
 }
 
@@ -135,30 +138,48 @@ private fun OwnRequestCard(request: sv.edu.catolica.climesa.domain.OwnAmbulanceR
         }
         if (request.canCancel) SecondaryButton(stringResource(R.string.amb_cancelar_solicitud), { cancelling = true }, enabled = !busy)
     }
+    var sent by remember(request.id) { mutableStateOf(false) }
+    // The dialog stays open (busy) until the write answers, so a double tap cannot send twice.
+    LaunchedEffect(busy) { if (sent && !busy) { sent = false; cancelling = false } }
     if (cancelling) {
         var reason by rememberSaveable { mutableStateOf("") }
         ConfirmDialog(
             title = stringResource(R.string.amb_cancelar_solicitud), confirmLabel = stringResource(R.string.amb_cancelar_solicitud), destructive = true, busy = busy,
             message = stringResource(R.string.amb_cancelar_detalle),
-            onConfirm = { cancelling = false; model.cancelRequest(request, reason) }, onDismiss = { cancelling = false },
+            onConfirm = { sent = true; model.cancelRequest(request, reason) }, onDismiss = { cancelling = false },
             body = { FormField(stringResource(R.string.amb_motivo_opcional), reason, { reason = it.take(300) }, singleLine = false) },
         )
     }
 }
 
 @Composable
-private fun RequestForm(busy: Boolean, model: AmbulanceViewModel) {
+private fun RequestForm(busy: Boolean, prefill: AmbulancePrefill?, model: AmbulanceViewModel) {
     var address by rememberSaveable { mutableStateOf("") }
     var municipality by rememberSaveable { mutableStateOf("") }
     var reason by rememberSaveable { mutableStateOf("") }
     var phone by rememberSaveable { mutableStateOf("") }
+    // Fields filled from the record, once per screen lifetime ("" = nothing filled, null = not applied yet).
+    var filled by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(prefill) {
+        if (prefill == null || filled != null) return@LaunchedEffect
+        val (draft, fields) = prefill.applyTo(RequestDraft(address, phone))
+        address = draft.address; phone = draft.phone
+        filled = fields.joinToString(",") { it.name }
+    }
+    val names = filled.orEmpty().split(',').filter { it.isNotBlank() }.map { RequestField.valueOf(it) }
     SectionCard(stringResource(R.string.amb_enviar_solicitud)) {
+        if (names.isNotEmpty()) NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_prefill_aviso, names.map { stringResource(it.label()) }.joinToString(stringResource(R.string.ui_y))))
+        FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, singleLine = false)
         FormField(stringResource(R.string.amb_direccion), address, { address = it.take(300) }, singleLine = false)
         FormField(stringResource(R.string.amb_municipio), municipality, { municipality = it.take(80) })
-        FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, singleLine = false)
         FormField(stringResource(R.string.amb_telefono), phone, { phone = it.take(20) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
         PrimaryButton(stringResource(R.string.amb_enviar_solicitud), { model.submitRequest(address, municipality, reason, phone) }, icon = Icons.Default.Send, loading = busy)
     }
+}
+
+private fun RequestField.label(): Int = when (this) {
+    RequestField.ADDRESS -> R.string.amb_campo_direccion
+    RequestField.PHONE -> R.string.amb_campo_telefono
 }
 
 /** Estado grande de la unidad, común a despacho y tripulación. */
@@ -184,25 +205,30 @@ private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: Ambula
     status.dispatchBlock?.let { block -> item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_no_despachable) + ". " + block.message + " " + block.action) } }
     item { Text(stringResource(R.string.amb_solicitudes_titulo, status.pendingRequests.size), style = MaterialTheme.typography.titleMedium) }
     if (status.pendingRequests.isEmpty()) item { EmptyState(stringResource(R.string.amb_sin_solicitudes)) }
-    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, status.dispatchBlock != null, state.busy, model, status.availableCrew) }
+    // One primary per screen: only the oldest request (the one the unit serves next) gets the filled "Despachar".
+    val first = status.pendingRequests.firstOrNull()?.id
+    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, status.dispatchBlock != null, state.busy, model, status.availableCrew, primary = request.id == first) }
 }
 
 @Composable
-private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, hasBlock: Boolean, busy: Boolean, model: AmbulanceViewModel, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>) {
+private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, hasBlock: Boolean, busy: Boolean, model: AmbulanceViewModel, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, primary: Boolean) {
     var dispatching by rememberSaveable(request.id) { mutableStateOf(false) }
     var discarding by rememberSaveable(request.id) { mutableStateOf(false) }
+    val sent = remember(request.id) { mutableStateOf(false) }
+    CloseWhenDone(busy, sent) { dispatching = false; discarding = false }
     val waiting = remember(request.createdAt) { runCatching { java.time.Duration.between(java.time.Instant.parse(request.createdAt), java.time.Instant.now()).toMinutes().coerceAtLeast(0) }.getOrDefault(0L) }
     SectionCard(AmbulanceRules.requesterLabel(request), eyebrow = AmbulanceRules.waiting(waiting), action = { FamilyBadge(stringResource(R.string.amb_por_confirmar), StatusFamily.ESPERA) }) {
         Text(request.reason, style = MaterialTheme.typography.bodyMedium)
         LabeledValue(stringResource(R.string.amb_donde), request.address + if (request.municipality.isNotBlank()) " · ${request.municipality}" else "")
         LabeledValue(stringResource(R.string.amb_telefono), request.contactPhone)
         if (request.patientRecord.isNotBlank()) LabeledValue(stringResource(R.string.amb_expediente), request.patientRecord)
-        PrimaryButton(stringResource(R.string.amb_despachar), { dispatching = true }, enabled = available && !busy)
+        if (primary) PrimaryButton(stringResource(R.string.amb_despachar), { dispatching = true }, enabled = available && !busy)
+        else SecondaryButton(stringResource(R.string.amb_despachar), { dispatching = true }, enabled = available && !busy)
         SecondaryButton(stringResource(R.string.amb_descartar), { discarding = true }, enabled = !busy)
         if (!available && !hasBlock) NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_unidad_no_disponible))
     }
-    if (dispatching) DispatchDialog(busy, crewPool, onClose = { dispatching = false }) { type, priority, destination, crew -> dispatching = false; model.dispatch(request, type, priority, destination, crew) }
-    if (discarding) ReasonDialog(stringResource(R.string.amb_descartar), busy, onClose = { discarding = false }) { reason -> discarding = false; model.discard(request, reason) }
+    if (dispatching) DispatchDialog(busy, crewPool, onClose = { dispatching = false }) { type, priority, destination, crew -> sent.value = true; model.dispatch(request, type, priority, destination, crew) }
+    if (discarding) ReasonDialog(stringResource(R.string.amb_descartar), busy, onClose = { discarding = false }) { reason -> sent.value = true; model.discard(request, reason) }
 }
 
 @Composable
@@ -305,7 +331,7 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
             Text(stringResource(R.string.amb_prioridad), style = MaterialTheme.typography.labelLarge)
             Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.priorities, filters.priority) { model.setLogFilters(filters.copy(priority = it)) }
             Text(stringResource(R.string.amb_estado_final), style = MaterialTheme.typography.labelLarge)
-            Choices(listOf("" to stringResource(R.string.amb_todas), "completado" to "Completado") + AmbulanceLabels.earlyFinalStates, filters.finalState) { model.setLogFilters(filters.copy(finalState = it)) }
+            Choices(listOf("" to stringResource(R.string.amb_todas), "completado" to StatusCatalog.label("completado")) + AmbulanceLabels.earlyFinalStates, filters.finalState) { model.setLogFilters(filters.copy(finalState = it)) }
             Text(stringResource(R.string.amb_tipo), style = MaterialTheme.typography.labelLarge)
             Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.types, filters.type) { model.setLogFilters(filters.copy(type = it)) }
         }

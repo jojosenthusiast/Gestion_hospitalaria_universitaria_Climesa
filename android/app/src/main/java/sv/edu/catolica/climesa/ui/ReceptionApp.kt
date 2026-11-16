@@ -59,14 +59,14 @@ import java.time.format.DateTimeFormatter
         onLogout={if(!signingOut)logout()},
         showNavigation=!state.formOpen && state.selected==null,
         snackbarHost={SnackbarHost(snack)},
-        title=if(state.formOpen){if(state.editingId==null)"Registrar paciente" else "Editar ficha"}else if(state.selected!=null)"Ficha del paciente" else page.label,
+        title=if(state.formOpen){stringResource(if(state.editingId==null)R.string.rec_form_registrar else R.string.rec_form_editar)}else if(state.selected!=null)stringResource(R.string.rec_ficha_titulo) else page.label,
         subtitle=if(state.formOpen)state.registry.patients.firstOrNull{it.id==state.editingId}?.fullName else state.selected?.fullName,
         navigationIcon={if(state.formOpen||state.selected!=null)BackButton({back()},enabled=!state.saving)},
     ) { padding -> Column(Modifier.fillMaxSize().padding(padding)) {
         state.error?.takeIf { page==AndroidSection.PATIENTS }?.let { error -> Surface(color=MaterialTheme.colorScheme.errorContainer) {
             Row(Modifier.padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) {
                 Text(error,Modifier.weight(1f).padding(vertical=10.dp),style=MaterialTheme.typography.bodyMedium)
-                if(!state.fatal) IconButton(onClick=model::clearError) { Icon(Icons.Default.Close,"Cerrar aviso") }
+                if(!state.fatal) IconButton(onClick=model::clearError) { Icon(Icons.Default.Close,stringResource(R.string.ui_cerrar_aviso)) }
             }
         } }
         when {
@@ -85,16 +85,16 @@ import java.time.format.DateTimeFormatter
             page!=AndroidSection.PATIENTS -> {
                 Column(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     CompactHeader(page.label)
-                    Text("Esta sección usa el destino ${page.screenId} del catálogo. Su contenido operativo se habilitará en la entrega correspondiente.")
+                    Text(stringResource(R.string.rec_seccion_pendiente,page.screenId))
                 }
             }
             state.loading -> LoadingState(Modifier.fillMaxSize().padding(Spacing.page))
-            state.fatal -> ErrorState("No pudimos abrir el registro. Tus datos no se han sobrescrito.",model::reload)
+            state.fatal -> ErrorState(stringResource(R.string.rec_error_registro),model::reload)
             else -> Patients(state,model)
         }
     } }
-    if(discard) AlertDialog(onDismissRequest={discard=false},title={Text("¿Salir del formulario?")},text={Text("Los cambios que aún no guardaste se perderán.")},
-        confirmButton={TextButton(onClick={discard=false;model.closeForm()}) {Text("Salir")}},dismissButton={TextButton(onClick={discard=false}) {Text("Seguir editando")}})
+    if(discard) AlertDialog(onDismissRequest={discard=false},title={Text(stringResource(R.string.rec_salir_titulo))},text={Text(stringResource(R.string.rec_salir_detalle))},
+        confirmButton={TextButton(onClick={discard=false;model.closeForm()}) {Text(stringResource(R.string.rec_salir))}},dismissButton={TextButton(onClick={discard=false}) {Text(stringResource(R.string.rec_seguir_editando))}})
 }
 @Composable private fun Home(state:ReceptionState,patients:()->Unit,select:(String)->Unit) {
     PageList {
@@ -116,21 +116,21 @@ import java.time.format.DateTimeFormatter
 }
 @Composable private fun Patients(state:ReceptionState,model:ReceptionViewModel) {
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item { SectionIntro("Recepción / CLIMESA", "Pacientes", stringResource(R.string.rec_registrar_regla)) }
-        item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text("Nombre, DUI o expediente")},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,"Limpiar búsqueda")}}) }
+        item { SectionIntro("", stringResource(R.string.rec_pacientes_titulo)) }
+        item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text(stringResource(R.string.rec_buscar_label))},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,stringResource(R.string.rec_limpiar_busqueda))}}) }
         item { Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            if(PatientAction.SEARCH in state.actions) ClimesaButton(if(state.searching) "Buscando…" else "Buscar",Icons.Default.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)
-            if(PatientAction.REGISTER in state.actions) ClimesaButton(if(state.searching) "Buscando…" else "Registrar paciente",Icons.Default.Add,model::newPatient,enabled=!state.searching,outlined=true)
+            if(PatientAction.SEARCH in state.actions) ClimesaButton(stringResource(if(state.searching) R.string.rec_buscando else R.string.rec_buscar),Icons.Default.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)
+            if(PatientAction.REGISTER in state.actions) ClimesaButton(stringResource(if(state.searching) R.string.rec_buscando else R.string.rec_form_registrar),Icons.Default.Add,model::newPatient,enabled=!state.searching,outlined=true)
             if(PatientAction.REGISTER in state.actions && state.searchedQuery==null && PatientRules.normalize(state.query).replace(" ","").length<2) Text(stringResource(R.string.rec_registrar_sin_busqueda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         } }
-        item { LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(3) {i->val label=listOf("Activos","Inactivos","Todos")[i];FilterChip(selected=state.filter==i,onClick={model.filter(i)},label={Text(label)})}} }
-        item { Text(if(state.searchedQuery==null) "${state.results.size} pacientes" else "${state.results.size} coincidencias",style=MaterialTheme.typography.labelLarge) }
-        if(state.results.isEmpty()) item { EmptyState("Sin coincidencias. Ajustá la búsqueda o el filtro.") }
+        item { LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(3) {i->val label=stringResource(listOf(R.string.rec_filtro_activos,R.string.rec_filtro_inactivos,R.string.rec_filtro_todos)[i]);FilterChip(selected=state.filter==i,onClick={model.filter(i)},label={Text(label)})}} }
+        item { Text(stringResource(if(state.searchedQuery==null) R.string.rec_n_pacientes else R.string.rec_n_coincidencias,state.results.size),style=MaterialTheme.typography.labelLarge) }
+        if(state.results.isEmpty()) item { EmptyState(stringResource(R.string.rec_sin_coincidencias)) }
         items(state.results,key={it.id}) {p -> PatientRow(p) {model.select(p.id)} }
     }
 }
 @Composable private fun PatientRow(p:Patient,click:()->Unit) {
-    DataRow(p.fullName,meta="EXP. ${p.record}",status={StatusTag(if(p.active) "activo" else "inactivo")},onClick=click)
+    DataRow(p.fullName,meta=stringResource(R.string.rec_exp_corto,p.record),status={StatusTag(if(p.active) "activo" else "inactivo")},onClick=click)
 }
 @Composable private fun PatientDetail(p:Patient,state:ReceptionState,model:ReceptionViewModel) {
     var dialog by remember(p.id) {mutableStateOf(false)}
@@ -139,31 +139,30 @@ import java.time.format.DateTimeFormatter
     var reason by remember(p.id) {mutableStateOf("")}
     LaunchedEffect(p.version) {dialog=false;reason=""}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        item {Surface(color=BrandBlue,shape=MaterialTheme.shapes.large) {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("EXPEDIENTE ${p.record}",style=MaterialTheme.typography.labelSmall,color=Color(0xFFD4D9FF));Text(p.fullName,style=MaterialTheme.typography.titleLarge,color=Color.White);Text(if(p.active) "Activo" else "Inactivo",style=MaterialTheme.typography.bodySmall,color=StateFree)}}}
+        item {SectionCard(p.fullName,eyebrow=stringResource(R.string.rec_expediente_n,p.record),action={StatusTag(if(p.active) "activo" else "inactivo")}) {Text(if(gaps.isEmpty()) stringResource(R.string.pac_ficha_completa) else stringResource(R.string.pac_ficha_faltan,gaps.joinToString(", ")),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
         item {androidx.compose.material3.TabRow(selectedTabIndex=tab) {listOf(R.string.pac_ficha_datos,R.string.pac_ficha_cambios).forEachIndexed {i,id->androidx.compose.material3.Tab(selected=tab==i,onClick={tab=i},text={Text(stringResource(id))})}}}
-        if(tab==0) item {Text(if(gaps.isEmpty()) stringResource(R.string.pac_ficha_completa) else stringResource(R.string.pac_ficha_faltan,gaps.joinToString(", ")),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
         if(tab==0) item {ClimesaCard {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
-            Value("DUI",p.dui ?: "Sin documento registrado");Value("Nacimiento",p.birth?.toString() ?: "No registrado");Value("Sexo",p.sex.label);Value("Teléfono",p.phone.ifBlank {"No registrado"})
+            val none=stringResource(R.string.rec_no_registrado);Value(stringResource(R.string.rec_dui),p.dui ?: stringResource(R.string.rec_sin_documento));Value(stringResource(R.string.rec_nacimiento),p.birth?.toString() ?: none);Value(stringResource(R.string.rec_sexo),p.sex.label);Value(stringResource(R.string.rec_telefono),p.phone.ifBlank {none})
         }}}
-        if(tab==0) item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) ClimesaButton("Editar datos",Icons.Default.Edit,{model.edit(p)})
-            if(PatientAction.CHANGE_STATUS in state.actions) ClimesaButton(if(p.active) "Inactivar paciente" else "Reactivar paciente",Icons.Default.ToggleOff,{dialog=true},enabled=!state.saving,outlined=true)}}
-        if(tab==1) item {Text("Historial de actividad",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
+        if(tab==0) item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) ClimesaButton(stringResource(R.string.rec_editar_datos),Icons.Default.Edit,{model.edit(p)})
+            if(PatientAction.CHANGE_STATUS in state.actions) ClimesaButton(stringResource(if(p.active) R.string.rec_inactivar else R.string.rec_reactivar),Icons.Default.ToggleOff,{dialog=true},enabled=!state.saving,outlined=true)}}
+        if(tab==1) item {Text(stringResource(R.string.rec_historial),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         val events=state.registry.audit.filter {it.record==p.record}.reversed()
-        if(tab==1&&events.isEmpty()) item {Text("Ficha de ejemplo. Todavía no tiene cambios.")}
+        if(tab==1&&events.isEmpty()) item {Text(stringResource(R.string.rec_sin_cambios))}
         if(tab==1) items(events) {AuditRow(it)}
-        if(tab==1) item {Text("Los cambios de esta ficha se conservan en el historial.",style=MaterialTheme.typography.bodySmall)}
+        if(tab==1) item {Text(stringResource(R.string.rec_cambios_conservan),style=MaterialTheme.typography.bodySmall)}
     }
-    if(dialog) AlertDialog(onDismissRequest={if(!state.saving)dialog=false},title={Text(if(p.active) "Inactivar paciente" else "Reactivar paciente")},
-        text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {Text("La ficha y su historial se conservan.");OutlinedTextField(reason,{reason=it.take(500)},label={Text("Motivo")},supportingText={Text("Mínimo 10 caracteres")})}},
-        confirmButton={TextButton(enabled=ChangeReason.error(reason)==null && !state.saving,onClick={model.changeActive(p,reason)}) {Text(if(state.saving) "Guardando…" else "Confirmar")}},
-        dismissButton={TextButton(enabled=!state.saving,onClick={dialog=false}) {Text("Cancelar")}})
+    if(dialog) ConfirmDialog(
+        title=stringResource(if(p.active) R.string.rec_inactivar else R.string.rec_reactivar),confirmLabel=stringResource(if(p.active) R.string.rec_inactivar else R.string.rec_reactivar),
+        onConfirm={model.changeActive(p,reason)},onDismiss={dialog=false},message=stringResource(R.string.rec_estado_conserva),
+        destructive=p.active,busy=state.saving,confirmEnabled=ChangeReason.error(reason)==null,
+        body={FormField(stringResource(R.string.rec_motivo),reason,{reason=it.take(500)},hint=stringResource(R.string.ui_minimo_10),singleLine=false)})
 }
 @Composable private fun Value(label:String,value:String) {Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {Text(label.uppercase(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Text(value,style=MaterialTheme.typography.bodyLarge);HorizontalDivider()}}
 @Composable private fun PatientForm(state:ReceptionState,model:ReceptionViewModel) {
     val d=state.draft
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Text(if(state.editingId==null) "Nuevo paciente" else "Actualizar información",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-        Text("Los campos con * son obligatorios.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.rec_obligatorios),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(state.editingId==null) Text(stringResource(R.string.rec_registrar_formulario_ayuda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
         state.existing?.let { NoticeBanner(NoticeKind.INFO,stringResource(R.string.rec_dui_existente,it)) }
         if(state.similar.isNotEmpty()) ClimesaCard { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -171,17 +170,16 @@ import java.time.format.DateTimeFormatter
             state.similar.forEach { Text(it,style=MaterialTheme.typography.bodyMedium) }
             ClimesaButton(stringResource(R.string.rec_duplicado_confirmar),Icons.Default.Add,{model.save(true)},enabled=!state.saving,outlined=true)
         } }
-        Text("01 / DATOS PERSONALES",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
-        PatientField("Nombres *",d.givenNames,state.fields["givenNames"],enabled=!state.saving) {model.draft(d.copy(givenNames=it.take(80)))}
-        PatientField("Apellidos *",d.surnames,state.fields["surnames"],enabled=!state.saving) {model.draft(d.copy(surnames=it.take(100)))}
-        PatientField("DUI · opcional",d.dui,state.fields["dui"],"12345678-9",KeyboardType.Phone,!state.saving) {model.draft(d.copy(dui=it.take(10)))}
-        PatientField("Nacimiento · opcional",d.birth,state.fields["birth"],"AAAA-MM-DD",enabled=!state.saving) {model.draft(d.copy(birth=it.take(10)))}
-        Text("Sexo registrado",style=MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.rec_datos_personales),style=MaterialTheme.typography.titleSmall)
+        PatientField(stringResource(R.string.rec_campo_nombres),d.givenNames,state.fields["givenNames"],enabled=!state.saving) {model.draft(d.copy(givenNames=it.take(80)))}
+        PatientField(stringResource(R.string.rec_campo_apellidos),d.surnames,state.fields["surnames"],enabled=!state.saving) {model.draft(d.copy(surnames=it.take(100)))}
+        PatientField(stringResource(R.string.rec_campo_dui),d.dui,state.fields["dui"],"12345678-9",KeyboardType.Phone,!state.saving) {model.draft(d.copy(dui=it.take(10)))}
+        PatientField(stringResource(R.string.rec_campo_nacimiento),d.birth,state.fields["birth"],"AAAA-MM-DD",enabled=!state.saving) {model.draft(d.copy(birth=it.take(10)))}
+        Text(stringResource(R.string.rec_campo_sexo),style=MaterialTheme.typography.labelLarge)
         Sex.entries.forEach {sex -> Row(verticalAlignment=Alignment.CenterVertically) {RadioButton(selected=d.sex==sex,onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving);TextButton(onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving) {Text(sex.label)}}}
-        PatientField("Teléfono · opcional",d.phone,state.fields["phone"],"7000-0000",KeyboardType.Phone,!state.saving) {model.draft(d.copy(phone=it.take(9)))}
-        if(state.editingId!=null) OutlinedTextField(state.reason,model::reason,modifier=Modifier.fillMaxWidth(),enabled=!state.saving,label={Text("Motivo de modificación *")},supportingText={Text("Mínimo 10 caracteres. Quedará en el historial.")})
-        Button(onClick={model.save()},enabled=!state.saving,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text(if(state.saving) "Guardando…" else "Guardar paciente")}
-        Text("Revisá posibles duplicados antes de guardar.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        PatientField(stringResource(R.string.rec_campo_telefono),d.phone,state.fields["phone"],"7000-0000",KeyboardType.Phone,!state.saving) {model.draft(d.copy(phone=it.take(9)))}
+        if(state.editingId!=null) OutlinedTextField(state.reason,model::reason,modifier=Modifier.fillMaxWidth(),enabled=!state.saving,label={Text(stringResource(R.string.rec_campo_motivo))},supportingText={Text(stringResource(R.string.rec_campo_motivo_ayuda))})
+        PrimaryButton(stringResource(R.string.rec_guardar_paciente),{model.save()},loading=state.saving)
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -191,10 +189,10 @@ import java.time.format.DateTimeFormatter
 @Composable private fun Profile(state:ReceptionState,dark:Boolean,setDark:(Boolean)->Unit,account:AuthenticatedAccount,onLogout:()->Unit) {
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {ProfileSummaryCard(account)}
-        account.profile.notice?.let {item {NoticeBanner(NoticeKind.WARNING,"La validación de permisos todavía no está disponible.")}}
+        account.profile.notice?.let {item {NoticeBanner(NoticeKind.WARNING,stringResource(R.string.rec_permisos_pendiente))}}
         item {AppearanceCard(dark,setDark)}
-        item {Text("Actividad reciente",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
-        if(state.registry.audit.isEmpty()) item {Text("Aquí aparecerán los registros y cambios.")}
+        item {Text(stringResource(R.string.rec_actividad_reciente),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
+        if(state.registry.audit.isEmpty()) item {Text(stringResource(R.string.rec_actividad_vacia))}
         items(state.registry.audit.takeLast(20).reversed()) {AuditRow(it)}
         item {HorizontalDivider();Spacer(Modifier.height(12.dp));SecondaryButton(stringResource(R.string.cerrar_sesion),onLogout,icon=Icons.Default.Logout);Spacer(Modifier.height(8.dp));Text(stringResource(R.string.ui_cerrar_sesion_ayuda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
     }

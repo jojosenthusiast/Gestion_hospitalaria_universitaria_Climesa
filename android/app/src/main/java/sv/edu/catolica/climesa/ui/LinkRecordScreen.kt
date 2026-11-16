@@ -16,6 +16,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sv.edu.catolica.climesa.R
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import sv.edu.catolica.climesa.domain.AccessProfile
 import sv.edu.catolica.climesa.domain.LinkStatus
 
@@ -31,26 +33,26 @@ fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, mode
         item { SectionIntro(stringResource(R.string.vinculo_eyebrow), stringResource(R.string.vinculo_titulo), stringResource(R.string.vinculo_detalle)) }
         when (state.status) {
             LinkStatus.APPROVED -> item {
-                SectionCard(stringResource(R.string.vinculo_aprobada)) {
+                SectionCard(stringResource(R.string.vinculo_aprobada), action = { StatusTag("aprobada") }) {
                     Text(stringResource(R.string.vinculo_aprobada_detalle), style = MaterialTheme.typography.bodyMedium)
                 }
             }
             LinkStatus.PENDING -> item {
-                SectionCard(stringResource(R.string.vinculo_en_verificacion)) {
+                SectionCard(stringResource(R.string.vinculo_en_verificacion), action = { StatusTag("en_espera") }) {
                     Text(stringResource(R.string.vinculo_en_verificacion_detalle), style = MaterialTheme.typography.bodyMedium)
                 }
             }
             LinkStatus.REJECTED -> item {
-                SectionCard(stringResource(R.string.vinculo_rechazada)) {
+                SectionCard(stringResource(R.string.vinculo_rechazada), action = { StatusTag("rechazada") }) {
                     NoticeBanner(NoticeKind.ERROR, stringResource(R.string.vinculo_rechazada_detalle))
-                    SecondaryButton(stringResource(R.string.vinculo_volver_a_pedir), { model.retry() }, icon = Icons.Default.Refresh)
+                    PrimaryButton(stringResource(R.string.vinculo_volver_a_pedir), { model.retry() }, icon = Icons.Default.Refresh)
                 }
             }
             LinkStatus.FORM -> item {
                 ClimesaActionGroup {
                     state.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
-                    FormField(stringResource(R.string.vinculo_dui), dui, { dui = it.take(10) }, error = state.fieldErrors["dui"])
-                    FormField(stringResource(R.string.vinculo_nacimiento), birth, { birth = it.take(10) }, error = state.fieldErrors["birth"], hint = stringResource(R.string.vinculo_nacimiento_formato))
+                    FormField(stringResource(R.string.vinculo_dui), dui, { dui = it.take(10) }, error = state.fieldErrors["dui"], enabled = !state.busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
+                    FormField(stringResource(R.string.vinculo_nacimiento), birth, { birth = it.take(10) }, error = state.fieldErrors["birth"], hint = stringResource(R.string.vinculo_nacimiento_formato), enabled = !state.busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
                     Text(stringResource(R.string.vinculo_privacidad), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     PrimaryButton(
                         stringResource(if (state.busy) R.string.vinculo_enviando else R.string.vinculo_enviar),

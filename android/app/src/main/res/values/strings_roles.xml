@@ -4,4 +4,92 @@
     <!-- Admission feasibility checks -->
     <string name="ing_chequeo_ok">Correcto</string>
     <string name="ing_chequeo_revisar">Revisar</string>
+    <!-- Shared bits -->
+    <string name="ui_cerrar_aviso">Cerrar aviso</string>
+    <string name="ui_y">" y "</string>
+    <string name="ui_minimo_10">Mínimo 10 caracteres.</string>
+
+    <!-- A09 patient ambulance request -->
+    <string name="amb_prefill_aviso">Tomamos de tu expediente: %1$s. Revísalo antes de enviar.</string>
+    <string name="amb_campo_direccion">dirección</string>
+    <string name="amb_campo_telefono">teléfono</string>
+
+    <!-- Reception: patients -->
+    <string name="rec_form_registrar">Registrar paciente</string>
+    <string name="rec_form_editar">Editar ficha</string>
+    <string name="rec_ficha_titulo">Ficha del paciente</string>
+    <string name="rec_seccion_pendiente">Esta sección (%1$s) todavía no está disponible en Android.</string>
+    <string name="rec_error_registro">No pudimos abrir el registro. Tus datos no se han sobrescrito.</string>
+    <string name="rec_salir_titulo">¿Salir del formulario?</string>
+    <string name="rec_salir_detalle">Los cambios que aún no guardaste se perderán.</string>
+    <string name="rec_salir">Salir</string>
+    <string name="rec_seguir_editando">Seguir editando</string>
+    <string name="rec_pacientes_titulo">Pacientes</string>
+    <string name="rec_buscar_label">Nombre, DUI o expediente</string>
+    <string name="rec_limpiar_busqueda">Limpiar búsqueda</string>
+    <string name="rec_buscando">Buscando…</string>
+    <string name="rec_buscar">Buscar</string>
+    <string name="rec_filtro_activos">Activos</string>
+    <string name="rec_filtro_inactivos">Inactivos</string>
+    <string name="rec_filtro_todos">Todos</string>
+    <string name="rec_n_pacientes">%1$d pacientes</string>
+    <string name="rec_n_coincidencias">%1$d coincidencias</string>
+    <string name="rec_sin_coincidencias">Sin coincidencias. Ajusta la búsqueda o el filtro.</string>
+    <string name="rec_exp_corto">Exp. %1$s</string>
+    <string name="rec_expediente_n">Expediente %1$s</string>
+    <string name="rec_no_registrado">No registrado</string>
+    <string name="rec_sin_documento">Sin documento registrado</string>
+    <string name="rec_dui">DUI</string>
+    <string name="rec_nacimiento">Nacimiento</string>
+    <string name="rec_sexo">Sexo</string>
+    <string name="rec_telefono">Teléfono</string>
+    <string name="rec_editar_datos">Editar datos</string>
+    <string name="rec_inactivar">Inactivar paciente</string>
+    <string name="rec_reactivar">Reactivar paciente</string>
+    <string name="rec_estado_conserva">La ficha y su historial se conservan. Escribe el motivo; quedará en el historial.</string>
+    <string name="rec_motivo">Motivo</string>
+    <string name="rec_historial">Historial de actividad</string>
+    <string name="rec_sin_cambios">Esta ficha todavía no tiene cambios.</string>
+    <string name="rec_cambios_conservan">Los cambios de esta ficha se conservan en el historial.</string>
+    <string name="rec_obligatorios">Los campos con * son obligatorios.</string>
+    <string name="rec_datos_personales">Datos personales</string>
+    <string name="rec_campo_nombres">Nombres *</string>
+    <string name="rec_campo_apellidos">Apellidos *</string>
+    <string name="rec_campo_dui">DUI · opcional</string>
+    <string name="rec_campo_nacimiento">Nacimiento · opcional</string>
+    <string name="rec_campo_sexo">Sexo registrado</string>
+    <string name="rec_campo_telefono">Teléfono · opcional</string>
+    <string name="rec_campo_motivo">Motivo de modificación *</string>
+    <string name="rec_campo_motivo_ayuda">Mínimo 10 caracteres. Quedará en el historial.</string>
+    <string name="rec_guardar_paciente">Guardar paciente</string>
+    <string name="rec_permisos_pendiente">La validación de permisos todavía no está disponible.</string>
+    <string name="rec_actividad_reciente">Actividad reciente</string>
+    <string name="rec_actividad_vacia">Aquí aparecerán los registros y cambios.</string>
+    <!-- Login and shell -->
+    <string name="app_acceso_error">No pudimos verificar tu acceso</string>
+    <string name="app_revisa_conexion">Revisa tu conexión e intenta de nuevo.</string>
+    <string name="app_volver_intentar">Volver a intentar</string>
+    <string name="app_rol_sin_android">Tu rol no usa esta aplicación</string>
+    <string name="app_comprobando_sesion">Comprobando sesión…</string>
+    <string name="app_olvidaste">¿Olvidaste tu contraseña?</string>
+    <string name="app_volver_ingreso">Volver al ingreso</string>
+    <string name="app_cuenta_paciente">Cuenta de paciente</string>
+    <string name="app_crea_cuenta">Crea tu cuenta</string>
+    <string name="app_nombre_completo">Nombre completo</string>
+    <string name="app_correo">Correo electrónico</string>
+    <string name="app_contrasena_8">Contraseña · 8 caracteres o más</string>
+    <string name="app_confirmar_contrasena">Confirmar contraseña</string>
+    <string name="app_creando_cuenta">Creando cuenta…</string>
+    <string name="app_crear_cuenta">Crear cuenta de paciente</string>
+    <string name="app_enviando_correo">Enviando correo…</string>
+    <string name="app_reenviar_en">Reenviar correo en %1$d s</string>
+    <string name="app_reenviar">Reenviar correo de confirmación</string>
+    <string name="app_revisa_correo">Revisa tu correo</string>
+    <string name="app_enlace_enviado">Te enviamos un enlace de confirmación a:</string>
+    <string name="app_abre_correo">Abre el correo y toca «Confirmar tu correo». Después vuelve aquí e inicia sesión. Si no lo ves en unos minutos, revisa la carpeta de spam.</string>
+    <string name="app_ya_confirme">Ya confirmé, iniciar sesión</string>
+    <string name="app_recuperar">Recuperar contraseña</string>
+    <string name="app_recuperar_detalle">Escribe el correo de tu cuenta. Te enviaremos un enlace para crear una contraseña nueva.</string>
+    <string name="app_enviando">Enviando…</string>
+    <string name="app_enviar_enlace">Enviar enlace</string>
 </resources>

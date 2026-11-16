@@ -50,6 +50,8 @@ data class AmbulanceUiState(
     val arrivals: List<sv.edu.catolica.climesa.domain.ArrivalCandidate> = emptyList(),
     /** MA-AMB-05: the patient's requests as the server keeps them; null until the first read answers. */
     val ownRequests: List<OwnAmbulanceRequest>? = null,
+    /** S13: the patient's own address and phone (`GET /me/paciente`) for the request form; null when the record is not readable. */
+    val requestPrefill: sv.edu.catolica.climesa.domain.AmbulancePrefill? = null,
     val prehospital: PrehospitalForm = PrehospitalForm(),
     val queued: QueuedPrehospital? = null,
     /** MA-AMB-06: milestones recorded without signal, sent in order with their phone time. */
@@ -119,11 +121,24 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
                     AmbulanceMode.LOG -> mutable.value = mutable.value.copy(loading = false, log = AmbulanceParser.log(api.request(AmbulanceRules.logPath(mutable.value.logFilters))))
                     AmbulanceMode.ARRIVAL -> loadArrival()
                     AmbulanceMode.PARAMEDIC -> loadParamedic()
-                    AmbulanceMode.REQUEST -> mutable.value = mutable.value.copy(loading = false, ownRequests = AmbulanceParser.ownRequests(api.request("/ambulancia/solicitudes/mias")))
+                    AmbulanceMode.REQUEST -> {
+                        mutable.value = mutable.value.copy(loading = false, ownRequests = AmbulanceParser.ownRequests(api.request("/ambulancia/solicitudes/mias")))
+                        loadPrefill()
+                    }
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) else mutable.value = mutable.value.copy(loading = false) }
         }
+    }
+
+    private var prefillRead = false
+
+    /** Reads the patient's own contact data once per ViewModel; a record that is not readable (unlinked account) prefills nothing. */
+    private suspend fun loadPrefill() {
+        if (prefillRead) return
+        prefillRead = true
+        val json = try { api.request("/me/paciente") as? org.json.JSONObject } catch (e: CancellationException) { prefillRead = false; throw e } catch (_: Exception) { null }
+        json?.let { mutable.value = mutable.value.copy(requestPrefill = sv.edu.catolica.climesa.domain.AmbulancePrefill.from(it)) }
     }
 
     /** Pantalla "Servicio activo": estado de la unidad y, aparte, los últimos servicios; si la bitácora falla, el estado se muestra igual. */
@@ -364,7 +379,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             "hito_hora_invalida" -> "La hora del hito es anterior al último registrado o tiene más de 24 horas."
             "tripulante_sin_turno" -> "Alguien de la tripulación elegida ya no tiene turno en curso. Se actualizó la lista; elige de nuevo."
             "servicio_cerrado" -> "Pasaron más de 24 horas desde que terminó el servicio."
-            else -> error.message ?: "No se pudo completar la operación."
+            else -> userMessage(error, "No se pudo completar la operación.")
         }
     }
 }
