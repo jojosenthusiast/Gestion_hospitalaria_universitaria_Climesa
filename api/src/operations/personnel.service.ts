@@ -1,11 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { ProblemException,VersionConflictException } from '../platform/problem';
-import { Actor, hasPermission } from '../platform/actor';
+import { Actor, SYSTEM_ACTOR, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
 import { Clock,businessDate,businessDayRange } from '../platform/clock';
-import { StaffDto, ShiftDto, RegistrationDto, PublishDto, AttendanceDto, CheckInDto } from './operations.dto';
+import { StaffDto, ShiftDto, RegistrationDto, PublishDto, AttendanceDto } from './operations.dto';
 import { AttendancePolicy, LoadPolicy, allowedActions, attendanceOf, consecutiveDays, isLate, stateByClock, windowLoad } from './shift.rules';
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
@@ -51,19 +51,37 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   // FR-103-13: trabajo programado cada minuto; las pruebas lo invocan con el reloj sustituido en lugar de esperar al temporizador.
   onModuleInit(){if(process.env.NODE_ENV==='test')return;const log=new Logger(PersonnelService.name);this.timer=setInterval(()=>this.advanceStates().catch(e=>log.warn(`No se pudo avanzar el estado de los turnos: ${e}`)),60_000);this.timer.unref();}
   onModuleDestroy(){if(this.timer)clearInterval(this.timer);}
-  /** Pasa los turnos publicados a "en curso" al empezar y a "completado" al terminar, según el reloj inyectable (FR-103-13, D-054). */
+  /**
+   * El estado sigue al reloj sin que nadie presione nada (FR-103-13, D-054, ASIS-01): un turno publicado pasa a
+   * "en curso" al empezar y a "completado" al terminar (America/El_Salvador es solo presentación: se compara en UTC).
+   * Al empezar, la entrada queda confirmada a la hora de inicio; JOP solo marca la ausencia o corrige la hora real.
+   * Nunca toca borradores, cancelados ni ausentes. Es idempotente: una segunda pasada no cambia nada. Cada cambio queda
+   * en la auditoría con el actor SISTEMA y se anuncia en el outbox. Lo corre el temporizador de cada minuto y, antes de
+   * leer o escribir turnos, `advanceSafely`.
+   */
   async advanceStates() {
     const now=this.clock.now();
     return this.db.transaction(async c=>{
-      const rows=(await c.query("UPDATE personal.turno SET estado=CASE WHEN upper(periodo)<=$1::timestamptz THEN 'completado' ELSE 'en_curso' END,version=version+1 WHERE (estado='publicado' AND lower(periodo)<=$1::timestamptz) OR (estado='en_curso' AND upper(periodo)<=$1::timestamptz) RETURNING id,persona_id,version",[now])).rows;
-      // ASIS-01: pasado el margen sin entrada, el turno queda "sin confirmar" y se avisa una vez a JOP (y a la persona).
-      const margin=(await this.policies.value<AttendancePolicy>(c,'turnos.asistencia',now)).margen_minutos;
-      const unconfirmed=(await c.query("UPDATE personal.turno SET alerta_sin_confirmar_en=$1,version=version+1 WHERE estado IN ('publicado','en_curso') AND presente_desde IS NULL AND alerta_sin_confirmar_en IS NULL AND lower(periodo)+make_interval(mins=>$2)<=$1::timestamptz AND upper(periodo)>$1::timestamptz RETURNING id,persona_id,version",[now,margin])).rows;
-      const latest=new Map([...rows,...unconfirmed].map(r=>[r.id,r]));
-      await this.announce(c,'turno.actualizado',[...latest.values()]);
+      // Una pasada a la vez; otra simultánea no espera, simplemente no hace nada.
+      if(!(await c.query('SELECT pg_try_advisory_xact_lock(671021) AS ok')).rows[0].ok)return 0;
+      await c.query("SET LOCAL lock_timeout = '2s'");
+      await c.query("SET LOCAL statement_timeout = '10s'");
+      const rows=(await c.query(`UPDATE personal.turno SET estado=CASE WHEN upper(periodo)<=$1::timestamptz THEN 'completado' ELSE 'en_curso' END,
+          presente_desde=coalesce(presente_desde,lower(periodo)),version=version+1
+        WHERE (estado='publicado' AND lower(periodo)<=$1::timestamptz) OR (estado='en_curso' AND upper(periodo)<=$1::timestamptz)
+        RETURNING id,persona_id,version,estado`,[now])).rows;
+      if(!rows.length)return 0;
+      const ids=(state:string)=>rows.filter(r=>r.estado===state).map(r=>r.id as string);
+      await this.commands.audit(c,SYSTEM_ACTOR,{action:'turnos.avance_automatico',entity:'turno',detail:{ids:rows.map(r=>r.id),enCurso:ids('en_curso'),completados:ids('completado'),en:now.toISOString()}});
+      await this.announce(c,'turno.actualizado',rows);
       return rows.length;
     });
   }
+  /** El barrido antes de una lectura o escritura: si falla (bloqueo o tiempo), se registra y se sigue; el temporizador lo reintenta. */
+  async advanceSafely() {
+    try{return await this.advanceStates();}catch(e){new Logger(PersonnelService.name).warn(`No se pudo avanzar el estado de los turnos antes de la operación: ${e}`);return 0;}
+  }
+
   private async announce(c:PoolClient,type:string,rows:{id:string;persona_id:string;version:number}[]) {
     if(!rows.length)return;
     const accounts=(await c.query('SELECT id,persona_personal_id FROM acceso.usuario WHERE persona_personal_id=ANY($1::uuid[])',[rows.map(r=>r.persona_id)])).rows;
@@ -106,11 +124,15 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   async coverage(from:string,to:string,areaId?:string) {
     const {start,end}=this.range(from,to);
     if(areaId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(areaId))throw new BadRequestException('Selecciona un área válida.');
+    await this.advanceSafely();
+
     return {from,to,gaps:await this.db.transaction(c=>this.gaps(c,start,end,areaId))};
   }
   /** FR-103-09: publica los borradores del rango; con huecos publica igual, advierte y deja registrado quién publicó. */
   async publish(actor:Actor,dto:PublishDto,key?:string) {
     const {start,end}=this.range(dto.from,dto.to);
+    // El estado vigente (en curso, completado) decide qué se puede mover o cancelar: primero se pone al día con el reloj.
+    await this.advanceSafely();
     return this.commands.run(actor,'turnos.publicar:rango',key,dto,async c=>{
       const at=this.clock.now();
       // CARGA-01: un borrador no contaba como carga; al publicarlo se revisan sus días seguidos aquí y el descanso y el
@@ -195,7 +217,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   }
   async shifts(actor:Actor,mine=false) {
     if(mine&&!actor.staffId)return [];
-    await this.advanceStates();
+    await this.advanceSafely();
     // Ventana alrededor de hoy, no "los 300 más lejanos": con la planificación a dos semanas, un tope fijo ordenado
     // del más futuro al más antiguo dejaba fuera los turnos de hoy (el recién asignado no aparecía y el formulario
     // no veía los conflictos de la jornada).
@@ -207,13 +229,13 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
         FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id JOIN infra.espacio e ON e.id=t.area_id
         WHERE ($1::uuid IS NULL OR t.persona_id=$1) AND ((NOT $2 AND $3) OR t.estado IN ('publicado','en_curso','completado','ausente'))
           AND t.periodo && tstzrange($4::timestamptz,$5::timestamptz,'[)') ORDER BY lower(t.periodo) DESC LIMIT 3000`,[mine?actor.staffId:null,mine,hasPermission(actor,'turnos.ver_borradores'),new Date(now-SHIFT_WINDOW.pastDays*DAY),new Date(now+SHIFT_WINDOW.futureDays*DAY)])).rows;
-      return rows.map(({attendanceReason,emergencyReason,...row})=>this.present(row,now,policy,canPlan,actor.staffId,{attendanceReason,emergencyReason}));
+      return rows.map(({attendanceReason,emergencyReason,...row})=>this.present(row,now,policy,canPlan,{attendanceReason,emergencyReason}));
     });
   }
   /** Asistencia derivada y acciones permitidas del turno para quien consulta (ASIS-01, MA-TUR-03). */
-  private present(row:any,now:number,policy:AttendancePolicy,canPlan:boolean,staffId:string|null,planner:Record<string,unknown>){
+  private present(row:any,now:number,policy:AttendancePolicy,canPlan:boolean,planner:Record<string,unknown>){
     const shift={state:row.state as string,start:new Date(row.start).valueOf(),end:new Date(row.end).valueOf(),presentSince:row.presentSince?new Date(row.presentSince).valueOf():null};
-    return {...row,attendance:attendanceOf(shift,now,policy),late:isLate(shift,policy),...(canPlan?planner:{}),allowedActions:allowedActions(shift,now,policy,canPlan,!!staffId&&staffId===row.staffId)};
+    return {...row,attendance:attendanceOf(shift,now),late:isLate(shift,policy),...(canPlan?planner:{}),allowedActions:allowedActions(shift,now,canPlan)};
   }
   /** Obs. 2/9: opciones reales para filtrar y asignar turnos; no depende de los turnos cargados ni de `personal.ver`/`espacios.ver`. Sin DUI, teléfono ni números de junta. */
   async shiftCatalog() {
@@ -239,15 +261,19 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     // MA-TUR-01 / CARGA-05: un turno nace publicado y pasa por todas las validaciones; `state` solo cancela uno existente.
     if(!id&&dto.state)throw new BadRequestException('Un turno nuevo se crea publicado; para cancelarlo, edítalo después de crearlo.');
     const at=this.clock.now(),cancelling=dto.state==='cancelado';
+    // El estado vigente (en curso, completado) decide qué se puede mover o cancelar: primero se pone al día con el reloj.
+    await this.advanceSafely();
     return this.commands.run(actor,`turnos.planificar:${id??'nuevo'}`,key,dto,async c=>{
       let old:any=null;
       if(id){
         old=(await c.query('SELECT t.version,t.estado,t.persona_id,t.area_id,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.tipo,p.tipo AS staff_type FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE t.id=$1 FOR UPDATE OF t',[id])).rows[0];
         if(!old)throw new NotFoundException('No se encontró el turno.');
+        // MA-TUR-03: un turno que ya empezó, terminó, se canceló o tiene ausencia no se mueve ni se cancela. Va antes de la
+        // versión: el barrido del reloj sube la versión al empezar, y la respuesta útil es "ya empezó", no "cambió".
+        if(!['publicado','borrador'].includes(old.estado)||new Date(old.start)<=at)throw new ProblemException('turno_iniciado',409,'El turno ya empezó o ya no está vigente; no se puede mover ni cancelar.','start');
         if(old.version!==dto.version)throw new VersionConflictException(old.version,'El turno cambió; actualiza la planificación.');
         if(!dto.reason||dto.reason.trim().length<10)throw new BadRequestException('Indica el motivo del cambio.');
-        // MA-TUR-03: un turno que ya empezó, terminó, se canceló o tiene ausencia no se mueve ni se cancela.
-        if(!['publicado','borrador'].includes(old.estado)||new Date(old.start)<=at)throw new ProblemException('turno_iniciado',409,'El turno ya empezó o ya no está vigente; no se puede mover ni cancelar.','start');
+
       }
       if(cancelling){
         // Cancelar solo cambia el estado; nunca mueve el turno a la vez (CARGA-05).
@@ -340,60 +366,48 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   private async attendanceResult(c:PoolClient,row:{id:string;version:number;estado:string;presente_desde:Date|null},shift:{start:Date;end:Date},extra:{affectedAppointments?:unknown[];substitutes?:unknown[]}={}) {
     const now=this.clock.now(),policy=await this.policies.value<AttendancePolicy>(c,'turnos.asistencia',now);
     const view={state:row.estado,start:shift.start.valueOf(),end:shift.end.valueOf(),presentSince:row.presente_desde?new Date(row.presente_desde).valueOf():null};
-    return {id:row.id,version:row.version,state:row.estado,attendance:attendanceOf(view,now.valueOf(),policy),late:isLate(view,policy),affectedAppointments:extra.affectedAppointments??[],substitutes:extra.substitutes??[]};
+    return {id:row.id,version:row.version,state:row.estado,attendance:attendanceOf(view,now.valueOf()),late:isLate(view,policy),affectedAppointments:extra.affectedAppointments??[],substitutes:extra.substitutes??[]};
   }
-  /** ASIS-01 a ASIS-03: JOP marca la entrada, la ausencia (justificada o no, con motivo) o deshace una marca equivocada. */
+  /**
+   * ASIS-01 a ASIS-03: la entrada se confirma sola a la hora de inicio; JOP marca la ausencia (tipo y motivo), corrige la
+   * hora real de entrada (`presente` con `at` y motivo, también de alguien marcado ausente que sí llegó) o deshace una
+   * ausencia equivocada (`pendiente`, con motivo), que devuelve el turno al estado del reloj con la entrada automática.
+   */
   async attendance(actor:Actor,id:string,dto:AttendanceDto,key?:string) {
     const reason=dto.reason?.trim()||null;
-    if(dto.state!=='presente'&&(reason?.length??0)<10)throw new BadRequestException(dto.state==='ausente'?'Indica el motivo de la ausencia, de al menos 10 caracteres.':'Indica por qué deshaces la marca, con al menos 10 caracteres.');
+    if((reason?.length??0)<10)throw new BadRequestException(dto.state==='ausente'?'Indica el motivo de la ausencia, de al menos 10 caracteres.':dto.state==='presente'?'Indica por qué corriges la entrada, con al menos 10 caracteres.':'Indica por qué deshaces la ausencia, con al menos 10 caracteres.');
     if(dto.state==='ausente'&&!dto.absenceType)throw new BadRequestException('Indica si la ausencia es justificada o injustificada.');
     if(dto.at&&!/(Z|[+-]\d\d:\d\d)$/.test(dto.at))throw new BadRequestException('Indica la hora de entrada con zona horaria.');
+    await this.advanceSafely();
     return this.commands.run(actor,`turnos.planificar:${id}:asistencia`,key,dto,async c=>{
       const now=this.clock.now(),shift=await this.lockedShift(c,id);
       if(shift.version!==dto.version)throw new VersionConflictException(shift.version,'El turno cambió; actualiza la planificación.');
       const policy=await this.policies.value<AttendancePolicy>(c,'turnos.asistencia',now);
       const early=new Date(shift.start.valueOf()-policy.entrada_anticipada_minutos*60_000);
+      const byClock=stateByClock(shift.start.valueOf(),shift.end.valueOf(),now.valueOf());
       let row,extra={};
       if(dto.state==='presente'){
-        if(!['publicado','en_curso','completado','ausente'].includes(shift.estado))throw new ProblemException('transicion_invalida',409,'Este turno no admite marcar la entrada.');
-        if(shift.presente_desde)throw new ProblemException('asistencia_ya_marcada',409,'La entrada de este turno ya está marcada.');
+        if(!['en_curso','completado','ausente'].includes(shift.estado)||now<shift.start)throw new ProblemException('transicion_invalida',409,'La entrada se corrige cuando el turno ya empezó.');
         if(!dto.at&&now>=shift.end)throw new BadRequestException('El turno ya terminó; indica la hora de entrada.');
         const at=dto.at?new Date(dto.at):now;
         if(!Number.isFinite(at.valueOf())||at<early||at>=shift.end||at>now)throw new BadRequestException('La hora de entrada debe caer dentro del turno y no ser futura.');
-        const state=shift.estado==='ausente'?stateByClock(shift.start.valueOf(),shift.end.valueOf(),now.valueOf()):shift.estado;
+        const state=shift.estado==='ausente'?byClock:shift.estado;
         row=(await dbRule(c.query('UPDATE personal.turno SET estado=$2,presente_desde=$3,ausencia_tipo=NULL,asistencia_motivo=$4,asistencia_por=$5,asistencia_en=$6,version=version+1 WHERE id=$1 RETURNING id,version,estado,presente_desde',[id,state,at,reason,actor.id,now]))).rows[0];
       }else if(dto.state==='ausente'){
         if(!['publicado','en_curso','completado'].includes(shift.estado))throw new ProblemException('transicion_invalida',409,'Este turno no admite marcar ausencia.');
-        if(shift.presente_desde)throw new ProblemException('asistencia_ya_marcada',409,'La persona ya marcó su entrada; deshaz la entrada antes de marcar la ausencia.');
-        row=(await dbRule(c.query("UPDATE personal.turno SET estado='ausente',ausencia_tipo=$2,asistencia_motivo=$3,asistencia_por=$4,asistencia_en=$5,version=version+1 WHERE id=$1 RETURNING id,version,estado,presente_desde",[id,dto.absenceType,reason,actor.id,now]))).rows[0];
+        // La entrada automática se quita: una ausencia nunca tiene entrada (turno_asistencia_coherente).
+        row=(await dbRule(c.query("UPDATE personal.turno SET estado='ausente',presente_desde=NULL,ausencia_tipo=$2,asistencia_motivo=$3,asistencia_por=$4,asistencia_en=$5,version=version+1 WHERE id=$1 RETURNING id,version,estado,presente_desde",[id,dto.absenceType,reason,actor.id,now]))).rows[0];
         // ASIS-02: lo que hay que resolver y quién podría cubrir.
         const from=new Date(Math.max(now.valueOf(),shift.start.valueOf()));
         extra={affectedAppointments:shift.staff_type==='medico'&&from<shift.end?await this.appointmentsIn(c,shift.persona_id,from,shift.end):[],substitutes:now<shift.end?await this.substitutes(c,shift):[]};
       }else{
-        if(shift.estado!=='ausente'&&!shift.presente_desde)throw new ProblemException('sin_asistencia_marcada',409,'Este turno no tiene entrada ni ausencia que deshacer.');
-        const state=shift.estado==='ausente'?stateByClock(shift.start.valueOf(),shift.end.valueOf(),now.valueOf()):shift.estado;
-        row=(await dbRule(c.query('UPDATE personal.turno SET estado=$2,presente_desde=NULL,ausencia_tipo=NULL,asistencia_motivo=NULL,asistencia_por=$3,asistencia_en=$4,version=version+1 WHERE id=$1 RETURNING id,version,estado,presente_desde',[id,state,actor.id,now]))).rows[0];
+        if(shift.estado!=='ausente')throw new ProblemException('sin_asistencia_marcada',409,'Este turno no tiene una ausencia que deshacer.');
+        const entry=byClock==='publicado'?null:shift.start;
+        row=(await dbRule(c.query('UPDATE personal.turno SET estado=$2,presente_desde=$3,ausencia_tipo=NULL,asistencia_motivo=$4,asistencia_por=$5,asistencia_en=$6,version=version+1 WHERE id=$1 RETURNING id,version,estado,presente_desde',[id,byClock,entry,reason,actor.id,now]))).rows[0];
       }
       await this.commands.audit(c,actor,{action:'turnos.asistencia',entity:'turno',entityId:id,permission:'turnos.planificar',reason:reason??undefined,detail:{asistencia:dto.state,tipoAusencia:dto.absenceType??null,presenteDesde:row.presente_desde?new Date(row.presente_desde).toISOString():null}});
       await this.announce(c,'turno.actualizado',[{...row,persona_id:shift.persona_id}]);
       return this.attendanceResult(c,row,shift,extra);
-    });
-  }
-  /** ASIS-01: la persona marca su propia entrada, desde poco antes del inicio hasta el fin del turno. */
-  async checkIn(actor:Actor,id:string,dto:CheckInDto,key?:string) {
-    if(!actor.staffId)throw new ProblemException('sin_ficha_personal',403,'Tu cuenta no está vinculada a una ficha de personal.');
-    return this.commands.run(actor,`turnos.ver:${id}:entrada`,key,dto,async c=>{
-      const now=this.clock.now(),shift=await this.lockedShift(c,id);
-      if(shift.persona_id!==actor.staffId)throw new ProblemException('turno_ajeno',403,'Solo puedes marcar la entrada de tus propios turnos.');
-      if(shift.version!==dto.version)throw new VersionConflictException(shift.version,'El turno cambió; actualiza tus turnos.');
-      const policy=await this.policies.value<AttendancePolicy>(c,'turnos.asistencia',now);
-      if(!['publicado','en_curso'].includes(shift.estado))throw new ProblemException('transicion_invalida',409,shift.estado==='ausente'?'Tu turno está marcado como ausencia; comunícate con la jefatura de operaciones.':'Este turno ya no admite marcar la entrada.');
-      if(shift.presente_desde)throw new ProblemException('asistencia_ya_marcada',409,'Ya marcaste la entrada de este turno.');
-      if(now.valueOf()<shift.start.valueOf()-policy.entrada_anticipada_minutos*60_000||now>=shift.end)throw new ProblemException('fuera_de_horario',409,`Puedes marcar la entrada desde ${policy.entrada_anticipada_minutos} minutos antes del inicio y hasta el fin del turno.`);
-      const row=(await dbRule(c.query('UPDATE personal.turno SET presente_desde=$2,asistencia_por=$3,asistencia_en=$2,version=version+1 WHERE id=$1 RETURNING id,version,estado,presente_desde',[id,now,actor.id]))).rows[0];
-      await this.commands.audit(c,actor,{action:'turnos.entrada',entity:'turno',entityId:id,permission:'turnos.ver',detail:{presenteDesde:now.toISOString()}});
-      await this.announce(c,'turno.actualizado',[{...row,persona_id:shift.persona_id}]);
-      return this.attendanceResult(c,row,shift);
     });
   }
   /** CARGA-04: médicos de turno por día y especialidad durante 7 días desde `from` (información pública, RN-17: sin contacto). */
@@ -401,15 +415,16 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     let start:Date;
     try{if(!/^\d{4}-\d{2}-\d{2}$/.test(from))throw new RangeError();start=businessDayRange(from).start;}catch{throw new BadRequestException('Indica el primer día con formato AAAA-MM-DD.');}
     const end=new Date(start.valueOf()+7*DAY),to=businessDate(new Date(end.valueOf()-1));
+    await this.advanceSafely();
     return this.db.transaction(async c=>{
-      const now=this.clock.now(),policy=await this.policies.value<AttendancePolicy>(c,'turnos.asistencia',now);
+      const now=this.clock.now();
       const rows=(await c.query(`SELECT coalesce(p.especialidad,'Medicina general') AS specialty,p.nombres||' '||p.apellidos AS name,e.nombre AS area,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.estado AS state,t.presente_desde AS "presentSince"
         FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id JOIN infra.espacio e ON e.id=t.area_id
         WHERE p.tipo='medico' AND p.activo AND t.estado IN ('publicado','en_curso','completado','ausente') AND t.periodo && tstzrange($1::timestamptz,$2::timestamptz,'[)')
         ORDER BY lower(t.periodo),1,2`,[start,end])).rows;
       const items=rows.map(r=>{
         const s=new Date(r.start),shift={state:r.state,start:s.valueOf(),end:new Date(r.end).valueOf(),presentSince:r.presentSince?new Date(r.presentSince).valueOf():null};
-        return {date:businessDate(s<start?start:s),specialty:r.specialty,name:r.name,area:r.area,start:s.toISOString(),end:new Date(r.end).toISOString(),attendance:attendanceOf(shift,now.valueOf(),policy)};
+        return {date:businessDate(s<start?start:s),specialty:r.specialty,name:r.name,area:r.area,start:s.toISOString(),end:new Date(r.end).toISOString(),attendance:attendanceOf(shift,now.valueOf())};
       });
       return {from,to,items};
     });

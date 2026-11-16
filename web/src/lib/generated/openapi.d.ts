@@ -468,23 +468,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/turnos/{id}/entrada": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Marcar la entrada del turno propio (ASIS-01) */
-        post: operations["OperationsController_checkIn"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/turnos/{id}/asistencia": {
         parameters: {
             query?: never;
@@ -2860,14 +2843,14 @@ export interface components {
          * @description Null en turnos cancelados o en borrador
          * @enum {string}
          */
-        AsistenciaTurno: "pendiente" | "presente" | "sin_confirmar" | "ausente";
+        AsistenciaTurno: "pendiente" | "presente" | "ausente";
         /** @enum {string} */
         TipoAusencia: "justificada" | "injustificada";
         /**
          * @description Acciones que quien consulta puede hacer ahora sobre este turno
          * @enum {string}
          */
-        AccionTurno: "editar" | "cancelar" | "marcar_entrada" | "marcar_presente" | "marcar_ausente" | "deshacer_asistencia";
+        AccionTurno: "editar" | "cancelar" | "marcar_presente" | "marcar_ausente" | "deshacer_asistencia";
         ShiftResponse: {
             /** Format: uuid */
             id: string;
@@ -2891,10 +2874,10 @@ export interface components {
             attendance: components["schemas"]["AsistenciaTurno"] | null;
             /**
              * Format: date-time
-             * @description Hora de entrada marcada por la persona o por JOP
+             * @description Hora de entrada: la de inicio, confirmada sola por el reloj, o la hora real que corrigió JOP
              */
             presentSince: string | null;
-            /** @description Marcó la entrada después del margen de la política turnos.asistencia */
+            /** @description JOP corrigió la entrada a una hora posterior al margen de la política turnos.asistencia */
             late: boolean;
             absenceType: components["schemas"]["TipoAusencia"] | null;
             /** @description Motivo de la ausencia; solo con turnos.planificar */
@@ -2992,8 +2975,18 @@ export interface components {
             to: string;
             items: components["schemas"]["SpecialistShiftResponse"][];
         };
-        CheckInDto: {
+        AttendanceDto: {
+            /** @enum {string} */
+            state: "presente" | "ausente" | "pendiente";
+            /** @enum {string} */
+            absenceType?: "justificada" | "injustificada";
+            /**
+             * Format: date-time
+             * @description Hora real de entrada al corregirla; por omisión, ahora. Obligatoria si el turno ya terminó
+             */
+            at?: string;
             version: number;
+            reason?: string;
         };
         AffectedAppointmentResponse: {
             /** Format: uuid */
@@ -3023,19 +3016,6 @@ export interface components {
             affectedAppointments: components["schemas"]["AffectedAppointmentResponse"][];
             /** @description ASIS-02: personal de la misma función (y especialidad) libre y con descanso cumplido */
             substitutes: components["schemas"]["SubstituteResponse"][];
-        };
-        AttendanceDto: {
-            /** @enum {string} */
-            state: "presente" | "ausente" | "pendiente";
-            /** @enum {string} */
-            absenceType?: "justificada" | "injustificada";
-            /**
-             * Format: date-time
-             * @description Hora de entrada; por omisión, ahora. Obligatoria si el turno ya terminó
-             */
-            at?: string;
-            version: number;
-            reason?: string;
         };
         PublishDto: {
             /**
@@ -7766,88 +7746,6 @@ export interface operations {
             };
             /** @description Sin permiso (`sin_permiso`) o regla de acceso */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    OperationsController_checkIn: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
-                "Idempotency-Key": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CheckInDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ShiftAttendanceResponse"];
-                };
-            };
-            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sesión requerida (`no_autenticado`) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No encontrado (`no_encontrado`) */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

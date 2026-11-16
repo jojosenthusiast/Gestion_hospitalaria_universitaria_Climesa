@@ -2958,125 +2958,6 @@
         "x-permiso": "turnos.ver"
       }
     },
-    "/api/v1/turnos/{id}/entrada": {
-      "post": {
-        "operationId": "OperationsController_checkIn",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 8,
-              "maxLength": 128,
-              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
-            },
-            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CheckInDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ShiftAttendanceResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Sesión requerida (`no_autenticado`)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No encontrado (`no_encontrado`)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Marcar la entrada del turno propio (ASIS-01)",
-        "tags": [
-          "operations"
-        ],
-        "x-permiso": "turnos.ver"
-      }
-    },
     "/api/v1/turnos/{id}/asistencia": {
       "post": {
         "operationId": "OperationsController_attendance",
@@ -17666,7 +17547,6 @@
         "enum": [
           "pendiente",
           "presente",
-          "sin_confirmar",
           "ausente"
         ],
         "description": "Null en turnos cancelados o en borrador"
@@ -17683,7 +17563,6 @@
         "enum": [
           "editar",
           "cancelar",
-          "marcar_entrada",
           "marcar_presente",
           "marcar_ausente",
           "deshacer_asistencia"
@@ -17761,11 +17640,11 @@
             "type": "string",
             "format": "date-time",
             "nullable": true,
-            "description": "Hora de entrada marcada por la persona o por JOP"
+            "description": "Hora de entrada: la de inicio, confirmada sola por el reloj, o la hora real que corrigió JOP"
           },
           "late": {
             "type": "boolean",
-            "description": "Marcó la entrada después del margen de la política turnos.asistencia"
+            "description": "JOP corrigió la entrada a una hora posterior al margen de la política turnos.asistencia"
           },
           "absenceType": {
             "nullable": true,
@@ -18104,15 +17983,41 @@
           "items"
         ]
       },
-      "CheckInDto": {
+      "AttendanceDto": {
         "type": "object",
         "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "presente",
+              "ausente",
+              "pendiente"
+            ]
+          },
+          "absenceType": {
+            "type": "string",
+            "enum": [
+              "justificada",
+              "injustificada"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hora real de entrada al corregirla; por omisión, ahora. Obligatoria si el turno ya terminó"
+          },
           "version": {
             "type": "number",
             "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
           }
         },
         "required": [
+          "state",
           "version"
         ]
       },
@@ -18227,44 +18132,6 @@
           "late",
           "affectedAppointments",
           "substitutes"
-        ]
-      },
-      "AttendanceDto": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "type": "string",
-            "enum": [
-              "presente",
-              "ausente",
-              "pendiente"
-            ]
-          },
-          "absenceType": {
-            "type": "string",
-            "enum": [
-              "justificada",
-              "injustificada"
-            ]
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Hora de entrada; por omisión, ahora. Obligatoria si el turno ya terminó"
-          },
-          "version": {
-            "type": "number",
-            "minimum": 1
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 10,
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "state",
-          "version"
         ]
       },
       "PublishDto": {

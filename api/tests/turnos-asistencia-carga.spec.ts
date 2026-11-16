@@ -23,22 +23,27 @@ jest.setTimeout(180000);
 describe('Reglas puras de turnos (ASIS-01, CARGA-01, MA-TUR-03)',()=>{
  const policy={margen_minutos:15,entrada_anticipada_minutos:30};
  const start=Date.parse(local('2026-11-10','07:00')),end=Date.parse(local('2026-11-10','15:00'));
- test('la asistencia pasa de pendiente a sin confirmar al vencer el margen; ausente y presente mandan',()=>{
-  const s={state:'en_curso',start,end,presentSince:null};
-  expect(attendanceOf(s,start+14*60_000,policy)).toBe('pendiente');
-  expect(attendanceOf(s,start+15*60_000,policy)).toBe('sin_confirmar');
-  expect(attendanceOf({...s,presentSince:start},start+60*60_000,policy)).toBe('presente');
-  expect(attendanceOf({...s,state:'ausente'},start,policy)).toBe('ausente');
-  expect(attendanceOf({...s,state:'cancelado'},start,policy)).toBeNull();
- });
- test('las acciones dependen del permiso, del dueño, del estado y de la hora',()=>{
+ test('la entrada se confirma sola a la hora de inicio; ausente manda y nunca queda "sin confirmar"',()=>{
   const s={state:'publicado',start,end,presentSince:null};
-  expect(allowedActions(s,start-60*60_000,policy,true,false)).toEqual(['editar','cancelar','marcar_ausente']);
-  expect(allowedActions(s,start-20*60_000,policy,false,true)).toEqual(['marcar_entrada']);
-  expect(allowedActions(s,start-40*60_000,policy,false,true)).toEqual([]);
-  expect(allowedActions({...s,state:'en_curso'},start+60_000,policy,true,false)).toEqual(['marcar_presente','marcar_ausente']);
-  expect(allowedActions({...s,state:'en_curso',presentSince:start},start+60_000,policy,true,true)).toEqual(['deshacer_asistencia']);
-  expect(allowedActions({...s,state:'cancelado'},start-60*60_000,policy,true,true)).toEqual([]);
+  expect(attendanceOf(s,start-60_000)).toBe('pendiente');
+  expect(attendanceOf({...s,state:'en_curso'},start)).toBe('presente');
+  expect(attendanceOf({...s,state:'en_curso'},start+60*60_000)).toBe('presente');
+  expect(attendanceOf({...s,state:'completado',presentSince:start},end+60_000)).toBe('presente');
+  expect(attendanceOf({...s,state:'ausente'},start)).toBe('ausente');
+  expect(attendanceOf({...s,state:'cancelado'},start)).toBeNull();
+  expect(attendanceOf({...s,state:'borrador'},start)).toBeNull();
+ });
+ test('las acciones dependen del permiso, del estado y de la hora; nadie confirma la entrada a mano',()=>{
+  const s={state:'publicado',start,end,presentSince:null};
+  expect(allowedActions(s,start-60*60_000,true)).toEqual(['editar','cancelar','marcar_ausente']);
+  expect(allowedActions(s,start-20*60_000,false)).toEqual([]);
+  expect(allowedActions({...s,state:'en_curso',presentSince:start},start+60_000,false)).toEqual([]);
+  expect(allowedActions({...s,state:'en_curso',presentSince:start},start+60_000,true)).toEqual(['marcar_presente','marcar_ausente']);
+  expect(allowedActions({...s,state:'completado',presentSince:start},end+60_000,true)).toEqual(['marcar_presente','marcar_ausente']);
+  expect(allowedActions({...s,state:'ausente'},start+60_000,true)).toEqual(['marcar_presente','deshacer_asistencia']);
+  // Una ausencia planificada (antes del inicio) se deshace, pero aún no hay entrada que corregir.
+  expect(allowedActions({...s,state:'ausente'},start-60*60_000,true)).toEqual(['deshacer_asistencia']);
+  expect(allowedActions({...s,state:'cancelado'},start-60*60_000,true)).toEqual([]);
  });
  test('ventana de 7 días y días seguidos',()=>{
   const H=3600_000,D=24*H,t0=Date.parse('2026-11-01T13:00:00Z');
@@ -219,8 +224,11 @@ describe('Turnos · asistencia, carga, descansos y estados (ASIS, CARGA, MA-TUR)
   const patient=(await fixture.pg.query<{id:string}>("INSERT INTO pacientes.paciente(expediente,nombres,primer_apellido,sexo,precision_nacimiento,nacimiento) VALUES('EXP-AS-2','Paciente','Ficticio','masculino','exacta','1991-01-01') RETURNING id")).rows[0];
   const cita=(await fixture.pg.query<{id:string}>("INSERT INTO atencion.cita(paciente_id,medico_id,horario,estado,origen) VALUES($1,$2,tstzrange($3::timestamptz,$4::timestamptz,'[)'),'confirmada','recepcion') RETURNING id",[patient.id,doctor,local('2026-11-18','10:00'),local('2026-11-18','10:20')])).rows[0];
   current=new Date(local('2026-11-18','06:30'));
+  // La entrada se confirmó sola a las 06:00; JOP igual puede marcar la ausencia durante el turno.
   const before=await listed('JOP',s.id);
-  expect(before.attendance).toBe('sin_confirmar');expect(before.allowedActions).toEqual(expect.arrayContaining(['marcar_presente','marcar_ausente']));
+  expect(before).toMatchObject({state:'en_curso',attendance:'presente',presentSince:new Date(local('2026-11-18','06:00')).toISOString(),late:false});
+  expect(before.allowedActions).toEqual(['marcar_presente','marcar_ausente']);
+
   expect((await call('JOP','POST',`/turnos/${s.id}/asistencia`,{state:'ausente',version:before.version,reason:'corta'})).status).toBe(400);
   expect((await call('JOP','POST',`/turnos/${s.id}/asistencia`,{state:'ausente',version:before.version,reason:'No se presentó ni avisó'})).status).toBe(400);
   expect((await call('MED','POST',`/turnos/${s.id}/asistencia`,{state:'ausente',absenceType:'injustificada',version:before.version,reason:'No se presentó ni avisó'})).status).toBe(403);
@@ -243,9 +251,11 @@ describe('Turnos · asistencia, carga, descansos y estados (ASIS, CARGA, MA-TUR)
   // Especialistas de la semana: aparece, marcado ausente.
   const week=(await call('REC','GET','/turnos/especialistas?from=2026-11-16')).body;
   expect(week.items.find((i:any)=>i.specialty==='Pediatría'&&i.attendance==='ausente')).toBeTruthy();
-  // Deshacer la marca equivocada lo devuelve a en curso.
+  // Deshacer la marca equivocada lo devuelve a en curso, con la entrada automática a la hora de inicio.
   const undo=await call('JOP','POST',`/turnos/${s.id}/asistencia`,{state:'pendiente',version:after.version,reason:'Llegó por la entrada de servicio'});
-  expect(undo.status).toBe(201);expect(undo.body.state).toBe('en_curso');
+  expect(undo.status).toBe(201);expect(undo.body).toMatchObject({state:'en_curso',attendance:'presente',late:false});
+  expect(new Date((await row(s.id)).presente_desde).toISOString()).toBe(new Date(local('2026-11-18','06:00')).toISOString());
+
   const audit=(await fixture.pg.query<any>("SELECT count(*)::int AS n FROM plataforma.auditoria WHERE accion='turnos.asistencia' AND entidad_id=$1",[s.id])).rows[0];
   expect(audit.n).toBe(2);
  });
@@ -269,23 +279,59 @@ describe('Turnos · asistencia, carga, descansos y estados (ASIS, CARGA, MA-TUR)
   expect(refused.status).toBe(409);expect(refused.body.codigo).toBe('tripulante_en_servicio');
  });
 
- test('ASIS-01: la persona marca su entrada en su turno (tarde si pasa el margen) y nadie más puede hacerlo por ella',async()=>{
+ test('ASIS-01 automático: al empezar, el turno queda en curso con la entrada confirmada, auditado como SISTEMA; ya no hay entrada manual',async()=>{
   const me=(await call('MED','GET','/auth/me')).body.staffId as string;
   await fixture.pg.query("INSERT INTO personal.inscripcion(persona_id,junta,numero,vigencia) VALUES($1,'JVPM','AS-MED-1',daterange('2026-01-01','2027-01-01'))",[me]);
   const s=(await shift(me,local('2026-11-21','07:00'),local('2026-11-21','15:00'))).body;
-  current=new Date(local('2026-11-21','06:00'));
-  expect((await listed('MED',s.id,'/turnos/mios')).allowedActions).toEqual([]);
+  current=new Date(local('2026-11-21','06:50'));
+  expect(await listed('MED',s.id,'/turnos/mios')).toMatchObject({state:'publicado',attendance:'pendiente',presentSince:null,allowedActions:[]});
+  // Nadie llama al barrido: leer "mis turnos" lo aplica (también lo hace el temporizador de cada minuto).
   current=new Date(local('2026-11-21','07:20'));
-  await app.get(PersonnelService).advanceStates();
+  const startIso=new Date(local('2026-11-21','07:00')).toISOString();
   const mine=await listed('MED',s.id,'/turnos/mios');
-  expect(mine).toMatchObject({attendance:'sin_confirmar',allowedActions:['marcar_entrada']});
-  const alert=(await row(s.id)).alerta_sin_confirmar_en;expect(alert).toBeTruthy();
-  expect((await call('ENF','POST',`/turnos/${s.id}/entrada`,{version:mine.version})).status).toBe(403);
-  const checked=await call('MED','POST',`/turnos/${s.id}/entrada`,{version:mine.version});
-  expect(checked.status).toBe(201);expect(checked.body).toMatchObject({attendance:'presente',late:true});
-  expect((await listed('MED',s.id,'/turnos/mios')).allowedActions).toEqual([]);
-  const again=await call('MED','POST',`/turnos/${s.id}/entrada`,{version:checked.body.version});
-  expect(again.status).toBe(409);expect(again.body.codigo).toBe('asistencia_ya_marcada');
+  expect(mine).toMatchObject({state:'en_curso',attendance:'presente',presentSince:startIso,late:false,allowedActions:[]});
+  const stored=await row(s.id);
+  expect(stored.alerta_sin_confirmar_en).toBeNull();expect(stored.asistencia_por).toBeNull();
+  const audit=(await fixture.pg.query<any>("SELECT actor_rol,detalle FROM plataforma.auditoria WHERE accion='turnos.avance_automatico' AND detalle->'ids' ? $1",[s.id])).rows;
+  expect(audit).toHaveLength(1);expect(audit[0].actor_rol).toBe('SISTEMA');
+  expect(audit[0].detalle).toMatchObject({enCurso:[s.id],completados:[]});
+  // El paso manual de "confirmar entrada" ya no existe.
+  expect((await call('MED','POST',`/turnos/${s.id}/entrada`,{version:mine.version})).status).toBe(404);
+  // JOP corrige una llegada tarde: con la hora real y un motivo.
+  current=new Date(local('2026-11-21','08:00'));
+  const jop=await listed('JOP',s.id);
+
+  const noReason=await call('JOP','POST',`/turnos/${s.id}/asistencia`,{state:'presente',at:local('2026-11-21','07:40'),version:jop.version});
+  expect(noReason.status).toBe(400);
+  const fixed=await call('JOP','POST',`/turnos/${s.id}/asistencia`,{state:'presente',at:local('2026-11-21','07:40'),version:jop.version,reason:'Llegó tarde por el tráfico'});
+  expect(fixed.status).toBe(201);expect(fixed.body).toMatchObject({state:'en_curso',attendance:'presente',late:true});
+  // Al terminar pasa a completado y conserva la entrada corregida; el barrido repetido no cambia nada.
+  current=new Date(local('2026-11-21','15:00'));
+  const done=await listed('MED',s.id,'/turnos/mios');
+  expect(done).toMatchObject({state:'completado',attendance:'presente',presentSince:new Date(local('2026-11-21','07:40')).toISOString()});
+  expect(await app.get(PersonnelService).advanceStates()).toBe(0);
+  expect((await row(s.id)).version).toBe(done.version);
+ });
+
+ test('el reloj nunca toca turnos cancelados ni ausentes, y una guardia de 24 h pide 12 h de descanso',async()=>{
+  const [nurse,other]=[await person('enfermero'),await person('enfermero')];
+  const guard=await shift(nurse,local('2026-11-25','07:00'),local('2026-11-26','07:00'),{type:'guardia'});
+  expect(guard.status).toBe(201);
+  const early=await shift(nurse,local('2026-11-26','20:00'),local('2026-11-27','04:00'),{type:'nocturno'});
+  expect(early.status).toBe(409);expect(early.body.codigo).toBe('personal_en_descanso');
+  expect((await shift(nurse,local('2026-11-27','07:00'),local('2026-11-27','15:00'))).status).toBe(201);
+  const planned=(await shift(other,local('2026-11-25','07:00'),local('2026-11-25','15:00'))).body;
+  const cancelled=(await shift(other,local('2026-11-26','07:00'),local('2026-11-26','15:00'))).body;
+  const absent=await call('JOP','POST',`/turnos/${planned.id}/asistencia`,{state:'ausente',absenceType:'justificada',version:planned.version,reason:'Vacaciones aprobadas por jefatura'});
+  expect(absent.status).toBe(201);
+  expect((await call('JOP','PATCH',`/turnos/${cancelled.id}`,{staffId:other,areaId,start:local('2026-11-26','07:00'),end:local('2026-11-26','15:00'),type:'diurno',state:'cancelado',version:cancelled.version,reason:'Cambio de planificación'})).status).toBe(200);
+  current=new Date(local('2026-11-26','06:00'));
+  expect(await listed('JOP',guard.body.id)).toMatchObject({state:'en_curso',attendance:'presente',type:'guardia'});
+  current=new Date(local('2026-11-28','06:00'));
+  await app.get(PersonnelService).advanceStates();
+  expect(await row(guard.body.id)).toMatchObject({estado:'completado'});
+  expect(await row(planned.id)).toMatchObject({estado:'ausente',presente_desde:null});
+  expect(await row(cancelled.id)).toMatchObject({estado:'cancelado',presente_desde:null});
  });
 
  test('CARGA-03: Recepción sin personal muestra huecos solo en su horario de atención',async()=>{

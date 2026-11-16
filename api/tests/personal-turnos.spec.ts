@@ -119,10 +119,12 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   current=new Date('2026-11-20T12:00:00Z');// 06:00 local, antes del inicio
   await app.get(PersonnelService).advanceStates();
   expect((await state()).estado).toBe('publicado');
-  // 07:10 local: dentro del margen de entrada (turnos.asistencia), así que aún no hay aviso de "sin entrada" (ASIS-01).
+  // 07:10 local: en curso y con la entrada confirmada a las 07:00, en un solo cambio (ASIS-01).
   current=new Date('2026-11-20T13:10:00Z');
   await app.get(PersonnelService).advanceStates();
   expect(await state()).toEqual({estado:'en_curso',version:2});
+  expect(new Date((await fixture.pg.query<any>("SELECT presente_desde FROM personal.turno WHERE id=$1",[created.id])).rows[0].presente_desde).toISOString()).toBe('2026-11-20T13:00:00.000Z');
+
   await app.get(PersonnelService).advanceStates();
   expect((await state()).version).toBe(2);// idempotente
   current=new Date('2026-11-20T22:00:00Z');// 16:00 local

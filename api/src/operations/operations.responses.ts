@@ -6,13 +6,13 @@ export const JUNTA_PROFESIONAL = ['JVPM', 'JVPE', 'JVPL', 'JVPO', 'otra'] as con
 export const TIPO_TURNO = ['diurno', 'nocturno', 'guardia'] as const;
 /** Estados de `personal.turno.estado`, con `ausente` de 20261120003000_turnos_asistencia_carga.sql (ASIS-01). */
 export const ESTADO_TURNO_ASISTENCIA = [...ESTADO_TURNO, 'ausente'] as const;
-/** Asistencia derivada: `sin_confirmar` = pasó el margen de la política `turnos.asistencia` sin marcar entrada. */
-export const ASISTENCIA_TURNO = ['pendiente', 'presente', 'sin_confirmar', 'ausente'] as const;
+/** Asistencia derivada: `pendiente` antes del inicio; desde el inicio, `presente` (automática) salvo que JOP marque `ausente`. */
+export const ASISTENCIA_TURNO = ['pendiente', 'presente', 'ausente'] as const;
 export const TIPO_AUSENCIA = ['justificada', 'injustificada'] as const;
 /** Situación de la persona en el día local, para filtrar el directorio de personal. */
 export const TURNO_HOY = ['de_turno', 'ausente', 'mas_tarde', 'libre'] as const;
 /** Acciones que el servidor permite a quien consulta, según su permiso, el estado y la hora (la UI no ofrece otras). */
-export const ACCION_TURNO = ['editar', 'cancelar', 'marcar_entrada', 'marcar_presente', 'marcar_ausente', 'deshacer_asistencia'] as const;
+export const ACCION_TURNO = ['editar', 'cancelar', 'marcar_presente', 'marcar_ausente', 'deshacer_asistencia'] as const;
 export const TIPO_ESPACIO = ['hospital', 'planta', 'area', 'habitacion', 'cama', 'consultorio', 'cubiculo', 'bodega', 'bahia'] as const;
 
 // ---- Inicio ----
@@ -125,8 +125,9 @@ export class ShiftResponse {
   @StrProp({ nullable: true }) justification!: string | null;
   @IntProp() version!: number;
   @EnumProp(ASISTENCIA_TURNO, 'AsistenciaTurno', { nullable: true, description: 'Null en turnos cancelados o en borrador' }) attendance!: string | null;
-  @DateTimeProp({ nullable: true, description: 'Hora de entrada marcada por la persona o por JOP' }) presentSince!: string | null;
-  @BoolProp({ description: 'Marcó la entrada después del margen de la política turnos.asistencia' }) late!: boolean;
+  @DateTimeProp({ nullable: true, description: 'Hora de entrada: la de inicio, confirmada sola por el reloj, o la hora real que corrigió JOP' }) presentSince!: string | null;
+  @BoolProp({ description: 'JOP corrigió la entrada a una hora posterior al margen de la política turnos.asistencia' }) late!: boolean;
+
   @EnumProp(TIPO_AUSENCIA, 'TipoAusencia', { nullable: true }) absenceType!: string | null;
   @StrProp({ optional: true, nullable: true, description: 'Motivo de la ausencia; solo con turnos.planificar' }) attendanceReason?: string | null;
   @StrProp({ optional: true, nullable: true, description: 'Motivo de emergencia que permitió superar el tope de carga; solo con turnos.planificar' }) emergencyReason?: string | null;
