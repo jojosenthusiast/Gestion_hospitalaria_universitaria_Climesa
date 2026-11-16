@@ -26,6 +26,8 @@ Datos **ficticios, anotados y removibles** para aprender el software sin inventa
 
 La semilla **no crea ni modifica usuarios de Supabase Auth**. Busca en `acceso.usuario` las cuentas `prueba.<rol>@example.test` (o `<rol>@example.test`) con ese rol. Si la cuenta de un rol de trabajo (REC, AST, ENF, MED, LAB, PAR) no tiene persona de personal, le crea una persona demo y la vincula; si ya tenía, usa esa. Así el turno, las citas, las consultas y las órdenes aparecen con la sesión real de cada rol. Si falta una cuenta, la semilla sigue con personal suelto.
 
+El servicio de ambulancia activo (unidad En Servicio) solo se crea si existe la cuenta activa del paramédico de prueba: la regla BL-05 exige un paramédico con cuenta en la app. Sin ella, la semilla avisa con un NOTICE, deja la unidad como estaba y siembra todo lo demás.
+
 La cuenta `PAC` real no se toca: para verla vinculada, usa el módulo de vinculación con el DUI `90000004-1` de Ana Cecilia Portillo y su fecha de nacimiento.
 
 ## Escala (Fase 2, S6)

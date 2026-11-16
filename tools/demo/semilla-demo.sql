@@ -1459,8 +1459,13 @@ begin
   end if;
 
   -- Servicio activo: la unidad pasa a En Servicio y se guarda su estado anterior para restaurarlo al limpiar.
+  -- BL-05: una unidad solo pasa a En Servicio con un paramédico que tenga cuenta activa en la app. Si el entorno no
+  -- tiene la cuenta de prueba del paramédico (`par@example.test`), la demo no crea el servicio activo y la unidad queda
+  -- como estaba; el resto de la semilla sigue igual.
   v_serv := pg_temp.did('0070', 6);
-  if not exists (select 1 from ambulancia.servicio where id = v_serv) then
+  if not exists (select 1 from acceso.usuario u where u.persona_personal_id = pg_temp.persona('PAR') and u.estado = 'activo') then
+    raise notice '[DEMO] Sin cuenta activa de paramédico de prueba: no se crea el servicio de ambulancia activo.';
+  elsif not exists (select 1 from ambulancia.servicio where id = v_serv) then
     v_base := now() - interval '20 minutes';
     insert into ambulancia.servicio (id, unidad_id, solicitud_id, tipo, prioridad, paciente_id, origen, destino, municipio, despachado_por, despachado_en, clave_idempotencia)
     values (v_serv, v_unidad, pg_temp.did('0071', 6), 'emergencia_domicilio', 'roja', pg_temp.did('0001', 24), 'Col. El Cañaveral, Apopa',
