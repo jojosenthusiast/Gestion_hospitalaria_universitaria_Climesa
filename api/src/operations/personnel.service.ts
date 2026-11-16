@@ -6,7 +6,7 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
 import { Clock,businessDate,businessDayRange } from '../platform/clock';
 import { StaffDto, ShiftDto, RegistrationDto, PublishDto, AttendanceDto, ShiftBatchDto, ShiftBatchItemDto, RotationDto, WeekTemplateDto, WeekTemplateRetireDto } from './operations.dto';
-import { RotationPattern, daysBetween, rotationSlots, slotRange } from './rotation.rules';
+import { RotationOptions, RotationPattern, daysBetween, rotationShapes, rotationSlots, slotRange } from './rotation.rules';
 import { AttendancePolicy, LoadPolicy, allowedActions, attendanceOf, consecutiveDays, isLate, stateByClock, windowLoad } from './shift.rules';
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
@@ -53,6 +53,22 @@ export type BatchItemResult={index:number;ok:boolean;id?:string;version?:number;
 const SUBSTITUTABLE=new Set(['personal_en_descanso','personal_jornada_ocupada','carga_semanal_excedida','dias_seguidos_excedidos','inscripcion_no_vigente','conflicto']);
 /** Personas que el generador prueba como reemplazo de un turno con conflicto. */
 const MAX_SUBSTITUTES=8;
+/**
+ * Request-level budget of `POST /turnos/generar`: shift attempts (`tryItem`, about 12 queries each) for the pattern, the
+ * substitutes and the coverage fill together. At the limits (60 people, 31 days) the densest pattern has 1,860 shifts,
+ * so it always fits; whatever does not fit is marked `limite_de_intentos`.
+ */
+export const GENERATOR_ATTEMPTS=2000;
+const ATTEMPTS_EXHAUSTED='Se alcanzó el límite de pruebas de esta vista previa; genera un rango más corto o un grupo más pequeño.';
+/** How each rejection reads in the reason of a gap the generator could not fill. */
+const REJECTION_PHRASE:Record<string,string>={
+  personal_en_descanso:'en descanso obligatorio',carga_semanal_excedida:'superaría el tope de horas en 7 días',dias_seguidos_excedidos:'superaría el máximo de días seguidos',
+  personal_jornada_ocupada:'ya tiene un turno esa jornada',inscripcion_no_vigente:'sin inscripción profesional vigente',horas_semanales_excedidas:'pasaría de las horas diurnas de la semana sin justificación',
+  conflicto:'con otro turno en ese horario',
+};
+type GroupPerson={id:string;name:string;tipo:string};
+/** Whole hours `[ceil(a), floor(b))` inside `[a, b)` (ms): the hours a shift fully covers. */
+const interior=(a:number,b:number):[number,number]=>[Math.ceil(a/HOUR)*HOUR,Math.floor(b/HOUR)*HOUR];
 type TemplateRow={dia:number;inicio:string;horas:number;tipo:string;staffId:string};
 @Injectable()
 export class PersonnelService implements OnModuleInit,OnModuleDestroy {
@@ -466,38 +482,114 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
    * Fase 2, flujo F: generador de rotaciones (vista previa, no escribe). Reparte el patrón entre las personas, prueba cada
    * turno con las reglas de un turno suelto (descanso, tope de 7 días, días seguidos, traslape, inscripción) y, si la
    * persona no puede, prueba con otras del grupo. Lo que nadie puede cubrir queda marcado con su conflicto.
+   * L13: then it fills the area's minimum coverage (`fillCoverage`) and returns the remaining gaps with their reason.
+   * The whole request makes at most `GENERATOR_ATTEMPTS` shift attempts.
    */
   async generate(actor:Actor,dto:RotationDto) {
-    this.range(dto.from,dto.to);
+    const {start:rangeStart,end:rangeEnd}=this.range(dto.from,dto.to);
     if(!dto.staffIds?.length&&!dto.role)throw new BadRequestException('Elige las personas o un grupo por función.');
     if(dto.pattern==='personalizado'&&(!dto.hours||!dto.workDays||!dto.restDays))throw new BadRequestException('Un patrón personalizado necesita horas por turno, días de trabajo y días de descanso.');
     await this.advanceSafely();
     return this.dryRun(async c=>{
       await this.area(c,dto.areaId);
       const people=(dto.staffIds?.length
-        ?(await c.query(`SELECT id,nombres||' '||apellidos AS name FROM personal.persona WHERE activo AND id=ANY($1::uuid[]) ORDER BY apellidos,nombres`,[dto.staffIds])).rows
-        :(await c.query(`SELECT id,nombres||' '||apellidos AS name FROM personal.persona WHERE activo AND tipo=$1 AND area_id=$2 ORDER BY apellidos,nombres`,[dto.role,dto.areaId])).rows) as {id:string;name:string}[];
+        ?(await c.query(`SELECT id,nombres||' '||apellidos AS name,tipo FROM personal.persona WHERE activo AND id=ANY($1::uuid[]) ORDER BY apellidos,nombres,id`,[dto.staffIds])).rows
+        :(await c.query(`SELECT id,nombres||' '||apellidos AS name,tipo FROM personal.persona WHERE activo AND tipo=$1 AND area_id=$2 ORDER BY apellidos,nombres,id`,[dto.role,dto.areaId])).rows) as GroupPerson[];
       if(dto.staffIds?.length&&people.length!==dto.staffIds.length)throw new BadRequestException('Hay personas inactivas o que no existen en la selección.');
       if(!people.length)throw new BadRequestException('No hay personal activo de esa función asignado al área.');
       const names=new Map(people.map(p=>[p.id,p.name]));
       const now=this.clock.now().valueOf();
-      const slots=rotationSlots(people.length,daysBetween(dto.from,dto.to),{pattern:dto.pattern as RotationPattern,startTime:dto.startTime??'07:00',hours:dto.hours,workDays:dto.workDays,restDays:dto.restDays});
+      const options={pattern:dto.pattern as RotationPattern,startTime:dto.startTime??'07:00',hours:dto.hours,workDays:dto.workDays,restDays:dto.restDays};
+      const slots=rotationSlots(people.length,daysBetween(dto.from,dto.to),options);
+      const budget={used:0,limit:GENERATOR_ATTEMPTS};
       const items:Record<string,unknown>[]=[];
       for(const slot of slots){
         const {start,end}=slotRange(slot.date,slot.startTime,slot.hours);
         if(Date.parse(start)<=now)continue;
         const base={areaId:dto.areaId,start,end,type:slot.type},planned=people[slot.person].id;
+        if(budget.used>=budget.limit){items.push({...base,staffId:planned,person:names.get(planned),origen:'patron',ok:false,codigo:'limite_de_intentos',mensaje:ATTEMPTS_EXHAUSTED,campo:null});continue;}
+        budget.used++;
         let staffId=planned,result=await this.tryItem(c,actor,{...base,staffId},dto.justification,items.length);
-        for(let k=1;!result.ok&&SUBSTITUTABLE.has(result.codigo!)&&k<people.length&&k<=MAX_SUBSTITUTES;k++){
+        for(let k=1;!result.ok&&SUBSTITUTABLE.has(result.codigo!)&&k<people.length&&k<=MAX_SUBSTITUTES&&budget.used<budget.limit;k++){
+          budget.used++;
           const other=people[(slot.person+k)%people.length].id,second=await this.tryItem(c,actor,{...base,staffId:other},dto.justification,items.length);
           if(second.ok){result=second;staffId=other;}
         }
         const {index:_index,id:_id,version:_version,...outcome}=result;
-        items.push({...base,staffId,person:names.get(staffId),...(staffId!==planned?{reemplazaA:planned}:{}),...outcome});
+        items.push({...base,staffId,person:names.get(staffId),origen:'patron',...(staffId!==planned?{reemplazaA:planned}:{}),...outcome});
       }
-      const ok=items.filter(i=>i.ok) as {areaId:string;start:string;end:string}[];
-      return {items,personas:people.length,huecos:await this.batchGaps(c,ok.length?ok:[{areaId:dto.areaId,start:businessDayRange(dto.from).start.toISOString(),end:businessDayRange(dto.to).end.toISOString()}])};
+      // Gaps count from the next whole hour: the past cannot be planned.
+      const from=new Date(Math.max(rangeStart.valueOf(),Math.ceil(now/HOUR)*HOUR));
+      const huecos=from<rangeEnd?await this.fillCoverage(c,actor,dto,people,options,from,rangeEnd,items,budget):[];
+      return {items,personas:people.length,huecos,intentos:budget.used,limiteIntentos:budget.limit};
     });
+  }
+  /**
+   * L13: after the pattern, assign people of the group until the area reaches its minimum coverage in every time band
+   * (`gaps`, counting drafts). It only places the pattern's own shifts (`rotationShapes`), in start order, and every
+   * shift goes through `tryItem` (the same rules as a single shift). Deterministic order: first the person of the gap's
+   * function with the fewest hours of working shifts (published, drafts and this preview) that start inside the range;
+   * ties by surnames, given names and id. It tries up to `MAX_SUBSTITUTES + 1` people per band. Returns the remaining
+   * gaps with their reason.
+   */
+  private async fillCoverage(c:PoolClient,actor:Actor,dto:RotationDto,people:GroupPerson[],options:RotationOptions,from:Date,to:Date,items:Record<string,unknown>[],budget:{used:number;limit:number}) {
+    const range=(g:{start:string;end:string})=>[Date.parse(g.start),Date.parse(g.end)] as const;
+    let gaps=await this.gaps(c,from,to,dto.areaId,true);
+    const fillable=[...new Set(gaps.map(g=>g.role))].filter(role=>people.some(p=>p.tipo===COVERAGE_ROLES[role])).sort();
+    const load=new Map(people.map(p=>[p.id,0]));
+    if(fillable.length){
+      const rows=(await c.query(`SELECT t.persona_id AS id,sum(extract(epoch FROM upper(t.periodo)-lower(t.periodo)))/3600 AS hours FROM personal.turno t WHERE ${WORKING} AND t.persona_id=ANY($1::uuid[]) AND lower(t.periodo)>=$2 AND lower(t.periodo)<$3 GROUP BY t.persona_id`,[people.map(p=>p.id),businessDayRange(dto.from).start,to])).rows;
+      for(const r of rows)load.set(r.id,Number(r.hours));
+    }
+    const now=this.clock.now().valueOf();
+    const all=daysBetween(dto.from,dto.to).flatMap(date=>rotationShapes(options).map(shape=>({...slotRange(date,shape.startTime,shape.hours),type:shape.type})))
+      .sort((a,b)=>a.start.localeCompare(b.start)||a.end.localeCompare(b.end));
+    const windows=all.filter(w=>Date.parse(w.start)>now);
+    // Bands of the pattern that already started: their hours can no longer be planned.
+    const started=all.filter(w=>Date.parse(w.start)<=now).map(w=>interior(...range(w))).filter(([a,b])=>a<b);
+    // What was tried in each band without success: it explains the gap that remains.
+    const failures:{role:string;start:number;end:number;rejected:Record<string,number>;exhausted:boolean}[]=[];
+    for(const window of windows)for(const role of fillable){
+      const [a,b]=range(window);
+      // `gaps` counts a shift for an hour only when it covers the whole hour: only the whole hours inside the band
+      // can be filled by it. A partial hour at the edge stays open and reads as outside the pattern.
+      const [ha,hb]=interior(a,b);
+      while(ha<hb&&gaps.some(g=>g.role===role&&range(g)[0]<hb&&range(g)[1]>ha)){
+        const order=people.filter(p=>p.tipo===COVERAGE_ROLES[role]).map((p,k)=>({p,k})).sort((x,y)=>load.get(x.p.id)!-load.get(y.p.id)!||x.k-y.k).map(x=>x.p);
+        const rejected:Record<string,number>={};
+        let placed=false,exhausted=false;
+        for(const candidate of order.slice(0,MAX_SUBSTITUTES+1)){
+          if(budget.used>=budget.limit){exhausted=true;break;}
+          budget.used++;
+          const base={areaId:dto.areaId,start:window.start,end:window.end,type:window.type};
+          const result=await this.tryItem(c,actor,{...base,staffId:candidate.id},dto.justification,items.length);
+          if(!result.ok){rejected[result.codigo!]=(rejected[result.codigo!]??0)+1;continue;}
+          const {index:_index,id:_id,version:_version,...outcome}=result;
+          items.push({...base,staffId:candidate.id,person:candidate.name,origen:'cobertura',...outcome});
+          load.set(candidate.id,load.get(candidate.id)!+(b-a)/HOUR);
+          placed=true;break;
+        }
+        if(!placed){failures.push({role,start:ha,end:hb,rejected,exhausted});break;}
+        const before=JSON.stringify(gaps);
+        gaps=await this.gaps(c,from,to,dto.areaId,true);
+        // A placement that changes no gap would repeat forever: stop on this band.
+        if(JSON.stringify(gaps)===before)break;
+      }
+    }
+    return gaps.map(gap=>({...gap,...this.gapReason(gap,fillable,failures,started)}));
+  }
+  /** Reason of a gap the generator did not fill: nobody of that function, outside the pattern, attempt limit, or what rejected each person. */
+  private gapReason(gap:CoverageGap,fillable:string[],failures:{role:string;start:number;end:number;rejected:Record<string,number>;exhausted:boolean}[],started:[number,number][]):{motivo:string;mensaje:string} {
+    if(!fillable.includes(gap.role))return {motivo:'sin_personal_elegible',mensaje:'El grupo no tiene personal de esa función para cubrir el mínimo.'};
+    const [a,b]=[Date.parse(gap.start),Date.parse(gap.end)];
+    const mine=failures.filter(f=>f.role===gap.role&&f.start<b&&f.end>a);
+    if(!mine.length&&started.some(([s,e])=>s<b&&e>a))return {motivo:'franja_ya_iniciada',mensaje:'El turno del patrón que cubre este horario ya empezó; cúbrelo a mano.'};
+    if(!mine.length)return {motivo:'fuera_del_patron',mensaje:'Ningún turno del patrón cae en este horario; agrégalo a mano.'};
+    const rejected:Record<string,number>={};
+    for(const f of mine)for(const [code,n] of Object.entries(f.rejected))rejected[code]=(rejected[code]??0)+n;
+    const codes=Object.entries(rejected).sort((x,y)=>y[1]-x[1]||x[0].localeCompare(y[0]));
+    if(!codes.length)return mine.some(f=>f.exhausted)?{motivo:'limite_de_intentos',mensaje:ATTEMPTS_EXHAUSTED}:{motivo:'sin_personal_elegible',mensaje:'El grupo no tiene personal de esa función para cubrir el mínimo.'};
+    return {motivo:codes[0][0],mensaje:`Nadie del grupo puede cubrirlo. De las personas probadas: ${codes.map(([code,n])=>`${n} ${REJECTION_PHRASE[code]??'con otro conflicto'}`).join(', ')}.`};
   }
   /** Plantillas de semana vigentes, por área (Fase 2, flujo F). */
   async templates() {

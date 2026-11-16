@@ -3603,7 +3603,7 @@
             "bearer": []
           }
         ],
-        "summary": "Vista previa de una rotación (rotativo, 12x36, 24x72 o personalizado) con descanso, tope de 7 días y cobertura; no guarda nada",
+        "summary": "Vista previa de una rotación (rotativo, 12x36, 24x72 o personalizado) con descanso y tope de 7 días; llena la cobertura mínima del área y marca los huecos que quedan con su motivo; no guarda nada",
         "tags": [
           "operations"
         ],
@@ -20100,6 +20100,14 @@
           "to"
         ]
       },
+      "OrigenTurnoGenerado": {
+        "type": "string",
+        "enum": [
+          "patron",
+          "cobertura"
+        ],
+        "description": "`patron`: turno de la rotación; `cobertura`: turno que el generador agregó para llegar a la cobertura mínima del área (L13)"
+      },
       "RotationItemResponse": {
         "type": "object",
         "properties": {
@@ -20131,6 +20139,14 @@
           },
           "ok": {
             "type": "boolean"
+          },
+          "origen": {
+            "description": "`patron`: turno de la rotación; `cobertura`: turno que el generador agregó para llegar a la cobertura mínima del área (L13)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrigenTurnoGenerado"
+              }
+            ]
           },
           "reemplazaA": {
             "type": "string",
@@ -20165,7 +20181,55 @@
           "start",
           "end",
           "type",
-          "ok"
+          "ok",
+          "origen"
+        ]
+      },
+      "RotationGapResponse": {
+        "type": "object",
+        "properties": {
+          "areaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "area": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "required": {
+            "type": "integer"
+          },
+          "actual": {
+            "type": "integer"
+          },
+          "motivo": {
+            "type": "string",
+            "description": "sin_personal_elegible, fuera_del_patron, franja_ya_iniciada, limite_de_intentos o el código que rechazó a más personas probadas (personal_en_descanso, carga_semanal_excedida...)"
+          },
+          "mensaje": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "areaId",
+          "area",
+          "role",
+          "start",
+          "end",
+          "required",
+          "actual",
+          "motivo",
+          "mensaje"
         ]
       },
       "RotationPreviewResponse": {
@@ -20181,16 +20245,27 @@
             "type": "integer"
           },
           "huecos": {
+            "description": "Huecos de cobertura del área en el rango, desde la próxima hora, que el relleno no pudo cubrir",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CoverageGapResponse"
+              "$ref": "#/components/schemas/RotationGapResponse"
             }
+          },
+          "intentos": {
+            "type": "integer",
+            "description": "Pruebas de turno que hizo la solicitud (patrón, reemplazos y relleno)"
+          },
+          "limiteIntentos": {
+            "type": "integer",
+            "description": "Máximo de pruebas de turno por solicitud"
           }
         },
         "required": [
           "items",
           "personas",
-          "huecos"
+          "huecos",
+          "intentos",
+          "limiteIntentos"
         ]
       },
       "TemplateShiftResponse": {

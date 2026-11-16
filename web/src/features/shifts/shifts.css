@@ -195,6 +195,8 @@
 .shift-preview-actions { display: flex; align-items: center; gap: 8px; }
 .shift-preview-actions select { min-height: 40px; max-width: 14rem; }
 .shift-preview-gaps ul { margin: 0; padding-left: 20px; }
+.shift-preview-gaps li .shift-preview-note { display: block; }
+.shift-preview-fill { color: var(--success); font-size: 0.875rem; font-weight: 700; }
 .shift-people { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; }
 .shift-people legend { padding: 0; font-weight: 700; }
 .shift-people ul { margin: 0; padding: 0; list-style: none; max-height: 16rem; overflow-y: auto; display: grid; gap: 4px; }

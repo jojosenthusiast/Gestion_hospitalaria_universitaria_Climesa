@@ -185,7 +185,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/turnos/{id}/asistencia` | `turnos.planificar` | La entrada es automática al inicio; ausencia con tipo y motivo, corregir la hora real de entrada o deshacer una ausencia; versión y motivo (ASIS-01 a ASIS-03) | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/lote/validar` | `turnos.planificar` | No guarda; un resultado por turno con las reglas de un turno suelto (descanso, tope de 7 días, traslape, inscripción) y huecos de cobertura | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/lote` | `turnos.planificar` | Todo o nada, como borradores; 409 lote_con_conflictos con el resultado de cada turno | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
-| POST | `/api/v1/turnos/generar` | `turnos.planificar` | Vista previa sin guardar: rotativo, 12x36, 24x72 o personalizado; máximo 31 días | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/turnos/generar` | `turnos.planificar` | Vista previa sin guardar: rotativo, 12x36, 24x72 o personalizado; llena la cobertura mínima del área y explica los huecos; máximo 31 días | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/turnos/plantillas` | `turnos.planificar` |  | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/plantillas` | `turnos.planificar` | Nombre único por área | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | PATCH | `/api/v1/turnos/plantillas/{id}` | `turnos.planificar` | Versión optimista | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |

@@ -565,7 +565,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Vista previa de una rotación (rotativo, 12x36, 24x72 o personalizado) con descanso, tope de 7 días y cobertura; no guarda nada */
+        /** Vista previa de una rotación (rotativo, 12x36, 24x72 o personalizado) con descanso y tope de 7 días; llena la cobertura mínima del área y marca los huecos que quedan con su motivo; no guarda nada */
         post: operations["OperationsController_generate"];
         delete?: never;
         options?: never;
@@ -3383,6 +3383,11 @@ export interface components {
             restDays?: number;
             justification?: string;
         };
+        /**
+         * @description `patron`: turno de la rotación; `cobertura`: turno que el generador agregó para llegar a la cobertura mínima del área (L13)
+         * @enum {string}
+         */
+        OrigenTurnoGenerado: "patron" | "cobertura";
         RotationItemResponse: {
             /** Format: uuid */
             staffId: string;
@@ -3395,6 +3400,8 @@ export interface components {
             end: string;
             type: components["schemas"]["TipoTurno"];
             ok: boolean;
+            /** @description `patron`: turno de la rotación; `cobertura`: turno que el generador agregó para llegar a la cobertura mínima del área (L13) */
+            origen: components["schemas"]["OrigenTurnoGenerado"];
             /**
              * Format: uuid
              * @description Persona del patrón a la que este turno reemplaza porque ella no podía
@@ -3408,10 +3415,30 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        RotationGapResponse: {
+            /** Format: uuid */
+            areaId: string;
+            area: string;
+            role: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            required: number;
+            actual: number;
+            /** @description sin_personal_elegible, fuera_del_patron, franja_ya_iniciada, limite_de_intentos o el código que rechazó a más personas probadas (personal_en_descanso, carga_semanal_excedida...) */
+            motivo: string;
+            mensaje: string;
+        };
         RotationPreviewResponse: {
             items: components["schemas"]["RotationItemResponse"][];
             personas: number;
-            huecos: components["schemas"]["CoverageGapResponse"][];
+            /** @description Huecos de cobertura del área en el rango, desde la próxima hora, que el relleno no pudo cubrir */
+            huecos: components["schemas"]["RotationGapResponse"][];
+            /** @description Pruebas de turno que hizo la solicitud (patrón, reemplazos y relleno) */
+            intentos: number;
+            /** @description Máximo de pruebas de turno por solicitud */
+            limiteIntentos: number;
         };
         TemplateShiftResponse: {
             /** @description 0 = lunes */

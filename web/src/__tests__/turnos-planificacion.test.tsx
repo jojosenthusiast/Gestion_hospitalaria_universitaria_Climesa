@@ -202,6 +202,30 @@ describe('turnos · lotes como borrador', () => {
     expect(await screen.findByText(/1 borrador creado/)).toBeTruthy();
   });
 
+  it('el generador distingue los turnos que agregó para cubrir el mínimo y lista los huecos que quedan con su motivo', async () => {
+    montar(true, path => path === '/turnos/generar' ? { personas: 2, intentos: 3, limiteIntentos: 2000, items: [
+      { staffId: 's-2', person: 'Rosa Enfermera Prueba', areaId: 'a-1', start: iso('2026-11-16', '07:00'), end: iso('2026-11-17', '07:00'), type: 'guardia', ok: true, origen: 'patron' },
+      { staffId: 's-3', person: 'Luis Enfermero Prueba', areaId: 'a-1', start: iso('2026-11-17', '07:00'), end: iso('2026-11-18', '07:00'), type: 'guardia', ok: true, origen: 'cobertura' },
+    ], huecos: [
+      { areaId: 'a-1', area: 'Emergencia', role: 'MED', start: iso('2026-11-16', '07:00'), end: iso('2026-11-18', '07:00'), required: 1, actual: 0, motivo: 'sin_personal_elegible', mensaje: 'El grupo no tiene personal de esa función para cubrir el mínimo.' },
+      { areaId: 'a-1', area: 'Emergencia', role: 'ENF', start: iso('2026-11-18', '07:00'), end: iso('2026-11-19', '07:00'), required: 1, actual: 0, motivo: 'personal_en_descanso', mensaje: 'Nadie del grupo puede cubrirlo. De las personas probadas: 2 en descanso obligatorio.' },
+    ] } : {});
+    await userEvent.click(await screen.findByRole('button', { name: 'Generar rotación' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Generar rotación' });
+    await userEvent.selectOptions(within(dialogo).getByLabelText('Área de los turnos'), 'a-1');
+    await userEvent.click(within(dialogo).getByLabelText('Rosa Enfermera Prueba'));
+    await userEvent.click(within(dialogo).getByLabelText('Luis Enfermero Prueba'));
+    fireEvent.change(within(dialogo).getByLabelText('Desde'), { target: { value: '2026-11-16' } });
+    fireEvent.change(within(dialogo).getByLabelText('Hasta'), { target: { value: '2026-11-18' } });
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Ver vista previa' }));
+    const previa = await screen.findByRole('dialog', { name: 'Vista previa de los borradores' });
+    expect(within(previa).getByText('2 turnos sin conflictos, 1 agregado para cubrir el mínimo del área. Se crean como borrador; nadie los ve hasta publicar la semana.')).toBeTruthy();
+    expect(within(previa).getAllByText('Cubre el mínimo del área')).toHaveLength(1);
+    const huecos = within(previa).getByRole('region', { name: 'Huecos que quedan sin cubrir' });
+    expect(within(huecos).getByText('El grupo no tiene personal de esa función para cubrir el mínimo.')).toBeTruthy();
+    expect(within(huecos).getByText('Nadie del grupo puede cubrirlo. De las personas probadas: 2 en descanso obligatorio.')).toBeTruthy();
+  });
+
   it('copiar la semana anterior valida los turnos en el servidor antes de crearlos', async () => {
     const api = montar(true, (path, body) => path === '/turnos/lote/validar' ? { resultados: body.items.map((_: unknown, index: number) => ({ index, ok: true })), huecos: [] } : {});
     await userEvent.click(await screen.findByRole('button', { name: 'Copiar semana anterior' }));

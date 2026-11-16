@@ -54,6 +54,10 @@ export function BatchPreview({ api, catalog, items: start, initial, onClose, onC
   const remove = (key: string) => setItems(list => list.filter(i => i.key !== key));
   const reassign = (key: string, staffId: string) => { setItems(list => list.map(i => i.key === key ? { ...i, staffId, person: staff.get(staffId)?.name ?? i.person, result: undefined, replaces: undefined } : i)); setStale(true); };
   const failed = items.filter(i => i.result && !i.result.ok);
+  const fills = items.filter(i => i.fill).length;
+  // Gaps from the generator carry why they stay open; a revalidated batch only lists them.
+  const explained = gaps.some(g => g.mensaje);
+  const gapsTitle = explained ? 'Huecos que quedan sin cubrir' : 'Huecos de cobertura con estos borradores';
   const needsJustification = items.some(i => i.result?.codigo === LOAD_JUSTIFY);
   const blocked = !items.length || stale || failed.length > 0 || check.busy;
 
@@ -80,7 +84,7 @@ export function BatchPreview({ api, catalog, items: start, initial, onClose, onC
         {check.busy ? 'Validando con las reglas de descanso, tope de 7 días y ausencias…'
           : stale ? 'Hay cambios sin validar.'
           : failed.length ? `${plural(failed.length, 'turno tiene', 'turnos tienen')} conflicto. Quítalos o cambia la persona y vuelve a validar.`
-          : `${plural(items.length, 'turno', 'turnos')} sin conflictos. Se crean como borrador; nadie los ve hasta publicar la semana.`}
+          : `${plural(items.length, 'turno', 'turnos')} sin conflictos${fills ? `, ${plural(fills, 'agregado', 'agregados')} para cubrir el mínimo del área` : ''}. Se crean como borrador; nadie los ve hasta publicar la semana.`}
       </p>
       {!items.length && <Notice kind="info">No quedan turnos en la vista previa.</Notice>}
       {days.map(day => <section key={day} className="shift-preview-day" aria-label={dayTitle(day, today)}>
@@ -94,6 +98,7 @@ export function BatchPreview({ api, catalog, items: start, initial, onClose, onC
                 <strong>{i.person}</strong>
                 <span className="shift-preview-time">{timeRange(i.start, i.end)} · {KIND_LABEL[i.type] ?? i.type}</span>
                 {i.replaces && <span className="shift-preview-note">Reemplaza a {staff.get(i.replaces)?.name ?? 'otra persona'}, que no podía.</span>}
+                {i.fill && <span className="shift-preview-fill">Cubre el mínimo del área</span>}
               </div>
               <div className="shift-preview-result">
                 {!i.result ? <span className="shift-preview-pending">{stale ? 'Sin validar' : 'Validando…'}</span>
@@ -110,11 +115,12 @@ export function BatchPreview({ api, catalog, items: start, initial, onClose, onC
           })}
         </ul>
       </section>)}
-      {gaps.length > 0 && <div className="shift-preview-gaps">
-        <h3>Huecos de cobertura con estos borradores</h3>
-        <ul>{gaps.slice(0, 8).map((g, k) => <li key={k}>{g.area} · {roleNames[g.role] ?? g.role}: {formatDateTime(g.start)} a {formatDateTime(g.end)} ({g.actual} de {g.required})</li>)}</ul>
+      {gaps.length > 0 && <section className="shift-preview-gaps" aria-label={gapsTitle}>
+        <h3>{gapsTitle}</h3>
+        <ul>{gaps.slice(0, 8).map((g, k) => <li key={k}>{g.area} · {roleNames[g.role] ?? g.role}: {formatDateTime(g.start)} a {formatDateTime(g.end)} ({g.actual} de {g.required})
+          {g.mensaje && <span className="shift-preview-note">{g.mensaje}</span>}</li>)}</ul>
         {gaps.length > 8 && <p className="form-hint">Y {plural(gaps.length - 8, 'hueco más', 'huecos más')}.</p>}
-      </div>}
+      </section>}
       {needsJustification && <Field label="Justificación de más de 44 h diurnas en la semana" value={justification} onChange={setJustification} minLength={10} maxLength={500}
         hint="Se guarda en cada turno que la necesite. Luego vuelve a validar." />}
       <div className="dialog-actions">
@@ -159,7 +165,8 @@ const PATTERNS: { code: string; label: string; hint: string }[] = [
 
 /**
  * Generador de rotaciones: personas (o el grupo de una función en el área), un patrón y un rango de fechas. La API
- * reparte las vueltas respetando descanso, tope de 7 días y cobertura, y devuelve la vista previa con conflictos.
+ * reparte las vueltas respetando descanso, tope de 7 días y cobertura, llena la cobertura mínima del área (L13) y
+ * devuelve la vista previa con conflictos y los huecos que quedan con su motivo.
  */
 export function RotationDialog({ api, catalog, defaultFrom, defaultTo, areaId: presetArea, onClose, onPreview }: {
   api: Api; catalog: ShiftCatalog; defaultFrom: string; defaultTo: string; areaId?: string; onClose: () => void;
@@ -176,12 +183,12 @@ export function RotationDialog({ api, catalog, defaultFrom, defaultTo, areaId: p
   async function preview(event: FormEvent) {
     event.preventDefault();
     if (missing) return;
-    const result = await action.run<{ items: (PreviewItem & { ok: boolean; codigo?: string; mensaje?: string; reemplazaA?: string })[]; huecos: BatchGap[] }>('/turnos/generar', {
+    const result = await action.run<{ items: (PreviewItem & { ok: boolean; codigo?: string; mensaje?: string; reemplazaA?: string; origen?: string })[]; huecos: BatchGap[] }>('/turnos/generar', {
       areaId, ...(people.length ? { staffIds: people } : { role }), pattern, from, to, startTime,
       ...(custom ? { hours: Number(hours), workDays: Number(workDays), restDays: Number(restDays) } : {}),
     });
     if (!result) return;
-    const items = result.items.map((i, index) => ({ key: `g-${index}`, staffId: i.staffId, person: i.person, areaId: i.areaId, start: i.start, end: i.end, type: i.type, replaces: i.reemplazaA }));
+    const items = result.items.map((i, index) => ({ key: `g-${index}`, staffId: i.staffId, person: i.person, areaId: i.areaId, start: i.start, end: i.end, type: i.type, replaces: i.reemplazaA, fill: i.origen === 'cobertura' }));
     onPreview(items, { resultados: result.items.map((i, index) => ({ index, ok: i.ok, codigo: i.codigo, mensaje: i.mensaje })), huecos: result.huecos });
   }
 

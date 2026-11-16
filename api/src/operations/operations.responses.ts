@@ -4,6 +4,8 @@ import { CATEGORIA_HABITACION, ESTADO_CAMA, ESTADO_TURNO } from '../platform/sta
 export const TIPO_PERSONAL = ['medico', 'enfermero', 'asistente', 'recepcionista', 'laboratorista', 'paramedico', 'motorista', 'limpieza', 'administrativo', 'otro'] as const;
 export const JUNTA_PROFESIONAL = ['JVPM', 'JVPE', 'JVPL', 'JVPO', 'otra'] as const;
 export const TIPO_TURNO = ['diurno', 'nocturno', 'guardia'] as const;
+/** Origen de un turno de la vista previa del generador de rotaciones (Fase 2, flujo F). */
+export const ORIGEN_TURNO_GENERADO = ['patron', 'cobertura'] as const;
 /** Estados de `personal.turno.estado`, con `ausente` de 20261120003000_turnos_asistencia_carga.sql (ASIS-01). */
 export const ESTADO_TURNO_ASISTENCIA = [...ESTADO_TURNO, 'ausente'] as const;
 /** Asistencia derivada: `pendiente` antes del inicio; desde el inicio, `presente` (automática) salvo que JOP marque `ausente`. */
@@ -243,6 +245,7 @@ export class RotationItemResponse {
   @DateTimeProp() end!: string;
   @EnumProp(TIPO_TURNO, 'TipoTurno') type!: string;
   @BoolProp() ok!: boolean;
+  @EnumProp(ORIGEN_TURNO_GENERADO, 'OrigenTurnoGenerado', { description: '`patron`: turno de la rotación; `cobertura`: turno que el generador agregó para llegar a la cobertura mínima del área (L13)' }) origen!: string;
   @UuidProp({ optional: true, description: 'Persona del patrón a la que este turno reemplaza porque ella no podía' }) reemplazaA?: string;
   @ClassArrayProp(ShiftWarningResponse, { optional: true }) advertencias?: ShiftWarningResponse[];
   @StrProp({ optional: true }) codigo?: string;
@@ -250,10 +253,17 @@ export class RotationItemResponse {
   @StrProp({ optional: true, nullable: true }) campo?: string | null;
   @JsonProp({ optional: true }) detalle?: Record<string, unknown>;
 }
+/** Hueco que queda después del relleno de cobertura del generador, con el motivo por el que no se llenó. */
+export class RotationGapResponse extends CoverageGapResponse {
+  @StrProp({ description: 'sin_personal_elegible, fuera_del_patron, franja_ya_iniciada, limite_de_intentos o el código que rechazó a más personas probadas (personal_en_descanso, carga_semanal_excedida...)' }) motivo!: string;
+  @StrProp() mensaje!: string;
+}
 export class RotationPreviewResponse {
   @ClassArrayProp(RotationItemResponse) items!: RotationItemResponse[];
   @IntProp() personas!: number;
-  @ClassArrayProp(CoverageGapResponse) huecos!: CoverageGapResponse[];
+  @ClassArrayProp(RotationGapResponse, { description: 'Huecos de cobertura del área en el rango, desde la próxima hora, que el relleno no pudo cubrir' }) huecos!: RotationGapResponse[];
+  @IntProp({ description: 'Pruebas de turno que hizo la solicitud (patrón, reemplazos y relleno)' }) intentos!: number;
+  @IntProp({ description: 'Máximo de pruebas de turno por solicitud' }) limiteIntentos!: number;
 }
 export class TemplateShiftResponse {
   @IntProp({ description: '0 = lunes' }) day!: number;
