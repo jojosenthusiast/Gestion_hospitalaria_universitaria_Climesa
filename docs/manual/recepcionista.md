@@ -97,7 +97,7 @@ Consulta de los servicios y de la planificación de turnos.
 
 ### Secciones
 
-Inicio, Emitir número, Pacientes, Citas, Vinculaciones, Admisión y cama, Tablero de camas, Despacho, Mis turnos, Hospital y Perfil. La barra inferior muestra Inicio y tres tareas; el resto está en **Más**.
+Inicio, Avisos, Emitir número, Pacientes, Citas, Vinculaciones, Admisión y cama, Tablero de camas, Despacho, Mis turnos, Hospital y Perfil. La barra inferior muestra Inicio y tres tareas; el resto está en **Más**. **Avisos** funciona igual que en la web; un aviso crítico para Recepción sale arriba en Inicio hasta que das **Enterado** (ver `README.md`, "Avisos").
 
 | Sección | Qué haces |
 |---|---|

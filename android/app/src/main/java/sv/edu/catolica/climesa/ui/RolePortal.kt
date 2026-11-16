@@ -128,7 +128,8 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         if(criticalLab&&AndroidSection.RESULT_REVIEW in sections)CriticalLabNotice(onReview={model.dismissCriticalLab();selectedName=AndroidSection.RESULT_REVIEW.name},onDismiss=model::dismissCriticalLab)
         val padding=PaddingValues(0.dp)
         Box(Modifier.weight(1f).fillMaxWidth()){when{
-        page==AndroidSection.HOME->RoleDashboardScreen(account,role,onDashboardAction,Modifier.padding(padding))
+        page==AndroidSection.HOME->RoleDashboardScreen(account,role,onDashboardAction,Modifier.padding(padding),onOpenNotices={if(AndroidSection.NOTICES in sections)selectedName=AndroidSection.NOTICES.name})
+        page==AndroidSection.NOTICES->NoticesScreen(account,Modifier.padding(padding))
         page==AndroidSection.BEDS||page==AndroidSection.CLEANING->BedsScreen(account.profile,Modifier.padding(padding))
         page==AndroidSection.MY_APPOINTMENTS->PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
         page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD->HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled)

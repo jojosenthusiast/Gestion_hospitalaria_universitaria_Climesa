@@ -7,7 +7,7 @@ Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#
 
 ## Secciones
 
-AST y ENF comparten un catálogo de estación de cuidado; cada cuenta ve solo las secciones que permiten sus permisos. Para AST: Inicio, Signos vitales, Mi consultorio, Mis turnos, Hospital y Perfil.
+AST y ENF comparten un catálogo de estación de cuidado; cada cuenta ve solo las secciones que permiten sus permisos. Para AST: Inicio, Avisos, Signos vitales, Mi consultorio, Mis turnos, Hospital y Perfil.
 
 ## Mi consultorio
 
@@ -26,5 +26,6 @@ Tus turnos publicados, agrupados por día (Hoy, Mañana, día y fecha) y por hor
 
 ## Inicio y Hospital
 
-- **Inicio** muestra "Acciones rápidas" y los avisos internos.
+- **Inicio** muestra "Acciones rápidas" y, arriba, el aviso **Crítico** pendiente para tu rol o tu área hasta que das **Enterado**.
+- **Avisos** (en **Más**) lista todos tus avisos con filtros **Todos**, **Sin leer** y **Críticos** (ver `README.md`, "Avisos").
 - **Hospital** muestra la información pública: ocupación, médicos de turno y avisos.

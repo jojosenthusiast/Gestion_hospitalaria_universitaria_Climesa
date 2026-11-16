@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- S11 · Avisos: su propia área (NoticesScreen) y aviso crítico persistente en el inicio (CriticalNoticeBanner) -->
+    <string name="avisos_breadcrumb">CLIMESA / Comunicación</string>
+    <string name="avisos_vacio">Estás al día</string>
+    <string name="avisos_vacio_detalle">No hay avisos vigentes para tu rol ni tu área.</string>
+    <string name="avisos_sin_criticos">Sin avisos críticos</string>
+    <string name="avisos_todo_leido">Todo leído</string>
+    <string name="avisos_filtro_vacio_detalle">Cambia el filtro para ver los demás avisos.</string>
+    <string name="aviso_enterado">Enterado</string>
+    <string name="aviso_sin_leer">Sin leer</string>
+    <string name="aviso_recordarme">Recordarme en %1$s h</string>
+    <string name="aviso_publicado">Publicado</string>
+    <string name="aviso_vigente_hasta">Vigente hasta</string>
+    <string name="aviso_te_recordamos">Te lo recordamos</string>
+    <string name="aviso_enterado_el">Diste «Enterado» el %1$s</string>
+    <string name="aviso_hasta">hasta %1$s</string>
+    <string name="aviso_banner_cuenta">1 de %1$d sin «Enterado»</string>
+    <string name="aviso_ver_en_avisos">Ver en Avisos</string>
+    <string name="aviso_volver">Volver a Avisos</string>
+    <string name="aviso_sin_fecha">—</string>
+
+    <!-- T07c · Adjuntos del resultado externo de laboratorio -->
+    <string name="lab_informe_externo">Informe externo</string>
+    <string name="lab_adjunto_abrir">Abrir archivo</string>
+    <string name="lab_adjunto_abrir_desc">Abrir %1$s</string>
+    <string name="lab_adjunto_solo_referencia">Solo se guardó la referencia del archivo (nombre, tipo, tamaño y huella) y los valores; el archivo no está en el sistema.</string>
+    <string name="lab_adjunto_subir">Subir la foto o el PDF (hasta 10 MB)</string>
+    <string name="lab_adjunto_sin">Sin adjuntos visibles.</string>
+    <string name="lab_adjunto_cargando">Cargando adjuntos…</string>
+    <string name="lab_adjunto_reintentar">Volver a cargar</string>
+    <string name="lab_subida_fallida_ayuda">Puedes subir el archivo desde la orden, en «Informe externo».</string>
+    <string name="lab_entendido">Entendido</string>
+</resources>

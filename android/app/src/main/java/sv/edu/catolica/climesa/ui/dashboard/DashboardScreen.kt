@@ -42,7 +42,10 @@ import sv.edu.catolica.climesa.domain.DashboardModel
 import sv.edu.catolica.climesa.domain.DashboardTone
 import sv.edu.catolica.climesa.domain.QuickActionRequest
 import sv.edu.catolica.climesa.domain.RoleAccess
+import sv.edu.catolica.climesa.domain.NoticeInboxRules
 import sv.edu.catolica.climesa.ui.CompactHeader
+import sv.edu.catolica.climesa.ui.CriticalNoticeBanner
+import sv.edu.catolica.climesa.ui.noticeInboxModel
 import sv.edu.catolica.climesa.ui.ClimesaCard
 import sv.edu.catolica.climesa.ui.EmptyState
 import sv.edu.catolica.climesa.ui.ErrorState
@@ -79,17 +82,18 @@ fun RoleDashboardScreen(
     onAction: (QuickActionRequest) -> Unit,
     modifier: Modifier = Modifier,
     model: DashboardViewModel = viewModel(key = "dashboard-${account.session.userId}-$role"),
-    noticesModel: NoticesViewModel = viewModel(key = "avisos-${account.session.userId}"),
+    onOpenNotices: () -> Unit = {},
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(role, account.profile.permissions, account.profile.channels, account.profile.patientId) {
         model.start(role, account.profile.permissions, account.profile.channels, account.profile.patientId != null)
     }
-    LaunchedEffect(account.profile.channels) { noticesModel.start(account.profile.channels) }
-    val notices by noticesModel.notices.collectAsStateWithLifecycle()
+    // S11: notices left the dashboard for their own area; "Inicio" keeps only the critical one for this role or area.
+    val inbox by noticeInboxModel(account).state.collectAsStateWithLifecycle()
+    val critical = NoticeInboxRules.banner(inbox.inbox, inbox.hidden).isNotEmpty()
     PageList(modifier) {
         item { DashboardHeader(account.profile.name, RoleAccess.label(role), stringResource(helpFor(role))) }
-        if (notices.isNotEmpty()) item { NoticesSection(notices) }
+        if (critical) item(key = "aviso-critico") { CriticalNoticeBanner(account, onOpenNotices) }
         val dashboard = state.model
         when {
             state.loading && dashboard == null -> item { LoadingState() }

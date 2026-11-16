@@ -23,7 +23,7 @@ Tú no eliges el expediente: lo confirma una persona de Recepción.
 
 ## Android
 
-Secciones: Inicio, Mi turno, Mis citas, Mis exámenes, Vincular expediente, Mi historial, Pedir ambulancia, Hospital, Quién vio mi expediente y Perfil. La barra inferior muestra Inicio, Mi turno, Mis citas y Exámenes.
+Secciones: Inicio, Avisos, Mi turno, Mis citas, Mis exámenes, Vincular expediente, Mi historial, Pedir ambulancia, Hospital, Quién vio mi expediente y Perfil. La barra inferior muestra Inicio, Mi turno, Mis citas y Exámenes.
 
 ## iOS
 
