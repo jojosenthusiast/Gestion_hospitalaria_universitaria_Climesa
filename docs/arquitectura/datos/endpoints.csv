@@ -39,6 +39,12 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 103,GET,/api/v1/turnos/especialistas,turnos.ver,"Médicos de turno por día y especialidad durante 7 días; sin datos de contacto (RN-17, CARGA-04)",R,3,Especialistas de la semana
 103,POST,/api/v1/turnos/{id}/entrada,turnos.ver,"Propio; obsoleto, una versión para apps instaladas: no cambia nada, devuelve el estado del turno ya empezado o 409 entrada_automatica antes del inicio",R,3,Marcar mi entrada al turno (obsoleto)
 103,POST,/api/v1/turnos/{id}/asistencia,turnos.planificar,"La entrada es automática al inicio; ausencia con tipo y motivo, corregir la hora real de entrada o deshacer una ausencia; versión y motivo (ASIS-01 a ASIS-03)",R,3,Registrar la asistencia de un turno
+103,POST,/api/v1/turnos/lote/validar,turnos.planificar,"No guarda; un resultado por turno con las reglas de un turno suelto (descanso, tope de 7 días, traslape, inscripción) y huecos de cobertura",R,4,Validar un lote de turnos
+103,POST,/api/v1/turnos/lote,turnos.planificar,"Todo o nada, como borradores; 409 lote_con_conflictos con el resultado de cada turno",R,4,Crear turnos en lote como borrador
+103,POST,/api/v1/turnos/generar,turnos.planificar,"Vista previa sin guardar: rotativo, 12x36, 24x72 o personalizado; máximo 31 días",R,4,Generar una rotación de turnos
+103,GET,/api/v1/turnos/plantillas,turnos.planificar,,R,4,Plantillas de semana por área
+103,POST,/api/v1/turnos/plantillas,turnos.planificar,Nombre único por área,R,4,Guardar una semana como plantilla
+103,PATCH,/api/v1/turnos/plantillas/{id},turnos.planificar,Versión optimista,R,4,Retirar una plantilla de semana
 104,GET,/api/v1/espacios,espacios.ver,,R,2,Árbol del edificio con disponibilidad agregada (CTE recursiva)
 104,POST,/api/v1/espacios,espacios.configurar,,R,2,Crear espacio
 104,PATCH,/api/v1/espacios/{id},espacios.configurar,No reduce capacidad bajo ocupación,R,2,Editar espacio

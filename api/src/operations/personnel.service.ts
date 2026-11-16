@@ -1,11 +1,12 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { ProblemException,VersionConflictException } from '../platform/problem';
 import { Actor, SYSTEM_ACTOR, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
 import { Clock,businessDate,businessDayRange } from '../platform/clock';
-import { StaffDto, ShiftDto, RegistrationDto, PublishDto, AttendanceDto } from './operations.dto';
+import { StaffDto, ShiftDto, RegistrationDto, PublishDto, AttendanceDto, ShiftBatchDto, ShiftBatchItemDto, RotationDto, WeekTemplateDto, WeekTemplateRetireDto } from './operations.dto';
+import { RotationPattern, daysBetween, rotationSlots, slotRange } from './rotation.rules';
 import { AttendancePolicy, LoadPolicy, allowedActions, attendanceOf, consecutiveDays, isLate, stateByClock, windowLoad } from './shift.rules';
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
@@ -44,6 +45,15 @@ async function dbRule<T>(work:Promise<T>):Promise<T>{
     throw error;
   }
 }
+/** Error de una vista previa que siempre se revierte: lleva el resultado fuera de la transacción. */
+class DryRun<T> { constructor(readonly value:T){} }
+/** Resultado de un turno de un lote: el mismo código y mensaje que respondería un turno suelto. */
+export type BatchItemResult={index:number;ok:boolean;id?:string;version?:number;advertencias?:{codigo:string;horasSemana:number;limite:number}[];codigo?:string;mensaje?:string;campo?:string|null;detalle?:Record<string,unknown>};
+/** Conflictos de la persona (no del horario): el generador prueba con otra persona del grupo. */
+const SUBSTITUTABLE=new Set(['personal_en_descanso','personal_jornada_ocupada','carga_semanal_excedida','dias_seguidos_excedidos','inscripcion_no_vigente','conflicto']);
+/** Personas que el generador prueba como reemplazo de un turno con conflicto. */
+const MAX_SUBSTITUTES=8;
+type TemplateRow={dia:number;inicio:string;horas:number;tipo:string;staffId:string};
 @Injectable()
 export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   private timer?:NodeJS.Timeout;
@@ -103,13 +113,13 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     }catch{throw new BadRequestException('Indica un rango de fechas válido, con el fin igual o posterior al inicio y de máximo 31 días.');}
   }
   /** FR-103-08 / CARGA-03: huecos por área, rol y hora frente al mínimo vigente; los turnos cancelados o ausentes no cuentan. */
-  private async gaps(c:PoolClient,start:Date,end:Date,areaId?:string):Promise<CoverageGap[]> {
+  private async gaps(c:PoolClient,start:Date,end:Date,areaId?:string,withDrafts=false):Promise<CoverageGap[]> {
     const policy=await this.policies.value<Record<string,Record<string,number>>>(c,'turnos.cobertura_minima',start);
     const hours=(await c.query("SELECT valor FROM plataforma.politica WHERE clave='turnos.horario_servicios' AND vigencia @> $1::timestamptz",[start])).rows[0]?.valor as Record<string,{desde:number;hasta:number}>|undefined;
     // Áreas con regla propia por código y áreas de hospitalización con alguna cama ocupada ahora (planta_con_ocupacion).
     const areas=(await c.query(`SELECT e.id,e.codigo,e.nombre,CASE WHEN e.codigo=ANY($1::text[]) THEN NULL ELSE 'planta_con_ocupacion' END AS regla FROM infra.espacio e
       WHERE e.activo AND ($2::uuid IS NULL OR e.id=$2) AND (e.codigo=ANY($1::text[]) OR (e.tipo='area' AND EXISTS(SELECT 1 FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio h ON h.id=o.habitacion_id WHERE h.padre_id=e.id AND upper_inf(o.periodo))))`,[Object.keys(COVERAGE_AREAS),areaId??null])).rows;
-    const shifts=(await c.query(`SELECT t.area_id,p.tipo,lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE ${WORKING} AND t.estado<>'borrador' AND t.area_id=ANY($1::uuid[]) AND t.periodo && tstzrange($2,$3)`,[areas.map(a=>a.id),start,end])).rows.map(s=>({...s,start:new Date(s.start).valueOf(),end:new Date(s.end).valueOf()}));
+    const shifts=(await c.query(`SELECT t.area_id,p.tipo,lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE ${WORKING} AND ($4 OR t.estado<>'borrador') AND t.area_id=ANY($1::uuid[]) AND t.periodo && tstzrange($2,$3)`,[areas.map(a=>a.id),start,end,withDrafts])).rows.map(s=>({...s,start:new Date(s.start).valueOf(),end:new Date(s.end).valueOf()}));
     const gaps:CoverageGap[]=[];
     for(const area of areas){
       const rule=area.regla??COVERAGE_AREAS[area.codigo];
@@ -265,6 +275,66 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   private conflictWithAppointments(rows:{id:string;start:Date;end:Date;state:string}[]) {
     return new ProblemException('turno_con_citas',409,`El médico tiene ${rows.length===1?'una cita':`${rows.length} citas`} en ese horario; reprográmalas o cancélalas desde Citas antes de cambiar el turno.`,'start',{citas:rows});
   }
+  /**
+   * Validación de un turno nuevo o movido (todas las reglas de un turno suelto): personal activo, área, inscripción
+   * vigente (FR-103-10), duración, traslape, descanso (RN-13), un turno por jornada, tope de 7 días y días seguidos
+   * (CARGA-01/02) y aviso de 44 h diurnas (RN-14). La usan `saveShift` y los lotes (`validateBatch`, `createBatch`,
+   * `generate`), así las reglas son idénticas. `countDrafts`: en un lote los borradores suman carga, porque se van a
+   * publicar juntos (al publicar, la base vuelve a revisar el descanso y el tope uno por uno).
+   */
+  private async checkShift(c:PoolClient,id:string|null,old:any,dto:Pick<ShiftDto,'staffId'|'areaId'|'type'|'justification'|'emergencyReason'>,start:Date,end:Date,countDrafts=false) {
+    const loaded=countDrafts?WORKING:LOADED;
+    const person=(await c.query('SELECT id,tipo,activo FROM personal.persona WHERE id=$1 FOR UPDATE',[dto.staffId])).rows[0];
+    if(!person?.activo)throw new BadRequestException('Selecciona personal activo.');
+    await this.area(c,dto.areaId);
+    // FR-103-10: medicina y enfermería no se programan sin inscripción vigente en la fecha del turno.
+    if(['medico','enfermero'].includes(person.tipo)&&!(await c.query('SELECT personal.inscrito($1,$2::date) AS ok',[dto.staffId,businessDate(start)])).rows[0].ok)throw new ProblemException('inscripcion_no_vigente',409,'La persona no tiene una inscripción profesional vigente en la fecha del turno.','staffId');
+    const duration=await this.policies.value<{min_horas:number;max_horas:number;max_guardia_medica:number}>(c,'turnos.duracion',start);
+    const rest=await this.policies.value<{min_horas:number;tras_guardia_24h:number}>(c,'turnos.descanso',start);
+    const load=await this.policies.value<LoadPolicy>(c,'turnos.carga',start);
+    const hours=(end.valueOf()-start.valueOf())/HOUR;
+    // Las guardias y los turnos nocturnos extendidos pueden cubrir hasta 24 h;
+    // la jornada de 24 h no se limita únicamente al rol médico.
+    const max=['guardia','nocturno'].includes(dto.type)?duration.max_guardia_medica:duration.max_horas;
+    if(hours<duration.min_horas||hours>max)throw new BadRequestException(`La duración permitida es de ${duration.min_horas} a ${max} horas.`);
+    const nearby=(await c.query(`SELECT t.id,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.tipo FROM personal.turno t WHERE t.persona_id=$1 AND ${WORKING} AND ($2::uuid IS NULL OR t.id<>$2) AND t.periodo && tstzrange($3::timestamptz-interval '3 days',$4::timestamptz+interval '3 days')`,[dto.staffId,id,start,end])).rows;
+    const localLabel=(value:Date)=>new Intl.DateTimeFormat('es-SV',{dateStyle:'medium',timeStyle:'short',timeZone:'America/El_Salvador'}).format(value);
+    // RN-13 (MA-TUR-04): 8 h de descanso después de cualquier turno y 12 h después de una guardia de 24 h; tras la
+    // guardia de 24 h, además, hasta el fin del día en que termina. Dos noches seguidas con 12 h entre ellas se permiten.
+    const restUntil=(a:number,b:number)=>{
+      const long=(b-a)/HOUR>=24;
+      const until=b+(long?rest.tras_guardia_24h:rest.min_horas)*HOUR;
+      return new Date(long?Math.max(until,businessDayRange(businessDate(new Date(b))).end.valueOf()):until);
+    };
+    for(const other of nearby){
+      const a=new Date(other.start).valueOf(),b=new Date(other.end).valueOf();
+      if(a<end.valueOf()&&b>start.valueOf())throw new ConflictException('Este horario se traslapa con otro turno de la misma persona.');
+      if(b<=start.valueOf()){const until=restUntil(a,b);if(start<until)throw new ProblemException('personal_en_descanso',409,`La persona está en descanso obligatorio hasta ${localLabel(until)} por su turno anterior.`,'staffId',{disponibleDesde:until.toISOString()});}
+      if(a>=end.valueOf()){const until=restUntil(start.valueOf(),end.valueOf());if(new Date(a)<until)throw new ProblemException('personal_en_descanso',409,`La persona debe descansar después de este turno; el siguiente horario podrá iniciar desde ${localLabel(until)}.`,'staffId',{disponibleDesde:until.toISOString()});}
+    }
+    // Un turno por jornada: la jornada de un turno es el día local en que empieza (una noche no ocupa el día siguiente).
+    if(nearby.some(other=>businessDate(new Date(other.start))===businessDate(start)))throw new ProblemException('personal_jornada_ocupada',409,`La persona ya tiene un turno asignado para la jornada del ${businessDate(start)}.`,'staffId',{jornada:businessDate(start)});
+    // CARGA-01/02: tope de horas en cualquier ventana de 7 días y de días seguidos; solo una emergencia escrita lo supera.
+    const emergency=dto.emergencyReason?.trim()||null;
+    const span=(await c.query(`SELECT lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t WHERE t.persona_id=$1 AND ${loaded} AND ($2::uuid IS NULL OR t.id<>$2) AND t.periodo && tstzrange($3::timestamptz-make_interval(days=>$5),$4::timestamptz+make_interval(days=>$5))`,[dto.staffId,id,start,end,Math.max(8,load.max_dias_seguidos+1)])).rows.map(o=>[new Date(o.start).valueOf(),new Date(o.end).valueOf()] as [number,number]);
+    const previous:[number,number]|null=old&&old.persona_id===dto.staffId&&!['cancelado','ausente',...(countDrafts?[]:['borrador'])].includes(old.estado)?[new Date(old.start).valueOf(),new Date(old.end).valueOf()]:null;
+    const rolling=windowLoad(span,[start.valueOf(),end.valueOf()],previous,load.max_horas_7_dias);
+    const days=consecutiveDays(new Set([...span.map(([a])=>businessDate(new Date(a))),businessDate(start)]),businessDate(start));
+    if(!emergency&&rolling.exceeds)throw new ProblemException('carga_semanal_excedida',409,`La persona sumaría ${rolling.hours} h en 7 días, más del tope de ${load.max_horas_7_dias} h. Solo en una emergencia se asigna, indicando el motivo de la excepción.`,'emergencyReason',{horas7Dias:rolling.hours,limite:load.max_horas_7_dias});
+    if(!emergency&&days>load.max_dias_seguidos)throw new ProblemException('dias_seguidos_excedidos',409,`La persona trabajaría ${days} días seguidos, más del máximo de ${load.max_dias_seguidos}. Solo en una emergencia se asigna, indicando el motivo de la excepción.`,'emergencyReason',{diasSeguidos:days,limite:load.max_dias_seguidos});
+    // FR-103-07 / RN-14: aviso, no bloqueo, de más de 44 h diurnas por semana (lunes a domingo, 06:00-22:00 local); excederlas exige justificación.
+    const warnings:{codigo:string;horasSemana:number;limite:number}[]=[];
+    const limit=(await this.policies.value<{aviso_diurnas:number}>(c,'turnos.horas_semanales',start)).aviso_diurnas;
+    const first=weekStart(start).valueOf(),last=weekStart(new Date(end.valueOf()-1)).valueOf()+7*DAY;
+    const others=(await c.query(`SELECT lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t WHERE t.persona_id=$1 AND ${WORKING} AND ($2::uuid IS NULL OR t.id<>$2) AND t.periodo && tstzrange($3::timestamptz,$4::timestamptz)`,[dto.staffId,id,new Date(first),new Date(last)])).rows.map(o=>[new Date(o.start).valueOf(),new Date(o.end).valueOf()]);
+    for(let week=first;week<last;week+=7*DAY){
+      const within=(a:number,b:number)=>daytimeHours(Math.max(a,week),Math.min(b,week+7*DAY));
+      const own=within(start.valueOf(),end.valueOf()),total=Math.round((own+others.reduce((sum,[a,b])=>sum+within(a,b),0))*100)/100;
+      if(own>0&&total>limit)warnings.push({codigo:'horas_semanales_excedidas',horasSemana:total,limite:limit});
+    }
+    if(warnings.length&&(dto.justification?.trim().length??0)<10)throw new ProblemException('horas_semanales_excedidas',409,`La persona suma ${warnings[0].horasSemana} horas diurnas en la semana, más de las ${limit} permitidas sin aviso; indica una justificación de al menos 10 caracteres.`,'justification',{horasSemana:warnings[0].horasSemana,limite:limit});
+    return {warnings,rolling,days,emergency};
+  }
   async saveShift(actor:Actor,id:string|null,dto:ShiftDto,key?:string) {
     const start=new Date(dto.start),end=new Date(dto.end);
     if(!/(Z|[+-]\d\d:\d\d)$/.test(dto.start)||!/(Z|[+-]\d\d:\d\d)$/.test(dto.end)||!Number.isFinite(start.valueOf())||end<=start)throw new BadRequestException('Indica inicio y fin con zona horaria.');
@@ -294,55 +364,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
         await this.announce(c,'turno.actualizado',[{...row,persona_id:old.persona_id}]);
         return {...row,advertencias:[],huecos};
       }
-      const person=(await c.query('SELECT id,tipo,activo FROM personal.persona WHERE id=$1 FOR UPDATE',[dto.staffId])).rows[0];
-      if(!person?.activo)throw new BadRequestException('Selecciona personal activo.');
-      await this.area(c,dto.areaId);
-      // FR-103-10: medicina y enfermería no se programan sin inscripción vigente en la fecha del turno.
-      if(['medico','enfermero'].includes(person.tipo)&&!(await c.query('SELECT personal.inscrito($1,$2::date) AS ok',[dto.staffId,businessDate(start)])).rows[0].ok)throw new ProblemException('inscripcion_no_vigente',409,'La persona no tiene una inscripción profesional vigente en la fecha del turno.','staffId');
-      const duration=await this.policies.value<{min_horas:number;max_horas:number;max_guardia_medica:number}>(c,'turnos.duracion',start);
-      const rest=await this.policies.value<{min_horas:number;tras_guardia_24h:number}>(c,'turnos.descanso',start);
-      const load=await this.policies.value<LoadPolicy>(c,'turnos.carga',start);
-      const hours=(end.valueOf()-start.valueOf())/HOUR;
-      // Las guardias y los turnos nocturnos extendidos pueden cubrir hasta 24 h;
-      // la jornada de 24 h no se limita únicamente al rol médico.
-      const max=['guardia','nocturno'].includes(dto.type)?duration.max_guardia_medica:duration.max_horas;
-      if(hours<duration.min_horas||hours>max)throw new BadRequestException(`La duración permitida es de ${duration.min_horas} a ${max} horas.`);
-      const nearby=(await c.query(`SELECT t.id,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.tipo FROM personal.turno t WHERE t.persona_id=$1 AND ${WORKING} AND ($2::uuid IS NULL OR t.id<>$2) AND t.periodo && tstzrange($3::timestamptz-interval '3 days',$4::timestamptz+interval '3 days')`,[dto.staffId,id,start,end])).rows;
-      const localLabel=(value:Date)=>new Intl.DateTimeFormat('es-SV',{dateStyle:'medium',timeStyle:'short',timeZone:'America/El_Salvador'}).format(value);
-      // RN-13 (MA-TUR-04): 8 h de descanso después de cualquier turno y 12 h después de una guardia de 24 h; tras la
-      // guardia de 24 h, además, hasta el fin del día en que termina. Dos noches seguidas con 12 h entre ellas se permiten.
-      const restUntil=(a:number,b:number)=>{
-        const long=(b-a)/HOUR>=24;
-        const until=b+(long?rest.tras_guardia_24h:rest.min_horas)*HOUR;
-        return new Date(long?Math.max(until,businessDayRange(businessDate(new Date(b))).end.valueOf()):until);
-      };
-      for(const other of nearby){
-        const a=new Date(other.start).valueOf(),b=new Date(other.end).valueOf();
-        if(a<end.valueOf()&&b>start.valueOf())throw new ConflictException('Este horario se traslapa con otro turno de la misma persona.');
-        if(b<=start.valueOf()){const until=restUntil(a,b);if(start<until)throw new ProblemException('personal_en_descanso',409,`La persona está en descanso obligatorio hasta ${localLabel(until)} por su turno anterior.`,'staffId',{disponibleDesde:until.toISOString()});}
-        if(a>=end.valueOf()){const until=restUntil(start.valueOf(),end.valueOf());if(new Date(a)<until)throw new ProblemException('personal_en_descanso',409,`La persona debe descansar después de este turno; el siguiente horario podrá iniciar desde ${localLabel(until)}.`,'staffId',{disponibleDesde:until.toISOString()});}
-      }
-      // Un turno por jornada: la jornada de un turno es el día local en que empieza (una noche no ocupa el día siguiente).
-      if(nearby.some(other=>businessDate(new Date(other.start))===businessDate(start)))throw new ProblemException('personal_jornada_ocupada',409,`La persona ya tiene un turno asignado para la jornada del ${businessDate(start)}.`,'staffId',{jornada:businessDate(start)});
-      // CARGA-01/02: tope de horas en cualquier ventana de 7 días y de días seguidos; solo una emergencia escrita lo supera.
-      const emergency=dto.emergencyReason?.trim()||null;
-      const span=(await c.query(`SELECT lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t WHERE t.persona_id=$1 AND ${LOADED} AND ($2::uuid IS NULL OR t.id<>$2) AND t.periodo && tstzrange($3::timestamptz-make_interval(days=>$5),$4::timestamptz+make_interval(days=>$5))`,[dto.staffId,id,start,end,Math.max(8,load.max_dias_seguidos+1)])).rows.map(o=>[new Date(o.start).valueOf(),new Date(o.end).valueOf()] as [number,number]);
-      const previous:[number,number]|null=old&&old.persona_id===dto.staffId&&!['cancelado','ausente','borrador'].includes(old.estado)?[new Date(old.start).valueOf(),new Date(old.end).valueOf()]:null;
-      const rolling=windowLoad(span,[start.valueOf(),end.valueOf()],previous,load.max_horas_7_dias);
-      const days=consecutiveDays(new Set([...span.map(([a])=>businessDate(new Date(a))),businessDate(start)]),businessDate(start));
-      if(!emergency&&rolling.exceeds)throw new ProblemException('carga_semanal_excedida',409,`La persona sumaría ${rolling.hours} h en 7 días, más del tope de ${load.max_horas_7_dias} h. Solo en una emergencia se asigna, indicando el motivo de la excepción.`,'emergencyReason',{horas7Dias:rolling.hours,limite:load.max_horas_7_dias});
-      if(!emergency&&days>load.max_dias_seguidos)throw new ProblemException('dias_seguidos_excedidos',409,`La persona trabajaría ${days} días seguidos, más del máximo de ${load.max_dias_seguidos}. Solo en una emergencia se asigna, indicando el motivo de la excepción.`,'emergencyReason',{diasSeguidos:days,limite:load.max_dias_seguidos});
-      // FR-103-07 / RN-14: aviso, no bloqueo, de más de 44 h diurnas por semana (lunes a domingo, 06:00-22:00 local); excederlas exige justificación.
-      const warnings:{codigo:string;horasSemana:number;limite:number}[]=[];
-      const limit=(await this.policies.value<{aviso_diurnas:number}>(c,'turnos.horas_semanales',start)).aviso_diurnas;
-      const first=weekStart(start).valueOf(),last=weekStart(new Date(end.valueOf()-1)).valueOf()+7*DAY;
-      const others=(await c.query(`SELECT lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t WHERE t.persona_id=$1 AND ${WORKING} AND ($2::uuid IS NULL OR t.id<>$2) AND t.periodo && tstzrange($3::timestamptz,$4::timestamptz)`,[dto.staffId,id,new Date(first),new Date(last)])).rows.map(o=>[new Date(o.start).valueOf(),new Date(o.end).valueOf()]);
-      for(let week=first;week<last;week+=7*DAY){
-        const within=(a:number,b:number)=>daytimeHours(Math.max(a,week),Math.min(b,week+7*DAY));
-        const own=within(start.valueOf(),end.valueOf()),total=Math.round((own+others.reduce((sum,[a,b])=>sum+within(a,b),0))*100)/100;
-        if(own>0&&total>limit)warnings.push({codigo:'horas_semanales_excedidas',horasSemana:total,limite:limit});
-      }
-      if(warnings.length&&(dto.justification?.trim().length??0)<10)throw new ProblemException('horas_semanales_excedidas',409,`La persona suma ${warnings[0].horasSemana} horas diurnas en la semana, más de las ${limit} permitidas sin aviso; indica una justificación de al menos 10 caracteres.`,'justification',{horasSemana:warnings[0].horasSemana,limite:limit});
+      const {warnings,rolling,days,emergency}=await this.checkShift(c,id,old,dto,start,end);
       let row;
       if(id){
         // MA-TUR-05: mover el turno de un médico no deja citas vivas fuera de su nueva jornada.
@@ -355,6 +377,156 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       const accounts=(await c.query('SELECT id FROM acceso.usuario WHERE persona_personal_id=ANY($1::uuid[])',[ids])).rows;
       await this.commands.event(c,'turno.actualizado','turno',row.id,row.version,['rol:JOP','rol:ADM',...accounts.map(a=>`usuario:${a.id}`)]);
       return {...row,advertencias:warnings};
+    });
+  }
+  /** Ejecuta `work` en una transacción que siempre se revierte: vista previa que valida contra la base sin escribir nada. */
+  private async dryRun<T>(work:(c:PoolClient)=>Promise<T>):Promise<T> {
+    try{await this.db.transaction(async c=>{throw new DryRun(await work(c));});}
+    catch(error){if(error instanceof DryRun)return error.value as T;throw error;}
+    throw new Error('dryRun sin resultado');
+  }
+  /** Código y mensaje de un turno rechazado, igual que los respondería `POST /turnos` (y el filtro de errores). */
+  private itemProblem(error:unknown):Pick<BatchItemResult,'codigo'|'mensaje'|'campo'|'detalle'> {
+    if(error instanceof ProblemException)return {codigo:error.codigo,mensaje:error.message,campo:error.campo??null,...(Object.keys(error.extra).length?{detalle:error.extra}:{})};
+    if(error instanceof HttpException){
+      const body=error.getResponse() as string|{message?:string|string[]};
+      const text=typeof body==='string'?body:Array.isArray(body.message)?body.message.join(' '):body.message??error.message;
+      return {codigo:error.getStatus()===409?'conflicto':'validacion',mensaje:text,campo:null};
+    }
+    const sql=error as {code?:string;message?:string};
+    if(sql.code==='23P01')return {codigo:'conflicto',mensaje:'Este horario se traslapa con otro turno de la misma persona.',campo:null};
+    const rule=sql.code==='P0001'?sql.message?.split(' ')[0]:undefined;
+    if(rule&&DB_RULES[rule])return {codigo:rule,mensaje:DB_RULES[rule],campo:null};
+    throw error;
+  }
+  /**
+   * Prueba un turno del lote dentro de la transacción `c`: lo valida con `checkShift` (las reglas de un turno suelto,
+   * con los borradores sumando carga) y lo inserta como borrador en un punto de guardado, así el siguiente turno del
+   * lote ya lo ve. Si tiene problema, se deshace solo él y su resultado lo explica; los demás siguen.
+   */
+  private async tryItem(c:PoolClient,actor:Actor,item:ShiftBatchItemDto,justification:string|undefined,index:number):Promise<BatchItemResult> {
+    const start=new Date(item.start),end=new Date(item.end);
+    const dto={...item,justification:item.justification?.trim()||justification?.trim()||undefined};
+    await c.query('SAVEPOINT lote_turno');
+    try{
+      if(!/(Z|[+-]\d\d:\d\d)$/.test(item.start)||!/(Z|[+-]\d\d:\d\d)$/.test(item.end)||!Number.isFinite(start.valueOf())||end<=start)throw new BadRequestException('Indica inicio y fin con zona horaria.');
+      // Un lote planifica: un borrador que ya empezó no se podría publicar a tiempo.
+      if(start<=this.clock.now())throw new BadRequestException('El turno empezaría antes de ahora; elige un horario futuro.');
+      const {warnings}=await this.checkShift(c,null,null,dto,start,end,true);
+      const row=(await dbRule(c.query("INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,justificacion,estado,creado_por) VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,'borrador',$7) RETURNING id,version",[dto.staffId,dto.areaId,start,end,dto.type,dto.justification??null,actor.id]))).rows[0];
+      await c.query('RELEASE SAVEPOINT lote_turno');
+      return {index,ok:true,id:row.id,version:row.version,advertencias:warnings};
+    }catch(error){
+      await c.query('ROLLBACK TO SAVEPOINT lote_turno');
+      await c.query('RELEASE SAVEPOINT lote_turno');
+      return {index,ok:false,...this.itemProblem(error)};
+    }
+  }
+  /** Huecos de cobertura (con los borradores) de los días y áreas que toca un lote; máximo 31 días desde el primero. */
+  private async batchGaps(c:PoolClient,items:{areaId:string;start:string;end:string}[]) {
+    if(!items.length)return [];
+    const first=Math.min(...items.map(i=>Date.parse(i.start))),last=Math.max(...items.map(i=>Date.parse(i.end)));
+    const start=businessDayRange(businessDate(new Date(first))).start,end=new Date(Math.min(businessDayRange(businessDate(new Date(last-1))).end.valueOf(),start.valueOf()+31*DAY));
+    const areas=new Set(items.map(i=>i.areaId));
+    return (await this.gaps(c,start,end,areas.size===1?[...areas][0]:undefined,true)).filter(g=>areas.has(g.areaId));
+  }
+  /**
+   * Fase 2, flujo F: valida un lote sin escribir nada. Cada turno pasa por las reglas de un turno suelto y ve a los
+   * anteriores del lote. Responde un resultado por turno (en el orden recibido) y los huecos de cobertura con el lote.
+   */
+  async validateBatch(actor:Actor,dto:ShiftBatchDto) {
+    await this.advanceSafely();
+    return this.dryRun(async c=>{
+      const resultados:BatchItemResult[]=[];
+      for(const [index,item] of dto.items.entries())resultados.push(await this.tryItem(c,actor,item,dto.justification,index));
+      return {resultados,huecos:await this.batchGaps(c,dto.items.filter((_,i)=>resultados[i].ok))};
+    });
+  }
+  /**
+   * Fase 2, flujo F: crea el lote como borradores, todo o nada. Si un solo turno tiene problema, no se crea ninguno y la
+   * respuesta 409 `lote_con_conflictos` trae el resultado de cada turno. Un borrador no se avisa a la persona (sin canal
+   * `usuario:`); los roles reciben solo el evento delgado y solo `turnos.ver_borradores` lo lee. Se publica con `POST /turnos/publicar`.
+   */
+  async createBatch(actor:Actor,dto:ShiftBatchDto,key?:string) {
+    await this.advanceSafely();
+    return this.commands.run(actor,'turnos.planificar:lote',key,dto,async c=>{
+      const resultados:BatchItemResult[]=[];
+      for(const [index,item] of dto.items.entries())resultados.push(await this.tryItem(c,actor,item,dto.justification,index));
+      const failed=resultados.filter(r=>!r.ok).length;
+      if(failed)throw new ProblemException('lote_con_conflictos',409,`${failed===1?'Un turno tiene':`${failed} turnos tienen`} conflictos; corrígelos o quítalos de la vista previa. No se creó ningún borrador.`,undefined,{resultados});
+      const huecos=await this.batchGaps(c,dto.items);
+      const days=dto.items.map(i=>businessDate(new Date(i.start))).sort();
+      await this.commands.audit(c,actor,{action:'turnos.crear_lote',entity:'planificacion',entityId:`${days[0]}/${days.at(-1)}`,permission:'turnos.planificar',
+        detail:{borradores:resultados.length,ids:resultados.map(r=>r.id),areas:[...new Set(dto.items.map(i=>i.areaId))],personas:new Set(dto.items.map(i=>i.staffId)).size,huecos:huecos.length,...(dto.justification?{justificacion:dto.justification.trim()}:{})}});
+      for(const r of resultados)await this.commands.event(c,'turno.actualizado','turno',r.id!,r.version!,['rol:JOP','rol:ADM']);
+      return {creados:resultados.length,ids:resultados.map(r=>r.id!),resultados,huecos};
+    });
+  }
+  /**
+   * Fase 2, flujo F: generador de rotaciones (vista previa, no escribe). Reparte el patrón entre las personas, prueba cada
+   * turno con las reglas de un turno suelto (descanso, tope de 7 días, días seguidos, traslape, inscripción) y, si la
+   * persona no puede, prueba con otras del grupo. Lo que nadie puede cubrir queda marcado con su conflicto.
+   */
+  async generate(actor:Actor,dto:RotationDto) {
+    this.range(dto.from,dto.to);
+    if(!dto.staffIds?.length&&!dto.role)throw new BadRequestException('Elige las personas o un grupo por función.');
+    if(dto.pattern==='personalizado'&&(!dto.hours||!dto.workDays||!dto.restDays))throw new BadRequestException('Un patrón personalizado necesita horas por turno, días de trabajo y días de descanso.');
+    await this.advanceSafely();
+    return this.dryRun(async c=>{
+      await this.area(c,dto.areaId);
+      const people=(dto.staffIds?.length
+        ?(await c.query(`SELECT id,nombres||' '||apellidos AS name FROM personal.persona WHERE activo AND id=ANY($1::uuid[]) ORDER BY apellidos,nombres`,[dto.staffIds])).rows
+        :(await c.query(`SELECT id,nombres||' '||apellidos AS name FROM personal.persona WHERE activo AND tipo=$1 AND area_id=$2 ORDER BY apellidos,nombres`,[dto.role,dto.areaId])).rows) as {id:string;name:string}[];
+      if(dto.staffIds?.length&&people.length!==dto.staffIds.length)throw new BadRequestException('Hay personas inactivas o que no existen en la selección.');
+      if(!people.length)throw new BadRequestException('No hay personal activo de esa función asignado al área.');
+      const names=new Map(people.map(p=>[p.id,p.name]));
+      const now=this.clock.now().valueOf();
+      const slots=rotationSlots(people.length,daysBetween(dto.from,dto.to),{pattern:dto.pattern as RotationPattern,startTime:dto.startTime??'07:00',hours:dto.hours,workDays:dto.workDays,restDays:dto.restDays});
+      const items:Record<string,unknown>[]=[];
+      for(const slot of slots){
+        const {start,end}=slotRange(slot.date,slot.startTime,slot.hours);
+        if(Date.parse(start)<=now)continue;
+        const base={areaId:dto.areaId,start,end,type:slot.type},planned=people[slot.person].id;
+        let staffId=planned,result=await this.tryItem(c,actor,{...base,staffId},dto.justification,items.length);
+        for(let k=1;!result.ok&&SUBSTITUTABLE.has(result.codigo!)&&k<people.length&&k<=MAX_SUBSTITUTES;k++){
+          const other=people[(slot.person+k)%people.length].id,second=await this.tryItem(c,actor,{...base,staffId:other},dto.justification,items.length);
+          if(second.ok){result=second;staffId=other;}
+        }
+        const {index:_index,id:_id,version:_version,...outcome}=result;
+        items.push({...base,staffId,person:names.get(staffId),...(staffId!==planned?{reemplazaA:planned}:{}),...outcome});
+      }
+      const ok=items.filter(i=>i.ok) as {areaId:string;start:string;end:string}[];
+      return {items,personas:people.length,huecos:await this.batchGaps(c,ok.length?ok:[{areaId:dto.areaId,start:businessDayRange(dto.from).start.toISOString(),end:businessDayRange(dto.to).end.toISOString()}])};
+    });
+  }
+  /** Plantillas de semana vigentes, por área (Fase 2, flujo F). */
+  async templates() {
+    const rows=await this.db.query<{turnos:TemplateRow[]}>(`SELECT p.id,p.area_id AS "areaId",e.nombre AS area,p.nombre AS name,p.turnos,p.version,p.creado_en AS "createdAt" FROM personal.plantilla_semana p JOIN infra.espacio e ON e.id=p.area_id WHERE p.activa ORDER BY e.nombre,p.nombre`);
+    return rows.map(({turnos,...row})=>({...row,shifts:turnos.map(t=>({day:t.dia,startTime:t.inicio,hours:t.horas,type:t.tipo,staffId:t.staffId}))}));
+  }
+  async saveTemplate(actor:Actor,dto:WeekTemplateDto,key?:string) {
+    return this.commands.run(actor,'turnos.planificar:plantilla',key,dto,async c=>{
+      await this.area(c,dto.areaId);
+      const ids=[...new Set(dto.shifts.map(s=>s.staffId))];
+      if((await c.query('SELECT count(*)::int AS n FROM personal.persona WHERE id=ANY($1::uuid[])',[ids])).rows[0].n!==ids.length)throw new BadRequestException('La plantilla menciona personal que no existe.');
+      const name=dto.name.trim();
+      if((await c.query('SELECT 1 FROM personal.plantilla_semana WHERE activa AND area_id=$1 AND lower(btrim(nombre))=lower($2)',[dto.areaId,name])).rowCount)throw new ProblemException('plantilla_duplicada',409,'El área ya tiene una plantilla con ese nombre; usa otro nombre o retira la anterior.','name');
+      const turnos:TemplateRow[]=dto.shifts.map(s=>({dia:s.day,inicio:s.startTime,horas:s.hours,tipo:s.type,staffId:s.staffId}));
+      const row=(await c.query('INSERT INTO personal.plantilla_semana(area_id,nombre,turnos,creado_por) VALUES($1,$2,$3::jsonb,$4) RETURNING id,version',[dto.areaId,name,JSON.stringify(turnos),actor.id])).rows[0];
+      await this.commands.audit(c,actor,{action:'turnos.plantilla_guardar',entity:'plantilla_semana',entityId:row.id,permission:'turnos.planificar',detail:{areaId:dto.areaId,nombre:name,turnos:turnos.length}});
+      await this.commands.event(c,'turno.actualizado','plantilla_semana',row.id,row.version,['rol:JOP','rol:ADM']);
+      return row;
+    });
+  }
+  async retireTemplate(actor:Actor,id:string,dto:WeekTemplateRetireDto,key?:string) {
+    return this.commands.run(actor,`turnos.planificar:plantilla:${id}`,key,dto,async c=>{
+      const old=(await c.query('SELECT version,activa FROM personal.plantilla_semana WHERE id=$1 FOR UPDATE',[id])).rows[0];
+      if(!old||!old.activa)throw new NotFoundException('No se encontró la plantilla.');
+      if(old.version!==dto.version)throw new VersionConflictException(old.version,'La plantilla cambió; actualiza la lista.');
+      const row=(await c.query('UPDATE personal.plantilla_semana SET activa=false,version=version+1 WHERE id=$1 RETURNING id,version',[id])).rows[0];
+      await this.commands.audit(c,actor,{action:'turnos.plantilla_retirar',entity:'plantilla_semana',entityId:id,permission:'turnos.planificar'});
+      await this.commands.event(c,'turno.actualizado','plantilla_semana',row.id,row.version,['rol:JOP','rol:ADM']);
+      return row;
     });
   }
   /** Turno con bloqueo para marcar asistencia. */

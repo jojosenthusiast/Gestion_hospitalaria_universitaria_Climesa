@@ -522,6 +522,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/turnos/lote/validar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validar un lote de turnos sin guardarlo: un resultado por turno con las reglas de un turno suelto y los huecos de cobertura */
+        post: operations["OperationsController_validateBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/turnos/lote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Crear un lote de turnos como borradores, todo o nada: con un solo conflicto no se crea ninguno (409 lote_con_conflictos con el resultado de cada turno) */
+        post: operations["OperationsController_createBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/turnos/generar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vista previa de una rotación (rotativo, 12x36, 24x72 o personalizado) con descanso, tope de 7 días y cobertura; no guarda nada */
+        post: operations["OperationsController_generate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/turnos/plantillas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plantillas de semana vigentes por área */
+        get: operations["OperationsController_templates"];
+        put?: never;
+        /** Guardar una semana de un área como plantilla */
+        post: operations["OperationsController_saveTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/turnos/plantillas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Retirar una plantilla de semana con versión */
+        patch: operations["OperationsController_retireTemplate"];
+        trace?: never;
+    };
     "/api/v1/turnos/{id}": {
         parameters: {
             query?: never;
@@ -3069,6 +3155,169 @@ export interface components {
             publishedAt: string;
             warnings: components["schemas"]["CoverageGapResponse"][];
         };
+        ShiftBatchItemDto: {
+            /** Format: uuid */
+            staffId: string;
+            /** Format: uuid */
+            areaId: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            /** @enum {string} */
+            type: "diurno" | "nocturno" | "guardia";
+            justification?: string;
+        };
+        ShiftBatchDto: {
+            items: components["schemas"]["ShiftBatchItemDto"][];
+            justification?: string;
+        };
+        ShiftWarningResponse: {
+            /** @description Código de la advertencia, por ejemplo horas_semanales_excedidas */
+            codigo: string;
+            horasSemana: number;
+            limite: number;
+        };
+        BatchItemResultResponse: {
+            /** @description Posición del turno en el lote (desde 0) */
+            index: number;
+            ok: boolean;
+            /**
+             * Format: uuid
+             * @description Solo al crear el lote
+             */
+            id?: string;
+            version?: number;
+            advertencias?: components["schemas"]["ShiftWarningResponse"][];
+            /** @description Mismo código que respondería POST /turnos (personal_en_descanso, carga_semanal_excedida, conflicto...) */
+            codigo?: string;
+            mensaje?: string;
+            campo?: string | null;
+            detalle?: {
+                [key: string]: unknown;
+            };
+        };
+        BatchValidationResponse: {
+            resultados: components["schemas"]["BatchItemResultResponse"][];
+            /** @description Huecos de cobertura contando el lote como borradores */
+            huecos: components["schemas"]["CoverageGapResponse"][];
+        };
+        BatchCreatedResponse: {
+            creados: number;
+            ids: string[];
+            resultados: components["schemas"]["BatchItemResultResponse"][];
+            huecos: components["schemas"]["CoverageGapResponse"][];
+        };
+        RotationDto: {
+            /**
+             * Format: uuid
+             * @description Área donde se asignan los turnos
+             */
+            areaId: string;
+            /** @description Personas elegidas; sin ellas se usa el grupo de `role` asignado al área */
+            staffIds?: string[];
+            /**
+             * @description Función del grupo (con el área de cada persona igual a `areaId`)
+             * @enum {string}
+             */
+            role?: "medico" | "enfermero" | "asistente" | "recepcionista" | "laboratorista" | "paramedico" | "motorista" | "limpieza" | "administrativo" | "otro";
+            /** @enum {string} */
+            pattern: "rotativo" | "12x36" | "24x72" | "personalizado";
+            /**
+             * Format: date
+             * @example 2026-11-16
+             */
+            from: string;
+            /**
+             * Format: date
+             * @example 2026-11-22
+             */
+            to: string;
+            /**
+             * @description Hora local de inicio; por omisión 07:00
+             * @example 07:00
+             */
+            startTime?: string;
+            /** @description Solo en personalizado */
+            hours?: number;
+            /** @description Solo en personalizado */
+            workDays?: number;
+            /** @description Solo en personalizado */
+            restDays?: number;
+            justification?: string;
+        };
+        RotationItemResponse: {
+            /** Format: uuid */
+            staffId: string;
+            person: string;
+            /** Format: uuid */
+            areaId: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            type: components["schemas"]["TipoTurno"];
+            ok: boolean;
+            /**
+             * Format: uuid
+             * @description Persona del patrón a la que este turno reemplaza porque ella no podía
+             */
+            reemplazaA?: string;
+            advertencias?: components["schemas"]["ShiftWarningResponse"][];
+            codigo?: string;
+            mensaje?: string;
+            campo?: string | null;
+            detalle?: {
+                [key: string]: unknown;
+            };
+        };
+        RotationPreviewResponse: {
+            items: components["schemas"]["RotationItemResponse"][];
+            personas: number;
+            huecos: components["schemas"]["CoverageGapResponse"][];
+        };
+        TemplateShiftResponse: {
+            /** @description 0 = lunes */
+            day: number;
+            /** @description Hora local HH:MM */
+            startTime: string;
+            hours: number;
+            type: components["schemas"]["TipoTurno"];
+            /** Format: uuid */
+            staffId: string;
+        };
+        WeekTemplateResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            areaId: string;
+            area: string;
+            name: string;
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            shifts: components["schemas"]["TemplateShiftResponse"][];
+        };
+        TemplateShiftDto: {
+            /** @description 0 = lunes */
+            day: number;
+            /** @example 07:00 */
+            startTime: string;
+            hours: number;
+            /** @enum {string} */
+            type: "diurno" | "nocturno" | "guardia";
+            /** Format: uuid */
+            staffId: string;
+        };
+        WeekTemplateDto: {
+            /** Format: uuid */
+            areaId: string;
+            name: string;
+            shifts: components["schemas"]["TemplateShiftDto"][];
+        };
+        WeekTemplateRetireDto: {
+            version: number;
+        };
         ShiftDto: {
             /** Format: uuid */
             staffId: string;
@@ -3089,12 +3338,6 @@ export interface components {
             version?: number;
             reason?: string;
             emergencyReason?: string;
-        };
-        ShiftWarningResponse: {
-            /** @description Código de la advertencia, por ejemplo horas_semanales_excedidas */
-            codigo: string;
-            horasSemana: number;
-            limite: number;
         };
         ShiftSavedResponse: {
             /** Format: uuid */
@@ -5625,7 +5868,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "lote_con_conflictos" | "plantilla_duplicada" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -7993,6 +8236,427 @@ export interface operations {
             };
             /** @description Sin permiso (`sin_permiso`) o regla de acceso */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_validateBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShiftBatchDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchValidationResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_createBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShiftBatchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchCreatedResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_generate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RotationDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotationPreviewResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeekTemplateResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_saveTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeekTemplateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdVersionResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_retireTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeekTemplateRetireDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdVersionResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
