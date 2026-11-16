@@ -38,6 +38,18 @@ class QueueBoardFase2Test {
         assertFalse(QueueMoves.destinations(called.copy(undoActions = emptyList())).any { it.first == QueueColumn.WAITING })
     }
 
+    @Test fun undoIsAColumnMoveOnlyForTheLastCall() {
+        val twice = QueueRules.parse(JSONArray().put(row("llamado", listOf("atender"), listOf("deshacer_llamado")).put("llamados", 2))).single()
+        assertNull(QueueMoves.moveFor(twice, QueueColumn.WAITING))
+        assertEquals(listOf(QueueColumn.IN_ATTENTION), QueueMoves.destinations(twice).map { it.first })
+        assertTrue(QueueMoves.canRemoveCall(twice))
+        assertEquals("Quitar un llamado", QueueMove.REMOVE_CALL.label)
+        assertEquals("/fila/t7/deshacer-llamado", QueueMoves.path(twice, QueueMove.REMOVE_CALL))
+        val once = twice.copy(calls = 1)
+        assertEquals(QueueMove.UNDO_CALL, QueueMoves.moveFor(once, QueueColumn.WAITING))
+        assertFalse(QueueMoves.canRemoveCall(once))
+    }
+
     @Test fun bodiesKeepRoutineIssuesAsBefore() {
         assertEquals("""{"service":"laboratorio"}""", QueueRules.issueBody("laboratorio", "rutina").toString())
         assertEquals("emergencia", QueueRules.issueBody("laboratorio", "emergencia").getString("priority"))

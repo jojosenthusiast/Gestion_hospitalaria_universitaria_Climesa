@@ -81,12 +81,12 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     /** Card menu (keyboard and touch alternative to dragging): the move is one server action the API already allows. */
     fun move(ticket: QueueTicket, move: QueueMove) {
         if (move == QueueMove.CALL) { call(ticket); return }
-        val body = if (move == QueueMove.UNDO_CALL) QueueRules.undoBody(ticket.version) else JSONObject().put("version", ticket.version)
+        val body = if (move == QueueMove.UNDO_CALL || move == QueueMove.REMOVE_CALL) QueueRules.undoBody(ticket.version) else JSONObject().put("version", ticket.version)
         mutate(QueueMoves.path(ticket, move), body, "${QueueLabels.code(ticket)}: ${move.label.lowercase()}.")
     }
     fun undoLastCall() {
         val undo = mutable.value.undo ?: return
-        mutate("/fila/${undo.ticketId}/deshacer-llamado", QueueRules.undoBody(undo.version), "Llamado deshecho: el número volvió a la espera.")
+        mutate("/fila/${undo.ticketId}/deshacer-llamado", QueueRules.undoBody(undo.version), "Llamado deshecho.")
     }
     fun changePriority(ticket: QueueTicket, priority: String) = mutate("/fila/${ticket.id}/prioridad", QueueRules.priorityBody(ticket.version, priority), "Prioridad de ${QueueLabels.code(ticket)}: ${QueueLabels.priority(priority)}.")
     fun attend(ticket: QueueTicket) = mutate("/fila/${ticket.id}/atender", JSONObject().put("version", ticket.version), "Atención iniciada.")

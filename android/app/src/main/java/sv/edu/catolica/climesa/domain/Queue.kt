@@ -114,6 +114,8 @@ data class NextProposal(val service: String, val area: String, val rule: String,
 enum class QueueMove(val wire: String, val path: String, val label: String) {
     CALL("llamar", "llamar", "Llamar"), ATTEND("atender", "atender", "Iniciar atención"), COMPLETE("completar", "completar", "Completar"),
     ABSENT("no_se_presento", "no-se-presento", "No se presentó"), UNDO_CALL("deshacer_llamado", "deshacer-llamado", "Devolver a espera"),
+    /** Same server action as [UNDO_CALL] with 2+ calls: one call less, the number stays called. Not a column move. */
+    REMOVE_CALL("deshacer_llamado", "deshacer-llamado", "Quitar un llamado"),
 }
 
 object QueueMoves {
@@ -125,9 +127,14 @@ object QueueMoves {
     /** The server action that moves [ticket] to [to], only when the server accepts it now; else null. */
     fun moveFor(ticket: QueueTicket, to: QueueColumn): QueueMove? {
         val move = moves[QueueBoard.column(ticket)]?.get(to) ?: return null
+        // Undo removes one call; only the last one sends the number back to waiting. With more calls the card would
+        // land in "En espera" and jump back, so that is not a column move (see [canRemoveCall]).
+        if (move == QueueMove.UNDO_CALL && ticket.calls > 1) return null
         val server = if (move == QueueMove.UNDO_CALL) ticket.undoActions else ticket.allowedActions.map { it.wire }
         return move.takeIf { it.wire in server }
     }
+    /** "Quitar un llamado": the number keeps being called (2+ calls) and the server accepts removing one. */
+    fun canRemoveCall(ticket: QueueTicket) = ticket.state == "llamado" && ticket.calls > 1 && "deshacer_llamado" in ticket.undoActions
     fun destinations(ticket: QueueTicket): List<Pair<QueueColumn, QueueMove>> = QueueColumn.entries.mapNotNull { c -> moveFor(ticket, c)?.let { c to it } }
     fun path(ticket: QueueTicket, move: QueueMove) = "/fila/${ticket.id}/${move.path}"
 }

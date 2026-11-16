@@ -187,20 +187,22 @@ private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Bo
         QueueActionButton(ticket, QueueAction.ATTEND, "Atender", busy, primary = true) { model.attend(ticket) }
         QueueActionButton(ticket, QueueAction.COMPLETE, "Completar", busy, primary = true) { model.complete(ticket) }
         QueueActionButton(ticket, QueueAction.ABSENT, "No se presentó", busy, primary = false) { model.absent(ticket) }
-        CardMenu(ticket, canManage, busy, model)
+        CardMenu(ticket, canCall, canManage, busy, model)
     }
 }
 
 /** Board moves without dragging (touch and keyboard): only the moves the server accepts now, plus the priority. */
 @Composable
-private fun CardMenu(ticket: QueueTicket, canManage: Boolean, busy: Boolean, model: QueueViewModel) {
+private fun CardMenu(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, busy: Boolean, model: QueueViewModel) {
     val moves = remember(ticket) { QueueMoves.destinations(ticket) }
+    val removeCall = canCall && QueueMoves.canRemoveCall(ticket)
     val priorities = if (canManage && ticket.state in listOf("en_espera", "llamado")) listOf("emergencia", "urgente", "rutina").filter { it != ticket.priority } else emptyList()
-    if (moves.isEmpty() && priorities.isEmpty()) return
+    if (moves.isEmpty() && priorities.isEmpty() && !removeCall) return
     var open by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { open = true }, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.fila_mover)) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (removeCall) DropdownMenuItem(text = { Text(stringResource(R.string.fila_quitar_llamado, ticket.calls)) }, onClick = { open = false; model.move(ticket, QueueMove.REMOVE_CALL) })
             moves.forEach { (column, move) ->
                 DropdownMenuItem(text = { Text(stringResource(R.string.fila_mover_a, column.label, move.label.lowercase())) }, onClick = { open = false; model.move(ticket, move) })
             }

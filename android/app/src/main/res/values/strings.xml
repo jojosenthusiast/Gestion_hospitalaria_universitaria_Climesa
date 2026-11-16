@@ -234,6 +234,7 @@
     <string name="fila_nadie_espera">Nadie espera en este servicio.</string>
     <string name="fila_regla">Regla: %1$s</string>
     <string name="fila_deshacer">Deshacer</string>
+    <string name="fila_quitar_llamado">Quitar un llamado (van %1$d)</string>
     <string name="fila_mover">Mover o cambiar prioridad</string>
     <string name="fila_mover_a">Mover a %1$s (%2$s)</string>
     <string name="fila_prioridad">Prioridad</string>
