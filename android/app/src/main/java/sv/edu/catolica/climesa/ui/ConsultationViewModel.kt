@@ -27,6 +27,8 @@ import sv.edu.catolica.climesa.domain.RealtimeSignal
 import sv.edu.catolica.climesa.domain.ReceptionAppointment
 import sv.edu.catolica.climesa.domain.ReceptionScheduling
 import sv.edu.catolica.climesa.domain.UnsignedConsultation
+import sv.edu.catolica.climesa.domain.NextProposal
+import sv.edu.catolica.climesa.domain.QueueRules
 
 data class ConsultationState(
     val loading: Boolean = true,
@@ -47,6 +49,8 @@ data class ConsultationState(
     val unsigned: List<UnsignedConsultation> = emptyList(),
     /** Own appointments with a patient's reschedule request the doctor can decide (`GET /citas`). */
     val reschedules: List<ReceptionAppointment> = emptyList(),
+    /** S9: after signing, who goes next in the consultation's area (`nextProposal` of the signature). */
+    val handoff: NextProposal? = null,
 )
 
 @HiltViewModel
@@ -177,14 +181,32 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
                 val nextVersion = draft.optInt("version", item.version + 1)
                 // The draft is already saved: keep its new version so a failed signature can be retried without a 409.
                 keepDraft(item, reason, physicalExam, plan, nextVersion)
-                api.request("/consultas/${item.consultationId}/firmar", "POST", JSONObject().put("version", nextVersion))
+                val signed = api.request("/consultas/${item.consultationId}/firmar", "POST", JSONObject().put("version", nextVersion))
                 item.consultationId?.let(::clearDraft)
-                mutable.value = mutable.value.copy(saving = false, notice = "Consulta firmada y cita marcada como atendida.")
+                val handoff = (signed as? JSONObject)?.opt("nextProposal")?.let(QueueRules::parseNext)
+                mutable.value = mutable.value.copy(saving = false, notice = "Consulta firmada y cita marcada como atendida.", handoff = handoff)
                 load(silent = true); onDone()
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
     }
+
+    /** Calls the proposed number (`POST /fila/{id}/llamar` with its version); the handoff closes when it is called. */
+    fun callProposed() {
+        val proposal = mutable.value.handoff?.proposal ?: return
+        if (mutable.value.saving) return
+        mutable.value = mutable.value.copy(saving = true, error = null)
+        viewModelScope.launch {
+            try {
+                api.request("/fila/${proposal.id}/llamar", "POST", JSONObject().put("version", proposal.version))
+                mutable.value = mutable.value.copy(saving = false, handoff = null, notice = "Llamaste ${proposal.code}.")
+                load(silent = true)
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
+        }
+    }
+
+    fun dismissHandoff() { mutable.value = mutable.value.copy(handoff = null) }
 
     fun signs(item: MedicalAppointment, systolic: String, diastolic: String, heartRate: String, temperature: String, oxygenSaturation: String) {
         if (item.consultationId == null) return

@@ -229,4 +229,19 @@
     <string name="aviso_para">Para: %1$s</string>
     <string name="servidor_activando">El servidor se está activando, puede tardar hasta un minuto.</string>
     <string name="portal_seccion_no_disponible">Esta sección no está disponible en la aplicación.</string>
+    <!-- Fase 2, flujo B (S9): fila del día y tablero -->
+    <string name="fila_quien_sigue">Quién pasa después</string>
+    <string name="fila_nadie_espera">Nadie espera en este servicio.</string>
+    <string name="fila_regla">Regla: %1$s</string>
+    <string name="fila_deshacer">Deshacer</string>
+    <string name="fila_mover">Mover o cambiar prioridad</string>
+    <string name="fila_mover_a">Mover a %1$s (%2$s)</string>
+    <string name="fila_prioridad">Prioridad</string>
+    <string name="fila_prioridad_a">Prioridad: %1$s</string>
+    <string name="fila_prioridad_ayuda">Emergencia y urgente pasan antes que las citas y la fila.</string>
+    <string name="fila_emitir_mensaje">El número cuenta desde 1 en cada área. Quien tiene cita hoy queda marcado con su hora.</string>
+    <string name="consulta_pasos">Consulta → procedimientos → receta o exámenes → cerrar</string>
+    <string name="consulta_quien_sigue">Consulta cerrada · quién pasa después</string>
+    <string name="consulta_llamar_a">Llamar a %1$s</string>
+    <string name="consulta_ahora_no">Ahora no</string>
 </resources>
