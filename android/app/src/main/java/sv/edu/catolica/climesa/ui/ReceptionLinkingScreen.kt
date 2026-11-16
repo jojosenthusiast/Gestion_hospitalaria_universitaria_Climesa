@@ -48,7 +48,9 @@ fun ReceptionLinkingScreen(channels: List<String>, canVerify: Boolean, openPatie
             state.rows.isEmpty() -> item { EmptyState(stringResource(R.string.rec_vinc_vacio), detail = stringResource(R.string.rec_vinc_vacio_detalle), icon = Icons.Default.Link) }
             else -> {
                 item { Text(stringResource(R.string.rec_vinc_resumen, state.rows.size, state.rows.count { it.hasCandidate }), style = MaterialTheme.typography.labelLarge) }
-                items(state.rows, key = { it.id }) { row -> LinkCard(row, canVerify, state.busyId == row.id, state.busyId != null, onApprove = { model.approve(row) }, onReject = { rejecting = row.id }, onSearch = openPatients) }
+                // One primary per screen: only the first request that can be approved gets the filled "Aprobar".
+                val first = state.rows.firstOrNull { it.canApprove }?.id
+                items(state.rows, key = { it.id }) { row -> LinkCard(row, canVerify, row.id == first, state.busyId == row.id, state.busyId != null, onApprove = { model.approve(row) }, onReject = { rejecting = row.id }, onSearch = openPatients) }
             }
         }
     }
@@ -72,7 +74,7 @@ private fun LinkingGuide() {
 }
 
 @Composable
-private fun LinkCard(row: LinkRequestRow, canVerify: Boolean, busy: Boolean, anyBusy: Boolean, onApprove: () -> Unit, onReject: () -> Unit, onSearch: () -> Unit) {
+private fun LinkCard(row: LinkRequestRow, canVerify: Boolean, primary: Boolean, busy: Boolean, anyBusy: Boolean, onApprove: () -> Unit, onReject: () -> Unit, onSearch: () -> Unit) {
     SectionCard(row.email) {
         if (row.accountName.isNotBlank()) Text(row.accountName, style = MaterialTheme.typography.bodyMedium)
         Text(stringResource(R.string.rec_vinc_declarado, row.declaredDui, row.declaredBirth), style = MaterialTheme.typography.bodySmall)
@@ -82,7 +84,8 @@ private fun LinkCard(row: LinkRequestRow, canVerify: Boolean, busy: Boolean, any
         }
         NoticeBanner(if (row.hasCandidate) NoticeKind.SUCCESS else NoticeKind.INFO, row.guidance)
         if (canVerify) ClimesaActionGroup {
-            if (row.canApprove) PrimaryButton(stringResource(R.string.rec_vinc_aprobar), onApprove, icon = Icons.Default.Check, enabled = !anyBusy, loading = busy)
+            if (row.canApprove && primary) PrimaryButton(stringResource(R.string.rec_vinc_aprobar), onApprove, icon = Icons.Default.Check, enabled = !anyBusy, loading = busy)
+            else if (row.canApprove) SecondaryButton(stringResource(R.string.rec_vinc_aprobar), onApprove, icon = Icons.Default.Check, enabled = !anyBusy, loading = busy)
             else SecondaryButton(stringResource(R.string.rec_vinc_buscar_antes), onSearch, icon = Icons.Default.Search)
             // Rejecting is secondary and always asks for a reason in a confirmation (RejectDialog).
             SecondaryButton(stringResource(R.string.rec_vinc_rechazar), onReject, icon = Icons.Default.Close, enabled = !anyBusy)
