@@ -157,5 +157,9 @@ final class DatesAndLiveTopicTests: XCTestCase {
         let view = try JSONDecoder().decode(PrehospitalView.self, from: Data(json.utf8))
         XCTAssertTrue(view.canReceive)
         XCTAssertEqual(view.version, 7)
+        // La entrega no lleva cuerpo ni versión; la llegada se encuentra aunque no haya evento ni reporte.
+        XCTAssertEqual(String(decoding: try JSONBody.encode(EmptyBody()), as: UTF8.self), "{}")
+        XCTAssertNil(try JSONDecoder().decode(ArrivalService.self, from: Data(#"{"serviceId":null}"#.utf8)).serviceId)
+        XCTAssertEqual(try JSONDecoder().decode(ArrivalService.self, from: Data(#"{"serviceId":"s1"}"#.utf8)).serviceId, "s1")
     }
 }

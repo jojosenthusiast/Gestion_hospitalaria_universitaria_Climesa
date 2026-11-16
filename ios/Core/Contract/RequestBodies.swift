@@ -49,8 +49,13 @@ public struct AmbulanceCancelBody: Encodable, Sendable, Equatable {
     }
 }
 
+/// Cuerpo vacío (`{}`) de una escritura sin campos, como la entrega al hospital (MA-AMB-04): no lleva la versión del
+/// servicio porque cada hito o reporte la cambia mientras se recibe al paciente.
+public struct EmptyBody: Encodable, Sendable, Equatable {
+    public init() {}
+}
+
 /// `QueueTransitionDto`, `ConsultationSignDto` y `LabVersionDto`: solo la versión vigente.
-/// También `HandoverDto` (MA-AMB-04: entrega al hospital con la versión del servicio).
 public struct VersionBody: Encodable, Sendable, Equatable {
     public let version: Int
     public init(version: Int) { self.version = version }

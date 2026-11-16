@@ -301,6 +301,11 @@ public struct LooseText: Decodable, Sendable, Equatable {
     }
 }
 
+/// `ArrivalServiceResponse` de `GET /ambulancia/llegada` (MA-AMB-04): el servicio que llega o llegó sin entrega registrada.
+public struct ArrivalService: Decodable, Sendable, Equatable {
+    public let serviceId: String?
+}
+
 /// `HandoverResponse` de `POST /ambulancia/servicios/{id}/recepcion` (MA-AMB-04).
 public struct HandoverResult: Decodable, Sendable, Equatable {
     public let serviceId: String

@@ -648,12 +648,14 @@ struct AmbulanceArrivalView: View {
                         meta: String(format: L.text("arrival.dispatched"), ClimesaDates.display(service.dispatchedAt, .time))
                     ) { MedicoTag(service.priority.rawValue, label: service.priority.label) }
                 }
-                if let view = arrival.prehospital {
-                    handover(view)
-                    if !view.clinical { Text("arrival.noClinical").font(Typo.small).foregroundStyle(Theme.muted) }
-                    if view.reports.isEmpty { Text("arrival.noReport").font(Typo.small).foregroundStyle(Theme.muted) }
-                    ForEach(view.reports) { report in PrehospitalReportCard(report: report) }
-                } else { Text("arrival.noReport").font(Typo.small).foregroundStyle(Theme.muted) }
+            }
+            if let view = arrival.prehospital {
+                handover(view)
+                if !view.clinical { Text("arrival.noClinical").font(Typo.small).foregroundStyle(Theme.muted) }
+                if view.reports.isEmpty { Text("arrival.noReport").font(Typo.small).foregroundStyle(Theme.muted) }
+                ForEach(view.reports) { report in PrehospitalReportCard(report: report) }
+            } else if arrival.status.activeService != nil {
+                Text("arrival.noReport").font(Typo.small).foregroundStyle(Theme.muted)
             } else {
                 EmptyStateView(title: L.text("arrival.none"), symbol: "cross.case")
             }
@@ -677,7 +679,7 @@ struct AmbulanceArrivalView: View {
     }
 
     private func receive(_ view: PrehospitalView) async {
-        let body = VersionBody(version: view.version ?? 1)
+        let body = EmptyBody()
         _ = await submission.run(view.serviceId, body: body, success: L.text("arrival.receive.done")) { key in
             _ = try await account.client().send("POST", "/ambulancia/servicios/\(view.serviceId)/recepcion", body: body, key: key, as: HandoverResult.self)
         }
@@ -689,8 +691,11 @@ struct AmbulanceArrivalView: View {
             let api = try account.client()
             let status = try await api.get("/ambulancia", as: AmbulanceStatus.self)
             var arrival = AmbulanceArrival(status: status, prehospital: nil)
-            if let service = status.activeService {
-                arrival.prehospital = try await api.get("/ambulancia/servicios/\(service.id)/prehospital", as: PrehospitalView.self)
+            // MA-AMB-04: también después de que la tripulación finalizó, mientras falte la entrega (24 h).
+            var serviceId = status.activeService?.id
+            if serviceId == nil { serviceId = try await api.get("/ambulancia/llegada", as: ArrivalService.self).serviceId }
+            if let serviceId {
+                arrival.prehospital = try await api.get("/ambulancia/servicios/\(serviceId)/prehospital", as: PrehospitalView.self)
             }
             return arrival
         }
