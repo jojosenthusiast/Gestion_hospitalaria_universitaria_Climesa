@@ -167,6 +167,49 @@ describe('Fase 2 · fila del día y tablero (S9)', () => {
       expect(undone.body.state).toBe('en_espera');
       expect((await ticketOf('MED', issued.id)).calledByMe).toBe(false);
       expect((await t.one<{ llamado_por: string | null }>('SELECT llamado_por FROM atencion.ticket_fila WHERE id=$1', [issued.id])).llamado_por).toBeNull();
+      expect((await ticketOf('AST', issued.id)).calledByColleague).toBe(false);
+    });
+
+    // A number is another clinician's only when its caller can start consultations (`consulta.iniciar`):
+    // reception and assistants call numbers into the doctor's office without taking them.
+    test('only a call by another clinician makes the number a colleague\'s; reception and assistants do not', async () => {
+      const calledBy = async (role: string) => {
+        const issued = await issue('consulta_general');
+        const called = await t.call(role, 'POST', `/fila/${issued.id}/llamar`, { version: issued.version });
+        expect(called.status).toBe(201);
+        return issued.id as string;
+      };
+      const byMed = await calledBy('MED');
+      expect((await ticketOf('MED', byMed)).calledByColleague).toBe(false);
+      const forAst = await ticketOf('AST', byMed);
+      expect(forAst.calledByColleague).toBe(true);
+      expect(forAst).not.toHaveProperty('llamadoPor');
+
+      const byRec = await calledBy('REC');
+      expect((await ticketOf('MED', byRec)).calledByColleague).toBe(false);
+      expect((await ticketOf('AST', byRec)).calledByColleague).toBe(false);
+
+      const byAst = await calledBy('AST');
+      expect((await ticketOf('MED', byAst)).calledByColleague).toBe(false);
+
+      // The assistant account as a second clinician: once its role holds `consulta.iniciar`, its call is a colleague's.
+      await t.pg.query("INSERT INTO acceso.rol_permiso(rol_codigo,permiso_codigo,contexto) VALUES('AST','consulta.iniciar','x')");
+      try {
+        const byClinician = await calledBy('AST');
+        expect((await ticketOf('MED', byClinician)).calledByColleague).toBe(true);
+        expect((await ticketOf('AST', byClinician)).calledByColleague).toBe(false);
+      } finally {
+        await t.pg.query("DELETE FROM acceso.rol_permiso WHERE rol_codigo='AST' AND permiso_codigo='consulta.iniciar'");
+      }
+    });
+
+    test('a called number with no recorded caller is nobody\'s colleague call', async () => {
+      const issued = await issue('admisiones');
+      const called = await t.call('MED', 'POST', `/fila/${issued.id}/llamar`, { version: issued.version });
+      expect(called.status).toBe(201);
+      await t.pg.query('UPDATE atencion.ticket_fila SET llamado_por=NULL WHERE id=$1', [issued.id]);
+      expect((await ticketOf('AST', issued.id)).calledByColleague).toBe(false);
+      expect((await ticketOf('MED', issued.id)).calledByColleague).toBe(false);
     });
   });
 

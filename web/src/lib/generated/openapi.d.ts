@@ -4216,8 +4216,10 @@ export interface components {
              */
             consultationId: string | null;
             consultationState: components["schemas"]["EstadoConsulta"] | null;
-            /** @description true si quien consulta la fila hizo el último llamado de este número; false si lo llamó un colega, nadie o se deshizo el llamado. Nunca se expone quién lo llamó */
+            /** @description true si quien consulta la fila hizo el último llamado de este número; false si lo llamó otra persona, nadie o se deshizo el llamado. Nunca se expone quién lo llamó */
             calledByMe: boolean;
+            /** @description true si el último llamado lo hizo otro profesional que puede iniciar consultas (permiso consulta.iniciar); false si lo llamó quien consulta, recepción, un asistente, nadie o no consta quién. Nunca se expone quién lo llamó */
+            calledByColleague: boolean;
             /** @description Llamados máximos (política fila.llamados_maximos) */
             maxCalls: number;
             /** @description Llamados necesarios para marcar "No se presentó" (política fila.llamados_para_ausencia) */

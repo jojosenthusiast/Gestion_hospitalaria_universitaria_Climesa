@@ -24,6 +24,8 @@ const APPOINTMENT_JOIN = `LEFT JOIN LATERAL (SELECT lower(c.horario) AS start FR
       WHERE t.servicio='consulta_general' AND c.paciente_id=t.paciente_id AND c.estado='confirmada'
         AND (lower(c.horario) AT TIME ZONE 'America/El_Salvador')::date=t.fecha
       ORDER BY lower(c.horario) LIMIT 1) ap ON true`;
+/** Permission that makes a caller a clinician who takes the number (T10f): reception and assistants call without it. */
+const CLINICIAN_PERMISSION = 'consulta.iniciar';
 const PATIENT_NAME = `coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional)`;
 
 const serviceNames: Record<string, string> = {
@@ -75,7 +77,9 @@ export class QueueService {
   /**
    * The day's queue. `consultationId`/`consultationState` describe the consultation started from each number only when
    * it belongs to the reading professional, so the doctor resumes their own consultation; nobody else sees the id.
-   * `calledByMe` says whether the reader made the last call (T10f); the colleague who called is never exposed.
+   * `calledByMe` says whether the reader made the last call (T10f). `calledByColleague` says another clinician (an
+   * account holding `consulta.iniciar`) made it: reception or an assistant calling into the office does not take the
+   * number, and neither does a call with no recorded caller. Who called is never exposed.
    */
   async list(actor: Actor, dateText?: string, service?: string) {
     const date = this.date(dateText);
@@ -89,13 +93,15 @@ export class QueueService {
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       t.estado AS state,t.consultorio_id AS "officeId",e.codigo AS "officeCode",t.llamados,t.version,t.emitido_en AS "issuedAt",
       t.prioridad AS priority,ap.start AS "appointmentAt",
-      k.id AS "consultationId",k.estado AS "consultationState",coalesce(t.llamado_por=$4::uuid,false) AS "calledByMe"
+      k.id AS "consultationId",k.estado AS "consultationState",coalesce(t.llamado_por=$4::uuid,false) AS "calledByMe",
+      (t.llamado_por IS NOT NULL AND t.llamado_por IS DISTINCT FROM $4::uuid AND EXISTS(SELECT 1 FROM acceso.usuario u
+        JOIN acceso.v_permisos_usuario v ON v.usuario_id=u.id WHERE u.persona_personal_id=t.llamado_por AND v.permiso_codigo=$5)) AS "calledByColleague"
       FROM atencion.ticket_fila t LEFT JOIN pacientes.paciente p ON p.id=t.paciente_id
       LEFT JOIN infra.espacio e ON e.id=t.consultorio_id
       ${APPOINTMENT_JOIN}
       LEFT JOIN atencion.consulta k ON k.ticket_id=t.id AND k.estado<>'ingresada_por_error' AND k.medico_id=$4::uuid
       WHERE t.fecha=$1::date AND ($2::text IS NULL OR t.servicio=$2) AND ($3::uuid IS NULL OR t.paciente_id=$3)
-      ORDER BY t.servicio,t.numero`, [date, service ?? null, own, actor.staffId ?? null])).rows;
+      ORDER BY t.servicio,t.numero`, [date, service ?? null, own, actor.staffId ?? null, CLINICIAN_PERMISSION])).rows;
       // SEG-02: aggregated read audit with every patient listed.
       await this.commands.audit(c, actor, { action: 'fila.leer', entity: 'ticket_fila', permission: 'fila.ver', detail: { date, patientIds: [...new Set(rows.map(row => row.patientId).filter(Boolean))] } });
       const policies = await this.queuePolicies(c);

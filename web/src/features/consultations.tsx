@@ -35,15 +35,19 @@ type UnsignedConsultation = { id: string; patientId: string; patientName?: strin
 
 /**
  * Row of `GET /fila`; `consultationId` is present only for the consultation this doctor started from the number.
- * `calledByMe` (T10f) says whether this doctor made the last call; the API never says which colleague did.
+ * `calledByMe` (T10f) says whether this doctor made the last call; `calledByColleague` whether another clinician
+ * (an account that can start consultations) made it. The API never says who called.
  */
 export type QueueConsultationTicket = {
   id: string; numero: number; service: string; state: string; patientId?: string | null; patientName?: string | null; issuedAt: string;
-  consultationId?: string | null; consultationState?: string | null; calledByMe?: boolean;
+  consultationId?: string | null; consultationState?: string | null; calledByMe?: boolean; calledByColleague?: boolean;
 };
 
-/** A called number without an own consultation is actionable only when this doctor called it; another office's call is not. */
-export const calledElsewhere = (ticket: QueueConsultationTicket) => ticket.state === 'llamado' && !ticket.consultationId && !ticket.calledByMe;
+/**
+ * A called number without an own consultation is another office's only when another clinician called it. A call by
+ * reception or an assistant, or one with no recorded caller, stays actionable for the doctor.
+ */
+export const calledElsewhere = (ticket: QueueConsultationTicket) => ticket.state === 'llamado' && !ticket.consultationId && ticket.calledByColleague === true;
 
 type ConsultationDetail = { consultation: { id: string; patientId: string; appointmentId?: string | null; reason?: string | null; physicalExam?: string | null; plan?: string | null; state: string; version: number; patientName?: string | null } };
 
