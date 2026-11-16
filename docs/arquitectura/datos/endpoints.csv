@@ -13,7 +13,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 101,POST,/api/v1/usuarios/{id}/invitacion/cancelacion,usuarios.invitar,Solo invitación pendiente; desactiva la cuenta,R,2,Cancelar invitación con motivo (MA-CTA-01)
 101,PATCH,/api/v1/usuarios/{id}/roles,usuarios.asignar_roles,Nunca a sí mismo,R,2,Asignar roles
 101,PATCH,/api/v1/usuarios/{id}/estado,usuarios.desactivar,Nunca a sí mismo,R,2,Desactivar cuenta
-102,GET,/api/v1/pacientes,pacientes.buscar,Devuelve datos mínimos y motivo de coincidencia,R,2,"Búsqueda fonética por nombre, DUI o expediente"
+102,GET,/api/v1/pacientes,pacientes.buscar,"Devuelve datos mínimos y motivo de coincidencia; filtrar por situación de hoy, área o médico exige admision.ver, fila.ver o citas.ver con alcance global",R,2,"Búsqueda fonética por nombre, DUI o expediente, con filtros de estado, situación de hoy, área y médico tratante"
 102,GET,/api/v1/pacientes/selector,pacientes.buscar,"Respuesta mínima (id, expediente, nombre, edad), paginada",R,2,Selector de pacientes con búsqueda mientras se escribe
 102,POST,/api/v1/pacientes/busquedas,pacientes.buscar,Registra la búsqueda previa que exige el alta,R,2,Búsqueda con datos sensibles en el cuerpo y no en la URL
 102,POST,/api/v1/pacientes,pacientes.registrar,Exige búsqueda previa reciente,R,2,Registrar paciente

@@ -8,27 +8,31 @@ import { Clock, businessDate } from '../platform/clock';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { PatientCreateDto, PatientUpdateDto, PatientSelfUpdateDto, PatientStateDto } from './patient-write.dto';
 import { ageOn, ageRange, fichaFields, searchBirthFields, searchShowsBirth } from './patient.privacy';
+import { PatientListFilters, assertListFilters, listFilterSql } from './patient-list.filters';
 import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateContact, validateDemographics } from './patient.rules';
 type Row = Record<string, any>;
 @Injectable()
 export class PatientsService {
   constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
-  private async candidates(c: PoolClient, query: string, limit: number, state?: string, offset = 0) {
+  private async candidates(c: PoolClient, query: string, limit: number, state?: string, offset = 0, filters: PatientListFilters = {}) {
     const words=normalize(query).split(' ').filter(Boolean).map(t=>`%${t}%`);
     const sounds=phonetic(query).split(' ').filter(Boolean).map(t=>`%${t}%`);
+    const {sql:filterSql,params:filterParams}=listFilterSql(filters,9,businessDate(this.clock.now()),this.clock.now());
     const rows=(await c.query(`SELECT p.id,p.expediente,p.estado,p.nombres,p.primer_apellido,p.segundo_apellido,p.alias_provisional,p.sexo,p.nacimiento::text AS nacimiento,p.version,p.busqueda_normalizada,i.valor_original AS dui FROM pacientes.paciente p
       LEFT JOIN LATERAL (SELECT valor_original FROM pacientes.identificador WHERE paciente_id=p.id AND tipo='dui' AND estado IN ('sin_verificar','verificado') LIMIT 1) i ON true
       WHERE ($1::text[]='{}' OR p.busqueda_normalizada LIKE ALL($1) OR (p.fon_apellido||' '||p.fon_nombres) LIKE ALL($2)
         OR p.expediente ILIKE $3 OR regexp_replace(coalesce(i.valor_original,''),'[^0-9]','','g') LIKE $4 OR p.nacimiento::text=$5)
-      AND ($6::text IS NULL OR p.estado=$6) ORDER BY p.nombres,p.primer_apellido,p.id LIMIT $7 OFFSET $8`,[words,sounds,`%${query.trim()}%`,query.replace(/\D/g,'').length>=4?`%${query.replace(/\D/g,'')}%`:'!no-document!',query,state??null,limit,offset])).rows;
+      AND ($6::text IS NULL OR p.estado=$6)${filterSql}
+      ORDER BY p.nombres,p.primer_apellido,p.id LIMIT $7 OFFSET $8`,[words,sounds,`%${query.trim()}%`,query.replace(/\D/g,'').length>=4?`%${query.replace(/\D/g,'')}%`:'!no-document!',query,state??null,limit,offset,...filterParams])).rows;
     return rows.map(p=>({ id:p.id, record:p.expediente, fullName:this.name(p), givenNames:p.nombres??p.alias_provisional??'', surnames:[p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' '), state:p.estado, active:p.estado!=='inactivo', sex:p.sexo, birth:p.nacimiento, version:p.version, matchReason:matchReasons({query,fullName:this.name(p),record:p.expediente,dui:p.dui,birth:p.nacimiento}).join(', ') }));
   }
   private name(p:Row) { return [p.nombres,p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' ')||p.alias_provisional; }
-  async search(actor:Actor, query:string|undefined, limit=50, state?:string, offset=0) {
+  async search(actor:Actor, query:string|undefined, limit=50, state?:string, offset=0, filters:PatientListFilters={}) {
+    assertListFilters(actor,filters);
     return this.db.transaction(async c=>{
-      const result=await this.candidates(c,query??'',limit,state,offset);
+      const result=await this.candidates(c,query??'',limit,state,offset,filters);
       // SEG-09 (audit 02 M-2): the audit keeps which patients the search exposed, not only how many.
-      await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query??'')),count:result.length,patientIds:result.map(p=>p.id)}});
+      await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query??'')),count:result.length,patientIds:result.map(p=>p.id),...(Object.values(filters).some(Boolean)?{filtros:filters}:{})}});
       const today=businessDate(this.clock.now());
       return result.map(p=>searchBirthFields(actor,p,today));
     });
