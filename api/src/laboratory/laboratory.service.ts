@@ -115,7 +115,7 @@ export class LaboratoryService {
         coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
         p.expediente AS "patientRecord",p.sexo AS "patientSex",p.nacimiento::text AS "birthRaw",m.nombres||' '||m.apellidos AS "doctorName",
         count(oi.id)::int AS "itemCount",count(r.orden_item_id)::int AS "capturedCount",
-        coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'unit',e.unidad,'result',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND (o.medico_id=$3 OR o.revisor) OR $2::boolean AND o.revisada_en IS NOT NULL) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version,'observation',r.observacion,'relevant',r.observacion_relevante) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
+        coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'unit',e.unidad,'resultType',e.tipo_resultado,'result',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND (o.medico_id=$3 OR o.revisor) OR $2::boolean AND o.revisada_en IS NOT NULL) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version,'observation',r.observacion,'relevant',r.observacion_relevante) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
         FROM filas o JOIN pacientes.paciente p ON p.id=o.paciente_id LEFT JOIN personal.persona m ON m.id=o.medico_id
         LEFT JOIN laboratorio.orden_item oi ON oi.orden_id=o.id LEFT JOIN laboratorio.examen e ON e.id=oi.examen_id LEFT JOIN laboratorio.resultado r ON r.orden_item_id=oi.id
         GROUP BY o.id,o.consulta_id,o.paciente_id,o.medico_id,o.prioridad,o.estado,o.creada_en,o.muestra_tomada_en,o.completada_en,o.revisada_en,o.enmendada_en,o.version,o.revisor,o.externa,o.lugar_externo,o.instrucciones_externas,p.id,m.id
@@ -395,7 +395,9 @@ export class LaboratoryService {
    */
   async sendExternal(actor: Actor, id: string, dto: LabSendExternalDto, key?: string) {
     const lab = contextsOf(actor, 'laboratorio.procesar').includes('x');
-    return this.commands.run(actor, `${lab ? 'laboratorio.procesar' : 'laboratorio.ordenar'}:${id}:externa`, key, dto, async c => {
+    // The scope names the permission the actor uses (CommandService.run checks its first segment).
+    const scope = lab ? `laboratorio.procesar:${id}:externa` : `laboratorio.ordenar:${id}:externa`;
+    return this.commands.run(actor, scope, key, dto, async c => {
       const old = await this.order(c, id, true);
       if (!lab && old.doctorId !== actor.staffId) throw new ForbiddenException('Solo el laboratorio o el médico que pidió la orden la envían a externo.');
       if (old.state !== 'pendiente') throw new ConflictException('Solo una orden pendiente (sin muestra tomada) puede enviarse a externo.');
@@ -419,7 +421,8 @@ export class LaboratoryService {
    */
   async externalResult(actor: Actor, id: string, dto: LabExternalResultDto, key?: string) {
     const lab = contextsOf(actor, 'laboratorio.procesar').includes('x');
-    return this.commands.run(actor, `${lab ? 'laboratorio.procesar' : 'laboratorio.revisar'}:${id}:externo`, key, dto, async c => {
+    const scope = lab ? `laboratorio.procesar:${id}:externo` : `laboratorio.revisar:${id}:externo`;
+    return this.commands.run(actor, scope, key, dto, async c => {
       const old = await this.order(c, id, true);
       const reviewer = !lab && !!actor.staffId && !!(await c.query('SELECT laboratorio.puede_revisar($1,$2,$3) AS ok', [id, actor.staffId, this.clock.now()])).rows[0]?.ok;
       if (!lab && !reviewer) throw new ForbiddenException('Solo el laboratorio o un médico que puede revisar la orden cargan su resultado externo.');

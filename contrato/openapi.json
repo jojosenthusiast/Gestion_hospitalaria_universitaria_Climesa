@@ -22072,6 +22072,14 @@
             "nullable": true,
             "description": "Unidad del catálogo"
           },
+          "resultType": {
+            "description": "S10: numérico (valor) o texto",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoResultadoLaboratorio"
+              }
+            ]
+          },
           "result": {
             "nullable": true,
             "description": "null sin resultado o si el actor aún no puede ver valores",
@@ -22089,6 +22097,7 @@
           "code",
           "name",
           "unit",
+          "resultType",
           "result"
         ]
       },

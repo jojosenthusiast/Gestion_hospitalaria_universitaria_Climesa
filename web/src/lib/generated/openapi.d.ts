@@ -4034,6 +4034,8 @@ export interface components {
             name: string;
             /** @description Unidad del catálogo */
             unit: string | null;
+            /** @description S10: numérico (valor) o texto */
+            resultType: components["schemas"]["TipoResultadoLaboratorio"];
             /** @description null sin resultado o si el actor aún no puede ver valores */
             result: components["schemas"]["LabItemResultResponse"] | null;
         };

@@ -29,6 +29,7 @@ export class LabOrderItemResponse {
   @StrProp() code!: string;
   @StrProp() name!: string;
   @StrProp({ nullable: true, description: 'Unidad del catálogo' }) unit!: string | null;
+  @EnumProp(TIPO_RESULTADO, 'TipoResultadoLaboratorio', { description: 'S10: numérico (valor) o texto' }) resultType!: string;
   @ClassProp(LabItemResultResponse, { nullable: true, description: 'null sin resultado o si el actor aún no puede ver valores' }) result!: LabItemResultResponse | null;
 }
 
