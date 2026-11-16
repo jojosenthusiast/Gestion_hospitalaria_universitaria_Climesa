@@ -84,6 +84,22 @@ describe('registro de paciente en un solo formulario (S13)', () => {
     await vi.waitFor(() => expect(within(dialogo).queryByText(/Copiamos de tu búsqueda/)).toBeNull());
     expect(within(dialogo).getByLabelText('Apellidos')).toHaveProperty('value', '');
   });
+
+  it('lo que la persona escribe mientras la búsqueda viaja no se pisa al llegar la respuesta', async () => {
+    let soltar: (v: unknown) => void = () => {};
+    const api = {
+      request: vi.fn(async () => [paciente]),
+      write: vi.fn((path: string) => (path === '/pacientes/busquedas' ? new Promise(r => { soltar = r; }) : Promise.resolve({ id: 'p2' }))),
+    };
+    render(<PatientsPage api={api as unknown as Api} profile={perfil} version={0} />);
+    const dialogo = await abrirRegistro();
+    await userEvent.type(within(dialogo).getByLabelText(/Nombre, DUI o expediente/), 'Pedro Gomez');
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Buscar' }));
+    await userEvent.type(within(dialogo).getByLabelText('Apellidos'), 'Martínez');
+    soltar(recibo());
+    await vi.waitFor(() => expect(within(dialogo).getByLabelText('Nombres')).toHaveProperty('value', 'Pedro'));
+    expect(within(dialogo).getByLabelText('Apellidos')).toHaveProperty('value', 'Martínez');
+  });
 });
 
 describe('ficha con una sola acción principal (S13)', () => {

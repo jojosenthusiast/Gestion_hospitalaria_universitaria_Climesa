@@ -156,7 +156,8 @@ function PatientForm({api,patient,receipt:initialReceipt,query:initialQuery,onCl
   setFilled(fill.map(([k])=>k));
   // The merged values go back to the caller: a register in the same run must not send the stale `form` of this render.
   const merged={...form,...Object.fromEntries(fill)} as PatientInput;
-  if(fill.length)setForm(merged);
+  // Functional update: a field typed while the search was in flight keeps what the person wrote.
+  if(fill.length)setForm(f=>({...f,...Object.fromEntries(fill.filter(([k])=>!edited.current.has(k)&&!f[k]))}));
   return {receipt:result,form:merged};
  }
  async function lookupNow(){
