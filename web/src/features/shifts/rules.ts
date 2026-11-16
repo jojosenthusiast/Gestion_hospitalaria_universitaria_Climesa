@@ -11,7 +11,7 @@ export type ShiftAction = 'editar' | 'cancelar' | 'marcar_presente' | 'marcar_au
 /** `GET /turnos` con la asistencia (ASIS-01: automática al inicio) y las acciones permitidas para quien consulta. */
 export type ShiftRow = Shift & {
   staffType?: string;
-  attendance?: 'pendiente' | 'presente' | 'ausente' | null;
+  attendance?: 'pendiente' | 'presente' | 'ausente' | 'sin_registro' | null;
   presentSince?: string | null;
   late?: boolean;
   absenceType?: 'justificada' | 'injustificada' | null;
@@ -20,6 +20,12 @@ export type ShiftRow = Shift & {
   allowedActions?: ShiftAction[];
 };
 export const can = (shift: ShiftRow, action: ShiftAction) => Boolean(shift.allowedActions?.includes(action));
+/**
+ * `can` con el reloj de la pantalla: un turno que ya empezó no se edita ni se cancela (la API responde turno_iniciado),
+ * aunque los datos se hayan cargado antes del inicio.
+ */
+export const canNow = (shift: ShiftRow, action: ShiftAction, now: number) =>
+  (action === 'editar' || action === 'cancelar') && now >= Date.parse(shift.start) ? false : can(shift, action);
 
 /** Texto de la asistencia para la persona que lee (nunca el código). */
 export function attendanceLabel(shift: ShiftRow): string | null {
@@ -27,6 +33,8 @@ export function attendanceLabel(shift: ShiftRow): string | null {
     case 'presente': return shift.late ? 'Presente · llegó tarde' : 'Presente';
     case 'ausente': return shift.absenceType === 'justificada' ? 'Ausencia justificada' : 'Ausencia injustificada';
     case 'pendiente': return 'Se confirma al iniciar';
+    case 'sin_registro': return 'Sin registro de entrada';
+
 
     default: return null;
   }

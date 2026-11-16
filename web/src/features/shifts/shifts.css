@@ -113,6 +113,8 @@
 .shift-day-title { position: sticky; top: 0; z-index: 1; margin: 0; padding: 14px 24px 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; background: var(--surface); font-size: 1rem; }
 .shift-day.is-today .shift-day-title > span:first-child { color: var(--primary-text); }
 .shift-day-count { color: var(--muted); font-size: 0.875rem; font-weight: 500; }
+.shift-day-empty { margin: 0 0 8px; color: var(--muted); font-size: 0.875rem; }
+.shift-carried { display: block; color: var(--muted); font-size: 0.8125rem; }
 .shift-detail-list { margin: 0; display: grid; gap: 12px; }
 .shift-detail-list div { display: grid; gap: 2px; }
 .shift-detail-list dt { color: var(--muted); font-size: 0.875rem; font-weight: 700; }

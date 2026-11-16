@@ -49,8 +49,9 @@ Hay tres vistas: **Semana**, **Lista por día** y **Especialistas de la semana**
 
 ### Asistencia
 
-- El estado sigue al reloj: a la hora de inicio el turno pasa solo a **En curso** con la entrada confirmada, y al terminar pasa a **Completado**. Nadie presiona un botón y ya no hay alertas de "sin entrada".
+- El estado sigue al reloj: a la hora de inicio el turno pasa solo a **En curso** con la entrada confirmada, y al terminar pasa a **Completado**. Nadie presiona un botón y ya no hay alertas de "sin entrada". Los turnos que empezaron antes de este cambio y no tenían entrada se muestran como **Sin registro de entrada**; no se confirman hacia atrás.
 - **Asistencia** registra solo lo que fue distinto, siempre con motivo: una ausencia justificada o injustificada (antes o durante el turno), la hora real de entrada de quien llegó tarde, o deshacer una ausencia equivocada.
+- La **Lista por día** muestra todos los días de la semana. Un turno de noche o una guardia de 24 h aparece también en el día al que llega, marcado **Viene del día anterior**. Cuando un turno empieza, la pantalla deja de ofrecer editarlo o cancelarlo.
 
 - Solo la ausencia saca a la persona del turno. Entonces aparecen **Suplentes disponibles** con **Asignar turno**.
 

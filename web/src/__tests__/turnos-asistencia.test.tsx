@@ -112,7 +112,7 @@ describe('turnos · asistencia (POST /turnos/{id}/asistencia)', () => {
 
 describe('turnos · cancelar con citas (MA-TUR-05)', () => {
   it('explica que Recepción debe reprogramar las citas, con sus horas', async () => {
-    montar([turno({ state: 'publicado', attendance: 'pendiente', allowedActions: ['editar', 'cancelar'] })], async () => {
+    montar([turno({ state: 'publicado', attendance: 'pendiente', start: '2026-11-10T17:00:00.000Z', allowedActions: ['editar', 'cancelar'] })], async () => {
       throw new ApiError('El médico tiene una cita en ese horario.', 409, 'turno_con_citas', undefined, { citas: [{ id: 'c-1', start: '2026-11-10T16:00:00.000Z' }] });
     });
     await userEvent.click(await screen.findByRole('button', { name: /Cancelar turno de Ana/ }));

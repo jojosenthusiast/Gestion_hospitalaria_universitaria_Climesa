@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile, Api } from '../lib/api';
 import { ShiftsPage } from '../features/personnel';
 import { localMs, type ShiftCatalog, type ShiftRow } from '../features/shifts/rules';
+import { entryAt } from '../features/shifts/AttendanceDialog';
 import { addWeeks, dayHeading, daySegments, displayState, mondayOf, unionSegments, weekDays, weekLabel } from '../features/shifts/week';
 
 // Martes 10 de noviembre de 2026, 09:00 en El Salvador.
@@ -85,10 +86,10 @@ const turnos: ShiftRow[] = [
 ];
 const cobertura = { from: '2026-11-09', to: '2026-11-15', gaps: [{ areaId: 'a-1', area: 'Emergencia', role: 'MED', start: iso('2026-11-11', '07:00'), end: iso('2026-11-11', '19:00'), required: 1, actual: 0 }] };
 
-function montar(ancho: boolean) {
+function montar(ancho: boolean, lista: ShiftRow[] = turnos, semana: (path: string) => ShiftRow[] = () => []) {
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: ancho && query.includes('min-width'), media: query, addEventListener: () => {}, removeEventListener: () => {} }));
   const api = {
-    request: vi.fn(async (path: string) => path === '/turnos/catalogo' ? catalogo : path.startsWith('/turnos/cobertura') ? cobertura : turnos),
+    request: vi.fn(async (path: string) => path === '/turnos/catalogo' ? catalogo : path.startsWith('/turnos/cobertura') ? cobertura : path.startsWith('/turnos?') ? semana(path) : lista),
     write: vi.fn(async () => ({})),
   };
   render(<ShiftsPage api={api as unknown as Api} profile={jefatura} version={0} />);
@@ -134,7 +135,12 @@ describe('turnos · vista semanal', () => {
     montar(false);
     expect(screen.getByRole('button', { name: 'Lista por día' }).getAttribute('aria-pressed')).toBe('true');
     const dias = await screen.findAllByRole('heading', { level: 3 });
-    expect(dias.map(h => h.textContent)).toEqual(['Hoy · martes, 10 de noviembre2 turnos', 'Jueves, 12 de noviembre1 turno']);
+    // Todos los días tienen su ancla; la guardia del martes también aparece el miércoles, al que llega.
+    expect(dias.map(h => h.textContent)).toEqual([
+      'Ayer · lunes, 9 de noviembreSin turnos', 'Hoy · martes, 10 de noviembre2 turnos', 'Mañana · miércoles, 11 de noviembre1 turno',
+      'Jueves, 12 de noviembre1 turno', 'Viernes, 13 de noviembreSin turnos', 'Sábado, 14 de noviembreSin turnos', 'Domingo, 15 de noviembreSin turnos',
+    ]);
+    expect(within(screen.getByRole('region', { name: /Mañana · miércoles/ })).getByText('Viene del día anterior')).toBeTruthy();
     const hoy = screen.getByRole('region', { name: /Hoy · martes, 10 de noviembre/ });
     expect(within(hoy).getAllByRole('row').slice(1).map(r => within(r).getAllByRole('cell')[0].textContent)).toEqual([
       expect.stringContaining('Ana Ficticia'), expect.stringContaining('Rosa Enfermera'),
@@ -160,5 +166,59 @@ describe('turnos · guardia de 24 h en un clic', () => {
     await userEvent.click(screen.getByRole('option', { name: /Rosa Enfermera/ }));
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Asignar turno' }));
     expect(api.write).toHaveBeenCalledWith('/turnos', expect.objectContaining({ type: 'guardia', start: iso('2026-11-20', '07:00'), end: iso('2026-11-21', '07:00') }), 'POST');
+  });
+});
+
+describe('turnos · días, reloj y semanas lejanas', () => {
+  const guardia = (n: number) => turno(`g-${n}`, n % 2 ? 'Ana Ficticia Prueba' : 'Rosa Enfermera Prueba', iso('2026-11-10', '07:00'), iso('2026-11-11', '07:00'), { type: 'guardia', state: 'en_curso', attendance: 'presente', allowedActions: ['marcar_presente', 'marcar_ausente'] });
+
+  it('cinco guardias martes 07:00 a miércoles 07:00: "N turnos más" del miércoles lleva a una lista con las cinco', async () => {
+    montar(true, [1, 2, 3, 4, 5].map(guardia));
+    const semana = await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre/ });
+    const miercoles = within(semana).getByRole('group', { name: /Mañana, miércoles, 11 de noviembre/ });
+    await userEvent.click(within(miercoles).getByRole('button', { name: /turnos? más/ }));
+    const dia = await screen.findByRole('region', { name: /Mañana · miércoles, 11 de noviembre/ });
+    expect(within(dia).getAllByText('Viene del día anterior')).toHaveLength(5);
+    expect(within(dia).getByRole('heading', { level: 3 }).textContent).toMatch(/5 turnos/);
+    expect(document.getElementById('dia-2026-11-11')).toBe(dia);
+  });
+
+  it('el lunes muestra la guardia que empezó el domingo anterior', async () => {
+    montar(false, [turno('n-1', 'Rosa Enfermera Prueba', iso('2026-11-08', '19:00'), iso('2026-11-09', '07:00'), { type: 'nocturno', state: 'completado', attendance: 'presente', allowedActions: [] })]);
+    const lunes = await screen.findByRole('region', { name: /Ayer · lunes, 9 de noviembre/ });
+    expect(within(lunes).getByText('Viene del día anterior')).toBeTruthy();
+    expect(within(lunes).getByText(/Rosa Enfermera Prueba/)).toBeTruthy();
+  });
+
+  it('al llegar la hora de inicio deja de ofrecer editar y cancelar y vuelve a pedir los turnos', async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(NOW);
+    const api = montar(false, [turno('p-1', 'Ana Ficticia Prueba', iso('2026-11-10', '09:30'), iso('2026-11-10', '15:30'))]);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByRole('button', { name: 'Cancelar turno de Ana Ficticia Prueba' })).toBeTruthy();
+    const antes = api.request.mock.calls.filter(([path]) => path === '/turnos').length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(31 * 60_000); });
+    expect(screen.queryByRole('button', { name: 'Cancelar turno de Ana Ficticia Prueba' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Editar/ })).toBeNull();
+    expect(api.request.mock.calls.filter(([path]) => path === '/turnos').length).toBeGreaterThan(antes);
+  });
+
+  it('una semana fuera de la ventana por omisión se pide con from y to, sin mostrar una semana vacía falsa', async () => {
+    const lejano = turno('l-1', 'Ana Ficticia Prueba', iso('2027-02-09', '07:00'), iso('2027-02-09', '15:00'));
+    const api = montar(true, turnos, path => path === '/turnos?from=2027-02-07&to=2027-02-14' ? [lejano] : []);
+    await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre/ });
+    for (let i = 0; i < 13; i++) fireEvent.click(screen.getByRole('button', { name: 'Semana siguiente' }));
+    expect(await screen.findByRole('button', { name: /Ana Ficticia Prueba, Emergencia, 07:00 a 15:00/ })).toBeTruthy();
+    expect(api.request).toHaveBeenCalledWith('/turnos?from=2027-02-07&to=2027-02-14', expect.anything());
+  });
+});
+
+describe('turnos · hora real de entrada', () => {
+  it('en un turno de noche, las 18:45 son del mismo día y las 06:30 del día siguiente', () => {
+    const noche = { start: iso('2026-11-10', '19:00'), end: iso('2026-11-11', '07:00') };
+    expect(entryAt(noche, '18:45')).toBe(localMs('2026-11-10', '18:45'));
+    expect(entryAt(noche, '06:30')).toBe(localMs('2026-11-11', '06:30'));
+    expect(entryAt({ start: iso('2026-11-10', '07:00'), end: iso('2026-11-10', '15:00') }, '07:20')).toBe(localMs('2026-11-10', '07:20'));
   });
 });

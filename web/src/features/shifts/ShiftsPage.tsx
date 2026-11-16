@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { AreaChip, RoleChip, roleIdentity } from '../../components/identity';
 import { ExportMenu } from '../../components/export-menu';
 import { SearchPicker, type PickerItem } from '../../components/search-picker';
@@ -25,6 +25,8 @@ const STATES: [string, string][] = [['borrador', 'Borradores'], ['publicado', 'P
 const EMPTY_CATALOG: ShiftCatalog = { roles: [], areas: [], staff: [] };
 /** La semana con bloques por hora necesita ancho; en un teléfono se abre la lista por día (la semana sigue disponible). */
 const WIDE = '(min-width: 900px)';
+/** Ventana que trae `GET /turnos` sin rango (SHIFT_WINDOW de la API); una semana fuera de ella se pide con from/to. */
+const WINDOW_PAST = 31 * 86_400_000, WINDOW_FUTURE = 93 * 86_400_000;
 const initialView = (): View => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(WIDE).matches ? 'semana' : 'lista';
 
 /** Si el catálogo no se puede leer, las opciones se arman con los turnos cargados: peor que el catálogo, pero la pantalla sigue útil. */
@@ -54,7 +56,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const [monday, setMonday] = useState(() => mondayOf(Date.now()));
   const [quick, consumeQuick] = useQuickAction();
   // Reloj local para pasar de "publicado" a "en curso" en pantalla sin pedir datos; no consulta la red.
-  useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 30_000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => { const timer = setInterval(() => setNow(new Date()), 30_000); return () => clearInterval(timer); }, []);
   useEffect(() => { if (!quick) return; if (quick === 'planificar' && plan) { setEditing(null); setOpen(true); } consumeQuick(); }, [quick, plan, consumeQuick]);
   // "N turnos más" de un día de la semana abre la lista en ese día.
   useEffect(() => { if (view !== 'lista' || !focusDay) return; document.getElementById(`dia-${focusDay}`)?.scrollIntoView({ block: 'start' }); setFocusDay(null); }, [view, focusDay]);
@@ -62,6 +64,24 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const at = now.valueOf(), today = localDay(at);
   const days = useMemo(() => weekDays(monday), [monday]);
   const weekStart = days[0].start, weekEnd = days[6].end, sunday = days[6].date;
+  // La semana visible sale de la ventana por omisión (con el día anterior, por las guardias que llegan al lunes); si no
+  // cabe, se pide esa semana con from/to para no mostrar una semana vacía que no lo está.
+  const covered = weekStart - 86_400_000 >= Date.now() - WINDOW_PAST && weekEnd <= Date.now() + WINDOW_FUTURE;
+  const weekData = useData<ShiftRow[]>(api, `/turnos?from=${localDay(weekStart - 1)}&to=${sunday}`, version, !covered && view !== 'especialistas');
+  const source = covered ? data : weekData;
+  const shown = source.data ?? [];
+  // Al llegar la hora de inicio del próximo turno, se vuelve a pedir la planificación: el servidor ya lo pasó a en curso
+  // y dejó de permitir editarlo o cancelarlo. Un temporizador hasta esa hora, no una consulta periódica.
+  const nextStart = useMemo(() => shown.map(t => Date.parse(t.start)).filter(s => s > at).reduce((a, b) => Math.min(a, b), Infinity), [shown, at]);
+  const refreshShown = useRef(source.refresh);
+  refreshShown.current = source.refresh;
+  useEffect(() => {
+    const wait = nextStart - Date.now();
+    if (!Number.isFinite(wait) || wait > 86_400_000) return;
+    const timer = setTimeout(() => { setNow(new Date()); refreshShown.current(); }, Math.max(0, wait) + 1_000);
+    return () => clearTimeout(timer);
+  }, [nextStart]);
+
   const coverage = useData<CoverageWeek>(api, `/turnos/cobertura?from=${monday}&to=${sunday}`, version, view === 'semana');
   const staffById = useMemo(() => new Map(catalog.staff.map(p => [p.id, p])), [catalog.staff]);
   const typeOf = (t: ShiftRow) => t.staffType ?? staffById.get(t.staffId)?.type;
@@ -70,7 +90,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const matches = (t: ShiftRow) => (!person || t.staffId === person.id) && (role === 'todos' || typeOf(t) === role) && (area === 'todos' || t.areaId === area) && (state === 'todos' || displayState(t, at) === state);
   // La semana dibuja todo lo que la toca (una guardia del domingo anterior llega al lunes); la lista y la exportación
   // toman los turnos asignados a sus días (los que empiezan en la semana).
-  const inWeek = useMemo(() => all.filter(t => Date.parse(t.start) < weekEnd && Date.parse(t.end) > weekStart), [all, weekStart, weekEnd]);
+  const inWeek = useMemo(() => shown.filter(t => Date.parse(t.start) < weekEnd && Date.parse(t.end) > weekStart), [shown, weekStart, weekEnd]);
   const drawn = inWeek.filter(matches);
   const rows = drawn.filter(t => Date.parse(t.start) >= weekStart).sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.person.localeCompare(b.person, 'es'));
   const assigned = inWeek.filter(t => Date.parse(t.start) >= weekStart).length;
@@ -149,18 +169,19 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
           {view === 'semana' && <StateLegend />}
         </div>
       </div>
-      <RemoteState state={data}>{() => view === 'semana' ? <section className="shift-week-wrap" aria-label={`Semana del ${weekLabel(monday)}`}>
+      <RemoteState state={source}>{() => view === 'semana' ? <section className="shift-week-wrap" aria-label={`Semana del ${weekLabel(monday)}`}>
         {coverage.error && coverage.error.status !== 403 && <Notice kind="error">No pudimos dibujar los huecos de cobertura de esta semana: {coverage.error.message} <button type="button" className="secondary-button" onClick={coverage.refresh}>Volver a intentar</button></Notice>}
         <ShiftWeek days={days} today={today} now={at} shifts={drawn} gaps={gaps} onOpen={setDetail} onShowDay={date => { setFocusDay(date); setView('lista'); }} />
         {!drawn.length && <Empty title="Sin turnos en esta semana" description={active.length ? 'Ajusta los filtros o la búsqueda para consultar otros horarios.' : 'Cambia de semana o asigna un turno.'} />}
-      </section> : rows.length ? <ShiftDayList days={days} today={today} now={at} rows={rows} plan={plan} byPerson={sort === 'persona'} typeOf={typeOf} actions={actions} />
+      </section> : drawn.length ? <ShiftDayList days={days} today={today} now={at} rows={drawn} plan={plan} byPerson={sort === 'persona'} typeOf={typeOf} actions={actions} />
         : <Empty title="Sin turnos en esta vista" description="Ajusta los filtros, la búsqueda o la semana para consultar otros horarios." />}</RemoteState>
     </section>
     </>}
     {detail && <ShiftDetail shift={detail} now={at} plan={plan} typeOf={typeOf} actions={actions} onClose={() => setDetail(null)} />}
-    {open && <ShiftForm api={api} shift={editing} draft={editing ? undefined : draft} catalog={catalog} shifts={all} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); data.refresh(); }} />}
-    {marking && <AttendanceDialog api={api} shift={marking} onClose={() => setMarking(null)} onSaved={() => { setMarking(null); data.refresh(); }} onAssignSubstitute={plan ? id => assignSubstitute(marking, id) : undefined} />}
-    {cancelling && <CancelShiftForm api={api} shift={cancelling} onClose={() => { setCancelling(null); data.refresh(); }} onSaved={() => { setCancelling(null); data.refresh(); }} />}
+    {open && <ShiftForm api={api} shift={editing} draft={editing ? undefined : draft} catalog={catalog} shifts={covered ? all : [...all, ...shown.filter(t => !all.some(a => a.id === t.id))]} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); data.refresh(); if (!covered) weekData.refresh(); }} />}
+    {marking && <AttendanceDialog api={api} shift={marking} onClose={() => setMarking(null)} onSaved={() => { setMarking(null); data.refresh(); if (!covered) weekData.refresh(); }} onAssignSubstitute={plan ? id => assignSubstitute(marking, id) : undefined} />}
+    {cancelling && <CancelShiftForm api={api} shift={cancelling} onClose={() => { setCancelling(null); source.refresh(); }} onSaved={() => { setCancelling(null); source.refresh(); }} />}
+
   </>;
 }
 
