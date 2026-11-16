@@ -1,3 +1,4 @@
+import CoreText
 import SwiftUI
 import UIKit
 
@@ -164,6 +165,16 @@ enum Atkinson {
             case .bold: return .bold
             }
         }
+
+        /// Value on the variable font's `wght` axis (200-800).
+        var axisValue: Double {
+            switch self {
+            case .regular: return 400
+            case .medium: return 500
+            case .semibold: return 600
+            case .bold: return 700
+            }
+        }
     }
 
     static func text(_ size: CGFloat, _ weight: Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
@@ -175,10 +186,16 @@ enum Atkinson {
         font(prefix: "AtkinsonHyperlegibleMono", base: "AtkinsonHyperlegibleMono-ExtraLight", size: size, weight: weight, style: style).monospacedDigit()
     }
 
+    /// The bundled files are variable fonts whose named instances have no PostScript names, and the Mono default
+    /// instance is ExtraLight. The weight is therefore set on the `wght` axis of the base font, and the result is scaled
+    /// with Dynamic Type for its text style.
     private static func font(prefix: String, base: String, size: CGFloat, weight: Weight, style: Font.TextStyle) -> Font {
-        let name = "\(prefix)-\(weight.rawValue)"
-        if UIFont(name: name, size: size) != nil { return .custom(name, size: size, relativeTo: style) }
-        return .custom(base, size: size, relativeTo: style).weight(weight.swiftUI)
+        guard let baseFont = UIFont(name: base, size: size) else { return .system(size: size, weight: weight.swiftUI) }
+        let variation = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
+        let wghtAxis = NSNumber(value: 0x7767_6874) // 'wght'
+        let descriptor = baseFont.fontDescriptor.addingAttributes([variation: [wghtAxis: NSNumber(value: weight.axisValue)]])
+        let weighted = UIFont(descriptor: descriptor, size: size)
+        return Font(UIFontMetrics(forTextStyle: style.uiKitStyle).scaledFont(for: weighted))
     }
 }
 
@@ -199,4 +216,24 @@ enum Typo {
     static let mono = Atkinson.mono(13, .regular, relativeTo: .footnote)
     /// Número de turno o ficha en grande.
     static func number(_ size: CGFloat) -> Font { Atkinson.text(size, .bold, relativeTo: .largeTitle).monospacedDigit() }
+}
+
+private extension Font.TextStyle {
+    /// UIKit text style used to scale an Atkinson font with Dynamic Type.
+    var uiKitStyle: UIFont.TextStyle {
+        switch self {
+        case .largeTitle: return .largeTitle
+        case .title: return .title1
+        case .title2: return .title2
+        case .title3: return .title3
+        case .headline: return .headline
+        case .subheadline: return .subheadline
+        case .callout: return .callout
+        case .footnote: return .footnote
+        case .caption: return .caption1
+        case .caption2: return .caption2
+        case .body: return .body
+        @unknown default: return .body
+        }
+    }
 }

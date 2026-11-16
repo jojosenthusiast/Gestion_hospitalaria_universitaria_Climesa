@@ -193,7 +193,7 @@ public enum StatusFamily: String, CaseIterable, Sendable {
         "llamado": .llamado, "confirmada": .llamado, "en_proceso": .llamado, "limpieza": .llamado, "reprogramada": .llamado,
         "en_atencion": .atencion, "en_curso": .atencion, "ocupada": .atencion, "hospitalizado": .atencion,
         "en_servicio": .atencion, "abierta": .atencion,
-        "atendida": .listo, "completado": .listo, "firmada": .listo, "alta_firmada": .listo, "egresado": .listo, "libre": .listo,
+        "atendida": .listo, "atendido": .listo, "completado": .listo, "firmada": .listo, "alta_firmada": .listo, "egresado": .listo, "libre": .listo,
         "disponible": .listo, "activo": .listo, "exito": .listo, "normal": .listo, "aprobada": .listo,
         "cancelado": .cerrado, "cancelada": .cerrado, "no_asistio": .cerrado, "no_se_presento": .cerrado, "cerrado": .cerrado,
         "rechazada": .cerrado, "vencida": .cerrado, "vencido": .cerrado, "bloqueada": .cerrado, "inactivo": .cerrado,

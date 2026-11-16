@@ -30,7 +30,7 @@ final class DesignTokensTests: XCTestCase {
             "en_espera": .espera, "solicitada": .espera, "pendiente_cama": .espera, "provisional": .espera,
             "llamado": .llamado, "confirmada": .llamado, "limpieza": .llamado, "reprogramada": .llamado,
             "en_atencion": .atencion, "ocupada": .atencion, "hospitalizado": .atencion, "abierta": .atencion,
-            "atendida": .listo, "alta_firmada": .listo, "libre": .listo, "normal": .listo, "aprobada": .listo,
+            "atendida": .listo, "atendido": .listo, "alta_firmada": .listo, "libre": .listo, "normal": .listo, "aprobada": .listo,
             "cancelado": .cerrado, "cancelada": .cerrado, "no_se_presento": .cerrado, "en_mantenimiento": .cerrado,
             "critico_alto": .critico, "critico_bajo": .critico
         ]
