@@ -192,9 +192,13 @@ export class PublicService {
       const notice = await this.noticeForMe(c, actor, id, now);
       const current = await this.ackRow(c, id, actor.id);
       if (current?.enterado_en) return PublicService.ackOf(id, current);
+      // FOR UPDATE above locks nothing when the row does not exist yet, so two first "Enterado" calls can race here.
+      // The conditional upsert lets only one of them set enterado_en; the other returns that acknowledgement unaudited.
       const row = (await c.query<{ enterado_en: string; recordar_en: string | null }>(
         `INSERT INTO publico.aviso_enterado(aviso_id,usuario_id,enterado_en,actualizado_en) VALUES($1,$2,$3,$3)
-         ON CONFLICT (aviso_id,usuario_id) DO UPDATE SET enterado_en=excluded.enterado_en,actualizado_en=excluded.actualizado_en RETURNING enterado_en,recordar_en`, [id, actor.id, now])).rows[0];
+         ON CONFLICT (aviso_id,usuario_id) DO UPDATE SET enterado_en=excluded.enterado_en,actualizado_en=excluded.actualizado_en
+         WHERE publico.aviso_enterado.enterado_en IS NULL RETURNING enterado_en,recordar_en`, [id, actor.id, now])).rows[0];
+      if (!row) return PublicService.ackOf(id, (await this.ackRow(c, id, actor.id))!);
       await this.commands.audit(c, actor, { action: 'avisos.enterado', entity: 'aviso', entityId: id, permission: 'sesion.perfil', detail: { avisoId: id, nivel: notice.nivel } });
       await this.commands.event(c, 'aviso.actualizado', 'aviso', id, notice.version, [`usuario:${actor.id}`]);
       return PublicService.ackOf(id, row);

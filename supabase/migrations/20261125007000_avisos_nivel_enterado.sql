@@ -27,6 +27,8 @@
 --   drop table if exists publico.aviso_enterado;
 --   delete from plataforma.politica where clave = 'avisos.recordatorio_horas';
 --   alter table publico.aviso drop constraint if exists aviso_nivel_valido;
+--   -- Antes de restaurar la restricción anterior, un aviso dirigido solo a áreas no la cumple: hazlo público o retíralo.
+--   update publico.aviso set publico = true where not publico and cardinality(roles) = 0;
 --   alter table publico.aviso drop constraint if exists aviso_audiencia_valida;
 --   alter table publico.aviso add constraint aviso_audiencia_valida check (prioridad in ('atencion', 'urgente', 'critico')
 --     and roles <@ array['ADM','JOP','REC','AST','ENF','MED','LAB','PAR','DPD','PAC']::text[] and (publico or cardinality(roles) > 0));
