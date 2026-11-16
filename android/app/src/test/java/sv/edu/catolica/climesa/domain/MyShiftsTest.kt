@@ -49,6 +49,7 @@ class MyShiftsTest {
         assertEquals("Entrada confirmada", MyShifts.attendanceLabel(open))
         assertEquals("Entrada corregida · llegó tarde", MyShifts.attendanceLabel(late))
         assertEquals("Se confirma sola al iniciar", MyShifts.attendanceLabel(next))
+        assertEquals("Sin registro de entrada", MyShifts.attendanceLabel(next.copy(attendance = "sin_registro")))
         assertEquals("En curso", StaffLabels.shiftState("en_curso"))
         assertEquals("Ausente", StaffLabels.shiftState("ausente"))
     }
@@ -75,5 +76,20 @@ class MyShiftsTest {
         val days = MyShifts.byDay(MyShifts.parse(rows), java.time.LocalDate.of(2026, 11, 10))
         assertEquals(listOf("Jueves, 12 de noviembre", "Sin fecha"), days.map { it.title })
         assertEquals(MyShifts.MISSING_TIME, days[1].shifts[0].hours)
+    }
+
+    // "Mis turnos" abre en hoy: hoy, un turno de noche que sigue en curso y lo que viene primero; lo anterior debajo.
+    @Test fun opensAtTodayWithPastDaysBelow() {
+        val row = { id: String, start: String, end: String -> JSONObject().put("id", id).put("area", "Emergencia").put("start", start).put("end", end).put("type", "diurno").put("state", "publicado") }
+        val rows = JSONArray()
+            .put(row("martes", "2026-11-10T13:00:00Z", "2026-11-10T21:00:00Z"))
+            .put(row("noche", "2026-11-12T04:00:00Z", "2026-11-12T16:00:00Z"))
+            .put(row("hoy", "2026-11-12T21:00:00Z", "2026-11-13T03:00:00Z"))
+            .put(row("viernes", "2026-11-13T13:00:00Z", "2026-11-13T21:00:00Z"))
+            .put(row("lunes", "2026-11-09T13:00:00Z", "2026-11-09T21:00:00Z"))
+        val days = MyShifts.byDay(MyShifts.parse(rows), java.time.LocalDate.of(2026, 11, 12), java.time.Instant.parse("2026-11-12T14:00:00Z"))
+        assertEquals(listOf(listOf("noche"), listOf("hoy"), listOf("viernes"), listOf("martes"), listOf("lunes")), days.map { d -> d.shifts.map { it.id } })
+        assertEquals(listOf(false, false, false, true, true), days.map { it.past })
+        assertEquals("Ayer · miércoles, 11 de noviembre", days[0].title)
     }
 }

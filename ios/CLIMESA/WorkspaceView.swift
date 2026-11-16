@@ -140,7 +140,10 @@ struct ShiftsContent:View {
             else if let error=model.error { ErrorStateView(message:error) { Task { await model.load(api:account.api) } } }
             else if model.shifts.isEmpty { EmptyStateView(title:L.text("shifts.empty"),symbol:"calendar") }
             // Por día asignado (Hoy, Mañana, día y fecha) y por hora de inicio; la entrada se confirma sola (ASIS-01).
-            ForEach(Array(ShiftAttendanceRules.byDay(model.shifts,start:{ ShiftAttendanceRules.date($0.start) },today:Date()).enumerated()),id:\.offset) { _, day in
+            // Abre en hoy: lo de hoy en adelante primero y los días anteriores debajo, bajo "Turnos anteriores".
+            let days=ShiftAttendanceRules.byDay(model.shifts,start:{ ShiftAttendanceRules.date($0.start) },end:{ ShiftAttendanceRules.date($0.end) },today:Date())
+            ForEach(Array(days.enumerated()),id:\.offset) { index, day in
+                if day.past && (index==0 || !days[index-1].past) { Text(L.text("shifts.past")).font(Typo.small).foregroundStyle(Theme.muted).accessibilityAddTraits(.isHeader) }
                 Text(verbatim:day.title).font(Typo.heading).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
                 ForEach(day.items) { shift in
                     SectionCard(title:shift.area) {

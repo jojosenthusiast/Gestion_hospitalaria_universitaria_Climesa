@@ -45,6 +45,7 @@
     <string name="mantenimiento_cancelar">Cancelar</string>
     <string name="mantenimiento_cerrar">Cerrar y recargar</string>    <string name="unidad_no">No</string>
     <string name="cerrar_sesion">Cerrar sesión</string>
+    <string name="turnos_anteriores">Turnos anteriores</string>
     <string name="turnos_vacio">No tienes turnos publicados.</string>
     <string name="hosp_asignar_cama">Asignar cama</string>
     <string name="hosp_firmar_alta">Firmar alta</string>

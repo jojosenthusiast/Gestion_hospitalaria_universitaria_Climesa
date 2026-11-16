@@ -10,6 +10,7 @@ final class ShiftAttendanceTests: XCTestCase {
         XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("presente", late: false), "Entrada confirmada")
         XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("presente", late: true), "Entrada corregida · llegó tarde")
         XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("pendiente", late: false), "Se confirma sola al iniciar")
+        XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("sin_registro", late: false), "Sin registro de entrada")
         XCTAssertNil(ShiftAttendanceRules.attendanceLabel(nil, late: false))
     }
 
@@ -26,5 +27,17 @@ final class ShiftAttendanceTests: XCTestCase {
         let days = ShiftAttendanceRules.byDay(starts, start: { ShiftAttendanceRules.date($0.1) }, today: today)
         XCTAssertEqual(days.map { $0.title }, ["Hoy · martes, 10 de noviembre", "Mañana · miércoles, 11 de noviembre", "Jueves, 12 de noviembre", "Sin fecha"])
         XCTAssertEqual(days.map { $0.items.map { $0.0 } }, [["guardia"], ["manana"], ["temprano", "tarde"], ["x"]])
+    }
+
+    func testOpensAtTodayWithPastDaysBelow() {
+        let now = ShiftAttendanceRules.date("2026-11-12T14:00:00Z")!
+        let rows: [(String, String, String)] = [
+            ("martes", "2026-11-10T13:00:00Z", "2026-11-10T21:00:00Z"), ("noche", "2026-11-12T04:00:00Z", "2026-11-12T16:00:00Z"),
+            ("hoy", "2026-11-12T21:00:00Z", "2026-11-13T03:00:00Z"), ("viernes", "2026-11-13T13:00:00Z", "2026-11-13T21:00:00Z"),
+            ("lunes", "2026-11-09T13:00:00Z", "2026-11-09T21:00:00Z"),
+        ]
+        let days = ShiftAttendanceRules.byDay(rows, start: { ShiftAttendanceRules.date($0.1) }, end: { ShiftAttendanceRules.date($0.2) }, today: now)
+        XCTAssertEqual(days.map { $0.items.map { $0.0 } }, [["noche"], ["hoy"], ["viernes"], ["martes"], ["lunes"]])
+        XCTAssertEqual(days.map { $0.past }, [false, false, false, true, true])
     }
 }

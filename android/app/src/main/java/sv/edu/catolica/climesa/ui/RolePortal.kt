@@ -200,9 +200,14 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         }
     }
 }
-/** A26 "Mis turnos" por día asignado (Hoy, Mañana, día y fecha), cada día en orden de hora de inicio. */
+/**
+ * A26 "Mis turnos" por día asignado (Hoy, Mañana, día y fecha), cada día en orden de hora de inicio. Abre en hoy: los
+ * días de hoy en adelante van primero y los anteriores debajo, bajo "Turnos anteriores".
+ */
 private fun androidx.compose.foundation.lazy.LazyListScope.myShiftDays(shifts:List<MyShift>){
-    for(day in MyShifts.byDay(shifts)){
+    val days=MyShifts.byDay(shifts)
+    for((index,day) in days.withIndex()){
+        if(day.past&&days.getOrNull(index-1)?.past!=true)item(key="turnos-anteriores"){Text(stringResource(R.string.turnos_anteriores),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=Spacing.md))}
         item(key="dia-${day.title}"){Text(day.title,style=MaterialTheme.typography.titleSmall,modifier=Modifier.padding(top=Spacing.sm))}
         items(day.shifts,key={it.id.ifBlank{it.period}}){shift->MyShiftCard(shift)}
     }

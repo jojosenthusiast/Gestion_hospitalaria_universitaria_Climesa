@@ -22,6 +22,7 @@ public enum ShiftAttendanceRules {
         case "presente": return late ? "Entrada corregida · llegó tarde" : "Entrada confirmada"
         case "ausente": return "Ausencia registrada"
         case "pendiente": return "Se confirma sola al iniciar"
+        case "sin_registro": return "Sin registro de entrada"
         default: return nil
         }
     }
@@ -65,18 +66,25 @@ public enum ShiftAttendanceRules {
         }
     }
 
-    /// Turnos agrupados por el día asignado (el día en que empiezan), días y turnos en orden de inicio; sin fecha, al final.
-    public static func byDay<T>(_ items: [T], start: (T) -> Date?, today: Date) -> [(title: String, items: [T])] {
+    /// Turnos agrupados por el día asignado (el día en que empiezan), turnos en orden de inicio. "Mis turnos" abre en
+    /// hoy: hoy, un día con un turno que sigue en curso (la noche de ayer) y lo que viene van primero, en orden de fecha;
+    /// los días anteriores ya terminados van debajo, el más reciente primero, con `past`. Sin fecha, al final.
+    public static func byDay<T>(_ items: [T], start: (T) -> Date?, end: (T) -> Date? = { _ in nil }, today: Date) -> [(title: String, items: [T], past: Bool)] {
         let dated = items.compactMap { item in start(item).map { (item, $0) } }.sorted { $0.1 < $1.1 }
-        var groups: [(title: String, items: [T])] = []
-        var current: Date?
+        var groups: [(title: String, items: [T], day: Date)] = []
         for (item, at) in dated {
-            if let day = current, calendar.isDate(day, inSameDayAs: at) { groups[groups.count - 1].items.append(item) }
-            else { current = at; groups.append((dayTitle(at, today: today), [item])) }
+            if let last = groups.last, calendar.isDate(last.day, inSameDayAs: at) { groups[groups.count - 1].items.append(item) }
+            else { groups.append((dayTitle(at, today: today), [item], at)) }
         }
+        let startOfToday = calendar.startOfDay(for: today)
+        let isPast = { (group: (title: String, items: [T], day: Date)) in
+            group.day < startOfToday && group.items.allSatisfy { item in end(item).map { $0 <= today } ?? false }
+        }
+        var result = groups.filter { !isPast($0) }.map { (title: $0.title, items: $0.items, past: false) }
+        result += groups.filter(isPast).reversed().map { (title: $0.title, items: $0.items, past: true) }
         let undated = items.filter { start($0) == nil }
-        if !undated.isEmpty { groups.append(("Sin fecha", undated)) }
-        return groups
+        if !undated.isEmpty { result.append((title: "Sin fecha", items: undated, past: false)) }
+        return result
     }
 }
 

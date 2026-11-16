@@ -26,12 +26,17 @@ data class MyShift(
     val type: String = "",
     /** Start instant, or null when the API sent no valid start. */
     val start: Instant? = null,
+    /** End instant, or null when the API sent no valid end. */
+    val end: Instant? = null,
     /** `07:00 a 15:00`, `07:00 a 07:00 del día siguiente · Guardia 24 h`. */
     val hours: String = MyShifts.MISSING_TIME,
 )
 
-/** One day of "Mis turnos": the assigned day (the day the shift starts) with its shifts in start order. */
-data class MyShiftDay(val title: String, val shifts: List<MyShift>)
+/**
+ * One day of "Mis turnos": the assigned day (the day the shift starts) with its shifts in start order. `past` days
+ * (before today, with every shift already over) go below the current and upcoming ones.
+ */
+data class MyShiftDay(val title: String, val shifts: List<MyShift>, val past: Boolean = false)
 
 /**
  * Parses `GET /turnos/mios` outside composition. A missing or malformed `start`/`end` never throws:
@@ -87,6 +92,7 @@ object MyShifts {
                     late = row.optBoolean("late"),
                     type = type,
                     start = start,
+                    end = instant(text(row, "end")),
                     hours = hours(start, instant(text(row, "end")), type),
                 )
             }
@@ -104,13 +110,20 @@ object MyShifts {
         }
     }
 
-    /** Shifts grouped by assigned day, days and shifts in start order; rows without a valid start go last. */
-    fun byDay(shifts: List<MyShift>, today: LocalDate = LocalDate.now(zone)): List<MyShiftDay> {
-        val dated = shifts.filter { it.start != null }.sortedBy { it.start }
+    /**
+     * Shifts grouped by assigned day, shifts in start order. The screen opens at today: today, a day whose shift is
+     * still running (a night shift from yesterday) and upcoming days come first, in date order; past days follow, the
+     * most recent first, marked `past`. Rows without a valid start go last.
+     */
+    fun byDay(shifts: List<MyShift>, today: LocalDate = LocalDate.now(zone), now: Instant = Instant.now()): List<MyShiftDay> {
+        val grouped = shifts.filter { it.start != null }.sortedBy { it.start }
             .groupBy { it.start!!.atZone(zone).toLocalDate() }
-            .map { (day, items) -> MyShiftDay(dayTitle(day, today), items) }
+        val isPast = { day: LocalDate, items: List<MyShift> -> day < today && items.none { it.end == null || it.end > now } }
+        val current = grouped.filter { (day, items) -> !isPast(day, items) }.map { (day, items) -> MyShiftDay(dayTitle(day, today), items) }
+        val past = grouped.filter { (day, items) -> isPast(day, items) }.toSortedMap(reverseOrder())
+            .map { (day, items) -> MyShiftDay(dayTitle(day, today), items, past = true) }
         val undated = shifts.filter { it.start == null }
-        return if (undated.isEmpty()) dated else dated + MyShiftDay("Sin fecha", undated)
+        return current + past + (if (undated.isEmpty()) emptyList() else listOf(MyShiftDay("Sin fecha", undated)))
     }
 
     private fun text(row: JSONObject, key: String): String? = if (row.isNull(key)) null else row.optString(key)
@@ -120,6 +133,7 @@ object MyShifts {
         "presente" -> if (shift.late) "Entrada corregida · llegó tarde" else "Entrada confirmada"
         "ausente" -> "Ausencia registrada"
         "pendiente" -> "Se confirma sola al iniciar"
+        "sin_registro" -> "Sin registro de entrada"
         else -> null
     }
 }
