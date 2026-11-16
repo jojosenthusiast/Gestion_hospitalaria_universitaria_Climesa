@@ -15,6 +15,8 @@ export const PROBLEM_CODES = [
   // Shifts: attendance, load and states (20261120003000; ASIS-01, CARGA-01, MA-TUR-01..05).
   'turno_iniciado', 'turno_con_citas', 'descanso_insuficiente', 'carga_semanal_excedida', 'dias_seguidos_excedidos', 'tripulante_en_servicio',
   'sin_asistencia_marcada', 'entrada_automatica', 'medico_ausente', 'tripulante_ausente',
+  // Shift planning batches and week templates (Fase 2, flow F).
+  'lote_con_conflictos', 'plantilla_duplicada',
   // Appointments, queue and consultation.
   'franja_desalineada', 'franja_ocupada', 'medico_sin_jornada', 'paciente_con_cita', 'cancelacion_fuera_de_plazo',
   'ticket_activo_existente', 'fila_max_llamados', 'consulta_ya_iniciada',
