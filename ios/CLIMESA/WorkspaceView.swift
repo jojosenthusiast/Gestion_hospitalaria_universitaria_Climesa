@@ -56,8 +56,8 @@ struct RoleTabsView:View {
             ForEach(tabs,id:\.self) { tab in
                 NavigationStack {
                     ScrollView {
+                        // S1: sin título gigante; el título de la pestaña va en línea en la barra de navegación (HIG).
                         VStack(alignment:.leading,spacing:25) {
-                            Text(LocalizedStringKey(tab.titleKey)).font(Typo.display).foregroundStyle(Theme.ink).fixedSize(horizontal:false,vertical:true).accessibilityAddTraits(.isHeader)
                             content(for:tab)
                         }.padding(24).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
                     }.safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)

@@ -27,18 +27,9 @@ struct PatientTag: View {
     init(_ code: String, label: String? = nil) { self.code = code; self.label = label }
 
     var body: some View {
+        // Fase 2: misma insignia que `StatusTag`; un código sin familia conserva el tono propio del paciente.
         let style = PatientStatus.style(for: code, label: label)
-        let colors = Theme.colors(for: style.tone)
-        HStack(spacing: 7) {
-            Circle().fill(colors.foreground).frame(width: 7, height: 7)
-            Text(verbatim: style.label).font(Typo.tag).lineLimit(1)
-        }
-        .foregroundStyle(colors.foreground)
-        .padding(.horizontal, 9).padding(.vertical, 5)
-        .background(colors.background, in: Capsule())
-        .overlay(Capsule().stroke(colors.foreground.opacity(0.24), lineWidth: 1))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: style.label))
+        StatusBadge(code, label: style.label, fallbackTone: style.tone)
     }
 }
 

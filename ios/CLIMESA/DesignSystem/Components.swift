@@ -52,26 +52,16 @@ struct StatTile: View {
 
 // MARK: - Estado y filas
 
-/// Etiqueta de estado: código de la API a etiqueta en español y color (`Tag` de web). `label` la reemplaza.
+/// Etiqueta de estado: código de la API a etiqueta en español (`Tag` de web). `label` la reemplaza.
 struct StatusTag: View {
     let code: String
     var label: String?
 
     init(_ code: String, label: String? = nil) { self.code = code; self.label = label }
 
+    /// Fase 2: se dibuja con `StatusBadge` (ícono + etiqueta + patrón); un código sin familia usa su tono de siempre.
     var body: some View {
-        let style = StatusCatalog.style(for: code, label: label)
-        let colors = Theme.colors(for: style.tone)
-        HStack(spacing: 7) {
-            Circle().fill(colors.foreground).frame(width: 7, height: 7)
-            Text(verbatim: style.label).font(Typo.tag).lineLimit(1)
-        }
-        .foregroundStyle(colors.foreground)
-        .padding(.horizontal, 9).padding(.vertical, 5)
-        .background(colors.background, in: Capsule())
-        .overlay(Capsule().stroke(colors.foreground.opacity(0.24), lineWidth: 1))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: style.label))
+        StatusBadge(code, label: label, fallbackTone: StatusCatalog.style(for: code).tone)
     }
 }
 
@@ -144,6 +134,7 @@ struct ClimesaButtonStyle: ButtonStyle {
     var kind: ClimesaButtonKind = .primary
     var loading = false
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: Spacing.s) {
@@ -156,7 +147,8 @@ struct ClimesaButtonStyle: ButtonStyle {
         .background(background, in: RoundedRectangle(cornerRadius: Radius.control))
         .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(border, lineWidth: 1))
         .opacity(configuration.isPressed ? 0.85 : 1)
-        .scaleEffect(configuration.isPressed ? 0.99 : 1)
+        .scaleEffect(configuration.isPressed && !reduceMotion ? 0.99 : 1)
+        .animation(Motion.feedback(Motion.instant, reduceMotion: reduceMotion), value: configuration.isPressed)
     }
 
     private var foreground: Color {
@@ -215,7 +207,8 @@ struct EmptyStateView: View {
     }
 }
 
-/// Carga en curso (diseño 04, «Cargando»).
+/// Carga en curso (diseño 04, «Cargando»). Fase 2: después del ingreso las secciones usan `Skeleton`; esta vista
+/// queda para estados previos al ingreso.
 struct LoadingStateView: View {
     var message = L.text("ds.loading")
 
@@ -275,5 +268,395 @@ struct ConflictBanner: View {
         .padding(Spacing.l)
         .background(Theme.dangerSoft, in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Theme.danger, lineWidth: 1))
+    }
+}
+
+// MARK: - Fase 2: sistema común (docs/diseno/fase2/02-sistema.md, espejo de web/src/components/system.tsx)
+
+/// S1: barra compacta. Ruta pequeña, título de 20 pt, filtros y la acción principal; sin descripción.
+/// En pantallas con título en la barra de navegación (`.inline`) se pasa `title: nil` y quedan solo filtros y acción.
+struct CompactHeader<Filters: View, Actions: View>: View {
+    var title: String?
+    var breadcrumb: String?
+    @ViewBuilder let filters: () -> Filters
+    @ViewBuilder let actions: () -> Actions
+
+    init(title: String? = nil, breadcrumb: String? = nil, @ViewBuilder filters: @escaping () -> Filters, @ViewBuilder actions: @escaping () -> Actions) {
+        self.title = title; self.breadcrumb = breadcrumb; self.filters = filters; self.actions = actions
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.space3) {
+            if title != nil || breadcrumb != nil {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let breadcrumb { Text(verbatim: breadcrumb).font(Typo.caption).foregroundStyle(Theme.muted) }
+                    if let title {
+                        Text(verbatim: title).font(Typo.heading).foregroundStyle(Theme.ink)
+                            .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
+                    }
+                }
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: Spacing.space3) {
+                    filters()
+                    Spacer(minLength: Spacing.space2)
+                    actions()
+                }
+                VStack(alignment: .leading, spacing: Spacing.space2) {
+                    filters()
+                    actions()
+                }
+            }
+        }
+        .padding(.bottom, Spacing.space3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
+    }
+}
+
+extension CompactHeader where Filters == EmptyView {
+    init(title: String? = nil, breadcrumb: String? = nil, @ViewBuilder actions: @escaping () -> Actions) {
+        self.init(title: title, breadcrumb: breadcrumb, filters: { EmptyView() }, actions: actions)
+    }
+}
+
+extension CompactHeader where Filters == EmptyView, Actions == EmptyView {
+    init(title: String?, breadcrumb: String? = nil) {
+        self.init(title: title, breadcrumb: breadcrumb, filters: { EmptyView() }, actions: { EmptyView() })
+    }
+}
+
+/// S3: lugar reservado mientras carga una sección, del alto del contenido real. Estático, sin spinner; el texto
+/// queda para VoiceOver. Reemplaza a `LoadingStateView` después del ingreso.
+struct Skeleton: View {
+    var rows = 3
+    /// Alto de cada fila: el de una fila de lista (`ListRow`, 48 pt) salvo que la sección sea otra cosa.
+    var rowHeight: CGFloat = Spacing.control
+    var label = L.text("ds.skeleton")
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.space3) {
+            ForEach(0..<max(rows, 1), id: \.self) { index in
+                GeometryReader { proxy in
+                    RoundedRectangle(cornerRadius: Radius.control)
+                        .fill(Theme.line.opacity(0.7))
+                        .frame(width: proxy.size.width * Skeleton.widthFraction(index))
+                }
+                .frame(height: rowHeight)
+            }
+        }
+        .padding(.vertical, Spacing.space2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: label))
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    /// Mismo ritmo que web: 88 %, 100 %, 72 %.
+    static func widthFraction(_ index: Int) -> CGFloat {
+        switch (index + 1) % 3 {
+        case 1: return 0.88
+        case 0: return 0.72
+        default: return 1
+        }
+    }
+}
+
+// MARK: Áreas
+
+/// Chip del código de área (`AreaTag` de web); con `showName` agrega el nombre. Acepta códigos de espacio (`P3-VIP`).
+struct AreaTag: View {
+    let code: String
+    var showName = false
+
+    init(_ code: String, showName: Bool = false) { self.code = code; self.showName = showName }
+
+    var body: some View {
+        let area = AreaCode.of(code)
+        let colors = Theme.colors(for: area)
+        HStack(spacing: Spacing.space2) {
+            Text(verbatim: area.rawValue)
+                .font(Atkinson.mono(12, .bold, relativeTo: .caption))
+                .tracking(0.5)
+                .foregroundStyle(Theme.onArea)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(colors.strong, in: RoundedRectangle(cornerRadius: Radius.chip))
+            if showName { Text(verbatim: area.name).font(Typo.tag).foregroundStyle(colors.strong).lineLimit(1) }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Área \(area.name)"))
+    }
+}
+
+/// Superficie de área: tinte suave, borde de 1 pt al 35 % y franja superior fuerte de 3 pt (`.area-surface`).
+struct AreaSurface: ViewModifier {
+    let area: AreaCode
+
+    func body(content: Content) -> some View {
+        let colors = Theme.colors(for: area)
+        let shape = RoundedRectangle(cornerRadius: Radius.card)
+        content
+            .background(colors.soft, in: shape)
+            .overlay(alignment: .top) { Rectangle().fill(colors.strong).frame(height: 3) }
+            .clipShape(shape)
+            .overlay(shape.stroke(colors.strong.opacity(0.35), lineWidth: 1))
+    }
+}
+
+extension View {
+    /// Tarjeta o celda con el tono de un área (`P1-EMG`, `LAB`, ...).
+    func areaSurface(_ code: String?) -> some View { modifier(AreaSurface(area: AreaCode.of(code))) }
+}
+
+// MARK: Estados
+
+/// S7: estado con ícono + etiqueta + patrón; el color acompaña, nunca va solo. Los patrones (rayado, punteado,
+/// sólido, contorno, discontinuo, doble) se distinguen en escala de grises. Un valor sin familia se muestra con un
+/// punto, su texto y `fallbackTone` (neutro por defecto).
+struct StatusBadge: View {
+    let value: String
+    var label: String?
+    var fallbackTone: StatusTone = .neutral
+
+    init(_ value: String, label: String? = nil, fallbackTone: StatusTone = .neutral) {
+        self.value = value; self.label = label; self.fallbackTone = fallbackTone
+    }
+
+    var body: some View {
+        let style = StatusBadgeStyle.of(value, label: label)
+        Group {
+            if let family = style.family { FamilyBadge(family: family, text: style.label) }
+            else { NeutralBadge(tone: fallbackTone, text: style.label) }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: style.label))
+    }
+}
+
+private struct FamilyBadge: View {
+    let family: StatusFamily
+    let text: String
+
+    var body: some View {
+        let colors = Theme.colors(for: family)
+        let shape = RoundedRectangle(cornerRadius: Radius.chip)
+        let solid = family.pattern == .solido
+        HStack(spacing: 6) {
+            Image(systemName: family.symbol).imageScale(.small).accessibilityHidden(true)
+            Text(verbatim: text).lineLimit(1)
+        }
+        .font(Typo.tag)
+        .foregroundStyle(solid ? Theme.onStatus : colors.strong)
+        .padding(.horizontal, 8).padding(.vertical, family.pattern == .doble ? 4 : 3)
+        .background { PatternFill(pattern: family.pattern, strong: colors.strong, soft: colors.soft).clipShape(shape) }
+        .overlay { PatternBorder(pattern: family.pattern, color: colors.strong) }
+    }
+}
+
+private struct NeutralBadge: View {
+    let tone: StatusTone
+    let text: String
+
+    var body: some View {
+        let colors = Theme.colors(for: tone)
+        HStack(spacing: 6) {
+            Circle().fill(colors.foreground).frame(width: 7, height: 7).accessibilityHidden(true)
+            Text(verbatim: text).lineLimit(1)
+        }
+        .font(Typo.tag)
+        .foregroundStyle(colors.foreground)
+        .padding(.horizontal, 8).padding(.vertical, 3)
+        .background(colors.background, in: RoundedRectangle(cornerRadius: Radius.chip))
+        .overlay(RoundedRectangle(cornerRadius: Radius.chip).stroke(colors.foreground.opacity(0.3), lineWidth: 1))
+    }
+}
+
+/// Fondo de cada patrón (mismas reglas que `.pattern-*` de web/src/modules.css).
+private struct PatternFill: View {
+    let pattern: StatusPattern
+    let strong: Color
+    let soft: Color
+
+    var body: some View {
+        switch pattern {
+        case .rayado: ZStack { soft; DiagonalStripes().fill(strong.opacity(0.18)) }
+        case .punteado: ZStack { soft; DotGrid().fill(strong.opacity(0.32)) }
+        case .solido: strong
+        case .contorno: Theme.surface
+        case .discontinuo: Color.clear
+        case .doble: soft
+        }
+    }
+}
+
+/// Borde de cada patrón: continuo, punteado, discontinuo o doble.
+private struct PatternBorder: View {
+    let pattern: StatusPattern
+    let color: Color
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.chip)
+        switch pattern {
+        case .rayado, .solido: shape.strokeBorder(color, lineWidth: 1)
+        case .punteado: shape.strokeBorder(color, style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [0.5, 2.5]))
+        case .contorno: shape.strokeBorder(color, lineWidth: 1.5)
+        case .discontinuo: shape.strokeBorder(color, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+        case .doble:
+            ZStack {
+                shape.strokeBorder(color, lineWidth: 1)
+                RoundedRectangle(cornerRadius: CGFloat(RadiusToken.inner(outer: RadiusToken.chip, padding: 2))).strokeBorder(color, lineWidth: 1).padding(2)
+            }
+        }
+    }
+}
+
+/// Rayas a 45°: 3 pt de raya cada 7 pt.
+private struct DiagonalStripes: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        var x = -rect.height
+        while x < rect.width {
+            path.move(to: CGPoint(x: x, y: rect.maxY))
+            path.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
+            path.addLine(to: CGPoint(x: x + rect.height + 3, y: rect.minY))
+            path.addLine(to: CGPoint(x: x + 3, y: rect.maxY))
+            path.closeSubpath()
+            x += 7
+        }
+        return path
+    }
+}
+
+/// Puntos de 1,4 pt cada 5 pt.
+private struct DotGrid: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        var y = rect.minY + 2.5
+        while y < rect.maxY {
+            var x = rect.minX + 2.5
+            while x < rect.maxX {
+                path.addEllipse(in: CGRect(x: x - 0.7, y: y - 0.7, width: 1.4, height: 1.4))
+                x += 5
+            }
+            y += 5
+        }
+        return path
+    }
+}
+
+// MARK: Prioridad
+
+/// Prioridad con ícono y texto. El rojo crítico solo en emergencia (relleno sólido).
+struct PriorityBadge: View {
+    let priority: Priority
+
+    init(_ priority: Priority) { self.priority = priority }
+    /// Valor de la API; lo desconocido se muestra como rutina.
+    init(_ value: String?) { self.priority = Priority.of(value) }
+
+    var body: some View {
+        let colors = Theme.colors(for: priority)
+        let emergency = priority == .emergencia
+        let shape = RoundedRectangle(cornerRadius: Radius.chip)
+        HStack(spacing: 6) {
+            Image(systemName: priority.symbol).imageScale(.small).accessibilityHidden(true)
+            Text(verbatim: priority.label).lineLimit(1)
+        }
+        .font(Typo.tag)
+        .foregroundStyle(emergency ? Theme.onStatus : colors.strong)
+        .padding(.horizontal, 8).padding(.vertical, 3)
+        .background(colors.soft, in: shape)
+        .overlay(shape.strokeBorder(colors.strong, lineWidth: 1))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Prioridad \(priority.label)"))
+    }
+}
+
+// MARK: Leyenda
+
+/// Leyenda con exactamente las mismas piezas que las tarjetas y los filtros.
+struct StatusLegend: View {
+    var areas = true
+    var statuses = true
+    var priorities = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.space4) {
+            if areas {
+                LegendGroup(title: L.text("ds.legend.areas")) {
+                    ForEach(AreaCode.allCases, id: \.self) { area in AreaTag(area.rawValue, showName: true) }
+                }
+            }
+            if statuses {
+                LegendGroup(title: L.text("ds.legend.statuses")) {
+                    ForEach(StatusFamily.allCases, id: \.self) { family in StatusBadge(family.sample, label: family.label) }
+                }
+            }
+            if priorities {
+                LegendGroup(title: L.text("ds.legend.priority")) {
+                    ForEach(Priority.allCases, id: \.self) { priority in PriorityBadge(priority) }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(verbatim: L.text("ds.legend.title")))
+    }
+}
+
+private struct LegendGroup<Items: View>: View {
+    let title: String
+    @ViewBuilder let items: () -> Items
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.space2) {
+            Text(verbatim: title).font(Typo.eyebrow).foregroundStyle(Theme.muted).textCase(.uppercase).accessibilityAddTraits(.isHeader)
+            FlowLayout(spacing: Spacing.space2) { items() }
+        }
+    }
+}
+
+/// Acomoda las piezas en filas y pasa a la siguiente cuando no caben (texto grande incluido).
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let height = rows.reduce(CGFloat(0)) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
+        let width = rows.map(\.width).max() ?? 0
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: min(size.width, bounds.width), height: size.height))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let needed = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            if !current.indices.isEmpty && needed > width {
+                rows.append(current)
+                current = Row()
+            }
+            current.width = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            current.height = max(current.height, size.height)
+            current.indices.append(index)
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
     }
 }

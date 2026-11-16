@@ -206,7 +206,8 @@ struct LoadState<Value: Sendable, Content: View>: View {
         VStack(alignment: .leading, spacing: 14) {
             if let error = loader.error { ErrorStateView(message: error) { Task { await retry() } } }
             if let value = loader.value { content(value) }
-            else if loader.loading { LoadingStateView() }
+            // S3: después del ingreso no hay spinner; la sección reserva su lugar con un esqueleto.
+            else if loader.loading { Skeleton() }
         }
     }
 }
@@ -226,8 +227,8 @@ struct ScreenFrame<Content: View>: View {
     @ViewBuilder let content: () -> Content
     var body: some View {
         ScrollView {
+            // S1: sin título gigante; el título va en línea en la barra de navegación (HIG).
             VStack(alignment: .leading, spacing: 18) {
-                Text(title).font(Typo.title).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 content()
             }.padding(24).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
         }.background(Theme.bg).navigationTitle(title).navigationBarTitleDisplayMode(.inline)

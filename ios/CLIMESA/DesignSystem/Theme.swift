@@ -1,7 +1,9 @@
+import CoreText
 import SwiftUI
 import UIKit
 
-/// Tokens de diseño portados de web/src/styles.css (:root claro y prefers-color-scheme: dark).
+/// Tokens de diseño portados de web/src/styles.css (:root claro y prefers-color-scheme: dark) y de la tabla de la
+/// sección 7 de docs/diseno/fase2/02-sistema.md (los valores viven en `Core/DesignTokens.swift`, probados).
 /// Cada color cambia solo con el modo de la interfaz; no hay conjunto de colores aparte para el modo oscuro.
 extension UIColor {
     fileprivate convenience init(hex: UInt32) {
@@ -14,6 +16,9 @@ extension Color {
     init(light: UInt32, dark: UInt32) {
         self.init(uiColor: UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light) })
     }
+
+    /// Color dinámico a partir de un par de la tabla de tokens (`Core/DesignTokens.swift`).
+    init(_ pair: ColorPair) { self.init(light: pair.light, dark: pair.dark) }
 }
 
 enum Theme {
@@ -59,39 +64,177 @@ enum Theme {
         case .neutral: return (muted, bg)
         }
     }
+
+    // Fase 2, sección 7 de docs/diseno/fase2/02-sistema.md: áreas, estados y prioridad (claro y oscuro).
+    static let areaEmg = Color(Palette.areaEmg)
+    static let areaEmgSoft = Color(Palette.areaEmgSoft)
+    static let areaCon = Color(Palette.areaCon)
+    static let areaConSoft = Color(Palette.areaConSoft)
+    static let areaLab = Color(Palette.areaLab)
+    static let areaLabSoft = Color(Palette.areaLabSoft)
+    static let areaHos = Color(Palette.areaHos)
+    static let areaHosSoft = Color(Palette.areaHosSoft)
+    static let areaRec = Color(Palette.areaRec)
+    static let areaRecSoft = Color(Palette.areaRecSoft)
+    static let areaAmb = Color(Palette.areaAmb)
+    static let areaAmbSoft = Color(Palette.areaAmbSoft)
+    static let areaGen = Color(Palette.areaGen)
+    static let areaGenSoft = Color(Palette.areaGenSoft)
+    static let onArea = Color(Palette.onArea)
+    static let statusEspera = Color(Palette.statusEspera)
+    static let statusEsperaSoft = Color(Palette.statusEsperaSoft)
+    static let statusLlamado = Color(Palette.statusLlamado)
+    static let statusLlamadoSoft = Color(Palette.statusLlamadoSoft)
+    static let statusAtencion = Color(Palette.statusAtencion)
+    static let statusAtencionSoft = Color(Palette.statusAtencionSoft)
+    static let statusListo = Color(Palette.statusListo)
+    static let statusListoSoft = Color(Palette.statusListoSoft)
+    static let statusCerrado = Color(Palette.statusCerrado)
+    static let statusCerradoSoft = Color(Palette.statusCerradoSoft)
+    static let onStatus = Color(Palette.onStatus)
+    static let critical = Color(Palette.critical)
+    static let criticalSoft = Color(Palette.criticalSoft)
+    static let priorityUrgente = Color(Palette.priorityUrgente)
+    static let priorityUrgenteSoft = Color(Palette.priorityUrgenteSoft)
+    static let priorityRutina = Color(Palette.priorityRutina)
+    static let priorityRutinaSoft = Color(Palette.priorityRutinaSoft)
+
+    /// Color fuerte y tinte de un área (franja, chip y texto; fondo de tarjeta).
+    static func colors(for area: AreaCode) -> (strong: Color, soft: Color) { (Color(area.strong), Color(area.soft)) }
+    /// Color fuerte y tinte de una familia de estado.
+    static func colors(for family: StatusFamily) -> (strong: Color, soft: Color) { (Color(family.strong), Color(family.soft)) }
+    /// Color fuerte y tinte de una prioridad (emergencia usa el rojo crítico como relleno).
+    static func colors(for priority: Priority) -> (strong: Color, soft: Color) { (Color(priority.strong), Color(priority.soft)) }
 }
 
-/// Escala de espaciado (múltiplos de 4 puntos).
+/// Escala de espaciado (múltiplos de 4 puntos). `space1`...`space12` son los tokens de la sección 7; los nombres cortos
+/// (`xs`...`xxl`) quedan como alias para las pantallas sin migrar.
 enum Spacing {
-    static let xs: CGFloat = 4
-    static let s: CGFloat = 8
-    static let m: CGFloat = 12
-    static let l: CGFloat = 16
-    static let xl: CGFloat = 24
-    static let xxl: CGFloat = 32
-    /// Alto mínimo de un control táctil (min-height: 48px en web).
+    static let space1 = CGFloat(SpaceToken.space1)
+    static let space2 = CGFloat(SpaceToken.space2)
+    static let space3 = CGFloat(SpaceToken.space3)
+    static let space4 = CGFloat(SpaceToken.space4)
+    static let space5 = CGFloat(SpaceToken.space5)
+    static let space6 = CGFloat(SpaceToken.space6)
+    static let space8 = CGFloat(SpaceToken.space8)
+    static let space10 = CGFloat(SpaceToken.space10)
+    static let space12 = CGFloat(SpaceToken.space12)
+    static let xs: CGFloat = space1
+    static let s: CGFloat = space2
+    static let m: CGFloat = space3
+    static let l: CGFloat = space4
+    static let xl: CGFloat = space6
+    static let xxl: CGFloat = space8
+    /// Alto mínimo de un control táctil (min-height: 48px en web; HIG pide al menos 44 pt).
     static let control: CGFloat = 48
 }
 
-/// Radios de esquina: --radius-control, --radius-card y --radius-panel.
+/// Radios de esquina: chip 4, control 6, tarjeta 10, panel 16. Anidados: interno = externo − padding.
 enum Radius {
-    static let control: CGFloat = 6
-    static let card: CGFloat = 10
-    static let panel: CGFloat = 16
+    static let chip = CGFloat(RadiusToken.chip)
+    static let control = CGFloat(RadiusToken.control)
+    static let card = CGFloat(RadiusToken.card)
+    static let panel = CGFloat(RadiusToken.panel)
 }
 
-/// Estilos de texto. Escalan con Dynamic Type; DM Sans y IBM Plex Mono vienen en el paquete de la app.
+/// Movimiento solo como respuesta (100-200 ms, curva `cubic-bezier(0.2, 0, 0, 1)`). Con «Reducir movimiento»
+/// (`accessibilityReduceMotion`) devuelve `nil`: el cambio ocurre sin animación.
+enum Motion {
+    static let instant = MotionToken.instant
+    static let fast = MotionToken.fast
+    static let standard = MotionToken.standard
+
+    static func feedback(_ duration: Double = MotionToken.fast, reduceMotion: Bool) -> Animation? {
+        guard let value = MotionToken.duration(duration, reduceMotion: reduceMotion) else { return nil }
+        return .timingCurve(0.2, 0, 0, 1, duration: value)
+    }
+}
+
+/// Atkinson Hyperlegible Next (texto) y Mono (códigos, horas, números de ficha), fuentes variables declaradas en
+/// `Info.plist` (`UIAppFonts`). Cada peso usa su instancia con nombre; si iOS no la expone, se pide el peso a la
+/// familia. `relativeTo:` respeta Dynamic Type.
+enum Atkinson {
+    enum Weight: String {
+        case regular = "Regular", medium = "Medium", semibold = "SemiBold", bold = "Bold"
+
+        var swiftUI: Font.Weight {
+            switch self {
+            case .regular: return .regular
+            case .medium: return .medium
+            case .semibold: return .semibold
+            case .bold: return .bold
+            }
+        }
+
+        /// Value on the variable font's `wght` axis (200-800).
+        var axisValue: Double {
+            switch self {
+            case .regular: return 400
+            case .medium: return 500
+            case .semibold: return 600
+            case .bold: return 700
+            }
+        }
+    }
+
+    static func text(_ size: CGFloat, _ weight: Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
+        font(prefix: "AtkinsonHyperlegibleNext", base: "AtkinsonHyperlegibleNext-Regular", size: size, weight: weight, style: style)
+    }
+
+    /// Mono con cifras tabulares (horas, contadores, números de ficha y de expediente).
+    static func mono(_ size: CGFloat, _ weight: Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
+        font(prefix: "AtkinsonHyperlegibleMono", base: "AtkinsonHyperlegibleMono-ExtraLight", size: size, weight: weight, style: style).monospacedDigit()
+    }
+
+    /// The bundled files are variable fonts whose named instances have no PostScript names, and the Mono default
+    /// instance is ExtraLight. The weight is therefore set on the `wght` axis of the base font, and the result is scaled
+    /// with Dynamic Type for its text style. The scale is taken when the font is built (the `Typo` fonts are static), so
+    /// a text-size change applies after the app is relaunched.
+    private static func font(prefix: String, base: String, size: CGFloat, weight: Weight, style: Font.TextStyle) -> Font {
+        guard let baseFont = UIFont(name: base, size: size) else { return .system(size: size, weight: weight.swiftUI) }
+        let variation = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
+        let wghtAxis = NSNumber(value: 0x7767_6874) // 'wght'
+        let descriptor = baseFont.fontDescriptor.addingAttributes([variation: [wghtAxis: NSNumber(value: weight.axisValue)]])
+        let weighted = UIFont(descriptor: descriptor, size: size)
+        return Font(UIFontMetrics(forTextStyle: style.uiKitStyle).scaledFont(for: weighted))
+    }
+}
+
+/// Estilos de texto. Escalan con Dynamic Type. Título de módulo: 20 pt, peso 700 (`heading`).
+/// Contadores, horas y números de registro usan cifras tabulares (`.monospacedDigit()`).
 enum Typo {
-    static let display = Font.custom("DMSans-Bold", size: 34, relativeTo: .largeTitle)
-    static let title = Font.custom("DMSans-Bold", size: 26, relativeTo: .title)
-    static let heading = Font.custom("DMSans-Bold", size: 20, relativeTo: .title3)
-    static let subheading = Font.custom("DMSans-Bold", size: 16, relativeTo: .headline)
-    static let body = Font.custom("DMSans-Regular", size: 16, relativeTo: .body)
-    static let label = Font.custom("DMSans-Bold", size: 14, relativeTo: .subheadline)
-    static let small = Font.custom("DMSans-Regular", size: 13, relativeTo: .footnote)
-    static let caption = Font.custom("DMSans-Regular", size: 12, relativeTo: .caption)
-    static let tag = Font.custom("DMSans-Bold", size: 12, relativeTo: .caption)
-    static let stat = Font.custom("DMSans-Bold", size: 38, relativeTo: .largeTitle)
-    static let eyebrow = Font.custom("IBMPlexMono-Regular", size: 12, relativeTo: .caption)
-    static let mono = Font.custom("IBMPlexMono-Regular", size: 13, relativeTo: .footnote)
+    static let display = Atkinson.text(34, .bold, relativeTo: .largeTitle)
+    static let title = Atkinson.text(26, .bold, relativeTo: .title)
+    static let heading = Atkinson.text(20, .bold, relativeTo: .title3)
+    static let subheading = Atkinson.text(16, .bold, relativeTo: .headline)
+    static let body = Atkinson.text(16, .regular, relativeTo: .body)
+    static let label = Atkinson.text(14, .bold, relativeTo: .subheadline)
+    static let small = Atkinson.text(13, .regular, relativeTo: .footnote)
+    static let caption = Atkinson.text(12, .regular, relativeTo: .caption)
+    static let tag = Atkinson.text(12, .bold, relativeTo: .caption).monospacedDigit()
+    static let stat = Atkinson.text(38, .bold, relativeTo: .largeTitle).monospacedDigit()
+    static let eyebrow = Atkinson.mono(12, .regular, relativeTo: .caption)
+    static let mono = Atkinson.mono(13, .regular, relativeTo: .footnote)
+    /// Número de turno o ficha en grande.
+    static func number(_ size: CGFloat) -> Font { Atkinson.text(size, .bold, relativeTo: .largeTitle).monospacedDigit() }
+}
+
+private extension Font.TextStyle {
+    /// UIKit text style used to scale an Atkinson font with Dynamic Type.
+    var uiKitStyle: UIFont.TextStyle {
+        switch self {
+        case .largeTitle: return .largeTitle
+        case .title: return .title1
+        case .title2: return .title2
+        case .title3: return .title3
+        case .headline: return .headline
+        case .subheadline: return .subheadline
+        case .callout: return .callout
+        case .footnote: return .footnote
+        case .caption: return .caption1
+        case .caption2: return .caption2
+        case .body: return .body
+        @unknown default: return .body
+        }
+    }
 }
