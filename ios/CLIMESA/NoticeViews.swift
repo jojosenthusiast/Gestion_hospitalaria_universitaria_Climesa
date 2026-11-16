@@ -17,6 +17,8 @@ final class NoticeInboxModel {
     private(set) var hidden: Set<String> = []
     /// One flag spans the whole action (write, then reread), so a double tap cannot submit twice.
     private(set) var busy = false
+    /// Notice whose last action failed; its message shows only under that notice, never under another one.
+    private(set) var failedNotice: String?
     let submission = Submission()
     private var current: Task<Void, Never>?
     private var generation = 0
@@ -51,6 +53,7 @@ final class NoticeInboxModel {
     func send(_ verb: Verb, _ notice: InboxNotice, success: String? = nil, _ makeClient: () throws -> APIClient) async {
         guard !busy else { return }
         busy = true
+        failedNotice = notice.id
         defer { busy = false }
         let api: APIClient
         do { api = try makeClient() } catch { submission.error = error.userMessage; return }
@@ -59,11 +62,11 @@ final class NoticeInboxModel {
         let ok = await submission.run("\(notice.id)-\(verb.rawValue)", body: body, success: success) { key in
             _ = try await api.send("POST", path, body: body, key: key, as: NoticeAck.self)
         }
-        if ok { hidden.insert(notice.id) } else if let failure = submission.lastFailure { submission.error = NoticeRules.actionMessage(failure) }
+        if ok { hidden.insert(notice.id); failedNotice = nil } else if let failure = submission.lastFailure { submission.error = NoticeRules.actionMessage(failure) }
         await load(makeClient)
     }
 
-    func clearMessages() { submission.error = nil; submission.notice = nil }
+    func clearMessages() { submission.error = nil; submission.notice = nil; failedNotice = nil }
 }
 
 extension View {
@@ -103,7 +106,7 @@ struct CriticalNoticeBanner: View {
                     Text(verbatim: notice.title).font(Typo.heading).foregroundStyle(Theme.ink)
                         .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
                     Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                    if let error = model.submission.error { PatientNotice(text: error, failure: true) }
+                    if model.failedNotice == notice.id, let error = model.submission.error { PatientNotice(text: error, failure: true) }
                     ClimesaButton(title: L.text("notices.ack"), loading: model.busy) {
                         Task { await model.send(.enterado, notice) { try account.client() } }
                     }
@@ -249,7 +252,7 @@ struct NoticeDetailView: View {
                     MetaLine(label: L.text("notices.remind"), value: ClimesaDates.display(remind))
                 }
             }
-            if let error = model.submission.error { PatientNotice(text: error, failure: true) }
+            if model.failedNotice == notice.id, let error = model.submission.error { PatientNotice(text: error, failure: true) }
             if let done = model.submission.notice { PatientNotice(text: done) }
             if let acknowledged = notice.acknowledgedAt {
                 HStack(spacing: Spacing.s) {
