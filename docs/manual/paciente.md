@@ -29,6 +29,8 @@ Secciones: Inicio, Mi turno, Mis citas, Mis exámenes, Vincular expediente, Mi h
 
 Pestañas: Inicio, Fila, Citas, Exámenes y **Más** (Vincular expediente, si todavía no lo vinculaste; Mis datos, Mi historial, Mi habitación, Pedir ambulancia, Información del hospital, Ubicación, Quién vio mi expediente y Perfil).
 
+En **Inicio**, cada tarjeta (fila, próxima cita, exámenes) abre su pestaña al tocarla. Si tu cuenta no está vinculada, **Vincular expediente** abre el formulario directamente.
+
 ## Mi turno (Fila)
 
 Muestra tu número y su estado: "Esperando a que el médico llame", "Llamado N de M". En iOS, cuando te llaman: "¡Es tu turno! Pasa al *consultorio*". Si no te presentas después de los llamados exigidos, el número se marca como ausente.
@@ -63,6 +65,7 @@ Tu historial clínico revisado: consultas firmadas, diagnósticos, recetas y res
 ## Pedir ambulancia
 
 - **Pedir ambulancia** con el motivo y la ubicación. La app recuerda: "Si hay riesgo de vida, llama al 911."
+- En iOS, la dirección y el teléfono vienen llenos con los de **Mis datos**; cámbialos si estás en otro lugar.
 - Ves el estado de tu solicitud. **Cancelar solicitud** solo mientras está por confirmar.
 
 ## Hospital
@@ -71,7 +74,7 @@ Información pública: ocupación por planta, médicos de turno y avisos. En iOS
 
 ## Quién vio mi expediente
 
-Lista quién consultó tus datos: fecha, rol y motivo, sin el nombre de la persona. En Android, **Actualizar** vuelve a cargar la lista.
+Lista quién consultó tus datos: rol, qué vio, motivo y fecha, sin el nombre de la persona. En Android, **Actualizar** vuelve a cargar la lista.
 
 ## Mis datos (Perfil)
 

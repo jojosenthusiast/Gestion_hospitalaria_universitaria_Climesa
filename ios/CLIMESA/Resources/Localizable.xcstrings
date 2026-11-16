@@ -4906,6 +4906,39 @@
           }
         }
       }
+    },
+    "ambulance.prefilled": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usamos la dirección y el teléfono de Mis datos. Cámbialos si estás en otro lugar."
+          }
+        }
+      }
+    },
+    "accesses.row": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ vio: %2$@"
+          }
+        }
+      }
+    },
+    "accesses.reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motivo: %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -87,6 +87,13 @@ final class RoleFlowRulesTests: XCTestCase {
         XCTAssertEqual(noProfile.phone, "")
     }
 
+    func testUnRechazoDeCampoDelFormularioSeNombraEnEspanol() {
+        XCTAssertEqual(ProblemText.fieldLabel("contactPhone"), "teléfono")
+        XCTAssertEqual(ProblemText.fieldLabel("address"), "dirección")
+        XCTAssertEqual(ProblemText.fieldLabel("items[0].dose"), "receta")
+        XCTAssertEqual(ProblemText.codeMessage("validacion", field: "exams"), "Revisa el dato «exámenes» e inténtalo de nuevo.")
+    }
+
     // MARK: - Ambulance log filters
 
     func testLosFiltrosDeLaBitacoraSeAplicanAlCambiar() {

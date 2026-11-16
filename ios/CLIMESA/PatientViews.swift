@@ -26,10 +26,16 @@ struct PatientHomeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if profile.patientId == nil {
+                // S13: while the account is not linked, linking is the one thing to do: open the form in one tap.
                 SectionCard {
                     Text("home.unlinked.title").font(Typo.subheading).foregroundStyle(Theme.ink)
                     Text("home.unlinked.body").font(Typo.small).foregroundStyle(Theme.muted)
-                    ClimesaButton(title: L.text("home.unlinked.action"), kind: .secondary) { go(.mas) }
+                    if profile.hasPermission(AppSection.vinculacion.requiredPermission ?? "") {
+                        NavigationLink { PatientSectionView(section: .vinculacion, profile: profile) } label: { Text("home.unlinked.action") }
+                            .buttonStyle(ClimesaButtonStyle())
+                    } else {
+                        ClimesaButton(title: L.text("home.unlinked.action"), kind: .secondary) { go(.mas) }
+                    }
                 }
             }
             LoadState(loader: loader, retry: load) { home in
@@ -99,11 +105,35 @@ struct PatientHomeView: View {
     }
 }
 
+/// S13: a home card opens its tab when tapped; a compact "Ver ›" replaces a full-width button per card.
+private struct HomeCardLink<Content: View>: View {
+    let eyebrow: String
+    let open: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        Button(action: open) {
+            SectionCard(eyebrow: eyebrow) {
+                content()
+                HStack(spacing: Spacing.xs) {
+                    Spacer()
+                    Text("home.open").font(Typo.label).foregroundStyle(Theme.primaryText)
+                    Image(systemName: "chevron.right").font(Typo.small).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
 private struct HomeQueueCard: View {
     let ticket: QueueTicket?
     let open: () -> Void
     var body: some View {
-        SectionCard(eyebrow: L.text("home.queue")) {
+        HomeCardLink(eyebrow: L.text("home.queue"), open: open) {
             if let ticket {
                 HStack(alignment: .center) {
                     Text(verbatim: "\(ticket.number)").font(Typo.stat).foregroundStyle(Theme.ink)
@@ -114,7 +144,6 @@ private struct HomeQueueCard: View {
             } else {
                 EmptyNote("home.queue.none")
             }
-            ClimesaButton(title: L.text("home.open"), kind: .secondary, action: open)
         }
     }
 }
@@ -123,7 +152,7 @@ private struct HomeAppointmentCard: View {
     let appointment: Appointment?
     let open: () -> Void
     var body: some View {
-        SectionCard(eyebrow: L.text("home.appointment")) {
+        HomeCardLink(eyebrow: L.text("home.appointment"), open: open) {
             if let appointment {
                 ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName) {
                     PatientTag(appointment.state.rawValue, label: appointment.state.label)
@@ -131,7 +160,6 @@ private struct HomeAppointmentCard: View {
             } else {
                 EmptyNote("home.appointment.none")
             }
-            ClimesaButton(title: L.text("home.open"), kind: .secondary, action: open)
         }
     }
 }
@@ -140,14 +168,13 @@ private struct HomeLabCard: View {
     let labs: [LabOrder]
     let open: () -> Void
     var body: some View {
-        SectionCard(eyebrow: L.text("home.labs")) {
+        HomeCardLink(eyebrow: L.text("home.labs"), open: open) {
             let pending = labs.filter { $0.reviewedAt == nil && $0.state != .cancelado }.count
             let ready = labs.filter { $0.reviewedAt != nil }.count
             HStack(spacing: Spacing.m) {
                 StatTile(value: String(pending), label: L.text("ds.paciente.home.pending"))
                 StatTile(value: String(ready), label: L.text("ds.paciente.home.ready"))
             }
-            ClimesaButton(title: L.text("home.open"), kind: .secondary, action: open)
         }
     }
 }
@@ -568,7 +595,7 @@ struct PatientExamsView: View {
                         NavigationLink {
                             ScreenFrame(title: "exams.detail") { LabOrderDetail(order: order, showValues: PatientLabRules.showsValues(order)) }
                         } label: {
-                            LabOrderRow(order: order, status: PatientLabRules.statusText(order), critical: false)
+                            LabOrderRow(order: order, status: PatientLabRules.statusText(order), critical: false, showPatient: false)
                         }.buttonStyle(.plain)
                     }
                 }
@@ -584,15 +611,18 @@ struct LabOrderRow: View {
     let order: LabOrder
     let status: String
     let critical: Bool
+    /// The patient's own list does not repeat their name on every row.
+    var showPatient = true
     var body: some View {
         SectionCard {
-            ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: order.patientName,
+            ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: showPatient ? order.patientName : nil,
                     meta: ClimesaDates.display(order.completedAt ?? order.createdAt)) {
                 Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
             }
             HStack(spacing: Spacing.s) {
                 PatientTag(order.reviewedAt != nil ? "firmada" : order.state.rawValue, label: status)
-                if order.priority == .urgente { PatientTag("llamado", label: order.priority.label) }
+                // Priority uses the priority badge (amber), not a queue state family.
+                if order.priority == .urgente { PriorityBadge(order.priority.rawValue) }
                 if critical { PatientTag("critico_alto", label: L.text("results.critical")) }
             }
         }
@@ -607,7 +637,12 @@ struct LabOrderDetail: View {
     var staffView = false
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            PatientTag(order.state.rawValue, label: order.state.label)
+            if staffView {
+                PatientTag(order.state.rawValue, label: order.state.label)
+            } else {
+                // Same wording as the list: a completed order not yet reviewed stays "En revisión médica".
+                PatientTag(order.reviewedAt != nil ? "firmada" : order.state.rawValue, label: PatientLabRules.statusText(order))
+            }
             // Solo el paciente ve este aviso (sin valores): el médico ve los valores y su propia etiqueta.
             // S10: orden externa. El paciente ve dónde hacerse el examen y las instrucciones tal como se escribieron.
             if order.external {
@@ -885,6 +920,8 @@ struct AmbulanceRequestView: View {
     @State private var reason = ""
     @State private var phone = ""
     @State private var errors: [String: String] = [:]
+    /// S13: true once the contact on file filled the form, to say where the data came from.
+    @State private var prefilled = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -900,6 +937,7 @@ struct AmbulanceRequestView: View {
             }
         }
         .task(id: live.snapshot.version(.ambulance)) { await load() }
+        .task { await prefill() }
         .sheet(item: $cancelling) { request in cancelSheet(request) }
     }
 
@@ -940,10 +978,11 @@ struct AmbulanceRequestView: View {
     private var form: some View {
         VStack(alignment: .leading, spacing: 16) {
                 SectionCard {
-                    PatientTextArea(label: L.text("ambulance.address"), text: $address, lines: 1...3, error: errors["address"])
+                    if prefilled { Text("ambulance.prefilled").font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true) }
+                    PatientTextArea(label: L.text("ambulance.address"), text: $address, lines: 1...3, error: errors["address"] ?? submission.fieldErrors["address"])
                     FormField(label: L.text("ambulance.municipality"), text: $municipality)
-                    PatientTextArea(label: L.text("ambulance.reason"), text: $reason, lines: 2...5, error: errors["reason"])
-                    FormField(label: L.text("ambulance.phone"), text: $phone, error: errors["contactPhone"])
+                    PatientTextArea(label: L.text("ambulance.reason"), text: $reason, lines: 2...5, error: errors["reason"] ?? submission.fieldErrors["reason"])
+                    FormField(label: L.text("ambulance.phone"), text: $phone, error: errors["contactPhone"] ?? submission.fieldErrors["contactPhone"])
                         .keyboardType(.phonePad).textContentType(.telephoneNumber)
                 }
                 PatientSubmissionNotice(submission: submission)
@@ -952,6 +991,18 @@ struct AmbulanceRequestView: View {
     }
 
     private func load() async { await loader.load { try await account.client().get("/ambulancia/solicitudes/mias", as: [OwnAmbulanceRequest].self) } }
+
+    /// Fills address and phone from "Mis datos" (`GET /me/paciente`) without overwriting what was typed. Best effort:
+    /// if the read fails, the form stays empty and works as before.
+    private func prefill() async {
+        guard let profile = account.profile, profile.patientId != nil,
+              profile.hasPermission(AppSection.misDatos.requiredPermission ?? "") else { return }
+        guard let patient = try? await account.client().get("/me/paciente", as: PatientProfile.self) else { return }
+        let filled = AmbulancePrefillRules.prefill(address: address, phone: phone, from: patient)
+        prefilled = filled.address != address || filled.phone != phone
+        address = filled.address
+        phone = filled.phone
+    }
 
     private func cancel(_ request: OwnAmbulanceRequest) async {
         let body = AmbulanceCancelBody(version: request.version, reason: cancelReason)
@@ -984,7 +1035,8 @@ struct MyAccessView: View {
             if rows.isEmpty { EmptyStateView(title: L.text("accesses.none"), symbol: "eye.slash") }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 SectionCard {
-                    ListRow(title: ClimesaDates.display(row.date), subtitle: row.reason, meta: "\(row.role) · \(row.dataType)")
+                    ListRow(title: String(format: L.text("accesses.row"), row.role, row.dataType),
+                            subtitle: String(format: L.text("accesses.reason"), row.reason), meta: ClimesaDates.display(row.date))
                 }
             }
         }
