@@ -14,7 +14,7 @@ Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#
 | Bitácora de ambulancia | Consultar los servicios, sin datos del paciente |
 | Auditoría | Buscar, revisar, exportar y verificar la cadena |
 | Métricas | Indicadores |
-| Avisos | Tus avisos y **Enterado** (ver `README.md`, "Avisos (web)") |
+| Avisos | Tus avisos y **Enterado** (ver `README.md`, "Avisos") |
 | Perfil | Tu cuenta |
 
 ## Inicio

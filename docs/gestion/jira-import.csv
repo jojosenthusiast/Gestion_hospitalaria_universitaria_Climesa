@@ -264,7 +264,7 @@ Criterios de aceptación:
 - Mi teléfono avisa al ser llamado
 
 Pantallas: W29, A31, A40, A05, I05
-Requisitos: FR-105-01, FR-105-02, FR-105-03, FR-105-04, FR-105-06",5,High,SGHU Sprint 3,spec-105,,comp-backend,comp-android,comp-ios,To Do
+Requisitos: FR-105-01, FR-105-02, FR-105-03, FR-105-04, FR-105-06",5,High,SGHU Sprint 3,spec-105,,comp-backend,comp-android,comp-ios,In Progress
 56,6,Story,HU-105-2 Agendar citas sin traslapes con la disponibilidad del médico,"Como recepcionista, quiero agendar citas sin traslapes con la disponibilidad del médico, para ordenar la consulta.
 
 Criterios de aceptación:
@@ -973,7 +973,7 @@ Depende de: las demás subtareas
 Cubre: criterios de la historia",,Low,,spec-104,nivel-R,comp-qa,,,To Do
 221,55,Subtask,"105-T02 Emitir, llamar y cambiar estado de números con reinicio diario","Hecho cuando: pruebas de transiciones válidas e inválidas y de cambio de día
 Depende de: T01
-Cubre: FR-105-01, FR-105-02, FR-105-03, FR-105-04",,High,,spec-105,nivel-R,comp-backend,,,To Do
+Cubre: FR-105-01, FR-105-02, FR-105-03, FR-105-04",,High,,spec-105,nivel-R,comp-backend,,,Done
 222,55,Subtask,105-T03-AND Mi número en la app del paciente y fila del consultorio (Android),"Hecho cuando: escenario 2 pasa en Android e iOS
 Depende de: T02, 121-T03, 122-T03
 Cubre: FR-105-06",,High,,spec-105,nivel-R,comp-android,,,To Do

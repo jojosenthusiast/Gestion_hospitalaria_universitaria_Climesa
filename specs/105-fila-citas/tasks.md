@@ -5,15 +5,18 @@
   - Depende de: 100-T03
   - Hecho cuando: escenarios 1 y 4 pasan como pruebas concurrentes
   - Verificado: Aplicada en Supabase; 02_concurrencia.sh casos 1 (50 números distintos) y 6 (1 cita de 2 simultáneas) (histórico: comprobación manual del 17-oct-2026 en la nube; evidencia repetible en el job `postgres-native` de `.github/workflows/supabase.yml`, que corre `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` contra PostgreSQL nativo)
-- [ ] T02 · S3 · R · Emitir, llamar y cambiar estado de números con reinicio diario
+- [x] T02 · S3 · R · Emitir, llamar y cambiar estado de números con reinicio diario
   - Cubre: FR-105-01 a FR-105-04
   - Depende de: T01
   - Hecho cuando: pruebas de transiciones válidas e inválidas y de cambio de día
+  - Verificado: 16-nov-2026, CI `API` en verde en el merge de #141 (0e38f56): `api/tests/fase2-fila-tablero.spec.ts` (18 pruebas: número por área desde 1, prioridad, regla de quién pasa después, deshacer el llamado, la regla llamado → atención se mantiene, llamar siguiente serializado por servicio) y `api/tests/fase01-citas-fila.spec.ts` (la base rechaza "no se presentó" sin los llamados, los números abiertos de días anteriores se cierran solos con auditoría, no se inicia consulta con un número de un día anterior). Migraciones 20261125001000, 20261125003000 y 20261125008000 aplicadas en producción
+  - Avance 16-nov-2026 (Fase 2, PR #124, #130, #141): recepción recibe `fila.llamar` y llama el siguiente desde la web; prioridad Rutina, Urgente o Emergencia; número por área con su código (**CON 7**); marca **Cita 10:30** o **Sin cita**; regla fija del servidor para quién pasa después (`GET /fila/siguiente`); deshacer el último llamado; `/fila` informa `calledByColleague` (llamó otra cuenta con `consulta.iniciar`) sin decir quién
 - [ ] T03 · S3 · R · Mi número en la app del paciente y fila del consultorio
   - Cubre: FR-105-06
   - Depende de: T02, 121-T03, 122-T03
   - Hecho cuando: escenario 2 pasa en Android e iOS
   - Avance 14-nov-2026 (iOS): I05 (número grande, estimación de cuántos faltan con `/publico/fila/{servicio}`, consultorio y vibración al pasar a Llamado), I06 (pedir con disponibilidad, cancelar con motivo y versión) e I20 (llamar siguiente con `POST /fila/{id}/llamar`). compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
+  - Avance 16-nov-2026 (Fase 2, PR #130, #137, #138): tablero de la fila con **Quién pasa después**, **Mover o cambiar prioridad** y **Deshacer** en Android (Emitir número, Mi consultorio y Mi día) e iOS (Mi día). Android e iOS todavía deciden el llamado propio en memoria y no usan `calledByColleague` de `/fila`. CI de Android e iOS en verde; sin probar a mano en un teléfono
 - [ ] T04 · S3 · R · Agenda, disponibilidad, agendar y cancelar
   - Cubre: FR-105-07, FR-105-09, FR-105-10, FR-105-12
   - Depende de: T01, 103-T06
@@ -22,6 +25,7 @@
   - Cubre: FR-105-08
   - Depende de: T04, 101-T07
   - Hecho cuando: escenario 3 pasa
+  - Avance 16-nov-2026 (Fase 2, PR #132): solicitud de cita por categoría sin médico (hasta tres categorías con ícono, búsqueda por motivo, franja preferida, nota y médico preferido opcional) en Android e iOS; bandeja **Solicitudes por asignar** de recepción en web y Android, con asignación prellenada de médico y hora, rechazo con motivo y auditoría. Una solicitud por categoría cuenta para el límite CITA-07 solo 14 días (RN-20a). Migración 20261125002000 aplicada (2 tablas, 14 categorías). Pruebas: `api/tests/fase2-citas-categoria.spec.ts` (12), que incluye la solicitud con médico y hora de antes. **Sigue abierta**: el escenario 3 completo (aviso en vivo al paciente al confirmar) no se probó de punta a punta
 - [ ] T06 · S5 · E · Pantalla pública de llamados y "no se presentó" automático
   - Cubre: FR-105-05, FR-105-11, FR-112-06
   - Depende de: T02, 112-T02

@@ -11,7 +11,10 @@ AST y ENF comparten un catálogo de estación de cuidado; cada cuenta ve solo la
 
 ## Mi consultorio
 
-- **Llamar siguiente** → **Llamar**: llama al primer número en espera. El paciente lo ve en su app.
+- Con **Todos** elegido, **Llamar siguiente** → **Llamar** llama al siguiente número del servicio que elijas. Al elegir un servicio en los filtros aparece **Quién pasa después**: el número propuesto según la regla de la fila (*emergencias primero; luego urgentes; luego citas dentro de su ventana de 15 min antes a 15 min después; luego el resto en orden de llegada*), y **Llamar siguiente** llama a ese número. El paciente lo ve en su app.
+- Cada número muestra el código del área (**CON 7**), la prioridad, si tiene cita (**Cita 10:30**) o no (**Sin cita**) y cuánto lleva esperando.
+- Después de llamar puedes **Deshacer** el llamado: el número vuelve a la espera. Con 2 o más llamados, **Mover o cambiar prioridad** ofrece **Quitar un llamado**.
+- **Mover o cambiar prioridad** ofrece solo los cambios que el servidor acepta en ese momento, incluido cambiar la prioridad mientras el número espera o está llamado.
 - En cada número, según lo que permita el servidor: **Llamar** o **Llamar de nuevo**, **Atender**, **Completar** y **No se presentó**.
 - **No se presentó** solo se permite después de los llamados exigidos (3 por omisión). Antes, la app explica: "Todavía no se completan los llamados necesarios para marcar la ausencia."
 

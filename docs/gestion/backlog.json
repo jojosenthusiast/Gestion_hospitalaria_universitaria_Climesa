@@ -1146,7 +1146,7 @@
     "FR-105-04",
     "FR-105-06"
    ],
-   "estado": "Por hacer",
+   "estado": "En curso",
    "pivote": false,
    "jira": "SCRUM-58",
    "orden": 30
@@ -4101,7 +4101,7 @@
    "componente": "BE",
    "resumen": "Emitir, llamar y cambiar estado de números con reinicio diario",
    "hecho_cuando": "pruebas de transiciones válidas e inválidas y de cambio de día",
-   "estado": "Por hacer",
+   "estado": "Hecho",
    "cubre": "FR-105-01, FR-105-02, FR-105-03, FR-105-04",
    "depende": "T01",
    "nivel": "R",

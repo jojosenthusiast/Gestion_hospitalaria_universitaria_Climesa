@@ -17,16 +17,19 @@
   - Cubre: FR-107-04 a FR-107-07
   - Depende de: T03, 120-T03, 121-T03
   - Hecho cuando: una orden recorre los tres estados desde web y desde Android con la cola en vivo
+  - Avance 16-nov-2026 (Fase 2, PR #131): la cola web agrupa las órdenes por etapa (liberadas y canceladas empiezan plegadas), filtra **Solo urgentes** y **Con valores críticos**, completa por lote y pliega las fechas en **Datos de la orden**; la prioridad urgente va en ámbar y el rojo queda solo para valores críticos. **Sigue abierta**: el recorrido de una orden desde Android con la cola en vivo
 - [ ] T05 · S4 · R · Revisión médica y vista del paciente
   - Cubre: FR-107-10, FR-107-11
   - Depende de: T03
   - Hecho cuando: escenario 1 completo pasa en iOS y Android
   - Avance 13-nov-2026: `GET /me/laboratorio` (`resultados.ver`): el paciente ve siempre el estado de sus órdenes y los valores solo tras la revisión médica (D-040); una cuenta sin vincular recibe 404. Prueba en `api/tests/paciente-vinculacion-historial.spec.ts` (sin valor antes de `revisar`, con marca después). Android A07 usa `/me/laboratorio` y muestra "En revisión médica" mientras falta la revisión. **Sigue abierta**: falta iOS y el escenario 1 completo en dispositivo.
   - Avance 14-nov-2026 (iOS): I07 (`GET /me/laboratorio`, valores solo revisados) e I23 (pendientes con críticos arriba, `POST /laboratorio/ordenes/{id}/revisar`). compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
+  - Avance 16-nov-2026 (Fase 2, PR #131, #134, #139, #142): bandeja **Resultados por revisar** del médico (valor crítico u observación marcada como relevante) con **Marcar como revisado**; órdenes externas (**Se realiza en otro sitio**, **Cargar resultado externo** con valores clave); propuesta de cita de seguimiento a recepción al completarse la orden. Los adjuntos (foto o PDF, hasta 10 MiB) van a un bucket privado de Supabase; la descarga usa un enlace firmado de 5 minutos y queda en la auditoría. El paciente nunca ve el adjunto ni la observación interna. Web sube y descarga; Android abre y sube; iOS solo abre (**Ver archivo**). Migraciones 20261125004000, 20261125006000 y 20261125006100 aplicadas. Pruebas: `api/tests/laboratorio-seguimiento.spec.ts` (21) y `api/tests/laboratorio-adjuntos.spec.ts` (15). **Sigue abierta**: el escenario 1 en un dispositivo
 - [ ] T06 · S5 · E · Aviso de valor crítico con push
   - Cubre: FR-107-08
   - Depende de: T03, 100-T10
   - Hecho cuando: escenario 2 pasa y el médico recibe push con la app cerrada
+  - Avance 16-nov-2026 (Fase 2, PR #131): un valor crítico crea siempre un pendiente en **Resultados por revisar** del médico que pidió la orden, además del evento `laboratorio.critico`. **Sigue abierta**: no hay push (FCM ni APNs)
 - [ ] T07 · S5 · E · Corrección de valores con historial
   - Cubre: FR-107-12
   - Depende de: T03

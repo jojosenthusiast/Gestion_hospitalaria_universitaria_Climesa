@@ -11,7 +11,7 @@ Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#
 
 Inicio, Pacientes, Vinculaciones, Camas, Edificio, Ambulancia, Bitácora de ambulancia, Turnos, Hospitalización, Fila del día, Citas, Avisos y Perfil.
 
-**Avisos**: tus avisos, con los críticos primero, y **Enterado**. Un aviso crítico para Recepción sale arriba en Inicio hasta que pulsas **Enterado** (ver `README.md`, "Avisos (web)").
+**Avisos**: tus avisos, con los críticos primero, y **Enterado**. Un aviso crítico para Recepción sale arriba en Inicio hasta que pulsas **Enterado** (ver `README.md`, "Avisos").
 
 ### Inicio
 
@@ -102,11 +102,11 @@ Inicio, Avisos, Emitir número, Pacientes, Citas, Vinculaciones, Admisión y cam
 
 | Sección | Qué haces |
 |---|---|
-| Emitir número | **Emitir número** → eliges el servicio → **Emitir** |
+| Emitir número | **Emitir número** → eliges el servicio y la **Prioridad** → **Emitir**. Debajo está la fila; al elegir un servicio aparece **Quién pasa después** con **Llamar siguiente**. Después de llamar aparece **Deshacer**. En cada número, **Mover o cambiar prioridad** ofrece solo los cambios que acepta el servidor. Cada número muestra su área (**CON 7**), su prioridad, **Cita** o **Sin cita** y la espera |
 | Pacientes | **Buscar paciente** y registrar después de buscar |
 | Citas | **Solicitudes por asignar**: **Asignar** (médico y franja ya prellenados; **Ver todo el día** si no hay libres en la franja pedida) → **Confirmar cita**, o **Rechazar** con motivo. **Agendar cita** → **Confirmar cita**. En cada cita: **Confirmar**, **Rechazar**, **Reprogramar**, **Cancelar cita**, **No asistió**, **Aceptar nuevo horario**, **Rechazar nuevo horario**, según lo que permita el servidor |
 | Vinculaciones | **Aprobar**, **Rechazar con motivo** |
-| Admisión y cama | **Ingresar paciente**, **Asignar cama** → **Confirmar cama**, **Cancelar admisión** |
+| Admisión y cama | **Ingresar paciente**, **Asignar cama** → **Confirmar cama**, **Cancelar admisión**. Si el origen, el médico tratante o la categoría tienen una sola opción, la app la elige y lo dice ("Elegimos por ti … porque solo había una opción") |
 | Tablero de camas | Estado de las camas |
 | Despacho | **Confirmar y despachar** o **Descartar** (con motivo). En el despacho eliges tipo (emergencia a domicilio o traslado interhospitalario), prioridad (roja, naranja, amarilla o verde), destino y **Tripulación**. Un paramédico sin cuenta aparece marcado "sin cuenta en la app" y no se puede elegir como único paramédico |
 | Mis turnos | Tus turnos publicados por día y hora, desde hoy (los días pasados quedan debajo, en "Turnos anteriores"); la entrada se confirma sola al iniciar |

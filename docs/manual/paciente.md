@@ -33,6 +33,8 @@ En **Inicio**, cada tarjeta (fila, próxima cita, exámenes) abre su pestaña al
 
 ## Avisos
 
+En Android, **Avisos** está en **Más**, con los filtros **Todos**, **Sin leer** y **Críticos**; un aviso **Crítico** dirigido a ti sale arriba en **Inicio** con **Enterado**, **Recordarme en 4 h** y **Ver en Avisos** (ver `README.md`, "Avisos").
+
 En iOS, **Más → Avisos** reúne los avisos vigentes del hospital (los públicos y los que van a pacientes), con los filtros **Todos**, **Sin leer** y **Críticos**. Abre un aviso y toca **Enterado** para marcarlo como leído. Solo un aviso **Crítico** dirigido a ti sale arriba en **Inicio**, con **Enterado** y **Recordarme en 4 h**, hasta que lo marcas; los demás ya no ocupan el Inicio. Los adjuntos de laboratorio (fotos o PDF de informes externos) nunca se muestran en la app del paciente.
 
 ## Mi turno (Fila)
@@ -69,7 +71,7 @@ Tu historial clínico revisado: consultas firmadas, diagnósticos, recetas y res
 ## Pedir ambulancia
 
 - **Pedir ambulancia** con el motivo y la ubicación. La app recuerda: "Si hay riesgo de vida, llama al 911."
-- En iOS, la dirección y el teléfono vienen llenos con los de **Mis datos**; cámbialos si estás en otro lugar.
+- En Android e iOS, la dirección y el teléfono vienen llenos con los de tu ficha (en iOS, **Mis datos**), solo si estaban vacíos; la app dice qué llenó ("Tomamos de tu expediente: …" en Android). Cámbialos si estás en otro lugar.
 - Ves el estado de tu solicitud. **Cancelar solicitud** solo mientras está por confirmar.
 
 ## Hospital

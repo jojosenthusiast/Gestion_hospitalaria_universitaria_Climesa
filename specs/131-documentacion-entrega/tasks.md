@@ -18,6 +18,7 @@
   - Cubre: FR-131-05
   - Depende de: 130-T04
   - Hecho cuando: el entorno se reconstruye en un comando y la demo funciona
+  - Avance 16-nov-2026 (Fase 2, PR #144, #145): la semilla demo crece a escala de hospital (ensayo en producción con ROLLBACK: 330 pacientes, 49 médicos, 515 citas y 30 solicitudes por categoría, sin tocar datos reales). **Sigue abierta**: la carga real en producción la ejecuta la dueña del proyecto
 - [ ] T05 · S5 · R · Documento de arquitectura en PDF
   - Cubre: FR-131-02, FR-131-06
   - Depende de: T01
