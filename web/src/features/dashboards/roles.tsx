@@ -70,7 +70,7 @@ const labStateChart = (rows: LabOrderRow[]) => <HBarList title="Órdenes de labo
 
 // ───────────────────────────── ADM · administración del sistema (sin contenido clínico)
 const adm: RoleDashboard = {
-  title: 'Administración del sistema', description: 'Cuentas, personal y espacios del hospital. Aquí no hay información clínica.',
+  title: 'Administración del sistema', description: 'Cuentas, personal y espacios del hospital, sin información clínica',
   needs: ['users', 'staff', 'board'],
   actions: [
     { id: 'invitar', label: 'Invitar persona', hint: 'Crea la cuenta y envía el correo de activación', icon: 'userPlus', href: '#/personal?accion=invitar', permission: 'usuarios.invitar' },
@@ -79,7 +79,7 @@ const adm: RoleDashboard = {
   ],
   render: ({ d }) => <>
     <KpiRow>
-      <Kpi icon="shield" label="Cuentas activas" value={num(d.users, u => u.filter(x => x.state === 'activo').length)} sub={d.users.data ? plural(d.users.data.filter(x => x.state !== 'activo').length, 'cuenta desactivada', 'cuentas desactivadas') : undefined} tone="ok" href="#/usuarios" />
+      <Kpi icon="shield" label="Cuentas activas" value={num(d.users, u => u.filter(x => x.state === 'activo').length)} sub={d.users.data ? plural(d.users.data.filter(x => x.state !== 'activo').length, 'cuenta desactivada', 'cuentas desactivadas') : undefined} tone="ok" href="#/personal" />
       <Kpi icon="user" label="Personal activo" value={num(d.staff, s => s.filter(x => x.active).length)} sub="Registros de personal vigentes" tone="info" href="#/personal" />
       <Kpi icon="bed" label="Ocupación de camas" value={num(d.board, b => b.camas.total ? `${Math.round(((b.camas.total - b.camas.libres) / b.camas.total) * 100)} %` : '—')} sub={d.board.data ? `${d.board.data.camas.libres} de ${d.board.data.camas.total} libres` : undefined} tone={d.board.data && d.board.data.camas.total ? occupancyTone(Math.round(((d.board.data.camas.total - d.board.data.camas.libres) / d.board.data.camas.total) * 100)) : 'neutral'} />
       <Kpi icon="clock" label="Turnos en curso" value={num(d.board, b => b.turnosEnCurso)} sub="Personas trabajando ahora" tone="neutral" />
@@ -88,7 +88,7 @@ const adm: RoleDashboard = {
       <Panel title="Ocupación de camas" icon="bed" hint="Camas que no están libres. Verde hasta 70 %, ámbar hasta 90 %, rojo por encima.">
         <PanelState state={d.board} empty={b => b.camas.total === 0 ? 'Todavía no hay camas registradas.' : null}>{b => { const percent = Math.round(((b.camas.total - b.camas.libres) / b.camas.total) * 100); return <Gauge title="Ocupación de camas" value={percent} tone={occupancyTone(percent)} caption={`${b.camas.libres} de ${b.camas.total} camas libres`} />; }}</PanelState>
       </Panel>
-      <Panel title="Cuentas por estado" icon="shield" action={{ label: 'Abrir usuarios', href: '#/usuarios' }} hint="Cuántas cuentas pueden ingresar y cuántas están desactivadas.">
+      <Panel title="Cuentas por estado" icon="shield" action={{ label: 'Abrir cuentas', href: '#/personal?cuenta=con' }} hint="Cuántas cuentas pueden ingresar y cuántas están desactivadas.">
         <PanelState state={d.users} empty={rows => rows.length === 0 ? 'Todavía no hay cuentas. Invita a la primera persona.' : null}>{rows => <Donut title="Cuentas por estado" centerLabel="cuentas" segments={[{ label: 'Activas', value: rows.filter(r => r.state === 'activo').length, tone: 'ok' }, { label: 'Desactivadas', value: rows.filter(r => r.state !== 'activo').length, tone: 'slate' }]} />}</PanelState>
       </Panel>
       <Panel title="Cuentas por rol" icon="users" hint="Una persona puede tener varios roles.">
@@ -104,7 +104,7 @@ const adm: RoleDashboard = {
         }}</PanelState>
       </Panel>
       <Panel title="Cuentas por completar" icon="alert" hint="Cuentas de trabajo sin personal vinculado: sin ese vínculo no pueden operar.">
-        <PanelState state={d.users}>{rows => <AttentionList empty="Todas las cuentas de trabajo tienen su personal vinculado." items={rows.filter(u => u.state === 'activo' && !u.staffId && u.roles.some(r => ['REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR'].includes(r))).map(u => ({ id: u.id, title: u.name || u.email, detail: u.roles.map(r => roleNames[r] ?? r).join(' · '), tone: 'warn' as Tone, href: '#/usuarios', action: 'Vincular' }))} />}</PanelState>
+        <PanelState state={d.users}>{rows => <AttentionList empty="Todas las cuentas de trabajo tienen su personal vinculado." items={rows.filter(u => u.state === 'activo' && !u.staffId && u.roles.some(r => ['REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR'].includes(r))).map(u => ({ id: u.id, title: u.name || u.email, detail: u.roles.map(r => roleNames[r] ?? r).join(' · '), tone: 'warn' as Tone, href: '#/personal?cuenta=con', action: 'Vincular' }))} />}</PanelState>
       </Panel>
     </>)}
   </>,
@@ -112,7 +112,7 @@ const adm: RoleDashboard = {
 
 // ───────────────────────────── JOP · operación (agregados, sin nombres)
 const jop: RoleDashboard = {
-  title: 'Operación del hospital', description: 'El día del hospital en una sola vista: camas, fila, laboratorio, ambulancia y cobertura de turnos.',
+  title: 'Operación del hospital', description: 'El día del hospital en una sola vista: camas, fila, laboratorio, ambulancia y cobertura de turnos',
   needs: ['board', 'admissions', 'stock', 'ambulance'],
   actions: [
     { id: 'admision', label: 'Nueva admisión', hint: 'Ingresar a un paciente para hospitalizar', icon: 'bed', href: '#/hospitalizacion?accion=admision', permission: 'admision.crear' },
@@ -150,7 +150,7 @@ const jop: RoleDashboard = {
 const resultTone: Record<string, Tone> = { exito: 'ok', denegado: 'danger', fallido: 'urgent' };
 const auditBy = (rows: AuditRow[], result: string) => rows.filter(r => r.result === result);
 const dpd: RoleDashboard = {
-  title: 'Protección de datos', description: 'Quién vio qué y cuándo. La auditoría registra metadatos, nunca valores clínicos.',
+  title: 'Protección de datos', description: 'Quién vio qué y cuándo, con metadatos y nunca valores clínicos',
   needs: ['audit', 'users', 'board'],
   actions: [
     { id: 'buscar', label: 'Buscar en la auditoría', hint: 'Por persona, paciente, acción o fecha', icon: 'search', href: '#/auditoria', permission: 'auditoria.ver' },
@@ -183,7 +183,7 @@ const dpd: RoleDashboard = {
 
 // ───────────────────────────── REC · recepción
 const rec: RoleDashboard = {
-  title: 'Recepción', description: 'Pacientes, fila, citas y camas: lo que llega a la puerta y lo que espera una respuesta tuya.',
+  title: 'Recepción', description: 'Pacientes, fila, citas y camas: lo que llega a la puerta y lo que espera una respuesta tuya',
   needs: ['summary', 'queue', 'appts', 'links', 'admissions', 'ambulance'],
   actions: [
     { id: 'registrar', label: 'Registrar paciente', hint: 'Busca primero y registra si no existe', icon: 'userPlus', href: '#/pacientes?accion=registrar', permission: 'pacientes.registrar' },
@@ -215,7 +215,7 @@ const rec: RoleDashboard = {
 
 // ───────────────────────────── AST · asistencia en consultorio
 const ast: RoleDashboard = {
-  title: 'Mi consultorio', description: 'La fila de quienes esperan y tu turno de hoy.',
+  title: 'Mi consultorio', description: 'La fila de quienes esperan y tu turno de hoy',
   needs: ['queue', 'myShifts'],
   actions: [
     { id: 'llamar', label: 'Llamar siguiente', hint: 'Llama al próximo número en espera', icon: 'queue', href: '#/fila?accion=llamar', permission: 'fila.llamar' },
@@ -240,7 +240,7 @@ const ast: RoleDashboard = {
 
 // ───────────────────────────── ENF · mi planta
 const enf: RoleDashboard = {
-  title: 'Mi planta', description: 'Camas, limpiezas por registrar o verificar, hospitalizados e insumos.',
+  title: 'Mi planta', description: 'Camas, limpiezas por registrar o verificar, hospitalizados e insumos',
   needs: ['beds', 'admissions', 'stock', 'myShifts'],
   actions: [
     { id: 'limpieza', label: 'Registrar limpieza', hint: 'Marca una cama limpia para su verificación', icon: 'bed', href: '#/camas?accion=limpieza', permission: 'camas.registrar_limpieza' },
@@ -271,7 +271,7 @@ const enf: RoleDashboard = {
 
 // ───────────────────────────── MED · mi día
 const med: RoleDashboard = {
-  title: 'Mi día', description: 'Tus citas, los resultados que esperan tu revisión y los pacientes hospitalizados.',
+  title: 'Mi día', description: 'Tus citas, los resultados que esperan tu revisión y los pacientes hospitalizados',
   needs: ['agenda', 'lab', 'queue', 'admissions', 'myShifts'],
   actions: [
     { id: 'llamar', label: 'Llamar siguiente', hint: 'Llama al próximo número en espera', icon: 'queue', href: '#/fila?accion=llamar', permission: 'fila.llamar' },
@@ -303,7 +303,7 @@ const med: RoleDashboard = {
 // ───────────────────────────── LAB · laboratorio
 const LAB_GOAL_MIN = 60;
 const lab: RoleDashboard = {
-  title: 'Laboratorio', description: 'Tu cola de órdenes, los tiempos de entrega y los reactivos que se acaban.',
+  title: 'Laboratorio', description: 'Tu cola de órdenes, los tiempos de entrega y los reactivos que se acaban',
   needs: ['lab', 'stock', 'myShifts'],
   actions: [
     { id: 'muestra', label: 'Tomar muestra', hint: 'Confirma la identidad y pasa la orden a proceso', icon: 'drop', href: '#/laboratorio?accion=muestra', permission: 'laboratorio.procesar' },
@@ -337,7 +337,7 @@ const lab: RoleDashboard = {
 
 // ───────────────────────────── PAR · atención prehospitalaria
 const par: RoleDashboard = {
-  title: 'Mi unidad', description: 'El estado de la ambulancia y el servicio en curso.',
+  title: 'Mi unidad', description: 'El estado de la ambulancia y el servicio en curso',
   needs: ['ambulance', 'myShifts'],
   actions: [{ id: 'unidad', label: 'Abrir ambulancia', hint: 'Estado, servicio e hitos', icon: 'ambulance', href: '#/ambulancia', permission: 'ambulancia.ver_estado' }],
   render: ({ d }) => {
@@ -366,7 +366,7 @@ const par: RoleDashboard = {
 
 // ───────────────────────────── PAC · paciente
 const pac: RoleDashboard = {
-  title: 'Mi atención', description: 'Tu próxima cita, tu número en la fila y el estado de tus exámenes.',
+  title: 'Mi atención', description: 'Tu próxima cita, tu número en la fila y el estado de tus exámenes',
   needs: ['appts', 'queue', 'myLab'],
   actions: [{ id: 'cita', label: 'Pedir una cita', hint: 'Elige médico y horario', icon: 'calendar', href: '#/citas?accion=solicitar', permission: 'citas.solicitar' }],
   render: ({ d }) => {

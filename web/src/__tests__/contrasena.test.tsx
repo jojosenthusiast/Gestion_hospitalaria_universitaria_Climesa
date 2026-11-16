@@ -33,7 +33,7 @@ describe('recuperar contraseña (W01)', () => {
 
   it('el enlace del correo abre el formulario de nueva contraseña, no el de invitación', () => {
     render(<ActivationView mode="reset" ready email="persona@example.test" password="" confirmation="" setPassword={() => undefined} setConfirmation={() => undefined} busy={false} error={null} onSubmit={() => undefined} />);
-    expect(screen.getByRole('heading', { name: 'Crea una nueva contraseña.' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Crea una nueva contraseña' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Guardar contraseña/ })).toBeTruthy();
   });
 });

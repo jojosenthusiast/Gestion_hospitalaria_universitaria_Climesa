@@ -128,7 +128,7 @@ export function LoginView({ email, password, setEmail, setPassword, busy, error,
   return (
     <AuthLayout>
       <form className="auth-form" onSubmit={submit} noValidate>
-        <div className="form-heading"><span className="eyebrow">Acceso a CLIMESA</span><h1>Hola de nuevo.</h1><p>Ingresa con tu cuenta institucional.</p></div>
+        <div className="form-heading"><span className="eyebrow">Acceso a CLIMESA</span><h1>Bienvenido</h1><p>Ingresa con tu cuenta institucional.</p></div>
         {accepted && <Notice kind="success">Contraseña creada. Tu cuenta está lista para ingresar.</Notice>}
         {notice && <Notice kind="info">{notice}</Notice>}
         {error && <Notice kind="error">{error}</Notice>}
@@ -168,7 +168,7 @@ export function PortalLayout({ email, roles, onLogout, children, accountMenuOpen
 export function WelcomeView({ roles }: { roles: string[] }) {
   return (
     <>
-      <section className="page-heading"><div><span className="eyebrow">Mi cuenta / CLIMESA</span><h1>Bienvenido<span>.</span></h1><p>Tu espacio personal en el hospital universitario.</p></div></section>
+      <section className="page-heading"><div><span className="eyebrow">Mi cuenta / CLIMESA</span><h1>Bienvenido</h1><p>Tu espacio personal en el hospital universitario.</p></div></section>
       <section className="welcome-banner"><div><span className="eyebrow">Cuenta activada</span><h2>Tu cuenta<br />está lista.</h2><p>Ya puedes ingresar a la aplicación Android de CLIMESA.</p></div><span className="welcome-check"><Icon name="check" size={62} /></span></section>
       <div className="account-facts"><span>Roles asignados</span><strong>{roles.join(' · ') || 'Sin rol'}</strong></div>
       <p className="welcome-note"><Icon name="info" size={18} />Los servicios clínicos para pacientes se habilitarán en las próximas entregas.</p>
@@ -184,8 +184,8 @@ export function ActivationView({ ready, email, password, confirmation, setPasswo
     <AuthLayout activation>
       <form className="auth-form activation-form" onSubmit={onSubmit}>
         {reset
-          ? <div className="form-heading"><span className="eyebrow">Nueva contraseña</span><h1>Crea una nueva contraseña.</h1><p>Elige una contraseña segura para tu cuenta de CLIMESA.</p></div>
-          : <div className="form-heading"><span className="eyebrow">Activación de cuenta</span><h1>Hazla tuya.</h1><p>Crea una contraseña para tu cuenta de CLIMESA.</p></div>}
+          ? <div className="form-heading"><span className="eyebrow">Nueva contraseña</span><h1>Crea una nueva contraseña</h1><p>Elige una contraseña segura para tu cuenta de CLIMESA.</p></div>
+          : <div className="form-heading"><span className="eyebrow">Activación de cuenta</span><h1>Hazla tuya</h1><p>Crea una contraseña para tu cuenta de CLIMESA.</p></div>}
         {!ready && <Notice kind="info">{reset ? 'Validando el enlace…' : 'Validando la invitación…'}</Notice>}
         {ready && !email && <><Notice kind="error">{error || (reset ? 'El enlace no es válido o ya expiró. Pide uno nuevo desde «¿Olvidaste tu contraseña?».' : 'El enlace no es válido o ya expiró. Solicita una nueva invitación.')}</Notice><a className="secondary-button" href="/"><Icon name="back" size={18} />Volver al inicio</a></>}
         {email && <>

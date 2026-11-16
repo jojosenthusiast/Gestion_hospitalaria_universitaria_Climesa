@@ -63,7 +63,7 @@ describe('/confirmar-correo', () => {
     auth.getSession.mockResolvedValue({ data: { session } });
     responderPerfil(perfil(PAC));
     render(<App />);
-    expect(await screen.findByText('Tu correo quedó confirmado.')).toBeTruthy();
+    expect(await screen.findByText('Tu correo quedó confirmado')).toBeTruthy();
     expect(await screen.findByText('Ya puedes iniciar sesión en la app CLIMESA (Android/iOS).')).toBeTruthy();
     expect(screen.getByText('App CLIMESA para Android')).toBeTruthy();
     expect(screen.getByText('App CLIMESA para iPhone (iOS)')).toBeTruthy();
@@ -88,7 +88,7 @@ describe('/confirmar-correo', () => {
     auth.exchangeCodeForSession.mockRejectedValue(new Error('PKCE code verifier not found in storage'));
     const fetchSpy = responderPerfil(perfil(PAC));
     render(<App />);
-    expect(await screen.findByText('Tu correo quedó confirmado.')).toBeTruthy();
+    expect(await screen.findByText('Tu correo quedó confirmado')).toBeTruthy();
     expect(screen.getByText(/Ya puedes iniciar sesión en la app CLIMESA \(Android\/iOS\) con tu correo/)).toBeTruthy();
     expect(auth.exchangeCodeForSession).toHaveBeenCalledWith('codigo-de-la-app');
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -101,7 +101,7 @@ describe('/confirmar-correo', () => {
     auth.verifyOtp.mockResolvedValue({ data: { session }, error: null });
     responderPerfil(perfil(PAC));
     render(<App />);
-    expect(await screen.findByText('Tu correo quedó confirmado.')).toBeTruthy();
+    expect(await screen.findByText('Tu correo quedó confirmado')).toBeTruthy();
     expect(auth.verifyOtp).toHaveBeenCalledWith({ token_hash: 'th-1', type: 'signup' });
   });
 
@@ -135,7 +135,7 @@ describe('/aceptar-invitacion', () => {
     await userEvent.clear(screen.getByLabelText(/^Nueva contraseña/));
     await userEvent.clear(screen.getByLabelText(/^Confirmar contraseña/));
     await crearContrasena('Clave#2026x');
-    expect(await screen.findByText('Tu cuenta está activa.')).toBeTruthy();
+    expect(await screen.findByText('Tu cuenta está activa')).toBeTruthy();
     expect(auth.updateUser).toHaveBeenCalledWith({ password: 'Clave#2026x' });
     expect(screen.getByText('Portal web CLIMESA')).toBeTruthy();
     expect(screen.getByRole('link', { name: /Entrar al portal web/ })).toBeTruthy();
@@ -169,7 +169,7 @@ describe('/aceptar-invitacion', () => {
   it('invitación vencida: pide reenviarla al administrador', async () => {
     irA('/aceptar-invitacion#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired');
     render(<App />);
-    expect(await screen.findByText('No pudimos abrir tu invitación.')).toBeTruthy();
+    expect(await screen.findByText('No pudimos abrir tu invitación')).toBeTruthy();
     expect(screen.getByText(/Pide al administrador de CLIMESA que te reenvíe la invitación/)).toBeTruthy();
     expect(auth.updateUser).not.toHaveBeenCalled();
   });
@@ -184,7 +184,7 @@ describe('/restablecer', () => {
     await userEvent.type(await screen.findByLabelText(/^Nueva contraseña/), 'Nueva#2026x');
     await userEvent.type(screen.getByLabelText(/^Confirmar contraseña/), 'Nueva#2026x');
     await userEvent.click(screen.getByRole('button', { name: /Guardar contraseña/ }));
-    expect(await screen.findByText('Contraseña actualizada.')).toBeTruthy();
+    expect(await screen.findByText('Contraseña actualizada')).toBeTruthy();
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
     expect(screen.getByRole('link', { name: /Ir al ingreso/ }).getAttribute('href')).toBe('/?contrasena=actualizada');
   });
@@ -193,7 +193,7 @@ describe('/restablecer', () => {
     irA('/restablecer?code=codigo-ajeno');
     auth.exchangeCodeForSession.mockResolvedValue({ data: { session: null }, error: { message: 'invalid' } });
     render(<App />);
-    expect(await screen.findByText('No pudimos abrir el enlace.')).toBeTruthy();
+    expect(await screen.findByText('No pudimos abrir el enlace')).toBeTruthy();
     expect(screen.getByRole('link', { name: /Pedir un enlace nuevo/ }).getAttribute('href')).toBe('/recuperar');
   });
 

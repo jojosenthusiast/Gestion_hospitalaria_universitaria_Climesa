@@ -92,7 +92,7 @@ export function MetricsPage({ api, profile, version }: { api: Api; profile: Acce
   });
   const active = (days: number) => from === localDay(-(days - 1)) && to === localDay();
   return <>
-    <Heading eyebrow="CLIMESA / Métricas" title="Métricas" description="Indicadores agregados por día, sin datos personales. Cada uno explica qué mide y cómo leerlo." actions={<ExportMenu label="Exportar todo" table={everything} disabled={!ready} />} />
+    <Heading eyebrow="CLIMESA / Métricas" title="Métricas" description="Indicadores agregados por día, sin datos personales" actions={<ExportMenu label="Exportar todo" table={everything} disabled={!ready} />} />
     <div className="metric-controls">
       <div className="segmented-control" role="group" aria-label="Rangos rápidos">{presets.map(p => <button key={p.days} type="button" aria-pressed={active(p.days)} onClick={() => { setFrom(localDay(-(p.days - 1))); setTo(localDay()); }}>{p.label}</button>)}</div>
       <div className="form-grid"><Field label="Desde" type="date" value={from} onChange={setFrom} /><Field label="Hasta" type="date" value={to} onChange={setTo} /></div>

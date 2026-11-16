@@ -116,13 +116,13 @@ export function ConfirmEmail() {
     return () => { cancelled = true; };
   }, []);
   return <AuthLayout activation><div className="auth-form">
-    {state.stage === 'checking' && <><Heading eyebrow="Confirmación de correo" title="Confirmando tu correo." /><Notice kind="info">Validando el enlace…</Notice></>}
+    {state.stage === 'checking' && <><Heading eyebrow="Confirmación de correo" title="Confirmando tu correo" /><Notice kind="info">Validando el enlace…</Notice></>}
     {state.stage === 'done' && <>
-      <Heading eyebrow="Confirmación de correo" title="Tu correo quedó confirmado." />
-      {state.profile ? <><Notice kind="success">{state.web ? 'Tu cuenta está activa.' : `Ya puedes iniciar sesión en la app CLIMESA (${mobileOf(state.profile.platforms).map(p => PLATFORM_NAMES[p]).join('/') || 'Android/iOS'}).`}</Notice><PlatformGuidance profile={state.profile} /></> : <GenericGuidance patient />}
+      <Heading eyebrow="Confirmación de correo" title="Tu correo quedó confirmado" />
+      {state.profile ? <><Notice kind="success">{state.web ? 'Tu cuenta está activa' : `Ya puedes iniciar sesión en la app CLIMESA (${mobileOf(state.profile.platforms).map(p => PLATFORM_NAMES[p]).join('/') || 'Android/iOS'}).`}</Notice><PlatformGuidance profile={state.profile} /></> : <GenericGuidance patient />}
       {state.web ? <a className="primary-button" href="/"><span>Ir al portal web</span><Icon name="arrow" size={18} /></a> : <div className="platform-next"><h2>Abre la app CLIMESA</h2><p>Inicia sesión en tu teléfono con este mismo correo y tu contraseña. Ya puedes cerrar esta página.</p></div>}
     </>}
-    {state.stage === 'problem' && <><Heading eyebrow="Confirmación de correo" title="No pudimos confirmar tu correo." /><Notice kind="error">{state.message} Si ya confirmaste tu correo, inicia sesión en la app. Si no, pide un enlace nuevo.</Notice><ResendConfirmation /><a className="auth-link" href="/">Volver al inicio</a></>}
+    {state.stage === 'problem' && <><Heading eyebrow="Confirmación de correo" title="No pudimos confirmar tu correo" /><Notice kind="error">{state.message} Si ya confirmaste tu correo, inicia sesión en la app. Si no, pide un enlace nuevo.</Notice><ResendConfirmation /><a className="auth-link" href="/">Volver al inicio</a></>}
   </div></AuthLayout>;
 }
 
@@ -171,12 +171,12 @@ export function SetPasswordLanding({ reset = false }: { reset?: boolean }) {
     } catch { setError('No se pudo conectar. Intenta nuevamente.'); } finally { setBusy(false); }
   }
   if (state.stage === 'problem') return <AuthLayout activation><div className="auth-form">
-    <Heading eyebrow={reset ? 'Nueva contraseña' : 'Activación de cuenta'} title={reset ? 'No pudimos abrir el enlace.' : 'No pudimos abrir tu invitación.'} />
+    <Heading eyebrow={reset ? 'Nueva contraseña' : 'Activación de cuenta'} title={reset ? 'No pudimos abrir el enlace' : 'No pudimos abrir tu invitación'} />
     <Notice kind="error">{state.message} {reset ? 'Pide un enlace nuevo; el anterior deja de servir.' : 'Pide al administrador de CLIMESA que te reenvíe la invitación.'}</Notice>
     {reset ? <a className="primary-button" href="/recuperar"><span>Pedir un enlace nuevo</span><Icon name="mail" size={18} /></a> : <a className="secondary-button" href="/"><Icon name="back" size={18} />Volver al inicio</a>}
   </div></AuthLayout>;
   if (state.stage === 'done') return <AuthLayout activation><div className="auth-form">
-    <Heading eyebrow={reset ? 'Nueva contraseña' : 'Activación de cuenta'} title={reset ? 'Contraseña actualizada.' : 'Tu cuenta está activa.'} />
+    <Heading eyebrow={reset ? 'Nueva contraseña' : 'Activación de cuenta'} title={reset ? 'Contraseña actualizada' : 'Tu cuenta está activa'} />
     {state.profile ? <PlatformGuidance profile={state.profile} /> : <GenericGuidance patient={false} />}
     {state.web && (reset ? <a className="primary-button" href="/?contrasena=actualizada"><span>Ir al ingreso</span><Icon name="arrow" size={18} /></a> : <a className="primary-button" href="/"><span>Entrar al portal web</span><Icon name="arrow" size={18} /></a>)}
     {!state.web && <a className="secondary-button" href="/"><Icon name="back" size={18} />Volver al inicio</a>}

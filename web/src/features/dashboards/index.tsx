@@ -18,15 +18,15 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
   const needed = useMemo(() => new Set<Source>(roles.flatMap(role => roleDashboards[role].needs)), [roles]);
   const data = useDashboardData(api, profile, version, needed);
   const first = profile.name ? profile.name.split(' ')[0] : '';
-  const greeting = `Bienvenido${first ? ', ' + first : ''}.`;
+  const greeting = `Bienvenido${first ? ', ' + first : ''}`;
   if (roles.length === 0) return <>
-    <Heading eyebrow="CLIMESA / Inicio" title="Inicio" description={`${greeting} Tu cuenta está activa.`} />
+    <Heading eyebrow="CLIMESA / Inicio" title="Inicio" description={`${greeting} · Tu cuenta está activa`} />
     <NoticesPanel api={api} version={version} />
     <div className="dashboard-account"><Icon name="shield" size={24} /><div><h3>Tu función no tiene un tablero en la web</h3><p>Usa los módulos del menú que tu cuenta tiene habilitados. Las operaciones y los datos corresponden a los roles de tu cuenta.</p></div><a className="row-action" href="#/perfil">Ver mi cuenta <Icon name="arrow" size={16} /></a></div>
   </>;
   const many = roles.length > 1;
   return <>
-    <Heading eyebrow="CLIMESA / Inicio" title={roleDashboards[roles[0]].title} description={`${greeting} ${roleDashboards[roles[0]].description}`} />
+    <Heading eyebrow="CLIMESA / Inicio" title={roleDashboards[roles[0]].title} description={`${greeting} · ${roleDashboards[roles[0]].description}`} />
     <NoticesPanel api={api} version={version} />
     {roles.map((role: RoleId, index) => {
       const dash = roleDashboards[role];

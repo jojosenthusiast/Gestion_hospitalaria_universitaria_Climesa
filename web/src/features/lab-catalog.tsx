@@ -20,7 +20,7 @@ export function LabCatalogPage({ api, profile, version }: { api: Api; profile: A
   const data = useData<CatalogExam[]>(api, '/catalogo/examenes', version, can(profile, 'catalogo.configurar'));
   const [query, setQuery] = useState(''), [selectedId, setSelectedId] = useState<string | null>(null);
   return <>
-    <Heading eyebrow="Configuración / Laboratorio" title="Catálogo de laboratorio" description="Exámenes y paneles que Medicina puede ordenar, con su unidad y los rangos de referencia que calculan la marca de cada resultado." />
+    <Heading eyebrow="Configuración / Laboratorio" title="Catálogo de laboratorio" description="Exámenes y paneles que Medicina puede ordenar, con su unidad y sus rangos de referencia" />
     <section className="data-workbench" aria-label="Catálogo de exámenes"><RemoteState state={data}>{all => {
       const rows = all.filter(exam => matches(query, exam.code, exam.name));
       const selected = rows.find(exam => exam.id === selectedId) ?? rows[0] ?? null;

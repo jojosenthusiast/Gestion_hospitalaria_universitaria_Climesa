@@ -21,9 +21,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import sv.edu.catolica.climesa.domain.headerText
+
 
 /** Shared presentation primitives. They add hierarchy and motion without owning business state. */
 @Composable
@@ -68,8 +72,8 @@ internal fun SectionIntro(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
         // "Rol / CLIMESA" style breadcrumbs repeat what the header already says; only a real label is shown.
         if (eyebrow.isNotBlank() && !eyebrow.contains(" / ")) Text(eyebrow.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.climesa.primaryText)
-        Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis) }
+        Text(headerText(title), style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+        detail?.takeIf { it.isNotBlank() }?.let { Text(headerText(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis) }
     }
 }
 

@@ -27,7 +27,10 @@ export function useAction(api:Api){
  }
  return {busy,error,run};
 }
-export function Heading({eyebrow,title,description,actions}:{eyebrow:string;title:string;description:string;actions?:ReactNode}){return <header className="module-heading reveal"><div><span className="eyebrow">{eyebrow}</span><h1>{title}<span>.</span></h1><p>{description}</p></div>{actions&&<div className="heading-actions">{actions}</div>}</header>;}
+/** Títulos y subtítulos de cabecera van sin punto final; un texto de varias oraciones conserva su puntuación. */
+export const headerText=(text:string)=>{const t=text.trim();return t.endsWith('.')&&!t.endsWith('..')&&!/[.!?…]\s/.test(t.slice(0,-1))?t.slice(0,-1):t;};
+/** Cabecera común de todos los módulos: título (h1) y una línea de descripción a la izquierda, acción principal a la derecha. */
+export function Heading({eyebrow,title,description,actions}:{eyebrow:string;title:string;description?:string;actions?:ReactNode}){const detail=description?headerText(description):'';return <header className="module-heading"><div className="module-heading-text"><span className="eyebrow">{eyebrow}</span><h1>{headerText(title)}</h1>{detail&&<p title={detail}>{detail}</p>}</div>{actions&&<div className="heading-actions">{actions}</div>}</header>;}
 export function RemoteState<T>({state,children}:{state:Remote<T>;children:(data:T)=>ReactNode}){
  if(state.loading&&!state.data)return <div className="module-state module-state-loading" role="status" aria-live="polite"><span className="status-symbol"><span className="status-spinner"/></span><div><strong>Cargando información…</strong><span>Estamos preparando esta sección…</span></div></div>;
  // WEB-04 (diseño 04): "sin permiso" y "error de carga" son estados distintos; ambos permiten reintentar (un acceso puede concederse).

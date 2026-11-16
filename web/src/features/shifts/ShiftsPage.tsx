@@ -87,7 +87,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const assignSubstitute = (shift: ShiftRow, staffId: string) => { setMarking(null); setEditing(null); setDraft({ areaId: shift.areaId, start: new Date(Math.max(Date.now() + 5 * 60_000, Date.parse(shift.start))).toISOString(), end: shift.end, type: shift.type, staffId }); setOpen(true); data.refresh(); };
 
   return <>
-    <Heading eyebrow="Operaciones / Jornada" title="Turnos" description="La jornada se abre automáticamente a las 00:00. Asigna horarios según el área, el rol y la disponibilidad real del personal."
+    <Heading eyebrow="Operaciones / Jornada" title="Turnos" description="Asigna horarios según el área, el rol y la disponibilidad real del personal"
       actions={<>
         <ExportMenu table={table} disabled={!rows.length} />
         {plan && view === 'plan' && <button className="primary-button" onClick={() => { setEditing(null); setDraft(undefined); setOpen(true); }}><Icon name="plus" size={18} />Asignar turno</button>}

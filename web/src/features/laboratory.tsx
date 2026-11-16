@@ -87,7 +87,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
     rows: rows.map(o => [o.priority === 'urgente' ? 'Urgente' : 'Rutina', o.patientName, o.patientRecord ?? '', o.patientAge ?? o.patientAgeRange ?? '', o.patientSex ? sexShort[o.patientSex] ?? '' : '', o.items.map(i => i.name).join('; '), o.doctorName ?? '', formatDateTime(o.createdAt), formatElapsed(elapsedMinutes(o, now)), STAGE_LABEL[stageOf(o)], isCritical(o) ? 'Sí' : 'No']),
   });
   return <>
-    <Heading eyebrow="Atención / Diagnóstico" title="Laboratorio" description="Cada orden avanza por pasos: Medicina la solicita, Laboratorio toma la muestra y captura los valores, Medicina revisa y libera, y recién entonces el paciente ve sus resultados." />
+    <Heading eyebrow="Atención / Diagnóstico" title="Laboratorio" description="Cada orden pasa de la solicitud a la muestra, los valores, la revisión y la liberación al paciente" />
     <section className="data-workbench" aria-label="Lista de trabajo de laboratorio"><RemoteState state={data}>{() => <>
       <ListToolbar trailing={<><label className="cl-sort">Ordenar<select value={sort} onChange={event => setSort(event.target.value as WorkSort)}>{(Object.keys(SORT_NAMES) as WorkSort[]).map(key => <option key={key} value={key}>{SORT_NAMES[key]}</option>)}</select></label><ExportMenu table={exportTable} disabled={!rows.length} /></>}>
         <LiveSearch label="Buscar órdenes" placeholder="Paciente, expediente, examen o médico" value={query} onChange={setQuery} />

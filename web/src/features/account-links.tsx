@@ -23,7 +23,7 @@ export function AccountLinksPage({ api, profile, version }: { api: Api; profile:
   const reload = () => { setRejecting(null); data.refresh(); };
   const allowed = can(profile, 'cuentas.verificar');
   return <>
-    <Heading eyebrow="Pacientes / Cuentas" title="Vinculaciones por verificar" description="Cuentas de pacientes que piden unirse a su expediente. Las nuevas aparecen solas." />
+    <Heading eyebrow="Pacientes / Cuentas" title="Vinculaciones por verificar" description="Cuentas de pacientes que piden unirse a su expediente, actualizadas en vivo" />
     <LinkingGuide />
     <section className="data-workbench" aria-label="Solicitudes de vinculación">
       <RemoteState state={data}>{rows => rows.length
