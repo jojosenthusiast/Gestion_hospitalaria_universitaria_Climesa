@@ -178,7 +178,7 @@ export class PublicService {
    */
   async edit(actor: Actor, id: string, dto: NoticeEditDto, key?: string) {
     const now = this.clock.now();
-    const result = await this.commands.run(actor, 'avisos.publicar:aviso.editar', key, { id, ...dto }, async c => {
+    const result = await this.commands.run(actor, `avisos.publicar:aviso.editar:${id}`, key, { id, ...dto }, async c => {
       const current = await this.openNotice(c, id, dto.version, now);
       const { from, to, priority, roles, isPublic, found } = await this.checkNotice(dto, now, new Date(current.desde), c);
       const row = (await c.query<NoticeRow>(
@@ -197,7 +197,7 @@ export class PublicService {
   /** MA-AVI-02 y D-13: retira el aviso antes de tiempo con un motivo auditado; deja de verse en todas partes. */
   async withdraw(actor: Actor, id: string, dto: NoticeWithdrawDto, key?: string) {
     const now = this.clock.now();
-    const result = await this.commands.run(actor, 'avisos.publicar:aviso.retirar', key, { id, ...dto }, async c => {
+    const result = await this.commands.run(actor, `avisos.publicar:aviso.retirar:${id}`, key, { id, ...dto }, async c => {
       const current = await this.openNotice(c, id, dto.version, now);
       const row = (await c.query<NoticeRow>(
         `UPDATE publico.aviso SET retirado_en=$2,retirado_por=$3,motivo_retiro=$4,version=version+1 WHERE id=$1 RETURNING ${NOTICE_COLUMNS}`,
