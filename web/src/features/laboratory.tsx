@@ -4,9 +4,11 @@ import { Field, Icon, Notice } from '../components/ui';
 import { PriorityBadge, StatusBadge } from '../components/system';
 import { ExportMenu } from '../components/export-menu';
 import { ApiError, can, type AccessProfile, type Api } from '../lib/api';
+import { downloadAttachment, uploadAttachment } from '../lib/lab-attachments';
 import { EXTERNAL_INSTRUCTIONS_TEMPLATE, attachmentProblem, externalResultBody, fingerprintFile, formatBytes, groupLabOrders, type LabGroupId } from '../lib/lab-flow';
 import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import { newIntentKey, withIntentKey } from './intent';
+import { spanishProblem } from './problems';
 import { useQuickAction } from './personal/accion';
 import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
 import { STAGE_LABEL, elapsedMinutes, formatElapsed, isCritical, slaLevel, sortOrders, stageOf, type Stage, type WorkSort } from './listas/lab-worklist';
@@ -159,7 +161,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
                 batchable={allows(order, 'completar')} inBatch={batch.has(order.id)} onBatch={() => setBatch(current => toggle(current, order.id))} />) : []),
             ];
           })}</ul>
-          {selected && <LabDetail key={selected.id} api={api} order={selected} onChanged={data.refresh} onSample={() => setSampleFor(selected)} />}
+          {selected && <LabDetail key={selected.id} api={api} order={selected} canAttach={can(profile, 'laboratorio.procesar') || can(profile, 'laboratorio.revisar')} onChanged={data.refresh} onSample={() => setSampleFor(selected)} />}
         </div></>
         : all.length ? <Empty title="Ninguna orden coincide con los filtros" description="Quita algún filtro o cambia lo que buscas." />
           : <Empty title="No hay órdenes de laboratorio" description="Las órdenes aparecerán cuando Medicina solicite estudios para una consulta." />}
@@ -198,7 +200,7 @@ function LabStepper({ order }: { order: LabOrder }) {
  * Panel de detalle con detalle progresivo: arriba quién actúa y la acción principal, luego los valores; las fechas quedan
  * plegadas en «Datos de la orden» y el avance va al final.
  */
-function LabDetail({ api, order, onChanged, onSample }: { api: Api; order: LabOrder; onChanged: () => void; onSample: () => void }) {
+function LabDetail({ api, order, canAttach, onChanged, onSample }: { api: Api; order: LabOrder; canAttach: boolean; onChanged: () => void; onSample: () => void }) {
   const action = useAction(api), [cancelOpen, setCancelOpen] = useState(false), [externalOpen, setExternalOpen] = useState(false), [loadOpen, setLoadOpen] = useState(false);
   const { captured, total } = labProgress(order), ready = total > 0 && captured === total, next = nextActor(order), stage = stageOf(order);
   const when = (value?: string | null) => value ? formatDateTime(value) : 'Pendiente';
@@ -219,7 +221,7 @@ function LabDetail({ api, order, onChanged, onSample }: { api: Api; order: LabOr
     {order.amendedAt && <p className="lab-requirement" role="note">Un resultado se corrigió el {formatDateTime(order.amendedAt)}; el valor anterior queda en el historial.{order.reviewedAt ? '' : ' Medicina debe revisarlo de nuevo antes de que el paciente lo vea.'}</p>}
     {allows(order, 'capturar') && <p className={`lab-requirement ${ready ? 'is-ready' : ''}`} role="status">Para completar la orden hace falta el valor de todos los exámenes: {captured} de {total} capturados{ready ? ' · lista para completar' : ''}.</p>}
     <div className="lab-order-detail">{order.items.map(item => <LabItemRow key={item.id} api={api} order={order} item={item} onChanged={onChanged} />)}</div>
-    {order.external && order.state === 'completado' && <ExternalReport api={api} order={order} />}
+    {order.external && order.state === 'completado' && <ExternalReport api={api} order={order} canAttach={canAttach} />}
     <details className="lab-more">
       <summary>Datos de la orden</summary>
       <dl className="cl-facts"><div><dt>Prioridad</dt><dd>{order.priority === 'urgente' ? 'Urgente' : 'Rutina'}</dd></div><div><dt>Pidió</dt><dd>{order.doctorName ?? 'Sin dato'}</dd></div><div><dt>Solicitada</dt><dd>{formatDateTime(order.createdAt)}</dd></div><div><dt>{order.external ? 'Informe recibido' : 'Muestra'}</dt><dd>{when(order.sampleTakenAt)}</dd></div><div><dt>Completada</dt><dd>{when(order.completedAt)}</dd></div><div><dt>Revisada</dt><dd>{when(order.reviewedAt)}</dd></div></dl>
@@ -245,18 +247,41 @@ function ExternalNote({ order }: { order: LabOrder }) {
   </div>;
 }
 
-/** Informe externo de una orden completada: referencia del adjunto con su nota. Se lee del detalle de la orden. */
-function ExternalReport({ api, order }: { api: Api; order: LabOrder }) {
+/**
+ * Informe externo de una orden completada (T07b). Con archivo guardado: «Descargar», que pide un enlace firmado de
+ * 5 minutos a la API (queda auditado). Solo con la referencia: se dice, y quien carga resultados puede subir el archivo.
+ */
+function ExternalReport({ api, order, canAttach }: { api: Api; order: LabOrder; canAttach: boolean }) {
   const detail = useData<{ attachments?: Attachment[] }>(api, `/laboratorio/ordenes/${order.id}`, order.version);
   const attachments = detail.data?.attachments ?? [];
   return <section className="lab-report" aria-label="Informe externo">
     <h4>Informe externo</h4>
-    <RemoteState state={detail} skeletonRows={1}>{() => attachments.length ? <ul>{attachments.map(file => <li key={file.id}>
-      <Icon name="download" size={16} /><span><strong>{file.fileName}</strong> <span className="muted">{file.mimeType === 'application/pdf' ? 'PDF' : 'Foto'} · {formatBytes(file.sizeBytes)} · {formatDateTime(file.uploadedAt)}{file.uploadedByName ? ` · ${file.uploadedByName}` : ''}</span>
-        {file.note && <small>{file.note}</small>}
-        {!file.stored && <small className="muted">Se guardó la referencia del archivo (nombre, tipo, tamaño y huella) y los valores; el original queda con quien lo cargó.</small>}</span>
-    </li>)}</ul> : <p className="muted">Sin adjuntos visibles.</p>}</RemoteState>
+    <RemoteState state={detail} skeletonRows={1}>{() => attachments.length ? <ul>{attachments.map(file => <AttachmentRow key={file.id} api={api} file={file} canAttach={canAttach} onStored={detail.refresh} />)}</ul> : <p className="muted">Sin adjuntos visibles.</p>}</RemoteState>
   </section>;
+}
+
+function AttachmentRow({ api, file, canAttach, onStored }: { api: Api; file: Attachment; canAttach: boolean; onStored: () => void }) {
+  const [busy, setBusy] = useState(false), [error, setError] = useState<ApiError | null>(null);
+  async function attempt(work: () => Promise<unknown>, after?: () => void) {
+    setBusy(true); setError(null);
+    try { await work(); after?.(); } catch (e) { setError(spanishProblem(e instanceof ApiError ? e : new ApiError('No se pudo completar la operación.'))); } finally { setBusy(false); }
+  }
+  function upload(picked: File | null) {
+    const problem = attachmentProblem(picked);
+    if (problem || !picked) { setError(new ApiError(problem ?? 'Elige un archivo.')); return; }
+    void attempt(() => uploadAttachment(api, file.id, picked), onStored);
+  }
+  return <li>
+    <Icon name="download" size={16} /><span><strong>{file.fileName}</strong> <span className="muted">{file.mimeType === 'application/pdf' ? 'PDF' : 'Foto'} · {formatBytes(file.sizeBytes)} · {formatDateTime(file.uploadedAt)}{file.uploadedByName ? ` · ${file.uploadedByName}` : ''}</span>
+      {file.note && <small>{file.note}</small>}
+      {file.stored
+        ? <button type="button" className="secondary-button" disabled={busy} aria-label={`Descargar ${file.fileName}`} onClick={() => void attempt(() => downloadAttachment(api, file.id))}>{busy ? 'Preparando…' : 'Descargar'}</button>
+        : <>
+          <small className="muted">Solo se guardó la referencia del archivo (nombre, tipo, tamaño y huella) y los valores; el archivo no está en el sistema.</small>
+          {canAttach && <small>{busy ? 'Subiendo el archivo…' : 'Sube aquí la foto o el PDF (hasta 10 MB):'} <input type="file" aria-label={`Subir archivo de ${file.fileName}`} accept="application/pdf,image/jpeg,image/png,image/heic,image/webp" disabled={busy} onChange={event => upload(event.target.files?.[0] ?? null)} /></small>}
+        </>}
+      {error && <Notice kind="error">{error.message}</Notice>}</span>
+  </li>;
 }
 
 function SendExternalDialog({ api, order, onClose, onSaved }: { api: Api; order: LabOrder; onClose: () => void; onSaved: () => void }) {
@@ -273,20 +298,37 @@ function SendExternalDialog({ api, order, onClose, onSaved }: { api: Api; order:
 }
 
 /**
- * Resultado externo: adjunto (foto o PDF) + valor clave de cada examen. El almacenamiento clínico de archivos todavía no
- * existe: se envía la referencia del archivo y sus valores, y se dice con claridad.
+ * Resultado externo: adjunto (foto o PDF) + valor clave de cada examen (S10). Primero se guardan los valores con la
+ * referencia del archivo; enseguida el archivo sube a la API, que lo guarda en el almacenamiento clínico privado (T07b).
+ * Si el archivo no sube, los valores ya quedaron y se dice; se puede subir después desde la orden.
  */
 function ExternalResultDialog({ api, order, onClose, onSaved }: { api: Api; order: LabOrder; onClose: () => void; onSaved: () => void }) {
   const action = useAction(api), [file, setFile] = useState<File | null>(null), [values, setValues] = useState<Record<string, string>>({}), [note, setNote] = useState('');
+  const [uploading, setUploading] = useState(false), [uploadError, setUploadError] = useState<ApiError | null>(null);
   const problem = attachmentProblem(file), missing = order.items.filter(item => !(values[item.id] ?? '').trim()).length;
   async function save() {
     if (!file || problem || missing) return;
     const sha256 = await fingerprintFile(file);
     const attachment = { fileName: file.name, mimeType: file.type, sizeBytes: file.size, ...(sha256 ? { sha256 } : {}) };
     const body = externalResultBody(order.version, attachment, order.items.map(item => ({ id: item.id, numeric: isNumeric(item) })), values, note);
-    if (await action.run(`/laboratorio/ordenes/${order.id}/resultado-externo`, body)) onSaved();
+    const saved = await action.run<{ attachmentId?: string }>(`/laboratorio/ordenes/${order.id}/resultado-externo`, body);
+    if (!saved) return;
+    if (saved.attachmentId) {
+      setUploading(true);
+      try { await uploadAttachment(api, saved.attachmentId, file); } catch (e) {
+        setUploadError(spanishProblem(e instanceof ApiError ? e : new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.')));
+        return;
+      } finally { setUploading(false); }
+    }
+    onSaved();
   }
-  return <Dialog title="Cargar resultado externo" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
+  if (uploadError) return <Dialog title="Cargar resultado externo" onClose={onSaved}><div className="module-form">
+    <Notice kind="error">Los valores se guardaron, pero el archivo no se subió: {uploadError.message}</Notice>
+    <p className="form-intro">Puedes subir el archivo desde la orden, en «Informe externo».</p>
+    <div className="dialog-actions"><button className="primary-button" type="button" onClick={onSaved}>Entendido</button></div>
+  </div></Dialog>;
+  const busy = action.busy || uploading;
+  return <Dialog title="Cargar resultado externo" onClose={onClose} busy={busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
     <p className="form-intro">Adjunta el informe que trajo el paciente y escribe el valor clave de cada examen. La marca (normal, alta, crítica) la calcula el sistema. Al guardar, la orden queda completada y espera la revisión médica.</p>
     <WriteError error={action.error} onReload={onSaved} reloadLabel="Recargar la orden" />
     <FieldShell label="Informe (PDF o foto, hasta 10 MB)">{id => <input id={id} type="file" accept="application/pdf,image/jpeg,image/png,image/heic,image/webp" onChange={event => setFile(event.target.files?.[0] ?? null)} aria-required="true" />}</FieldShell>
@@ -295,8 +337,8 @@ function ExternalResultDialog({ api, order, onClose, onSaved }: { api: Api; orde
       {order.items.map(item => <Field key={item.id} label={`${item.name}${isNumeric(item) && item.unit ? ` (${item.unit})` : ''}`} type={isNumeric(item) ? 'number' : 'text'} step="any" value={values[item.id] ?? ''} onChange={value => setValues(current => ({ ...current, [item.id]: value }))} required />)}
     </fieldset>
     <Field label="Nota sobre el informe (opcional)" value={note} onChange={setNote} maxLength={1000} />
-    <p className="muted lab-storage-note">Se guarda la referencia del archivo (nombre, tipo, tamaño y huella) y los valores. El archivo original queda con quien lo cargó mientras se habilita el almacenamiento clínico.</p>
-    <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={action.busy}>Volver</button><SaveButton busy={action.busy} disabled={!!problem || missing > 0} label="Guardar resultado" /></div>
+    <p className="muted lab-storage-note">El archivo se guarda en el expediente, en un almacenamiento privado: solo el personal que ve los valores puede descargarlo, nunca el paciente.</p>
+    <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={busy}>Volver</button><SaveButton busy={busy} disabled={!!problem || missing > 0} label={uploading ? 'Subiendo archivo…' : 'Guardar resultado'} /></div>
   </form></Dialog>;
 }
 
