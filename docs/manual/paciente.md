@@ -1,0 +1,67 @@
+# Manual del Paciente (PAC)
+
+**Plataformas:** app Android y app iOS. La web no tiene cuenta de paciente: su página `/registro` solo indica que la cuenta se crea en la app.
+**Qué hace:** ve su turno en la fila, sus citas, el estado de sus exámenes, sus resultados revisados y su historial; pide citas y ambulancia; sabe quién vio su expediente.
+
+Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#lo-que-vale-para-todos-los-roles).
+
+## Crear la cuenta
+
+1. En la app, **Crear cuenta de paciente** (Android) o **Crear cuenta** (iOS).
+2. Abre el correo de confirmación. El enlace abre la web, que dice "Tu correo quedó confirmado" y que ya puedes ingresar en la app.
+3. Si no llegó, **Reenviar correo de confirmación** (hay una espera entre reenvíos). Después, **Ya confirmé, iniciar sesión**.
+
+## Vincular tu expediente
+
+Hasta vincular la cuenta con tu expediente no ves datos clínicos.
+
+1. **Vincular expediente**: escribe tu DUI y tu fecha de nacimiento y **Enviar solicitud** (en iOS, **Enviar**).
+2. Recepción revisa y aprueba. Al aprobarse, tu historial aparece sin cerrar la app.
+3. Si te la rechazan, **Corregir y volver a pedir**.
+
+Tú no eliges el expediente: lo confirma una persona de Recepción.
+
+## Android
+
+Secciones: Inicio, Mi turno, Mis citas, Mis exámenes, Vincular expediente, Mi historial, Pedir ambulancia, Hospital, Quién vio mi expediente y Perfil. La barra inferior muestra Inicio, Mi turno, Mis citas y Exámenes.
+
+## iOS
+
+Pestañas: Inicio, Fila, Citas, Exámenes y **Más** (Vincular expediente, si todavía no lo vinculaste; Mis datos, Mi historial, Mi habitación, Pedir ambulancia, Información del hospital, Ubicación, Quién vio mi expediente y Perfil).
+
+## Mi turno (Fila)
+
+Muestra tu número y su estado: "Esperando a que el médico llame", "Llamado N de M". En iOS, cuando te llaman: "¡Es tu turno! Pasa al *consultorio*". Si no te presentas después de los llamados exigidos, el número se marca como ausente.
+
+## Mis citas
+
+- **Solicitar cita** (en iOS, **Pedir cita**): eliges médico, fecha y una franja libre de 20 minutos y **Enviar solicitud**. Recepción la confirma o la rechaza.
+- **Solicitar reprogramación** (en iOS, **Reprogramar → Pedir el cambio**): tu cita original sigue vigente hasta que Recepción o tu médico acepten el cambio.
+- **Cancelar** (en iOS, **Cancelar cita → Confirmar cancelación**).
+- La cita muestra "Puedes cancelar o reprogramar hasta las …": puedes hacerlo hasta 2 horas antes.
+- Puedes tener como máximo 2 solicitudes pendientes. Una solicitud que nadie confirmó antes de su hora queda vencida.
+
+## Mis exámenes
+
+Ves el estado de cada orden siempre. Los **valores** aparecen solo después de que tu médico revisa el resultado. Si el laboratorio corrige un valor, vuelve a esperar la revisión.
+
+## Mi historial
+
+Tu historial clínico revisado: consultas firmadas, diagnósticos, recetas y resultados liberados.
+
+## Pedir ambulancia
+
+- **Pedir ambulancia** con el motivo y la ubicación. La app recuerda: "Si hay riesgo de vida, llama al 911."
+- Ves el estado de tu solicitud. **Cancelar solicitud** solo mientras está por confirmar.
+
+## Hospital
+
+Información pública: ocupación por planta, médicos de turno y avisos. En iOS, **Ubicación** ofrece **Llamar al hospital** y **Abrir en Mapas**; **Mi habitación** muestra tu cama si estás hospitalizado.
+
+## Quién vio mi expediente
+
+Lista quién consultó tus datos: fecha, rol y motivo, sin el nombre de la persona. En Android, **Actualizar** vuelve a cargar la lista.
+
+## Mis datos (Perfil)
+
+Puedes corregir tu teléfono, tu correo y tu dirección (en iOS, **Editar mis datos → Guardar cambios**). Los demás datos los corrige Recepción.

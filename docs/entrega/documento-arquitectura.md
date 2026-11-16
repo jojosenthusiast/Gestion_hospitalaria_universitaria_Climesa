@@ -4,7 +4,7 @@ Sistema de Gestión Hospitalaria Universitaria · Proyecto final de Desarrollo d
 
 > Todos los datos del sistema, de las pruebas y de este documento son ficticios.
 >
-> Este documento describe el código de la rama `feat/r-docs-entrega`, rebasada sobre `main` tras la fusión del PR #68 (commit `c762fd2`, 13-nov-2026). Cada afirmación remite a un archivo del repositorio y se verificó contra los controladores (`api/src/**`), el contrato (`contrato/openapi.json`), el menú web (`web/src/features/shell.tsx`), las secciones Android (`domain/AuthModels.kt`, campo `ready`) y `ios/README.md`. Lo que no existe se marca **parcial** o **pendiente**; lo que existe pero no se probó en un dispositivo real se dice.
+> Este documento describe el código de `main` en el commit `1a124e7` (15-nov-2026), con los PR #105 a #119 fusionados (fases 0 y 1 de la auditoría final). Cada afirmación remite a un archivo del repositorio y se verificó contra los controladores (`api/src/**`), las migraciones (`supabase/migrations/`), el contrato (`contrato/openapi.json`), el menú web (`web/src/features/shell.tsx`), las secciones Android (`domain/AuthModels.kt`) y las pestañas iOS (`ios/Core/Access.swift`). Lo que no existe se marca **parcial** o **pendiente**; lo que existe pero no se probó en un dispositivo real se dice.
 
 ## Contenido
 
@@ -42,13 +42,13 @@ El curso pide un ecosistema multiplataforma para un hospital universitario: app 
 | Información pública frente a privada | Política de la sección 8; `GET /publico/*` sin sesión y la pantalla pública de la web (`/publico`, `web/src/features/public-screen.tsx`) |
 | Una sola ambulancia con estados Disponible, En Servicio, En Mantenimiento | `ambulancia.unidad.estado` con esos tres valores; la semilla crea una única unidad. Solicitud, despacho, hitos, reporte prehospital y bitácora en `/ambulancia/*` (sección 4) |
 
-Roles del sistema (10): ADM (administración técnica), JOP (jefatura de operaciones), REC (recepción), AST (asistencia), ENF (enfermería), MED (médico), LAB (laboratorio), PAR (paramédico), DPD (delegado de protección de datos) y PAC (paciente). El catálogo está en `docs/arquitectura/datos/permisos.csv` (78 permisos).
+Roles del sistema (10): ADM (administración técnica), JOP (jefatura de operaciones), REC (recepción), AST (asistencia), ENF (enfermería), MED (médico), LAB (laboratorio), PAR (paramédico), DPD (delegado de protección de datos) y PAC (paciente). El catálogo está en `docs/arquitectura/datos/permisos.csv` (76 permisos). Plataformas por rol (`docs/arquitectura/datos/roles.csv`): ADM, JOP, LAB y DPD, solo web; REC, web y Android; AST, ENF y PAR, Android; MED y PAC, Android e iOS. La API no bloquea por plataforma; cada cliente muestra "Tu rol no usa esta aplicación" a los roles que no le corresponden (D-08).
 
 ## 2. Diseño UX/UI (Figma y sistema de diseño)
 
 | Entregable | Ubicación | Estado |
 |---|---|---|
-| Archivo de Figma | https://www.figma.com/design/bHJjbgi64I0p0Bnw8nho8e | Versión anterior. **No está sincronizado** con las pantallas actuales (`README.md`, sección "Figma y alcance") |
+| Archivo de Figma | https://www.figma.com/design/bHJjbgi64I0p0Bnw8nho8e | Versión anterior. **No está sincronizado** con las pantallas actuales y no refleja las fases 0 y 1 (MA-OPS-05, pendiente de la dueña del proyecto). La referencia vigente es el sistema de diseño en HTML de la fila siguiente |
 | Sistema de diseño (paleta clara y oscura, tipografía, estados de componentes) | `docs/diseno/claude-design/01-sistema-claro.html`, `02-sistema-oscuro.html`, `04-estados-y-avisos.html` | En HTML, versionado en el repositorio |
 | Prototipos por rol y plataforma | `docs/diseno/claude-design/05-…` a `19-…` (web por rol y Android por rol) | En HTML |
 | Inventario de pantallas (códigos W, A, I) | `docs/diseno/inventario-pantallas.md`, `docs/arquitectura/datos/pantallas.csv` | Generado por `tools/` |
@@ -119,34 +119,40 @@ Carpetas de `api/src`: `auth`, `users`, `accounts` (vinculación de cuentas), `p
 
 ## 4. Módulos y estado por módulo
 
-Estados: **Implementado** (API y al menos un cliente), **Parcial** (existe una parte; se indica cuál falta) y **Pendiente** (no existe). En Android, "pendiente" significa `ready=false` en `AndroidSection`: la sección muestra "Próxima entrega".
+Estados: **Implementado** (API y al menos un cliente), **Parcial** (existe una parte; se indica cuál falta) y **Pendiente** (no existe). Todas las secciones Android tienen `ready=true` (`domain/AuthModels.kt`): ninguna muestra "Próxima entrega". En las acciones por fila (citas, fila, admisiones, órdenes, servicios de ambulancia, invitaciones) la API envía `allowedActions` y los clientes muestran solo esos botones.
 
 | Módulo | API | Web | Android | iOS | Estado |
 |---|---|---|---|---|---|
-| Identidad, sesión y perfil | `/auth/me`, `/inicio`, `/eventos` | Ingreso, recuperar y restablecer contraseña, aceptar invitación, aterrizajes de correo; `/registro` solo orienta a la app (D-04) | Ingreso; un 401 renueva la sesión una vez y, si falla, vuelve al ingreso | I01, I02, I12 | Implementado |
-| Usuarios, invitaciones y roles | `/usuarios/*` | Sí | — | — | Implementado |
-| Pacientes (búsqueda, registro, provisionales, duplicados, ficha filtrada) | `/pacientes/*`, `/me/paciente` | Sí | Pacientes (REC), Paciente sin identidad (PAR) | Expediente (MED, I22) | Implementado |
-| Personal e inscripciones | `/personal/*` | Sí | — | — | Implementado |
-| Turnos del personal | `/turnos/*` | Sí | Mis turnos | Mis turnos (I26) | Implementado |
-| Edificio y espacios | `/espacios/*` | Sí | — | — | Implementado |
-| Camas (tablero, bloqueo, limpieza) | `/camas/*` | Sí | Tablero de camas | — | Implementado. Limpieza en Android pendiente (A52) |
-| Citas de 20 minutos | `/citas/*` | Sí | Mis citas (PAC) | Mis citas (I06) | Implementado. Citas de recepción en Android pendiente (A32) |
-| Fila del día | `/fila/*` | Sí | Emitir número, Mi turno, Mi consultorio | Mi turno (I05), Mi día (I20) | Implementado |
-| Consulta general (borrador, signos, diagnósticos CIE-10, receta, firma) | `/consultas/*` | Mi consultorio | Mi día, Consulta, Expediente. Signos vitales (A41) pendiente | Mi día, Consulta (I20, I21) | Implementado |
-| Laboratorio (orden, muestra con doble identificación, resultados, validación, revisión) | `/laboratorio/*`, `/me/laboratorio` | Sí | Sí | Mis exámenes (I07), Resultados por revisar (I23) | Implementado |
-| Hospitalización (admisión, cama, traslado, notas, alta, salida) | `/admisiones/*`, `/ocupaciones/{id}/traslado` | Sí, incluido el traslado | Admisión y cama, Mi planta, Mis hospitalizados, Paciente hospitalizado; sin traslado | Mis hospitalizados (I24) | Implementado. Notas de enfermería (`POST /admisiones/{id}/notas-enfermeria`): solo API |
-| Inventario (existencias, movimientos, artículos, alerta de mínimo) | `/inventario/*` | Sí | Consumo de insumos | — | Implementado |
-| Ambulancia (estado, mantenimiento) | `GET /ambulancia`, `POST /ambulancia/mantenimiento` | Sí | Unidad (A70) | — | Implementado |
-| Ambulancia (solicitud, despacho, hitos, ubicación, reporte prehospital, bitácora) | `/ambulancia/solicitudes`, `/servicios`, `/ubicacion`, `/bitacora` | Ambulancia y Bitácora de ambulancia | Pedir ambulancia (PAC), Despacho (REC), Servicio, Reporte prehospital, Paciente sin identidad, Mi bitácora (PAR), recepción (ENF, MED) | Pedir ambulancia (I09), Llegada de ambulancia (I25) | Implementado |
-| Información pública (ocupación, médicos de turno, fila, avisos) | `/publico/*` sin sesión y con límite de tasa; `POST /avisos` | Pantalla `/publico`; Avisos (JOP) | Hospital (A10) | Información del hospital (I10) | Implementado |
-| Métricas | `/metricas/tablero`, `/metricas/{indicador}` | Métricas (ADM, JOP, DPD) | — | — | Implementado (solo web) |
-| Auditoría (búsqueda y verificación de la cadena de hash) | `GET /auditoria` (persona, paciente, acción, fechas), `POST /auditoria/verificacion` | Auditoría (DPD) | — | — | Implementado |
-| "Quién vio mi expediente" | `GET /me/accesos` | — | A11 | I11 | Implementado |
-| Historial clínico completo | `GET /pacientes/{id}/historial` | Historial (`clinical-history.tsx`) | Mi historial (PAC), Expediente (MED) | Mi historial (I08), Expediente (I22) | Implementado |
-| Vinculación de cuenta PAC con expediente | `POST /cuentas/vinculacion`, `/cuentas/vinculaciones/*` | Vinculaciones (REC) | Vincular expediente (PAC, A03). Vinculaciones de recepción (A33) pendiente | Vincular expediente (I03) | Implementado |
-| Notificaciones push (FCM, APNs) | No | No | No | No | Pendiente |
+| Identidad, sesión y perfil | `/auth/me`, `/inicio`, `/eventos` | Ingreso, recuperar y restablecer contraseña, aceptar invitación, aterrizajes de correo; `/registro` solo orienta a la app (BL-06, D-04); aviso de arranque en frío (`web/src/lib/cold-start.ts`) | Ingreso, registro de paciente, reenvío de confirmación, recuperación; un 401 renueva la sesión una vez; aviso de arranque en frío (`data/ColdStart.kt`) | Ingreso, registro, recuperación, aviso de arranque en frío | Implementado |
+| Usuarios, invitaciones y roles | `/usuarios/*`: invitar, `/invitacion/reenvio`, `/invitacion/cancelacion` (con motivo), roles, estado | Personal (ADM gestiona; JOP y DPD consultan) | — | — | Implementado. PAC no se invita (`rol_no_invitable`); solo el administrador principal gestiona a otros ADM; desactivar revisa el trabajo abierto (`20261120004000_cuentas_invitaciones.sql`) |
+| Pacientes (búsqueda, registro, provisionales, duplicados, ficha filtrada) | `/pacientes/*`, `/me/paciente` | Pacientes (REC, JOP, LAB) | Pacientes (REC), Paciente sin identidad (PAR) | Pacientes (MED), Mis datos (PAC) | Implementado |
+| Personal e inscripciones | `/personal/*` | Personal | — | — | Implementado |
+| Turnos del personal | `/turnos/*`, `/turnos/especialistas`, `/turnos/cobertura` | Turnos (JOP planifica) | Mis turnos | Turnos (MED) | Implementado |
+| Asistencia y carga de turnos | `POST /turnos/{id}/entrada`, `POST /turnos/{id}/asistencia` | Asistencia, suplentes disponibles, carga del turno y motivo de emergencia (JOP) | Marcar mi entrada | Marcar mi entrada | Implementado. Máximo 72 h en 7 días y 6 días seguidos; descanso de 8 h (12 h tras 24 h); solo `ausente` saca de turno (`20261120003000_turnos_asistencia_carga.sql`) |
+| Edificio y espacios | `/espacios/*` | Edificio (ADM configura) | — | Información del hospital | Implementado |
+| Camas (tablero, bloqueo, limpieza) | `/camas/*` | Camas (JOP bloquea y limpia) | Tablero de camas (REC), Limpieza de camas (ENF) | — | Implementado |
+| Citas de 20 minutos | `/citas/*`, `/citas/{id}/reprogramar`, `/citas/reprogramaciones/{id}/aceptar` y `/rechazar`, `/citas/{id}/no-asistio` | Citas (REC) | Citas (REC), Mis citas (PAC) | Citas (PAC); solicitudes de reprogramación en Mi día (MED) | Implementado. Máximo 2 reprogramaciones por cadena y 2 solicitudes pendientes por paciente; el paciente cancela hasta 2 h antes (`20261120002000_citas_fila_fase01.sql`) |
+| Fila del día | `/fila/*`, `POST /fila/llamar-siguiente` | Fila del día (REC) | Emitir número (REC), Mi consultorio (AST), Mi turno (PAC), Mi día (MED) | Fila (PAC), Mi día (MED) | Implementado. "No se presentó" solo tras 3 llamados (`fila.llamados_para_ausencia`) |
+| Barrido de citas y fila | `AttentionSweepService` cada 60 s y antes de cada lectura, con bloqueo consultivo | — | — | — | Implementado. Vence solicitudes pasadas, marca `no_asistio` y cierra los números de días anteriores; audita como `SISTEMA` |
+| Consulta general (borrador, signos, diagnósticos CIE-10, receta, firma) | `/consultas/*`, `GET /consultas/sin-firmar` | — (MED no usa la web) | Mi día, Expediente (MED); Signos vitales (AST, ENF) | Mi día, Consulta (MED) | Implementado. Corrección por addendum: pendiente (D-06) |
+| Laboratorio (orden, muestra, resultados, validación, revisión) | `/laboratorio/*`, `/me/laboratorio` | Laboratorio (LAB) | Resultados por revisar (MED), Mis exámenes (PAC) | Resultados (MED), Exámenes (PAC) | Implementado |
+| Laboratorio: enmienda, revisión suplente, aviso crítico, catálogo | `POST /laboratorio/ordenes/{id}/enmendar`, `/catalogo/examenes` | Corregir resultado y filtro de críticos (LAB), Catálogo de laboratorio (ADM) | Aviso de valor crítico (MED) | Aviso de valor crítico (MED) | Implementado. La enmienda exige motivo de 10 caracteres o más y devuelve la orden a revisión; tras 2 h sin revisión puede revisar un médico de turno en el área de origen; el aviso crítico nunca llega al paciente (`20261121001000_laboratorio_enmienda_revision.sql`) |
+| Hospitalización (admisión, cama, traslado, notas, alta, salida) | `/admisiones/*`, `/ocupaciones/{id}/traslado` | Hospitalización (REC, JOP) | Admisión y cama (REC), Mi planta (ENF), Mis hospitalizados (MED) | Mis hospitalizados (MED) | Implementado |
+| Hospitalización: cierre del ciclo | `/admisiones/{id}/cancelar`, `/anular`, `/solicitar-alta`, `/revocar-alta`, `/tratante`, `/salida` | Cancelar admisión, Anular ingreso por error, Solicitar alta al médico tratante, Reasignar médico tratante, Revocar alta, Registrar salida | Cancelar admisión (REC), Firmar y revocar alta (MED), Registrar salida | Firmar y revocar alta (MED) | Implementado. Solo MED firma el alta (D-02); nada se borra: cancelar y anular dejan `cancelada` con autor y motivo (`20261120001000_admision_cierre_ciclo.sql`) |
+| Inventario (existencias, movimientos, artículos, alerta de mínimo) | `/inventario/*` | Inventario (JOP; LAB reactivos; ADM consulta y configura, sin movimientos) | Consumo de insumos (ENF) | — | Implementado. ADM recibió `inventario.ver` y se retiraron `recursos.*` (D-091, `20261121003100_recursos_inventario_adm.sql`) |
+| Ambulancia (estado, mantenimiento) | `GET /ambulancia`, `POST /ambulancia/mantenimiento` | Ambulancia (JOP) | Unidad (MED) | — | Implementado |
+| Ambulancia (solicitud, despacho, hitos, ubicación, reporte prehospital, bitácora) | `/ambulancia/solicitudes`, `/solicitudes/mias`, `/servicios`, `/ubicacion`, `/bitacora` | Ambulancia y Bitácora de ambulancia (JOP, REC; DPD solo bitácora) | Pedir ambulancia (PAC), Despacho (REC), Servicio y Bitácora (PAR) | Pedir ambulancia (PAC) | Implementado |
+| Ambulancia: tripulación, estados finales, entrega y cierre administrativo | `availableCrew` y `crew` en el despacho; `activeService.finalStates`; `POST /ambulancia/servicios/{id}/recepcion`; `GET /ambulancia/llegada`; `POST /ambulancia/servicios/{id}/cerrar` | Tripulación elegida por quien despacha; Cierre administrativo (JOP); la entrega se muestra | Tripulación (REC); Terminar sin llegar al hospital (PAR); Llegada o Recepción de ambulancia con Marcar recibido (MED, ENF) | Llegada de ambulancia con Marcar recibido (MED) | Implementado. Paramédico con cuenta y motorista de turno (RN-30); estados finales validados por hitos; recibe quien tiene turno en Emergencia (`P1-EMG`) o relación de atención (`20261121002000_ambulancia_fase1.sql`) |
+| Información pública (ocupación, médicos de turno, fila, avisos) | `/publico/*` sin sesión y con límite de tasa | Pantalla `/publico` | Hospital | Información del hospital | Implementado |
+| Avisos | `POST /avisos`, `PUT /avisos/{id}`, `POST /avisos/{id}/retirar`, `/me/avisos` | Avisos (JOP): publicar, editar, retirar | Avisos en Inicio | Avisos en Inicio | Implementado. Retirar exige motivo de 10 caracteres o más; un aviso retirado no cambia más (`20261121003000_aviso_editar_retirar.sql`) |
+| Métricas | `/metricas/tablero`, `/metricas/{indicador}` | Métricas (ADM, JOP, DPD), con exportación | — | — | Implementado (solo web) |
+| Auditoría (búsqueda y verificación de la cadena de hash) | `GET /auditoria`, `POST /auditoria/verificacion` | Auditoría (DPD), con exportación | — | — | Implementado |
+| "Quién vio mi expediente" | `GET /me/accesos` | — | Quién vio mi expediente (PAC) | Quién vio mi expediente (PAC) | Implementado |
+| Historial clínico completo | `GET /pacientes/{id}/historial` | — | Mi historial (PAC), Expediente (MED) | Mi historial (PAC), Pacientes (MED) | Implementado |
+| Vinculación de cuenta PAC con expediente | `POST /cuentas/vinculacion`, `/cuentas/vinculaciones/*` | Vinculaciones (REC) | Vinculaciones (REC), Vincular expediente (PAC) | Vincular expediente (PAC) | Implementado |
+| Notificaciones push (FCM, APNs) | No | No | No | No | Pendiente (D-09) |
 
-Fuentes: controladores en `api/src/**/*.controller.ts`, menú web en `web/src/features/shell.tsx`, secciones Android en `android/app/src/main/java/sv/edu/catolica/climesa/domain/AuthModels.kt` (campo `ready`; pendientes: A32, A33, A41, A52) y tabla de pantallas de `ios/README.md`.
+Fuentes: controladores en `api/src/**/*.controller.ts`, migraciones `20261119002000` a `20261121003200`, menú web en `web/src/features/shell.tsx`, secciones Android en `android/app/src/main/java/sv/edu/catolica/climesa/domain/AuthModels.kt` y pestañas iOS en `ios/Core/Access.swift`.
 
 
 ## 5. Clientes
@@ -165,19 +171,20 @@ Fuentes: controladores en `api/src/**/*.controller.ts`, menú web en `web/src/fe
 
 - Kotlin 2.1.20, Jetpack Compose (BOM 2025.04.01) con Material 3, Hilt 2.57.1, corrutinas y `StateFlow`, OkHttp 4.12. `minSdk` 26, `targetSdk`/`compileSdk` 35. `applicationId` `sv.edu.catolica.climesa`.
 - Patrón **MVVM**: pantallas Compose (`*Screen.kt`) que observan `ViewModel` con `StateFlow`; los ViewModel llaman a repositorios HTTP de forma asíncrona con corrutinas (`viewModelScope.launch`).
-- Las secciones se habilitan por permiso (`AndroidSection` en `domain/AuthModels.kt`); las que no están listas muestran su estado pendiente.
+- Las secciones se habilitan por permiso (`AndroidSection` en `domain/AuthModels.kt`); todas están listas. JOP, LAB, ADM y DPD ven "Tu rol no usa esta aplicación" con el enlace a la web. En teléfono, la barra muestra Inicio y hasta tres tareas; el resto va en **Más**.
 - Tiempo real nativo con el mismo protocolo que la web: `data/realtime/OkHttpRealtimeSocket.kt`, `RealtimeRepository.kt`, `SharedRealtime.kt`. Al llegar un evento se vuelven a pedir los datos de la pantalla abierta; no hay sondeo.
 - Fase 1: APK release firmado con las variables `CLIMESA_RELEASE_*` (sin ellas genera un APK sin firmar; ver `android/README.md`), 401 con una renovación y regreso al ingreso, cierre de sesión que descarta los ViewModels y una `Idempotency-Key` por intención del usuario (`SubmissionIntent`).
 - La sesión se guarda cifrada con Android Keystore; los pacientes remotos no se guardan en disco.
+- Versión `1.0.0` (`versionCode` 4). El build Release nunca incluye el inicio de sesión de prueba.
 - URL de la API: Debug usa `http://10.0.2.2:3000/api/v1` (emulador) salvo que `CLIMESA_API_BASE_URL` la sobrescriba; Release usa `https://sghu-api.onrender.com/api/v1` (`android/app/build.gradle.kts`).
 
 ### 5.3 iOS (`ios/`)
 
 - SwiftUI con MVVM (`@Observable` y servicios `actor`), `URLSession` con `async/await` y Keychain (`WhenUnlockedThisDeviceOnly`). iOS 17+, Xcode 15+. Sin dependencias externas; el núcleo `Core/` es un Swift Package con pruebas (`swift test`).
-- Roles Médico y Paciente. Las pestañas salen del perfil de `/auth/me` (`TabPolicy`); otro rol ve "Tu rol no usa esta aplicación". Pantallas I01 a I12 (PAC y comunes) e I20 a I26 (MED), con los endpoints de cada una en la tabla de `ios/README.md`.
+- Roles Médico y Paciente. Las pestañas salen del perfil de `/auth/me` (`ios/Core/Access.swift`); otro rol ve "Tu rol no usa esta aplicación". MED: Mi día, Pacientes, Resultados, Turnos y Más. PAC: Inicio, Fila, Citas, Exámenes y Más.
 - Tiempo real en `Core/Realtime` con el mismo protocolo Phoenix que web y Android; tras una caída se hace una sola consulta `GET /eventos?after=`.
 - Un 401 borra la sesión y vuelve al ingreso; la sesión se cierra al volver tras cinco minutos en segundo plano.
-- **Estado.** El workflow `ios.yml` (macOS 15) corre `swift test` y compila para simulador sin firma. **No** se probó en simulador ni en un iPhone con cuentas MED y PAC, y no se entrega IPA: instalar en un dispositivo o publicar en TestFlight requiere firmar con una cuenta de Apple. La paridad con Android no es total: faltan seguimiento y cancelación de la ambulancia del paciente, buscador CIE-10 y push (`docs/preguntas-abiertas.md`).
+- **Estado.** El workflow `ios.yml` (macOS 15) corre `swift test` y compila para simulador sin firma. **No** se probó en simulador ni en un iPhone con cuentas MED y PAC, y no se entrega IPA: instalar en un dispositivo o publicar en TestFlight requiere firmar con una cuenta de Apple. Versión `1.0.0`, build 4. El paciente sigue y cancela su solicitud de ambulancia (`/ambulancia/solicitudes/mias`); como en Android, no hay notificaciones push.
 
 ## 6. Modelo de datos
 
@@ -280,6 +287,12 @@ Las reglas concurrentes no dependen del cliente (`AGENTS.md`, regla 5):
 | Un servicio activo por ambulancia | Índice único parcial `servicio_activo_unico` donde `finalizado_en is null` (`20261017000900_ambulancia.sql`) |
 | Hitos de ambulancia en orden | Validación de la secuencia `salida → en_escena → trasladando → en_hospital → finalizado` (`20261017000900_ambulancia.sql`; despacho en `20261115001000_ambulancia_despacho.sql`) |
 | Una vinculación pendiente por cuenta | Restricciones de `20261115003000_vinculacion_invariantes.sql` |
+| Una persona no supera la carga ni descansa menos de lo exigido | Disparadores de `20261120003000_turnos_asistencia_carga.sql` (72 h en 7 días; descanso de 8 h, o 12 h tras 24 h; códigos `carga_semanal_excedida` y `descanso_insuficiente`) |
+| Un despacho lleva paramédico con cuenta y motorista de turno | Disparadores de `20261119002000_ambulancia_motorista_de_turno.sql` y `20261120001100_ambulancia_cierre_administrativo.sql` |
+| El estado final de un servicio corresponde a sus hitos; la entrega en el hospital es única | `estado_final_invalido` y disparador `servicio_cierre` (`20261121002000_ambulancia_fase1.sql`) |
+| Una consulta vigente por número de fila | Índice único (`20261119003000_consulta_ticket_unico.sql`) |
+| Una sola alta vigente por admisión; cancelar o anular no borra | `20261120001000_admision_cierre_ciclo.sql` |
+| Un aviso retirado no cambia | `aviso_retirado` (`20261121003000_aviso_editar_retirar.sql`) |
 | Auditoría inmutable | El rol de la API solo tiene `INSERT` y `SELECT` sobre la auditoría; cada fila guarda el hash de la anterior |
 
 Las pruebas `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` comprueban estas reglas sobre PostgreSQL nativo.
@@ -302,38 +315,46 @@ Las pruebas `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` comprue
 
 ### 7.2 Matriz resumida por rol
 
-Resumen de qué puede ver (V) y modificar (M) cada rol, según `docs/arquitectura/datos/permisos.csv`. El detalle completo por permiso está en el Anexo B y el permiso de cada endpoint en el Anexo A.
+Resumen de qué puede ver (V) y modificar (M) cada rol, según `docs/arquitectura/datos/permisos.csv` en `1a124e7`. El detalle completo por permiso está en el Anexo B y el permiso de cada endpoint en el Anexo A.
 
 | Área | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Usuarios y roles | V/M | · | · | · | · | · | · | · | V | · |
+| Usuarios, invitaciones y roles | V/M | · | · | · | · | · | · | · | V | · |
 | Personal | V/M | V | · | · | · | · | · | · | · | · |
-| Turnos | V | V/M | V | V | V | V | V | V | · | · |
+| Turnos (incluida la asistencia) | V | V/M | V | V | V | V | V | V | · | · |
 | Edificio y espacios | V/M | V | V | V | V | V | · | · | · | · |
-| Camas (tablero, asignación, traslado, bloqueo, limpieza) | · | V/M | V/M | · | V/M (área) | V | · | · | · | V (propio) |
-| Pacientes (ficha y registro) | · | V/M (duplicados) | V/M | V (área) | V/M (área; provisional) | V (relación) | V (orden) | V/M (relación; provisional) | · | V (propio) |
+| Camas: tablero | · | V | V | · | V | V | · | · | · | V (propio) |
+| Camas: asignar y trasladar | · | M | M | · | · | · | · | · | · | · |
+| Camas: bloquear | · | M | · | · | · | · | · | · | · | · |
+| Camas: limpieza (registrar y verificar) | · | M | · | · | M | · | · | · | · | · |
+| Pacientes (ficha y registro) | · | V/M (duplicados) | V/M | V (área) | V/M (área; provisional) | V (relación) | V (orden) | V/M (relación; provisional) | · | V/M (propio) |
 | Citas | · | V | V/M | V | · | V (propias) | · | · | · | V/M (propias) |
 | Fila del día | · | V | V/M | V/M | · | V/M | · | · | · | V (propio) |
-| Consulta, diagnósticos, recetas, signos | · | · | · | M (signos) | V (relación); M (signos) | V/M (relación) | · | M (signos) | · | V (propio, revisado) |
-| Laboratorio | M (catálogo) | · | · | · | V (relación) | V/M (ordenar, revisar) | V/M (procesar, validar) | · | · | V (propio, revisado) |
-| Hospitalización | · | V/M | V/M | · | V/M (área) | V/M (relación; indicar, alta) | · | · | · | V (propio) |
-| Inventario | M (configurar) | V/M | · | · | V/M (consumo) | · | V/M (reactivos) | · | · | · |
+| Consulta, diagnósticos y recetas | · | · | · | · | V (relación) | V/M (relación) | · | · | · | V (propio, revisado) |
+| Signos vitales | · | · | · | M | M | M | · | M | · | · |
+| Laboratorio: órdenes y revisión | · | · | · | · | V (relación) | V/M (ordenar, revisar) | V/M (procesar, validar, enmendar) | · | · | V (propio, revisado) |
+| Laboratorio: catálogo | M | · | · | · | · | · | · | · | · | · |
+| Hospitalización: admisión, cancelación y solicitud de alta | · | V/M (además autoriza excepciones) | V/M | · | V (área) | V/M (relación; indica hospitalización) | · | · | · | V (propio) |
+| Hospitalización: firma del alta | · | · | · | · | · | M (relación) | · | · | · | · |
+| Hospitalización: salida física | · | · | M | · | M | · | · | · | · | · |
+| Notas de enfermería | · | · | · | · | M (área) | · | · | · | · | · |
+| Inventario | V/M (configurar, sin movimientos) | V/M | · | · | V/M (consumo) | · | V/M (reactivos) | · | · | · |
 | Ambulancia: estado | · | V | V | · | · | V | · | V | · | · |
 | Ambulancia: mantenimiento | · | M | · | · | · | · | · | · | · | · |
+| Ambulancia: solicitud | · | · | M | · | · | · | · | · | · | M (propio) |
+| Ambulancia: despacho | · | M | M | · | · | · | · | · | · | · |
+| Ambulancia: hitos, ubicación y prehospital (registro) | · | · | · | · | · | · | · | M | · | · |
+| Ambulancia: recepción prehospital y entrega en el hospital | · | V | V | · | V/M (relación o turno en Emergencia) | V/M (relación o turno en Emergencia) | · | · | · | · |
+| Ambulancia: bitácora | · | V | V | · | · | V | · | V (propio) | V | · |
 | Auditoría (metadatos, búsqueda, verificación de cadena) | · | · | · | · | · | · | · | · | V | · |
 | Vinculación de cuenta con expediente | · | · | M (aprueba) | · | · | · | · | · | · | M (solicita, propio) |
 | "Quién vio mi expediente" | · | · | · | · | · | · | · | · | · | V (propio) |
-| Ambulancia: solicitud | · | · | M | · | · | · | · | · | · | M |
-| Ambulancia: despacho | · | M | M | · | · | · | · | · | · | · |
-| Ambulancia: hitos, ubicación y prehospital (registro) | · | · | · | · | · | · | · | M | · | · |
-| Ambulancia: recepción prehospital | · | V | V | · | V | V | · | · | · | · |
-| Ambulancia: bitácora | · | V | V | · | · | · | · | V | V | · |
-| Avisos públicos | · | M | · | · | · | · | · | · | · | · |
+| Avisos públicos (publicar, editar y retirar) | · | M | · | · | · | · | · | · | · | · |
 | Métricas | V | V | · | · | · | · | · | · | V | · |
 
-Contextos: "área" significa con turno en curso en el área del paciente; "relación", con relación de atención; "orden", solo pacientes con orden de laboratorio; "propio", solo lo del propio paciente.
+Contextos: "área" significa con turno en curso en el área del paciente; "relación", con relación de atención; "orden", solo pacientes con orden de laboratorio; "propio", solo lo del propio paciente o servicio. Reglas que van además del permiso y viven en la API: la entrega en el hospital exige `expediente.ver` y turno en curso en Emergencia (`P1-EMG`) o relación de atención (`api/src/ambulance/ambulance.rules.ts`); el cierre administrativo de un servicio es de JOP; el médico de la cita acepta o rechaza las reprogramaciones que pide el paciente.
 
-La tabla es una lectura humana del CSV; si difiere, manda `permisos.csv`, que es la fuente que usan la base (`20261017000210_acceso_semilla.sql`, generada) y las pruebas.
+La tabla es una lectura humana del CSV; si difiere, manda `permisos.csv`, que es la fuente de las migraciones de permisos (generadas por `tools/generar_docs.py`) y de las pruebas.
 
 ## 8. Política de privacidad de datos
 
@@ -443,11 +464,12 @@ flowchart LR
 | Base, Auth y Realtime | Proyecto Supabase "Gestion hospitalaria universitaria (Climesa)" | Migraciones aplicadas a mano en orden de fecha (`docs/desarrollo/ges-15-supabase-remoto.md`); no se usa `supabase db push` |
 
 - `autoDeploy: false` en ambos servicios: el despliegue es manual desde el panel de Render.
-- **Pendiente de la dueña del proyecto (Render).** `render.yaml` ya contiene la reescritura `/*` → `/index.html` y las cabeceras de seguridad, pero Render no las aplica solo: hay que sincronizarlas en el panel (Blueprint o reglas del sitio estático). Mientras no se haga, la producción responde 404 en `/publico`, `/recuperar`, `/restablecer`, `/confirmar-correo` y `/aceptar-invitacion`.
-- **Base de datos de producción.** Todas las migraciones hasta `20261116002000_fase1_contrato_api.sql` están aplicadas, salvo `20261114000300_ticket_activo_unico.sql`, que se aplica pasada la medianoche local del 14-nov (depende de la fecha). Se aplican a mano; no se usa `supabase db push`.
+- **Pendiente de la dueña del proyecto (Render).** `render.yaml` ya contiene la reescritura `/*` → `/index.html` y las cabeceras de seguridad, pero Render no las aplica solo si el servicio no sigue el Blueprint. El build copia `index.html` como `404.html`, así que los enlaces profundos cargan igual, aunque con estado 404 y sin cabeceras hasta que se sincronicen.
+- **`WEB_APP_URL`.** En producción la API no arranca si falta, si no es HTTPS o si apunta a localhost (`docs/operacion/correo-auth.md`).
+- **Base de datos de producción.** Las migraciones se aplican a mano en el SQL Editor, en orden de fecha y después de la comprobación previa que trae cada archivo; no se usa `supabase db push`. El procedimiento y la lista de las 15 migraciones de las fases 0 y 1 (`20261119002000` a `20261121003200`) están en `docs/operacion/runbook-operador.md`.
 - Las variables secretas (`SUPABASE_SECRET_KEY`, `DATABASE_URL`) se escriben a mano en Render (`sync: false`).
 - La API se conecta por el *Session pooler* de Supabase porque la conexión directa es solo IPv6.
-- El plan gratuito duerme la API tras 15 minutos sin tráfico; la primera llamada tarda cerca de un minuto (`docs/desarrollo/despliegue-render.md`).
+- El plan gratuito duerme la API tras 15 minutos sin tráfico; la primera llamada tarda cerca de un minuto (`docs/desarrollo/despliegue-render.md`). Los tres clientes reintentan con espera creciente (2, 5 y 10 s) y muestran "El servidor se está activando" a los 5 s; la web pide `/salud` al abrir el ingreso (MA-OPS-01).
 
 ## 12. Integración continua
 
@@ -455,11 +477,11 @@ Un workflow de GitHub Actions por componente, que solo corre cuando cambian sus 
 
 | Workflow | Qué ejecuta |
 |---|---|
-| `api.yml` | Node 22: instalación, ESLint, pruebas Jest y compilación de la API |
+| `api.yml` | Node 22: instalación, ESLint, pruebas Jest, compilación y comprobación de que `contrato/openapi.json` está al día |
 | `web.yml` | Node 22: instalación, ESLint, pruebas Vitest y compilación de la web |
 | `android.yml` | JDK 17: `./gradlew testDebugUnitTest assembleDebug` |
-| `ios.yml` | macOS 15: `swift test` y `xcodebuild` para simulador |
-| `supabase.yml` | PostgreSQL en Docker: todas las migraciones, `01_invariantes.sql` y `02_concurrencia.sh` |
+| `ios.yml` | macOS 15: `swift test`, `xcodebuild` para simulador y un IPA sin firmar |
+| `supabase.yml` | Job `postgres-native`: PostgreSQL en Docker, todas las migraciones, `01_invariantes.sql` y `02_concurrencia.sh`. Tiene una falla intermitente conocida cuando la base responde antes de terminar la semilla; se vuelve a ejecutar (runbook, sección 7) |
 | `docs.yml` | Python: `generar_docs.py`, `progreso.py` y `backlog.py` con `--verificar` |
 
 El despliegue no está conectado a CI: no hay un gate que impida desplegar un commit con pruebas fallidas.
@@ -468,14 +490,14 @@ El despliegue no está conectado a CI: no hay un gate que impida desplegar un co
 
 | Componente | Pruebas en esta rama | Herramienta |
 |---|---|---|
-| API | 43 archivos `*.spec.ts` en `api/tests/` (pipeline HTTP, RBAC, privacidad, tiempo real, módulos clínicos, ambulancia, público, métricas, vinculación) | Jest sobre PostgreSQL WASM (PGlite) con todas las migraciones |
-| Web | 33 archivos de prueba en `web/src` | Vitest |
-| Android | 38 archivos de prueba en `android/app/src/test` | JUnit (`testDebugUnitTest`) |
-| iOS | 6 archivos en `ios/Tests` (contrato, reglas, tiempo real); el workflow `ios.yml` ejecuta `swift test` y compila para simulador | XCTest (no ejecutado en este entorno) |
+| API | 66 archivos `*.spec.ts` en `api/tests/` (pipeline HTTP, RBAC, privacidad, tiempo real, módulos clínicos, ambulancia, público, métricas, vinculación, contrato móvil) | Jest sobre PostgreSQL WASM (PGlite) con todas las migraciones |
+| Web | 57 archivos de prueba en `web/src` | Vitest |
+| Android | 71 archivos de prueba en `android/app/src/test` | JUnit (`testDebugUnitTest`) |
+| iOS | 19 archivos en `ios/Tests` (contrato, reglas, tiempo real); el workflow `ios.yml` ejecuta `swift test` y compila para simulador | XCTest (no ejecutado en este entorno) |
 | Base de datos | `supabase/pruebas/01_invariantes.sql`, `02_concurrencia.sh` | PostgreSQL nativo en Docker |
 | Documentación | `tools/progreso.py --verificar`, `tools/generar_docs.py --verificar` | Python |
 
-Última ejecución registrada (`docs/ESTADO_DESARROLLO_2026-11-13.md`, anterior a la integración de las fases 1): API 25 suites y 273 pruebas en verde; web 13 archivos y 143 pruebas en verde. Los conteos de esta sección son de archivos y se obtuvieron contando los archivos del repositorio; este documento no vuelve a ejecutar las pruebas. La CI de cada pull request las ejecuta.
+Los conteos de esta sección son de archivos y se obtuvieron contando los archivos del repositorio en `1a124e7`; este documento no vuelve a ejecutar las pruebas. La CI de cada pull request las ejecuta.
 
 PGlite usa una sola conexión y no demuestra carreras entre sesiones; esas carreras se cubren con `02_concurrencia.sh` sobre PostgreSQL nativo.
 
@@ -497,27 +519,30 @@ Archivos: `docs/decisiones/adr/ADR-0001-…` a `ADR-0008-…` y `docs/decisiones
 
 ## 15. Limitaciones conocidas
 
-1. **Despliegue manual y configuración de Render sin sincronizar.** Render no despliega solo ni espera a CI. Hasta que la dueña sincronice `render.yaml` (reescritura y cabeceras), producción da 404 en `/publico`, `/recuperar`, `/restablecer`, `/confirmar-correo` y `/aceptar-invitacion`. Las migraciones de la nube se aplican a mano; `20261114000300` queda para después de la medianoche local del 14-nov.
-2. **Inicio de sesión de prueba.** Si se fusiona el selector temporal de rol (`docs/operacion/login-de-prueba.md`), debe desactivarse antes de la entrega.
-3. **iOS sin probar en dispositivo.** Compila y pasa `swift test` en CI, pero no se ejecutó en simulador ni iPhone con cuentas reales; no hay IPA ni TestFlight.
-4. **Sin notificaciones push.** FCM y APNs no están construidos; los cambios llegan solo con la app abierta (Realtime).
-5. **Pantallas Android pendientes.** Citas y Vinculaciones de recepción, Signos vitales (AST y ENF) y Limpieza de camas (`ready=false`); la web cubre esas funciones. Traslado de cama y notas de enfermería no tienen pantalla móvil.
-6. **Addendum.** `atencion.addendum` existe sin endpoint; una consulta firmada no se corrige.
-7. **Figma desactualizado.** El sistema de diseño vigente está en HTML dentro del repositorio.
-8. **Plan gratuito de Render.** La API duerme tras 15 minutos sin tráfico.
-9. **Cursor de recuperación.** Un evento de una transacción lenta puede quedar por debajo del cursor; se mitiga porque el cliente vuelve a pedir todas sus vistas al reconectar (`docs/arquitectura/tiempo-real.md`).
-10. **Pruebas contra Supabase real.** Las pruebas de API usan PGlite con identidad simulada; no sustituyen el login, el correo y la concurrencia multisesión en la nube.
+1. **Despliegue y migraciones manuales.** Render no despliega solo ni espera a CI (`autoDeploy: false`). Las migraciones de la nube se aplican a mano en el SQL Editor (`docs/operacion/runbook-operador.md`). Si `sghu-web` no sigue el Blueprint, la reescritura y las cabeceras de `render.yaml` se crean en el panel.
+2. **Datos demo de una semilla anterior.** La semilla actual usa solo las camas reales de P2 y P3 (BL-01). Si producción conserva la planta 4 de una semilla anterior, se retira con `tools/demo/limpiar-demo.sql`, con respaldo previo y aprobación (D-01).
+3. **Inicio de sesión de prueba.** Debe quedar apagado y las contraseñas demo rotadas antes de la entrega (`docs/operacion/login-de-prueba.md`).
+4. **iOS sin probar en dispositivo.** Compila y pasa `swift test` en CI, pero no se ejecutó en simulador ni iPhone con cuentas reales; no hay IPA firmado ni TestFlight.
+5. **Sin notificaciones push (D-09).** FCM y APNs no están construidos; los cambios llegan solo con la app abierta (Realtime).
+6. **Addendum (D-06).** `atencion.addendum` y el permiso `consulta.corregir` existen sin endpoint; una consulta firmada no se corrige.
+7. **Figma no sincronizado (MA-OPS-05).** El archivo de Figma es una versión anterior y no refleja las fases 0 y 1. El sistema de diseño vigente está en HTML dentro del repositorio (`docs/diseno/claude-design/`).
+8. **Plan gratuito de Render.** La API duerme tras 15 minutos sin tráfico; los clientes avisan y reintentan, pero la primera llamada tarda cerca de un minuto.
+9. **Correo de Supabase Auth.** Sin SMTP propio con SPF y DKIM (D-15), los correos de cuenta pueden llegar a spam (`docs/operacion/correo-auth.md`).
+10. **Cursor de recuperación.** Un evento de una transacción lenta puede quedar por debajo del cursor; se mitiga porque el cliente vuelve a pedir todas sus vistas al reconectar (`docs/arquitectura/tiempo-real.md`).
+11. **Pruebas contra Supabase real.** Las pruebas de API usan PGlite con identidad simulada; no sustituyen el login, el correo y la concurrencia multisesión en la nube. El job `postgres-native` tiene una falla intermitente conocida (sección 12).
+12. **Plataforma por rol (D-08).** Es una restricción de interfaz: la API autoriza por permiso, no por plataforma.
 
 ---
 
 ## Anexo A. Endpoints y permiso requerido
 
-Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 108 operaciones bajo `/api/v1`. Cuando se listan varios permisos, basta con tener uno. "Sin sesión" son `/health`, `/salud` y `/publico/*`. Toda escritura exige `Idempotency-Key` y, si cambia un registro existente, su `version`. Los errores son `application/problem+json`. La documentación interactiva está en `/api/v1/docs`.
+Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 160 operaciones bajo `/api/v1`. Cuando se listan varios permisos, basta con tener uno. "Sin sesión" son `/health`, `/salud` y `/publico/*`. Toda escritura exige `Idempotency-Key` y, si cambia un registro existente, su `version`. Los errores son `application/problem+json`. La documentación interactiva está en `/api/v1/docs`.
 
 | Método | Ruta (`/api/v1`) | Permiso requerido | Qué hace |
 |---|---|---|---|
 | GET | `/pacientes` | `pacientes.buscar` | Buscar por nombre, fonética, DUI o expediente; devuelve campos mínimos |
 | POST | `/pacientes` | `pacientes.registrar` | Registrar después de buscar; expediente y DUI exclusivos |
+| GET | `/pacientes/selector` | `pacientes.buscar` | Selector de pacientes: id, expediente, nombre y edad, paginado y sin tildes |
 | POST | `/pacientes/busquedas` | `pacientes.buscar` | Buscar y obtener constancia de diez minutos, ligada a la cuenta y criterios |
 | GET | `/pacientes/casos-duplicado` | `pacientes.gestionar_duplicados` | Casos abiertos de posible duplicado con los dos pacientes mínimos |
 | GET | `/pacientes/{id}` | `pacientes.ver_ficha` | Ficha filtrada por rol y relación de atención |
@@ -525,22 +550,30 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 | POST | `/pacientes/provisionales` | `pacientes.registrar_provisional` | Registrar identidad provisional sin inventar fecha exacta |
 | POST | `/pacientes/{id}/estado` | `pacientes.editar_demograficos` | Inactivar o reactivar sin eliminar historial |
 | GET | `/me/paciente` | `pacientes.ver_ficha` | Ficha del paciente autenticado |
+| PATCH | `/me/paciente` | `pacientes.editar_propios` | El paciente edita su teléfono, correo y dirección; versión optimista e historial |
 | GET | `/auth/me` | `sesion.perfil` | Cuenta activa, roles, plataformas y permisos vigentes en la base |
-| GET | `/usuarios` | `usuarios.ver` | Cuentas, roles, estado y vínculo con personal |
-| POST | `/usuarios/invitaciones` | `usuarios.invitar` | Invitar paciente o personal con roles autorizados por el administrador |
+| GET | `/usuarios` | `usuarios.ver` | Cuentas, roles, estado, invitación y acciones permitidas a quien consulta |
+| POST | `/usuarios/invitaciones` | `usuarios.invitar` | Invitar personal con roles autorizados por el administrador (el paciente se registra en la app) |
+| POST | `/usuarios/{id}/invitacion/reenvio` | `usuarios.invitar` | Reenviar una invitación pendiente |
+| POST | `/usuarios/{id}/invitacion/cancelacion` | `usuarios.invitar` | Cancelar una invitación pendiente; desactiva la cuenta invitada |
 | PATCH | `/usuarios/{id}/roles` | `usuarios.asignar_roles` | Cambiar roles; prohíbe autoasignación y protege el último administrador |
 | PATCH | `/usuarios/{id}/estado` | `usuarios.desactivar` | Desactivar o reactivar; no desactiva al último administrador |
-| GET | `/health` | sin sesión | Comprueba que la API está disponible |
-| GET | `/salud` | sin sesión | Readiness: API y conexión PostgreSQL operativas |
+| GET | `/health` | `publico` | Comprueba que la API está disponible |
+| GET | `/salud` | `publico` | Readiness: API y conexión PostgreSQL operativas |
 | GET | `/inicio` | `sesion.perfil` | Resumen permitido para la cuenta actual |
 | GET | `/personal` | `personal.ver` | Directorio de personal con o sin cuenta |
 | POST | `/personal` | `personal.gestionar` | Registrar personal |
+| GET | `/personal/especialidades` | `personal.ver` | Catálogo de especialidades por categoría (tipo de personal) |
 | PATCH | `/personal/{id}` | `personal.gestionar` | Editar o inactivar personal con versión y motivo |
 | POST | `/personal/{id}/inscripciones` | `personal.gestionar` | Registrar inscripción profesional con vigencia, versión y motivo |
 | GET | `/turnos` | `turnos.ver` | Consultar la planificación de turnos |
 | POST | `/turnos` | `turnos.planificar` | Planificar turno con duración, traslapes y descanso |
+| GET | `/turnos/catalogo` | `turnos.ver` | Catálogo completo de áreas, funciones y personal para filtrar y asignar turnos |
 | GET | `/turnos/mios` | `turnos.ver` | Turnos publicados de la persona vinculada a la cuenta |
 | GET | `/turnos/cobertura` | `turnos.ver` | Huecos de cobertura por área y hora frente al mínimo vigente |
+| GET | `/turnos/especialistas` | `turnos.ver` | Médicos de turno por día y especialidad durante 7 días (CARGA-04) |
+| POST | `/turnos/{id}/entrada` | `turnos.ver` | Marcar la entrada del turno propio (ASIS-01) |
+| POST | `/turnos/{id}/asistencia` | `turnos.planificar` | Marcar entrada, ausencia (con tipo y motivo) o deshacer la marca de un turno (ASIS-01 a ASIS-03) |
 | POST | `/turnos/publicar` | `turnos.publicar` | Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó |
 | PATCH | `/turnos/{id}` | `turnos.planificar` | Mover o cancelar turno con versión y motivo |
 | GET | `/espacios` | `espacios.ver` | Árbol, rutas y disponibilidad recursiva por espacio |
@@ -553,20 +586,26 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 | POST | `/camas/{id}/limpieza/completar` | `camas.registrar_limpieza` | Registrar la limpieza realizada con versión y motivo |
 | POST | `/camas/{id}/limpieza/verificar` | `camas.verificar_limpieza` | Verificar la limpieza realizada por otra persona |
 | GET | `/eventos` | `sesion.perfil` | Eventos delgados de canales autorizados para recuperar cambios tras reconexión |
-| GET | `/citas/catalogos` | `citas.agendar` o `citas.solicitar` | Consultar pacientes y médicos disponibles para agendar |
-| GET | `/citas/disponibilidad` | `citas.agendar` o `citas.solicitar` | Consultar franjas libres de un médico para una fecha |
+| GET | `/citas/catalogos` | `citas.agendar` o `citas.solicitar` | Médicos activos (con date indica quién tiene turno ese día); a recepción ya no devuelve pacientes: se buscan con /pacientes/selector |
+| GET | `/citas/disponibilidad` | `citas.agendar` o `citas.solicitar` | Consultar las franjas del día de un médico con su estado (libre, ocupado, sin_turno, pasado) |
 | GET | `/citas` | `citas.ver` | Consultar citas del rango permitido por el rol |
 | POST | `/citas` | `citas.agendar` | Agendar y confirmar una cita desde recepción |
 | POST | `/citas/solicitudes` | `citas.solicitar` | Solicitar una cita como paciente |
 | POST | `/citas/solicitudes/{id}/confirmar` | `citas.agendar` | Confirmar una solicitud de cita |
 | POST | `/citas/solicitudes/{id}/rechazar` | `citas.agendar` | Rechazar una solicitud de cita |
 | POST | `/citas/{id}/cancelar` | `citas.cancelar` | Cancelar una cita propia o gestionada por recepción |
+| POST | `/citas/{id}/reprogramar` | `citas.agendar` o `citas.solicitar` | Reprogramar a una franja libre del mismo médico: recepción la aplica; el paciente deja una solicitud que la cita original conserva hasta que se acepta |
+| POST | `/citas/reprogramaciones/{id}/aceptar` | `citas.agendar` o `consulta.iniciar` | Aceptar una solicitud de reprogramación (recepción o el médico de la cita) |
+| POST | `/citas/reprogramaciones/{id}/rechazar` | `citas.agendar` o `consulta.iniciar` | Rechazar una solicitud de reprogramación con motivo (recepción o el médico de la cita) |
+| POST | `/citas/{id}/no-asistio` | `citas.agendar` | Marcar que el paciente no asistió (la hora ya llegó y no hay consulta) |
 | GET | `/consultas/agenda` | `consulta.iniciar` | Agenda propia del médico con estado de consulta |
+| GET | `/consultas/sin-firmar` | `consulta.iniciar` | Consultas abiertas propias de cualquier día, para reanudarlas y firmarlas |
 | POST | `/consultas` | `consulta.iniciar` | Iniciar una consulta desde una cita confirmada |
 | PATCH | `/consultas/{id}` | `consulta.registrar` | Guardar el borrador clínico de una consulta |
 | POST | `/consultas/{id}/firmar` | `consulta.registrar` | Firmar la consulta y marcar la cita como atendida |
 | GET | `/fila` | `fila.ver` | Consultar la fila del día |
 | POST | `/fila` | `fila.emitir` | Emitir un número para el paciente actual o indicado |
+| POST | `/fila/llamar-siguiente` | `fila.llamar` | Llamar el siguiente número en espera del servicio (orden de llegada) |
 | POST | `/fila/{id}/llamar` | `fila.llamar` | Llamar un número de fila |
 | POST | `/fila/{id}/atender` | `fila.gestionar` | Pasar un número llamado a atención |
 | POST | `/fila/{id}/completar` | `fila.gestionar` | Marcar un número como atendido |
@@ -576,60 +615,95 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 | POST | `/consultas/{id}/diagnosticos` | `consulta.registrar` | Registrar un diagnóstico CIE-10 |
 | POST | `/consultas/{id}/receta` | `recetas.emitir` | Emitir una receta con sus indicaciones |
 | GET | `/pacientes/{id}/historial` | `expediente.ver` | Historial clínico: relación o propio revisado |
+| GET | `/pacientes/{id}/signos` | `signos.registrar` | Historial de signos vitales del paciente, el más reciente primero |
+| POST | `/pacientes/{id}/signos` | `signos.registrar` | Registrar signos vitales de un paciente fuera de una consulta |
 | GET | `/laboratorio/catalogo` | `laboratorio.ordenar` o `catalogo.configurar` | Catálogo activo de exámenes y paneles |
 | GET | `/laboratorio/ordenes` | `laboratorio.ver_cola` o `resultados.ver` | Cola de laboratorio o resultados permitidos |
 | POST | `/laboratorio/ordenes` | `laboratorio.ordenar` | Crear una orden de laboratorio desde una consulta |
+| GET | `/laboratorio/ordenes/{id}` | `resultados.ver` | Detalle de una orden: resultados permitidos, motivo de cancelación e historial de correcciones |
 | POST | `/laboratorio/ordenes/{id}/muestra` | `laboratorio.procesar` | Tomar muestra y pasar la orden a proceso |
 | POST | `/laboratorio/ordenes/{id}/resultados` | `laboratorio.procesar` | Capturar o actualizar el resultado de un examen |
+| POST | `/laboratorio/ordenes/{id}/enmendar` | `laboratorio.validar` | Enmendar un resultado de una orden completada; vuelve a revisión médica |
 | POST | `/laboratorio/ordenes/{id}/completar` | `laboratorio.validar` | Completar una orden con todos sus resultados |
 | POST | `/laboratorio/ordenes/{id}/revisar` | `laboratorio.revisar` | Revisar y liberar resultados al paciente |
 | POST | `/laboratorio/ordenes/{id}/cancelar` | `laboratorio.cancelar` | Cancelar una orden pendiente o en proceso |
 | GET | `/me/laboratorio` | `resultados.ver` | Mis exámenes: estado siempre; valores solo revisados |
+| GET | `/catalogo/examenes` | `catalogo.configurar` | Catálogo completo de exámenes con componentes y rangos vigentes |
+| PUT | `/catalogo/examenes/{id}` | `catalogo.configurar` | Editar nombre, unidad, estado y rangos de un examen (los rangos se versionan por vigencia) |
+| GET | `/admisiones/origenes` | `admision.crear` | Registros recientes del paciente que pueden originar el ingreso |
+| GET | `/admisiones/medicos-disponibles` | `admision.crear` | Médicos con su disponibilidad (turno) en el instante de ingreso |
+| GET | `/admisiones/mapa-camas` | `admision.crear` | Camas por planta y habitación con su compatibilidad para el paciente |
+| GET | `/admisiones/factibilidad` | `admision.crear` | Comprobación previa a confirmar el ingreso (sin escribir) |
 | GET | `/admisiones` | `admision.ver` | Admisiones visibles para el actor |
 | POST | `/admisiones` | `admision.crear` | Crear una admisión |
 | GET | `/admisiones/{id}/sugerencias-cama` | `camas.asignar` |  |
 | POST | `/admisiones/{id}/cama` | `camas.asignar` |  |
 | POST | `/admisiones/{id}/autorizar` | `admision.autorizar` |  |
 | POST | `/admisiones/{id}/notas-enfermeria` | `enfermeria.registrar` |  |
+| GET | `/admisiones/{id}/notas-enfermeria` | `enfermeria.registrar` | Notas de enfermería de la admisión, de la más reciente a la más antigua |
 | POST | `/admisiones/{id}/alta` | `alta.firmar` |  |
 | POST | `/admisiones/{id}/salida` | `admision.registrar_salida` |  |
+| POST | `/admisiones/{id}/cancelar` | `admision.crear` | Cancelar una admisión pendiente de cama, con motivo |
+| POST | `/admisiones/{id}/anular` | `admision.autorizar` | Anular una hospitalización ingresada por error: cierra la ocupación y la cama pasa a limpieza |
+| POST | `/admisiones/{id}/tratante` | `admision.autorizar` | Reasignar el médico tratante, con motivo |
+| POST | `/admisiones/{id}/solicitar-alta` | `admision.crear` | Pedir al médico tratante que firme el alta (le llega un aviso en vivo) |
+| POST | `/admisiones/{id}/revocar-alta` | `alta.firmar` o `admision.autorizar` | Revocar un alta firmada antes de la salida física (el firmante o Jefatura) |
 | POST | `/admisiones/indicaciones` | `admision.solicitar` |  |
 | POST | `/ocupaciones/{id}/traslado` | `camas.trasladar` | Trasladar una ocupación a otra cama |
 | GET | `/inventario/existencias` | `inventario.ver` | Existencias por bodega, lote y vencimiento |
 | GET | `/inventario/movimientos` | `inventario.ver` | Historial de movimientos |
-| POST | `/inventario/movimientos` | `inventario.mover` | Registrar entrada, salida, ajuste, traslado o consumo |
+| POST | `/inventario/movimientos` | `inventario.mover` | Registrar entrada, salida, ajuste, traslado, consumo o merma |
+| GET | `/inventario/articulos` | `inventario.ver` | Artículos con resumen de existencia y estado, según lo que el rol puede ver |
 | POST | `/inventario/articulos` | `inventario.configurar` | Crear artículo de inventario |
+| GET | `/inventario/articulos/{id}` | `inventario.ver` | Detalle del artículo: lotes con vencimiento, existencia por bodega e historial |
 | PUT | `/inventario/articulos/{id}` | `inventario.configurar` | Editar artículo de inventario |
+| DELETE | `/inventario/articulos/{id}` | `inventario.configurar` | Eliminar un artículo creado por error; con lotes o historial solo se desactiva |
+| GET | `/inventario/bodegas` | `inventario.ver` | Bodegas donde el rol puede mover existencias |
+| GET | `/inventario/lotes` | `inventario.ver` | Lotes de un artículo con su cantidad en una bodega, el que vence primero marcado (FEFO) |
+| POST | `/inventario/articulos/{id}/lotes` | `inventario.configurar` | Crear lote de un artículo |
+| PUT | `/inventario/lotes/{id}` | `inventario.configurar` | Editar vencimiento, número o baja de un lote |
 | GET | `/auditoria` | `auditoria.ver` | Metadatos de auditoría por persona, paciente, acción y fecha; no contiene valores clínicos |
+| GET | `/auditoria/registros` | `auditoria.ver` | Auditoría paginada y ordenable por persona, rol, paciente, acción, entidad, resultado y fecha |
+| GET | `/auditoria/opciones` | `auditoria.ver` | Acciones, entidades y roles que existen en la auditoría, para los filtros |
+| GET | `/auditoria/registros/{seq}` | `auditoria.ver` | Detalle de una fila de auditoría: quién, qué, cuándo, metadatos y hashes de la cadena |
 | POST | `/auditoria/verificacion` | `auditoria.ver` | Verificar la integridad de la cadena de hash de la auditoría |
+| POST | `/exportaciones` | `sesion.perfil` | Registrar en la auditoría una exportación de lista (CSV, Excel o PDF) hecha en la web |
 | GET | `/me/accesos` | `auditoria.mis_accesos` | Quién vio mi expediente: fecha, rol y motivo, sin nombres del personal |
 | POST | `/cuentas/vinculacion` | `cuenta.vincular` | El paciente pide vincular su cuenta con DUI y fecha de nacimiento |
 | GET | `/cuentas/vinculaciones` | `cuentas.verificar` | Vinculaciones pendientes con el expediente que coincide |
 | POST | `/cuentas/vinculaciones/{id}/aprobar` | `cuentas.verificar` | Aprobar vinculación tras verificar identidad |
 | POST | `/cuentas/vinculaciones/{id}/rechazar` | `cuentas.verificar` | Rechazar vinculación con motivo obligatorio |
-| GET | `/publico/ocupacion` | sin sesión | Ocupación por planta y tipo, solo agregados |
-| GET | `/publico/medicos-de-turno` | sin sesión | Médicos de turno: nombre, especialidad y área |
-| GET | `/publico/avisos` | sin sesión | Avisos vigentes |
-| GET | `/publico/fila/{servicio}` | sin sesión | Números llamados hoy con su consultorio, sin nombres |
+| GET | `/publico/ocupacion` | `publico` | Ocupación por planta y tipo, solo agregados |
+| GET | `/publico/hospital` | `publico` | Dirección, teléfono y coordenadas del hospital |
+| GET | `/publico/medicos-de-turno` | `publico` | Médicos de turno: nombre, especialidad y área |
+| GET | `/publico/avisos` | `publico` | Avisos vigentes |
+| GET | `/publico/fila/{servicio}` | `publico` | Números llamados hoy con su consultorio, sin nombres |
+| GET | `/avisos` | `avisos.publicar` | Avisos recientes con su audiencia, prioridad y estado, para quien los redacta |
 | POST | `/avisos` | `avisos.publicar` | Publicar un aviso general con vigencia; advierte si parece llevar datos personales |
-| PUT | `/avisos/{id}` | `avisos.publicar` | Editar un aviso vigente o programado (texto, audiencia, prioridad y vigencia), con versión y auditoría |
-| POST | `/avisos/{id}/retirar` | `avisos.publicar` | Retirar un aviso antes de tiempo con motivo (D-13) |
+| PUT | `/avisos/{id}` | `avisos.publicar` | Editar un aviso vigente o programado: texto, prioridad, audiencia y vigencia (adelantar el fin lo vence antes); auditado |
+| POST | `/avisos/{id}/retirar` | `avisos.publicar` | Retirar un aviso antes de tiempo con motivo (D-13); deja de verse en todas partes |
+| GET | `/me/avisos` | `sesion.perfil` | Avisos vigentes para mis roles, incluidos los públicos |
 | GET | `/metricas/tablero` | `metricas.ver` | Tablero inicial: agregados sin datos personales |
 | GET | `/metricas/{indicador}` | `metricas.ver` | Serie diaria de un indicador (ocupacion_diaria, estancia_promedio, tiempo_laboratorio, tiempo_ambulancia, cobertura_turnos) |
 | GET | `/ambulancia` | `ambulancia.ver_estado` | Estado de la unidad, servicio activo con hitos y, para despacho, solicitudes por confirmar |
 | POST | `/ambulancia/mantenimiento` | `ambulancia.mantenimiento` | Entrar o salir de mantenimiento; salir exige paramédico con turno en curso |
 | POST | `/ambulancia/solicitudes` | `ambulancia.solicitar` | Solicitar ambulancia; queda por confirmar (paciente verificado o recepción por teléfono) |
+| GET | `/ambulancia/solicitudes/mias` | `ambulancia.solicitar` | Mis solicitudes de ambulancia (últimos 7 días) con su estado y el avance del servicio |
+| POST | `/ambulancia/solicitudes/{id}/cancelar` | `ambulancia.solicitar` | Cancelar mi solicitud mientras está por confirmar |
 | POST | `/ambulancia/solicitudes/{id}/descartar` | `ambulancia.despachar` | Descartar una solicitud por confirmar con motivo |
 | POST | `/ambulancia/servicios` | `ambulancia.despachar` | Despachar: solo si la unidad está Disponible; la pasa a En Servicio en la misma transacción |
 | POST | `/ambulancia/servicios/{id}/hitos` | `ambulancia.operar` | Registrar hito en orden: salida, en escena, trasladando, en hospital, finalizado |
+| POST | `/ambulancia/servicios/{id}/cerrar` | `ambulancia.mantenimiento` | Cierre administrativo de un servicio activo (Jefatura, con motivo): queda cancelado y la unidad vuelve a Disponible |
 | POST | `/ambulancia/servicios/{id}/prehospital` | `ambulancia.reportar_prehospital` | Reporte prehospital; el reenvío con la misma Idempotency-Key no duplica |
 | GET | `/ambulancia/servicios/{id}/prehospital` | `ambulancia.recibir_prehospital` | Ver el reporte prehospital; el contenido clínico solo con relación de atención |
+| GET | `/ambulancia/llegada` | `ambulancia.recibir_prehospital` | Servicio que llega o llegó sin entrega registrada (para abrir el reporte y marcar recibido) |
+| POST | `/ambulancia/servicios/{id}/recepcion` | `ambulancia.recibir_prehospital` | Marcar recibido al paciente en el hospital (personal clínico, después de la llegada; una sola vez) |
 | POST | `/ambulancia/ubicacion` | `ambulancia.operar` | Ubicación en vivo de la tripulación; solo con servicio activo |
-| GET | `/ambulancia/bitacora` | `ambulancia.ver_bitacora` | Bitácora filtrable (D-056); sin datos del paciente |
+| GET | `/ambulancia/bitacora` | `ambulancia.ver_bitacora` | Bitácora filtrable (D-056); sin datos del paciente (solo el expediente enmascarado) |
 
 ## Anexo B. Matriz completa de permisos por rol
 
-Copia de `docs/arquitectura/datos/permisos.csv` (78 permisos, 10 roles). `✔` = permitido sin restricción adicional; `·` = no permitido; una palabra indica el contexto que la API exige además del permiso: `propio` (solo lo del propio usuario o paciente), `propio_revisado` (lo propio, solo después de la revisión o firma del médico), `relacion` (relación de atención con el paciente), `area` (turno en curso en el área del paciente), `orden` (paciente con orden de laboratorio), `rango` (solo para calcular rangos de referencia), `autor` (solo lo que creó la misma persona), `consumo` y `reactivos` (solo esos movimientos de inventario).
+Copia de `docs/arquitectura/datos/permisos.csv` (76 permisos, 10 roles). `✔` = permitido sin restricción adicional; `·` = no permitido; una palabra indica el contexto que la API exige además del permiso: `propio` (solo lo del propio usuario o paciente), `propio_revisado` (lo propio, solo después de la revisión o firma del médico), `relacion` (relación de atención con el paciente), `area` (turno en curso en el área del paciente), `orden` (paciente con orden de laboratorio), `rango` (solo para calcular rangos de referencia), `autor` (solo lo que creó la misma persona), `consumo` y `reactivos` (solo esos movimientos de inventario).
 
 Seis permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo y filtran campos dentro de otros endpoints (`pacientes.ver_nacimiento`, `pacientes.ver_contacto`, `personal.ver_datos_personales`, `turnos.ver_borradores`, `camas.ver_ocupante`); `consulta.corregir` espera el addendum clínico (MA-CIT-04). Los permisos `recursos.*` se retiraron (D-091): el control de recursos del Administrador es inventario + edificio.
 
@@ -649,6 +723,7 @@ Seis permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo
 | `pacientes.ver_nacimiento` | · | · | ✔ | ✔ | ✔ | ✔ | rango | ✔ | · | propio |
 | `pacientes.ver_contacto` | · | · | ✔ | · | · | ✔ | · | · | · | propio |
 | `pacientes.editar_demograficos` | · | · | ✔ | · | · | · | · | · | · | · |
+| `pacientes.editar_propios` | · | · | · | · | · | · | · | · | · | propio |
 | `pacientes.gestionar_duplicados` | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `expediente.ver` | · | · | · | · | relacion | relacion | · | · | · | propio_revisado |
 | `personal.ver` | ✔ | ✔ | · | · | · | · | · | · | · | · |
@@ -665,7 +740,7 @@ Seis permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo
 | `camas.asignar` | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `camas.trasladar` | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `camas.bloquear` | · | ✔ | · | · | · | · | · | · | · | · |
-| `camas.registrar_limpieza` | · | · | · | · | ✔ | · | · | · | · | · |
+| `camas.registrar_limpieza` | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | `camas.verificar_limpieza` | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | `fila.emitir` | · | · | ✔ | · | · | · | · | · | · | · |
 | `fila.ver` | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
@@ -702,7 +777,7 @@ Seis permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo
 | `ambulancia.reportar_prehospital` | · | · | · | · | · | · | · | ✔ | · | · |
 | `ambulancia.recibir_prehospital` | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | `ambulancia.mantenimiento` | · | ✔ | · | · | · | · | · | · | · | · |
-| `ambulancia.ver_bitacora` | · | ✔ | ✔ | · | · | · | · | propio | ✔ | · |
+| `ambulancia.ver_bitacora` | · | ✔ | ✔ | · | · | ✔ | · | propio | ✔ | · |
 | `auditoria.ver` | · | · | · | · | · | · | · | · | ✔ | · |
 | `auditoria.mis_accesos` | · | · | · | · | · | · | · | · | · | propio |
 | `inventario.ver` | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · | · |
