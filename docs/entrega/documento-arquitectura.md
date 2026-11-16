@@ -4,7 +4,7 @@ Sistema de Gestión Hospitalaria Universitaria · Proyecto final de Desarrollo d
 
 > Todos los datos del sistema, de las pruebas y de este documento son ficticios.
 >
-> Este documento describe el código de `main` en el commit `1a124e7` (15-nov-2026), con los PR #105 a #119 fusionados (fases 0 y 1 de la auditoría final). Cada afirmación remite a un archivo del repositorio y se verificó contra los controladores (`api/src/**`), las migraciones (`supabase/migrations/`), el contrato (`contrato/openapi.json`), el menú web (`web/src/features/shell.tsx`), las secciones Android (`domain/AuthModels.kt`) y las pestañas iOS (`ios/Core/Access.swift`). Lo que no existe se marca **parcial** o **pendiente**; lo que existe pero no se probó en un dispositivo real se dice.
+> Este documento describe el código de `main` en el commit `c7f31a6` (16-nov-2026), con los PR #105 a #122 fusionados (fases 0 y 1 de la auditoría final, filtros de las listas de Pacientes y Personal, y turnos que siguen al reloj). Cada afirmación remite a un archivo del repositorio y se verificó contra los controladores (`api/src/**`), las migraciones (`supabase/migrations/`), el contrato (`contrato/openapi.json`), el menú web (`web/src/features/shell.tsx`), las secciones Android (`domain/AuthModels.kt`) y las pestañas iOS (`ios/Core/Access.swift`). Lo que no existe se marca **parcial** o **pendiente**; lo que existe pero no se probó en un dispositivo real se dice.
 
 ## Contenido
 
@@ -125,10 +125,10 @@ Estados: **Implementado** (API y al menos un cliente), **Parcial** (existe una p
 |---|---|---|---|---|---|
 | Identidad, sesión y perfil | `/auth/me`, `/inicio`, `/eventos` | Ingreso, recuperar y restablecer contraseña, aceptar invitación, aterrizajes de correo; `/registro` solo orienta a la app (BL-06, D-04); aviso de arranque en frío (`web/src/lib/cold-start.ts`) | Ingreso, registro de paciente, reenvío de confirmación, recuperación; un 401 renueva la sesión una vez; aviso de arranque en frío (`data/ColdStart.kt`) | Ingreso, registro, recuperación, aviso de arranque en frío | Implementado |
 | Usuarios, invitaciones y roles | `/usuarios/*`: invitar, `/invitacion/reenvio`, `/invitacion/cancelacion` (con motivo), roles, estado | Personal (ADM gestiona; JOP y DPD consultan) | — | — | Implementado. PAC no se invita (`rol_no_invitable`); solo el administrador principal gestiona a otros ADM; desactivar revisa el trabajo abierto (`20261120004000_cuentas_invitaciones.sql`) |
-| Pacientes (búsqueda, registro, provisionales, duplicados, ficha filtrada) | `/pacientes/*`, `/me/paciente` | Pacientes (REC, JOP, LAB) | Pacientes (REC), Paciente sin identidad (PAR) | Pacientes (MED), Mis datos (PAC) | Implementado |
-| Personal e inscripciones | `/personal/*` | Personal | — | — | Implementado |
-| Turnos del personal | `/turnos/*`, `/turnos/especialistas`, `/turnos/cobertura` | Turnos (JOP planifica) | Mis turnos | Turnos (MED) | Implementado |
-| Asistencia y carga de turnos | `POST /turnos/{id}/asistencia` | Asistencia, suplentes disponibles, carga del turno y motivo de emergencia (JOP) | Mis turnos por día (entrada automática) | Mis turnos por día (entrada automática) | Implementado. Máximo 72 h en 7 días y 6 días seguidos; descanso de 8 h (12 h tras 24 h); solo `ausente` saca de turno (`20261120003000_turnos_asistencia_carga.sql`) |
+| Pacientes (búsqueda, registro, provisionales, duplicados, ficha filtrada) | `/pacientes/*`, `/me/paciente` | Pacientes (REC, JOP, LAB) | Pacientes (REC), Paciente sin identidad (PAR) | Pacientes (MED), Mis datos (PAC) | Implementado. La lista web filtra por estado del expediente, situación de hoy (hospitalizado, espera cama, alta firmada, en la fila, con cita hoy), área de la cama y médico tratante; filtrar por la atención de hoy exige `admision.ver`, `fila.ver` o `citas.ver` con alcance global, si no responde 403 (`api/src/patients/patient-list.filters.ts`) |
+| Personal e inscripciones | `/personal/*` | Personal, con filtros por función, área, turno de hoy (de turno ahora, turno más tarde, ausente, libre; campo `shiftToday`), cuenta de acceso y rol | — | — | Implementado |
+| Turnos del personal | `/turnos/*` (`GET /turnos?from&to`, máximo 31 días), `/turnos/especialistas`, `/turnos/cobertura` | Turnos (JOP planifica): vistas Semana y Lista por día, botón Guardia 24 h | Mis turnos por día, desde hoy | Turnos (MED) por día, desde hoy | Implementado |
+| Asistencia y carga de turnos | `POST /turnos/{id}/asistencia` | Asistencia, suplentes disponibles, carga del turno y motivo de emergencia (JOP) | Mis turnos por día (entrada automática) | Mis turnos por día (entrada automática) | Implementado. Máximo 72 h en 7 días y 6 días seguidos; descanso de 8 h (12 h tras 24 h); solo `ausente` saca de turno (`20261120003000_turnos_asistencia_carga.sql`). El estado sigue al reloj: la API pasa `publicado → en_curso → completado` cada minuto y antes de leer o escribir turnos, y al iniciar fija `presente_desde` en los turnos que empiezan desde la política `turnos.entrada_automatica` (16-nov-2026); los anteriores sin entrada se leen "Sin registro de entrada". `POST /turnos/{id}/entrada` queda obsoleto y sin efecto durante una versión (`20261122001000_turnos_estado_por_reloj.sql`) |
 | Edificio y espacios | `/espacios/*` | Edificio (ADM configura) | — | Información del hospital | Implementado |
 | Camas (tablero, bloqueo, limpieza) | `/camas/*` | Camas (JOP bloquea y limpia) | Tablero de camas (REC), Limpieza de camas (ENF) | — | Implementado |
 | Citas de 20 minutos | `/citas/*`, `/citas/{id}/reprogramar`, `/citas/reprogramaciones/{id}/aceptar` y `/rechazar`, `/citas/{id}/no-asistio` | Citas (REC) | Citas (REC), Mis citas (PAC) | Citas (PAC); solicitudes de reprogramación en Mi día (MED) | Implementado. Máximo 2 reprogramaciones por cadena y 2 solicitudes pendientes por paciente; el paciente cancela hasta 2 h antes (`20261120002000_citas_fila_fase01.sql`) |
@@ -152,7 +152,7 @@ Estados: **Implementado** (API y al menos un cliente), **Parcial** (existe una p
 | Vinculación de cuenta PAC con expediente | `POST /cuentas/vinculacion`, `/cuentas/vinculaciones/*` | Vinculaciones (REC) | Vinculaciones (REC), Vincular expediente (PAC) | Vincular expediente (PAC) | Implementado |
 | Notificaciones push (FCM, APNs) | No | No | No | No | Pendiente (D-09) |
 
-Fuentes: controladores en `api/src/**/*.controller.ts`, migraciones `20261119002000` a `20261121003200`, menú web en `web/src/features/shell.tsx`, secciones Android en `android/app/src/main/java/sv/edu/catolica/climesa/domain/AuthModels.kt` y pestañas iOS en `ios/Core/Access.swift`.
+Fuentes: controladores en `api/src/**/*.controller.ts`, migraciones `20261119002000` a `20261122001000`, menú web en `web/src/features/shell.tsx`, secciones Android en `android/app/src/main/java/sv/edu/catolica/climesa/domain/AuthModels.kt` y pestañas iOS en `ios/Core/Access.swift`.
 
 
 ## 5. Clientes
@@ -190,7 +190,7 @@ Fuentes: controladores en `api/src/**/*.controller.ts`, migraciones `20261119002
 
 ### 6.1 Esquemas por dominio
 
-La base tiene **11 esquemas de dominio** y **66 tablas**, definidas en 28 archivos de `supabase/migrations/` (incluida la semilla de acceso generada). Además existe el esquema `metricas`, solo con vistas (`v_ocupacion_por_planta`, `v_laboratorio_por_estado`). Cada módulo escribe solo en su esquema; entre esquemas se usan llaves lógicas y vistas de solo lectura con prefijo `v_` (`docs/arquitectura/modelo-datos.md`).
+La base tiene **11 esquemas de dominio** y **66 tablas**, definidas en 54 archivos de `supabase/migrations/` (incluida la semilla de acceso generada). Además existe el esquema `metricas`, solo con vistas (`v_ocupacion_por_planta`, `v_laboratorio_por_estado`). Cada módulo escribe solo en su esquema; entre esquemas se usan llaves lógicas y vistas de solo lectura con prefijo `v_` (`docs/arquitectura/modelo-datos.md`).
 
 | Esquema | Tablas |
 |---|---|
@@ -315,7 +315,7 @@ Las pruebas `supabase/pruebas/01_invariantes.sql` y `02_concurrencia.sh` comprue
 
 ### 7.2 Matriz resumida por rol
 
-Resumen de qué puede ver (V) y modificar (M) cada rol, según `docs/arquitectura/datos/permisos.csv` en `1a124e7`. El detalle completo por permiso está en el Anexo B y el permiso de cada endpoint en el Anexo A.
+Resumen de qué puede ver (V) y modificar (M) cada rol, según `docs/arquitectura/datos/permisos.csv` en `c7f31a6`. El detalle completo por permiso está en el Anexo B y el permiso de cada endpoint en el Anexo A.
 
 | Área | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -466,7 +466,7 @@ flowchart LR
 - `autoDeploy: false` en ambos servicios: el despliegue es manual desde el panel de Render.
 - **Pendiente de la dueña del proyecto (Render).** `render.yaml` ya contiene la reescritura `/*` → `/index.html` y las cabeceras de seguridad, pero Render no las aplica solo si el servicio no sigue el Blueprint. El build copia `index.html` como `404.html`, así que los enlaces profundos cargan igual, aunque con estado 404 y sin cabeceras hasta que se sincronicen.
 - **`WEB_APP_URL`.** En producción la API no arranca si falta, si no es HTTPS o si apunta a localhost (`docs/operacion/correo-auth.md`).
-- **Base de datos de producción.** Las migraciones se aplican a mano en el SQL Editor, en orden de fecha y después de la comprobación previa que trae cada archivo; no se usa `supabase db push`. El procedimiento y la lista de las 15 migraciones de las fases 0 y 1 (`20261119002000` a `20261121003200`) están en `docs/operacion/runbook-operador.md`.
+- **Base de datos de producción.** Las migraciones se aplican a mano en el SQL Editor, en orden de fecha y después de la comprobación previa que trae cada archivo; no se usa `supabase db push`. El procedimiento y la lista de las 16 migraciones de las fases 0 y 1 y de los turnos por reloj (`20261119002000` a `20261122001000`, todas aplicadas en producción; la última el 16-nov-2026) están en `docs/operacion/runbook-operador.md`.
 - Las variables secretas (`SUPABASE_SECRET_KEY`, `DATABASE_URL`) se escriben a mano en Render (`sync: false`).
 - La API se conecta por el *Session pooler* de Supabase porque la conexión directa es solo IPv6.
 - El plan gratuito duerme la API tras 15 minutos sin tráfico; la primera llamada tarda cerca de un minuto (`docs/desarrollo/despliegue-render.md`). Los tres clientes reintentan con espera creciente (2, 5 y 10 s) y muestran "El servidor se está activando" a los 5 s; la web pide `/salud` al abrir el ingreso (MA-OPS-01).
@@ -490,14 +490,14 @@ El despliegue no está conectado a CI: no hay un gate que impida desplegar un co
 
 | Componente | Pruebas en esta rama | Herramienta |
 |---|---|---|
-| API | 66 archivos `*.spec.ts` en `api/tests/` (pipeline HTTP, RBAC, privacidad, tiempo real, módulos clínicos, ambulancia, público, métricas, vinculación, contrato móvil) | Jest sobre PostgreSQL WASM (PGlite) con todas las migraciones |
-| Web | 57 archivos de prueba en `web/src` | Vitest |
-| Android | 71 archivos de prueba en `android/app/src/test` | JUnit (`testDebugUnitTest`) |
+| API | 67 archivos `*.spec.ts` en `api/tests/` (pipeline HTTP, RBAC, privacidad, tiempo real, módulos clínicos, ambulancia, público, métricas, vinculación, contrato móvil) | Jest sobre PostgreSQL WASM (PGlite) con todas las migraciones |
+| Web | 59 archivos de prueba en `web/src` | Vitest |
+| Android | 72 archivos de prueba en `android/app/src/test` | JUnit (`testDebugUnitTest`) |
 | iOS | 19 archivos en `ios/Tests` (contrato, reglas, tiempo real); el workflow `ios.yml` ejecuta `swift test` y compila para simulador | XCTest (no ejecutado en este entorno) |
 | Base de datos | `supabase/pruebas/01_invariantes.sql`, `02_concurrencia.sh` | PostgreSQL nativo en Docker |
 | Documentación | `tools/progreso.py --verificar`, `tools/generar_docs.py --verificar` | Python |
 
-Los conteos de esta sección son de archivos y se obtuvieron contando los archivos del repositorio en `1a124e7`; este documento no vuelve a ejecutar las pruebas. La CI de cada pull request las ejecuta.
+Los conteos de esta sección son de archivos y se obtuvieron contando los archivos del repositorio en `c7f31a6`; este documento no vuelve a ejecutar las pruebas. La CI de cada pull request las ejecuta.
 
 PGlite usa una sola conexión y no demuestra carreras entre sesiones; esas carreras se cubren con `02_concurrencia.sh` sobre PostgreSQL nativo.
 
@@ -540,7 +540,7 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 
 | Método | Ruta (`/api/v1`) | Permiso requerido | Qué hace |
 |---|---|---|---|
-| GET | `/pacientes` | `pacientes.buscar` | Buscar por nombre, fonética, DUI o expediente; devuelve campos mínimos |
+| GET | `/pacientes` | `pacientes.buscar` | Buscar por nombre, fonética, DUI o expediente, con filtros de estado y de atención de hoy; devuelve campos mínimos |
 | POST | `/pacientes` | `pacientes.registrar` | Registrar después de buscar; expediente y DUI exclusivos |
 | GET | `/pacientes/selector` | `pacientes.buscar` | Selector de pacientes: id, expediente, nombre y edad, paginado y sin tildes |
 | POST | `/pacientes/busquedas` | `pacientes.buscar` | Buscar y obtener constancia de diez minutos, ligada a la cuenta y criterios |
@@ -572,6 +572,7 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 | GET | `/turnos/mios` | `turnos.ver` | Turnos publicados de la persona vinculada a la cuenta |
 | GET | `/turnos/cobertura` | `turnos.ver` | Huecos de cobertura por área y hora frente al mínimo vigente |
 | GET | `/turnos/especialistas` | `turnos.ver` | Médicos de turno por día y especialidad durante 7 días (CARGA-04) |
+| POST | `/turnos/{id}/entrada` | `turnos.ver` | Obsoleto: la entrada se registra sola al iniciar el turno. No cambia nada: devuelve el estado del turno propio ya empezado; antes del inicio responde 409 entrada_automatica |
 | POST | `/turnos/{id}/asistencia` | `turnos.planificar` | Ausencia (con tipo y motivo), corregir la hora real de entrada o deshacer una ausencia; la entrada es automática al inicio (ASIS-01 a ASIS-03) |
 | POST | `/turnos/publicar` | `turnos.publicar` | Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó |
 | PATCH | `/turnos/{id}` | `turnos.planificar` | Mover o cancelar turno con versión y motivo |

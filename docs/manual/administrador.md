@@ -20,10 +20,11 @@ Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#
 
 ## Inicio
 
-El tablero tiene accesos rápidos: **Invitar persona**, **Agregar espacio** y **Ver métricas**.
+El tablero tiene accesos rápidos: **Invitar persona**, **Agregar espacio** y **Ver métricas**. Los indicadores de cuentas llevan a **Personal**: "Cuentas activas" abre el directorio y "Cuentas por estado → Abrir cuentas" y "Cuentas por completar → Vincular" lo abren filtrado a las personas con cuenta.
 
 ## Personal: cuentas, invitaciones y roles
 
+- **Filtros:** **Mostrar** (activo, inactivo o todo), **Filtrar por función**, **Área** (incluye "Sin área asignada"), **Cuenta de acceso** (con cuenta, cuenta activa, cuenta desactivada, invitación pendiente o sin cuenta todavía), **Rol** y **Turno de hoy** (De turno ahora, Turno más tarde, Ausentes o Libres).
 - **Registrar personal:** crea la ficha de una persona del hospital, con sus inscripciones profesionales.
 - **Invitar:** crea la cuenta de una persona y le envía el correo de invitación. Los roles son obligatorios.
   - Los pacientes no se invitan: crean su cuenta en la app.

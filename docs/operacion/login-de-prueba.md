@@ -4,7 +4,9 @@ Ayuda **temporal** para probar el sistema en desarrollo: en la pantalla de ingre
 
 Este archivo no contiene contraseñas ni correos reales, y nunca debe contenerlos.
 
-## Estado actual (15-nov-2026)
+## Estado actual (16-nov-2026)
+
+**Web en producción: selector encendido.** El 16-nov-2026 la dueña del proyecto activó el selector en Render `sghu-web` (`VITE_DEMO_LOGIN=true` y `VITE_DEMO_CREDENTIALS` definida en el panel) para probar el sistema. La web publicada muestra "Modo de prueba: cuentas ficticias" hasta que se apague. Antes de la entrega hay que apagarlo y cambiar las contraseñas de todas las cuentas del selector (sección "Antes de la entrega").
 
 | Plataforma | Dónde puede activarse | Qué impide que llegue a la entrega |
 |---|---|---|

@@ -27,7 +27,7 @@ La revisión médica (**Revisar y liberar**) no es de tu rol: la hace el médico
 
 ## Pacientes
 
-Solo ves a los pacientes que tienen una orden de laboratorio. De la fecha de nacimiento ves el rango de edad necesario para elegir el rango de referencia.
+Solo ves a los pacientes que tienen una orden de laboratorio. De la fecha de nacimiento ves el rango de edad necesario para elegir el rango de referencia. La lista se filtra solo por estado del expediente (Vigentes, Provisionales, Inactivos o Todos): los filtros de la atención de hoy exigen permisos que tu rol no tiene, y la web no los muestra.
 
 ## Inventario
 

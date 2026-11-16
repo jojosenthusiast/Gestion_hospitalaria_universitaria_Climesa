@@ -11,7 +11,7 @@ Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#
 |---|---|
 | Inicio | Tablero "Operación del hospital" |
 | Pacientes | Buscar pacientes y revisar posibles duplicados |
-| Personal | Consultar el personal (solo lectura) |
+| Personal | Consultar el personal y quién está de turno hoy (solo lectura) |
 | Camas | Tablero de camas: bloqueo y limpieza |
 | Edificio | Consultar el árbol del edificio |
 | Ambulancia | Despacho, cierre administrativo y mantenimiento |
@@ -97,9 +97,17 @@ Vista de **Tarjetas** o **Tabla**, filtros (incluido "Estado final"), **Quitar f
 - **Editar → Guardar cambios**. Si otra persona lo cambió antes, la web te pide volver a cargarlo.
 - **Retirar → Retirar aviso**, con un motivo de 10 caracteres o más. Un aviso retirado desaparece de `/publico` y ya no se puede cambiar.
 
+## Personal
+
+Consulta del directorio, sin cambios. Filtros: **Mostrar** (personal activo, inactivo o todo el directorio), **Filtrar por función**, **Área** (incluye "Sin área asignada") y **Turno de hoy**: De turno ahora, Turno más tarde, Ausentes o Libres, cada uno con su conteo. Cada persona activa muestra en la lista su turno de hoy. El turno de hoy lo calcula la API con los turnos del día local.
+
 ## Pacientes, Fila del día y Citas
 
-- En **Pacientes** buscas pacientes y revisas los posibles duplicados.
+- En **Pacientes** buscas pacientes y revisas los posibles duplicados. La lista se filtra en el servidor:
+  - **Expediente:** Vigentes (por omisión), Provisionales, Inactivos o Todos.
+  - **Hoy:** Hospitalizados, Esperan cama, Con alta firmada, En la fila de hoy o Con cita hoy.
+  - **Área de la cama:** pacientes que ocupan ahora una cama en esa área (o en una habitación dentro de ella).
+  - **Médico tratante:** pacientes con una admisión activa a cargo de ese médico.
 - **Fila del día** y **Citas** son de consulta para ti; las operan Recepción y el consultorio.
 
 ## Métricas

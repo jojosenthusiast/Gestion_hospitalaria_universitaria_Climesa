@@ -1,6 +1,6 @@
 # Manual de usuario de CLIMESA
 
-Una página por rol, con las pantallas reales de cada plataforma que usa ese rol. Describe el código de `main` en el commit `1a124e7` (15-nov-2026). Todos los datos del sistema son ficticios.
+Una página por rol, con las pantallas reales de cada plataforma que usa ese rol. Describe el código de `main` en el commit `c7f31a6` (16-nov-2026). Todos los datos del sistema son ficticios.
 
 | Rol | Código | Plataformas | Página |
 |---|---|---|---|
@@ -23,6 +23,7 @@ Fuente de los roles y sus plataformas: `docs/arquitectura/datos/roles.csv`. Fuen
 
 - **Web:** https://sghu-web.onrender.com. El personal ingresa con correo y contraseña.
 - **Android e iOS:** la app CLIMESA. El paciente crea su cuenta en la app; el personal recibe una invitación por correo.
+- La pantalla de ingreso saluda con "Bienvenido" en la web, en Android y en iOS.
 - Si un rol no usa la plataforma donde ingresó, la pantalla dice "Tu rol no usa esta aplicación" e indica dónde ingresar, con el botón "Cerrar sesión".
 
 ### Cuenta y contraseña
@@ -39,6 +40,7 @@ Fuente de los roles y sus plataformas: `docs/arquitectura/datos/roles.csv`. Fuen
 - **Todo se actualiza en vivo.** Lo que hace otra persona aparece sin recargar. No hace falta actualizar la página.
 - **Arranque en frío.** Si el servidor estaba dormido, aparece "El servidor se está activando"; la primera conexión del día puede tardar hasta un minuto.
 - **Motivos.** Las acciones que corrigen o anulan algo (cancelar, retirar, corregir, cerrar) piden un motivo. Muchas exigen al menos 10 caracteres. Nada clínico se borra: se corrige con autor, fecha y motivo.
+- **Filtros que se comparten (web).** Los filtros de **Pacientes** y **Personal** quedan en la dirección de la página (por ejemplo `#/pacientes?situacion=hospitalizado`): se conservan al recargar, al volver atrás y al compartir el enlace. El texto que escribes en la búsqueda nunca va en la dirección. Si un enlace trae un filtro que tu rol no puede usar o un valor no válido, la web lo quita antes de pedir la lista. Los filtros activos aparecen como etiquetas que se quitan una por una o todas a la vez, y una lista vacía dice qué filtro la dejó así.
 - **Exportar.** Las listas con el botón **Exportar** generan CSV, Excel (.xlsx) o PDF. Cada exportación queda en la auditoría.
 
 ### En Android

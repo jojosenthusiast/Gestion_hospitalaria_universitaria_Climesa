@@ -42,7 +42,7 @@ Cada lectura de datos de paciente y cada escritura quedan registradas: quién, c
 
 ## Personal
 
-Ves las cuentas, sus roles y su estado. No puedes invitar, cambiar roles ni desactivar.
+Ves las cuentas, sus roles y su estado. Filtros: **Mostrar** (cuentas activas, inactivas o todas) y **Rol**. No puedes invitar, cambiar roles ni desactivar.
 
 ## Bitácora de ambulancia
 

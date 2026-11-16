@@ -46,4 +46,4 @@ docker compose -f compose.test.yaml exec -T -e PSQL="psql -U postgres -d sghu_te
 docker compose -f compose.test.yaml down -v
 ```
 
-La base usa almacenamiento temporal y no publica puertos. Inicializa Auth/Realtime simulados, las 14 migraciones y la semilla ficticia. El script concurrente exige resultados exactos y falla con código 1 si hay duplicados o faltan registros. Debe ejecutarse una vez por base recién creada. El workflow `postgres-native` reproduce estos pasos. PGlite tiene una sola conexión y sus pruebas no se presentan como carreras nativas.
+La base usa almacenamiento temporal y no publica puertos. Inicializa Auth/Realtime simulados, las 54 migraciones de `supabase/migrations/` y la semilla ficticia. El script concurrente exige resultados exactos y falla con código 1 si hay duplicados o faltan registros. Debe ejecutarse una vez por base recién creada. El workflow `postgres-native` reproduce estos pasos. PGlite tiene una sola conexión y sus pruebas no se presentan como carreras nativas.
