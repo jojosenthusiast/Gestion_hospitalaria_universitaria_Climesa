@@ -34,7 +34,7 @@ class ReceptionLinkingViewModel @Inject constructor(private val api: ApiGateway,
                 val rows = ReceptionLinking.parse(api.request("/cuentas/vinculaciones") as? JSONArray ?: JSONArray())
                 mutable.update { it.copy(loading = false, rows = rows) }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                mutable.update { it.copy(loading = false, error = e.message ?: "No se pudieron cargar las vinculaciones.") }
+                mutable.update { it.copy(loading = false, error = userMessage(e, "No se pudieron cargar las vinculaciones.")) }
             }
         }
     }
@@ -65,7 +65,7 @@ class ReceptionLinkingViewModel @Inject constructor(private val api: ApiGateway,
                 mutable.update { it.copy(busyId = null, notice = done) }
                 load()
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                mutable.update { it.copy(busyId = null, error = e.message ?: "No se pudo resolver la vinculación.") }
+                mutable.update { it.copy(busyId = null, error = userMessage(e, "No se pudo resolver la vinculación.")) }
                 load()
             }
         }

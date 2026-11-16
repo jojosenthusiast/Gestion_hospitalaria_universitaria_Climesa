@@ -48,6 +48,8 @@ data class AdmissionIntakeState(
     val error: String? = null,
     /** Raised after a successful confirmation so the list behind reloads; the screen clears it. */
     val finished: Boolean = false,
+    /** S13: fields the guide chose on its own (single possible answer), named in its notice. */
+    val prefilled: List<sv.edu.catolica.climesa.domain.IntakeField> = emptyList(),
 )
 
 /** A34: guided admission in eight steps. Every step validates before moving on; the API repeats every check when confirming. */
@@ -96,8 +98,19 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
         else "/admisiones/mapa-camas?patientId=${enc(patient.id)}"
     }
 
-    fun open() { mutable.value = AdmissionIntakeState(open = true) }
-    fun close() { searchJob?.cancel(); stepJob?.cancel(); doctorsJob?.cancel(); liveJob?.cancel(); mutable.value = AdmissionIntakeState() }
+    fun open() { prefillTried.clear(); mutable.value = AdmissionIntakeState(open = true) }
+    fun close() { searchJob?.cancel(); stepJob?.cancel(); doctorsJob?.cancel(); liveJob?.cancel(); prefillTried.clear(); mutable.value = AdmissionIntakeState() }
+
+    /** Each automatic choice runs once per guide: a field the person cleared or changed is not filled again. */
+    private val prefillTried = mutableSetOf<sv.edu.catolica.climesa.domain.IntakeField>()
+
+    private fun prefill(field: sv.edu.catolica.climesa.domain.IntakeField, rule: (AdmissionDraft) -> Pair<AdmissionDraft, List<sv.edu.catolica.climesa.domain.IntakeField>>) {
+        if (!prefillTried.add(field)) return
+        mutable.update { s ->
+            val (draft, filled) = rule(s.draft)
+            if (filled.isEmpty()) s else s.copy(draft = draft, prefilled = (s.prefilled + filled).distinct())
+        }
+    }
     fun consumeFinished() = mutable.update { it.copy(finished = false) }
 
     fun error(canAssignBed: Boolean): String? = mutable.value.let { AdmissionIntake.stepError(it.step, it.draft, canAssignBed, it.feasibility?.feasible == true) }
@@ -114,9 +127,19 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
         mutable.update { it.copy(step = step, error = null, loading = false, feasibility = if (step == AdmissionIntake.LAST_STEP) null else it.feasibility) }
         val draft = mutable.value.draft
         when (step) {
-            1 -> load { mutable.update { it.copy(origins = AdmissionIntake.origins(api.request("/admisiones/origenes?patientId=${enc(draft.patient!!.id)}") as JSONArray)) } }
+            1 -> load {
+                mutable.update { it.copy(origins = AdmissionIntake.origins(api.request("/admisiones/origenes?patientId=${enc(draft.patient!!.id)}") as JSONArray)) }
+                prefill(sv.edu.catolica.climesa.domain.IntakeField.ORIGIN) { sv.edu.catolica.climesa.domain.IntakePrefill.origin(it, mutable.value.origins) }
+            }
             2 -> loadDoctors(immediately = true)
-            3 -> load { mutable.update { it.copy(bedMap = AdmissionIntake.bedMap(api.request("/admisiones/mapa-camas?patientId=${enc(draft.patient!!.id)}") as JSONObject)) } }
+            3 -> load {
+                mutable.update { it.copy(bedMap = AdmissionIntake.bedMap(api.request("/admisiones/mapa-camas?patientId=${enc(draft.patient!!.id)}") as JSONObject)) }
+                prefill(sv.edu.catolica.climesa.domain.IntakeField.CATEGORY) { d ->
+                    val (next, filled) = sv.edu.catolica.climesa.domain.IntakePrefill.category(d, mutable.value.bedMap)
+                    // Same visitor limit as choosing the category by hand.
+                    (if (filled.isEmpty()) next else next.copy(visitorsMax = minOf(next.visitorsMax, AdmissionIntake.VISITOR_LIMIT[next.category] ?: 4))) to filled
+                }
+            }
             5 -> if (canAssignBed && AdmissionIntake.isImmediate(draft.at)) load {
                 val map = AdmissionIntake.bedMap(api.request("/admisiones/mapa-camas?patientId=${enc(draft.patient!!.id)}&isolation=${draft.isolation}&category=${draft.category}") as JSONObject)
                 // The suggestion arrives pre-selected; the person can pick another compatible bed.
@@ -132,7 +155,7 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
         stepJob = viewModelScope.launch {
             try { block(); mutable.update { it.copy(loading = false) } }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { mutable.update { it.copy(loading = false, error = e.message ?: "No se pudo consultar la información.") } }
+            catch (e: Exception) { mutable.update { it.copy(loading = false, error = userMessage(e, "No se pudo consultar la información.")) } }
         }
     }
     private fun enc(v: String) = URLEncoder.encode(v, "UTF-8")
@@ -151,7 +174,7 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
         try {
             val page = ReceptionScheduling.pickerPage(api.request("/pacientes/selector?query=${enc(q.trim())}&limit=10&offset=$offset") as JSONObject)
             if (mutable.value.query.trim() == q.trim()) mutable.update { it.copy(searching = false, results = if (offset == 0) page.items else it.results + page.items, hasMore = page.hasMore) }
-        } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.update { it.copy(searching = false, error = e.message ?: "No se pudo buscar.") } }
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.update { it.copy(searching = false, error = userMessage(e, "No se pudo buscar.")) } }
     }
     /** Changing the patient drops whatever depended on them (source record and bed). */
     fun pickPatient(p: PickerPatient?) = mutable.update { it.copy(draft = it.draft.copy(patient = p, origin = null, originRecord = null, bed = null), query = "", results = emptyList(), hasMore = false, origins = emptyList()) }
@@ -172,7 +195,8 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
                 val rows = AdmissionIntake.doctors(api.request("/admisiones/medicos-disponibles?at=${enc(instant.toString())}") as JSONArray)
                 // The chosen doctor is re-evaluated for the new time: no shift turns it grey and validation explains why.
                 mutable.update { s -> s.copy(doctors = rows, draft = s.draft.copy(doctor = s.draft.doctor?.let { chosen -> rows.firstOrNull { it.id == chosen.id } })) }
-            } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.update { it.copy(error = e.message ?: "No se pudieron consultar los médicos.") } }
+                if (immediately) prefill(sv.edu.catolica.climesa.domain.IntakeField.DOCTOR) { sv.edu.catolica.climesa.domain.IntakePrefill.doctor(it, rows) }
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.update { it.copy(error = userMessage(e, "No se pudieron consultar los médicos.")) } }
         }
     }
     /** A doctor without a shift at that time is shown grey and cannot be chosen. */
@@ -209,7 +233,7 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
             try {
                 api.request("/admisiones", "POST", body)
                 mutable.value = AdmissionIntakeState(finished = true)
-            } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.update { it.copy(busy = false, error = e.message ?: "No se pudo crear el ingreso.") } }
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.update { it.copy(busy = false, error = userMessage(e, "No se pudo crear el ingreso.")) } }
         }
     }
 }

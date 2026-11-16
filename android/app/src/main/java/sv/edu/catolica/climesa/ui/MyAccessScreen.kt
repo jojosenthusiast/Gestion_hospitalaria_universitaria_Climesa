@@ -39,7 +39,7 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
         loadJob = viewModelScope.launch {
             try { mutable.value = MyAccessState(loading = false, entries = MyAccessRules.parse(api.request("/me/accesos"))) }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { mutable.value = mutable.value.copy(loading = false, error = e.message ?: "No se pudo cargar quién vio tu expediente.") }
+            catch (e: Exception) { mutable.value = mutable.value.copy(loading = false, error = userMessage(e, "No se pudo cargar quién vio tu expediente.")) }
         }
     }
 }

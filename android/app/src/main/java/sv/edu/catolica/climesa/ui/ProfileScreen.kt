@@ -28,9 +28,9 @@ internal fun ProfileSummaryCard(account: AuthenticatedAccount, modifier: Modifie
         Text(account.session.email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         HorizontalDivider(color = MaterialTheme.climesa.line)
         LabeledValue(stringResource(R.string.ui_cuenta_roles), account.profile.roles.joinToString { RoleAccess.label(it) }.ifBlank { "—" })
-        StatusPill(
+        FamilyBadge(
             stringResource(if (account.profile.verifiedByBackend) R.string.ui_cuenta_verificada else R.string.ui_cuenta_autenticada),
-            if (account.profile.verifiedByBackend) StatusTone.SUCCESS else StatusTone.NEUTRAL,
+            if (account.profile.verifiedByBackend) StatusFamily.LISTO else null,
         )
     }
 }

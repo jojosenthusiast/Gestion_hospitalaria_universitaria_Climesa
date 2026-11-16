@@ -65,7 +65,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     }
 }
 @Composable private fun AccessPending(error:String?,retry:()->Unit,logout:()->Unit){
-    Surface { Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){CompactHeader("No pudimos verificar tu acceso");Text(error?:"Revisa tu conexión e intenta de nuevo.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Spacer(Modifier.height(24.dp));ClimesaButton("Volver a intentar",Icons.Default.Refresh,retry);Spacer(Modifier.height(10.dp));TextButton(onClick=logout){Text("Cerrar sesión")}} }
+    Surface { Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){CompactHeader(stringResource(R.string.app_acceso_error));Text(error?:stringResource(R.string.app_revisa_conexion),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Spacer(Modifier.height(24.dp));ClimesaButton(stringResource(R.string.app_volver_intentar),Icons.Default.Refresh,retry);Spacer(Modifier.height(10.dp));TextButton(onClick=logout){Text(stringResource(R.string.cerrar_sesion))}} }
 }
 @Composable private fun AuthorizedWorkspace(account:AuthenticatedAccount,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit){
     val destination=account.profile.androidDestination()
@@ -73,7 +73,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     val roles=if(destination==AndroidDestination.NOT_AVAILABLE||destination==AndroidDestination.PENDING_VERIFICATION)emptyList() else allowedRoles.filter { AndroidSections.hasAppScreens(it,account.profile.permissions) }
     var selectedRole by rememberSaveable(account.session.userId){mutableStateOf(roles.firstOrNull().orEmpty())}
     val role=selectedRole.takeIf{it in roles}?:roles.firstOrNull().orEmpty()
-    if(roles.isEmpty()){Surface{Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center){SectionIntro("Acceso / CLIMESA","Tu rol no usa esta aplicación");Spacer(Modifier.height(16.dp));Text(PlatformGate.message(account.profile.platforms,"android",BuildConfig.WEB_URL));Spacer(Modifier.height(24.dp));PrimaryButton(stringResource(R.string.cerrar_sesion),logout)}};return}
+    if(roles.isEmpty()){Surface{Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center){SectionIntro("",stringResource(R.string.app_rol_sin_android));Spacer(Modifier.height(16.dp));Text(PlatformGate.message(account.profile.platforms,"android",BuildConfig.WEB_URL));Spacer(Modifier.height(24.dp));PrimaryButton(stringResource(R.string.cerrar_sesion),logout)}};return}
     Column(Modifier.fillMaxSize()){
         if(roles.size>1){var menu by remember{mutableStateOf(false)};Surface(color=BrandNavy){Box(Modifier.fillMaxWidth().safeDrawingPadding().padding(horizontal=20.dp)){TextButton(onClick={menu=true}){Text("${RoleAccess.label(role)}  ▾",color=Color.White)};DropdownMenu(expanded=menu,onDismissRequest={menu=false}){roles.forEach{r->DropdownMenuItem(text={Text(RoleAccess.label(r))},onClick={selectedRole=r;menu=false})}}}}}
         Box(Modifier.weight(1f)){if(role=="REC"){
@@ -98,7 +98,7 @@ private fun AuthLoadingScreen() {
             Spacer(Modifier.height(24.dp))
             CircularProgressIndicator()
             Spacer(Modifier.height(12.dp))
-            Text("Comprobando sesión…")
+            Text(stringResource(R.string.app_comprobando_sesion))
             Spacer(Modifier.height(8.dp))
             SlowServerHint(active = true, modifier = Modifier.padding(horizontal = 24.dp))
         }
@@ -138,7 +138,7 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(stringResource(R.string.login_brand), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.login_brand_subtitle), style = MaterialTheme.typography.labelSmall, color = Color(0xFFD4D9FF))
+                    Text(stringResource(R.string.login_brand_subtitle), style = MaterialTheme.typography.labelSmall, color = BrandAccent)
                 }
             }
             Surface(
@@ -208,7 +208,7 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
                     }
                     SlowServerHint(state.signingIn, Modifier.fillMaxWidth())
                     TextButton(onClick = { draft.email = email; onForgot() }, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth()) {
-                        Text("¿Olvidaste tu contraseña?")
+                        Text(stringResource(R.string.app_olvidaste))
                     }
                     HorizontalDivider()
                     TextButton(onClick = onRegister, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth()) {
@@ -226,17 +226,17 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
 @Composable private fun RegistrationScreen(state:AuthUiState,back:()->Unit,register:(String,String,String,String)->Unit){
     var name by rememberSaveable{mutableStateOf("")};var email by rememberSaveable{mutableStateOf("")};var password by remember{mutableStateOf("")};var confirmation by remember{mutableStateOf("")}
     Surface(color=BrandBlue){Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        TextButton(onClick=back,enabled=!state.signingIn){Text("← Volver al ingreso",color=Color.White)}
+        TextButton(onClick=back,enabled=!state.signingIn){Text(stringResource(R.string.app_volver_ingreso),color=Color.White)}
         Surface(color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-            Text("CUENTA DE PACIENTE",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
-            Text("Crea tu cuenta",style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.app_cuenta_paciente),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.app_crea_cuenta),style=MaterialTheme.typography.headlineMedium)
             run{
                 state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
-                OutlinedTextField(name,{name=it.take(120)},label={Text("Nombre completo")},modifier=Modifier.fillMaxWidth(),singleLine=true,isError=state.fieldErrors.containsKey("name"),supportingText={state.fieldErrors["name"]?.let{Text(it)}},enabled=!state.signingIn)
-                OutlinedTextField(email,{email=it.take(254)},label={Text("Correo electrónico")},modifier=Modifier.fillMaxWidth(),singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email),isError=state.fieldErrors.containsKey("email"),supportingText={state.fieldErrors["email"]?.let{Text(it)}},enabled=!state.signingIn)
-                OutlinedTextField(password,{password=it},label={Text("Contraseña · 8+ caracteres")},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),isError=state.fieldErrors.containsKey("password"),supportingText=state.fieldErrors["password"]?.let{error->{Text(error)}},enabled=!state.signingIn)
-                OutlinedTextField(confirmation,{confirmation=it},label={Text("Confirmar contraseña")},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),isError=state.fieldErrors.containsKey("confirmation"),supportingText={state.fieldErrors["confirmation"]?.let{Text(it)}},enabled=!state.signingIn)
-                ClimesaButton(if(state.signingIn)"Creando cuenta…"else"Crear cuenta de paciente",Icons.Default.PersonAdd,{register(name,email,password,confirmation)},enabled=!state.signingIn)
+                OutlinedTextField(name,{name=it.take(120)},label={Text(stringResource(R.string.app_nombre_completo))},modifier=Modifier.fillMaxWidth(),singleLine=true,isError=state.fieldErrors.containsKey("name"),supportingText={state.fieldErrors["name"]?.let{Text(it)}},enabled=!state.signingIn)
+                OutlinedTextField(email,{email=it.take(254)},label={Text(stringResource(R.string.app_correo))},modifier=Modifier.fillMaxWidth(),singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email),isError=state.fieldErrors.containsKey("email"),supportingText={state.fieldErrors["email"]?.let{Text(it)}},enabled=!state.signingIn)
+                OutlinedTextField(password,{password=it},label={Text(stringResource(R.string.app_contrasena_8))},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),isError=state.fieldErrors.containsKey("password"),supportingText=state.fieldErrors["password"]?.let{error->{Text(error)}},enabled=!state.signingIn)
+                OutlinedTextField(confirmation,{confirmation=it},label={Text(stringResource(R.string.app_confirmar_contrasena))},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),isError=state.fieldErrors.containsKey("confirmation"),supportingText={state.fieldErrors["confirmation"]?.let{Text(it)}},enabled=!state.signingIn)
+                ClimesaButton(stringResource(if(state.signingIn)R.string.app_creando_cuenta else R.string.app_crear_cuenta),Icons.Default.PersonAdd,{register(name,email,password,confirmation)},enabled=!state.signingIn)
             }
         }}
     }}
@@ -257,7 +257,7 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
     val seconds=rememberSecondsLeft(state.resendAvailableAt)
     OutlinedButton(onClick={resend(email)},enabled=!state.sendingEmail&&seconds==0L,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){
         Icon(Icons.Default.Email,contentDescription=null);Spacer(Modifier.width(10.dp))
-        Text(when{state.sendingEmail->"Enviando correo…";seconds>0->"Reenviar correo en $seconds s";else->"Reenviar correo de confirmación"})
+        Text(when{state.sendingEmail->stringResource(R.string.app_enviando_correo);seconds>0->stringResource(R.string.app_reenviar_en,seconds);else->stringResource(R.string.app_reenviar)})
     }
 }
 /** After a patient signs up: the account exists but Supabase waits for the link in the email before allowing sign-in. */
@@ -265,14 +265,14 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
     Surface(color=BrandBlue){Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){
         Surface(Modifier.widthIn(max=560.dp).fillMaxWidth(),color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
             Icon(Icons.Default.Email,contentDescription=null,Modifier.size(40.dp),tint=MaterialTheme.colorScheme.primary)
-            Text("Revisa tu correo",style=MaterialTheme.typography.headlineMedium)
-            Text("Te enviamos un enlace de confirmación a:",style=MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.app_revisa_correo),style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.app_enlace_enviado),style=MaterialTheme.typography.bodyMedium)
             Text(email,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
-            Text("Abre el correo y toca \"Confirmar tu correo\". Después vuelve aquí e inicia sesión. Si no lo ves en unos minutos, revisa la carpeta de spam.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.app_abre_correo),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
             state.emailNotice?.let{AuthInfoNotice(it)}
             ResendConfirmationButton(state,email,resend)
-            ClimesaButton("Ya confirmé, iniciar sesión",Icons.AutoMirrored.Filled.ArrowForward,signIn)
+            ClimesaButton(stringResource(R.string.app_ya_confirme),Icons.AutoMirrored.Filled.ArrowForward,signIn)
         }}
     }}
 }
@@ -280,14 +280,14 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
 @Composable private fun PasswordResetScreen(state:AuthUiState,initialEmail:String,send:(String)->Unit,back:()->Unit){
     var email by rememberSaveable{mutableStateOf(initialEmail)}
     Surface(color=BrandBlue){Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        TextButton(onClick=back,enabled=!state.sendingEmail){Text("← Volver al ingreso",color=Color.White)}
+        TextButton(onClick=back,enabled=!state.sendingEmail){Text(stringResource(R.string.app_volver_ingreso),color=Color.White)}
         Surface(color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-            Text("Recuperar contraseña",style=MaterialTheme.typography.headlineMedium)
-            Text("Escribe el correo de tu cuenta. Te enviaremos un enlace para crear una contraseña nueva.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.app_recuperar),style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.app_recuperar_detalle),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
             state.emailNotice?.let{AuthInfoNotice(it)}
-            OutlinedTextField(email,{email=it.trimStart().take(254)},label={Text("Correo electrónico")},modifier=Modifier.fillMaxWidth(),singleLine=true,leadingIcon={Icon(Icons.Default.Email,contentDescription=null)},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email,imeAction=ImeAction.Send),keyboardActions=KeyboardActions(onSend={send(email)}),isError=state.fieldErrors.containsKey("email"),supportingText=state.fieldErrors["email"]?.let{error->{Text(error)}},enabled=!state.sendingEmail)
-            ClimesaButton(if(state.sendingEmail)"Enviando…" else "Enviar enlace",Icons.Default.Email,{send(email)},enabled=!state.sendingEmail)
+            OutlinedTextField(email,{email=it.trimStart().take(254)},label={Text(stringResource(R.string.app_correo))},modifier=Modifier.fillMaxWidth(),singleLine=true,leadingIcon={Icon(Icons.Default.Email,contentDescription=null)},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email,imeAction=ImeAction.Send),keyboardActions=KeyboardActions(onSend={send(email)}),isError=state.fieldErrors.containsKey("email"),supportingText=state.fieldErrors["email"]?.let{error->{Text(error)}},enabled=!state.sendingEmail)
+            ClimesaButton(stringResource(if(state.sendingEmail)R.string.app_enviando else R.string.app_enviar_enlace),Icons.Default.Email,{send(email)},enabled=!state.sendingEmail)
         }}
     }}
 }

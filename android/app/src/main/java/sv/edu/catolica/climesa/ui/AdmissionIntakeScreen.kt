@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -43,10 +44,12 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
     val draft = state.draft
     val step = state.step
     val problem = AdmissionIntake.stepError(step, draft, canAssignBed, state.feasibility?.feasible == true)
+    var leaving by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     PageList(modifier) {
         item { CompactHeader(stringResource(R.string.ing_titulo), breadcrumb = stringResource(R.string.ing_paso, step + 1, AdmissionIntake.STEP_TITLES.size, AdmissionIntake.STEP_TITLES[step])) }
         item { LinearProgressIndicator(progress = { (step + 1f) / AdmissionIntake.STEP_TITLES.size }, modifier = Modifier.fillMaxWidth()) }
         state.error?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
+        if (state.prefilled.isNotEmpty()) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.ing_prefill_aviso, state.prefilled.map { stringResource(it.label()) }.joinToString(", "))) }
         if (state.loading) item { LoadingState() }
         item {
             when (step) {
@@ -66,8 +69,20 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
             else PrimaryButton(stringResource(R.string.ing_siguiente), { model.next(canAssignBed) }, enabled = problem == null && !state.loading)
         }
         item { if (step > 0) SecondaryButton(stringResource(R.string.ing_atras), { model.back(canAssignBed) }, enabled = !state.busy) }
-        item { SecondaryButton(stringResource(R.string.ing_cancelar), model::close, icon = Icons.Default.Close, enabled = !state.busy) }
+        item { SecondaryButton(stringResource(R.string.ing_cancelar), { if (draft.patient != null) leaving = true else model.close() }, icon = Icons.Default.Close, enabled = !state.busy) }
     }
+    // Leaving the guide drops everything typed: confirm once something was chosen.
+    if (leaving) ConfirmDialog(
+        title = stringResource(R.string.ing_salir_titulo), confirmLabel = stringResource(R.string.ing_salir), destructive = true,
+        message = stringResource(R.string.ing_salir_detalle), dismissLabel = stringResource(R.string.rec_seguir_editando),
+        onConfirm = { leaving = false; model.close() }, onDismiss = { leaving = false },
+    )
+}
+
+private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this) {
+    sv.edu.catolica.climesa.domain.IntakeField.ORIGIN -> R.string.ing_campo_origen
+    sv.edu.catolica.climesa.domain.IntakeField.DOCTOR -> R.string.ing_campo_medico
+    sv.edu.catolica.climesa.domain.IntakeField.CATEGORY -> R.string.ing_campo_categoria
 }
 
 @Composable private fun PatientStep(state: AdmissionIntakeState, model: AdmissionIntakeViewModel) = SectionCard(stringResource(R.string.ing_paciente_buscar)) {
@@ -120,8 +135,8 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
 @Composable private fun DoctorRow(d: IntakeDoctor, selected: Boolean, pick: () -> Unit) {
     TextButton(onClick = pick, enabled = d.available, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Column(Modifier.weight(1f)) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.specialty ?: "Medicina general", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            if (!d.available) StatusPill(d.reason ?: stringResource(R.string.ing_medico_sin_turno), StatusTone.BLOCKED) else if (selected) StatusPill("Elegido", StatusTone.SUCCESS)
+            Column(Modifier.weight(1f)) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.specialty ?: stringResource(R.string.ing_medicina_general), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (!d.available) FamilyBadge(d.reason ?: stringResource(R.string.ing_medico_sin_turno), StatusFamily.CERRADO) else if (selected) FamilyBadge(stringResource(R.string.ing_elegido), StatusFamily.LISTO)
         }
     }
 }
@@ -189,13 +204,13 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
         LabeledValue(stringResource(R.string.ing_resumen_motivo), d.motive.trim())
         LabeledValue(stringResource(R.string.ing_resumen_medico), "${d.at} · ${d.doctor?.name.orEmpty()}")
         LabeledValue(stringResource(R.string.ing_resumen_categoria), AdmissionIntake.CATEGORY_LABELS[d.category] ?: d.category.orEmpty())
-        val needs = listOfNotNull(if (d.isolation) "Aislamiento" + (d.isolationType?.let { " ${it.label.lowercase()}" } ?: "") else null, if (d.unstable) "Inestable" else null, if (d.postSurgical) "Posquirúrgico" else null)
+        val needs = listOfNotNull(if (d.isolation) stringResource(R.string.ing_req_aislamiento) + (d.isolationType?.let { " ${it.label.lowercase()}" } ?: "") else null, if (d.unstable) stringResource(R.string.ing_req_inestable) else null, if (d.postSurgical) stringResource(R.string.ing_req_posquirurgico) else null)
         LabeledValue(stringResource(R.string.ing_resumen_requisitos), if (needs.isEmpty()) stringResource(R.string.ing_resumen_ninguno) else needs.joinToString(" · "))
         val bed = if (canAssignBed && AdmissionIntake.isImmediate(d.at) && d.bed != null) "${d.bed.code} · ${d.bed.room}" else stringResource(R.string.ing_resumen_pendiente_cama)
         LabeledValue(stringResource(R.string.ing_resumen_cama), bed)
         LabeledValue(stringResource(R.string.ing_resumen_visitas), if (d.visitorsAllowed) stringResource(R.string.ing_resumen_hasta, d.visitorsMax) else stringResource(R.string.ing_resumen_sin_visitas))
     }
     SectionCard(stringResource(R.string.ing_factibilidad)) {
-        state.feasibility?.checks?.forEach { check -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { StatusPill(if (check.ok) "OK" else "Revisar", if (check.ok) StatusTone.SUCCESS else StatusTone.BLOCKED); Text(check.message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f)) } }
+        state.feasibility?.checks?.forEach { check -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { StatusTag(if (check.ok) LinkCheck.MATCH else LinkCheck.REVIEW, label = stringResource(if (check.ok) R.string.ing_chequeo_ok else R.string.ing_chequeo_revisar)); Text(check.message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f)) } }
     }
 }

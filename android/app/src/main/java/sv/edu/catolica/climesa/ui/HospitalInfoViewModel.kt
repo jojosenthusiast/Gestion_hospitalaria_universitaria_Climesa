@@ -43,7 +43,7 @@ class HospitalInfoViewModel @Inject constructor(private val api: ApiGateway, rea
                 )
                 mutable.value = HospitalInfoState(loading = false, info = info)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = e.message ?: "No se pudo cargar la información del hospital.") }
+            catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = userMessage(e, "No se pudo cargar la información del hospital.")) }
         }
     }
 

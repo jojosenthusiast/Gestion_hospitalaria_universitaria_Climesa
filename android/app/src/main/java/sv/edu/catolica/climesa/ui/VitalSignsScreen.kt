@@ -59,13 +59,14 @@ import sv.edu.catolica.climesa.domain.VitalsHistory
 import sv.edu.catolica.climesa.domain.VitalsRules
 
 /** Labels short enough for a half-width field. */
+@androidx.compose.runtime.Composable
 private fun compact(m: VitalMeasure) = when (m) {
-    VitalMeasure.HEART_RATE -> "Frec. cardiaca"
-    VitalMeasure.RESPIRATORY_RATE -> "Frec. respiratoria"
-    VitalMeasure.SYSTOLIC -> "Sistólica"
-    VitalMeasure.DIASTOLIC -> "Diastólica"
-    VitalMeasure.OXYGEN -> "SpO2"
-    VitalMeasure.PAIN -> "Dolor"
+    VitalMeasure.HEART_RATE -> stringResource(R.string.signos_corto_fc)
+    VitalMeasure.RESPIRATORY_RATE -> stringResource(R.string.signos_corto_fr)
+    VitalMeasure.SYSTOLIC -> stringResource(R.string.signos_corto_sistolica)
+    VitalMeasure.DIASTOLIC -> stringResource(R.string.signos_corto_diastolica)
+    VitalMeasure.OXYGEN -> stringResource(R.string.signos_corto_spo2)
+    VitalMeasure.PAIN -> stringResource(R.string.signos_corto_dolor)
     else -> m.label
 }
 
@@ -99,10 +100,11 @@ private fun levelWord(level: VitalLevel?): String = stringResource(when (level) 
     else -> R.string.signos_nivel_normal
 })
 
-private fun levelTone(level: VitalLevel) = when (level) {
-    VitalLevel.CRITICAL -> StatusTone.DANGER
-    VitalLevel.ABNORMAL -> StatusTone.WARNING
-    else -> StatusTone.SUCCESS
+/** Family of a reading level: normal is done, altered is a neutral badge, critical keeps the red [CriticalPill]. */
+internal fun vitalLevelFamily(level: VitalLevel): StatusFamily? = when (level) {
+    VitalLevel.CRITICAL -> StatusFamily.CRITICO
+    VitalLevel.ABNORMAL -> null
+    else -> StatusFamily.LISTO
 }
 
 /**
@@ -343,6 +345,6 @@ private fun ReadingCard(reading: VitalReading) {
         subtitle = reading.summary(),
         meta = meta,
         leadingIcon = Icons.Default.MonitorHeart,
-        status = { if (level == VitalLevel.CRITICAL) CriticalPill(levelWord(level)) else StatusPill(levelWord(level), levelTone(level)) },
+        status = { if (level == VitalLevel.CRITICAL) CriticalPill(levelWord(level)) else FamilyBadge(levelWord(level), vitalLevelFamily(level)) },
     )
 }

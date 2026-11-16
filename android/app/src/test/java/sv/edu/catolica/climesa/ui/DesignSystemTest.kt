@@ -99,7 +99,6 @@ class DesignSystemTest {
     @Test fun `unknown status falls back to the catalog tone, then to neutral`() {
         assertNull(StatusFamily.of("alto"))
         assertNull(StatusFamily.resolve("estado_raro", null))
-        assertNull(StatusFamily.resolve("bajo_minimo", StatusTone.NEUTRAL))
         assertEquals(StatusFamily.LISTO, StatusFamily.resolve("atendido", StatusTone.SUCCESS))
         // A warning tone is not the queue "Llamado" family: the badge stays neutral with its own text.
         assertNull(StatusFamily.resolve("sin_traslado", StatusTone.WARNING))
@@ -120,7 +119,8 @@ class DesignSystemTest {
         // out of stock or isolation are not); "Llamado" is a queue state, not a generic warning.
         assertNull(StatusFamily.fromTone(StatusTone.DANGER))
         assertNull(StatusFamily.fromTone(StatusTone.WARNING))
-        assertNull(StatusFamily.resolve("bajo_minimo", StatusTone.DANGER))
+        assert(StatusFamily.resolve("bajo_minimo", StatusTone.DANGER) != StatusFamily.CRITICO)
+        assert(StatusFamily.resolve("agotado", StatusTone.DANGER) != StatusFamily.CRITICO)
         assertEquals(StatusFamily.CRITICO, StatusFamily.resolve("critico_alto", StatusTone.DANGER))
     }
 
@@ -151,5 +151,18 @@ class DesignSystemTest {
     @Test fun `spacing and radii follow the 4 dp scale`() {
         assertEquals(listOf(4f, 8f, 12f, 16f, 20f, 24f, 32f, 40f, 48f), listOf(Space1, Space2, Space3, Space4, Space5, Space6, Space8, Space10, Space12).map { it.value })
         assertEquals(listOf(4f, 6f, 10f, 16f), listOf(RadiusChip, RadiusControl, RadiusCard, RadiusPanel).map { it.value })
+    }
+
+    @Test fun `stock and link-check states have a family and are never critical`() {
+        // S13: inventory and account-link screens use the shared families instead of hand-picked tones.
+        assertEquals(StatusFamily.CERRADO, StatusFamily.of("agotado"))
+        assertEquals(StatusFamily.LLAMADO, StatusFamily.of("bajo_minimo"))
+        assertEquals(StatusFamily.ESPERA, StatusFamily.of("por_vencer"))
+        assertEquals(StatusFamily.LISTO, StatusFamily.of("coincide"))
+        assertEquals(StatusFamily.ESPERA, StatusFamily.of("revisar"))
+        assertEquals("Agotado", StatusCatalog.label("agotado"))
+        assertEquals("Por vencer", StatusCatalog.label("por_vencer"))
+        assertEquals("Coincide", StatusCatalog.label("coincide"))
+        assertEquals("Revisar", StatusCatalog.label("revisar"))
     }
 }

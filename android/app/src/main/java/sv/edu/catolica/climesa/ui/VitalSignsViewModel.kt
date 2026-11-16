@@ -92,7 +92,7 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
     private suspend fun fetch(base: CandidateList, path: String, parse: (Any?) -> List<VitalsCandidate>): CandidateList =
         try { CandidateList(parse(api.request(path))) }
         catch (e: CancellationException) { throw e }
-        catch (e: Exception) { base.copy(loading = false, error = e.message ?: "No se pudo cargar la lista.") }
+        catch (e: Exception) { base.copy(loading = false, error = userMessage(e, "No se pudo cargar la lista.")) }
 
     /** Debounced autosuggest: waits for a pause in typing and ignores queries under two characters. */
     fun onQuery(text: String) {
@@ -133,7 +133,7 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 // Keep the shown history on a failed silent reload (rule: keep data on API failure).
-                if (mutable.value.patientId == id && (!silent || mutable.value.history == null)) mutable.value = mutable.value.copy(loading = false, error = e.message ?: "No se pudo cargar los signos.")
+                if (mutable.value.patientId == id && (!silent || mutable.value.history == null)) mutable.value = mutable.value.copy(loading = false, error = userMessage(e, "No se pudo cargar los signos."))
                 else if (mutable.value.patientId == id) mutable.value = mutable.value.copy(loading = false)
             }
         }
@@ -161,7 +161,7 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 val conflict = (e as? AuthRequestException)?.let { it.statusCode == 409 } == true
-                mutable.value = mutable.value.copy(saving = false, conflict = conflict, formError = e.message ?: "No se pudo guardar. Intenta de nuevo; lo escrito se conserva.")
+                mutable.value = mutable.value.copy(saving = false, conflict = conflict, formError = userMessage(e, "No se pudo guardar. Intenta de nuevo; lo escrito se conserva."))
             }
         }
     }

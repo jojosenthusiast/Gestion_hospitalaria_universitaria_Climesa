@@ -56,6 +56,9 @@ class AdmissionIntakeViewModelTest {
         vm.query("nueve"); advanceUntilIdle()
         vm.pickPatient(vm.state.value.results.single()); vm.next(true); runCurrent()
         assertEquals(1, vm.state.value.step); assertEquals(1, vm.state.value.origins.size)
+        // The only source record is preselected and named in the notice (S13).
+        assertEquals("c1", vm.state.value.draft.originRecord?.id)
+        assertEquals(listOf(sv.edu.catolica.climesa.domain.IntakeField.ORIGIN), vm.state.value.prefilled)
         vm.pickOrigin(OriginKind.APPOINTMENT); vm.pickRecord(vm.state.value.origins.single()); vm.next(true)
         assertEquals(1, vm.state.value.step) // motive missing
         vm.motive("Dolor abdominal con fiebre"); vm.next(true)
@@ -67,8 +70,9 @@ class AdmissionIntakeViewModelTest {
         val off = vm.state.value.doctors.first { !it.available }
         vm.pickDoctor(off); assertNull(vm.state.value.draft.doctor)
         vm.pickDoctor(vm.state.value.doctors.first { it.available }); vm.next(true); runCurrent()
-        // Step 4: VIP has no free beds.
-        vm.pickCategory("vip"); assertNull(vm.state.value.draft.category)
+        // Step 4: semiprivada is the only category with a free bed, so the guide preselects it (S13); VIP has none and is refused.
+        assertEquals("semiprivada", vm.state.value.draft.category)
+        vm.pickCategory("vip"); assertEquals("semiprivada", vm.state.value.draft.category)
         vm.pickCategory("semiprivada"); vm.next(true); vm.next(true); runCurrent()
         // Step 6: the suggestion arrives chosen; an incompatible bed cannot be picked.
         assertEquals("b1", vm.state.value.draft.bed?.id)

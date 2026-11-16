@@ -169,7 +169,7 @@ private fun FollowUpInbox(items: List<LabFollowUp>, busy: String?, model: Labora
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Text(item.patientName, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                    if (item.critical) CriticalPill(stringResource(R.string.lab_critico)) else StatusPill(stringResource(R.string.lab_pendiente_observacion), StatusTone.PROCESS)
+                    if (item.critical) CriticalPill(stringResource(R.string.lab_critico)) else FamilyBadge(stringResource(R.string.lab_pendiente_observacion), StatusFamily.ATENCION)
                 }
                 item.record?.let { Text(stringResource(R.string.lab_expediente, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 Text(item.detail, style = MaterialTheme.typography.bodyMedium)
@@ -370,12 +370,16 @@ private fun LabStepper(order: LaboratoryOrder, ownView: Boolean) {
     }
 }
 
-/** One tone per stage, the same as the web list: pending amber, in process blue, to review purple, released green. */
+/** One family per stage, the same table as the web `STAGE_STATUS`: pending and to review wait, in process is called, released is done. */
 @Composable
-private fun LabStagePill(stage: LabStage) = StatusPill(
-    stage.label,
-    when (stage) { LabStage.PENDING -> StatusTone.WARNING; LabStage.IN_PROCESS -> StatusTone.PROCESS; LabStage.TO_REVIEW -> StatusTone.RESERVED; LabStage.RELEASED -> StatusTone.SUCCESS; LabStage.CANCELLED -> StatusTone.BLOCKED },
-)
+private fun LabStagePill(stage: LabStage) = FamilyBadge(stage.label, labStageFamily(stage))
+
+internal fun labStageFamily(stage: LabStage): StatusFamily = when (stage) {
+    LabStage.PENDING, LabStage.TO_REVIEW -> StatusFamily.ESPERA
+    LabStage.IN_PROCESS -> StatusFamily.LLAMADO
+    LabStage.RELEASED -> StatusFamily.LISTO
+    LabStage.CANCELLED -> StatusFamily.CERRADO
+}
 
 /** Identity (record, age, sex), ordering doctor, elapsed time with its goal colour and the critical-value flag. */
 @Composable

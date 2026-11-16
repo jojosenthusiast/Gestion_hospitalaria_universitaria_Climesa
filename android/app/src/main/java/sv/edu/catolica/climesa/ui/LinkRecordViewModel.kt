@@ -57,7 +57,7 @@ class LinkRecordViewModel @Inject constructor(private val api: ApiGateway, realt
                 mutable.value = when (code) {
                     "vinculacion_pendiente" -> mutable.value.copy(busy = false, status = LinkStatus.PENDING)
                     "cuenta_ya_vinculada" -> mutable.value.copy(busy = false, status = LinkStatus.APPROVED)
-                    else -> mutable.value.copy(busy = false, error = e.message ?: "No se pudo enviar la solicitud.")
+                    else -> mutable.value.copy(busy = false, error = userMessage(e, "No se pudo enviar la solicitud."))
                 }
             }
         }

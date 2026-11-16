@@ -112,8 +112,8 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
 
 /** States the server adds (vencida, reprogramada) labelled in Spanish; the rest use the shared catalog. */
 @Composable internal fun AppointmentStateTag(state: String) = when (state) {
-    AppointmentActions.EXPIRED -> StatusPill(stringResource(R.string.rec_cita_vencida), StatusTone.NEUTRAL)
-    AppointmentActions.RESCHEDULED -> StatusPill(stringResource(R.string.cita_reprogramada), StatusTone.NEUTRAL)
+    AppointmentActions.EXPIRED -> FamilyBadge(stringResource(R.string.rec_cita_vencida), null)
+    AppointmentActions.RESCHEDULED -> FamilyBadge(stringResource(R.string.cita_reprogramada), null)
     else -> StatusTag(state)
 }
 
@@ -248,8 +248,8 @@ private fun DoctorPicker(state: ReceptionAppointmentsState, model: ReceptionAppo
                 Text(d.name, style = MaterialTheme.typography.titleSmall)
                 Text(d.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (!d.hasShift) StatusPill(d.reason ?: stringResource(R.string.rec_agendar_sin_turno), StatusTone.BLOCKED)
-            else if (selected) StatusPill(stringResource(R.string.rec_leyenda_libre), StatusTone.SUCCESS)
+            if (!d.hasShift) FamilyBadge(d.reason ?: stringResource(R.string.rec_agendar_sin_turno), StatusFamily.CERRADO)
+            else if (selected) FamilyBadge(stringResource(R.string.rec_leyenda_libre), StatusFamily.LISTO)
         }
     }
     HorizontalDivider(color = colors.line)
@@ -265,10 +265,10 @@ private fun SlotSection(state: ReceptionAppointmentsState, model: ReceptionAppoi
             else -> {
                 DaySlotGrid(state.slots, state.slot, model::pickSlot)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusPill(stringResource(R.string.rec_leyenda_libre), StatusTone.SUCCESS); StatusPill(stringResource(R.string.rec_leyenda_ocupado), StatusTone.NEUTRAL)
+                    FamilyBadge(stringResource(R.string.rec_leyenda_libre), StatusFamily.LISTO); FamilyBadge(stringResource(R.string.rec_leyenda_ocupado), null)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusPill(stringResource(R.string.rec_leyenda_sin_turno), StatusTone.BLOCKED); StatusPill(stringResource(R.string.rec_leyenda_pasado), StatusTone.NEUTRAL)
+                    FamilyBadge(stringResource(R.string.rec_leyenda_sin_turno), StatusFamily.CERRADO); FamilyBadge(stringResource(R.string.rec_leyenda_pasado), null)
                 }
                 if (state.slots.none { it.selectable }) NoticeBanner(NoticeKind.INFO, stringResource(R.string.rec_agendar_sin_libres))
             }

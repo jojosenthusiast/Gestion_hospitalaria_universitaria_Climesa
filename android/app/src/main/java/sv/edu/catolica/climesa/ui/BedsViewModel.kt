@@ -80,7 +80,7 @@ class BedsViewModel @Inject constructor(
                 mutable.update { it.copy(loading = false, beds = beds, error = null) }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                mutable.update { it.copy(loading = false, error = e.message ?: "No se pudo cargar el tablero de camas.") }
+                mutable.update { it.copy(loading = false, error = userMessage(e, "No se pudo cargar el tablero de camas.")) }
             }
         }
     }

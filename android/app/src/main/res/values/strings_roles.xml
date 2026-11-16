@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fase 2 S13: per-role screens (Android A1 reception and patient, A2 clinical and ward). -->
+<resources>
+    <!-- Admission feasibility checks -->
+    <string name="ing_chequeo_ok">Correcto</string>
+    <string name="ing_chequeo_revisar">Revisar</string>
+    <!-- Shared bits -->
+    <string name="ui_cerrar_aviso">Cerrar aviso</string>
+    <string name="ui_y">" y "</string>
+    <string name="ui_minimo_10">Mínimo 10 caracteres.</string>
+
+    <!-- A09 patient ambulance request -->
+    <string name="amb_prefill_aviso">Tomamos de tu expediente: %1$s. Revísalo antes de enviar.</string>
+    <string name="amb_campo_direccion">dirección</string>
+    <string name="amb_campo_telefono">teléfono</string>
+
+    <!-- Reception: patients -->
+    <string name="rec_form_registrar">Registrar paciente</string>
+    <string name="rec_form_editar">Editar ficha</string>
+    <string name="rec_ficha_titulo">Ficha del paciente</string>
+    <string name="rec_seccion_pendiente">Esta sección (%1$s) todavía no está disponible en Android.</string>
+    <string name="rec_error_registro">No pudimos abrir el registro. Tus datos no se han sobrescrito.</string>
+    <string name="rec_salir_titulo">¿Salir del formulario?</string>
+    <string name="rec_salir_detalle">Los cambios que aún no guardaste se perderán.</string>
+    <string name="rec_salir">Salir</string>
+    <string name="rec_seguir_editando">Seguir editando</string>
+    <string name="rec_pacientes_titulo">Pacientes</string>
+    <string name="rec_buscar_label">Nombre, DUI o expediente</string>
+    <string name="rec_limpiar_busqueda">Limpiar búsqueda</string>
+    <string name="rec_buscando">Buscando…</string>
+    <string name="rec_buscar">Buscar</string>
+    <string name="rec_filtro_activos">Activos</string>
+    <string name="rec_filtro_inactivos">Inactivos</string>
+    <string name="rec_filtro_todos">Todos</string>
+    <string name="rec_n_pacientes">%1$d pacientes</string>
+    <string name="rec_n_coincidencias">%1$d coincidencias</string>
+    <string name="rec_sin_coincidencias">Sin coincidencias. Ajusta la búsqueda o el filtro.</string>
+    <string name="rec_exp_corto">Exp. %1$s</string>
+    <string name="rec_expediente_n">Expediente %1$s</string>
+    <string name="rec_no_registrado">No registrado</string>
+    <string name="rec_sin_documento">Sin documento registrado</string>
+    <string name="rec_dui">DUI</string>
+    <string name="rec_nacimiento">Nacimiento</string>
+    <string name="rec_sexo">Sexo</string>
+    <string name="rec_telefono">Teléfono</string>
+    <string name="rec_editar_datos">Editar datos</string>
+    <string name="rec_inactivar">Inactivar paciente</string>
+    <string name="rec_reactivar">Reactivar paciente</string>
+    <string name="rec_estado_conserva">La ficha y su historial se conservan. Escribe el motivo; quedará en el historial.</string>
+    <string name="rec_motivo">Motivo</string>
+    <string name="rec_historial">Historial de actividad</string>
+    <string name="rec_sin_cambios">Esta ficha todavía no tiene cambios.</string>
+    <string name="rec_cambios_conservan">Los cambios de esta ficha se conservan en el historial.</string>
+    <string name="rec_obligatorios">Los campos con * son obligatorios.</string>
+    <string name="rec_datos_personales">Datos personales</string>
+    <string name="rec_campo_nombres">Nombres *</string>
+    <string name="rec_campo_apellidos">Apellidos *</string>
+    <string name="rec_campo_dui">DUI · opcional</string>
+    <string name="rec_campo_nacimiento">Nacimiento · opcional</string>
+    <string name="rec_campo_sexo">Sexo registrado</string>
+    <string name="rec_campo_telefono">Teléfono · opcional</string>
+    <string name="rec_campo_motivo">Motivo de modificación *</string>
+    <string name="rec_campo_motivo_ayuda">Mínimo 10 caracteres. Quedará en el historial.</string>
+    <string name="rec_guardar_paciente">Guardar paciente</string>
+    <string name="rec_permisos_pendiente">La validación de permisos todavía no está disponible.</string>
+    <string name="rec_actividad_reciente">Actividad reciente</string>
+    <string name="rec_actividad_vacia">Aquí aparecerán los registros y cambios.</string>
+    <!-- Login and shell -->
+    <string name="app_acceso_error">No pudimos verificar tu acceso</string>
+    <string name="app_revisa_conexion">Revisa tu conexión e intenta de nuevo.</string>
+    <string name="app_volver_intentar">Volver a intentar</string>
+    <string name="app_rol_sin_android">Tu rol no usa esta aplicación</string>
+    <string name="app_comprobando_sesion">Comprobando sesión…</string>
+    <string name="app_olvidaste">¿Olvidaste tu contraseña?</string>
+    <string name="app_volver_ingreso">Volver al ingreso</string>
+    <string name="app_cuenta_paciente">Cuenta de paciente</string>
+    <string name="app_crea_cuenta">Crea tu cuenta</string>
+    <string name="app_nombre_completo">Nombre completo</string>
+    <string name="app_correo">Correo electrónico</string>
+    <string name="app_contrasena_8">Contraseña · 8 caracteres o más</string>
+    <string name="app_confirmar_contrasena">Confirmar contraseña</string>
+    <string name="app_creando_cuenta">Creando cuenta…</string>
+    <string name="app_crear_cuenta">Crear cuenta de paciente</string>
+    <string name="app_enviando_correo">Enviando correo…</string>
+    <string name="app_reenviar_en">Reenviar correo en %1$d s</string>
+    <string name="app_reenviar">Reenviar correo de confirmación</string>
+    <string name="app_revisa_correo">Revisa tu correo</string>
+    <string name="app_enlace_enviado">Te enviamos un enlace de confirmación a:</string>
+    <string name="app_abre_correo">Abre el correo y toca «Confirmar tu correo». Después vuelve aquí e inicia sesión. Si no lo ves en unos minutos, revisa la carpeta de spam.</string>
+    <string name="app_ya_confirme">Ya confirmé, iniciar sesión</string>
+    <string name="app_recuperar">Recuperar contraseña</string>
+    <string name="app_recuperar_detalle">Escribe el correo de tu cuenta. Te enviaremos un enlace para crear una contraseña nueva.</string>
+    <string name="app_enviando">Enviando…</string>
+    <string name="app_enviar_enlace">Enviar enlace</string>
+    <!-- Hospitalization and admission guide -->
+    <string name="hosp_titulo">Hospitalización</string>
+    <string name="hosp_cama">Cama</string>
+    <string name="ing_prefill_aviso">Elegimos por ti %1$s porque solo había una opción. Puedes cambiarlo.</string>
+    <string name="ing_campo_origen">el origen</string>
+    <string name="ing_campo_medico">el médico tratante</string>
+    <string name="ing_campo_categoria">la categoría</string>
+    <string name="ing_salir_titulo">¿Salir del ingreso?</string>
+    <string name="ing_salir">Salir</string>
+    <string name="ing_salir_detalle">Se pierde lo elegido en la guía. El paciente no queda ingresado.</string>
+    <string name="ing_medicina_general">Medicina general</string>
+    <string name="ing_elegido">Elegido</string>
+    <string name="ing_req_aislamiento">Aislamiento</string>
+    <string name="ing_req_inestable">Inestable</string>
+    <string name="ing_req_posquirurgico">Posquirúrgico</string>
+
+    <!-- Inventory -->
+    <string name="inv_fila_existencia">%1$s %2$s · mínimo %3$s</string>
+    <string name="inv_vence_el">vence %1$s</string>
+    <string name="inv_lote_n">Lote %1$s</string>
+    <string name="inv_dado_baja">dado de baja</string>
+    <string name="inv_lote_vence">Vence %1$s</string>
+    <string name="inv_lote_vencido">(vencido)</string>
+    <string name="inv_no_vence">No vence</string>
+    <string name="inv_disponible_lote">Disponible en el lote: %1$s</string>
+    <string name="inv_ajuste_ayuda">Negativo resta un faltante; positivo suma un sobrante.</string>
+    <string name="inv_eliminar_titulo">¿Eliminar el artículo?</string>
+    <string name="inv_eliminar_detalle">Se elimina «%1$s» del catálogo. No tiene lotes ni movimientos, y no se puede deshacer.</string>
+
+    <!-- Vital signs (short labels) -->
+    <string name="signos_corto_fc">Frec. cardiaca</string>
+    <string name="signos_corto_fr">Frec. respiratoria</string>
+    <string name="signos_corto_sistolica">Sistólica</string>
+    <string name="signos_corto_diastolica">Diastólica</string>
+    <string name="signos_corto_spo2">SpO2</string>
+    <string name="signos_corto_dolor">Dolor</string>
+
+    <!-- Paramedic -->
+    <string name="par_sexo_femenino">Femenino</string>
+    <string name="par_sexo_masculino">Masculino</string>
+    <string name="par_sexo_indeterminado">Indeterminado</string>
+
+    <!-- Consultation (MED) -->
+    <string name="consulta_mi_consultorio">Mi consultorio</string>
+    <string name="consulta_t_firmada">Consulta firmada</string>
+    <string name="consulta_t_iniciar">Iniciar consulta</string>
+    <string name="consulta_t_continuar">Continuar consulta</string>
+    <string name="consulta_paciente">Paciente</string>
+    <string name="consulta_numero">Número</string>
+    <string name="consulta_cita">Cita</string>
+    <string name="consulta_no_iniciable">La consulta no se puede iniciar ahora.</string>
+    <string name="consulta_paso1">1. Consulta</string>
+    <string name="consulta_paso2">2. Procedimientos y plan</string>
+    <string name="consulta_paso3">3. Receta y exámenes</string>
+    <string name="consulta_paso4">4. Cerrar consulta</string>
+    <string name="consulta_paso4_detalle">Firmar cierra la consulta y el número de fila; luego te proponemos quién pasa después.</string>
+    <string name="consulta_motivo">Motivo de consulta</string>
+    <string name="consulta_examen">Examen físico</string>
+    <string name="consulta_pa_sis">PA sis.</string>
+    <string name="consulta_pa_dia">PA dia.</string>
+    <string name="consulta_fc">FC</string>
+    <string name="consulta_temp">Temp.</string>
+    <string name="consulta_sat">Sat. O₂</string>
+    <string name="consulta_registrar_signos">Registrar signos</string>
+    <string name="consulta_codigo">Código</string>
+    <string name="consulta_nota">Nota</string>
+    <string name="consulta_principal">Principal</string>
+    <string name="consulta_registrar_diagnostico">Registrar diagnóstico</string>
+    <string name="consulta_plan">Plan</string>
+    <string name="consulta_medicamento">Medicamento</string>
+    <string name="consulta_dosis">Dosis</string>
+    <string name="consulta_via">Vía</string>
+    <string name="consulta_frecuencia">Frecuencia</string>
+    <string name="consulta_duracion">Duración</string>
+    <string name="consulta_indicaciones">Indicaciones</string>
+    <string name="consulta_emitir_receta">Emitir receta</string>
+    <string name="consulta_guardar_borrador">Guardar borrador</string>
+    <string name="consulta_cerrar">Cerrar</string>
+    <string name="consulta_firmar">Firmar</string>
+    <string name="consulta_firmar_titulo">¿Firmar la consulta?</string>
+    <string name="consulta_firmar_detalle">Primero se guardan tus notas y después se firma. Una consulta firmada ya no se puede modificar, la cita queda atendida y el número de fila se cierra.</string>
+</resources>

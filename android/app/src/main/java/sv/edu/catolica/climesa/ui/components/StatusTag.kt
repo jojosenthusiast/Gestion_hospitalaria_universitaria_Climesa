@@ -20,6 +20,7 @@ internal object StatusCatalog {
         "alto" to "Alto", "bajo" to "Bajo", "critico_alto" to "Crítico alto", "critico_bajo" to "Crítico bajo", "sin_rango" to "Sin rango",
         "disponible" to "Disponible", "en_servicio" to "En servicio", "en_mantenimiento" to "En mantenimiento",
         "vencida" to "Vencida", "reprogramada" to "Reprogramada", "cerrado" to "Cerrado sin atender", "aprobada" to "Aprobada",
+        "agotado" to "Agotado", "por_vencer" to "Por vencer", "coincide" to "Coincide", "revisar" to "Revisar",
     )
     private val tones: Map<String, StatusTone> = buildMap {
         listOf("activo", "libre", "exito", "completado", "disponible").forEach { put(it, StatusTone.SUCCESS) }
@@ -42,10 +43,11 @@ internal object StatusCatalog {
 internal fun StatusTag(value: String, modifier: Modifier = Modifier, label: String? = null) =
     StatusBadge(value, modifier, label ?: StatusCatalog.label(value), StatusCatalog.tone(value))
 
-/** Badge for a screen-specific text with a legacy [tone]; the tone maps to its status family ([StatusFamily.fromTone]). */
-@Composable
-internal fun StatusPill(text: String, tone: StatusTone, modifier: Modifier = Modifier) =
-    FamilyBadge(text, StatusFamily.fromTone(tone), modifier)
+/** UI codes for a check against a record (account linking, admission feasibility): matches is done, the rest waits for review. */
+internal object LinkCheck {
+    const val MATCH = "coincide"
+    const val REVIEW = "revisar"
+}
 
 /** Badge for a critical clinical value (critical lab result, critical vital sign): the only free-text badge in red. */
 @Composable

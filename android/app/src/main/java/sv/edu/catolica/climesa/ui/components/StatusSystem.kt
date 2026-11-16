@@ -58,9 +58,15 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
                 "inactivo", "desactivado", "denegado", "fallido", "en_mantenimiento",
             ).forEach { put(it, CERRADO) }
             listOf("critico_alto", "critico_bajo").forEach { put(it, CRITICO) }
+            // Stock (inventory) and link checks (account linking). Never critical: red stays for clinical values.
+            put("agotado", CERRADO)
+            put("bajo_minimo", LLAMADO)
+            put("por_vencer", ESPERA)
+            put("coincide", LISTO)
+            put("revisar", ESPERA)
         }
 
-        /** Family of an API state value, or null when the value has none (`alto`, `bajo`, `sin_rango`, `bajo_minimo`). */
+        /** Family of an API state value, or null when the value has none (`alto`, `bajo`, `sin_rango`). */
         fun of(value: String): StatusFamily? = byValue[value]
 
         /**
