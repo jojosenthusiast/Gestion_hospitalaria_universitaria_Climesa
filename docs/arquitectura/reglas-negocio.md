@@ -39,6 +39,7 @@ Una sola lista de las reglas que el sistema hace cumplir. Cada spec las referenc
 - **RN-18** El número de fila es único por servicio y día, empieza en 1 cada día y no tiene huecos (D-035).
 - **RN-19** Estados del número: en espera, llamado, en atención, atendido, no se presentó y cerrado sin atender. "No se presentó" solo después de `fila.llamados_para_ausencia` llamados (3); nunca desde "en espera". Al terminar el día, los números abiertos se cierran solos (fase 0/1, FILA-01 y FILA-03).
 - **RN-20** Un médico no tiene dos citas a la vez. La cita pedida por el paciente queda "solicitada" hasta que recepción la confirma (D-033).
+- **RN-20a** Solicitud por motivo (Fase 2, flujo A): el paciente pide cita con una a tres categorías, franja preferida y nota, sin médico; recepción la asigna (crea una cita confirmada con RN-20) o la rechaza con motivo, y el paciente la retira mientras está pendiente. El límite de solicitudes pendientes (CITA-07, `citas.solicitudes_pendientes_max`) suma las citas "solicitadas" futuras y las solicitudes por motivo pendientes creadas en los últimos 14 días: una solicitud por motivo no tiene franja que la venza, así que pasado ese plazo deja de bloquear al paciente, aunque sigue en la bandeja de recepción hasta que se asigne o se rechace.
 - **RN-21** El paciente puede cancelar su cita, o pedir reprogramarla, hasta 2 h antes (`citas.cancelacion_horas`). Recepción, hasta la hora de inicio. La API devuelve el plazo (`cancelableUntil`) y las acciones válidas (`allowedActions`).
 
 ## Consulta y laboratorio

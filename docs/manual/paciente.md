@@ -44,7 +44,7 @@ Muestra tu número y su estado: "Esperando a que el médico llame", "Llamado N d
 - **Retirar solicitud** mientras siga "Por asignar". Si Recepción la rechaza, ves el motivo.
 - En la app Android, **Pedir una cita** abre una página con los motivos, la franja, la nota y **Ya tengo médico (opcional)**; **Mis solicitudes** aparece debajo, en **Mis citas**.
 - En iOS, **Pedir cita** abre la misma hoja: motivos con ícono, **Buscar motivo**, **Franja preferida**, la nota y **Ya tengo médico (opcional)**; **Enviar solicitud**. **Mis solicitudes** aparece arriba de tus citas, con **Retirar solicitud**.
-- Puedes tener hasta 2 solicitudes esperando a la vez (por motivo o con médico y hora).
+- Puedes tener hasta 2 solicitudes esperando a la vez (por motivo o con médico y hora). Una solicitud por motivo deja de contar para ese límite a los 14 días, aunque Recepción todavía puede asignarla.
 - **Solicitar reprogramación** (en iOS, **Reprogramar → Pedir el cambio**): tu cita original sigue vigente hasta que Recepción o tu médico acepten el cambio.
 - **Cancelar** (en iOS, **Cancelar cita → Confirmar cancelación**).
 - La cita muestra "Puedes cancelar o reprogramar hasta las …": puedes hacerlo hasta 2 horas antes.

@@ -15,6 +15,9 @@ import { businessDate } from '../platform/clock';
 type AppointmentRow = Record<string, any>;
 const SLOT_MS = 20 * 60_000;
 
+/** RN-20a: days a pending category request counts toward the CITA-07 limit (it has no slot that expires it). */
+export const CATEGORY_REQUEST_COUNT_DAYS = 14;
+
 @Injectable()
 export class AttentionService {
   constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock, private readonly policies: PolicyRegistry, private readonly sweeper: AttentionSweepService) {}
@@ -300,13 +303,15 @@ export class AttentionService {
   /**
    * CITA-07: a patient cannot pile up simultaneous requests; they reschedule or cancel the one they already have.
    * Counts both kinds of request still waiting for reception: with a doctor (future `solicitada`) and by category
-   * (`pendiente`, Fase 2 flow A).
+   * (`pendiente`, Fase 2 flow A). A category request has no slot to expire with, so it only counts during
+   * `CATEGORY_REQUEST_COUNT_DAYS` after it was created (RN-20a); it stays in reception's inbox until resolved.
    */
   async assertPendingLimit(c: PoolClient, patientId: string) {
     const { maximo } = await this.policies.value<{ maximo: number }>(c, 'citas.solicitudes_pendientes_max', this.clock.now());
     const pending = Number((await c.query(`SELECT
         (SELECT count(*) FROM atencion.cita WHERE paciente_id=$1 AND estado='solicitada' AND lower(horario)>$2::timestamptz)
-        + (SELECT count(*) FROM atencion.solicitud_cita WHERE paciente_id=$1 AND estado='pendiente') AS n`, [patientId, this.clock.now()])).rows[0].n);
+        + (SELECT count(*) FROM atencion.solicitud_cita WHERE paciente_id=$1 AND estado='pendiente'
+            AND creado_en > $2::timestamptz - make_interval(days => $3)) AS n`, [patientId, this.clock.now(), CATEGORY_REQUEST_COUNT_DAYS])).rows[0].n);
     if (pending >= maximo) throw new ProblemException('solicitudes_pendientes_max', 409, `Ya tienes ${pending} solicitudes pendientes; reprograma o cancela una antes de pedir otra.`);
   }
 

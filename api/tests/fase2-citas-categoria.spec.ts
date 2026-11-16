@@ -70,6 +70,17 @@ describe('Fase 2 · solicitud de cita por categoría', () => {
     expect(third.body.codigo).toBe('solicitudes_pendientes_max');
   });
 
+  test('CITA-07: una solicitud por categoría pendiente deja de contar a los 14 días, pero sigue en la bandeja', async () => {
+    const old = (await request()).body.id;
+    const recent = (await request()).body.id;
+    expect((await request()).status).toBe(409);
+    await t.pg.query(`UPDATE atencion.solicitud_cita SET creado_en = $2::timestamptz - interval '14 days 1 minute' WHERE id = $1`, [old, now]);
+    await t.pg.query(`UPDATE atencion.solicitud_cita SET creado_en = $2::timestamptz - interval '13 days 23 hours' WHERE id = $1`, [recent, now]);
+    expect((await request()).status).toBe(201);
+    expect((await request()).status).toBe(409);
+    expect((await inbox('REC')).find(r => r.id === old)).toMatchObject({ state: 'pendiente', allowedActions: ['asignar', 'rechazar'] });
+  });
+
   test('recepción ve la bandeja con nota y acciones; el paciente solo las suyas; el médico ninguna', async () => {
     const mine = (await request({ categories: ['ojos', 'cabeza_nervios'] })).body;
     const other = await t.patient();
