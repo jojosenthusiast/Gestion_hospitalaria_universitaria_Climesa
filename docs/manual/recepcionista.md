@@ -32,6 +32,15 @@ Un paciente que creó su cuenta en la app pide vincularla a su expediente con su
 
 ### Citas
 
+- **Solicitudes por asignar** (arriba de la agenda): los pacientes piden cita por motivo (por ejemplo "Piel" o
+  "Corazón y presión"), con su franja preferida (mañana, tarde o cualquier hora) y una nota. No eligen médico. La
+  bandeja muestra primero las más antiguas, con el expediente, la nota y, si lo dijo, el médico que prefiere.
+  - **Asignar** abre la asignación en la misma fila, ya prellenada: el médico que prefiere el paciente o el primero con
+    turno de las especialidades sugeridas, y la primera franja libre de 20 minutos dentro de la franja pedida. Puedes
+    cambiar fecha, médico o franja (**Ver todo el día**) y luego **Confirmar cita**. Se crea una cita confirmada con las
+    reglas de siempre (franja de la jornada del médico, sin traslapes) y el paciente la ve en su app.
+  - **Rechazar** pide un motivo de 10 caracteres o más; el paciente lo ve.
+  - Bandeja vacía: "Al día: no hay solicitudes por asignar". El inicio también las muestra en **Requiere tu atención**.
 - **Agendar cita** crea una cita de 20 minutos, ya confirmada, en una franja libre del médico.
 - Las solicitudes de los pacientes llegan en vivo. Para cada cita, la fila muestra solo las acciones permitidas:
   - **Confirmar** o **Rechazar** una solicitud.
@@ -86,7 +95,7 @@ Inicio, Emitir número, Pacientes, Citas, Vinculaciones, Admisión y cama, Table
 |---|---|
 | Emitir número | **Emitir número** → eliges el servicio → **Emitir** |
 | Pacientes | **Buscar paciente** y registrar después de buscar |
-| Citas | **Agendar cita** → **Confirmar cita**. En cada cita: **Confirmar**, **Rechazar**, **Reprogramar**, **Cancelar cita**, **No asistió**, **Aceptar nuevo horario**, **Rechazar nuevo horario**, según lo que permita el servidor |
+| Citas | **Solicitudes por asignar**: **Asignar** (médico y franja ya prellenados; **Ver todo el día** si no hay libres en la franja pedida) → **Confirmar cita**, o **Rechazar** con motivo. **Agendar cita** → **Confirmar cita**. En cada cita: **Confirmar**, **Rechazar**, **Reprogramar**, **Cancelar cita**, **No asistió**, **Aceptar nuevo horario**, **Rechazar nuevo horario**, según lo que permita el servidor |
 | Vinculaciones | **Aprobar**, **Rechazar con motivo** |
 | Admisión y cama | **Ingresar paciente**, **Asignar cama** → **Confirmar cama**, **Cancelar admisión** |
 | Tablero de camas | Estado de las camas |

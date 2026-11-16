@@ -53,13 +53,16 @@ private val zone = ZoneId.of("America/El_Salvador")
 
 /** A32 Citas de Recepción: lista de citas y flujo para agendar con búsqueda de paciente, médicos con/sin turno y franjas del día. */
 @Composable
-fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, permissions: Collection<String> = emptyList(), model: ReceptionAppointmentsViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel()) {
+fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, permissions: Collection<String> = emptyList(), model: ReceptionAppointmentsViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel(), requests: CategoryRequestsViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
+    val requestState by requests.state.collectAsStateWithLifecycle()
+    // Fase 2, flow A: an assigned category request becomes a confirmed appointment, so the list reloads with it.
+    LaunchedEffect(requestState.notice) { if (requestState.notice != null) model.load() }
     val actionState by actions.state.collectAsStateWithLifecycle()
     LaunchedEffect(actionState.done) { if (actionState.done != null) model.load() }
     AppointmentActionDialog(actionState, actions)
     var query by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(Unit) { model.load(); model.startLive(channels) }
+    LaunchedEffect(Unit) { model.load(); model.startLive(channels); if (canSchedule) { requests.load(); requests.startLive(channels) } }
     LaunchedEffect(quickAction) {
         if (quickAction == null) return@LaunchedEffect
         if (quickAction == QuickAction.SCHEDULE_APPOINTMENT && canSchedule) model.openScheduling()
@@ -72,6 +75,11 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
         (actionState.done ?: state.notice)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         if (canSchedule) item { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = Icons.Default.Add) }
+        if (canSchedule) {
+            requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+            requestState.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+            item { CategoryRequestInbox(requestState, requests) }
+        }
         when {
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
             state.appointments.isEmpty() -> item { EmptyState(stringResource(R.string.rec_citas_vacio), detail = stringResource(R.string.rec_citas_vacio_detalle), icon = Icons.Default.CalendarMonth) }

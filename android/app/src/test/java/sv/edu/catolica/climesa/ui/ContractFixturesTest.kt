@@ -20,6 +20,8 @@ import sv.edu.catolica.climesa.domain.AdmissionIndication
 import sv.edu.catolica.climesa.domain.AppointmentAction
 import sv.edu.catolica.climesa.domain.AppointmentActions
 import sv.edu.catolica.climesa.domain.AppointmentSlot
+import sv.edu.catolica.climesa.domain.CategoryRequestRules
+import sv.edu.catolica.climesa.domain.RequestFranja
 import sv.edu.catolica.climesa.domain.DaySlot
 import sv.edu.catolica.climesa.domain.DischargePending
 import sv.edu.catolica.climesa.domain.DischargeType
@@ -99,6 +101,15 @@ class ContractFixturesTest {
 
     @Test fun appointmentRequestedByThePatient() {
         assertContract("cita-solicitar", "POST", "/citas/solicitudes", PatientAppointmentRules.requestBody(DOCTOR, AppointmentSlot(START, END), "Control de presión arterial"))
+    }
+
+    @Test fun appointmentRequestedByReasonAndResolvedByReception() {
+        assertContract("cita-solicitar-categoria", "POST", CategoryRequestRules.PATH,
+            CategoryRequestRules.createBody(listOf("piel", "alergias"), RequestFranja.AFTERNOON, " Mancha en el brazo desde hace un mes ", DOCTOR))
+        val request = CategoryRequestRules.requests(JSONArray().put(JSONObject().put("id", APPOINTMENT).put("version", 1).put("state", "pendiente").put("franja", "tarde"))).single()
+        assertContract("cita-asignar-categoria", "POST", CategoryRequestRules.assignPath(request), CategoryRequestRules.assignBody(request, DOCTOR, DaySlot(START, END, SlotStatus.FREE, null)), APPOINTMENT)
+        assertContract("cita-rechazar-categoria", "POST", CategoryRequestRules.rejectPath(request), CategoryRequestRules.rejectBody(request, " No hay dermatología este mes "), APPOINTMENT)
+        assertContract("cita-retirar-categoria", "POST", CategoryRequestRules.cancelPath(request), CategoryRequestRules.cancelBody(request.copy(version = 2)), APPOINTMENT)
     }
 
     @Test fun appointmentConfirmRejectAndCancel() {

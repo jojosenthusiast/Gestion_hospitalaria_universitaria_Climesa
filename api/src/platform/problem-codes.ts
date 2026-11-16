@@ -21,6 +21,8 @@ export const PROBLEM_CODES = [
   'franja_desalineada', 'franja_ocupada', 'medico_sin_jornada', 'paciente_con_cita', 'cancelacion_fuera_de_plazo',
   'ticket_activo_existente', 'fila_max_llamados', 'consulta_ya_iniciada',
   'cita_con_consulta', 'cita_fuera_de_dia', 'fila_llamados_insuficientes', 'fila_sin_espera', 'solicitudes_pendientes_max',
+  // Category appointment requests (Fase 2 flow A, 20261125002000).
+  'solicitud_cita_resuelta',
   // Accounts, privacy and patients.
   'cuenta_no_verificada', 'cuenta_ya_vinculada', 'expediente_ya_vinculado', 'paciente_ya_vinculado', 'sin_vinculacion', 'vinculacion_pendiente', 'vinculacion_resuelta',
   'sin_expediente', 'rol_no_invitable', 'invitacion_no_pendiente', 'jerarquia_administrador', 'trabajo_abierto',

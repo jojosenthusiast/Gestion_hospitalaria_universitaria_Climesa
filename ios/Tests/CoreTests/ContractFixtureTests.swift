@@ -19,6 +19,12 @@ final class ContractFixtureTests: XCTestCase {
         try assertMatches(body, fixture: "appointment-request")
     }
 
+    func testSolicitudDeCitaPorMotivoYRetiro() throws {
+        let body = CategoryRequestRules.body(picked: ["piel", "alergias"], franja: .tarde, note: " Mancha en el brazo desde hace un mes ", preferredDoctorId: doctor)
+        try assertMatches(body, fixture: "appointment-category-request")
+        try assertMatches(VersionBody(version: 2), fixture: "appointment-category-withdraw")
+    }
+
     func testCancelacionDeCita() throws {
         try assertMatches(AppointmentCancelBody(version: 2, reason: "No podré asistir por un compromiso de trabajo."), fixture: "appointment-cancel")
     }
