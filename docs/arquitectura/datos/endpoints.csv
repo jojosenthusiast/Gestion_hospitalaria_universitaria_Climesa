@@ -158,3 +158,9 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/citas/{id}/no-asistio,citas.agendar,Hora alcanzada y sin consulta,R,4,Marcar que el paciente no asistió
 105,POST,/api/v1/fila/llamar-siguiente,fila.llamar,Primer número en espera del servicio,R,4,Llamar el siguiente número
 106,GET,/api/v1/consultas/sin-firmar,consulta.iniciar,Solo propias,R,4,Consultas abiertas de cualquier día para reanudar
+105,GET,/api/v1/citas/categorias,citas.solicitar OR citas.agendar,,R,5,"Catálogo de motivos de cita (categoría, ícono, palabras de búsqueda y especialidades sugeridas)"
+105,GET,/api/v1/citas/solicitudes-categoria,citas.ver,"REC todas las pendientes y las resueltas en 30 días; PAC solo propias",R,5,Bandeja de solicitudes de cita por categoría con allowedActions
+105,POST,/api/v1/citas/solicitudes-categoria,citas.solicitar,"PAC propio; una a tres categorías, franja y nota; sin médico",R,5,Paciente pide cita por motivo sin elegir médico
+105,POST,/api/v1/citas/solicitudes-categoria/{id}/asignar,citas.agendar,"Crea cita confirmada con las reglas de siempre; auditado",R,5,Recepción asigna médico y hora a una solicitud por categoría
+105,POST,/api/v1/citas/solicitudes-categoria/{id}/rechazar,citas.agendar,Motivo,R,5,Recepción rechaza una solicitud por categoría
+105,POST,/api/v1/citas/solicitudes-categoria/{id}/cancelar,citas.cancelar,PAC solo propias y pendientes,R,5,Paciente retira su solicitud por categoría

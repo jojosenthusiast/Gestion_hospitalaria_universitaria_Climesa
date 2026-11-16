@@ -81,7 +81,7 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `cama.estado_cambiado` | `cama` | Bloqueo, limpieza, asignación, traslado, salida | `camas.ver_tablero` (y `espacios.ver` desde infraestructura) | 104, 108 |
 | `cama.estado_cambiado` | `publico` | Derivado en la base (ocupación agregada) | `publico` | 112 |
 | `cama.limpieza_pendiente` | `cama` | Solicitar limpieza | `camas.ver_tablero`, `espacios.ver` | 104 |
-| `cita.actualizada` | `cita` | Agendar, solicitar, confirmar, rechazar, cancelar, atender (al firmar) | `citas.ver` (sin `propio`), `usuario:<paciente>` | 105 |
+| `cita.actualizada` | `cita` | Agendar, solicitar, confirmar, rechazar, cancelar, atender (al firmar); también la solicitud por categoría (Fase 2, flujo A): pedir, asignar, rechazar y retirar, con el id de la solicitud | `citas.ver` (sin `propio`), `usuario:<paciente>` | 105 |
 | `fila.actualizada` | `ticket_fila` | Emitir, llamar, atender, completar, ausencia, iniciar consulta desde la fila | `fila.ver`, `fila.llamar`, `fila.gestionar`, `usuario:<paciente>` | 105 |
 | `fila.llamado` / `fila.estado` | `publico` | Derivado en la base (número sin nombre) | `publico` | 112 |
 | `consulta.actualizada` | `consulta` | Iniciar, borrador, signos, diagnóstico, receta, firmar | `expediente.ver` y el permiso del paso; al firmar, `usuario:<paciente>` | 106 |

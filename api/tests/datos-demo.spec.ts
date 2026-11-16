@@ -68,7 +68,9 @@ const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acc
   // Fase 0/1 (CITA-02): las solicitudes de reprogramación nacen solo del uso real.
   'atencion.reprogramacion',
   // Historial de cambios de médico tratante (BL-03): nace de una acción de Jefatura, la demo no lo siembra.
-  'hospitalizacion.cambio_tratante'];
+  'hospitalizacion.cambio_tratante',
+  // Fase 2 flujo A: las solicitudes de cita por categoría nacen solo del uso real del paciente.
+  'atencion.solicitud_cita'];
 
 const MINIMOS: Record<string, number> = {
   'pacientes.paciente': 120, 'pacientes.identificador': 100, 'atencion.cita': 130, 'atencion.ticket_fila': 30, 'atencion.consulta': 70,
@@ -108,7 +110,7 @@ describe('Datos de demostración (tools/demo)', () => {
     const todas = (await t.pg.query<{ t: string }>(`SELECT schemaname || '.' || tablename AS t FROM pg_tables
       WHERE schemaname IN ('plataforma','acceso','pacientes','infra','personal','atencion','laboratorio','hospitalizacion','ambulancia','inventario','publico')`)).rows.map(r => r.t);
     const catalogos = ['pacientes.tipo_identificador', 'infra.tipo_equipo', 'acceso.rol', 'acceso.permiso', 'acceso.rol_permiso', 'atencion.cie10',
-      'laboratorio.examen', 'laboratorio.examen_componente', 'laboratorio.rango_referencia', 'plataforma.politica', 'ambulancia.unidad', 'personal.especialidad_catalogo'];
+      'laboratorio.examen', 'laboratorio.examen_componente', 'laboratorio.rango_referencia', 'plataforma.politica', 'ambulancia.unidad', 'personal.especialidad_catalogo', 'atencion.categoria_cita'];
     expect(todas.filter(x => !(x in TABLAS) && !SIN_SEMBRAR.includes(x) && !catalogos.includes(x))).toEqual([]);
   });
 
