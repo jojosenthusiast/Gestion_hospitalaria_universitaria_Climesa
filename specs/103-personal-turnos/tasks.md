@@ -37,6 +37,7 @@
   - Depende de: T06, 121-T02, 122-T02
   - Hecho cuando: un cambio de turno aparece en el teléfono de la persona sin recargar
   - Avance 14-nov-2026 (iOS): I26 sin cambios funcionales; ahora se invalida con el contador `LiveTopic.shifts`.
+  - Avance 16-nov-2026 (Fase 2, PR #129, #133): W16 con calendario semanal (crear haciendo clic o arrastrando, mover, estirar y mover con teclado, validación de la API y **Deshacer**), **Lista por día** que empieza por hoy con los días pasados plegados, lote con **Vista previa de los borradores** (**Generar rotación**, **Copiar semana anterior**, **Asignación masiva**, **Plantillas**) y **Publicar semana**. El generador llena la cobertura mínima por área y franja y lista los huecos que quedan. Migración 20261125005000 aplicada (tabla vacía). Pruebas: `api/tests/turnos-lote-fase2.spec.ts` (13) y `api/tests/turnos-cobertura-fase2.spec.ts` (9). **Sigue abierta**: comprobar en un teléfono que el cambio llega sin recargar
 - [ ] T08 · S3 · R · Médicos de turno públicos
   - Cubre: FR-103-12
   - Depende de: T06

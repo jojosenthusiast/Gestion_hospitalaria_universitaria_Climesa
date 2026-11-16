@@ -25,6 +25,7 @@
   - Depende de: T03
   - Hecho cuando: revisión de contraste sin errores y los flujos Playwright pasan
   - Avance: 13-nov-2026 errores de formulario asociados al campo (`aria-invalid`, `aria-describedby`), foco visible en `textarea`, aviso de sesión por vencer a los 13 min con "Seguir trabajando" (`estados-sesion.test.tsx`, `estados-comunes.test.tsx`). Falta para marcarla: revisión de contraste y flujos Playwright
+  - Avance 16-nov-2026 (Fase 2, PR #125, #128, #140): tokens de área, estado y prioridad; el estado lleva patrón, ícono y etiqueta, nunca solo color; contraste AA comprobado en `docs/diseno/fase2/02-sistema.md`; movimiento de 100 a 200 ms con `prefers-reduced-motion`. Encabezado compacto, esqueletos por sección, caché de `useData` y división de código por ruta (paquete principal de 662 a 322 kB). **Sigue abierta**: la revisión de contraste automatizada y los flujos Playwright
 
 
 ## Verificación del corte 0.3.0 · 24-oct-2026

@@ -29,6 +29,7 @@
   - Cubre: FR-108-03, FR-108-06, FR-108-14
   - Depende de: T04, 120-T03, 121-T03
   - Hecho cuando: el flujo completo funciona en web y Android con conflicto visible
+  - Avance 16-nov-2026 (Fase 2, PR #137, #140): la web acorta el asistente de admisión (habitación en un solo paso, camas sugeridas con la primera ya elegida); Android elige por la persona el origen, el médico tratante o la categoría cuando hay una sola opción y lo avisa. **Sigue abierta**: el flujo completo en Android con conflicto visible
 - [ ] T08 · S4 · R · Mis hospitalizados del médico y mi planta de enfermería
   - Cubre: FR-108-14
   - Depende de: T06

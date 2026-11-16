@@ -2,7 +2,7 @@
 
 > Generado por `tools/progreso.py` desde `specs/*/tasks.md`. No editar a mano.
 
-**Tareas:** 50 de 132 (37%) · **Requisitos:** 222 · **Specs:** 20
+**Tareas:** 51 de 132 (38%) · **Requisitos:** 222 · **Specs:** 20
 
 ## Por spec
 
@@ -13,7 +13,7 @@
 | [102 Pacientes](./102-pacientes/spec.md) | En revisión | 11/1/0 | 5/7 | ███████░░░ |
 | [103 Personal de salud y turnos](./103-personal-turnos/spec.md) | En revisión | 11/3/0 | 7/9 | ████████░░ |
 | [104 Edificio, camas y recursos](./104-infraestructura-recursos/spec.md) | En revisión | 12/1/0 | 5/7 | ███████░░░ |
-| [105 Fila del día y citas](./105-fila-citas/spec.md) | En revisión | 10/2/0 | 1/6 | ██░░░░░░░░ |
+| [105 Fila del día y citas](./105-fila-citas/spec.md) | En revisión | 10/2/0 | 2/6 | ███░░░░░░░ |
 | [106 Consulta general](./106-consulta-general/spec.md) | En revisión | 11/1/0 | 1/7 | █░░░░░░░░░ |
 | [107 Laboratorio](./107-laboratorio/spec.md) | En revisión | 11/2/0 | 1/7 | █░░░░░░░░░ |
 | [108 Admisión y hospitalización](./108-admision-hospitalizacion/spec.md) | En revisión | 14/2/0 | 1/10 | █░░░░░░░░░ |
@@ -35,7 +35,7 @@
 |---|---|---|---|---|
 | S1 | 17 a 23 oct | 12/12 | 0/0 | ██████████ |
 | S2 | 24 a 30 oct | 24/36 | 1/1 | ███████░░░ |
-| S3 | 31 oct a 6 nov | 7/29 | 0/0 | ██░░░░░░░░ |
+| S3 | 31 oct a 6 nov | 8/29 | 0/0 | ███░░░░░░░ |
 | S4 | 7 a 13 nov | 3/22 | 0/0 | █░░░░░░░░░ |
 | S5 | 14 a 20 nov | 0/9 | 3/23 | █░░░░░░░░░ |
 

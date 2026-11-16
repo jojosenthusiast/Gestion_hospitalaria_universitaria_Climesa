@@ -26,12 +26,14 @@
   - Depende de: T04, 120-T03, 121-T03
   - Hecho cuando: un servicio se opera de punta a punta entre web y Android en vivo
   - Avance 15-nov-2026: W18 web (solicitudes, despachar, descartar, llamada, hitos, prehospital) y A36, A70, A71, A73 en Android consumen la API con pruebas de componente y de ViewModel. **Sin probar**: el servicio de punta a punta entre web y un teléfono en vivo.
+  - Avance 16-nov-2026 (Fase 2, PR #140): **Registrar llamada** en la web copia quien llama, el teléfono y la dirección del paciente elegido a los campos vacíos y dice cuáles llenó
 - [ ] T06 · S4 · R · Seguimiento del paciente en Android e iOS (A09, I09)
   - Cubre: FR-109-16
   - Depende de: T03, 122-T03
   - Hecho cuando: escenario 4 pasa
   - Avance 15-nov-2026: A09 envía la solicitud, muestra el aviso del 911 y lista los eventos de `usuario:<id>`. Bloqueado: no hay endpoint de lectura de la solicitud para el paciente (pregunta AMB-01).
   - Avance 14-nov-2026 (iOS): I09 (aviso del 911 y `POST /ambulancia/solicitudes`; sin seguimiento ni cancelación porque la API no los ofrece al paciente) e I25 de solo lectura (`GET /ambulancia` y el reporte prehospital). compila en el CI de macOS (`ios.yml`, PR #68) y pasan las 69 pruebas del paquete; sin ejecutar en simulador ni dispositivo.
+  - Avance 16-nov-2026 (Fase 2, PR #135, #137): la solicitud del paciente en Android e iOS llega prellenada con la dirección y el teléfono de su ficha, solo en los campos vacíos
 - [x] T07 · S4 · R · Bitácora con filtros y privacidad (W19, A74)
   - Cubre: FR-109-14, FR-109-15
   - Depende de: T04
