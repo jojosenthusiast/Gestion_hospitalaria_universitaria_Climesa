@@ -15,13 +15,27 @@ Accesos rápidos: **Tomar muestra** y **Ver inventario**.
 
 ## Laboratorio
 
-La cola muestra todas las órdenes con su estado: `Pendiente`, `En Proceso`, `Completado` o `Cancelado`. Los filtros **Solo urgentes** y **Con valores críticos** acotan la lista. Las filas con un valor crítico llevan la marca "Crítico".
+La cola agrupa las órdenes por lo que toca hacer, en este orden: "En proceso", "Por tomar muestra", "Externas: esperan el informe", "Esperan revisión médica", "Liberadas" y "Canceladas". Los dos últimos grupos empiezan plegados: ábrelos con **Mostrar liberadas** o **Mostrar canceladas**. Al buscar o filtrar por etapa se ven todos. Los filtros **Solo urgentes** y **Con valores críticos** acotan la lista. La prioridad urgente se marca en ámbar; el rojo y la marca "Crítico" son solo para valores críticos.
+
+El detalle de la orden muestra primero quién actúa y las acciones; las fechas quedan plegadas en **Datos de la orden**.
 
 1. **Tomar muestra → Confirmar identidad.** La doble identificación exige el expediente y el nombre completo del paciente. Si no coinciden, la API lo rechaza. La orden pasa a `En Proceso`.
 2. **Capturar resultados.** La API calcula la marca de cada valor (por ejemplo normal, alto o crítico) con el rango vigente del examen.
 3. **Completar.** La orden pasa a `Completado`. Si hay un valor crítico, el aviso llega en vivo a Laboratorio, al médico que pidió la orden y al médico tratante; nunca al paciente.
 4. **Corregir resultado → Guardar corrección.** Pide un motivo de 10 caracteres o más. Se guarda el valor anterior, la orden sigue `Completado` y vuelve a revisión médica: el paciente deja de ver los valores hasta la nueva revisión.
 5. **Cancelar orden**, con motivo.
+
+**Observación.** Al capturar un valor puedes escribir una **Observación (opcional)**. Si marcas **Es relevante**, el médico que pidió la orden recibe un pendiente en "Resultados por revisar". Un valor crítico crea ese pendiente siempre, sin marcar nada.
+
+**Completar por lote.** Las órdenes con todos sus valores capturados tienen una casilla. Marca las que quieras (o **Seleccionar todas**) y pulsa **Completar N seleccionadas**. Cada orden se completa por separado: si una falla, el aviso dice cuál y por qué, y las demás quedan completadas.
+
+**Órdenes externas.**
+
+1. **Se realiza en otro sitio.** En una orden pendiente, escribe dónde se hace el examen y las instrucciones para el paciente (el texto trae una plantilla que puedes editar). La orden ya no pide muestra aquí y el paciente ve el lugar y las instrucciones en "Mis exámenes".
+2. **Cargar resultado externo.** Cuando el paciente trae el informe, adjunta el PDF o la foto (hasta 10 MB) y escribe el valor clave de cada examen. La marca la calcula el sistema y la orden queda `Completado`, esperando la revisión médica.
+3. Hoy se guarda la **referencia** del archivo (nombre, tipo, tamaño y huella) junto con los valores. El archivo original queda con quien lo cargó: el sistema aún no tiene almacenamiento clínico de archivos.
+
+Al completarse una orden de una consulta (sin hospitalización activa), el sistema propone a Recepción una cita de seguimiento con el médico que pidió los exámenes.
 
 La revisión médica (**Revisar y liberar**) no es de tu rol: la hace el médico desde su app.
 

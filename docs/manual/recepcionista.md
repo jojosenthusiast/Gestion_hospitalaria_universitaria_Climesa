@@ -15,6 +15,12 @@ Inicio, Pacientes, Vinculaciones, Camas, Edificio, Ambulancia, Bitácora de ambu
 
 Accesos rápidos: **Registrar paciente**, **Agendar cita**, **Emitir número**, **Llamar siguiente** y **Solicitar ambulancia**. **Emitir número** abre directamente el formulario de la fila.
 
+**Citas de seguimiento por confirmar.** Cuando se completan los exámenes de una consulta, el sistema propone una cita con el médico que los pidió. Ves el paciente, el médico y la fecha de los resultados, nunca los exámenes ni los valores.
+
+1. **Agendar cita**: elige el día (por defecto, dentro de una semana) y una de las horas libres del médico. **Confirmar cita** agenda la cita como siempre y la enlaza a la propuesta.
+2. Si la cita quedó agendada pero no se pudo enlazar, pulsa **Enlazar la cita**: no se agenda otra.
+3. **Descartar**: escribe el motivo (10 caracteres o más), por ejemplo que el paciente ya tiene control agendado.
+
 ### Pacientes
 
 - Busca siempre antes de registrar: por nombre (también por sonido), DUI o expediente.
