@@ -21,10 +21,21 @@ const listItemOf = (r: NoticeRow, at: Date) => {
   const estado = noticeState(r, at);
   return { ...noticeOf(r), estado, publicadoEn: iso(r.creado_en), version: r.version, allowedActions: estado === 'vigente' || estado === 'programado' ? ['editar', 'retirar'] : [], retiradoEn: iso(r.retirado_en), motivoRetiro: r.motivo_retiro ?? null };
 };
-/** Roles del personal: un aviso por área avisa en vivo a todos ellos (no hay canal por área) y cada cliente vuelve a pedir lo suyo. */
-const STAFF_ROLES = ['ADM', 'JOP', 'REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR', 'DPD'];
 /** Canales de un aviso: `publico` si es público y `rol:<código>` por cada rol dirigido (la base amplía el resto). */
-const noticeChannels = (isPublic: boolean, roles: string[], areas: string[] = []) => [...new Set([...(isPublic ? ['publico'] : []), ...[...roles, ...(areas.length ? STAFF_ROLES : [])].map(r => `rol:${r}`)])];
+const noticeChannels = (isPublic: boolean, roles: string[]) => [...(isPublic ? ['publico'] : []), ...roles.map(r => `rol:${r}`)];
+/**
+ * S11: no hay canal por área, así que un aviso por área avisa en vivo a `usuario:<id>` de cada cuenta activa cuya ficha
+ * o turno en curso está en una de esas áreas (la misma regla que decide quién lo recibe).
+ */
+async function areaChannels(c: PoolClient, areas: string[], at: Date) {
+  if (!areas.length) return [];
+  const rows = (await c.query<{ id: string }>(
+    `SELECT DISTINCT u.id FROM acceso.usuario u JOIN infra.espacio e ON e.codigo = ANY($1::text[])
+     WHERE u.estado='activo' AND u.persona_personal_id IS NOT NULL AND (
+       EXISTS (SELECT 1 FROM personal.persona p WHERE p.id=u.persona_personal_id AND p.area_id=e.id)
+       OR EXISTS (SELECT 1 FROM personal.turno t WHERE t.persona_id=u.persona_personal_id AND t.area_id=e.id AND t.estado IN ('publicado','en_curso') AND t.periodo @> $2::timestamptz))`, [areas, at])).rows;
+  return rows.map(r => `usuario:${r.id}`);
+}
 type Query = <T>(sql: string, params?: unknown[]) => Promise<T[]>;
 const viaClient = (c: PoolClient): Query => async <T>(sql: string, params: unknown[] = []) => (await c.query(sql, params)).rows as T[];
 /** Aviso visible para una cuenta: vigente, sin retirar y público o dirigido a uno de sus roles o de sus áreas. */
@@ -288,7 +299,7 @@ export class PublicService {
         "INSERT INTO publico.aviso(titulo,cuerpo,vigencia,publicado_por,creado_en,prioridad,publico,roles,nivel,areas) VALUES($1,$2,tstzrange($3::timestamptz,$4::timestamptz,'[)'),$5,$6,$7,$8,$9,$10,$11) RETURNING id,lower(vigencia) AS desde,upper(vigencia) AS hasta,creado_en",
         [dto.titulo.trim(), dto.cuerpo.trim(), from, to, actor.id, now, priority, isPublic, roles, level, areas])).rows[0];
       await this.commands.audit(c, actor, { action: 'avisos.publicar', entity: 'aviso', entityId: row.id, permission: 'avisos.publicar', detail: { desde: iso(row.desde), hasta: iso(row.hasta), prioridad: priority, nivel: level, publico: isPublic, roles, areas, datosPersonalesConfirmados: found } });
-      await this.commands.event(c, 'aviso.publicado', 'aviso', row.id, 1, noticeChannels(isPublic, roles, areas));
+      await this.commands.event(c, 'aviso.publicado', 'aviso', row.id, 1, [...noticeChannels(isPublic, roles), ...(await areaChannels(c, areas, now))]);
       return { id: row.id, titulo: dto.titulo.trim(), cuerpo: dto.cuerpo.trim(), desde: iso(row.desde), hasta: iso(row.hasta), prioridad: priority, nivel: level, publico: isPublic, roles, areas, publicadoEn: iso(row.creado_en) };
     });
     this.cache.clear();
@@ -320,7 +331,7 @@ export class PublicService {
         [id, dto.titulo.trim(), dto.cuerpo.trim(), from, to, priority, isPublic, roles, now, actor.id, level, areas])).rows[0];
       const before = noticeOf(current), after = noticeOf(row);
       await this.commands.audit(c, actor, { action: 'avisos.editar', entity: 'aviso', entityId: id, permission: 'avisos.publicar', detail: { antes: before, despues: after, datosPersonalesConfirmados: found } });
-      await this.commands.event(c, 'aviso.actualizado', 'aviso', id, row.version, [...new Set([...noticeChannels(current.publico, current.roles, current.areas), ...noticeChannels(isPublic, roles, areas)])]);
+      await this.commands.event(c, 'aviso.actualizado', 'aviso', id, row.version, [...new Set([...noticeChannels(current.publico, current.roles), ...noticeChannels(isPublic, roles), ...(await areaChannels(c, [...new Set([...current.areas, ...areas])], now))])]);
       return listItemOf(row, now);
     });
     this.cache.clear();
@@ -336,7 +347,7 @@ export class PublicService {
         `UPDATE publico.aviso SET retirado_en=$2,retirado_por=$3,motivo_retiro=$4,version=version+1 WHERE id=$1 RETURNING ${NOTICE_COLUMNS}`,
         [id, now, actor.id, dto.motivo])).rows[0];
       await this.commands.audit(c, actor, { action: 'avisos.retirar', entity: 'aviso', entityId: id, permission: 'avisos.publicar', reason: dto.motivo, detail: { motivo: dto.motivo, aviso: noticeOf(current) } });
-      await this.commands.event(c, 'aviso.actualizado', 'aviso', id, row.version, noticeChannels(current.publico, current.roles, current.areas));
+      await this.commands.event(c, 'aviso.actualizado', 'aviso', id, row.version, [...noticeChannels(current.publico, current.roles), ...(await areaChannels(c, current.areas, now))]);
       return listItemOf(row, now);
     });
     this.cache.clear();

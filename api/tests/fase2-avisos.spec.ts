@@ -38,6 +38,8 @@ describe('Fase 2 · avisos con nivel, enterado y recordatorio', () => {
     const byRole = await publish({ titulo: 'Solo recepción', publico: false, roles: ['REC'], nivel: 'importante' });
     const byArea = await publish({ titulo: 'Solo emergencia', publico: false, areas: ['P1-EMG'], nivel: 'importante' });
     expect(byArea).toMatchObject({ areas: ['P1-EMG'], roles: [], publico: false, prioridad: 'urgente' });
+    // No area channel exists: the live event goes to each account of the area, never to unrelated role channels.
+    expect((await t.events('aviso.publicado', byArea.id))[0]).not.toContain('rol:MED');
     expect(await item('REC', byRole.id)).toBeDefined();
     expect(await item('LAB', byRole.id)).toBeUndefined();
     // The MED account belongs to P1-CON; a shift in progress in P1-EMG adds that area.
