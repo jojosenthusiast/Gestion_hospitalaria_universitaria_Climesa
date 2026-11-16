@@ -42,6 +42,7 @@ import sv.edu.catolica.climesa.domain.DashboardModel
 import sv.edu.catolica.climesa.domain.DashboardTone
 import sv.edu.catolica.climesa.domain.QuickActionRequest
 import sv.edu.catolica.climesa.domain.RoleAccess
+import sv.edu.catolica.climesa.ui.CompactHeader
 import sv.edu.catolica.climesa.ui.ClimesaCard
 import sv.edu.catolica.climesa.ui.EmptyState
 import sv.edu.catolica.climesa.ui.ErrorState
@@ -136,16 +137,10 @@ private fun LazyListScope.dashboardContent(dashboard: DashboardModel, onAction: 
     }
 }
 
+/** S1: compact header instead of the blue welcome banner; the role help text is no longer drawn. */
 @Composable
-private fun DashboardHeader(name: String, roleLabel: String, help: String) {
-    Surface(color = MaterialTheme.colorScheme.primary, shape = MaterialTheme.shapes.large) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(name.ifBlank { stringResource(R.string.dash_bienvenida) }, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimary)
-            Text("$roleLabel · ${stringResource(R.string.dash_inicio)}", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .78f), style = MaterialTheme.typography.bodySmall)
-            Text(help, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .9f), style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
+private fun DashboardHeader(name: String, roleLabel: String, @Suppress("UNUSED_PARAMETER") help: String) =
+    CompactHeader(name.ifBlank { stringResource(R.string.dash_bienvenida) }, breadcrumb = "$roleLabel · ${stringResource(R.string.dash_inicio)}")
 
 /** State tile: coloured top edge, a shape icon, the big value and its label. Tappable when it leads to a section. */
 @Composable

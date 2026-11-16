@@ -343,6 +343,6 @@ private fun ReadingCard(reading: VitalReading) {
         subtitle = reading.summary(),
         meta = meta,
         leadingIcon = Icons.Default.MonitorHeart,
-        status = { StatusPill(levelWord(level), levelTone(level)) },
+        status = { if (level == VitalLevel.CRITICAL) CriticalPill(levelWord(level)) else StatusPill(levelWord(level), levelTone(level)) },
     )
 }

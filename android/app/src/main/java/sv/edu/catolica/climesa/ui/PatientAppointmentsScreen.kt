@@ -106,7 +106,7 @@ fun PatientAppointmentsScreen(
 @Composable
 private fun AppointmentCard(appointment: PatientAppointment, onCancel: () -> Unit, onReschedule: () -> Unit) {
     SectionCard(appointment.doctorName.ifBlank { "Médico asignado" }) {
-        StatusPill(StatusCatalogPaciente.label(appointment.state), StatusCatalogPaciente.tone(appointment.state))
+        PatientAppointmentTag(appointment.state)
         LabeledValue("Horario", "${sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start))} · ${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end)}")
         appointment.reason?.let { LabeledValue("Motivo", it) }
         // CITA-01: the deadline the API gives for cancelling or rescheduling.

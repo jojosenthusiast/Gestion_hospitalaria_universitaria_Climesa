@@ -1,5 +1,8 @@
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+
 /**
  * Appointment states (`citas`) shown to the patient, with the Spanish copy the patient screens already use.
  * Kept apart from the shared [StatusCatalog]: codes that only belong to the patient flow live here.
@@ -29,3 +32,8 @@ internal object StatusCatalogPaciente {
     fun label(code: String): String = labels[code] ?: code
     fun tone(code: String): StatusTone = tones[code] ?: StatusTone.NEUTRAL
 }
+
+/** Appointment state badge with the patient copy; the family comes from the shared table ([StatusBadge]). */
+@Composable
+internal fun PatientAppointmentTag(state: String, modifier: Modifier = Modifier) =
+    StatusBadge(state, modifier, StatusCatalogPaciente.label(state), StatusCatalogPaciente.tone(state))

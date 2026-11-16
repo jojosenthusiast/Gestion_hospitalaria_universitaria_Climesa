@@ -84,11 +84,11 @@ import java.time.format.DateTimeFormatter
             page==AndroidSection.PROFILE -> Profile(state,dark,setDark,account,{if(!signingOut)logout()})
             page!=AndroidSection.PATIENTS -> {
                 Column(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Text(page.label,style=MaterialTheme.typography.headlineMedium)
+                    CompactHeader(page.label)
                     Text("Esta sección usa el destino ${page.screenId} del catálogo. Su contenido operativo se habilitará en la entrega correspondiente.")
                 }
             }
-            state.loading -> LoadingState(Modifier.fillMaxSize())
+            state.loading -> LoadingState(Modifier.fillMaxSize().padding(Spacing.page))
             state.fatal -> ErrorState("No pudimos abrir el registro. Tus datos no se han sobrescrito.",model::reload)
             else -> Patients(state,model)
         }

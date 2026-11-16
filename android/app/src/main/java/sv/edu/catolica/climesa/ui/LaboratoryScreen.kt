@@ -205,7 +205,7 @@ private fun LabWorkSummary(order: LaboratoryOrder, now: Long) {
             LabWorklist.elapsedMinutes(order, now)?.let { minutes ->
                 Text(stringResource(R.string.lab_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(LabWorklist.sla(order, now)))
             }
-            if (LabWorklist.isCritical(order)) StatusPill(stringResource(R.string.lab_critico), StatusTone.DANGER)
+            if (LabWorklist.isCritical(order)) CriticalPill(stringResource(R.string.lab_critico))
         }
     }
 }

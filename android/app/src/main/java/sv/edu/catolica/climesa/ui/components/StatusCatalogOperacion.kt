@@ -28,7 +28,7 @@ internal object OperacionStatus {
     fun label(code: String): String = labels[code] ?: StatusCatalog.label(code)
 }
 
-/** [StatusTag] with the operations tones; `label` overrides the Spanish name (for example a domain label). */
+/** [StatusBadge] with the operations tones as fallback for codes the shared table lacks (`atendido`, `sin_traslado`); `label` overrides the Spanish name (for example a domain label). */
 @Composable
 internal fun OperacionStatusTag(code: String, modifier: Modifier = Modifier, label: String? = null) =
-    StatusPill(label ?: OperacionStatus.label(code), OperacionStatus.tone(code), modifier)
+    StatusBadge(code, modifier, label ?: OperacionStatus.label(code), OperacionStatus.tone(code))

@@ -87,10 +87,13 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
     val canPlan = "turnos.planificar" in profile.permissions
     PageList(modifier) {
         item {
-            SectionIntro(
-                eyebrow = status?.let { stringResource(R.string.par_eyebrow, it.unit.plate) } ?: stringResource(R.string.amb_eyebrow),
+            // The live "dispatched N min ago" line joins the breadcrumb: the compact header has no description (S1).
+            CompactHeader(
                 title = stringResource(if (service != null) R.string.par_titulo_activo else R.string.par_titulo_libre),
-                detail = service?.let { stringResource(R.string.par_despachado) + " " + ParamedicRules.elapsed(ParamedicRules.elapsedMinutes(it.dispatchedAt, now)).replaceFirstChar { c -> c.lowercase() } },
+                breadcrumb = listOfNotNull(
+                    status?.let { stringResource(R.string.par_eyebrow, it.unit.plate) } ?: stringResource(R.string.amb_eyebrow),
+                    service?.let { stringResource(R.string.par_despachado) + " " + ParamedicRules.elapsed(ParamedicRules.elapsedMinutes(it.dispatchedAt, now)).replaceFirstChar { c -> c.lowercase() } },
+                ).joinToString(" · "),
             )
         }
         state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
