@@ -45,4 +45,27 @@ class RoleNoticesTest {
         assertTrue(NoticeEvents.matches(edited))
         assertTrue(HospitalInfoEvents.matches(edited))
     }
+
+    @Test fun feedCarriesTheNextChangeAndTheRefreshIsScheduledThere() {
+        val body = JSONObject().put("avisos", JSONArray().put(notice("1", "Visitas", "atencion"))).put("proximoCambio", "2026-11-20T12:00:00.000Z")
+        val feed = RoleNoticeParser.parseFeed(body)
+        assertEquals(listOf("Visitas"), feed.notices.map { it.title })
+        assertEquals("2026-11-20T12:00:00.000Z", feed.nextChange)
+        val now = java.time.Instant.parse("2026-11-20T11:00:00.000Z").toEpochMilli()
+        assertEquals(3_600_000L + NoticeRefresh.SLACK_MS, NoticeRefresh.delayMs(feed.nextChange, now))
+        assertEquals(NoticeRefresh.SLACK_MS, NoticeRefresh.delayMs("2026-11-20T10:00:00.000Z", now))
+        assertEquals(null, NoticeRefresh.delayMs(null, now))
+        assertEquals(null, NoticeRefresh.delayMs("no es fecha", now))
+        assertEquals(null, RoleNoticeParser.parseFeed(JSONObject().put("avisos", JSONArray()).put("proximoCambio", JSONObject.NULL)).nextChange)
+    }
+
+    @Test fun aFailedRefetchDropsTheChangedNoticeAndTheExpiredOnesInsteadOfShowingThemStale() {
+        val list = RoleNoticeParser.parse(JSONObject().put("avisos", JSONArray()
+            .put(notice("1", "Retirado", "critico"))
+            .put(notice("2", "Sigue", "atencion").put("hasta", "2026-11-21T12:00:00.000Z"))))
+        val withdrawn = EventoDominio(type = "aviso.actualizado", entity = "aviso", id = "1", version = 2)
+        assertEquals(listOf("Sigue"), NoticeRefresh.afterFailedRefetch(list, withdrawn, nowMs = 0).map { it.title })
+        val atNoon = java.time.Instant.parse("2026-11-20T12:00:00.000Z").toEpochMilli()
+        assertEquals(listOf("Sigue"), NoticeRefresh.afterFailedRefetch(list, null, atNoon).map { it.title })
+    }
 }

@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.domain
 
+import java.time.Instant
 import org.json.JSONObject
 
 /** Escalera de avisos (D-071): del más urgente al menos. */
@@ -37,8 +38,36 @@ object RoleNoticeParser {
         }.sortedBy { it.priority.ordinal }
     }
 
+    /** La lista y su `proximoCambio`: el instante en que cambia solo por el paso del tiempo (un aviso vence o empieza). */
+    fun parseFeed(value: Any?): RoleNoticeFeed {
+        val next = (value as? JSONObject)?.takeUnless { it.isNull("proximoCambio") }?.optString("proximoCambio")?.takeUnless { it.isBlank() }
+        return RoleNoticeFeed(parse(value), next)
+    }
+
     /** Nombres de rol para decir a quién va dirigido: «Medicina, Enfermería»; vacío si solo es público. */
     fun audience(notice: RoleNotice): String = notice.roles.joinToString(", ") { RoleAccess.label(it) }
+}
+
+data class RoleNoticeFeed(val notices: List<RoleNotice>, val nextChange: String?)
+
+/** Cuándo volver a leer los avisos y qué mostrar si esa lectura falla (revisión del PR #119, igual que iOS y la web). */
+object NoticeRefresh {
+    /** Margen tras `proximoCambio` para que el servidor ya vea el cambio al volver a leer. */
+    const val SLACK_MS = 1_000L
+
+    /** Milisegundos hasta `proximoCambio` (más el margen); null si nada cambia con el tiempo o la fecha no se entiende. */
+    fun delayMs(nextChange: String?, nowMs: Long): Long? {
+        val at = nextChange?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: return null
+        return (at - nowMs).coerceAtLeast(0) + SLACK_MS
+    }
+
+    /**
+     * Si volver a leer falla, no se deja a la vista lo que ya no vale: se quita el aviso que cambió o se retiró
+     * (`event`) y los que ya vencieron a `nowMs`.
+     */
+    fun afterFailedRefetch(current: List<RoleNotice>, event: EventoDominio?, nowMs: Long): List<RoleNotice> = current.filter { n ->
+        n.id != event?.id && n.until?.let { u -> runCatching { Instant.parse(u).toEpochMilli() > nowMs }.getOrDefault(true) } ?: true
+    }
 }
 
 object NoticeEvents {

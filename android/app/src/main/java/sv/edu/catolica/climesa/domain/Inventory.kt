@@ -122,7 +122,7 @@ fun parseDetail(value: Any?): ArticleDetail? {
         list("lotList") { l -> StockLot(l.optString("id"), l.optString("number"), l.optString("expiresAt").takeIf { it.isNotBlank() && it != "null" }, l.optBoolean("active", true), l.optInt("version", 1), l.optBoolean("expired"), l.optDouble("total"),
             l.optJSONArray("warehouses")?.let { w -> (0 until w.length()).map { parseWarehouseStock(w.getJSONObject(it)) } } ?: emptyList()) },
         list("warehouses", ::parseWarehouseStock),
-        list("movements") { m -> ArticleMovement(m.optString("type"), m.optString("lotNumber"), m.optDouble("quantity"), m.optString("reason"), m.optString("originWarehouseCode").takeIf { it.isNotBlank() && it != "null" }, m.optString("destinationWarehouseCode").takeIf { it.isNotBlank() && it != "null" }, m.optString("authorName"), m.optString("registeredAt")) },
+        list("movements") { m -> ArticleMovement(m.optString("type"), m.optString("lotNumber"), m.optDouble("quantity"), if (m.isNull("reason")) "" else m.optString("reason"), m.optString("originWarehouseCode").takeIf { it.isNotBlank() && it != "null" }, m.optString("destinationWarehouseCode").takeIf { it.isNotBlank() && it != "null" }, m.optString("authorName"), m.optString("registeredAt")) },
         row.optJSONArray("allowedMovements")?.let { a -> parseAllowedMovements((0 until a.length()).map { a.getString(it) }) } ?: emptyList(),
     )
 }

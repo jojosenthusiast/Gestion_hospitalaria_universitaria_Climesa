@@ -26,9 +26,12 @@ export function AreaCoverageAlert({ api, version, now, onPlan }: { api: Api; ver
   const from = localDay(now.valueOf()), to = localDay(now.valueOf() + (AREA_COVERAGE_DAYS - 1) * 24 * HOUR);
   const week = useData<CoverageWeek>(api, `/turnos/cobertura?from=${from}&to=${to}`, version);
   if (week.error?.status === 403) return null;
-  if (week.error) return <Notice kind="error">No pudimos revisar la cobertura mínima de los próximos {AREA_COVERAGE_DAYS} días: {week.error.message} <button type="button" className="secondary-button" onClick={week.refresh}>Volver a intentar</button></Notice>;
-  const list = week.data?.gaps;
-  if (!Array.isArray(list)) return null;
+  const retry = <button type="button" className="secondary-button" onClick={week.refresh}>Volver a intentar</button>;
+  if (week.error) return <Notice kind="error">No pudimos revisar la cobertura mínima de los próximos {AREA_COVERAGE_DAYS} días: {week.error.message} {retry}</Notice>;
+  if (week.data === undefined || week.data === null) return null;
+  const list = week.data.gaps;
+  // A 200 without the gap list is a broken answer, not "no gaps": say so instead of hiding the alert.
+  if (!Array.isArray(list)) return <Notice kind="error">No pudimos revisar la cobertura mínima de los próximos {AREA_COVERAGE_DAYS} días: la respuesta llegó incompleta. {retry}</Notice>;
   const gaps = upcomingGaps(list, now);
   if (!gaps.length) return null;
   const shown = gaps.slice(0, SHOWN);

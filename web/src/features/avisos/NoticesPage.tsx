@@ -75,6 +75,8 @@ function WithdrawDialog({ api, notice, onClose, onDone, onReload }: { api: Api; 
 function NoticeComposer({ api, editing, onDone, onCancel, onReload }: { api: Api; editing: NoticeListItem | null; onDone: () => void; onCancel: () => void; onReload: () => void }) {
   // Al editar un aviso ya vigente su inicio no cambia: se envía sin `desde` y la API conserva el inicio vigente.
   const started = editing?.estado === 'vigente';
+  // Al editar uno programado, vaciar «Desde» significa empezar ahora: se envía la hora actual (sin `desde` la API conservaría el inicio programado).
+  const scheduled = editing?.estado === 'programado';
   const [title, setTitle] = useState(editing?.titulo ?? ''), [body, setBody] = useState(editing?.cuerpo ?? ''), [priority, setPriority] = useState<Priority>((editing?.prioridad as Priority) ?? 'atencion');
   const [isPublic, setPublic] = useState(editing?.publico ?? true), [roles, setRoles] = useState<string[]>(editing?.roles ?? []);
   const [from, setFrom] = useState(editing && !started && editing.desde ? isoToLocalInput(editing.desde) : ''), [until, setUntil] = useState(() => editing?.hasta ? isoToLocalInput(editing.hasta) : localInput(72));
@@ -86,7 +88,7 @@ function NoticeComposer({ api, editing, onDone, onCancel, onReload }: { api: Api
   const toggle = (role: string) => setRoles(current => current.includes(role) ? current.filter(r => r !== role) : [...current, role]);
 
   async function publish(confirm: boolean) {
-    const payload = { titulo: title.trim(), cuerpo: body.trim(), prioridad: priority, publico: isPublic, roles, ...(from && !started ? { desde: localToIso(from) } : {}), hasta: localToIso(until), ...(confirm ? { confirmarDatosPersonales: true } : {}) };
+    const payload = { titulo: title.trim(), cuerpo: body.trim(), prioridad: priority, publico: isPublic, roles, ...(started ? {} : from ? { desde: localToIso(from) } : scheduled ? { desde: new Date().toISOString() } : {}), hasta: localToIso(until), ...(confirm ? { confirmarDatosPersonales: true } : {}) };
     if (editing) {
       if (await action.run(`/avisos/${editing.id}`, { ...payload, version: editing.version }, 'PUT')) onDone();
       return;
@@ -121,7 +123,7 @@ function NoticeComposer({ api, editing, onDone, onCancel, onReload }: { api: Api
         <div className="form-grid">
           {started
             ? <p className="field-hint">Vigente desde {editing?.desde ? formatDateTime(editing.desde) : '—'}; el inicio no cambia.</p>
-            : <Field label="Desde (opcional)" type="datetime-local" value={from} onChange={setFrom} hint="Sin fecha, empieza al publicarlo." />}
+            : <Field label="Desde (opcional)" type="datetime-local" value={from} onChange={setFrom} hint={scheduled && editing?.desde ? `Programado para ${formatDateTime(editing.desde)}. Si lo vacías, empieza al guardar.` : 'Sin fecha, empieza al publicarlo.'} />}
           <Field label="Hasta" type="datetime-local" value={until} onChange={setUntil} required hint={editing ? 'Adelántalo para que venza antes.' : undefined} />
         </div>
         <div className="segmented-control" role="group" aria-label="Duración rápida">{durations.map(d => <button key={d.hours} type="button" onClick={() => setUntil(localInput(d.hours))}>{d.label}</button>)}</div>

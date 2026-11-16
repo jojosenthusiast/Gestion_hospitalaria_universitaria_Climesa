@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { Actor, contextsOf } from '../platform/actor';
+import { Actor, contextsOf, hasPermission } from '../platform/actor';
 import { channelsFor } from '../platform/channels';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
@@ -25,9 +25,14 @@ export class InventoryService {
       return rows;
     });
   }
+  /**
+   * D-050 (MA-REQ-01): the free-text reason and the patient of a movement are only for whoever moves stock
+   * (`inventario.mover`). The Administrator, who only sees and configures, gets item, lot, quantity, type, date and warehouse.
+   */
+  private seesMovementDetail(actor: Actor) { return hasPermission(actor, 'inventario.mover'); }
   async movements(actor: Actor) {
     const scope = this.scope(actor);
-    return this.db.query(`SELECT m.id,m.tipo AS type,m.lote_id AS "lotId",m.bodega_origen_id AS "originWarehouseId",m.bodega_destino_id AS "destinationWarehouseId",CASE WHEN m.tipo='ajuste' AND m.bodega_destino_id IS NULL THEN -m.cantidad ELSE m.cantidad END AS quantity,m.motivo AS reason,m.paciente_id AS "patientId",m.autor_id AS "authorId",m.registrado_en AS "registeredAt",a.codigo AS "articleCode",a.nombre AS "articleName",l.numero AS "lotNumber" FROM inventario.movimiento m JOIN inventario.lote l ON l.id=m.lote_id JOIN inventario.articulo a ON a.id=l.articulo_id WHERE ($1::text[] IS NULL OR a.tipo=ANY($1)) ORDER BY m.registrado_en DESC LIMIT 500`, [scope.articleTypes]);
+    return this.db.query(`SELECT m.id,m.tipo AS type,m.lote_id AS "lotId",m.bodega_origen_id AS "originWarehouseId",m.bodega_destino_id AS "destinationWarehouseId",CASE WHEN m.tipo='ajuste' AND m.bodega_destino_id IS NULL THEN -m.cantidad ELSE m.cantidad END AS quantity,CASE WHEN $2 THEN m.motivo END AS reason,CASE WHEN $2 THEN m.paciente_id END AS "patientId",m.autor_id AS "authorId",m.registrado_en AS "registeredAt",a.codigo AS "articleCode",a.nombre AS "articleName",l.numero AS "lotNumber" FROM inventario.movimiento m JOIN inventario.lote l ON l.id=m.lote_id JOIN inventario.articulo a ON a.id=l.articulo_id WHERE ($1::text[] IS NULL OR a.tipo=ANY($1)) ORDER BY m.registrado_en DESC LIMIT 500`, [scope.articleTypes, this.seesMovementDetail(actor)]);
   }
   async saveArticle(actor: Actor, id: string | null, dto: ArticleDto, key?: string) {
     return this.commands.run(actor, `inventario.configurar:${id ?? 'nuevo'}`, key, dto, async c => {
@@ -140,10 +145,10 @@ export class InventoryService {
           if (r.active) { const w = warehouses.get(r.warehouseId) ?? { warehouseId: r.warehouseId, warehouseCode: r.warehouseCode, warehouseName: r.warehouseName, quantity: 0 }; w.quantity += r.quantity; warehouses.set(r.warehouseId, w); }
         }
       }
-      const movements = (await c.query(`SELECT m.id,m.tipo AS type,l.numero AS "lotNumber",CASE WHEN m.tipo='ajuste' AND m.bodega_destino_id IS NULL THEN -m.cantidad ELSE m.cantidad END::float8 AS quantity,m.motivo AS reason,
+      const movements = (await c.query(`SELECT m.id,m.tipo AS type,l.numero AS "lotNumber",CASE WHEN m.tipo='ajuste' AND m.bodega_destino_id IS NULL THEN -m.cantidad ELSE m.cantidad END::float8 AS quantity,CASE WHEN $2 THEN m.motivo END AS reason,
           o.codigo AS "originWarehouseCode",d.codigo AS "destinationWarehouseCode",coalesce(nullif(u.nombre_mostrar,''),'Sistema') AS "authorName",m.registrado_en AS "registeredAt"
         FROM inventario.movimiento m JOIN inventario.lote l ON l.id=m.lote_id LEFT JOIN infra.espacio o ON o.id=m.bodega_origen_id LEFT JOIN infra.espacio d ON d.id=m.bodega_destino_id LEFT JOIN acceso.usuario u ON u.id=m.autor_id
-        WHERE l.articulo_id=$1 ORDER BY m.registrado_en DESC LIMIT 200`, [id])).rows;
+        WHERE l.articulo_id=$1 ORDER BY m.registrado_en DESC LIMIT 200`, [id, this.seesMovementDetail(actor)])).rows;
       await this.commands.audit(c, actor, { action: 'inventario.leer', entity: 'articulo', entityId: id, permission: 'inventario.ver' });
       return { ...this.withStatus(base), lotList: [...lots.values()], warehouses: [...warehouses.values()], movements, allowedMovements: scope.movementTypes.filter(t => t !== 'salida') };
     });

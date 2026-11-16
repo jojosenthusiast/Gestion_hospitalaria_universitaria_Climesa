@@ -16,6 +16,8 @@ struct DoctorDay: Sendable {
     var reschedules: Part<[Appointment]>?
     /// MA-AVI-01: avisos públicos y los dirigidos a Medicina (`GET /me/avisos`), como en el inicio de Android.
     var notices: Part<[PublicNotices.Notice]>?
+    /// La respuesta de `/me/avisos`, para volver a leer en su `proximoCambio`.
+    var noticeFeed: PublicNotices?
 }
 
 /// I20 · Mi día: citas del día, números de la fila, resultados por revisar y hospitalizados.
@@ -51,6 +53,7 @@ struct DoctorDayView: View {
             }
         }
         .task(id: live.snapshot.version([.appointments, .consultations, .queue, .laboratory, .admissions, .hospitalInfo])) { await load() }
+        .task(id: loader.value?.noticeFeed?.nextChange) { await reloadAtNextChange(loader.value?.noticeFeed, reload: load) }
         .sheet(item: $rejecting) { item in RejectRescheduleSheet(appointment: item, submission: deciding) { await load() } }
     }
 
@@ -236,7 +239,9 @@ struct DoctorDayView: View {
                     return DischargeRules.current(admissions).count
                 }
             }
-            day.notices = try await Part<[PublicNotices.Notice]>.load { try await api.get("/me/avisos", as: PublicNotices.self).byPriority }
+            let feed = try await Part<PublicNotices>.load { try await api.get("/me/avisos", as: PublicNotices.self) }
+            day.noticeFeed = feed.value
+            day.notices = feed.value.map { .loaded($0.byPriority) } ?? .failed(feed.error ?? "")
             return day
         }
     }

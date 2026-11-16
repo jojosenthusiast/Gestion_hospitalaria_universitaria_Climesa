@@ -4492,7 +4492,8 @@ export interface components {
             destinationWarehouseId: string | null;
             /** @description Negativo en un ajuste de salida */
             quantity: string;
-            reason: string;
+            /** @description Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050) */
+            reason: string | null;
             /** Format: uuid */
             patientId: string | null;
             /** Format: uuid */
@@ -4564,7 +4565,8 @@ export interface components {
             lotNumber: string;
             /** @description Negativo en un ajuste que resta */
             quantity: number;
-            reason: string;
+            /** @description Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050) */
+            reason: string | null;
             originWarehouseCode: string | null;
             destinationWarehouseCode: string | null;
             authorName: string;

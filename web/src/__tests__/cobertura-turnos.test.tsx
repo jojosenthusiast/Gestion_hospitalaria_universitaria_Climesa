@@ -49,4 +49,12 @@ describe('cobertura mínima por área en Turnos', () => {
     expect(await screen.findByText(/No pudimos revisar la cobertura mínima/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Volver a intentar' })).toBeTruthy();
   });
+
+  it('una respuesta 200 sin la lista de huecos no se confunde con "sin huecos": muestra el error y reintenta', async () => {
+    const api = { request: vi.fn(async () => ({ from: '', to: '' })), write: vi.fn() };
+    render(<AreaCoverageAlert api={api as unknown as Api} version={0} now={now} />);
+    expect(await screen.findByText(/No pudimos revisar la cobertura mínima/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Volver a intentar' }));
+    await vi.waitFor(() => expect(api.request).toHaveBeenCalledTimes(2));
+  });
 });

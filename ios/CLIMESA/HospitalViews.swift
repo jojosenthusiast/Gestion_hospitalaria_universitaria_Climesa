@@ -44,6 +44,7 @@ struct HospitalInfoView: View {
             noticesSection(info.notices)
         }
         .task(id: live.snapshot.version(.hospitalInfo)) { await load() }
+        .task(id: loader.value?.notices.value?.nextChange) { await reloadAtNextChange(loader.value?.notices.value, reload: load) }
     }
 
     @ViewBuilder private func occupancySection(_ part: Part<PublicOccupancy>) -> some View {

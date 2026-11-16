@@ -77,4 +77,11 @@ class InventoryTest {
         assertEquals("DL", detail.lots.single().number); assertEquals(300.0, detail.warehouses.single().quantity, 0.0)
         assertEquals(listOf(MovementKind.CONSUMPTION), detail.allowedMovements); assertEquals("BOD-CEN", detail.movements.single().origin); assertNull(detail.movements.single().destination)
     }
+
+    /** D-050: quien solo ve el inventario (Administración) recibe el motivo en null; no se muestra el texto "null". */
+    @Test fun aWithheldReasonIsBlankNotTheWordNull() {
+        val json = JSONObject("""{"id":"a1","code":"PAR","name":"Paracetamol","type":"insumo","unit":"tableta","minimum":100,"active":true,"version":2,"available":300,"expired":0,"expiringSoon":0,"nextExpiry":null,"status":"ok",
+            "lotList":[],"warehouses":[],"allowedMovements":[],"movements":[{"id":"m1","type":"entrada","lotNumber":"DL","quantity":20,"reason":null,"originWarehouseCode":null,"destinationWarehouseCode":"BOD-CEN","authorName":"Ficticia","registeredAt":"2026-11-13T15:00:00Z"}]}""")
+        assertEquals("", parseDetail(json)!!.movements.single().reason)
+    }
 }

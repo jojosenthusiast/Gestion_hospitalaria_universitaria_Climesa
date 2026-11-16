@@ -39,6 +39,18 @@ describe('MA-AVI-02 · editar y retirar avisos', () => {
     expect(channels).toEqual(expect.arrayContaining(['rol:ENF', 'rol:MED']));
   });
 
+  test('editar uno programado con desde = ahora lo adelanta; sin desde conserva su inicio programado', async () => {
+    const { id } = await publish({ titulo: 'Simulacro programado', desde: at(2), hasta: at(6) });
+    expect((await listed(id)).estado).toBe('programado');
+    const kept = await t.call('JOP', 'PUT', `/avisos/${id}`, { version: 1, titulo: 'Simulacro programado', cuerpo: 'Texto.', hasta: at(6) });
+    expect(kept.status).toBe(200);
+    expect((await listed(id)).estado).toBe('programado');
+    const now = await t.call('JOP', 'PUT', `/avisos/${id}`, { version: 2, titulo: 'Simulacro programado', cuerpo: 'Texto.', desde: at(0), hasta: at(6) });
+    expect(now.status).toBe(200);
+    expect((await listed(id)).estado).toBe('vigente');
+    expect(await publicTitles()).toContain('Simulacro programado');
+  });
+
   test('una versión vieja choca con version_conflicto y no pisa la edición de otra persona', async () => {
     const { id } = await publish();
     expect((await t.call('JOP', 'PUT', `/avisos/${id}`, { version: 1, titulo: 'Primera edición', cuerpo: 'Texto uno.', hasta: at(6) })).status).toBe(200);
@@ -85,6 +97,11 @@ describe('MA-AVI-02 · editar y retirar avisos', () => {
       expect(edit.status).toBe(409);
       expect(edit.body.codigo).toBe('aviso_vencido');
     } finally { t.setNow(start); }
+  });
+
+  test('no queda una vista de avisos vigentes sin los filtros de audiencia y retiro', async () => {
+    const view = await t.one("SELECT to_regclass('publico.v_avisos_vigentes') AS name");
+    expect(view.name).toBeNull();
   });
 
   test('la base rechaza cambiar un aviso retirado y un retiro sin motivo suficiente', async () => {

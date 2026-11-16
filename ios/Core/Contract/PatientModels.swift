@@ -408,7 +408,18 @@ public struct PublicNotices: Decodable, Sendable, Equatable {
     }
     public let updatedAt: String
     public let notices: [Notice]
-    enum CodingKeys: String, CodingKey { case updatedAt = "actualizadoEn", notices = "avisos" }
+    /// Siguiente instante en que la lista cambia solo por el paso del tiempo (un aviso vence o empieza).
+    public let nextChange: String?
+    enum CodingKeys: String, CodingKey { case updatedAt = "actualizadoEn", notices = "avisos", nextChange = "proximoCambio" }
+
+    /// Margen tras `proximoCambio` para que el servidor ya vea el cambio al volver a leer.
+    public static let refreshSlack: TimeInterval = 1
+
+    /// Segundos hasta volver a leer los avisos (en `proximoCambio`, como Android y la web); nil si nada cambia con el tiempo.
+    public func refreshDelay(now: Date) -> TimeInterval? {
+        guard let at = ClimesaDates.parse(nextChange) else { return nil }
+        return max(0, at.timeIntervalSince(now)) + Self.refreshSlack
+    }
 }
 
 /// MA-AMB-05: `OwnAmbulanceRequestResponse` de `GET /ambulancia/solicitudes/mias`: la solicitud propia como la guarda el servidor.

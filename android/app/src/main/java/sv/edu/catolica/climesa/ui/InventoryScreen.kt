@@ -185,7 +185,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
             detail.movements.take(30).forEach { m ->
                 Column(Modifier.padding(vertical = Spacing.xs)) {
                     Text("${MovementKind.entries.firstOrNull { it.code == m.type }?.label ?: m.type.replaceFirstChar { c -> c.uppercase() }} · lote ${m.lotNumber} · ${trimNumber(m.quantity)} ${article.unit}", style = MaterialTheme.typography.titleSmall)
-                    Text(listOfNotNull(m.origin, m.destination).joinToString(" → ").ifBlank { "—" } + " · ${m.reason} · ${m.author} · ${m.at.take(16).replace('T', ' ')}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(listOfNotNull(m.origin, m.destination).joinToString(" → ").ifBlank { "—" } + m.reason.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty() + " · ${m.author} · ${m.at.take(16).replace('T', ' ')}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

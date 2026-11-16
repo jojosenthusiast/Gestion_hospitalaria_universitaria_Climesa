@@ -23459,7 +23459,9 @@
             "description": "Negativo en un ajuste de salida"
           },
           "reason": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050)"
           },
           "patientId": {
             "type": "string",
@@ -23703,7 +23705,9 @@
             "description": "Negativo en un ajuste que resta"
           },
           "reason": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050)"
           },
           "originWarehouseCode": {
             "type": "string",
