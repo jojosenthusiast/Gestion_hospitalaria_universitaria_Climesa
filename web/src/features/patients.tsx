@@ -1,11 +1,14 @@
 import { useEffect,useState,type FormEvent } from 'react';
 import { Field,Icon,Notice } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
-import { ActiveFilters,ChipGroup,LiveSearch,ListToolbar } from './listas/chips';
+import { ActiveFilters,ChipGroup,ListToolbar } from './listas/chips';
 import { ageFrom,profileGaps,validatePatientDraft } from './listas/patient-rules';
 import type { ClinicalHistory } from './clinical-history';
 import { dayKey,dayLabel,timeRange } from './listas/schedule';
 import './listas/lists.css';
+import { matchesPatientState,canFilterAdmissions,patientEmptyState,patientFilterDefaults,patientListPath,patientStateOptions,situationChip,situationOptions,stateChip,type PatientFilters } from './listas/patient-filters';
+import type { ShiftCatalog } from './shifts/rules';
+import { useHashFilters } from '../lib/hash-params';
 import { useQuickAction } from './personal/accion';
 import { can,type AccessProfile,type Api,type ApiError,type Appointment,type Patient,type PatientInput,type SearchReceipt } from '../lib/api';
 import { Dialog,Empty,Heading,RemoteState,SaveButton,Select,Tag,WriteError,formatDate,formatDateTime,isVersionConflict,useAction,useData } from './common';
@@ -36,31 +39,51 @@ export function prefillFromQuery(query:string):Partial<PatientInput>{
  return {givenNames:w.slice(0,n).join(' '),surnames:w.slice(n).join(' ')};
 }
 export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfile;version:number}){
+ // Filtros en la dirección (#/pacientes?situacion=hospitalizado&area=…): se comparten, sobreviven a recargar y el servidor los aplica.
+ // El texto buscado (nombre, DUI) no va a la dirección: quedaría en el historial del navegador de un equipo compartido.
+ const [filters,setFilters]=useHashFilters<keyof PatientFilters>(patientFilterDefaults);
  const [query,setQuery]=useState(''),[typed,setTyped]=useState('');
  // Búsqueda mientras se escribe: la lista se pide con una pequeña espera; el botón «Buscar» sigue registrando la constancia que exige el alta.
  useEffect(()=>{const t=setTimeout(()=>setTyped(query.trim().length>=2?query.trim():''),300);return()=>clearTimeout(t);},[query]);
- const initial=useData<Patient[]>(api,`/pacientes?limit=50${typed?`&query=${encodeURIComponent(typed)}`:''}`,version),search=useAction(api);
- const [receipt,setReceipt]=useState<SearchReceipt|null>(null),[filter,setFilter]=useState('activo');
+ const initial=useData<Patient[]>(api,patientListPath(filters,typed),version),search=useAction(api);
+ const situations=situationOptions(profile),byAdmission=canFilterAdmissions(profile)&&can(profile,'turnos.ver');
+ const catalog=useData<ShiftCatalog>(api,'/turnos/catalogo',version,byAdmission);
+ const areas=(catalog.data?.areas??[]).filter(a=>a.type==='area'||a.type==='planta'),doctors=(catalog.data?.staff??[]).filter(s=>s.type==='medico');
+ const areaName=areas.find(a=>a.id===filters.area)?.name,doctorName=doctors.find(d=>d.id===filters.medico)?.name;
+ const [receipt,setReceipt]=useState<SearchReceipt|null>(null);
  const [selected,setSelected]=useState<string|null>(null),[editing,setEditing]=useState<Patient|null>(null),[creating,setCreating]=useState(false),[status,setStatus]=useState<Patient|null>(null);
- const candidates=receipt?.candidates??initial.data??[],rows=candidates.filter(p=>filter==='todos'||(filter==='activo'?p.active:!p.active));
+ // Con la constancia de «Buscar» se muestran sus candidatos (lo que el alta revisa); el estado se aplica igual que en el servidor.
+ // Un filtro de atención de hoy solo lo resuelve el servidor, así que entonces manda la lista filtrada.
+ const byCare=!!filters.situacion||!!filters.area||!!filters.medico;
+ const rows=receipt&&!byCare?receipt.candidates.filter(p=>matchesPatientState(p.state,filters.estado)):initial.data??[];
  const register=can(profile,'pacientes.registrar'),viewFicha=can(profile,'pacientes.ver_ficha');
  const expired=useExpired(receipt?.expiresAt),validReceipt=!!receipt&&!expired&&Date.parse(receipt.expiresAt)>Date.now();
  const [quick,consumeQuick]=useQuickAction();
  useEffect(()=>{if(quick==='registrar'&&register)setCreating(true);if(quick)consumeQuick();},[quick,register,consumeQuick]);
  const done=()=>{setCreating(false);setEditing(null);setStatus(null);setReceipt(null);initial.refresh();};
- async function find(e:FormEvent){e.preventDefault();const result=await search.run<SearchReceipt>('/pacientes/busquedas',{query:query.trim()});if(result)setReceipt(result);}
- const active=candidates.filter(p=>p.active).length,inactive=candidates.length-active;
- const filters=[...(filter!=='activo'?[{key:'estado',label:filter==='todos'?'Todos los estados':'Inactivos',remove:()=>setFilter('activo')}]:[]),...(query.trim()?[{key:'texto',label:`«${query.trim()}»`,remove:()=>{setQuery('');setReceipt(null);}}]:[])];
- const exportTable=()=>({filename:'pacientes',title:'Pacientes',subtitle:`${rows.length} expedientes`,columns:['Expediente','Paciente','Sexo','Nacimiento','Estado'],rows:rows.map(p=>[p.record,p.fullName,sexNames[p.sex]??p.sex,p.birth?formatDate(p.birth):p.ageRange?`${p.ageRange} años`:'',p.active?'Activo':'Inactivo'])});
- return <><Heading eyebrow="Pacientes / Registro compartido" title="Pacientes" description="Busca primero y registra solo si la persona no existe: así evitamos expedientes duplicados. Cada expediente conserva su identidad y sus cambios." actions={register&&<button className="primary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={18}/>Registrar paciente</button>}/>
+ async function find(e:FormEvent){e.preventDefault();const text=query.trim();setTyped(text);const result=await search.run<SearchReceipt>('/pacientes/busquedas',{query:text});if(result)setReceipt(result);}
+ const clearQuery=()=>{setQuery('');setTyped('');setReceipt(null);};
+ const filtered=filters.estado!=='vigente'||!!filters.situacion||!!filters.area||!!filters.medico;
+ const active=[
+  ...(filters.estado!=='vigente'?[{key:'estado',label:stateChip(filters.estado),remove:()=>setFilters({estado:'vigente'})}]:[]),
+  ...(filters.situacion?[{key:'situacion',label:situationChip(filters.situacion),remove:()=>setFilters({situacion:''})}]:[]),
+  ...(filters.area?[{key:'area',label:`Área: ${areaName??'elegida'}`,remove:()=>setFilters({area:''})}]:[]),
+  ...(filters.medico?[{key:'medico',label:`Médico: ${doctorName??'elegido'}`,remove:()=>setFilters({medico:''})}]:[]),
+  ...(query.trim()?[{key:'texto',label:`«${query.trim()}»`,remove:clearQuery}]:[]),
+ ];
+ const empty=patientEmptyState(filters,{area:areaName,medico:doctorName});
+ const exportTable=()=>({filename:'pacientes',title:'Pacientes',subtitle:`${rows.length} expedientes${active.length?` · ${active.map(f=>f.label).join(' · ')}`:''}`,columns:['Expediente','Paciente','Sexo','Nacimiento','Estado'],rows:rows.map(p=>[p.record,p.fullName,sexNames[p.sex]??p.sex,p.birth?formatDate(p.birth):p.ageRange?`${p.ageRange} años`:'',p.active?'Activo':'Inactivo'])});
+ return <><Heading eyebrow="Pacientes / Registro compartido" title="Pacientes" description="Busca primero y registra solo si la persona no existe, para no duplicar expedientes" actions={register&&<button className="primary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={18}/>Registrar paciente</button>}/>
  <section className="data-workbench" aria-label="Registro de pacientes"><ListToolbar trailing={<ExportMenu table={exportTable} disabled={!rows.length}/>}><form className="search-form" onSubmit={find}><Field label="Nombre, DUI o expediente" placeholder="Escribe al menos dos caracteres" value={query} onChange={v=>{setQuery(v);setReceipt(null);}} minLength={2} maxLength={100} required/><button className="primary-button" disabled={search.busy} type="submit"><Icon name="search" size={18}/>{search.busy?'Buscando…':'Buscar'}</button></form></ListToolbar>
- <div className="cl-filter-row"><span className="cl-filter-label">Estado</span><ChipGroup label="Estado del expediente" value={filter} onChange={setFilter} options={[{value:'activo',label:'Activos',count:active},{value:'inactivo',label:'Inactivos',count:inactive},{value:'todos',label:'Todos',count:candidates.length}]}/></div>
- <ActiveFilters filters={filters} onClear={()=>{setFilter('activo');setQuery('');setReceipt(null);}}/>
- <WriteError error={search.error}/><p className="table-caption">{receipt?`${rows.length} coincidencias · ${query}`:typed?`${rows.length} resultados mientras escribes · ${typed}`:'Expedientes recientes'}<span>{!register?'Consulta de solo lectura.':validReceipt?'Puedes registrar después de revisar las coincidencias.':receipt?expiredText:'Para registrar a alguien nuevo, primero busca si ya existe.'}</span></p>
+ <div className="cl-filter-row"><span className="cl-filter-label">Expediente</span><ChipGroup label="Estado del expediente" value={filters.estado} onChange={estado=>setFilters({estado})} options={patientStateOptions.map(o=>({...o}))}/></div>
+ {situations.length>0&&<div className="cl-filter-row"><span className="cl-filter-label">Hoy</span><ChipGroup label="Situación de hoy" value={filters.situacion} onChange={situacion=>setFilters({situacion})} options={[{value:'',label:'Cualquiera'},...situations.map(s=>({value:s.value,label:s.label}))]}/></div>}
+ {byAdmission&&<div className="cl-filter-row cl-filter-selects"><Select label="Área de la cama" value={filters.area} onChange={area=>setFilters({area})} disabled={!catalog.data}><option value="">Todas las áreas</option>{areas.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</Select><Select label="Médico tratante" value={filters.medico} onChange={medico=>setFilters({medico})} disabled={!catalog.data}><option value="">Todos los médicos</option>{doctors.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</Select>{catalog.error&&<span className="muted">No pudimos cargar áreas y médicos.</span>}</div>}
+ <ActiveFilters filters={active} onClear={()=>{clearQuery();setFilters({estado:'vigente',situacion:'',area:'',medico:''});}}/>
+ <WriteError error={search.error}/><p className="table-caption">{receipt?`${rows.length} coincidencias · ${query}`:typed?`${rows.length} resultados mientras escribes · ${typed}`:filtered?`${rows.length} expedientes con estos filtros`:'Expedientes recientes'}<span>{!register?'Consulta de solo lectura.':validReceipt?'Puedes registrar después de revisar las coincidencias.':receipt?expiredText:'Para registrar a alguien nuevo, primero busca si ya existe.'}</span></p>
  {register&&validReceipt&&receipt.candidates.length>0&&<Notice kind="info">Posibles coincidencias: revisa cada ficha y su motivo antes de registrar a alguien nuevo.</Notice>}
  <RemoteState state={initial}>{()=>rows.length?<div className="cl-master-detail"><ul className="cl-master" aria-label="Pacientes encontrados">{rows.map(p=><li key={p.id}><button type="button" className="pt-row" aria-current={p.id===selected} aria-label={viewFicha?`Abrir ficha de ${p.fullName}`:`Paciente ${p.fullName}`} disabled={!viewFicha} onClick={()=>setSelected(p.id)}><span className="pt-name"><strong>{p.fullName}</strong><small>{p.matchReason}</small></span><span className="mono-data">{p.record}</span><span className="pt-meta">{p.birth?`${formatDate(p.birth)}${ageFrom(p.birth)!==null?` · ${ageFrom(p.birth)} años`:''}`:p.ageRange?`${p.ageRange} años`:'Sin fecha'} · {sexNames[p.sex]}</span><Tag value={p.state}/></button></li>)}</ul>
-  {selected?<PatientPanel key={selected} api={api} id={selected} profile={profile} version={version} onClose={()=>setSelected(null)} onEdit={p=>setEditing(p)} onState={p=>setStatus(p)}/>:<aside className="cl-detail"><p className="muted">{viewFicha?'Elige un paciente de la lista para ver su ficha completa: datos, citas, historial clínico y cambios.':'Tu rol consulta la lista pero no abre fichas.'}</p></aside>}</div>:<Empty title="No hay coincidencias" description="Revisa el filtro y también los registros inactivos antes de crear un expediente."/>}</RemoteState>
- <p className="table-footnote">Se muestran hasta 50 resultados. Afina la búsqueda si no encuentras el expediente.</p></section>
+  {selected?<PatientPanel key={selected} api={api} id={selected} profile={profile} version={version} onClose={()=>setSelected(null)} onEdit={p=>setEditing(p)} onState={p=>setStatus(p)}/>:<aside className="cl-detail"><p className="muted">{viewFicha?'Elige un paciente de la lista para ver su ficha completa: datos, citas, historial clínico y cambios.':'Tu rol consulta la lista pero no abre fichas.'}</p></aside>}</div>:<Empty title={empty.title} description={empty.description}/>}</RemoteState>
+ <p className="table-footnote">Se muestran hasta 50 resultados. Afina la búsqueda o los filtros si no encuentras el expediente.</p></section>
  {(creating||editing)&&<PatientForm api={api} patient={editing} receipt={receipt} query={query} onClose={()=>{setCreating(false);setEditing(null);}} onSaved={done}/>}
  {status&&<PatientStateForm api={api} patient={status} onClose={()=>setStatus(null)} onSaved={done}/>}</>;
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { writeHashParams } from '../../lib/hash-params';
 
 /** `?accion=<verbo>` del hash (`#/personal?accion=invitar`): los tableros abren acciones reales de un módulo con él. */
 export const readQuickAction = (): string | null => {
@@ -19,7 +20,8 @@ export function useQuickAction(): [string | null, () => void] {
   }, []);
   const consume = useCallback(() => {
     setAction(null);
-    if (readQuickAction()) history.replaceState(null, '', location.hash.split('?')[0] || '#/');
+    // Solo se quita `accion`: los filtros que viajan en la misma dirección se conservan.
+    if (readQuickAction()) writeHashParams({ accion: null });
   }, []);
   return [action, consume];
 }
