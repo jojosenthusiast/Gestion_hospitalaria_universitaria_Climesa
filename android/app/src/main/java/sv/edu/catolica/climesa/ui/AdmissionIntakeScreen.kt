@@ -121,7 +121,7 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
     TextButton(onClick = pick, enabled = d.available, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(Modifier.weight(1f)) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.specialty ?: "Medicina general", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            if (!d.available) StatusPill(d.reason ?: stringResource(R.string.ing_medico_sin_turno), StatusTone.BLOCKED) else if (selected) StatusPill("Elegido", StatusTone.SUCCESS)
+            if (!d.available) FamilyBadge(d.reason ?: stringResource(R.string.ing_medico_sin_turno), StatusFamily.CERRADO) else if (selected) FamilyBadge("Elegido", StatusFamily.LISTO)
         }
     }
 }
@@ -196,6 +196,6 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
         LabeledValue(stringResource(R.string.ing_resumen_visitas), if (d.visitorsAllowed) stringResource(R.string.ing_resumen_hasta, d.visitorsMax) else stringResource(R.string.ing_resumen_sin_visitas))
     }
     SectionCard(stringResource(R.string.ing_factibilidad)) {
-        state.feasibility?.checks?.forEach { check -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { StatusPill(if (check.ok) "OK" else "Revisar", if (check.ok) StatusTone.SUCCESS else StatusTone.BLOCKED); Text(check.message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f)) } }
+        state.feasibility?.checks?.forEach { check -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { StatusTag(if (check.ok) LinkCheck.MATCH else LinkCheck.REVIEW, label = stringResource(if (check.ok) R.string.ing_chequeo_ok else R.string.ing_chequeo_revisar)); Text(check.message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f)) } }
     }
 }

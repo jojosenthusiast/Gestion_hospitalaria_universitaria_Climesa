@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fase 2 S13: per-role screens (Android A1 reception and patient, A2 clinical and ward). -->
+<resources>
+    <!-- Admission feasibility checks -->
+    <string name="ing_chequeo_ok">Correcto</string>
+    <string name="ing_chequeo_revisar">Revisar</string>
+</resources>

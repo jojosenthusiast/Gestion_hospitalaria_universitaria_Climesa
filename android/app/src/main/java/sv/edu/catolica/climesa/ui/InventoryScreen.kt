@@ -55,18 +55,10 @@ private fun categoryIcon(category: ArticleCategory): ImageVector = when (categor
     ArticleCategory.REAGENT -> Icons.Default.Science
     ArticleCategory.MINOR_EQUIPMENT -> Icons.Default.MedicalServices
 }
-private fun tone(status: StockStatus) = when (status) {
-    StockStatus.OUT, StockStatus.LOW -> StatusTone.DANGER
-    StockStatus.EXPIRING -> StatusTone.WARNING
-    StockStatus.OK -> StatusTone.SUCCESS
-    StockStatus.INACTIVE -> StatusTone.BLOCKED
-}
-@Composable private fun statusColor(status: StockStatus): Color = when (tone(status)) {
-    StatusTone.DANGER -> MaterialTheme.colorScheme.error
-    StatusTone.WARNING -> MaterialTheme.climesa.warning
-    StatusTone.SUCCESS -> MaterialTheme.climesa.success
-    else -> MaterialTheme.climesa.controlLine
-}
+/** Stock state on the shared family table (`agotado` closed, `bajo_minimo` called, `por_vencer` waiting); `ok` is done. Never red. */
+internal fun stockFamily(status: StockStatus): StatusFamily = StatusFamily.of(status.code) ?: StatusFamily.LISTO
+@Composable private fun statusColor(status: StockStatus): Color = MaterialTheme.system.status(stockFamily(status)).first
+@Composable private fun StockBadge(status: StockStatus) = FamilyBadge(status.label, stockFamily(status))
 
 /** Inventory as master-detail: the article list (search, filters, status) and, once one is chosen, its lots, warehouses and history. */
 @Composable fun InventoryScreen(modifier: Modifier = Modifier, profile: AccessProfile? = null, model: InventoryViewModel = viewModel()) {
@@ -129,7 +121,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.listItems(state: Inve
 @Composable private fun ArticleRow(article: ArticleSummary, onClick: () -> Unit) {
     SectionCard(article.name, eyebrow = "${article.code} · ${article.category.label}", modifier = Modifier.clickable(onClick = onClick), action = {
         Icon(categoryIcon(article.category), article.category.label, tint = MaterialTheme.climesa.primaryText)
-        StatusPill(article.status.label, tone(article.status))
+        StockBadge(article.status)
     }) {
         Gauge(article.available, article.minimum, article.status)
         Text("${trimNumber(article.available)} ${article.unit} · mínimo ${trimNumber(article.minimum)}" + (article.nextExpiry?.let { " · vence $it" } ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -141,7 +133,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
     if (detail == null) { item { if (state.detailLoading) LoadingState() else ErrorState(state.error, onRetry = { model.clearMessages(); state.selectedId?.let(model::select) }) }; return }
     val article = detail.summary
     item {
-        SectionCard(article.name, eyebrow = "${article.code} · ${article.category.label} · ${article.unit}", action = { StatusPill(article.status.label, tone(article.status)) }) {
+        SectionCard(article.name, eyebrow = "${article.code} · ${article.category.label} · ${article.unit}", action = { StockBadge(article.status) }) {
             Gauge(article.available, article.minimum, article.status)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 StatTile(trimNumber(article.available), stringResource(R.string.inv_existencia), Modifier.weight(1f), suffix = article.unit)

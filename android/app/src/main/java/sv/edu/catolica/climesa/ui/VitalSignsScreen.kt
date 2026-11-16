@@ -99,10 +99,11 @@ private fun levelWord(level: VitalLevel?): String = stringResource(when (level) 
     else -> R.string.signos_nivel_normal
 })
 
-private fun levelTone(level: VitalLevel) = when (level) {
-    VitalLevel.CRITICAL -> StatusTone.DANGER
-    VitalLevel.ABNORMAL -> StatusTone.WARNING
-    else -> StatusTone.SUCCESS
+/** Family of a reading level: normal is done, altered is a neutral badge, critical keeps the red [CriticalPill]. */
+internal fun vitalLevelFamily(level: VitalLevel): StatusFamily? = when (level) {
+    VitalLevel.CRITICAL -> StatusFamily.CRITICO
+    VitalLevel.ABNORMAL -> null
+    else -> StatusFamily.LISTO
 }
 
 /**
@@ -343,6 +344,6 @@ private fun ReadingCard(reading: VitalReading) {
         subtitle = reading.summary(),
         meta = meta,
         leadingIcon = Icons.Default.MonitorHeart,
-        status = { if (level == VitalLevel.CRITICAL) CriticalPill(levelWord(level)) else StatusPill(levelWord(level), levelTone(level)) },
+        status = { if (level == VitalLevel.CRITICAL) CriticalPill(levelWord(level)) else FamilyBadge(levelWord(level), vitalLevelFamily(level)) },
     )
 }

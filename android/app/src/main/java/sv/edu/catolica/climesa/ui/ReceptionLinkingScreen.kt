@@ -62,8 +62,8 @@ private fun LinkingGuide() {
             Text(stringResource(R.string.rec_vinc_paso3), style = MaterialTheme.typography.bodySmall)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusPill(stringResource(R.string.rec_vinc_coincide), StatusTone.SUCCESS)
-            StatusPill(stringResource(R.string.rec_vinc_revisar), StatusTone.WARNING)
+            StatusTag(LinkCheck.MATCH, label = stringResource(R.string.rec_vinc_coincide))
+            StatusTag(LinkCheck.REVIEW, label = stringResource(R.string.rec_vinc_revisar))
         }
     }
 }
@@ -75,7 +75,7 @@ private fun LinkCard(row: LinkRequestRow, canVerify: Boolean, busy: Boolean, onA
         Text(stringResource(R.string.rec_vinc_declarado, row.declaredDui, row.declaredBirth), style = MaterialTheme.typography.bodySmall)
         if (row.hasCandidate) Text(stringResource(R.string.rec_vinc_candidato, row.candidateRecord.orEmpty(), row.candidateName.orEmpty()), style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (row.hasCandidate) StatusPill(stringResource(R.string.rec_vinc_coincide), StatusTone.SUCCESS) else StatusPill(stringResource(R.string.rec_vinc_revisar), StatusTone.WARNING)
+            if (row.hasCandidate) StatusTag(LinkCheck.MATCH, label = stringResource(R.string.rec_vinc_coincide)) else StatusTag(LinkCheck.REVIEW, label = stringResource(R.string.rec_vinc_revisar))
         }
         NoticeBanner(if (row.hasCandidate) NoticeKind.SUCCESS else NoticeKind.INFO, row.guidance)
         if (canVerify) ClimesaActionGroup {

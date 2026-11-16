@@ -72,10 +72,10 @@ internal fun categoryIcon(key: String): ImageVector = when (key) {
 
 @Composable
 private fun requestStateTag(state: String) = when (state) {
-    "pendiente" -> StatusPill(stringResource(R.string.cat_estado_pendiente), StatusTone.WARNING)
-    "asignada" -> StatusPill(stringResource(R.string.cat_estado_asignada), StatusTone.SUCCESS)
-    "rechazada" -> StatusPill(stringResource(R.string.cat_estado_rechazada), StatusTone.DANGER)
-    else -> StatusPill(stringResource(R.string.cat_estado_cancelada), StatusTone.NEUTRAL)
+    "pendiente" -> FamilyBadge(stringResource(R.string.cat_estado_pendiente), null)
+    "asignada" -> FamilyBadge(stringResource(R.string.cat_estado_asignada), StatusFamily.LISTO)
+    "rechazada" -> FamilyBadge(stringResource(R.string.cat_estado_rechazada), null)
+    else -> FamilyBadge(stringResource(R.string.cat_estado_cancelada), null)
 }
 
 /** A06 Android: the patient asks by reason (one to three categories with icon and search), time of day and note; the doctor is optional. */
@@ -197,9 +197,9 @@ private fun AssignPanel(state: CategoryRequestsState, model: CategoryRequestsVie
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Column(Modifier.weight(1f)) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.detail, style = MaterialTheme.typography.bodySmall) }
                     when {
-                        !d.hasShift -> StatusPill(d.reason ?: stringResource(R.string.rec_agendar_sin_turno), StatusTone.BLOCKED)
-                        state.doctor?.id == d.id -> StatusPill(stringResource(R.string.rec_leyenda_libre), StatusTone.SUCCESS)
-                        CategoryRequestRules.isSuggested(request, d) -> StatusPill(stringResource(R.string.cat_sugerido), StatusTone.PROCESS)
+                        !d.hasShift -> FamilyBadge(d.reason ?: stringResource(R.string.rec_agendar_sin_turno), StatusFamily.CERRADO)
+                        state.doctor?.id == d.id -> FamilyBadge(stringResource(R.string.rec_leyenda_libre), StatusFamily.LISTO)
+                        CategoryRequestRules.isSuggested(request, d) -> FamilyBadge(stringResource(R.string.cat_sugerido), StatusFamily.ATENCION)
                     }
                 }
             }

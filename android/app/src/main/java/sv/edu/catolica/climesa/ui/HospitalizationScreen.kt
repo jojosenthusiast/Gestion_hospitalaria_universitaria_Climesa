@@ -351,7 +351,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
     SectionCard(title = row.patientName, eyebrow = AdmissionIntake.CATEGORY_LABELS[row.category] ?: row.category, action = { StatusTag(row.state) }) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
             LabeledValue("Cama", if (row.bed.isBlank()) stringResource(R.string.clin_hosp_sin_cama) else row.bed, Modifier.weight(1f))
-            if (row.isolation) StatusPill(stringResource(R.string.clin_hosp_aislamiento), StatusTone.DANGER)
+            if (row.isolation) FamilyBadge(stringResource(R.string.clin_hosp_aislamiento), null)
         }
         row.attendingDoctorName?.let { LabeledValue(stringResource(R.string.hosp_tratante), it) }
         if (AdmissionAction.SIGN_DISCHARGE in actions) row.dischargeRequestedAt?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_alta_solicitada, localTime(it))) }

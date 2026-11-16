@@ -122,8 +122,8 @@ private fun LazyListScope.requestContent(state: AmbulanceUiState, model: Ambulan
 @Composable
 private fun OwnRequestCard(request: sv.edu.catolica.climesa.domain.OwnAmbulanceRequest, busy: Boolean, model: AmbulanceViewModel) {
     var cancelling by rememberSaveable(request.id) { mutableStateOf(false) }
-    val tone = if (request.state == "por_confirmar") StatusTone.RESERVED else StatusTone.PROCESS
-    SectionCard(stringResource(R.string.amb_solicitud_enviada), eyebrow = localTime(request.createdAt), action = { StatusPill(AmbulanceLabels.requestState(request.state), tone) }) {
+    val family = if (request.state == "por_confirmar") StatusFamily.ESPERA else StatusFamily.ATENCION
+    SectionCard(stringResource(R.string.amb_solicitud_enviada), eyebrow = localTime(request.createdAt), action = { FamilyBadge(AmbulanceLabels.requestState(request.state), family) }) {
         Text(AmbulanceRules.requestProgress(request), style = MaterialTheme.typography.bodyMedium)
         LabeledValue(stringResource(R.string.amb_donde), request.address)
         request.service?.let { service ->
@@ -192,7 +192,7 @@ private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean,
     var dispatching by rememberSaveable(request.id) { mutableStateOf(false) }
     var discarding by rememberSaveable(request.id) { mutableStateOf(false) }
     val waiting = remember(request.createdAt) { runCatching { java.time.Duration.between(java.time.Instant.parse(request.createdAt), java.time.Instant.now()).toMinutes().coerceAtLeast(0) }.getOrDefault(0L) }
-    SectionCard(AmbulanceRules.requesterLabel(request), eyebrow = AmbulanceRules.waiting(waiting), action = { StatusPill(stringResource(R.string.amb_por_confirmar), StatusTone.RESERVED) }) {
+    SectionCard(AmbulanceRules.requesterLabel(request), eyebrow = AmbulanceRules.waiting(waiting), action = { FamilyBadge(stringResource(R.string.amb_por_confirmar), StatusFamily.ESPERA) }) {
         Text(request.reason, style = MaterialTheme.typography.bodyMedium)
         LabeledValue(stringResource(R.string.amb_donde), request.address + if (request.municipality.isNotBlank()) " · ${request.municipality}" else "")
         LabeledValue(stringResource(R.string.amb_telefono), request.contactPhone)
@@ -286,7 +286,7 @@ private fun LazyListScope.logContent(state: AmbulanceUiState, model: AmbulanceVi
 private fun LogCard(entry: AmbulanceLogEntry) {
     val final = entry.finalState ?: "en_curso"
     SectionCard("${AmbulanceLabels.type(entry.type)} · ${AmbulanceLabels.priority(entry.priority)}", eyebrow = localTime(entry.dispatchedAt), action = { OperacionStatusTag(final, label = AmbulanceLabels.finalState(entry.finalState)) }) {
-        if (entry.administrativeClose) StatusPill(AmbulanceLabels.ADMINISTRATIVE_CLOSE, StatusTone.WARNING)
+        if (entry.administrativeClose) FamilyBadge(AmbulanceLabels.ADMINISTRATIVE_CLOSE, null)
         Text(AmbulanceRules.narrate(entry), style = MaterialTheme.typography.bodyMedium)
         entry.milestones.forEach { Text("${AmbulanceLabels.milestone(it.type)}: ${localTime(it.occurredAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.success) }
         Text(entry.responseMinutes?.let { stringResource(R.string.amb_respuesta_min, it) } ?: stringResource(R.string.amb_sin_llegada), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -357,7 +357,7 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
 private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, busy: Boolean, model: AmbulanceViewModel) {
     var confirming by rememberSaveable(view.serviceId) { mutableStateOf(false) }
     val handover = view.handover
-    SectionCard(stringResource(R.string.amb_entrega_titulo), action = { if (handover != null) StatusPill(stringResource(R.string.amb_recibido), StatusTone.SUCCESS) }) {
+    SectionCard(stringResource(R.string.amb_entrega_titulo), action = { if (handover != null) FamilyBadge(stringResource(R.string.amb_recibido), StatusFamily.LISTO) }) {
         when {
             handover != null -> Text(stringResource(R.string.amb_recibido_por, handover.receivedByName.ifBlank { stringResource(R.string.amb_personal_clinico) }, localTime(handover.receivedAt)), style = MaterialTheme.typography.bodyMedium)
             view.canReceive -> PrimaryButton(stringResource(R.string.amb_marcar_recibido), { confirming = true }, icon = Icons.Default.Check, enabled = !busy, loading = busy)
