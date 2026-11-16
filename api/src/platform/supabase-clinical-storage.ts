@@ -35,7 +35,8 @@ export class SupabaseClinicalFileStorage extends ClinicalFileStorage {
   }
 
   async signedUrl(path: string, seconds: number, downloadName: string) {
-    const { data, error } = await this.bucket().createSignedUrl(path, seconds, { download: downloadName });
+    // storage-js appends `download` to the URL without encoding it, so a name with `&` or `#` would break the link.
+    const { data, error } = await this.bucket().createSignedUrl(path, seconds, { download: encodeURIComponent(downloadName) });
     if (error || !data?.signedUrl) throw new ProblemException('no_disponible', 503, 'No se pudo preparar la descarga; intenta de nuevo en unos minutos.');
     return data.signedUrl;
   }
