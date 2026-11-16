@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiExtension, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { NoticeDto } from './public.dto';
+import { NoticeDto, NoticeEditDto, NoticeWithdrawDto } from './public.dto';
 import { PublicRateLimitGuard } from './rate-limit.guard';
 import { PublicService } from './public.service';
 import { DoctorsOnDutyResponse, HospitalLocationResponse, MyNoticesResponse, NoticeListItemResponse, NoticePublishedResponse, NoticesResponse, PublicOccupancyResponse, PublicQueueResponse } from './public.responses';
@@ -30,6 +30,10 @@ export class NoticesController {
   list() { return this.service.listNotices(); }
   @Post() @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Publicar un aviso general con vigencia; advierte si parece llevar datos personales' }) @ApiCreatedResponse({ type: NoticePublishedResponse })
   publish(@Req() r: ActorRequest, @Body() d: NoticeDto, @Headers('idempotency-key') k?: string) { return this.service.publish(r.actor, d, k); }
+  @Put(':id') @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Editar un aviso vigente o programado: texto, prioridad, audiencia y vigencia (adelantar el fin lo vence antes); auditado' }) @ApiOkResponse({ type: NoticeListItemResponse })
+  edit(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: NoticeEditDto, @Headers('idempotency-key') k?: string) { return this.service.edit(r.actor, id, d, k); }
+  @Post(':id/retirar') @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Retirar un aviso antes de tiempo con motivo (D-13); deja de verse en todas partes' }) @ApiCreatedResponse({ type: NoticeListItemResponse })
+  withdraw(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() d: NoticeWithdrawDto, @Headers('idempotency-key') k?: string) { return this.service.withdraw(r.actor, id, d, k); }
 }
 
 /** Avisos de mi tablero de inicio: los públicos y los dirigidos a mis roles. Cualquier cuenta con sesión. */

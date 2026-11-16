@@ -14001,6 +14001,244 @@
         "x-permiso": "avisos.publicar"
       }
     },
+    "/api/v1/avisos/{id}": {
+      "put": {
+        "operationId": "NoticesController_edit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeEditDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeListItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar un aviso vigente o programado: texto, prioridad, audiencia y vigencia (adelantar el fin lo vence antes); auditado",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "avisos.publicar"
+      }
+    },
+    "/api/v1/avisos/{id}/retirar": {
+      "post": {
+        "operationId": "NoticesController_withdraw",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeWithdrawDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeListItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirar un aviso antes de tiempo con motivo (D-13); deja de verse en todas partes",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "avisos.publicar"
+      }
+    },
     "/api/v1/me/avisos": {
       "get": {
         "operationId": "MyNoticesController_mine",
@@ -23221,7 +23459,9 @@
             "description": "Negativo en un ajuste de salida"
           },
           "reason": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050)"
           },
           "patientId": {
             "type": "string",
@@ -23465,7 +23705,9 @@
             "description": "Negativo en un ajuste que resta"
           },
           "reason": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050)"
           },
           "originWarehouseCode": {
             "type": "string",
@@ -24721,6 +24963,14 @@
           "llamados"
         ]
       },
+      "AccionAviso": {
+        "type": "string",
+        "enum": [
+          "editar",
+          "retirar"
+        ],
+        "description": "Acciones que el servidor acepta ahora: ninguna si el aviso venció o fue retirado"
+      },
       "NoticeListItemResponse": {
         "type": "object",
         "properties": {
@@ -24759,12 +25009,33 @@
           },
           "estado": {
             "type": "string",
-            "description": "vigente, programado o vencido"
+            "description": "vigente, programado, vencido o retirado"
           },
           "publicadoEn": {
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "description": "Versión vigente; se envía al editar o retirar"
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "Acciones que el servidor acepta ahora: ninguna si el aviso venció o fue retirado",
+            "items": {
+              "$ref": "#/components/schemas/AccionAviso"
+            }
+          },
+          "retiradoEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "motivoRetiro": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo del retiro (D-13)"
           }
         },
         "required": [
@@ -24777,7 +25048,11 @@
           "publico",
           "roles",
           "estado",
-          "publicadoEn"
+          "publicadoEn",
+          "version",
+          "allowedActions",
+          "retiradoEn",
+          "motivoRetiro"
         ]
       },
       "NoticeDto": {
@@ -24888,6 +25163,86 @@
           "publico",
           "roles",
           "publicadoEn"
+        ]
+      },
+      "NoticeEditDto": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "cuerpo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Inicio de la vigencia, con zona horaria"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fin de la vigencia, con zona horaria"
+          },
+          "prioridad": {
+            "type": "string",
+            "enum": [
+              "atencion",
+              "urgente",
+              "critico"
+            ],
+            "default": "atencion",
+            "description": "Escalera de avisos (D-071): atencion, urgente o critico"
+          },
+          "publico": {
+            "type": "boolean",
+            "default": true,
+            "description": "Visible en la pantalla pública y en las apps sin sesión. Sin roles, debe ser true"
+          },
+          "roles": {
+            "description": "Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confirmarDatosPersonales": {
+            "type": "boolean",
+            "description": "Publicar aunque el texto parezca contener un DUI, expediente o teléfono (FR-112-05)"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Versión que se leyó; otra distinta responde version_conflicto"
+          }
+        },
+        "required": [
+          "titulo",
+          "cuerpo",
+          "hasta",
+          "version"
+        ]
+      },
+      "NoticeWithdrawDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "motivo"
         ]
       },
       "NoticeAudienceResponse": {
@@ -26845,6 +27200,8 @@
           "trabajo_abierto",
           "existencia_insuficiente",
           "aviso_con_datos_personales",
+          "aviso_retirado",
+          "aviso_vencido",
           "indicador_desconocido",
           "examen_con_resultados",
           "ambulancia_ya_despachada",
@@ -26952,6 +27309,7 @@
           "ambulancia.prehospital",
           "ambulancia.solicitud_creada",
           "ambulancia.ubicacion",
+          "aviso.actualizado",
           "aviso.publicado",
           "cama.estado_cambiado",
           "cama.limpieza_pendiente",

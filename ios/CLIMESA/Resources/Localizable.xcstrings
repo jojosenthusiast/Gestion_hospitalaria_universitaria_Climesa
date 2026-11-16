@@ -1860,6 +1860,17 @@
         }
       }
     },
+    "notice.until": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vigente hasta %@"
+          }
+        }
+      }
+    },
     "home.open": {
       "extractionState": "manual",
       "localizations": {

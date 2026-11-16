@@ -6,7 +6,7 @@
 export const EVENT_TYPES = [
   'admision.actualizada', 'admision.cama_asignada', 'admision.creada',
   'ambulancia.estado_cambiado', 'ambulancia.hito', 'ambulancia.prehospital', 'ambulancia.solicitud_creada', 'ambulancia.ubicacion',
-  'aviso.publicado',
+  'aviso.actualizado', 'aviso.publicado',
   'cama.estado_cambiado', 'cama.limpieza_pendiente',
   'caso_duplicado.abierto',
   'cita.actualizada',

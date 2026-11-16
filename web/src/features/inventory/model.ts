@@ -12,7 +12,7 @@ export type ArticleSummary = {
 };
 export type LotStock = { warehouseId: string; warehouseCode: string; warehouseName: string; quantity: number };
 export type Lot = { id: string; number: string; expiresAt: string | null; active: boolean; version: number; expired: boolean; total: number; warehouses: LotStock[] };
-export type ArticleMovement = { id: string; type: MovementType; lotNumber: string; quantity: number; reason: string; originWarehouseCode: string | null; destinationWarehouseCode: string | null; authorName: string; registeredAt: string };
+export type ArticleMovement = { id: string; type: MovementType; lotNumber: string; quantity: number; reason: string | null; originWarehouseCode: string | null; destinationWarehouseCode: string | null; authorName: string; registeredAt: string };
 export type ArticleDetail = ArticleSummary & { lotList: Lot[]; warehouses: LotStock[]; movements: ArticleMovement[] };
 export type Warehouse = { id: string; code: string; name: string };
 export type AvailableLot = { id: string; number: string; expiresAt: string | null; expired: boolean; quantity: number; fefo: boolean };
@@ -138,7 +138,7 @@ export function movementsExport(article: ArticleDetail): ExportTable {
   return {
     filename: `movimientos-${article.code}`, title: `Movimientos de ${article.name}`, subtitle: article.code,
     columns: ['Fecha', 'Tipo', 'Lote', 'Cantidad', 'Origen', 'Destino', 'Motivo', 'Registró'],
-    rows: article.movements.map(m => [m.registeredAt, movementLabels[m.type].label, m.lotNumber, m.quantity, m.originWarehouseCode ?? '', m.destinationWarehouseCode ?? '', m.reason, m.authorName]),
+    rows: article.movements.map(m => [m.registeredAt, movementLabels[m.type].label, m.lotNumber, m.quantity, m.originWarehouseCode ?? '', m.destinationWarehouseCode ?? '', m.reason ?? '', m.authorName]),
   };
 }
 

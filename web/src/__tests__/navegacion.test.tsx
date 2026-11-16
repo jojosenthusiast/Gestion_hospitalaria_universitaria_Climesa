@@ -76,7 +76,8 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); window.l
 
 // FR-120-02 / escenario 1: cada rol con web ve únicamente el menú que sus permisos reales habilitan.
 const menuEsperado: Record<string, string[]> = {
-  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Catálogo de laboratorio', 'Métricas', 'Perfil'],
+  // D-05 y D-091 (MA-REQ-01): el control de recursos del Administrador es Inventario + Edificio.
+  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Catálogo de laboratorio', 'Inventario', 'Métricas', 'Perfil'],
   JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Métricas', 'Perfil'],
   REC: ['Inicio', 'Pacientes', 'Vinculaciones', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
   LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil'],

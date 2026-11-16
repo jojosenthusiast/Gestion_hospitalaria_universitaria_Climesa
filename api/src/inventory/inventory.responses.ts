@@ -30,7 +30,7 @@ export class MovementResponse {
   @UuidProp({ nullable: true }) originWarehouseId!: string | null;
   @UuidProp({ nullable: true }) destinationWarehouseId!: string | null;
   @DecimalProp({ description: 'Negativo en un ajuste de salida' }) quantity!: string;
-  @StrProp() reason!: string;
+  @StrProp({ nullable: true, description: 'Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050)' }) reason!: string | null;
   @UuidProp({ nullable: true }) patientId!: string | null;
   @UuidProp() authorId!: string;
   @DateTimeProp() registeredAt!: string;
@@ -107,7 +107,7 @@ export class ArticleMovementResponse {
   @EnumProp(TIPO_MOVIMIENTO, 'TipoMovimiento') type!: string;
   @StrProp() lotNumber!: string;
   @NumProp({ description: 'Negativo en un ajuste que resta' }) quantity!: number;
-  @StrProp() reason!: string;
+  @StrProp({ nullable: true, description: 'Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050)' }) reason!: string | null;
   @StrProp({ nullable: true }) originWarehouseCode!: string | null;
   @StrProp({ nullable: true }) destinationWarehouseCode!: string | null;
   @StrProp() authorName!: string;

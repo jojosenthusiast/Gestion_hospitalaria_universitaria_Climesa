@@ -18,7 +18,7 @@ export function InventoryWorkspace({ api, profile, version }: { api: Api; profil
   const [selected, setSelected] = useState<string | null>(null), [filters, setFilters] = useState<Filters>(emptyFilters), [panel, setPanel] = useState(false), [sort, setSort] = useState<SortKey>('estado'), [dialog, setDialog] = useState<Dialog>(null);
   const moveTypes = movementTypesFor(profile.permissions), configure = hasConfigure(profile.permissions);
   const refresh = () => setReload(v => v + 1);
-  const scopeLabel = useMemo(() => profile.permissions.filter(p => p.code === 'inventario.mover').some(p => p.context === 'x') ? 'Todas las categorías' : moveTypes.length === 1 ? 'Consumo de insumos de tu área' : 'Reactivos del laboratorio', [profile.permissions, moveTypes.length]);
+  const scopeLabel = useMemo(() => profile.permissions.filter(p => p.code === 'inventario.mover').some(p => p.context === 'x') ? 'Todas las categorías' : moveTypes.length === 0 ? 'Todas las categorías, solo consulta y configuración' : moveTypes.length === 1 ? 'Consumo de insumos de tu área' : 'Reactivos del laboratorio', [profile.permissions, moveTypes.length]);
   return <div className="inv">
     <Heading eyebrow="Operaciones / Recursos" title="Inventario" description={`${scopeLabel}. Artículos, lotes con vencimiento y movimientos trazables, sin saldos negativos.`}
       actions={<>{moveTypes.length > 0 && <button className="primary-button" onClick={() => setDialog({ kind: 'move', articleId: selected ?? undefined })}><Icon name="plus" size={18} />Registrar movimiento</button>}{configure && <button className="secondary-button" onClick={() => setDialog({ kind: 'article', article: null })}>Nuevo artículo</button>}</>} />

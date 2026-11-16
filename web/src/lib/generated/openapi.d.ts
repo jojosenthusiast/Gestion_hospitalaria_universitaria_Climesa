@@ -2105,6 +2105,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/avisos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Editar un aviso vigente o programado: texto, prioridad, audiencia y vigencia (adelantar el fin lo vence antes); auditado */
+        put: operations["NoticesController_edit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avisos/{id}/retirar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retirar un aviso antes de tiempo con motivo (D-13); deja de verse en todas partes */
+        post: operations["NoticesController_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/avisos": {
         parameters: {
             query?: never;
@@ -4492,7 +4526,8 @@ export interface components {
             destinationWarehouseId: string | null;
             /** @description Negativo en un ajuste de salida */
             quantity: string;
-            reason: string;
+            /** @description Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050) */
+            reason: string | null;
             /** Format: uuid */
             patientId: string | null;
             /** Format: uuid */
@@ -4564,7 +4599,8 @@ export interface components {
             lotNumber: string;
             /** @description Negativo en un ajuste que resta */
             quantity: number;
-            reason: string;
+            /** @description Solo para quien mueve existencias (inventario.mover); null para quien solo ve (D-050) */
+            reason: string | null;
             originWarehouseCode: string | null;
             destinationWarehouseCode: string | null;
             authorName: string;
@@ -4939,6 +4975,11 @@ export interface components {
             fecha: string;
             llamados: components["schemas"]["CalledNumberResponse"][];
         };
+        /**
+         * @description Acciones que el servidor acepta ahora: ninguna si el aviso venció o fue retirado
+         * @enum {string}
+         */
+        AccionAviso: "editar" | "retirar";
         NoticeListItemResponse: {
             /** Format: uuid */
             id: string;
@@ -4952,10 +4993,18 @@ export interface components {
             prioridad: string;
             publico: boolean;
             roles: string[];
-            /** @description vigente, programado o vencido */
+            /** @description vigente, programado, vencido o retirado */
             estado: string;
             /** Format: date-time */
             publicadoEn: string | null;
+            /** @description Versión vigente; se envía al editar o retirar */
+            version: number;
+            /** @description Acciones que el servidor acepta ahora: ninguna si el aviso venció o fue retirado */
+            allowedActions: components["schemas"]["AccionAviso"][];
+            /** Format: date-time */
+            retiradoEn: string | null;
+            /** @description Motivo del retiro (D-13) */
+            motivoRetiro: string | null;
         };
         NoticeDto: {
             titulo: string;
@@ -5001,6 +5050,41 @@ export interface components {
             roles: string[];
             /** Format: date-time */
             publicadoEn: string | null;
+        };
+        NoticeEditDto: {
+            titulo: string;
+            cuerpo: string;
+            /**
+             * Format: date-time
+             * @description Inicio de la vigencia, con zona horaria
+             */
+            desde?: string;
+            /**
+             * Format: date-time
+             * @description Fin de la vigencia, con zona horaria
+             */
+            hasta: string;
+            /**
+             * @description Escalera de avisos (D-071): atencion, urgente o critico
+             * @default atencion
+             * @enum {string}
+             */
+            prioridad: "atencion" | "urgente" | "critico";
+            /**
+             * @description Visible en la pantalla pública y en las apps sin sesión. Sin roles, debe ser true
+             * @default true
+             */
+            publico: boolean;
+            /** @description Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol */
+            roles?: string[];
+            /** @description Publicar aunque el texto parezca contener un DUI, expediente o teléfono (FR-112-05) */
+            confirmarDatosPersonales?: boolean;
+            /** @description Versión que se leyó; otra distinta responde version_conflicto */
+            version: number;
+        };
+        NoticeWithdrawDto: {
+            version: number;
+            motivo: string;
         };
         NoticeAudienceResponse: {
             /** Format: uuid */
@@ -5530,7 +5614,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "asistencia_ya_marcada" | "sin_asistencia_marcada" | "sin_ficha_personal" | "turno_ajeno" | "fuera_de_horario" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "indicador_desconocido" | "examen_con_resultados" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "asistencia_ya_marcada" | "sin_asistencia_marcada" | "sin_ficha_personal" | "turno_ajeno" | "fuera_de_horario" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -5569,7 +5653,7 @@ export interface components {
          * @description Catálogo de eventos que la API emite (docs/arquitectura/tiempo-real.md).
          * @enum {string}
          */
-        TipoEvento: "admision.actualizada" | "admision.cama_asignada" | "admision.creada" | "ambulancia.estado_cambiado" | "ambulancia.hito" | "ambulancia.prehospital" | "ambulancia.solicitud_creada" | "ambulancia.ubicacion" | "aviso.publicado" | "cama.estado_cambiado" | "cama.limpieza_pendiente" | "caso_duplicado.abierto" | "cita.actualizada" | "consulta.actualizada" | "espacio.actualizado" | "fila.actualizada" | "fila.estado" | "fila.llamado" | "inventario.actualizado" | "inventario.bajo_minimo" | "laboratorio.actualizado" | "laboratorio.critico" | "metricas.recalculadas" | "paciente.actualizado" | "paciente.creado" | "personal.actualizado" | "signos.registrados" | "turno.actualizado" | "turno.cambiado" | "turno.publicado" | "usuario.actualizado" | "vinculacion.resuelta" | "vinculacion.solicitada";
+        TipoEvento: "admision.actualizada" | "admision.cama_asignada" | "admision.creada" | "ambulancia.estado_cambiado" | "ambulancia.hito" | "ambulancia.prehospital" | "ambulancia.solicitud_creada" | "ambulancia.ubicacion" | "aviso.actualizado" | "aviso.publicado" | "cama.estado_cambiado" | "cama.limpieza_pendiente" | "caso_duplicado.abierto" | "cita.actualizada" | "consulta.actualizada" | "espacio.actualizado" | "fila.actualizada" | "fila.estado" | "fila.llamado" | "inventario.actualizado" | "inventario.bajo_minimo" | "laboratorio.actualizado" | "laboratorio.critico" | "metricas.recalculadas" | "paciente.actualizado" | "paciente.creado" | "personal.actualizado" | "signos.registrados" | "turno.actualizado" | "turno.cambiado" | "turno.publicado" | "usuario.actualizado" | "vinculacion.resuelta" | "vinculacion.solicitada";
         EventoDelgado: {
             /** @description Posición en plataforma.outbox (entero de 64 bits como texto); sirve de cursor. */
             seq: string;
@@ -15297,6 +15381,170 @@ export interface operations {
             };
             /** @description Sin permiso (`sin_permiso`) o regla de acceso */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    NoticesController_edit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeEditDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeListItemResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    NoticesController_withdraw: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeWithdrawDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeListItemResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

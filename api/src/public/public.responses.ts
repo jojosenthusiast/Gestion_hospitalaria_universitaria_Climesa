@@ -1,4 +1,4 @@
-import { BoolProp, ClassArrayProp, DateProp, DateTimeProp, EnumProp, IntProp, NumProp, StrArrayProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, DateProp, DateTimeProp, EnumArrayProp, EnumProp, IntProp, NumProp, StrArrayProp, StrProp, UuidProp } from '../platform/responses';
 import { CATEGORIA_HABITACION } from '../platform/states';
 
 export class PublicOccupancyRowResponse {
@@ -52,9 +52,15 @@ export class NoticeAudienceResponse extends NoticeResponse {
   @StrArrayProp() roles!: string[];
 }
 
+export const NOTICE_ACTIONS = ['editar', 'retirar'] as const;
+
 export class NoticeListItemResponse extends NoticeAudienceResponse {
-  @StrProp({ description: 'vigente, programado o vencido' }) estado!: string;
+  @StrProp({ description: 'vigente, programado, vencido o retirado' }) estado!: string;
   @DateTimeProp({ nullable: true }) publicadoEn!: string | null;
+  @IntProp({ description: 'Versión vigente; se envía al editar o retirar' }) version!: number;
+  @EnumArrayProp(NOTICE_ACTIONS, 'AccionAviso', { description: 'Acciones que el servidor acepta ahora: ninguna si el aviso venció o fue retirado' }) allowedActions!: string[];
+  @DateTimeProp({ nullable: true }) retiradoEn!: string | null;
+  @StrProp({ nullable: true, description: 'Motivo del retiro (D-13)' }) motivoRetiro!: string | null;
 }
 
 export class MyNoticesResponse {

@@ -11,6 +11,8 @@ struct PatientHome: Sendable {
     var labs: Part<[LabOrder]>?
     var room: Part<Admission?>?
     var notices: Part<[PublicNotices.Notice]>?
+    /// La respuesta de `/me/avisos`, para volver a leer en su `proximoCambio`.
+    var noticeFeed: PublicNotices?
 }
 
 /// I04 · Inicio del paciente.
@@ -49,14 +51,13 @@ struct PatientHomeView: View {
                         SectionCard { PartError(message: error, retry: load) }
                     } else if let list = notices.value, !list.isEmpty {
                         SectionTitle("home.notices")
-                        ForEach(list) { notice in
-                            SectionCard(title: notice.title) { Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink) }
-                        }
+                        ForEach(list) { notice in NoticeCard(notice: notice) }
                     }
                 }
             }
         }
         .task(id: live.snapshot.version([.queue, .appointments, .laboratory, .hospitalInfo, .admissions])) { await load() }
+        .task(id: loader.value?.noticeFeed?.nextChange) { await reloadAtNextChange(loader.value?.noticeFeed, reload: load) }
     }
 
     @ViewBuilder private func failedCard(_ eyebrow: String, _ message: String) -> some View {
@@ -90,7 +91,9 @@ struct PatientHomeView: View {
                 }
             }
             // MA-AVI-01: los avisos dirigidos a los roles de la persona además de los públicos.
-            home.notices = try await Part<[PublicNotices.Notice]>.load { try await api.get("/me/avisos", as: PublicNotices.self).notices }
+            let feed = try await Part<PublicNotices>.load { try await api.get("/me/avisos", as: PublicNotices.self) }
+            home.noticeFeed = feed.value
+            home.notices = feed.value.map { .loaded($0.byPriority) } ?? .failed(feed.error ?? "")
             return home
         }
     }

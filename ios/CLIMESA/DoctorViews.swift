@@ -14,6 +14,10 @@ struct DoctorDay: Sendable {
     var unsigned: Part<[UnsignedConsultation]>?
     /// CITA-02: citas propias con una solicitud de reprogramación que el médico puede decidir.
     var reschedules: Part<[Appointment]>?
+    /// MA-AVI-01: avisos públicos y los dirigidos a Medicina (`GET /me/avisos`), como en el inicio de Android.
+    var notices: Part<[PublicNotices.Notice]>?
+    /// La respuesta de `/me/avisos`, para volver a leer en su `proximoCambio`.
+    var noticeFeed: PublicNotices?
 }
 
 /// I20 · Mi día: citas del día, números de la fila, resultados por revisar y hospitalizados.
@@ -37,6 +41,10 @@ struct DoctorDayView: View {
                 }
                 summary(day)
                 partErrors(day)
+                if let notices = day.notices?.value, !notices.isEmpty {
+                    SectionTitle("home.notices")
+                    ForEach(notices) { notice in NoticeCard(notice: notice) }
+                }
                 if let open = day.unsigned?.value, !open.isEmpty { unsignedSection(open) }
                 if let pending = day.reschedules?.value, !pending.isEmpty { rescheduleSection(pending) }
                 if let tickets = day.tickets?.value { queueSection(tickets) }
@@ -44,7 +52,8 @@ struct DoctorDayView: View {
                 moreSection(day)
             }
         }
-        .task(id: live.snapshot.version([.appointments, .consultations, .queue, .laboratory, .admissions])) { await load() }
+        .task(id: live.snapshot.version([.appointments, .consultations, .queue, .laboratory, .admissions, .hospitalInfo])) { await load() }
+        .task(id: loader.value?.noticeFeed?.nextChange) { await reloadAtNextChange(loader.value?.noticeFeed, reload: load) }
         .sheet(item: $rejecting) { item in RejectRescheduleSheet(appointment: item, submission: deciding) { await load() } }
     }
 
@@ -99,7 +108,8 @@ struct DoctorDayView: View {
         let failed = [
             PartFailure(title: L.text("day.queue"), message: day.tickets?.error),
             PartFailure(title: L.text("day.results.title"), message: day.pendingResults?.error),
-            PartFailure(title: L.text("ds.medico.stat.hospitalized"), message: day.hospitalized?.error)
+            PartFailure(title: L.text("ds.medico.stat.hospitalized"), message: day.hospitalized?.error),
+            PartFailure(title: L.text("home.notices"), message: day.notices?.error)
         ].filter { $0.message != nil }
         ForEach(failed) { part in
             SectionCard(title: part.title) { PartError(message: part.message ?? "", retry: load) }
@@ -229,6 +239,9 @@ struct DoctorDayView: View {
                     return DischargeRules.current(admissions).count
                 }
             }
+            let feed = try await Part<PublicNotices>.load { try await api.get("/me/avisos", as: PublicNotices.self) }
+            day.noticeFeed = feed.value
+            day.notices = feed.value.map { .loaded($0.byPriority) } ?? .failed(feed.error ?? "")
             return day
         }
     }
