@@ -7,7 +7,7 @@ import { ActorRequest } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
-import { AttendanceDto, BedBlockDto, BedTransitionDto, CheckInDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
+import { AttendanceDto, BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
 import { BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftAttendanceResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpecialistWeekResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
 import { IdVersionResponse } from '../platform/responses';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
@@ -25,8 +25,8 @@ export class OperationsController {
   editStaff(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:StaffDto,@Headers('idempotency-key') k?:string){return this.people.save(r.actor,id,d,k);}
   @Post('personal/:id/inscripciones') @RequirePermission('personal.gestionar') @ApiOperation({summary:'Registrar inscripción profesional con vigencia, versión y motivo'}) @ApiCreatedResponse({ type: IdVersionResponse })
   registerRegistration(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:RegistrationDto,@Headers('idempotency-key') k?:string){return this.people.register(r.actor,id,d,k);}
-  @Get('turnos') @RequirePermission('turnos.ver') @ApiOperation({summary:'Consultar la planificación de turnos'}) @ApiOkResponse({ type: [ShiftResponse] })
-  shifts(@Req() r:ActorRequest){return this.people.shifts(r.actor);}
+  @Get('turnos') @RequirePermission('turnos.ver') @ApiOperation({summary:'Consultar la planificación de turnos'}) @ApiQuery({name:'from',required:false,type:String,description:'Primer día local, yyyy-MM-dd (con `to`, máximo 31 días); sin rango, las últimas semanas y la planificación próxima'}) @ApiQuery({name:'to',required:false,type:String,description:'Último día local, yyyy-MM-dd'}) @ApiOkResponse({ type: [ShiftResponse] })
+  shifts(@Req() r:ActorRequest,@Query('from') from?:string,@Query('to') to?:string){return this.people.shifts(r.actor,false,from,to);}
   @Get('turnos/catalogo') @RequirePermission('turnos.ver') @ApiOperation({summary:'Catálogo completo de áreas, funciones y personal para filtrar y asignar turnos'}) @ApiOkResponse({ type: ShiftCatalogResponse })
   shiftCatalog(){return this.people.shiftCatalog();}
   @Get('turnos/mios') @RequirePermission('turnos.ver') @ApiOperation({summary:'Turnos publicados de la persona vinculada a la cuenta'}) @ApiOkResponse({ type: [ShiftResponse] })
@@ -35,9 +35,12 @@ export class OperationsController {
   coverage(@Query('from') from='',@Query('to') to='',@Query('areaId') areaId?:string){return this.people.coverage(from,to,areaId);}
   @Get('turnos/especialistas') @RequirePermission('turnos.ver') @ApiOperation({summary:'Médicos de turno por día y especialidad durante 7 días (CARGA-04)'}) @ApiQuery({name:'from',type:String,description:'Primer día local, yyyy-MM-dd'}) @ApiOkResponse({ type: SpecialistWeekResponse })
   specialists(@Query('from') from=''){return this.people.specialists(from);}
-  @Post('turnos/:id/entrada') @RequirePermission('turnos.ver') @ApiOperation({summary:'Marcar la entrada del turno propio (ASIS-01)'}) @ApiCreatedResponse({ type: ShiftAttendanceResponse })
-  checkIn(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:CheckInDto,@Headers('idempotency-key') k?:string){return this.people.checkIn(r.actor,id,d,k);}
-  @Post('turnos/:id/asistencia') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Marcar entrada, ausencia (con tipo y motivo) o deshacer la marca de un turno (ASIS-01 a ASIS-03)'}) @ApiCreatedResponse({ type: ShiftAttendanceResponse })
+  // TODO(retirar en la próxima versión): compatibilidad para apps instaladas que todavía marcan la entrada a mano.
+  @Post('turnos/:id/entrada') @RequirePermission('turnos.ver') @ApiOperation({summary:'Obsoleto: la entrada se registra sola al iniciar el turno. No cambia nada: devuelve el estado del turno propio ya empezado; antes del inicio responde 409 entrada_automatica',deprecated:true}) @ApiCreatedResponse({ type: ShiftAttendanceResponse })
+  checkIn(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string){return this.people.legacyCheckIn(r.actor,id);}
+
+  @Post('turnos/:id/asistencia')
+ @RequirePermission('turnos.planificar') @ApiOperation({summary:'Marcar entrada, ausencia (con tipo y motivo) o deshacer la marca de un turno (ASIS-01 a ASIS-03)'}) @ApiCreatedResponse({ type: ShiftAttendanceResponse })
   attendance(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:AttendanceDto,@Headers('idempotency-key') k?:string){return this.people.attendance(r.actor,id,d,k);}
   @Post('turnos/publicar') @RequirePermission('turnos.publicar') @ApiOperation({summary:'Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó'}) @ApiCreatedResponse({ type: PublishShiftsResponse })
   publishShifts(@Req() r:ActorRequest,@Body() d:PublishDto,@Headers('idempotency-key') k?:string){return this.people.publish(r.actor,d,k);}

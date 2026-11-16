@@ -12,38 +12,48 @@ export type LoadPolicy = { max_horas_7_dias: number; max_dias_seguidos: number }
 
 export type ShiftLike = { state: string; start: number; end: number; presentSince: number | null };
 
-/** Asistencia derivada: `null` en turnos que no se trabajan (cancelado, borrador). */
-export function attendanceOf(shift: ShiftLike, now: number, policy: AttendancePolicy): 'pendiente' | 'presente' | 'sin_confirmar' | 'ausente' | null {
+/**
+ * Asistencia derivada: `null` en turnos que no se trabajan (cancelado, borrador). La entrada se confirma sola a la hora
+ * de inicio (el barrido del reloj guarda `presente_desde`); solo una ausencia marcada por JOP la quita. Nunca queda un
+ * turno "sin confirmar". `autoFrom` es la política `turnos.entrada_automatica`: un turno que empezó antes, sin entrada
+ * registrada, es `sin_registro` (nada se confirma hacia atrás).
+ */
+export type Attendance = 'pendiente' | 'presente' | 'ausente' | 'sin_registro';
+export function attendanceOf(shift: ShiftLike, now: number, autoFrom: number | null): Attendance | null {
   if (shift.state === 'cancelado' || shift.state === 'borrador') return null;
   if (shift.state === 'ausente') return 'ausente';
   if (shift.presentSince !== null) return 'presente';
-  return now >= shift.start + policy.margen_minutos * 60_000 ? 'sin_confirmar' : 'pendiente';
+  if (now < shift.start) return 'pendiente';
+  return autoFrom !== null && shift.start >= autoFrom ? 'presente' : 'sin_registro';
 }
+
 
 /** Llegó después del margen de la política. */
 export const isLate = (shift: ShiftLike, policy: AttendancePolicy) =>
   shift.presentSince !== null && shift.presentSince > shift.start + policy.margen_minutos * 60_000;
 
-export type ShiftAction = 'editar' | 'cancelar' | 'marcar_entrada' | 'marcar_presente' | 'marcar_ausente' | 'deshacer_asistencia';
+export type ShiftAction = 'editar' | 'cancelar' | 'marcar_presente' | 'marcar_ausente' | 'deshacer_asistencia';
 
 /**
- * Acciones que el servidor aceptaría ahora. `canPlan` = turnos.planificar; `own` = el turno es de la persona de la cuenta.
- * MA-TUR-03: solo se edita o cancela un turno que no ha empezado. La persona marca su entrada desde
- * `entrada_anticipada_minutos` antes del inicio hasta el fin; JOP marca entrada o ausencia (también después, para el historial).
+ * Acciones que el servidor aceptaría ahora. `canPlan` = turnos.planificar. Nadie confirma la entrada a mano: el reloj
+ * la confirma a la hora de inicio.
+ * MA-TUR-03: solo se edita o cancela un turno que no ha empezado. JOP marca la ausencia (antes o durante el turno, o
+ * después para el historial), corrige la hora real de entrada de un turno ya empezado (`marcar_presente`, también de
+ * alguien marcado ausente que sí llegó) y deshace una ausencia equivocada.
  */
-export function allowedActions(shift: ShiftLike, now: number, policy: AttendancePolicy, canPlan: boolean, own: boolean): ShiftAction[] {
+export function allowedActions(shift: ShiftLike, now: number, canPlan: boolean): ShiftAction[] {
+  if (!canPlan) return [];
   const out: ShiftAction[] = [];
-  const early = shift.start - policy.entrada_anticipada_minutos * 60_000;
-  const unmarked = shift.presentSince === null;
-  if (canPlan && ['publicado', 'borrador'].includes(shift.state) && now < shift.start) out.push('editar', 'cancelar');
-  if (own && ['publicado', 'en_curso'].includes(shift.state) && unmarked && now >= early && now < shift.end) out.push('marcar_entrada');
-  if (canPlan && ['publicado', 'en_curso', 'completado', 'ausente'].includes(shift.state) && unmarked && now >= early) out.push('marcar_presente');
-  if (canPlan && ['publicado', 'en_curso', 'completado'].includes(shift.state) && unmarked) out.push('marcar_ausente');
-  if (canPlan && (shift.state === 'ausente' || !unmarked)) out.push('deshacer_asistencia');
+  const started = now >= shift.start;
+  if (['publicado', 'borrador'].includes(shift.state) && !started) out.push('editar', 'cancelar');
+  if (started && ['en_curso', 'completado', 'ausente'].includes(shift.state)) out.push('marcar_presente');
+  if (['publicado', 'en_curso', 'completado'].includes(shift.state)) out.push('marcar_ausente');
+  if (shift.state === 'ausente') out.push('deshacer_asistencia');
   return out;
 }
 
-/** Estado por reloj de un turno que vuelve de `ausente` (deshacer) o recibe una entrada tardía. */
+/** Estado por reloj de un turno que vuelve de `ausente` (deshacer) o recibe una entrada corregida. */
+
 export const stateByClock = (start: number, end: number, now: number) => now >= end ? 'completado' : now >= start ? 'en_curso' : 'publicado';
 
 /**

@@ -6,12 +6,15 @@ import { ShiftsPage } from '../features/personnel';
 import { loadFor, localMs, restUntil, conflictsFor, type ShiftCatalog, type ShiftRow } from '../features/shifts/rules';
 
 // jsdom no implementa <dialog>: lo abrimos con el atributo para que sus campos sean accesibles.
+// La pantalla muestra la semana actual: el reloj queda fijo el martes 10 de noviembre de 2026, 09:00 local.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-10T15:00:00.000Z'));
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   Element.prototype.scrollIntoView = vi.fn();
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const perfil = (permisos: string[]): AccessProfile => ({
   id: 'u-1', user: { id: 'u-1' }, email: 'jop@example.test', name: 'Jefatura de prueba', roles: ['JOP'], platforms: ['web'],
@@ -28,7 +31,7 @@ const catalogo: ShiftCatalog = {
 };
 const turno = (over: Partial<ShiftRow> = {}): ShiftRow => ({
   id: 't-1', staffId: 's-1', person: 'Ana Ficticia Prueba', areaId: 'a-1', area: 'Emergencia', start: '2026-11-10T14:00:00.000Z', end: '2026-11-10T22:00:00.000Z',
-  type: 'diurno', state: 'en_curso', version: 4, attendance: 'sin_confirmar', late: false, allowedActions: ['marcar_presente', 'marcar_ausente'], ...over,
+  type: 'diurno', state: 'en_curso', version: 4, attendance: 'presente', late: false, allowedActions: ['marcar_presente', 'marcar_ausente'], ...over,
 });
 const semana = { from: '2026-11-09', to: '2026-11-15', items: [
   { date: '2026-11-10', specialty: 'Pediatría', name: 'Ana Ficticia Prueba', area: 'Emergencia', start: '2026-11-10T14:00:00.000Z', end: '2026-11-10T22:00:00.000Z', attendance: 'ausente' },
@@ -51,16 +54,15 @@ describe('turnos · acciones según el servidor (allowedActions)', () => {
     expect(screen.queryByRole('button', { name: /^Editar/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Cancelar turno de/ })).toBeNull();
     expect(screen.getAllByRole('button', { name: /Asistencia de Ana/ })).toHaveLength(1);
-    expect(screen.getAllByText('Sin entrada marcada').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Presente').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Presente').length).toBe(2);
   });
 
-  it('avisa los turnos en curso sin entrada y los filtra con un clic', async () => {
-    montar([turno(), turno({ id: 't-2', person: 'Otra Persona', staffId: 's-2', attendance: 'presente', allowedActions: [] })]);
+  it('la entrada es automática: no hay aviso ni filtro de turnos "sin entrada"', async () => {
+    montar([turno(), turno({ id: 't-2', person: 'Otra Persona', staffId: 's-2', allowedActions: [] })]);
     await screen.findByRole('table');
-    expect(screen.getByText(/Un turno en curso no tiene la entrada marcada/)).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Ver turnos sin entrada' }));
-    expect(screen.getByText('1 de 2 turnos')).toBeTruthy();
+    expect(screen.queryByText(/sin entrada/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Ver turnos sin entrada/ })).toBeNull();
+    expect(screen.getByText('2 de 2 turnos de la semana')).toBeTruthy();
   });
 });
 
@@ -89,19 +91,28 @@ describe('turnos · asistencia (POST /turnos/{id}/asistencia)', () => {
     expect(within(formulario).getByRole('group', { name: 'Área' }).textContent).toMatch(/Emergencia/);
   });
 
-  it('marcar la entrada de un turno ya terminado exige la hora', async () => {
-    const api = montar([turno({ state: 'completado', start: '2026-01-10T14:00:00.000Z', end: '2026-01-10T22:00:00.000Z', allowedActions: ['marcar_presente'] })]);
+  it('corregir la hora de entrada de una llegada tarde exige la hora real y un motivo', async () => {
+    const api = montar([turno({ allowedActions: ['marcar_presente', 'marcar_ausente'] })]);
     await userEvent.click(await screen.findByRole('button', { name: /Asistencia de Ana/ }));
     const dialogo = await screen.findByRole('dialog', { name: 'Asistencia del turno' });
-    fireEvent.change(within(dialogo).getByLabelText('Hora de entrada'), { target: { value: '08:10' } });
-    await userEvent.click(within(dialogo).getByRole('button', { name: 'Marcar entrada' }));
-    expect(api.write).toHaveBeenCalledWith('/turnos/t-1/asistencia', { state: 'presente', version: 4, at: '2026-01-10T14:10:00.000Z' }, 'POST');
+    expect(within(dialogo).getByText(/La entrada se confirmó sola a las 08:00/)).toBeTruthy();
+    await userEvent.click(within(dialogo).getAllByRole('button', { name: 'Corregir hora de entrada' })[0]);
+    const enviar = within(dialogo).getAllByRole('button', { name: /Corregir hora de entrada/ }).at(-1)!;
+    await userEvent.click(enviar);
+    expect(within(dialogo).getByText('Indica la hora real de entrada.')).toBeTruthy();
+    fireEvent.change(within(dialogo).getByLabelText('Hora real de entrada'), { target: { value: '08:40' } });
+    await userEvent.click(enviar);
+    expect(api.write).not.toHaveBeenCalled();
+    await userEvent.type(within(dialogo).getByLabelText('Motivo de la corrección'), 'Llegó tarde por el tráfico');
+    await userEvent.click(enviar);
+    expect(api.write).toHaveBeenCalledWith('/turnos/t-1/asistencia', { state: 'presente', version: 4, at: '2026-11-10T14:40:00.000Z', reason: 'Llegó tarde por el tráfico' }, 'POST');
   });
+
 });
 
 describe('turnos · cancelar con citas (MA-TUR-05)', () => {
   it('explica que Recepción debe reprogramar las citas, con sus horas', async () => {
-    montar([turno({ state: 'publicado', attendance: 'pendiente', allowedActions: ['editar', 'cancelar'] })], async () => {
+    montar([turno({ state: 'publicado', attendance: 'pendiente', start: '2026-11-10T17:00:00.000Z', allowedActions: ['editar', 'cancelar'] })], async () => {
       throw new ApiError('El médico tiene una cita en ese horario.', 409, 'turno_con_citas', undefined, { citas: [{ id: 'c-1', start: '2026-11-10T16:00:00.000Z' }] });
     });
     await userEvent.click(await screen.findByRole('button', { name: /Cancelar turno de Ana/ }));

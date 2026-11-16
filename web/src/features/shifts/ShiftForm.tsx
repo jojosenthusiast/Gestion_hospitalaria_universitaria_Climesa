@@ -42,6 +42,9 @@ export function ShiftForm({ api, shift, draft, catalog, shifts, onClose, onSaved
   const chosenKind = kindTouched || !Number.isFinite(startMs) || !Number.isFinite(endMs) ? kind : suggestKind(startMs, endMs);
   const durationIssue = durationProblem(startMs, endMs, chosenKind);
   const nextDay = Number.isFinite(startMs) && Number.isFinite(endMs) && localDay(endMs - 1) !== localDay(startMs);
+  const isGuard24 = chosenKind === 'guardia' && Number.isFinite(startMs) && Number.isFinite(endMs) && hoursBetween(startMs, endMs) === 24;
+  /** Guardia de 24 h en un clic: misma hora de inicio y de fin (termina al día siguiente), tipo guardia. RN-13 pide luego 12 h de descanso. */
+  const guard24 = () => { const at = startTime || '07:00'; setStartTime(at); setEndTime(at); setKind('guardia'); setKindTouched(true); };
 
   const areaItems = useMemo<PickerItem[]>(() => catalog.areas.map(a => ({ id: a.id, label: a.name, detail: areaIdentity(a.name, a.type).label })), [catalog.areas]);
   const areaValue = areaItems.find(i => i.id === areaId) ?? (shift && areaId === shift.areaId ? { id: shift.areaId, label: shift.area } : null);
@@ -91,7 +94,12 @@ export function ShiftForm({ api, shift, draft, catalog, shifts, onClose, onSaved
           <Field label="Hora de inicio" type="time" value={startTime} onChange={setStartTime} required />
           <Field label="Hora de fin" type="time" value={endTime} onChange={setEndTime} required hint={nextDay ? 'Termina el día siguiente.' : undefined} />
         </div>
+        <div className="shift-presets">
+          <button type="button" className="shift-pill" aria-pressed={isGuard24} onClick={guard24}>Guardia 24 h</button>
+          <span className="form-hint">Misma hora de inicio y fin; después pide 12 h de descanso.</span>
+        </div>
         <div className="shift-kind" role="radiogroup" aria-label="Tipo de turno">
+
           {KINDS.map(k => <label key={k} className={`shift-kind-option${chosenKind === k ? ' is-selected' : ''}`}>
             <input type="radio" name="shift-kind" value={k} checked={chosenKind === k} onChange={() => { setKind(k); setKindTouched(true); }} />{KIND_LABEL[k]}
           </label>)}

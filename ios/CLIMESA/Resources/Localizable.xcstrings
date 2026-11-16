@@ -683,6 +683,17 @@
         }
       }
     },
+    "shifts.past": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turnos anteriores"
+          }
+        }
+      }
+    },
     "shifts.until": {
       "extractionState": "manual",
       "localizations": {

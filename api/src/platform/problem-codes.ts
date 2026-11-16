@@ -14,7 +14,7 @@ export const PROBLEM_CODES = [
   'personal_en_descanso', 'personal_jornada_ocupada', 'horas_semanales_excedidas', 'inscripcion_no_vigente', 'capacidad_bajo_ocupacion',
   // Shifts: attendance, load and states (20261120003000; ASIS-01, CARGA-01, MA-TUR-01..05).
   'turno_iniciado', 'turno_con_citas', 'descanso_insuficiente', 'carga_semanal_excedida', 'dias_seguidos_excedidos', 'tripulante_en_servicio',
-  'asistencia_ya_marcada', 'sin_asistencia_marcada', 'sin_ficha_personal', 'turno_ajeno', 'fuera_de_horario', 'medico_ausente', 'tripulante_ausente',
+  'sin_asistencia_marcada', 'entrada_automatica', 'medico_ausente', 'tripulante_ausente',
   // Appointments, queue and consultation.
   'franja_desalineada', 'franja_ocupada', 'medico_sin_jornada', 'paciente_con_cita', 'cancelacion_fuera_de_plazo',
   'ticket_activo_existente', 'fila_max_llamados', 'consulta_ya_iniciada',

@@ -1,12 +1,8 @@
 import Foundation
 
-/// "Mis turnos" (I26): estado, asistencia y la entrada propia (ASIS-01). Solo se ofrece marcar la entrada cuando la API
-/// lo incluye en `allowedActions` (`marcar_entrada`); la API sigue siendo la garantía.
+/// "Mis turnos" (I26): estado, asistencia y orden por día (ASIS-01). La entrada se confirma sola a la hora de inicio en
+/// la API (el estado sigue al reloj), así que la app no ofrece marcarla; solo Jefatura registra ausencias.
 public enum ShiftAttendanceRules {
-    public static let checkInAction = "marcar_entrada"
-
-    public static func canCheckIn(_ allowedActions: [String]?) -> Bool { allowedActions?.contains(checkInAction) == true }
-
     /// Nombre del estado del turno; nunca el código crudo.
     public static func stateLabel(_ state: String) -> String {
         switch state {
@@ -23,26 +19,72 @@ public enum ShiftAttendanceRules {
     /// Texto de la asistencia para la persona, o `nil` si el turno no se trabaja.
     public static func attendanceLabel(_ attendance: String?, late: Bool) -> String? {
         switch attendance {
-        case "presente": return late ? "Entrada marcada · tarde" : "Entrada marcada"
-        case "sin_confirmar": return "Sin entrada marcada"
+        case "presente": return late ? "Entrada corregida · llegó tarde" : "Entrada confirmada"
         case "ausente": return "Ausencia registrada"
-        case "pendiente": return "Entrada pendiente"
+        case "pendiente": return "Se confirma sola al iniciar"
+        case "sin_registro": return "Sin registro de entrada"
         default: return nil
         }
     }
 
-    /// Mensaje para una entrada rechazada, por `codigo` (el texto de la API queda de respaldo).
-    public static func checkInError(code: String?, status: Int?, fallback: String?) -> String {
-        switch code {
-        case "version_conflicto": return "Tu turno cambió. Actualizamos la lista; vuelve a intentarlo."
-        case "asistencia_ya_marcada": return "Ya marcaste la entrada de este turno."
-        case "fuera_de_horario": return "Puedes marcar la entrada desde 30 minutos antes del inicio y hasta el fin del turno."
-        case "transicion_invalida": return "Este turno ya no admite marcar la entrada. Si es un error, comunícate con la jefatura de operaciones."
-        default:
-            if status == 403 { return "Solo puedes marcar la entrada de tus propios turnos." }
-            if let fallback, !fallback.isEmpty { return fallback }
-            return "No se pudo marcar la entrada. Intenta de nuevo."
+    private static let zone = TimeZone(identifier: "America/El_Salvador")!
+    private static var calendar: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = zone; return c }
+    private static func formatter(_ pattern: String) -> DateFormatter {
+        let f = DateFormatter(); f.locale = Locale(identifier: "es_SV"); f.timeZone = zone; f.dateFormat = pattern; return f
+    }
+
+    /// Instante ISO 8601 de la API (con o sin fracciones de segundo), o `nil` si no es válido.
+    public static func date(_ iso: String?) -> Date? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let fractional = ISO8601DateFormatter(); fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+    }
+
+    /// `07:00 a 15:00`, `07:00 a 07:00 del día siguiente · Guardia 24 h`, en hora de El Salvador.
+    public static func hours(start: Date?, end: Date?, type: String?) -> String {
+        guard let start, let end else { return "Sin hora" }
+        let clock = formatter("HH:mm")
+        let nextDay = !calendar.isDate(start, inSameDayAs: end.addingTimeInterval(-0.001))
+        let kind: String
+        switch type {
+        case "guardia": kind = end.timeIntervalSince(start) == 24 * 3600 ? " · Guardia 24 h" : " · Guardia"
+        case "nocturno": kind = " · Nocturno"
+        default: kind = ""
         }
+        return "\(clock.string(from: start)) a \(clock.string(from: end))\(nextDay ? " del día siguiente" : "")\(kind)"
+    }
+
+    /// `Hoy · martes, 10 de noviembre`, `Mañana · …`, `Ayer · …` o `Jueves, 12 de noviembre`.
+    public static func dayTitle(_ day: Date, today: Date) -> String {
+        let name = formatter("EEEE, d 'de' MMMM").string(from: day)
+        let diff = calendar.dateComponents([.day], from: calendar.startOfDay(for: today), to: calendar.startOfDay(for: day)).day ?? 99
+        switch diff {
+        case 0: return "Hoy · \(name)"
+        case 1: return "Mañana · \(name)"
+        case -1: return "Ayer · \(name)"
+        default: return name.prefix(1).uppercased() + name.dropFirst()
+        }
+    }
+
+    /// Turnos agrupados por el día asignado (el día en que empiezan), turnos en orden de inicio. "Mis turnos" abre en
+    /// hoy: hoy, un día con un turno que sigue en curso (la noche de ayer) y lo que viene van primero, en orden de fecha;
+    /// los días anteriores ya terminados van debajo, el más reciente primero, con `past`. Sin fecha, al final.
+    public static func byDay<T>(_ items: [T], start: (T) -> Date?, end: (T) -> Date? = { _ in nil }, today: Date) -> [(title: String, items: [T], past: Bool)] {
+        let dated = items.compactMap { item in start(item).map { (item, $0) } }.sorted { $0.1 < $1.1 }
+        var groups: [(title: String, items: [T], day: Date)] = []
+        for (item, at) in dated {
+            if let last = groups.last, calendar.isDate(last.day, inSameDayAs: at) { groups[groups.count - 1].items.append(item) }
+            else { groups.append((dayTitle(at, today: today), [item], at)) }
+        }
+        let startOfToday = calendar.startOfDay(for: today)
+        let past = groups.map { group in
+            group.day < startOfToday && group.items.allSatisfy { item in end(item).map { $0 <= today } ?? false }
+        }
+        var result = groups.indices.filter { !past[$0] }.map { (title: groups[$0].title, items: groups[$0].items, past: false) }
+        result += groups.indices.filter { past[$0] }.reversed().map { (title: groups[$0].title, items: groups[$0].items, past: true) }
+        let undated = items.filter { start($0) == nil }
+        if !undated.isEmpty { result.append((title: "Sin fecha", items: undated, past: false)) }
+        return result
     }
 }
 

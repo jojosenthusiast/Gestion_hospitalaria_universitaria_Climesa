@@ -7,11 +7,15 @@ import type { ShiftCatalog, ShiftRow } from '../features/shifts/rules';
 import { StaffFicha } from '../features/personnel-ficha';
 
 // jsdom no implementa <dialog>: lo abrimos con el atributo para que sus campos sean accesibles.
+// La pantalla muestra la semana actual: el reloj queda fijo el martes 10 de noviembre de 2026, 09:00 local.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-10T15:00:00.000Z'));
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.useRealTimers(); });
+
 
 const perfil = (permisos: string[]): AccessProfile => ({
   id: 'u-1', user: { id: 'u-1' }, email: 'jop@example.test', name: 'Jefatura de prueba', roles: ['JOP'], platforms: ['web'],
@@ -184,7 +188,7 @@ describe('turnos · asignar turno de punta a punta (obs. 9)', () => {
 
 describe('turnos · cancelar (PATCH /turnos/{id})', () => {
   it('pide un motivo de al menos 10 caracteres y envía state=cancelado con la versión', async () => {
-    const api = montar(jefatura, [turno('t-1', 'publicado', 5)]);
+    const api = montar(jefatura, [turno('t-1', 'publicado', 5, { start: '2026-11-10T17:00:00.000Z' })]);
     await userEvent.click(await screen.findByRole('button', { name: /Cancelar turno de Ana Ficticia Prueba/ }));
     const dialogo = await screen.findByRole('dialog', { name: 'Cancelar turno' });
     await userEvent.type(within(dialogo).getByLabelText('Motivo de la cancelación'), 'corto');
@@ -202,7 +206,7 @@ describe('turnos · cancelar (PATCH /turnos/{id})', () => {
   });
 
   it('un conflicto de versión pide recargar en vez de un error genérico', async () => {
-    montar(jefatura, [turno('t-1', 'borrador')], async () => { throw new ApiError('El turno cambió.', 409, 'version_conflicto', 6); });
+    montar(jefatura, [turno('t-1', 'borrador', 3, { start: '2026-11-10T17:00:00.000Z' })], async () => { throw new ApiError('El turno cambió.', 409, 'version_conflicto', 6); });
     await userEvent.click(await screen.findByRole('button', { name: /Cancelar turno de/ }));
     const dialogo = await screen.findByRole('dialog', { name: 'Cancelar turno' });
     await userEvent.type(within(dialogo).getByLabelText('Motivo de la cancelación'), 'Motivo de prueba suficiente');

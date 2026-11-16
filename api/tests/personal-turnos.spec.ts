@@ -51,6 +51,8 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   app=module.createNestApplication<NestFastifyApplication>(new FastifyAdapter(),{logger:false});configureApplication(app);await app.init();await app.getHttpAdapter().getInstance().ready();
   const tree=(await call('JOP','GET','/espacios')).body;
   areaId=tree.find((n:any)=>n.code==='P1-CON').id;emergencyId=tree.find((n:any)=>n.code==='P1-EMG').id;
+  // Las pruebas viajan en el tiempo: la entrada automática aplica desde antes de todas sus fechas (la migración la fija a su hora de aplicación).
+  await fixture.pg.query("UPDATE plataforma.politica SET valor=jsonb_build_object('desde','2026-10-01T00:00:00Z') WHERE clave='turnos.entrada_automatica'");
  });
  afterAll(async()=>{await app?.close();await fixture?.pg.close();});
 
@@ -119,10 +121,12 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   current=new Date('2026-11-20T12:00:00Z');// 06:00 local, antes del inicio
   await app.get(PersonnelService).advanceStates();
   expect((await state()).estado).toBe('publicado');
-  // 07:10 local: dentro del margen de entrada (turnos.asistencia), así que aún no hay aviso de "sin entrada" (ASIS-01).
+  // 07:10 local: en curso y con la entrada confirmada a las 07:00, en un solo cambio (ASIS-01).
   current=new Date('2026-11-20T13:10:00Z');
   await app.get(PersonnelService).advanceStates();
   expect(await state()).toEqual({estado:'en_curso',version:2});
+  expect(new Date((await fixture.pg.query<any>("SELECT presente_desde FROM personal.turno WHERE id=$1",[created.id])).rows[0].presente_desde).toISOString()).toBe('2026-11-20T13:00:00.000Z');
+
   await app.get(PersonnelService).advanceStates();
   expect((await state()).version).toBe(2);// idempotente
   current=new Date('2026-11-20T22:00:00Z');// 16:00 local

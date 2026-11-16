@@ -31,11 +31,15 @@ Accesos rápidos: **Nueva admisión**, **Planificar turno**, **Publicar aviso** 
 
 ## Turnos
 
-Hay dos vistas: **Planificación** y **Especialistas de la semana**.
+Hay tres vistas: **Semana**, **Lista por día** y **Especialistas de la semana**.
+
+- **Semana** (la vista inicial en computadora) muestra de lunes a domingo un bloque por turno, ubicado por su hora y con el color de su estado: borrador, publicado, en curso, completado, ausente o cancelado (la leyenda está sobre la semana). Una guardia de 24 h se ve en los dos días que toca. Los huecos de cobertura aparecen como bandas rayadas en su día y hora. Toca un bloque para ver el turno y sus acciones.
+- **Lista por día** (la vista inicial en el teléfono) agrupa los turnos por el día asignado (Hoy, Mañana, día y fecha) y los ordena por hora de inicio.
+- Las flechas cambian de semana; **Esta semana** vuelve a la actual.
 
 ### Planificar
 
-- Crea el turno con persona, área y horario. Luego publica la planificación.
+- Crea el turno con persona, área y horario. **Guardia 24 h** llena en un clic una guardia de 24 horas (misma hora de inicio y fin) con su tipo.
 - El formulario muestra "Carga con este turno". La API rechaza el turno si:
   - se traslapa con otro de la misma persona;
   - deja menos de 8 horas de descanso (12 horas después de un turno de 24 horas);
@@ -45,8 +49,10 @@ Hay dos vistas: **Planificación** y **Especialistas de la semana**.
 
 ### Asistencia
 
-- La persona marca su entrada desde la app ("Marcar mi entrada"). Si a los 15 minutos no la marcó, recibes una alerta en vivo, pero sigue contando como de turno.
-- **Asistencia** en la fila del turno registra presente, ausencia justificada o ausencia injustificada (con motivo). Se puede deshacer.
+- El estado sigue al reloj: a la hora de inicio el turno pasa solo a **En curso** con la entrada confirmada, y al terminar pasa a **Completado**. Nadie presiona un botón y ya no hay alertas de "sin entrada". Los turnos que empezaron antes de este cambio y no tenían entrada se muestran como **Sin registro de entrada**; no se confirman hacia atrás.
+- **Asistencia** registra solo lo que fue distinto, siempre con motivo: una ausencia justificada o injustificada (antes o durante el turno), la hora real de entrada de quien llegó tarde, o deshacer una ausencia equivocada.
+- La **Lista por día** muestra todos los días de la semana. Un turno de noche o una guardia de 24 h aparece también en el día al que llega, marcado **Viene del día anterior**. Cuando un turno empieza, la pantalla deja de ofrecer editarlo o cancelarlo.
+
 - Solo la ausencia saca a la persona del turno. Entonces aparecen **Suplentes disponibles** con **Asignar turno**.
 
 ## Camas

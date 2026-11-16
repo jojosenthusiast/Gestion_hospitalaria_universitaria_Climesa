@@ -159,32 +159,15 @@ final class LoginDraft {
 }
 struct Shift:Decodable,Identifiable {
     let id:String; let area:String; let start:String; let end:String; let state:String
-    /// ASIS-01: asistencia derivada por la API y acciones que aceptaría ahora (`marcar_entrada`).
-    var version:Int?=nil; var attendance:String?=nil; var late:Bool?=nil; var allowedActions:[String]?=nil
+    /// ASIS-01: asistencia derivada por la API (la entrada se confirma sola al iniciar) y tipo de turno (guardia de 24 h).
+    var version:Int?=nil; var attendance:String?=nil; var late:Bool?=nil; var type:String?=nil
     static func display(_ value:String)->String {
         let iso=ISO8601DateFormatter(); iso.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
         let date=iso.date(from:value) ?? ISO8601DateFormatter().date(from:value)
         guard let date else { return L.text("shift.unavailable") }; let formatter=DateFormatter(); formatter.locale=Locale(identifier:"es_SV"); formatter.timeZone=TimeZone(identifier:"America/El_Salvador"); formatter.dateStyle = .medium; formatter.timeStyle = .short; return formatter.string(from:date)
     }
 }
-/// Cuerpo y respuesta de `POST /turnos/{id}/entrada` (fuera del actor principal para cruzar al `APIClient`).
-struct ShiftCheckInBody:Encodable, Sendable { let version:Int }
-struct ShiftCheckInResult:Decodable, Sendable { let id:String }
 @MainActor final class ShiftModel:ObservableObject {
     @Published var shifts:[Shift]=[]; @Published var loading=false; @Published var error:String?
     func load(api:APIClient?) async { guard let api else { return }; loading=true; error=nil; do { shifts=try await api.get("/turnos/mios",as:[Shift].self) } catch { self.error=SessionFailure.visibleMessage(for:error) }; loading=false }
-    @Published var checkingIn:String?; @Published var checkInError:String?
-    private var intent=SubmissionIntent()
-    /// `POST /turnos/{id}/entrada` con la `Idempotency-Key` de la intención; después vuelve a pedir la lista.
-    func checkIn(_ shift:Shift,api:APIClient?) async {
-        guard let api, checkingIn == nil, let version=shift.version else { return }
-        checkingIn=shift.id; checkInError=nil
-        let fingerprint="\(shift.id)-\(version)"
-        let key=intent.key(for:fingerprint)
-        do { _=try await api.send("POST","/turnos/\(shift.id)/entrada",body:ShiftCheckInBody(version:version),key:key,as:ShiftCheckInResult.self); intent.settle(success:true) }
-        catch let failure as APIFailure { intent.settle(success:false,failure:failure,fingerprint:fingerprint); checkInError=ShiftAttendanceRules.checkInError(code:failure.code,status:failure.status,fallback:SessionFailure.visibleMessage(for:failure)) }
-        catch { checkInError=SessionFailure.visibleMessage(for:error) }
-        checkingIn=nil
-        await load(api:api)
-    }
 }

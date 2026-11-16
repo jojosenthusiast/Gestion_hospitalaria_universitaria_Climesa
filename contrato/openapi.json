@@ -2478,7 +2478,26 @@
     "/api/v1/turnos": {
       "get": {
         "operationId": "OperationsController_shifts",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Primer día local, yyyy-MM-dd (con `to`, máximo 31 días); sin rango, las últimas semanas y la planificación próxima",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Último día local, yyyy-MM-dd",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2960,6 +2979,7 @@
     },
     "/api/v1/turnos/{id}/entrada": {
       "post": {
+        "deprecated": true,
         "operationId": "OperationsController_checkIn",
         "parameters": [
           {
@@ -2983,16 +3003,6 @@
             "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CheckInDto"
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
             "description": "",
@@ -3070,7 +3080,7 @@
             "bearer": []
           }
         ],
-        "summary": "Marcar la entrada del turno propio (ASIS-01)",
+        "summary": "Obsoleto: la entrada se registra sola al iniciar el turno. No cambia nada: devuelve el estado del turno propio ya empezado; antes del inicio responde 409 entrada_automatica",
         "tags": [
           "operations"
         ],
@@ -17666,8 +17676,8 @@
         "enum": [
           "pendiente",
           "presente",
-          "sin_confirmar",
-          "ausente"
+          "ausente",
+          "sin_registro"
         ],
         "description": "Null en turnos cancelados o en borrador"
       },
@@ -17683,7 +17693,6 @@
         "enum": [
           "editar",
           "cancelar",
-          "marcar_entrada",
           "marcar_presente",
           "marcar_ausente",
           "deshacer_asistencia"
@@ -17761,11 +17770,11 @@
             "type": "string",
             "format": "date-time",
             "nullable": true,
-            "description": "Hora de entrada marcada por la persona o por JOP"
+            "description": "Hora de entrada: la de inicio, confirmada sola por el reloj, o la hora real que corrigió JOP"
           },
           "late": {
             "type": "boolean",
-            "description": "Marcó la entrada después del margen de la política turnos.asistencia"
+            "description": "JOP corrigió la entrada a una hora posterior al margen de la política turnos.asistencia"
           },
           "absenceType": {
             "nullable": true,
@@ -18104,18 +18113,6 @@
           "items"
         ]
       },
-      "CheckInDto": {
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "number",
-            "minimum": 1
-          }
-        },
-        "required": [
-          "version"
-        ]
-      },
       "AffectedAppointmentResponse": {
         "type": "object",
         "properties": {
@@ -18250,7 +18247,7 @@
           "at": {
             "type": "string",
             "format": "date-time",
-            "description": "Hora de entrada; por omisión, ahora. Obligatoria si el turno ya terminó"
+            "description": "Hora real de entrada al corregirla; por omisión, ahora. Obligatoria si el turno ya terminó"
           },
           "version": {
             "type": "number",
@@ -27242,11 +27239,8 @@
           "carga_semanal_excedida",
           "dias_seguidos_excedidos",
           "tripulante_en_servicio",
-          "asistencia_ya_marcada",
           "sin_asistencia_marcada",
-          "sin_ficha_personal",
-          "turno_ajeno",
-          "fuera_de_horario",
+          "entrada_automatica",
           "medico_ausente",
           "tripulante_ausente",
           "franja_desalineada",

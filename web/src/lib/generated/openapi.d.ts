@@ -477,7 +477,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Marcar la entrada del turno propio (ASIS-01) */
+        /**
+         * Obsoleto: la entrada se registra sola al iniciar el turno. No cambia nada: devuelve el estado del turno propio ya empezado; antes del inicio responde 409 entrada_automatica
+         * @deprecated
+         */
         post: operations["OperationsController_checkIn"];
         delete?: never;
         options?: never;
@@ -2860,14 +2863,14 @@ export interface components {
          * @description Null en turnos cancelados o en borrador
          * @enum {string}
          */
-        AsistenciaTurno: "pendiente" | "presente" | "sin_confirmar" | "ausente";
+        AsistenciaTurno: "pendiente" | "presente" | "ausente" | "sin_registro";
         /** @enum {string} */
         TipoAusencia: "justificada" | "injustificada";
         /**
          * @description Acciones que quien consulta puede hacer ahora sobre este turno
          * @enum {string}
          */
-        AccionTurno: "editar" | "cancelar" | "marcar_entrada" | "marcar_presente" | "marcar_ausente" | "deshacer_asistencia";
+        AccionTurno: "editar" | "cancelar" | "marcar_presente" | "marcar_ausente" | "deshacer_asistencia";
         ShiftResponse: {
             /** Format: uuid */
             id: string;
@@ -2891,10 +2894,10 @@ export interface components {
             attendance: components["schemas"]["AsistenciaTurno"] | null;
             /**
              * Format: date-time
-             * @description Hora de entrada marcada por la persona o por JOP
+             * @description Hora de entrada: la de inicio, confirmada sola por el reloj, o la hora real que corrigió JOP
              */
             presentSince: string | null;
-            /** @description Marcó la entrada después del margen de la política turnos.asistencia */
+            /** @description JOP corrigió la entrada a una hora posterior al margen de la política turnos.asistencia */
             late: boolean;
             absenceType: components["schemas"]["TipoAusencia"] | null;
             /** @description Motivo de la ausencia; solo con turnos.planificar */
@@ -2992,9 +2995,6 @@ export interface components {
             to: string;
             items: components["schemas"]["SpecialistShiftResponse"][];
         };
-        CheckInDto: {
-            version: number;
-        };
         AffectedAppointmentResponse: {
             /** Format: uuid */
             id: string;
@@ -3031,7 +3031,7 @@ export interface components {
             absenceType?: "justificada" | "injustificada";
             /**
              * Format: date-time
-             * @description Hora de entrada; por omisión, ahora. Obligatoria si el turno ya terminó
+             * @description Hora real de entrada al corregirla; por omisión, ahora. Obligatoria si el turno ya terminó
              */
             at?: string;
             version: number;
@@ -5625,7 +5625,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "asistencia_ya_marcada" | "sin_asistencia_marcada" | "sin_ficha_personal" | "turno_ajeno" | "fuera_de_horario" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -7431,7 +7431,12 @@ export interface operations {
     };
     OperationsController_shifts: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Primer día local, yyyy-MM-dd (con `to`, máximo 31 días); sin rango, las últimas semanas y la planificación próxima */
+                from?: string;
+                /** @description Último día local, yyyy-MM-dd */
+                to?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7796,11 +7801,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CheckInDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {

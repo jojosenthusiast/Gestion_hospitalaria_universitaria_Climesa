@@ -1,26 +1,33 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { AreaChip, RoleChip, roleIdentity } from '../../components/identity';
 import { ExportMenu } from '../../components/export-menu';
 import { SearchPicker, type PickerItem } from '../../components/search-picker';
 import { Icon, Notice } from '../../components/ui';
 import { can, type AccessProfile, type Api, type Shift } from '../../lib/api';
 import { exportName, type ExportTable } from '../../lib/export';
-import { Dialog, Empty, Heading, RemoteState, SaveButton, Tag, WriteError, formatDateTime, isVersionConflict, useAction, useData } from '../common';
+import { Dialog, Empty, Heading, RemoteState, SaveButton, WriteError, formatDateTime, isVersionConflict, useAction, useData } from '../common';
 import { useQuickAction } from '../personal/accion';
 import { Field } from '../../components/ui';
 import { ShiftForm, type ShiftDraft } from './ShiftForm';
 import { CrewCoverageAlert } from './CrewCoverageAlert';
-import { AreaCoverageAlert } from './AreaCoverageAlert';
+import { AreaCoverageAlert, type CoverageWeek } from './AreaCoverageAlert';
 import { AttendanceDialog } from './AttendanceDialog';
 import { SpecialistsWeek } from './SpecialistsWeek';
-import { KIND_LABEL, attendanceLabel, can as allows, type CatalogArea, type CatalogRole, type CatalogStaff, type ShiftCatalog, type ShiftRow } from './rules';
+import { ShiftWeek, StateLegend, timeRange } from './ShiftWeek';
+import { ShiftDayList, ShiftDetail, dayTitle, type RowActions } from './ShiftDayList';
+import { KIND_LABEL, attendanceLabel, localDay, type CatalogArea, type CatalogRole, type CatalogStaff, type ShiftCatalog, type ShiftRow } from './rules';
+import { addWeeks, displayState, mondayOf, stateName, weekDays, weekLabel } from './week';
 import './shifts.css';
 
-type Sort = 'recientes' | 'antiguos' | 'persona';
-const PAGE = 25;
-const STATES: [string, string][] = [['borrador', 'Borradores'], ['pendiente', 'Pendientes de iniciar'], ['en_curso', 'En curso'], ['sin_confirmar', 'Sin entrada marcada'], ['completado', 'Completados'], ['ausente', 'Ausencias'], ['cancelado', 'Cancelados']];
-const ATTENDANCE_ACTIONS = ['marcar_presente', 'marcar_ausente', 'deshacer_asistencia'] as const;
+type View = 'semana' | 'lista' | 'especialistas';
+type Sort = 'inicio' | 'persona';
+const STATES: [string, string][] = [['borrador', 'Borradores'], ['publicado', 'Publicados por iniciar'], ['en_curso', 'En curso'], ['completado', 'Completados'], ['ausente', 'Ausencias'], ['cancelado', 'Cancelados']];
 const EMPTY_CATALOG: ShiftCatalog = { roles: [], areas: [], staff: [] };
+/** La semana con bloques por hora necesita ancho; en un teléfono se abre la lista por día (la semana sigue disponible). */
+const WIDE = '(min-width: 900px)';
+/** Ventana que trae `GET /turnos` sin rango (SHIFT_WINDOW de la API); una semana fuera de ella se pide con from/to. */
+const WINDOW_PAST = 31 * 86_400_000, WINDOW_FUTURE = 93 * 86_400_000;
+const initialView = (): View => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(WIDE).matches ? 'semana' : 'lista';
 
 /** Si el catálogo no se puede leer, las opciones se arman con los turnos cargados: peor que el catálogo, pero la pantalla sigue útil. */
 function fallbackCatalog(rows: ShiftRow[]): ShiftCatalog {
@@ -41,30 +48,53 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const catalog = remote.data ?? (remote.error ? fallbackCatalog(all) : EMPTY_CATALOG);
 
   const [open, setOpen] = useState(false), [editing, setEditing] = useState<Shift | null>(null), [cancelling, setCancelling] = useState<Shift | null>(null);
-  const [marking, setMarking] = useState<ShiftRow | null>(null), [draft, setDraft] = useState<ShiftDraft | undefined>(undefined), [view, setView] = useState<'plan' | 'especialistas'>('plan');
+  const [marking, setMarking] = useState<ShiftRow | null>(null), [detail, setDetail] = useState<ShiftRow | null>(null), [draft, setDraft] = useState<ShiftDraft | undefined>(undefined);
+  const [view, setView] = useState<View>(initialView);
   const [person, setPerson] = useState<PickerItem | null>(null), [role, setRole] = useState('todos'), [area, setArea] = useState('todos'), [state, setState] = useState('todos');
-  const [sort, setSort] = useState<Sort>('recientes'), [panel, setPanel] = useState(false), [shown, setShown] = useState(PAGE);
+  const [sort, setSort] = useState<Sort>('inicio'), [panel, setPanel] = useState(false), [focusDay, setFocusDay] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [monday, setMonday] = useState(() => mondayOf(Date.now()));
   const [quick, consumeQuick] = useQuickAction();
-  // Reloj local para pasar de "pendiente" a "en curso" sin pedir datos; no consulta la red.
-  useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 30_000); return () => window.clearInterval(timer); }, []);
+  // Reloj local para pasar de "publicado" a "en curso" en pantalla sin pedir datos; no consulta la red.
+  useEffect(() => { const timer = setInterval(() => setNow(new Date()), 30_000); return () => clearInterval(timer); }, []);
   useEffect(() => { if (!quick) return; if (quick === 'planificar' && plan) { setEditing(null); setOpen(true); } consumeQuick(); }, [quick, plan, consumeQuick]);
-  useEffect(() => setShown(PAGE), [person, role, area, state, sort]);
+  // "N turnos más" de un día de la semana abre la lista en ese día.
+  useEffect(() => { if (view !== 'lista' || !focusDay) return; document.getElementById(`dia-${focusDay}`)?.scrollIntoView({ block: 'start' }); setFocusDay(null); }, [view, focusDay]);
 
+  const at = now.valueOf(), today = localDay(at);
+  const days = useMemo(() => weekDays(monday), [monday]);
+  const weekStart = days[0].start, weekEnd = days[6].end, sunday = days[6].date;
+  // La semana visible sale de la ventana por omisión (con el día anterior, por las guardias que llegan al lunes); si no
+  // cabe, se pide esa semana con from/to para no mostrar una semana vacía que no lo está.
+  const covered = weekStart - 86_400_000 >= Date.now() - WINDOW_PAST && weekEnd <= Date.now() + WINDOW_FUTURE;
+  const weekData = useData<ShiftRow[]>(api, `/turnos?from=${localDay(weekStart - 1)}&to=${sunday}`, version, !covered && view !== 'especialistas');
+  const source = covered ? data : weekData;
+  const shown = source.data ?? [];
+  // Al llegar la hora de inicio del próximo turno, se vuelve a pedir la planificación: el servidor ya lo pasó a en curso
+  // y dejó de permitir editarlo o cancelarlo. Un temporizador hasta esa hora, no una consulta periódica.
+  const nextStart = useMemo(() => shown.map(t => Date.parse(t.start)).filter(s => s > at).reduce((a, b) => Math.min(a, b), Infinity), [shown, at]);
+  const refreshShown = useRef(source.refresh);
+  refreshShown.current = source.refresh;
+  useEffect(() => {
+    const wait = nextStart - Date.now();
+    if (!Number.isFinite(wait) || wait > 86_400_000) return;
+    const timer = setTimeout(() => { setNow(new Date()); refreshShown.current(); }, Math.max(0, wait) + 1_000);
+    return () => clearTimeout(timer);
+  }, [nextStart]);
+
+  const coverage = useData<CoverageWeek>(api, `/turnos/cobertura?from=${monday}&to=${sunday}`, version, view === 'semana');
   const staffById = useMemo(() => new Map(catalog.staff.map(p => [p.id, p])), [catalog.staff]);
   const typeOf = (t: ShiftRow) => t.staffType ?? staffById.get(t.staffId)?.type;
-  const effective = (t: ShiftRow) => {
-    if (t.state !== 'publicado') return t.state;
-    const start = Date.parse(t.start), end = Date.parse(t.end), at = now.valueOf();
-    return at < start ? 'pendiente' : at < end ? 'en_curso' : 'completado';
-  };
   const personItems = useMemo<PickerItem[]>(() => catalog.staff.map(p => ({ id: p.id, label: p.name, detail: [roleIdentity(p.type).label, p.area].filter(Boolean).join(' · ') })), [catalog.staff]);
 
-  const rows = useMemo(() => {
-    const out = all.filter(t => (!person || t.staffId === person.id) && (role === 'todos' || typeOf(t) === role) && (area === 'todos' || t.areaId === area) && (state === 'todos' || effective(t) === state || (state === 'sin_confirmar' && t.attendance === 'sin_confirmar')));
-    const by = { recientes: (a: Shift, b: Shift) => Date.parse(b.start) - Date.parse(a.start), antiguos: (a: Shift, b: Shift) => Date.parse(a.start) - Date.parse(b.start), persona: (a: Shift, b: Shift) => a.person.localeCompare(b.person, 'es') || Date.parse(a.start) - Date.parse(b.start) }[sort];
-    return [...out].sort(by);
-  }, [all, person, role, area, state, sort, staffById, now]); // eslint-disable-line react-hooks/exhaustive-deps
+  const matches = (t: ShiftRow) => (!person || t.staffId === person.id) && (role === 'todos' || typeOf(t) === role) && (area === 'todos' || t.areaId === area) && (state === 'todos' || displayState(t, at) === state);
+  // La semana dibuja todo lo que la toca (una guardia del domingo anterior llega al lunes); la lista y la exportación
+  // toman los turnos asignados a sus días (los que empiezan en la semana).
+  const inWeek = useMemo(() => shown.filter(t => Date.parse(t.start) < weekEnd && Date.parse(t.end) > weekStart), [shown, weekStart, weekEnd]);
+  const drawn = inWeek.filter(matches);
+  const rows = drawn.filter(t => Date.parse(t.start) >= weekStart).sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.person.localeCompare(b.person, 'es'));
+  const assigned = inWeek.filter(t => Date.parse(t.start) >= weekStart).length;
+  const gaps = (coverage.data?.gaps ?? []).filter(g => area === 'todos' || g.areaId === area);
 
   const active: { key: string; label: string; clear: () => void }[] = [
     ...(person ? [{ key: 'persona', label: `Persona: ${person.label}`, clear: () => setPerson(null) }] : []),
@@ -75,40 +105,49 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const clearAll = () => { setPerson(null); setRole('todos'); setArea('todos'); setState('todos'); };
 
   const table = (): ExportTable => ({
-    filename: exportName('turnos'), title: 'Turnos del personal', subtitle: active.length ? active.map(a => a.label).join(' · ') : 'Todos los turnos',
-    columns: ['Persona', 'Rol', 'Área', 'Inicio', 'Fin', 'Tipo', 'Estado', 'Asistencia'],
-    rows: rows.map(t => [t.person, roleIdentity(typeOf(t)).label, t.area, formatDateTime(t.start), formatDateTime(t.end), KIND_LABEL[t.type] ?? t.type, STATES.find(s => s[0] === effective(t))?.[1] ?? effective(t), attendanceLabel(t) ?? '']),
+    filename: exportName('turnos'), title: 'Turnos del personal', subtitle: [`Semana del ${weekLabel(monday)}`, ...active.map(a => a.label)].join(' · '),
+    columns: ['Día', 'Persona', 'Rol', 'Área', 'Horario', 'Inicio', 'Fin', 'Tipo', 'Estado', 'Asistencia'],
+    rows: rows.map(t => [dayTitle(localDay(Date.parse(t.start)), today), t.person, roleIdentity(typeOf(t)).label, t.area, timeRange(t.start, t.end), formatDateTime(t.start), formatDateTime(t.end), KIND_LABEL[t.type] ?? t.type, stateName(displayState(t, at)), attendanceLabel(t) ?? '']),
   });
 
   const jornada = new Intl.DateTimeFormat('es-SV', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/El_Salvador' }).format(now);
   const toggle = (current: string, value: string, set: (v: string) => void) => set(current === value ? 'todos' : value);
-  // ASIS-01: turnos en curso sin entrada marcada después del margen; la API avisa a JOP en vivo.
-  const unconfirmed = all.filter(t => t.attendance === 'sin_confirmar' && t.state === 'en_curso');
   const assignSubstitute = (shift: ShiftRow, staffId: string) => { setMarking(null); setEditing(null); setDraft({ areaId: shift.areaId, start: new Date(Math.max(Date.now() + 5 * 60_000, Date.parse(shift.start))).toISOString(), end: shift.end, type: shift.type, staffId }); setOpen(true); data.refresh(); };
+  const actions: RowActions = {
+    onEdit: t => { setEditing(t); setDraft(undefined); setOpen(true); },
+    onCancel: t => setCancelling(t),
+    onAttendance: t => setMarking(t),
+  };
+  const isThisWeek = monday === mondayOf(at);
 
   return <>
     <Heading eyebrow="Operaciones / Jornada" title="Turnos" description="Asigna horarios según el área, el rol y la disponibilidad real del personal"
       actions={<>
         <ExportMenu table={table} disabled={!rows.length} />
-        {plan && view === 'plan' && <button className="primary-button" onClick={() => { setEditing(null); setDraft(undefined); setOpen(true); }}><Icon name="plus" size={18} />Asignar turno</button>}
+        {plan && view !== 'especialistas' && <button className="primary-button" onClick={() => { setEditing(null); setDraft(undefined); setOpen(true); }}><Icon name="plus" size={18} />Asignar turno</button>}
       </>} />
     <div className="shift-views" role="group" aria-label="Vista">
-      <button type="button" className="shift-pill" aria-pressed={view === 'plan'} onClick={() => setView('plan')}>Planificación</button>
+      <button type="button" className="shift-pill" aria-pressed={view === 'semana'} onClick={() => setView('semana')}>Semana</button>
+      <button type="button" className="shift-pill" aria-pressed={view === 'lista'} onClick={() => setView('lista')}>Lista por día</button>
       <button type="button" className="shift-pill" aria-pressed={view === 'especialistas'} onClick={() => setView('especialistas')}>Especialistas de la semana</button>
     </div>
     {view === 'especialistas' ? <SpecialistsWeek api={api} version={version} /> : <>
-    <div className="planning-window"><strong>Jornada laboral abierta</strong><span>{jornada} · Asignaciones habilitadas durante toda la jornada. El sistema controla traslapes y descansos.</span></div>
-    {unconfirmed.length > 0 && <Notice kind="info">{unconfirmed.length === 1 ? 'Un turno en curso no tiene' : `${unconfirmed.length} turnos en curso no tienen`} la entrada marcada. Confirma la asistencia o registra la ausencia para que no cuenten como de turno.{' '}
-      <button type="button" className="secondary-button" onClick={() => { setState('sin_confirmar'); setPanel(false); }}>Ver turnos sin entrada</button></Notice>}
+    <div className="planning-window"><strong>Jornada laboral abierta</strong><span>{jornada} · Cada turno pasa a en curso a su hora, con la entrada confirmada, y a completado al terminar. Jefatura solo marca ausencias.</span></div>
     {data.data && remote.data && <CrewCoverageAlert shifts={all} typeOf={typeOf} now={now} onPlan={plan ? () => { setEditing(null); setOpen(true); } : undefined} />}
     <AreaCoverageAlert api={api} version={version} now={now} onPlan={plan ? () => { setEditing(null); setDraft(undefined); setOpen(true); } : undefined} />
     <section className="data-workbench">
       <div className="shift-toolbar">
+        <div className="shift-weeknav" role="group" aria-label="Semana">
+          <button type="button" className="secondary-button" aria-label="Semana anterior" onClick={() => setMonday(m => addWeeks(m, -1))}><Icon name="back" size={18} /></button>
+          <strong className="shift-weeknav-label">{weekLabel(monday)}</strong>
+          <button type="button" className="secondary-button" aria-label="Semana siguiente" onClick={() => setMonday(m => addWeeks(m, 1))}><Icon name="arrow" size={18} /></button>
+          {!isThisWeek && <button type="button" className="secondary-button" onClick={() => setMonday(mondayOf(at))}>Esta semana</button>}
+        </div>
         <div className="shift-toolbar-row">
           <SearchPicker label="Buscar persona" value={person} onChange={setPerson} items={personItems} placeholder="Escribe un nombre" />
           <button type="button" className="secondary-button" aria-expanded={panel} aria-controls="shift-filters" onClick={() => setPanel(v => !v)}><Icon name="grid" size={18} />Filtros{active.length > 0 && ` (${active.length})`}</button>
-          <div className="select-field"><label htmlFor="shift-sort">Ordenar por</label>
-            <select id="shift-sort" value={sort} onChange={e => setSort(e.target.value as Sort)}><option value="recientes">Más recientes</option><option value="antiguos">Más antiguos</option><option value="persona">Persona (A–Z)</option></select></div>
+          {view === 'lista' && <div className="select-field"><label htmlFor="shift-sort">Ordenar cada día por</label>
+            <select id="shift-sort" value={sort} onChange={e => setSort(e.target.value as Sort)}><option value="inicio">Hora de inicio</option><option value="persona">Persona (A–Z)</option></select></div>}
         </div>
         {panel && <div id="shift-filters" className="shift-filter-panel">
           <fieldset className="shift-filter-group"><legend>Rol del personal</legend><div className="shift-pills">
@@ -125,32 +164,24 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
           {active.map(a => <button key={a.key} type="button" className="shift-active-chip" aria-label={`Quitar filtro ${a.label}`} onClick={a.clear}>{a.label}<Icon name="close" size={14} /></button>)}
           <button type="button" className="secondary-button" onClick={clearAll}>Quitar filtros</button>
         </div>}
-        <p className="shift-count" role="status">{rows.length} de {all.length} turnos</p>
+        <div className="shift-toolbar-foot">
+          <p className="shift-count" role="status">{rows.length} de {assigned} turnos de la semana</p>
+          {view === 'semana' && <StateLegend />}
+        </div>
       </div>
-      <RemoteState state={data}>{() => rows.length ? <>
-        <table className="record-table"><caption className="sr-only">Planificación de turnos</caption>
-          <thead><tr><th>Persona</th><th>Inicio</th><th>Fin</th><th>Tipo</th><th>Estado</th><th>Asistencia</th>{plan && <th>Acción</th>}</tr></thead>
-          <tbody>{rows.slice(0, shown).map(t => {
-            const st = effective(t);
-            return <tr key={t.id}>
-              <td data-label="Persona y área"><div className="shift-who"><strong>{t.person}</strong><span className="shift-chips"><RoleChip code={typeOf(t)} /><AreaChip name={t.area} /></span></div></td>
-              <td data-label="Inicio">{formatDateTime(t.start)}</td><td data-label="Fin">{formatDateTime(t.end)}</td>
-              <td data-label="Tipo">{KIND_LABEL[t.type] ?? t.type}</td><td data-label="Estado"><Tag value={st} label={st === 'ausente' ? 'Ausente' : undefined} /></td>
-              <td data-label="Asistencia">{attendanceLabel(t) ?? '—'}</td>
-              {plan && <td data-label="Acción">
-                {allows(t, 'editar') && <button className="row-action" onClick={() => { setEditing(t); setDraft(undefined); setOpen(true); }}>Editar <Icon name="arrow" size={16} /></button>}
-                {allows(t, 'cancelar') && <button className="row-action" aria-label={`Cancelar turno de ${t.person}`} onClick={() => setCancelling(t)}>Cancelar turno</button>}
-                {ATTENDANCE_ACTIONS.some(a => allows(t, a)) && <button className="row-action" aria-label={`Asistencia de ${t.person}`} onClick={() => setMarking(t)}>Asistencia</button>}
-              </td>}
-            </tr>;
-          })}</tbody></table>
-        {rows.length > shown && <button type="button" className="secondary-button shift-more" onClick={() => setShown(n => n + PAGE)}>Mostrar más ({rows.length - shown} restantes)</button>}
-      </> : <Empty title="Sin turnos en esta vista" description="Ajusta los filtros o la búsqueda para consultar otros horarios." />}</RemoteState>
+      <RemoteState state={source}>{() => view === 'semana' ? <section className="shift-week-wrap" aria-label={`Semana del ${weekLabel(monday)}`}>
+        {coverage.error && coverage.error.status !== 403 && <Notice kind="error">No pudimos dibujar los huecos de cobertura de esta semana: {coverage.error.message} <button type="button" className="secondary-button" onClick={coverage.refresh}>Volver a intentar</button></Notice>}
+        <ShiftWeek days={days} today={today} now={at} shifts={drawn} gaps={gaps} onOpen={setDetail} onShowDay={date => { setFocusDay(date); setView('lista'); }} />
+        {!drawn.length && <Empty title="Sin turnos en esta semana" description={active.length ? 'Ajusta los filtros o la búsqueda para consultar otros horarios.' : 'Cambia de semana o asigna un turno.'} />}
+      </section> : drawn.length ? <ShiftDayList days={days} today={today} now={at} rows={drawn} plan={plan} byPerson={sort === 'persona'} typeOf={typeOf} actions={actions} />
+        : <Empty title="Sin turnos en esta vista" description="Ajusta los filtros, la búsqueda o la semana para consultar otros horarios." />}</RemoteState>
     </section>
     </>}
-    {open && <ShiftForm api={api} shift={editing} draft={editing ? undefined : draft} catalog={catalog} shifts={all} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); data.refresh(); }} />}
-    {marking && <AttendanceDialog api={api} shift={marking} onClose={() => setMarking(null)} onSaved={() => { setMarking(null); data.refresh(); }} onAssignSubstitute={plan ? id => assignSubstitute(marking, id) : undefined} />}
-    {cancelling && <CancelShiftForm api={api} shift={cancelling} onClose={() => { setCancelling(null); data.refresh(); }} onSaved={() => { setCancelling(null); data.refresh(); }} />}
+    {detail && <ShiftDetail shift={detail} now={at} plan={plan} typeOf={typeOf} actions={actions} onClose={() => setDetail(null)} />}
+    {open && <ShiftForm api={api} shift={editing} draft={editing ? undefined : draft} catalog={catalog} shifts={covered ? all : [...all, ...shown.filter(t => !all.some(a => a.id === t.id))]} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); data.refresh(); if (!covered) weekData.refresh(); }} />}
+    {marking && <AttendanceDialog api={api} shift={marking} onClose={() => setMarking(null)} onSaved={() => { setMarking(null); data.refresh(); if (!covered) weekData.refresh(); }} onAssignSubstitute={plan ? id => assignSubstitute(marking, id) : undefined} />}
+    {cancelling && <CancelShiftForm api={api} shift={cancelling} onClose={() => { setCancelling(null); source.refresh(); }} onSaved={() => { setCancelling(null); source.refresh(); }} />}
+
   </>;
 }
 

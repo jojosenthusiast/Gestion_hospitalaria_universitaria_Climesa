@@ -1,25 +1,43 @@
 import XCTest
 @testable import ClimesaCore
 
-/// I26 "Mis turnos": la entrada solo se ofrece si la API la permite y nunca se muestra un código crudo (ASIS-01).
+/// I26 "Mis turnos": la entrada se confirma sola (ASIS-01), nunca se muestra un código crudo y los turnos se agrupan por
+/// el día asignado con Hoy / Mañana / día y fecha.
 final class ShiftAttendanceTests: XCTestCase {
-    func testCheckInOnlyWhenTheServerAllowsIt() {
-        XCTAssertTrue(ShiftAttendanceRules.canCheckIn(["marcar_entrada"]))
-        XCTAssertFalse(ShiftAttendanceRules.canCheckIn(["editar", "cancelar"]))
-        XCTAssertFalse(ShiftAttendanceRules.canCheckIn(nil))
-    }
-
     func testStateAndAttendanceLabelsAreSpanish() {
         XCTAssertEqual(ShiftAttendanceRules.stateLabel("en_curso"), "En curso")
         XCTAssertEqual(ShiftAttendanceRules.stateLabel("ausente"), "Ausente")
-        XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("presente", late: true), "Entrada marcada · tarde")
-        XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("sin_confirmar", late: false), "Sin entrada marcada")
+        XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("presente", late: false), "Entrada confirmada")
+        XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("presente", late: true), "Entrada corregida · llegó tarde")
+        XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("pendiente", late: false), "Se confirma sola al iniciar")
+        XCTAssertEqual(ShiftAttendanceRules.attendanceLabel("sin_registro", late: false), "Sin registro de entrada")
         XCTAssertNil(ShiftAttendanceRules.attendanceLabel(nil, late: false))
     }
 
-    func testRefusedCheckInIsExplainedByCode() {
-        XCTAssertEqual(ShiftAttendanceRules.checkInError(code: "asistencia_ya_marcada", status: 409, fallback: "x"), "Ya marcaste la entrada de este turno.")
-        XCTAssertEqual(ShiftAttendanceRules.checkInError(code: "turno_ajeno", status: 403, fallback: "x"), "Solo puedes marcar la entrada de tus propios turnos.")
-        XCTAssertEqual(ShiftAttendanceRules.checkInError(code: nil, status: nil, fallback: nil), "No se pudo marcar la entrada. Intenta de nuevo.")
+    func testHoursMarkTheNextDayAndTheTwentyFourHourGuard() {
+        let start = ShiftAttendanceRules.date("2026-11-10T13:00:00.000Z"), end = ShiftAttendanceRules.date("2026-11-11T13:00:00Z")
+        XCTAssertEqual(ShiftAttendanceRules.hours(start: start, end: end, type: "guardia"), "07:00 a 07:00 del día siguiente · Guardia 24 h")
+        XCTAssertEqual(ShiftAttendanceRules.hours(start: start, end: ShiftAttendanceRules.date("2026-11-10T21:00:00Z"), type: "diurno"), "07:00 a 15:00")
+        XCTAssertEqual(ShiftAttendanceRules.hours(start: nil, end: end, type: nil), "Sin hora")
+    }
+
+    func testShiftsAreGroupedByAssignedDayInStartOrder() {
+        let today = ShiftAttendanceRules.date("2026-11-10T15:00:00Z")!
+        let starts: [(String, String?)] = [("tarde", "2026-11-12T21:00:00Z"), ("guardia", "2026-11-10T13:00:00Z"), ("x", nil), ("manana", "2026-11-11T14:00:00Z"), ("temprano", "2026-11-12T13:00:00Z")]
+        let days = ShiftAttendanceRules.byDay(starts, start: { ShiftAttendanceRules.date($0.1) }, today: today)
+        XCTAssertEqual(days.map { $0.title }, ["Hoy · martes, 10 de noviembre", "Mañana · miércoles, 11 de noviembre", "Jueves, 12 de noviembre", "Sin fecha"])
+        XCTAssertEqual(days.map { $0.items.map { $0.0 } }, [["guardia"], ["manana"], ["temprano", "tarde"], ["x"]])
+    }
+
+    func testOpensAtTodayWithPastDaysBelow() {
+        let now = ShiftAttendanceRules.date("2026-11-12T14:00:00Z")!
+        let rows: [(String, String, String)] = [
+            ("martes", "2026-11-10T13:00:00Z", "2026-11-10T21:00:00Z"), ("noche", "2026-11-12T04:00:00Z", "2026-11-12T16:00:00Z"),
+            ("hoy", "2026-11-12T21:00:00Z", "2026-11-13T03:00:00Z"), ("viernes", "2026-11-13T13:00:00Z", "2026-11-13T21:00:00Z"),
+            ("lunes", "2026-11-09T13:00:00Z", "2026-11-09T21:00:00Z"),
+        ]
+        let days = ShiftAttendanceRules.byDay(rows, start: { ShiftAttendanceRules.date($0.1) }, end: { ShiftAttendanceRules.date($0.2) }, today: now)
+        XCTAssertEqual(days.map { $0.items.map { $0.0 } }, [["noche"], ["hoy"], ["viernes"], ["martes"], ["lunes"]])
+        XCTAssertEqual(days.map { $0.past }, [false, false, false, true, true])
     }
 }

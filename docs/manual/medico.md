@@ -52,7 +52,7 @@ Historial clínico completo de un paciente con relación de atención.
 
 ### Mis turnos
 
-Tus turnos publicados y **Marcar mi entrada**.
+Tus turnos publicados, agrupados por día y por hora. La entrada se confirma sola a la hora de inicio.
 
 ## iOS
 
@@ -68,7 +68,7 @@ Mi día, Pacientes, Resultados, Turnos y **Más** (Agenda, Mis hospitalizados, A
 | Resultados | **Marcar revisado**, **Cancelar orden**. Un aviso indica cuántos resultados con valor crítico esperan tu revisión |
 | Mis hospitalizados | **Firmar alta**, **Revocar alta** |
 | Llegada de ambulancia | "Servicios por recibir", "Entrega del paciente" y **Marcar recibido** |
-| Turnos | **Marcar mi entrada** |
+| Turnos | Consultar tus turnos por día (la entrada es automática) |
 
 La app iOS compila y pasa sus pruebas en CI, pero no se ha probado en un iPhone.
 

@@ -5,8 +5,8 @@ import { businessDayRange, Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 
-/** Author of the automatic closures in the audit trail (no user account). */
-export const SYSTEM_ACTOR = { id: '00000000-0000-0000-0000-000000000000', roles: ['SISTEMA'] };
+import { SYSTEM_ACTOR } from '../platform/actor';
+export { SYSTEM_ACTOR };
 
 /**
  * Automatic closures that depend only on the clock (audit CITA-05, CITA-02, MA-CIT-02/ASIS-05, FILA-03/ASIS-04):

@@ -39,17 +39,13 @@ export class ShiftDto {
 }
 export const attendanceStates=['presente','ausente','pendiente'];
 export const absenceTypes=['justificada','injustificada'];
-/** ASIS-01/03: JOP marca la entrada, la ausencia (con tipo y motivo) o deshace una marca equivocada (`pendiente`, con motivo). */
+/** ASIS-01/03: la entrada es automática; JOP corrige la hora real (`presente`), marca la ausencia (con tipo) o deshace una ausencia (`pendiente`); siempre con motivo. */
 export class AttendanceDto {
   @ApiProperty({enum:attendanceStates}) @IsIn(attendanceStates) state!:string;
   @ApiPropertyOptional({enum:absenceTypes}) @IsOptional() @IsIn(absenceTypes) absenceType?:string;
-  @ApiPropertyOptional({format:'date-time',description:'Hora de entrada; por omisión, ahora. Obligatoria si el turno ya terminó'}) @IsOptional() @IsISO8601({strict:true}) at?:string;
+  @ApiPropertyOptional({format:'date-time',description:'Hora real de entrada al corregirla; por omisión, ahora. Obligatoria si el turno ya terminó'}) @IsOptional() @IsISO8601({strict:true}) at?:string;
   @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
   @Text(10,500,true) reason?:string;
-}
-/** ASIS-01: la persona marca su propia entrada desde su turno. */
-export class CheckInDto {
-  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
 }
 export class PublishDto {
   @ApiProperty({format:'date',example:'2026-11-10'}) @Matches(/^\d{4}-\d{2}-\d{2}$/) from!:string;
