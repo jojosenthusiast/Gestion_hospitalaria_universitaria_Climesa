@@ -43,20 +43,20 @@ const joinNames=(names:string[])=>names.length>1?`${names.slice(0,-1).join(', ')
  */
 export function PhoneRequestForm({api,profile,onClose,onSaved}:{api:Api;profile:AccessProfile;onClose:()=>void;onSaved:()=>void}){
  const [address,setAddress]=useState(''),[municipality,setMunicipality]=useState(''),[reason,setReason]=useState(''),[phone,setPhone]=useState(''),[caller,setCaller]=useState(''),[problem,setProblem]=useState(''),action=useAction(api);
- const [patient,setPatient]=useState<PickerItem|null>(null),[filled,setFilled]=useState<CallField[]>([]),[loading,setLoading]=useState(false);
+ const [patient,setPatient]=useState<PickerItem|null>(null),[filled,setFilled]=useState<CallField[]>([]),[loading,setLoading]=useState(false),[lookupFailed,setLookupFailed]=useState(false);
  const edited=useRef(new Set<CallField>()),values={caller,phone,address};
  const setters:Record<CallField,(v:string)=>void>={caller:setCaller,phone:setPhone,address:setAddress};
  const edit=(k:CallField)=>(v:string)=>{edited.current.add(k);setFilled(f=>f.filter(x=>x!==k));setters[k](v);};
  const canPick=can(profile,'pacientes.buscar')&&can(profile,'pacientes.ver_ficha'),busy=action.busy||loading;
  async function pick(item:PickerItem|null){
-  setPatient(item);if(!item)return;
+  setPatient(item);setLookupFailed(false);if(!item)return;
   setLoading(true);
   try{
    const record=await api.request<Patient>(`/pacientes/${item.id}`);
    const known:Record<CallField,string>={caller:record.fullName??'',phone:record.phone??'',address:record.address??''};
    const fill=(Object.keys(known) as CallField[]).filter(k=>known[k]&&!values[k]&&!edited.current.has(k));
    fill.forEach(k=>setters[k](known[k]));setFilled(fill);
-  }catch{setFilled([]);}
+  }catch{setFilled([]);setLookupFailed(true);}
   finally{setLoading(false);}
  }
  async function save(e:FormEvent){e.preventDefault();if(busy)return;
@@ -67,6 +67,7 @@ export function PhoneRequestForm({api,profile,onClose,onSaved}:{api:Api;profile:
  return <Dialog title="Registrar llamada" onClose={onClose} busy={busy}><form className="module-form" onSubmit={save} noValidate aria-busy={busy}>{problem&&<Notice kind="error">{problem}</Notice>}<WriteError error={action.error}/>
   <Notice kind="info">Si hay riesgo de vida, indica a la persona que llame al 911.</Notice>
   {canPick&&<SearchPicker label="Paciente · opcional" value={patient} onChange={item=>void pick(item)} search={patientPicker(api)} hint="Si la llamada es por un paciente con expediente, elígelo para copiar sus datos de contacto." emptyText="No hay pacientes con ese nombre, DUI o expediente."/>}
+  {lookupFailed&&<Notice kind="error">No pudimos leer el expediente. Escribe los datos de contacto a mano.</Notice>}
   {filled.length>0&&<p className="muted" role="status">Copiamos del expediente: {joinNames(filled.map(k=>callFieldNames[k]))}.</p>}
   <Field label="Nombre de quien llama" value={caller} onChange={edit('caller')} maxLength={120} autoFocus={!canPick}/><Field label="Dirección" value={address} onChange={edit('address')} required maxLength={300}/><Field label="Municipio" value={municipality} onChange={setMunicipality} maxLength={80}/><Field label="Motivo" value={reason} onChange={setReason} required maxLength={500}/><Field label="Teléfono de contacto" value={phone} onChange={edit('phone')} required inputMode="tel" maxLength={20}/>
   <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Cancelar</button><SaveButton busy={busy} label="Registrar solicitud"/></div></form></Dialog>;

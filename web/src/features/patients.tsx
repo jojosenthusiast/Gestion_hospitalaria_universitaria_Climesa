@@ -125,8 +125,11 @@ function PatientClinicalTab({api,id,version,tab}:{api:Api;id:string;version:numb
 const prefillNames:Partial<Record<keyof PatientInput,string>>={givenNames:'nombres',surnames:'apellidos',dui:'DUI'};
 /** Names the prefilled fields in plain Spanish: "nombres y apellidos". */
 export const prefillNotice=(keys:(keyof PatientInput)[])=>{const names=keys.map(k=>prefillNames[k]??k);return names.length?`Copiamos de tu búsqueda: ${names.length>1?`${names.slice(0,-1).join(', ')} y ${names[names.length-1]}`:names[0]}.`:'';};
-/** The search text register uses when the person skipped «Buscar»: the DUI if typed, otherwise the full name. */
-const autoQuery=(form:PatientInput,query:string)=>query.trim()||form.dui?.trim()||`${form.givenNames} ${form.surnames}`.trim();
+/** The search text register uses when the person skipped «Buscar»: the typed search, the DUI, or first name and first surname; at most 100 characters (the API limit). */
+export const autoQuery=(form:Pick<PatientInput,'givenNames'|'surnames'|'dui'>,query:string)=>{
+ const first=(v:string)=>v.trim().split(/\s+/)[0]??'';
+ return (query.trim()||form.dui?.trim()||`${first(form.givenNames)} ${first(form.surnames)}`.trim()).slice(0,100);
+};
 /**
  * W1 (S13): one form, search first. The search row sits on top of the data; its result prefills only empty fields the person
  * has not touched and names them. «Registrar paciente» runs the search itself when there is no valid one, stops if it finds
@@ -151,8 +154,10 @@ function PatientForm({api,patient,receipt:initialReceipt,query:initialQuery,onCl
   setReceipt(result);
   const fill=Object.entries(prefillFromQuery(text)).filter(([k])=>!edited.current.has(k as keyof PatientInput)&&!form[k as keyof PatientInput]) as [keyof PatientInput,string][];
   setFilled(fill.map(([k])=>k));
-  if(fill.length)setForm(f=>({...f,...Object.fromEntries(fill)}));
-  return result;
+  // The merged values go back to the caller: a register in the same run must not send the stale `form` of this render.
+  const merged={...form,...Object.fromEntries(fill)} as PatientInput;
+  if(fill.length)setForm(merged);
+  return {receipt:result,form:merged};
  }
  async function lookupNow(){
   const text=query.trim();if(text.length<2||running.current)return;
@@ -166,15 +171,16 @@ function PatientForm({api,patient,receipt:initialReceipt,query:initialQuery,onCl
   if(running.current)return;
   running.current=true;setPending(true);
   try{
-   let current=receipt,text=query.trim();
+   let current=receipt,text=query.trim(),values=form;
    if(!patient&&!valid(current)){
     text=autoQuery(form,query);setQuery(text);
-    current=(await searchNow(text))??null;
-    if(!current)return;
+    const found=await searchNow(text);
+    if(!found)return;
+    current=found.receipt;values=found.form;
     // A fresh search with candidates stops here so they are reviewed; the next press registers with this receipt.
     if(current.candidates.length)return;
    }
-   const result=patient?await action.run(`/pacientes/${patient.id}`,{...form,version:patient.version,reason},'PATCH'):await action.run('/pacientes',{...form,searchToken:current?.token,searchQuery:text,...(confirmNew?{confirmarNuevo:true}:{})});
+   const result=patient?await action.run(`/pacientes/${patient.id}`,{...values,version:patient.version,reason},'PATCH'):await action.run('/pacientes',{...values,searchToken:current?.token,searchQuery:text,...(confirmNew?{confirmarNuevo:true}:{})});
    if(result)onSaved();
   }finally{running.current=false;setPending(false);}
  }
@@ -183,7 +189,7 @@ function PatientForm({api,patient,receipt:initialReceipt,query:initialQuery,onCl
  const existing=action.error?.code==='dui_duplicado'?(action.error.details?.paciente as {record:string;fullName:string}|undefined):undefined;
  const intro=patient?'Completa los datos conocidos. El documento y la fecha pueden quedar vacíos; el expediente se asigna automáticamente.':receipt&&!expired?'Revisa las coincidencias; si la persona no está, completa los datos. El documento y la fecha pueden quedar vacíos; el expediente se asigna automáticamente.':'Busca primero si la persona ya existe: lo que escribas se copia al formulario. Si no buscas, lo hacemos al registrar.';
  return <Dialog title={patient?'Corregir datos personales':'Registrar paciente'} busy={busy} onClose={onClose}><form onSubmit={save} className="module-form" aria-busy={busy}><p className="form-intro">{intro}</p>
-  {!patient&&<div className="search-form pt-register-search"><Field label="Nombre, DUI o expediente" placeholder="Escribe al menos dos caracteres" value={query} onChange={setQuery} maxLength={100} autoFocus onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();void lookupNow();}}}/><button type="button" className="secondary-button" disabled={busy||query.trim().length<2} onClick={()=>void lookupNow()}><Icon name="search" size={18}/>{lookup.busy?'Buscando…':'Buscar'}</button></div>}
+  {!patient&&<div className="search-form pt-register-search"><Field label="Nombre, DUI o expediente" placeholder="Escribe al menos dos caracteres" value={query} onChange={v=>{setQuery(v);setReceipt(null);}} maxLength={100} autoFocus onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();void lookupNow();}}}/><button type="button" className="secondary-button" disabled={busy||query.trim().length<2} onClick={()=>void lookupNow()}><Icon name="search" size={18}/>{lookup.busy?'Buscando…':'Buscar'}</button></div>}
   <WriteError error={lookup.error}/>{receipt&&expired&&<Notice kind="error">{expiredText}</Notice>}
   {filled.length>0&&<p className="muted" role="status">{prefillNotice(filled)}</p>}
   <SaveFailure error={action.error} onReload={onSaved}/>{existing&&<Notice kind="info">Ese DUI ya tiene expediente: {existing.fullName} · {existing.record}. Búscalo en la lista en vez de crear otro.</Notice>}{similar.length>0&&<section aria-label="Pacientes con el mismo nombre y nacimiento"><span className="eyebrow">Ya existe alguien igual</span><ul className="muted">{similar.map(c=><li key={c.id}><strong>{c.fullName}</strong> · {c.record}{c.birth?` · nace ${formatDate(c.birth)}`:''}</li>)}</ul><button type="button" className="secondary-button" disabled={busy} onClick={()=>void submit(true)}>Es otra persona: registrar de todos modos</button></section>}{candidates.length>0&&!expired&&<section aria-label="Posibles duplicados"><span className="eyebrow">Revisa estos expedientes antes de crear uno nuevo</span><ul className="muted">{candidates.map(c=><li key={c.id}><strong>{c.fullName}</strong> · {c.record} · {c.matchReason}</li>)}</ul></section>}

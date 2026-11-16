@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Field, Icon } from '../components/ui';
 import { can, type AccessProfile, type Api, type Bed } from '../lib/api';
 import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, useAction, useData } from './common';
@@ -90,8 +90,10 @@ function BedSuggestionDialog({ api, admission, version, onClose, onSaved }: { ap
   const all = [...(requested.data ?? []), ...(both ? other.data ?? [] : [])];
   const selected = all.find(x => x.id === bedId), reasonInvalid = reason.trim().length > 0 && reason.trim().length < 10;
   const first = requested.data?.[0]?.id ?? (both ? other.data?.[0]?.id : undefined);
-  // Prefill only while nothing is chosen; a bed that left the list (real time) leaves the choice empty again.
-  useEffect(() => { if (!selected && first) setBedId(first); }, [first, selected]);
+  // The first suggestion is chosen once, on the first load. A bed that later leaves the list (real time) leaves the choice
+  // empty and «Confirmar cama» disabled: another bed is never chosen silently.
+  const prefilled = useRef(false);
+  useEffect(() => { if (!prefilled.current && first) { prefilled.current = true; setBedId(first); } }, [first]);
   // WEB-08: el motivo lo escribe la persona; si queda vacío no se envía uno inventado.
   async function assign() { if (selected && await action.run(`/admisiones/${admission.id}/cama`, { bedId: selected.id, version: selected.version, ...(reason.trim() ? { reason: reason.trim() } : {}) })) onSaved(); }
   const group = (category: string, rows: Suggestion[]) => <fieldset className="choice-list" key={category}><legend>{both ? `Camas sugeridas · ${categoryNames[category] ?? category}${category !== admission.requestedCategory ? ' (excepción)' : ''}` : 'Camas sugeridas'}</legend>

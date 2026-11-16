@@ -61,6 +61,19 @@ describe('llamada de ambulancia prellenada (S13)', () => {
     expect(quien).toHaveProperty('value', '');
   });
 
+  // S13 review (A3): a failed record lookup says so in Spanish instead of clearing silently.
+  it('si no se puede leer el expediente lo avisa y deja los campos como estaban', async () => {
+    const a = api();
+    const base = a.request.getMockImplementation()!;
+    a.request.mockImplementation(async (path: string) => { if (path === '/pacientes/p1') throw new Error('sin red'); return base(path); });
+    render(<PhoneRequestForm api={a} profile={conFicha} onClose={() => {}} onSaved={() => {}} />);
+    await userEvent.type(screen.getByLabelText('Teléfono de contacto'), '7111-1111');
+    await elegirPaciente();
+    expect(await screen.findByText('No pudimos leer el expediente. Escribe los datos de contacto a mano.')).toBeTruthy();
+    expect(screen.getByLabelText('Teléfono de contacto')).toHaveProperty('value', '7111-1111');
+    expect(screen.queryByText(/Copiamos del expediente/)).toBeNull();
+  });
+
   it('sin permiso para ver fichas no ofrece elegir paciente', () => {
     render(<PhoneRequestForm api={api()} profile={perfil(['ambulancia.solicitar'])} onClose={() => {}} onSaved={() => {}} />);
     const dialogo = screen.getByRole('dialog', { name: 'Registrar llamada' });
