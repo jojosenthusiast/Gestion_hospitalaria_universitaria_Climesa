@@ -200,8 +200,12 @@ struct DoctorDayView: View {
     @ViewBuilder private func cardMenu(_ ticket: QueueTicket) -> some View {
         let moves = QueueBoardRules.destinations(ticket)
         let priorities = account.can("fila.gestionar") ? QueueBoardRules.priorityChoices(ticket) : []
-        if !moves.isEmpty || !priorities.isEmpty {
+        let removeCall = account.can("fila.llamar") && QueueBoardRules.canRemoveCall(ticket)
+        if !moves.isEmpty || !priorities.isEmpty || removeCall {
             Menu {
+                if removeCall {
+                    Button(String(format: L.text("queue.removeCall"), ticket.calls)) { Task { await move(ticket, .quitarLlamado) } }
+                }
                 ForEach(moves, id: \.column) { item in
                     Button(String(format: L.text("queue.move.to"), item.column.label, item.move.label.lowercased())) { Task { await move(ticket, item.move) } }
                 }

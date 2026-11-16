@@ -43,10 +43,12 @@ public enum QueueColumn: String, CaseIterable, Sendable {
 /// Server action behind a board move, with its path segment under `/fila/{id}/`.
 public enum QueueMove: String, Sendable {
     case llamar, atender, completar, noSePresento = "no_se_presento", deshacerLlamado = "deshacer_llamado"
+    /// Same server action as `deshacerLlamado` with 2+ calls: one call less, the number stays called. Not a column move.
+    case quitarLlamado = "quitar_llamado"
     public var path: String {
         switch self {
         case .noSePresento: return "no-se-presento"
-        case .deshacerLlamado: return "deshacer-llamado"
+        case .deshacerLlamado, .quitarLlamado: return "deshacer-llamado"
         default: return rawValue
         }
     }
@@ -57,6 +59,7 @@ public enum QueueMove: String, Sendable {
         case .completar: return "Completar"
         case .noSePresento: return "No se presentó"
         case .deshacerLlamado: return "Devolver a espera"
+        case .quitarLlamado: return "Quitar un llamado"
         }
     }
 }
@@ -129,6 +132,9 @@ public enum QueueBoardRules {
     /// The move to a column only when the server accepts its action now (`allowedActions`, or `undoActions` for undo).
     public static func move(_ ticket: QueueTicket, to: QueueColumn) -> QueueMove? {
         guard let move = action(from: column(ticket.state), to: to) else { return nil }
+        // Undo removes one call; only the last one sends the number back to waiting. With more calls the card would
+        // land in "En espera" and jump back, so that is not a column move (see `canRemoveCall`).
+        if move == .deshacerLlamado && ticket.calls > 1 { return nil }
         if move == .deshacerLlamado { return (ticket.undoActions ?? []).contains(move.rawValue) ? move : nil }
         let allowed = (ticket.allowedActions ?? []).map(\.rawValue)
         return allowed.contains(move.rawValue) ? move : nil
@@ -137,6 +143,11 @@ public enum QueueBoardRules {
     /// Columns the card may go to now, for the card menu (no dragging needed).
     public static func destinations(_ ticket: QueueTicket) -> [QueueDestination] {
         QueueColumn.allCases.compactMap { column in move(ticket, to: column).map { QueueDestination(column: column, move: $0) } }
+    }
+
+    /// "Quitar un llamado": the number keeps being called (2+ calls) and the server accepts removing one.
+    public static func canRemoveCall(_ ticket: QueueTicket) -> Bool {
+        ticket.state == .llamado && ticket.calls > 1 && (ticket.undoActions ?? []).contains(QueueMove.deshacerLlamado.rawValue)
     }
 
     /// Priorities the card can change to: only while waiting or called.

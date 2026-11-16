@@ -4,8 +4,8 @@ import XCTest
 /// Fase 2, flow B (S9): per-area code, priority, cited vs walk-in, board moves backed by server actions, and the
 /// "who goes next" proposal from the API (also returned when signing a consultation).
 final class QueueBoardRulesTests: XCTestCase {
-    private func ticket(_ extra: String, state: String = "en_espera", number: Int = 7, service: String = "consulta_general") -> QueueTicket {
-        let json = #"{"id":"t7","service":"\#(service)","fecha":"2026-11-20","numero":\#(number),"patientId":null,"patientName":"Paciente Ficticio","state":"\#(state)","officeId":null,"llamados":1,"version":3,"issuedAt":"2026-11-20T14:00:00Z"\#(extra)}"#
+    private func ticket(_ extra: String, state: String = "en_espera", number: Int = 7, service: String = "consulta_general", calls: Int = 1) -> QueueTicket {
+        let json = #"{"id":"t7","service":"\#(service)","fecha":"2026-11-20","numero":\#(number),"patientId":null,"patientName":"Paciente Ficticio","state":"\#(state)","officeId":null,"llamados":\#(calls),"version":3,"issuedAt":"2026-11-20T14:00:00Z"\#(extra)}"#
         return try! JSONDecoder().decode(QueueTicket.self, from: Data(json.utf8))
     }
 
@@ -31,6 +31,18 @@ final class QueueBoardRulesTests: XCTestCase {
         XCTAssertEqual(QueueBoardRules.move(waiting, to: .llamado), .llamar)
         XCTAssertEqual(QueueBoardRules.priorityChoices(waiting), ["emergencia", "urgente"])
         XCTAssertEqual(QueueBoardRules.priorityChoices(ticket("", state: "en_atencion")), [])
+    }
+
+    func testDeshacerComoMovimientoSoloConElUltimoLlamado() {
+        let twice = ticket(#","allowedActions":["atender"],"undoActions":["deshacer_llamado"]"#, state: "llamado", calls: 2)
+        XCTAssertNil(QueueBoardRules.move(twice, to: .espera), "with 2 calls the card would drop into En espera and jump back")
+        XCTAssertEqual(QueueBoardRules.destinations(twice).map(\.column), [.atencion])
+        XCTAssertTrue(QueueBoardRules.canRemoveCall(twice))
+        XCTAssertEqual(QueueMove.quitarLlamado.label, "Quitar un llamado")
+        XCTAssertEqual(QueueBoardRules.path(twice, .quitarLlamado), "/fila/t7/deshacer-llamado")
+        let once = ticket(#","allowedActions":["atender"],"undoActions":["deshacer_llamado"]"#, state: "llamado", calls: 1)
+        XCTAssertEqual(QueueBoardRules.move(once, to: .espera), .deshacerLlamado)
+        XCTAssertFalse(QueueBoardRules.canRemoveCall(once))
     }
 
     func testPropuestaAlFirmar() throws {
