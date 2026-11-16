@@ -103,3 +103,18 @@ export function followUpReason(mark: string, relevant: boolean): FollowUpReason 
 export function appointmentMatchesProposal(appointment: { patientId: string; doctorId: string; state: string }, proposal: { patientId: string; doctorId: string }) {
   return appointment.patientId === proposal.patientId && appointment.doctorId === proposal.doctorId && ['solicitada', 'confirmada'].includes(appointment.state);
 }
+
+const HEIF_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
+/**
+ * T07b (S10): the attachment type read from the first bytes of the file (magic bytes), never from the name or the
+ * declared Content-Type. Only PDF, JPEG, PNG, HEIC/HEIF and WEBP pass; anything else is null.
+ */
+export function detectAttachmentType(content: Uint8Array): 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/heic' | 'image/webp' | null {
+  const ascii = (from: number, to: number) => Buffer.from(content.subarray(from, to)).toString('latin1');
+  if (content.length >= 5 && ascii(0, 5) === '%PDF-') return 'application/pdf';
+  if (content.length >= 3 && content[0] === 0xff && content[1] === 0xd8 && content[2] === 0xff) return 'image/jpeg';
+  if (content.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((byte, i) => content[i] === byte)) return 'image/png';
+  if (content.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+  if (content.length >= 12 && ascii(4, 8) === 'ftyp' && HEIF_BRANDS.has(ascii(8, 12))) return 'image/heic';
+  return null;
+}

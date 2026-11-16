@@ -32,6 +32,8 @@ export const PROBLEM_CODES = [
   'examen_con_resultados',
   // Laboratory follow-up, external orders and proposed appointments (Fase 2, S10).
   'orden_no_externa', 'cita_no_coincide', 'propuesta_resuelta',
+  // Private storage of lab attachments (T07b): file type by content, size, reference-only and already stored.
+  'adjunto_tipo_invalido', 'adjunto_muy_grande', 'adjunto_sin_archivo', 'adjunto_ya_almacenado',
   // Ambulance.
   'ambulancia_ya_despachada', 'estado_final_invalido', 'hito_fuera_de_orden', 'servicio_cerrado', 'servicio_finalizado', 'sin_paramedico_de_turno',
   'sin_motorista_de_turno', 'sin_tripulacion_de_turno', 'tripulante_sin_turno', 'hito_hora_invalida', 'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio',

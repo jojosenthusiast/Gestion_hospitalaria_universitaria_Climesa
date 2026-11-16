@@ -1,10 +1,11 @@
 import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { LabAmendDto, LabCancelDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabProposalConfirmDto, LabProposalDiscardDto, LabResultDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
+import { readSingleFile } from '../platform/multipart';
+import { MAX_ATTACHMENT_BYTES, LabAmendDto, LabCancelDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabProposalConfirmDto, LabProposalDiscardDto, LabResultDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
 import { LaboratoryService } from './laboratory.service';
-import { LabCompleteResponse, LabExamResponse, LabExternalSentResponse, LabFollowUpResponse, LabFollowUpStateResponse, LabOrderCreatedResponse, LabOrderDetailResponse, LabOrderResponse, LabOrderStateResponse, LabProposalResponse, LabProposalStateResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
+import { LabAttachmentLinkResponse, LabAttachmentStoredResponse, LabCompleteResponse, LabExamResponse, LabExternalSentResponse, LabFollowUpResponse, LabFollowUpStateResponse, LabOrderCreatedResponse, LabOrderDetailResponse, LabOrderResponse, LabOrderStateResponse, LabProposalResponse, LabProposalStateResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
 
 @ApiTags('laboratory') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('laboratorio')
 export class LaboratoryController {
@@ -45,6 +46,15 @@ export class LaboratoryController {
 
   @Post('ordenes/:id/resultado-externo') @RequirePermission('laboratorio.procesar', 'laboratorio.revisar') @ApiOperation({ summary: 'Cargar el resultado de una orden externa: referencia del adjunto (foto o PDF) y valor clave de cada examen; completa la orden' }) @ApiCreatedResponse({ type: LabCompleteResponse })
   externalResult(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabExternalResultDto, @Headers('idempotency-key') key?: string) { return this.laboratory.externalResult(r.actor, id, dto, key); }
+
+  @Post('adjuntos/:id/archivo') @RequirePermission('laboratorio.procesar', 'laboratorio.revisar') @ApiOperation({ summary: 'Subir la foto o el PDF de un adjunto que solo tiene la referencia (T07b): bucket privado, tipo leído del contenido, huella SHA-256 calculada en el servidor; no reemplaza un archivo guardado' })
+  @ApiConsumes('multipart/form-data') @ApiBody({ schema: { type: 'object', required: ['archivo'], properties: { archivo: { type: 'string', format: 'binary', description: 'PDF, JPG, PNG, HEIC o WEBP de hasta 10 MB' } } } }) @ApiCreatedResponse({ type: LabAttachmentStoredResponse })
+  async storeAttachment(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Headers('idempotency-key') key?: string) {
+    return this.laboratory.storeAttachment(r.actor, id, await readSingleFile(r, 'archivo', MAX_ATTACHMENT_BYTES), key);
+  }
+
+  @Get('adjuntos/:id/enlace') @RequirePermission('resultados.ver') @ApiOperation({ summary: 'Enlace firmado de 5 minutos para descargar un adjunto (T07b); solo personal que ve los valores de la orden, nunca el paciente; cada enlace queda auditado' }) @ApiOkResponse({ type: LabAttachmentLinkResponse })
+  attachmentLink(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string) { return this.laboratory.attachmentLink(r.actor, id); }
 
   @Get('pendientes') @RequirePermission('laboratorio.revisar') @ApiOperation({ summary: 'Resultados por revisar: pendientes de seguimiento (valor crítico u observación relevante) de las órdenes que pidió quien lee' }) @ApiOkResponse({ type: [LabFollowUpResponse] })
   followUps(@Req() r: ActorRequest) { return this.laboratory.followUps(r.actor); }

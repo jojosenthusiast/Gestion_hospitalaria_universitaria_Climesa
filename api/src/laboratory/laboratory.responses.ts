@@ -60,14 +60,14 @@ export class LabOrderResponse {
   @EnumArrayProp(LAB_EXTERNAL_ACTIONS, 'AccionExternaLaboratorio', { description: 'S10: acciones del camino externo que el servidor acepta ahora para quien lee' }) externalActions!: string[];
 }
 
-/** S10: reference of the photo or PDF of an external result. `stored` is false while the clinical Storage is not built. */
+/** S10: reference of the photo or PDF of an external result. `stored` says whether the file is in the private bucket (T07b). */
 export class LabAttachmentResponse {
   @UuidProp() id!: string;
   @StrProp() fileName!: string;
   @EnumProp(ATTACHMENT_TYPES, 'TipoAdjuntoLaboratorio') mimeType!: string;
   @IntProp() sizeBytes!: number;
   @StrProp({ nullable: true }) sha256!: string | null;
-  @BoolProp({ description: 'El archivo está guardado en el almacenamiento clínico (hoy siempre false: solo la referencia)' }) stored!: boolean;
+  @BoolProp({ description: 'El archivo está guardado en el almacenamiento clínico privado; false si solo existe la referencia' }) stored!: boolean;
   @StrProp({ nullable: true }) note!: string | null;
   @DateTimeProp() uploadedAt!: string;
   @StrProp({ nullable: true }) uploadedByName!: string | null;
@@ -82,6 +82,25 @@ export class LabResultHistoryResponse {
   @DateTimeProp() changedAt!: string;
   @StrProp({ nullable: true }) changedByName!: string | null;
   @StrProp() reason!: string;
+}
+
+/** POST /laboratorio/adjuntos/{id}/archivo (T07b): what the server stored; never the bucket path. */
+export class LabAttachmentStoredResponse {
+  @UuidProp() id!: string;
+  @BoolProp() stored!: boolean;
+  @EnumProp(ATTACHMENT_TYPES, 'TipoAdjuntoLaboratorio', { description: 'Tipo leído del contenido del archivo (bytes iniciales), no del nombre' }) mimeType!: string;
+  @IntProp() sizeBytes!: number;
+  @StrProp({ description: 'Huella SHA-256 calculada en el servidor' }) sha256!: string;
+}
+
+/** GET /laboratorio/adjuntos/{id}/enlace (T07b): short-lived signed download link, for staff who see the order's values. */
+export class LabAttachmentLinkResponse {
+  @StrProp({ description: 'Enlace firmado de descarga; deja de funcionar en `expiresAt`. No se guarda ni se comparte.' }) url!: string;
+  @DateTimeProp() expiresAt!: string;
+  @IntProp() expiresInSeconds!: number;
+  @StrProp() fileName!: string;
+  @EnumProp(ATTACHMENT_TYPES, 'TipoAdjuntoLaboratorio') mimeType!: string;
+  @IntProp() sizeBytes!: number;
 }
 
 /** GET /laboratorio/ordenes/{id}: the list row plus the cancel reason and, for staff who see values, the correction history. */

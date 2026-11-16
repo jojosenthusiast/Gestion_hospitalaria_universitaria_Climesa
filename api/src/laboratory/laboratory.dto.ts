@@ -27,8 +27,9 @@ export const ATTACHMENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', '
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 /**
- * Reference of the photo or PDF that backs an external result. The clinical Storage is not built yet: the API keeps the
- * reference (name, type, size, SHA-256) and the key values; the file itself stays with whoever loaded it.
+ * Reference of the photo or PDF that backs an external result (name, type, size, SHA-256). The file itself is uploaded
+ * next with POST /laboratorio/adjuntos/{id}/archivo (T07b), which replaces type, size and SHA-256 with what the server
+ * reads from the bytes. Until then only the reference exists.
  */
 export class LabAttachmentDto {
   @ApiProperty({ minLength: 1, maxLength: 200 }) @IsString() @MinLength(1) @MaxLength(200) fileName!: string;

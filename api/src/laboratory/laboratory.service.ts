@@ -1,15 +1,17 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { createHash, randomUUID } from 'node:crypto';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf, hasPermission } from '../platform/actor';
 import { ageOn, ageRange, fichaFields } from '../patients/patient.privacy';
 import { channelsFor, patientAccount } from '../platform/channels';
+import { ClinicalFileStorage } from '../platform/clinical-storage';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
 import { auditLabReads } from './lab-read-audit';
-import { LabAmendDto, LabCancelDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabPriority, LabProposalConfirmDto, LabProposalDiscardDto, LabResultDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
-import { FollowUpReason, LabPermissions, appointmentMatchesProposal, classifyLabValue, followUpReason, labExternalActions, labOrderActions, matchesDoubleIdentification } from './laboratory.rules';
+import { MAX_ATTACHMENT_BYTES, LabAmendDto, LabCancelDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabPriority, LabProposalConfirmDto, LabProposalDiscardDto, LabResultDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
+import { FollowUpReason, LabPermissions, appointmentMatchesProposal, classifyLabValue, detectAttachmentType, followUpReason, labExternalActions, labOrderActions, matchesDoubleIdentification } from './laboratory.rules';
 
 type Row = Record<string, any>;
 type ResultInput = { value?: number; text?: string; unit?: string };
@@ -20,9 +22,12 @@ const MARK_LABEL: Record<string, string> = { normal: 'Normal', alto: 'Alto', baj
 /** Admission states that count as "active" (same as the unique index `admision_activa_unica`). */
 const ACTIVE_ADMISSION = "('pendiente_cama','hospitalizado','alta_firmada')";
 
+/** T07b: a signed download link of a lab attachment stops working after 5 minutes. */
+export const ATTACHMENT_LINK_SECONDS = 300;
+
 @Injectable()
 export class LaboratoryService {
-  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
+  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock, private readonly storage: ClinicalFileStorage) {}
 
   private async order(c: PoolClient, id: string, lock = false) {
     const row = (await c.query(`SELECT o.id,o.consulta_id AS "consultationId",o.paciente_id AS "patientId",o.medico_id AS "doctorId",
@@ -458,6 +463,67 @@ export class LaboratoryService {
       await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver', ...(proposed ? ['citas.agendar'] : [])], { users: followUp ? await this.staffAccounts(c, [old.doctorId]) : [] }));
       if (critical) await this.publishResult(c, old, row.version, true);
       return { ...row, attachmentId: attachment.id as string };
+    });
+  }
+
+  /**
+   * POST /laboratorio/adjuntos/{id}/archivo (T07b): the photo or PDF of an attachment goes to the private bucket. The
+   * type is read from the bytes (never the name or the declared type), the SHA-256 is computed here, and the object path
+   * is `<orden_id>/<random uuid>` with no patient data. Same people as loading the external result: the lab or a doctor
+   * who may review the order. A stored file is never replaced. The object is written inside the command transaction,
+   * after the checks, so a replayed key never uploads again; if anything fails after the upload, the object is removed.
+   */
+  async storeAttachment(actor: Actor, id: string, content: Buffer, key?: string) {
+    const mimeType = detectAttachmentType(content);
+    if (!mimeType) throw new ProblemException('adjunto_tipo_invalido', 415, 'El archivo no es un PDF ni una foto JPG, PNG, HEIC o WEBP.', 'archivo');
+    if (content.length > MAX_ATTACHMENT_BYTES) throw new ProblemException('adjunto_muy_grande', 413, 'El archivo pasa de 10 MB.', 'archivo');
+    const sha256 = createHash('sha256').update(content).digest('hex'), sizeBytes = content.length;
+    const lab = contextsOf(actor, 'laboratorio.procesar').includes('x');
+    const permission = lab ? 'laboratorio.procesar' : 'laboratorio.revisar';
+    let uploaded: string | undefined;
+    try {
+      return await this.commands.run(actor, `${permission}:adjunto:${id}:archivo`, key, { sha256, sizeBytes, mimeType }, async c => {
+        const found = (await c.query(`SELECT a.orden_id AS "orderId",(a.ruta_almacenamiento IS NOT NULL) AS stored,o.paciente_id AS "patientId",o.medico_id AS "doctorId",o.version
+          FROM laboratorio.adjunto a JOIN laboratorio.orden o ON o.id=a.orden_id WHERE a.id=$1 FOR UPDATE OF a`, [id])).rows[0] as Row | undefined;
+        if (!found) throw new NotFoundException('No se encontró el adjunto.');
+        const reviewer = !lab && !!actor.staffId && !!(await c.query('SELECT laboratorio.puede_revisar($1,$2,$3) AS ok', [found.orderId, actor.staffId, this.clock.now()])).rows[0]?.ok;
+        if (!lab && !reviewer) throw new ForbiddenException('Solo el laboratorio o un médico que puede revisar la orden suben su archivo.');
+        if (found.stored) throw new ProblemException('adjunto_ya_almacenado', 409, 'Este adjunto ya tiene su archivo guardado; no se reemplaza.');
+        const path = `${found.orderId}/${randomUUID()}`;
+        uploaded = path;
+        await this.storage.put(path, content, mimeType);
+        await c.query('UPDATE laboratorio.adjunto SET ruta_almacenamiento=$2,tipo_mime=$3,tamano_bytes=$4,huella_sha256=$5 WHERE id=$1', [id, path, mimeType, sizeBytes, sha256]);
+        await this.commands.audit(c, actor, { action: 'laboratorio.adjunto_subido', entity: 'orden_laboratorio', entityId: found.orderId, patientId: found.patientId, permission, detail: { attachmentId: id, mimeType, sizeBytes, sha256 } });
+        await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', found.orderId, found.version, await channelsFor(c, ['laboratorio.ver_cola'], { users: await this.staffAccounts(c, [found.doctorId]) }));
+        return { id, stored: true, mimeType, sizeBytes, sha256 };
+      });
+    } catch (error) {
+      // No orphans: the transaction rolled back, so the object it wrote must go too. The original error is what counts.
+      if (uploaded) await this.storage.remove(uploaded).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  /**
+   * GET /laboratorio/adjuntos/{id}/enlace (T07b): a 5-minute signed link to download the file, for whoever sees the
+   * order's values (the lab, the doctor who ordered it or may review it). The patient never gets it, reviewed or not:
+   * outside that scope the attachment does not exist (404). Each link handed out writes an audit row first.
+   */
+  async attachmentLink(actor: Actor, id: string) {
+    const { lab, doctor } = this.scope(actor);
+    const missing = () => new NotFoundException('No se encontró el adjunto.');
+    if (!lab && !doctor) throw missing();
+    const [file] = await this.db.query<Row>(`SELECT orden_id AS "orderId",nombre_archivo AS "fileName",tipo_mime AS "mimeType",tamano_bytes AS "sizeBytes",ruta_almacenamiento AS path
+      FROM laboratorio.adjunto WHERE id=$1`, [id]);
+    if (!file) throw missing();
+    const [order] = await this.orders(actor, lab, null, doctor, file.orderId);
+    if (!order || !(lab || order.doctorId === doctor || order.reviewer)) throw missing();
+    if (!file.path) throw new ProblemException('adjunto_sin_archivo', 409, 'Este adjunto solo tiene la referencia (nombre, tipo, tamaño y huella): el archivo no se guardó en el sistema. Súbelo desde la orden para poder abrirlo.');
+    const seconds = ATTACHMENT_LINK_SECONDS;
+    return this.db.transaction(async c => {
+      await this.commands.audit(c, actor, { action: 'laboratorio.adjunto_descargado', entity: 'orden_laboratorio', entityId: file.orderId, patientId: order.patientId, permission: 'resultados.ver', detail: { attachmentId: id, expiresInSeconds: seconds } });
+      const url = await this.storage.signedUrl(file.path, seconds, file.fileName);
+      return { url, expiresAt: new Date(this.clock.now().valueOf() + seconds * 1000).toISOString(), expiresInSeconds: seconds, fileName: file.fileName as string, mimeType: file.mimeType as string, sizeBytes: file.sizeBytes as number };
     });
   }
 

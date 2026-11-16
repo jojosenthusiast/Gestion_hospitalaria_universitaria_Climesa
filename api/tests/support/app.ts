@@ -8,6 +8,8 @@ import { SupabaseService } from '../../src/supabase/supabase.service';
 import { Clock, businessDate } from '../../src/platform/clock';
 import { createDatabase, userId } from './database';
 import { CREW_ON_DUTY_SQL } from '../../src/ambulance/ambulance.rules';
+import { ClinicalFileStorage } from '../../src/platform/clinical-storage';
+import { InMemoryClinicalFileStorage } from './clinical-storage';
 
 const issuer = 'https://gvmvmrusscsfbndnbvbr.supabase.co/auth/v1';
 
@@ -28,10 +30,13 @@ export async function createTestApp(start: Date) {
     return { data: { user: { id: p.sub, email: 'fixture@example.test' } }, error: null };
   } } }, admin: { auth: { admin: { inviteUserByEmail: jest.fn() } } }, isConfigured: () => true };
   const clock = { now: () => current, today: () => businessDate(current) };
+  // Clinical files never leave the process in tests (no network): the private bucket is an in-memory fake.
+  const storage = new InMemoryClinicalFileStorage();
   const module = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(DatabaseService).useValue(fixture.db)
     .overrideProvider(SupabaseService).useValue(auth)
     .overrideProvider(Clock).useValue(clock)
+    .overrideProvider(ClinicalFileStorage).useValue(storage)
     .compile();
   const app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter(), { logger: false });
   configureApplication(app);
@@ -41,6 +46,11 @@ export async function createTestApp(start: Date) {
 
   const call = async (role: string, method: string, path: string, body?: unknown, key?: string) => {
     const response = await app.inject({ method: method as any, url: '/api/v1' + path, headers: { authorization: `Bearer ${jwt(role)}`, ...(body ? { 'content-type': 'application/json', 'idempotency-key': key ?? randomUUID() } : {}) }, ...(body ? { payload: body as object } : {}) });
+    return { status: response.statusCode, body: response.body ? response.json() : undefined };
+  };
+  /** Raw request (for example multipart/form-data) with the role's token and, for writes, an Idempotency-Key. */
+  const send = async (role: string, method: string, path: string, payload: Buffer, contentType: string, key?: string) => {
+    const response = await app.inject({ method: method as any, url: '/api/v1' + path, headers: { authorization: `Bearer ${jwt(role)}`, 'content-type': contentType, 'idempotency-key': key ?? randomUUID() }, payload });
     return { status: response.statusCode, body: response.body ? response.json() : undefined };
   };
   const one = async <T = any>(sql: string, params: unknown[] = []) => (await pg.query<T>(sql, params)).rows[0];
@@ -116,7 +126,7 @@ export async function createTestApp(start: Date) {
     return [paramedic, pool.find(p => p.tipo === 'motorista')].filter((p): p is { id: string; tipo: string; hasAccount: boolean } => !!p).map(p => p.id);
   };
   return {
-    app, pg, call, one, staffOf, patient, enroll, shift, driverShift, appointment, consultation, admissionBody, events, audits, crewOnDuty,
+    app, pg, call, send, storage, one, staffOf, patient, enroll, shift, driverShift, appointment, consultation, admissionBody, events, audits, crewOnDuty,
     setNow: (value: Date) => { current = value; },
     close: async () => { await app.close(); await pg.close(); },
   };
