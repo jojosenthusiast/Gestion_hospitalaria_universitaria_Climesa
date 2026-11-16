@@ -1204,6 +1204,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/laboratorio/ordenes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle de una orden: resultados permitidos, motivo de cancelación e historial de correcciones */
+        get: operations["LaboratoryController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/laboratorio/ordenes/{id}/muestra": {
         parameters: {
             query?: never;
@@ -1232,6 +1249,23 @@ export interface paths {
         put?: never;
         /** Capturar o actualizar el resultado de un examen */
         post: operations["LaboratoryController_result"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/laboratorio/ordenes/{id}/enmendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enmendar un resultado de una orden completada; vuelve a revisión médica */
+        post: operations["LaboratoryController_amend"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1299,6 +1333,40 @@ export interface paths {
         /** Mis exámenes: estado siempre; valores solo revisados */
         get: operations["MeLaboratoryController_mine"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalogo/examenes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catálogo completo de exámenes con componentes y rangos vigentes */
+        get: operations["LabCatalogController_exams"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalogo/examenes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Editar nombre, unidad, estado y rangos de un examen (los rangos se versionan por vigencia) */
+        put: operations["LabCatalogController_update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3796,9 +3864,16 @@ export interface components {
             examId: string;
             code: string;
             name: string;
+            /** @description Unidad del catálogo */
+            unit: string | null;
             /** @description null sin resultado o si el actor aún no puede ver valores */
             result: components["schemas"]["LabItemResultResponse"] | null;
         };
+        /**
+         * @description Acciones que el servidor acepta ahora para quien lee
+         * @enum {string}
+         */
+        AccionOrdenLaboratorio: "tomar_muestra" | "capturar" | "completar" | "revisar" | "cancelar" | "enmendar";
         LabOrderResponse: {
             /** Format: uuid */
             id: string;
@@ -3818,6 +3893,11 @@ export interface components {
             completedAt: string | null;
             /** Format: date-time */
             reviewedAt: string | null;
+            /**
+             * Format: date-time
+             * @description Última enmienda de un resultado ya completado (vuelve a revisión médica)
+             */
+            amendedAt: string | null;
             version: number;
             patientName: string | null;
             /** @description Número de expediente */
@@ -3830,6 +3910,63 @@ export interface components {
             /** @description Médico que ordenó los estudios */
             doctorName: string | null;
             items: components["schemas"]["LabOrderItemResponse"][];
+            /** @description Acciones que el servidor acepta ahora para quien lee */
+            allowedActions: components["schemas"]["AccionOrdenLaboratorio"][];
+        };
+        LabResultHistoryResponse: {
+            /** Format: uuid */
+            orderItemId: string;
+            /** @description Versión del resultado que se reemplazó */
+            version: number;
+            value: number | null;
+            text: string | null;
+            mark: components["schemas"]["MarcaResultado"];
+            /** Format: date-time */
+            changedAt: string;
+            changedByName: string | null;
+            reason: string;
+        };
+        LabOrderDetailResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            consultationId: string;
+            /** Format: uuid */
+            patientId: string;
+            /** Format: uuid */
+            doctorId: string;
+            priority: components["schemas"]["PrioridadLaboratorio"];
+            state: components["schemas"]["EstadoOrdenLaboratorio"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            sampleTakenAt: string | null;
+            /** Format: date-time */
+            completedAt: string | null;
+            /** Format: date-time */
+            reviewedAt: string | null;
+            /**
+             * Format: date-time
+             * @description Última enmienda de un resultado ya completado (vuelve a revisión médica)
+             */
+            amendedAt: string | null;
+            version: number;
+            patientName: string | null;
+            /** @description Número de expediente */
+            patientRecord: string | null;
+            patientSex: string | null;
+            /** @description Edad exacta; solo con permiso de ver la fecha de nacimiento */
+            patientAge: number | null;
+            /** @description Decenio de edad («30-39») para quien solo ve el rango */
+            patientAgeRange: string | null;
+            /** @description Médico que ordenó los estudios */
+            doctorName: string | null;
+            items: components["schemas"]["LabOrderItemResponse"][];
+            /** @description Acciones que el servidor acepta ahora para quien lee */
+            allowedActions: components["schemas"]["AccionOrdenLaboratorio"][];
+            cancellationReason: string | null;
+            /** @description Vacío para quien no ve valores */
+            history: components["schemas"]["LabResultHistoryResponse"][];
         };
         LabOrderDto: {
             /** Format: uuid */
@@ -3868,7 +4005,7 @@ export interface components {
             /** Format: uuid */
             orderItemId: string;
             /** @description Versión vigente de la orden; cada captura la incrementa (`orderVersion` en la respuesta). */
-            version?: number;
+            version: number;
             value?: number;
             text?: string;
             /** @description Unidad del catálogo; si se envía debe coincidir. */
@@ -3893,6 +4030,18 @@ export interface components {
             version: number;
             /** @description Versión de la orden después de la captura */
             orderVersion: number;
+        };
+        LabAmendDto: {
+            /** Format: uuid */
+            orderItemId: string;
+            /** @description Versión vigente de la orden. */
+            version: number;
+            value?: number;
+            text?: string;
+            /** @description Unidad del catálogo; si se envía debe coincidir. */
+            unit?: string;
+            /** @description Por qué se corrige el resultado; queda en el historial y en la auditoría. */
+            reason: string;
         };
         LabVersionDto: {
             version: number;
@@ -3922,6 +4071,66 @@ export interface components {
             id: string;
             state: components["schemas"]["EstadoOrdenLaboratorio"];
             version: number;
+        };
+        LabCatalogComponentResponse: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+        };
+        /** @enum {string} */
+        SexoRangoReferencia: "femenino" | "masculino" | "cualquiera";
+        LabRangeResponse: {
+            /** Format: uuid */
+            id: string;
+            sex: components["schemas"]["SexoRangoReferencia"];
+            ageFrom: number;
+            ageTo: number | null;
+            min: number | null;
+            max: number | null;
+            criticalLow: number | null;
+            criticalHigh: number | null;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            validFrom: string;
+            source: string;
+        };
+        LabCatalogExamResponse: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            isPanel: boolean;
+            unit: string | null;
+            resultType: components["schemas"]["TipoResultadoLaboratorio"];
+            active: boolean;
+            version: number;
+            /** @description Ya tiene resultados capturados (la unidad no se cambia) */
+            hasResults: boolean;
+            components: components["schemas"]["LabCatalogComponentResponse"][];
+            ranges: components["schemas"]["LabRangeResponse"][];
+        };
+        LabRangeDto: {
+            sex: components["schemas"]["SexoRangoReferencia"];
+            ageFrom: number;
+            /** @description Edad en años excluida; null = sin límite. */
+            ageTo?: Record<string, never> | null;
+            min?: Record<string, never> | null;
+            max?: Record<string, never> | null;
+            criticalLow?: Record<string, never> | null;
+            criticalHigh?: Record<string, never> | null;
+            /** @description Fuente bibliográfica o del laboratorio. */
+            source: string;
+        };
+        LabExamUpdateDto: {
+            version: number;
+            name?: string;
+            /** @description Solo exámenes numéricos; no cambia si el examen ya tiene resultados. */
+            unit?: string;
+            active?: boolean;
+            ranges?: components["schemas"]["LabRangeDto"][];
         };
         /** @enum {string} */
         OrigenAdmisionNueva: "cita" | "consulta" | "emergencia" | "ambulancia";
@@ -5321,7 +5530,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "asistencia_ya_marcada" | "sin_asistencia_marcada" | "sin_ficha_personal" | "turno_ajeno" | "fuera_de_horario" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "indicador_desconocido" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "asistencia_ya_marcada" | "sin_asistencia_marcada" | "sin_ficha_personal" | "turno_ajeno" | "fuera_de_horario" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "indicador_desconocido" | "examen_con_resultados" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -11000,6 +11209,72 @@ export interface operations {
             };
         };
     };
+    LaboratoryController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabOrderDetailResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     LaboratoryController_sample: {
         parameters: {
             query?: never;
@@ -11097,6 +11372,88 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LabResultDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabResultResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    LaboratoryController_amend: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabAmendDto"];
             };
         };
         responses: {
@@ -11447,6 +11804,143 @@ export interface operations {
             };
             /** @description Sin permiso (`sin_permiso`) o regla de acceso */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    LabCatalogController_exams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabCatalogExamResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    LabCatalogController_update: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabExamUpdateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabCatalogExamResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
