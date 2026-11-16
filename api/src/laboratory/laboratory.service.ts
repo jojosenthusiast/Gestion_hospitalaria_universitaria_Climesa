@@ -7,6 +7,7 @@ import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
+import { auditLabReads } from './lab-read-audit';
 import { LabAmendDto, LabCancelDto, LabOrderDto, LabPriority, LabResultDto, LabSampleDto, LabVersionDto } from './laboratory.dto';
 import { LabPermissions, classifyLabValue, labOrderActions, matchesDoubleIdentification } from './laboratory.rules';
 
@@ -79,23 +80,25 @@ export class LaboratoryService {
   }
 
   /**
-   * MA-LAB-01: open work (pending, in process, completed but not reviewed) is never cut off; only closed orders (released
-   * or cancelled) are capped to the latest 300. MA-LAB-03: a doctor also sees, with values, the completed orders it may
-   * review (laboratorio.puede_revisar).
+   * MA-LAB-01: the lab's open work (pending, in process) is never cut off; completed orders are capped to the latest 300.
+   * For a doctor, completed orders still waiting for review count as open too (that is the doctor's work).
+   * MA-LAB-03: only a reader with laboratorio.revisar who is a doctor (laboratorio.puede_revisar) also sees, with values,
+   * the completed orders it may review; other `relacion` readers (nursing) keep seeing only orders they requested.
+   * Every row read is audited in one batched insert.
    */
   private async orders(actor: Actor, lab: boolean, patient: string | null, doctor: string | null, only?: string) {
     const rows = await this.db.transaction(async c => {
       const result = await c.query(`WITH alcance AS (
-          SELECT o.id,o.creada_en,(o.estado IN ('pendiente','en_proceso') OR (o.estado='completado' AND o.revisada_en IS NULL)) AS abierta
+          SELECT o.id,o.creada_en,(o.estado IN ('pendiente','en_proceso') OR (NOT $1::boolean AND o.estado='completado' AND o.revisada_en IS NULL)) AS abierta
           FROM laboratorio.orden o
           WHERE ($5::uuid IS NULL OR o.id=$5) AND (($1::boolean AND o.estado IN ('pendiente','en_proceso','completado'))
             OR ($4::uuid IS NOT NULL AND o.paciente_id=$4)
-            OR ($3::uuid IS NOT NULL AND (o.medico_id=$3 OR (o.estado='completado' AND o.revisada_en IS NULL AND laboratorio.puede_revisar(o.id,$3,$6)))))
+            OR ($3::uuid IS NOT NULL AND (o.medico_id=$3 OR ($7::boolean AND o.estado='completado' AND o.revisada_en IS NULL AND laboratorio.puede_revisar(o.id,$3,$6)))))
         ), elegidas AS (
           SELECT id FROM alcance WHERE abierta
           UNION ALL (SELECT id FROM alcance WHERE NOT abierta ORDER BY creada_en DESC LIMIT 300)
         ), filas AS (
-          SELECT o.*,($3::uuid IS NOT NULL AND laboratorio.puede_revisar(o.id,$3,$6)) AS revisor FROM laboratorio.orden o JOIN elegidas e ON e.id=o.id
+          SELECT o.*,($7::boolean AND $3::uuid IS NOT NULL AND laboratorio.puede_revisar(o.id,$3,$6)) AS revisor FROM laboratorio.orden o JOIN elegidas e ON e.id=o.id
         )
         SELECT o.id,o.consulta_id AS "consultationId",o.paciente_id AS "patientId",o.medico_id AS "doctorId",
         o.prioridad AS priority,o.estado AS state,o.creada_en AS "createdAt",o.muestra_tomada_en AS "sampleTakenAt",
@@ -107,8 +110,8 @@ export class LaboratoryService {
         FROM filas o JOIN pacientes.paciente p ON p.id=o.paciente_id LEFT JOIN personal.persona m ON m.id=o.medico_id
         LEFT JOIN laboratorio.orden_item oi ON oi.orden_id=o.id LEFT JOIN laboratorio.examen e ON e.id=oi.examen_id LEFT JOIN laboratorio.resultado r ON r.orden_item_id=oi.id
         GROUP BY o.id,o.consulta_id,o.paciente_id,o.medico_id,o.prioridad,o.estado,o.creada_en,o.muestra_tomada_en,o.completada_en,o.revisada_en,o.enmendada_en,o.version,o.revisor,p.id,m.id
-        ORDER BY o.creada_en DESC`, [lab, !!patient, doctor, patient, only ?? null, this.clock.now()]);
-      for (const row of result.rows) await this.commands.audit(c, actor, { action: 'laboratorio.leer', entity: 'orden_laboratorio', entityId: row.id, patientId: row.patientId, permission: 'resultados.ver' });
+        ORDER BY o.creada_en DESC`, [lab, !!patient, doctor, patient, only ?? null, this.clock.now(), hasPermission(actor, 'laboratorio.revisar')]);
+      await auditLabReads(c, actor, this.clock.now(), result.rows);
       return result.rows;
     });
     // Ronda 2 (obs. 4): la edad respeta la privacidad de la ficha (exacta con fecha visible, por decenio con `rango`, nada sin permiso).
@@ -141,16 +144,17 @@ export class LaboratoryService {
   }
 
   /**
-   * RN-25, MA-LAB-04: a critical value also reaches the requesting doctor and the attending doctor of the patient's active
-   * admission on their own `usuario:` channel (besides the role channels); the mobile clients show it as a banner.
+   * RN-25, MA-LAB-04: a result always publishes `laboratorio.actualizado` to the role channels (plus `users`, e.g. the
+   * patient after an amendment, never with values). A critical mark also publishes `laboratorio.critico`, but only to the
+   * lab role and to the own `usuario:` channel of the requesting doctor and of the attending doctor of the patient's
+   * active admission: other doctors and the patient never get the critical notice.
    */
-  private async resultChannels(c: PoolClient, order: Row, critical: boolean, extraUsers: Array<string | null> = []) {
-    const users = [...extraUsers];
-    if (critical) {
-      const attending = (await c.query(`SELECT medico_tratante_id AS id FROM hospitalizacion.admision WHERE paciente_id=$1 AND estado IN ${ACTIVE_ADMISSION}`, [order.patientId])).rows.map(r => r.id as string);
-      users.push(...await this.staffAccounts(c, [order.doctorId, ...attending]));
-    }
-    return channelsFor(c, ['resultados.ver', 'laboratorio.ver_cola'], { users });
+  private async publishResult(c: PoolClient, order: Row, version: number, critical: boolean, users: Array<string | null> = []) {
+    await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', order.id, version, await channelsFor(c, ['resultados.ver', 'laboratorio.ver_cola'], { users }));
+    if (!critical) return;
+    const attending = (await c.query(`SELECT medico_tratante_id AS id FROM hospitalizacion.admision WHERE paciente_id=$1 AND estado IN ${ACTIVE_ADMISSION}`, [order.patientId])).rows.map(r => r.id as string);
+    const doctors = await this.staffAccounts(c, [order.doctorId, ...attending]);
+    await this.commands.event(c, 'laboratorio.critico', 'orden_laboratorio', order.id, version, await channelsFor(c, ['laboratorio.ver_cola'], { users: doctors }));
   }
 
   async create(actor: Actor, dto: LabOrderDto, key?: string) {
@@ -209,8 +213,7 @@ export class LaboratoryService {
       const row = await this.store(c, actor, dto.orderItemId, dto, mark, range);
       await this.commands.audit(c, actor, { action: previous ? 'laboratorio.resultado_corregido' : 'laboratorio.resultado', entity: 'resultado_laboratorio', entityId: dto.orderItemId, patientId: old.patientId, permission: 'laboratorio.procesar', reason: dto.reason, detail: { mark, rangeId: range?.id ?? null } });
       const order = (await c.query('UPDATE laboratorio.orden SET version=version+1 WHERE id=$1 RETURNING version', [id])).rows[0];
-      const critical = mark.startsWith('critico_');
-      await this.commands.event(c, critical ? 'laboratorio.critico' : 'laboratorio.actualizado', 'orden_laboratorio', id, order.version, await this.resultChannels(c, old, critical));
+      await this.publishResult(c, old, order.version, mark.startsWith('critico_'));
       return { ...row, orderVersion: order.version };
     });
   }
@@ -236,10 +239,10 @@ export class LaboratoryService {
       const order = (await c.query(`UPDATE laboratorio.orden SET revisada_en=NULL,revisada_por=NULL,enmendada_en=$2,enmendada_por=$3,version=version+1 WHERE id=$1 RETURNING version`, [id, this.clock.now(), actor.staffId])).rows[0];
       const wasReleased = !!old.reviewedAt;
       await this.commands.audit(c, actor, { action: 'laboratorio.resultado_enmendado', entity: 'resultado_laboratorio', entityId: dto.orderItemId, patientId: old.patientId, permission: 'laboratorio.validar', reason: dto.reason, detail: { mark, rangeId: range?.id ?? null, previousVersion: previous.version, wasReleased } });
-      const critical = mark.startsWith('critico_');
-      // The requesting doctor must review again; if the values were already released, the patient sees them go back to review.
+      // The requesting doctor must review again; if the values were already released, the patient sees them go back to
+      // review through a plain update (SEG-05, D-040: never the critical notice, never values).
       const users = [...await this.staffAccounts(c, [old.doctorId]), wasReleased ? await patientAccount(c, old.patientId) : null];
-      await this.commands.event(c, critical ? 'laboratorio.critico' : 'laboratorio.actualizado', 'orden_laboratorio', id, order.version, await this.resultChannels(c, old, critical, users));
+      await this.publishResult(c, old, order.version, mark.startsWith('critico_'), users);
       return { ...row, orderVersion: order.version };
     });
   }
@@ -301,9 +304,9 @@ export class LaboratoryService {
   async review(actor: Actor, id: string, dto: LabVersionDto, key?: string) {
     return this.commands.run(actor, `laboratorio.revisar:${id}`, key, dto, async c => {
       const old = await this.order(c, id, true);
-      // MA-LAB-03: requester, attending doctor, current care relationship or, while the requester is off duty, a doctor on duty.
+      // MA-LAB-03: requester, attending doctor, current care relationship or an on-duty substitute of the order's area after the grace period.
       const allowed = !!actor.staffId && !!(await c.query('SELECT laboratorio.puede_revisar($1,$2,$3) AS ok', [id, actor.staffId, this.clock.now()])).rows[0]?.ok;
-      if (!allowed) throw new ForbiddenException('Solo revisa el médico que pidió la orden, el tratante, un médico con relación de atención vigente o, si quien la pidió no está de turno, un médico de turno.');
+      if (!allowed) throw new ForbiddenException('Solo revisa el médico que pidió la orden, el tratante, un médico con relación de atención vigente o, pasado el plazo sin revisión, un médico de turno del área de la orden.');
       if (old.state !== 'completado') throw new ConflictException('La orden debe estar completada antes de revisarla.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
       const row = (await c.query(`UPDATE laboratorio.orden SET revisada_en=$2,revisada_por=$3,version=version+1 WHERE id=$1 RETURNING id,version,revisada_en AS "reviewedAt"`, [id, this.clock.now(), actor.staffId])).rows[0];

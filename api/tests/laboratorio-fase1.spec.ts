@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createTestApp, TestApp } from './support/app';
 import { userId } from './support/database';
 
@@ -43,6 +44,12 @@ describe('Laboratorio · auditoría final (MA-LAB-01..06)', () => {
     return { id, item, patientId, version };
   }
   const listed = async (role: string, id: string) => ((await t.call(role, 'GET', '/laboratorio/ordenes')).body as any[]).find(o => o.id === id);
+  /** Shift of `staffId` covering the test clock in the area `code`, inserted without triggers. */
+  const shiftIn = (staffId: string, code: string) => t.pg.transaction(async tx => {
+    await tx.exec('SET LOCAL session_replication_role = replica');
+    await tx.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','en_curso' FROM infra.espacio WHERE codigo=$4`, [staffId, new Date(now.valueOf() - 60 * MINUTE), new Date(now.valueOf() + 5 * 60 * MINUTE), code]);
+  });
+  const clearShifts = async (role: string) => t.pg.query('DELETE FROM personal.turno WHERE persona_id=$1 AND periodo @> $2::timestamptz', [await t.staffOf(role), now]);
 
   describe('MA-LAB-01 cola y captura', () => {
     test('una pendiente antigua sigue en la cola aunque haya más de 300 órdenes cerradas más recientes', async () => {
@@ -54,6 +61,33 @@ describe('Laboratorio · auditoría final (MA-LAB-01..06)', () => {
       expect(queue.some(o => o.id === old.id)).toBe(true);
       expect(queue.filter(o => o.state === 'completado' && o.reviewedAt).length).toBeLessThanOrEqual(300);
       await t.pg.query("DELETE FROM laboratorio.orden WHERE paciente_id=$1 AND estado='completado' AND NOT EXISTS (SELECT 1 FROM laboratorio.orden_item i WHERE i.orden_id=laboratorio.orden.id)", [old.patientId]);
+    });
+
+    test('la cola del laboratorio no carga las completadas por revisar más allá del tope; el médico sí las ve', async () => {
+      const waiting = await order('completado');
+      await t.pg.query('UPDATE laboratorio.orden SET creada_en=$2 WHERE id=$1', [waiting.id, new Date(now.valueOf() - 90 * 24 * 60 * MINUTE)]);
+      await t.pg.query(`INSERT INTO laboratorio.orden(consulta_id,paciente_id,medico_id,estado,completada_en,revisada_en,creada_en)
+        SELECT gen_random_uuid(),$1,$2,'completado',$3::timestamptz,$3::timestamptz,$3::timestamptz - (g * interval '1 minute') FROM generate_series(1,305) g`, [waiting.patientId, await t.staffOf('MED'), now]);
+      const pending = await order('pendiente');
+      const queue = (await t.call('LAB', 'GET', '/laboratorio/ordenes')).body as any[];
+      expect(queue.some(o => o.id === pending.id)).toBe(true);
+      expect(queue.some(o => o.id === waiting.id)).toBe(false);
+      expect(queue.filter(o => o.state === 'completado').length).toBeLessThanOrEqual(300);
+      expect((await listed('MED', waiting.id))?.allowedActions).toEqual(['revisar']);
+      const reads = await t.one<{ n: number }>("SELECT count(*)::int AS n FROM plataforma.auditoria WHERE accion='laboratorio.leer' AND entidad_id=$1", [pending.id]);
+      expect(reads.n).toBeGreaterThan(0);
+      await t.pg.query("DELETE FROM laboratorio.orden WHERE paciente_id=$1 AND estado='completado' AND NOT EXISTS (SELECT 1 FROM laboratorio.orden_item i WHERE i.orden_id=laboratorio.orden.id)", [waiting.patientId]);
+    });
+
+    test('la lectura en lote deja la cadena de auditoría íntegra', async () => {
+      await order('pendiente');
+      await order('pendiente');
+      await t.call('LAB', 'GET', '/laboratorio/ordenes');
+      const rows = (await t.pg.query<{ ok: boolean }>(`SELECT hash_previo = lag(hash) OVER (ORDER BY seq) AS ok FROM plataforma.auditoria ORDER BY seq`)).rows.slice(1);
+      expect(rows.every(r => r.ok)).toBe(true);
+      const reads = (await t.pg.query<{ hash_previo: Buffer; hash: Buffer; detalle: any }>("SELECT hash_previo,hash,detalle FROM plataforma.auditoria WHERE accion='laboratorio.leer' ORDER BY seq DESC LIMIT 2")).rows;
+      expect(reads).toHaveLength(2);
+      for (const r of reads) expect(createHash('sha256').update(r.hash_previo).update(r.detalle.canonicalEvent).digest().equals(r.hash)).toBe(true);
     });
 
     test('capturar sin versión se rechaza', async () => {
@@ -104,6 +138,17 @@ describe('Laboratorio · auditoría final (MA-LAB-01..06)', () => {
       expect((await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version: amended.body.orderVersion })).status).toBe(201);
     });
 
+    test('una enmienda crítica de un resultado liberado no lleva el aviso crítico al paciente', async () => {
+      const o = await order('revisada');
+      const amended = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/enmendar`, { orderItemId: o.item, version: o.version, value: 5.1, reason: 'Repetición confirma valor crítico' });
+      expect([amended.status, amended.body.marca]).toEqual([201, 'critico_bajo']);
+      const critical = (await t.events('laboratorio.critico', o.id)).at(-1);
+      expect(critical).toEqual(expect.arrayContaining([`usuario:${userId('MED')}`, 'rol:LAB']));
+      expect(critical).not.toContain(`usuario:${userId('PAC')}`);
+      expect(critical).not.toContain('rol:PAC');
+      expect((await t.events('laboratorio.actualizado', o.id)).at(-1)).toContain(`usuario:${userId('PAC')}`);
+    });
+
     test('una orden en proceso no se enmienda: se corrige en la captura', async () => {
       const o = await order('en_proceso');
       const res = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/enmendar`, { orderItemId: o.item, version: o.version, value: 12, reason: 'Corrección de un valor capturado' });
@@ -119,25 +164,40 @@ describe('Laboratorio · auditoría final (MA-LAB-01..06)', () => {
       return other;
     }
 
-    test('sin turno ni relación, otro médico no revisa; de turno y con el solicitante ausente, sí', async () => {
+    test('un médico de turno de otra área no ve ni revisa; uno del área, solo pasado el plazo sin revisión', async () => {
       const o = await order('completado');
-      const other = await absentDoctor(o);
+      await absentDoctor(o);
+      await t.pg.query(`UPDATE atencion.consulta SET consultorio_id=(SELECT id FROM infra.espacio WHERE codigo='C-101') WHERE id=(SELECT consulta_id FROM laboratorio.orden WHERE id=$1)`, [o.id]);
+      await clearShifts('MED');
       const version = (await t.one<{ version: number }>('SELECT version FROM laboratorio.orden WHERE id=$1', [o.id])).version;
+      const review = () => t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version });
+      // On duty, but in another area: neither the order nor its values, even after the grace period.
+      await t.pg.query("UPDATE laboratorio.orden SET completada_en=$2 WHERE id=$1", [o.id, new Date(now.valueOf() - 3 * 60 * MINUTE)]);
+      await shiftIn(await t.staffOf('MED'), 'P1-EMG');
       expect(await listed('MED', o.id)).toBeUndefined();
-      expect((await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version })).status).toBe(403);
-      await t.shift('MED', new Date(now.valueOf() - 60 * MINUTE), new Date(now.valueOf() + 5 * 60 * MINUTE));
+      expect((await review()).status).toBe(403);
+      // On duty in the order's area, before the grace period (2 hours by policy).
+      await clearShifts('MED');
+      await shiftIn(await t.staffOf('MED'), 'P1-CON');
+      await t.pg.query("UPDATE laboratorio.orden SET completada_en=$2 WHERE id=$1", [o.id, new Date(now.valueOf() - 60 * MINUTE)]);
+      expect(await listed('MED', o.id)).toBeUndefined();
+      expect((await review()).status).toBe(403);
+      // Past the grace period.
+      await t.pg.query("UPDATE laboratorio.orden SET completada_en=$2 WHERE id=$1", [o.id, new Date(now.valueOf() - 3 * 60 * MINUTE)]);
       const seen = await listed('MED', o.id);
       expect([seen?.allowedActions, seen?.items[0].result?.value]).toEqual([['revisar'], 13.2]);
-      // While the requester is on duty, the substitute does not review.
-      await t.pg.transaction(async tx => {
-        await tx.exec('SET LOCAL session_replication_role = replica');
-        await tx.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','en_curso' FROM infra.espacio WHERE codigo='P1-CON'`, [other, new Date(now.valueOf() - 120 * MINUTE), new Date(now.valueOf() + 120 * MINUTE)]);
-      });
-      expect((await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version })).status).toBe(403);
-      await t.pg.query('DELETE FROM personal.turno WHERE persona_id=$1', [other]);
-      const reviewed = await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version });
+      const reviewed = await review();
       expect(reviewed.status).toBe(201);
       expect((await t.audits('laboratorio.revisar')).at(-1)?.detalle).toMatchObject({ substitute: true });
+      await clearShifts('MED');
+    });
+
+    test('enfermería con relación de atención no ve valores sin liberar ni revisa', async () => {
+      const o = await order('completado');
+      const nurse = await t.staffOf('ENF');
+      await t.pg.query(`INSERT INTO atencion.relacion_atencion(paciente_id,profesional_id,origen,origen_id,vigencia) VALUES($1,$2,'consulta',gen_random_uuid(),tstzrange($3::timestamptz - interval '1 day',$3::timestamptz + interval '1 day'))`, [o.patientId, nurse, now]);
+      expect(await listed('ENF', o.id)).toBeUndefined();
+      expect((await t.one<{ ok: boolean }>('SELECT laboratorio.puede_revisar($1,$2,$3) AS ok', [o.id, nurse, now])).ok).toBe(false);
     });
 
     test('el tratante de la admisión activa revisa aunque no haya pedido la orden', async () => {
@@ -153,12 +213,14 @@ describe('Laboratorio · auditoría final (MA-LAB-01..06)', () => {
     });
   });
 
-  test('MA-LAB-04: un valor crítico llega al canal propio del médico que pidió la orden', async () => {
+  test('MA-LAB-04: un valor crítico llega solo al canal propio del médico que pidió la orden y al laboratorio', async () => {
     const o = await order('en_proceso');
     const saved = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultados`, { orderItemId: o.item, value: 5.1, version: o.version });
     expect([saved.status, saved.body.marca]).toEqual([201, 'critico_bajo']);
-    expect((await t.events('laboratorio.critico', o.id)).at(-1)).toEqual(expect.arrayContaining([`usuario:${userId('MED')}`, 'rol:MED']));
-    expect((await t.events('laboratorio.critico', o.id)).at(-1)).not.toContain(`usuario:${userId('PAC')}`);
+    const critical = (await t.events('laboratorio.critico', o.id)).at(-1);
+    expect(critical).toEqual(expect.arrayContaining([`usuario:${userId('MED')}`, 'rol:LAB']));
+    for (const channel of ['rol:MED', 'rol:ENF', `usuario:${userId('PAC')}`]) expect(critical).not.toContain(channel);
+    expect((await t.events('laboratorio.actualizado', o.id)).at(-1)).toEqual(expect.arrayContaining(['rol:MED', 'rol:LAB']));
   });
 
   describe('MA-LAB-06 catálogo', () => {
