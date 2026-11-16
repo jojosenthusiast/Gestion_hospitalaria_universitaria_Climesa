@@ -9,7 +9,7 @@ import './shifts.css';
 
 /** `draft` prellena un turno nuevo con lo que la pantalla ya sabe (por ejemplo, el suplente de una ausencia). */
 export type ShiftDraft = { areaId: string; start: string; end: string; type: string; staffId: string };
-type Props = { api: Api; shift: Shift | null; draft?: ShiftDraft; catalog: ShiftCatalog; shifts: Shift[]; onClose: () => void; onSaved: () => void };
+type Props = { api: Api; shift: Shift | null; draft?: ShiftDraft; catalog: ShiftCatalog; shifts: Shift[]; onClose: () => void; onSaved: (id?: string) => void };
 /** Códigos con los que la API pide un motivo de emergencia para superar la carga (CARGA-01/02). */
 const LOAD_CODES = ['carga_semanal_excedida', 'dias_seguidos_excedidos'];
 
@@ -74,7 +74,8 @@ export function ShiftForm({ api, shift, draft, catalog, shifts, onClose, onSaved
       ...(emergency.trim() ? { emergencyReason: emergency.trim() } : {}),
       ...(shift ? { version: shift.version, reason: reason.trim() } : {}),
     };
-    if (await action.run(shift ? `/turnos/${shift.id}` : '/turnos', body, shift ? 'PATCH' : 'POST')) onSaved();
+    const saved = await action.run<{ id?: string }>(shift ? `/turnos/${shift.id}` : '/turnos', body, shift ? 'PATCH' : 'POST');
+    if (saved) onSaved(saved.id ?? shift?.id);
   }
 
   return <Dialog title={shift ? 'Editar turno' : 'Asignar turno'} onClose={onClose} busy={action.busy}>

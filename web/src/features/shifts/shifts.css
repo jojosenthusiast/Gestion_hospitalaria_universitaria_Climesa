@@ -141,3 +141,78 @@
   .shift-week-now::before { left: -3px; top: -3px; }
   .shift-day-title { padding: 12px 16px 8px; }
 }
+
+/* Planificación en el calendario (S12): crear en una hora, mover y estirar bloques, vista Día y turno nuevo resaltado. */
+.shift-week.is-day { grid-template-columns: 44px minmax(0, 1fr); }
+.shift-week-head { position: relative; }
+.shift-week-head:has(.shift-week-add) { padding-right: 38px; }
+.shift-week-add { position: absolute; top: 50%; right: 0; width: 32px; height: 32px; display: grid; place-items: center; transform: translateY(-50%);
+  border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--primary-text); cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out); }
+.shift-week-add::before { content: ""; position: absolute; inset: -6px; }
+.shift-week-add:hover { background: var(--soft); border-color: color-mix(in srgb, var(--primary) 45%, var(--line)); }
+.shift-week-add:focus-visible { outline: 3px solid var(--outline); outline-offset: 2px; }
+.shift-week-track.is-plannable { cursor: cell; touch-action: pan-y; }
+.shift-select { position: absolute; z-index: 1; left: 2px; right: 2px; top: calc(var(--from) * 100%); height: calc(var(--len) * 100%);
+  border: 2px dashed var(--primary); border-radius: 6px; background: color-mix(in srgb, var(--primary) 12%, transparent); pointer-events: none; }
+.shift-block.is-movable { cursor: grab; touch-action: none; }
+.shift-block.is-dragging { z-index: 5; cursor: grabbing; transform: translate(var(--dx, 0), var(--dy, 0)); height: calc(var(--len) * 100% + var(--grow, 0px));
+  box-shadow: var(--shadow-float); opacity: 0.92; transition: none; }
+.shift-block-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; cursor: ns-resize; }
+.shift-block-resize::after { content: ""; position: absolute; left: 50%; bottom: 2px; width: 16px; height: 2px; margin-left: -8px; border-radius: 1px; background: currentColor; opacity: 0.45; }
+/* Turno recién creado o movido: anillo fijo (no depende del movimiento) y un único pulso breve al aparecer. */
+.shift-block.is-new { z-index: 4; outline: 3px solid var(--primary); outline-offset: 1px; animation: shift-new var(--motion-standard) var(--ease-out); }
+@keyframes shift-new { from { transform: scale(0.96); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .shift-block.is-new { animation: none; }
+  .shift-week-add, .shift-block { transition: none; }
+}
+
+.shift-plan-tools, .shift-scale, .shift-day-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.shift-scale { justify-content: space-between; }
+.shift-day-picker .shift-pill { text-transform: capitalize; font-variant-numeric: tabular-nums; }
+.shift-announce:empty { display: none; }
+.shift-undo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--soft); }
+
+/* Lista: los días pasados de la semana quedan plegados al final. */
+.shift-past { border-top: 1px solid var(--line); }
+.shift-past > summary { min-height: 44px; padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; color: var(--muted); font-weight: 700; cursor: pointer; }
+.shift-past > summary:focus-visible { outline: 3px solid var(--outline); outline-offset: -3px; }
+.shift-past[open] > summary { border-bottom: 1px solid var(--line); }
+
+/* Lotes: vista previa, personas, patrones y plantillas. */
+.shift-preview { gap: 16px; }
+.shift-preview-summary { margin: 0; font-weight: 700; }
+.shift-preview-day h3 { margin: 0 0 6px; font-size: 0.9375rem; }
+.shift-preview-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.shift-preview-item { padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; align-items: center; gap: 8px 12px;
+  border: 1px solid var(--line); border-left-width: 4px; border-radius: var(--radius-control); }
+.shift-preview-item.has-conflict { border-left-color: var(--danger); background: color-mix(in srgb, var(--danger) 6%, var(--surface)); }
+.shift-preview-who { min-width: 0; display: grid; gap: 2px; }
+.shift-preview-time, .shift-preview-note, .shift-preview-pending { color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.shift-preview-ok { color: var(--success); font-weight: 700; }
+.shift-preview-error { color: var(--danger); font-weight: 700; }
+.shift-preview-actions { display: flex; align-items: center; gap: 8px; }
+.shift-preview-actions select { min-height: 40px; max-width: 14rem; }
+.shift-preview-gaps ul { margin: 0; padding-left: 20px; }
+.shift-people { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; }
+.shift-people legend { padding: 0; font-weight: 700; }
+.shift-people ul { margin: 0; padding: 0; list-style: none; max-height: 16rem; overflow-y: auto; display: grid; gap: 4px; }
+.shift-people li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.shift-people-tools { display: flex; gap: 12px; }
+.shift-patterns { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 8px; }
+.shift-pattern { padding: 12px; display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-control); cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out); }
+.shift-pattern > span { display: grid; gap: 2px; }
+.shift-pattern.is-selected { border-color: var(--primary); background: var(--soft); }
+.shift-pattern:has(input:focus-visible) { outline: 3px solid var(--outline); outline-offset: 2px; }
+.shift-templates { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.shift-templates li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.shift-templates li > div { flex: 1 1 12rem; display: grid; gap: 2px; }
+@media (prefers-reduced-motion: reduce) { .shift-pattern { transition: none; } }
+@media (max-width: 720px) {
+  .shift-week.is-day { grid-template-columns: minmax(0, 1fr); }
+  .shift-week-add { position: static; transform: none; width: 44px; height: 44px; }
+  .shift-preview-item { grid-template-columns: minmax(0, 1fr); }
+  .shift-past > summary { padding: 12px 16px; }
+}
