@@ -174,7 +174,7 @@ object LaboratoryEvents {
 }
 
 /**
- * RN-25: a critical value publishes `laboratorio.critico` on `orden_laboratorio`, also on the requesting and attending doctor's
+ * RN-25: a critical value publishes `laboratorio.critico` on `orden_laboratorio`, only to the lab role and the requesting and attending doctor's
  * `usuario:<id>` channel. Only an account that may review results gets the app-wide notice.
  */
 object LabCriticalEvents {

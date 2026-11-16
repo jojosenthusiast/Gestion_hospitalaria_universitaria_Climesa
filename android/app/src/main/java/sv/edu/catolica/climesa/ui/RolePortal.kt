@@ -83,14 +83,21 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
         }
     }
     fun load(path:String?,silent:Boolean=false){current=path;job?.cancel();job=viewModelScope.launch{if(!silent||path==null)mutable.value=RoleData(loading=path!=null);if(path!=null)try{mutable.value=RoleData(data=source.get(path))}catch(e:Exception){if(e is CancellationException)throw e;if(silent&&mutable.value.data!=null)return@launch;mutable.value=RoleData(error=e.message?:"No se pudo cargar la información.")}}}
-    /** RN-25: llegó un valor crítico y la cuenta puede revisar resultados; sigue visible hasta que se cierra o se abre la revisión. */
+    /**
+     * RN-25: llegó un valor crítico y la API deja a esta cuenta revisar una orden crítica (`allowedActions` incluye `revisar`,
+     * como en iOS); sigue visible hasta que se cierra o se abre la revisión.
+     */
     private val criticalLabMutable=MutableStateFlow(false);val criticalLab=criticalLabMutable.asStateFlow()
     fun dismissCriticalLab(){criticalLabMutable.value=false}
+    private fun checkCriticalLab(){viewModelScope.launch{
+        try{if(LabCritical.pendingReview(LaboratoryParser.orders(source.get("/laboratorio/ordenes")))>0)criticalLabMutable.value=true}
+        catch(e:Exception){if(e is CancellationException)throw e}
+    }}
     /** Idempotente: refresca la sección abierta cuando llega un evento que le importa, sin mostrar el indicador de carga. */
     fun start(channels:List<String>,permissions:Collection<String> = emptyList()){live.start(viewModelScope,channels){signal->
         when(signal){
             is RealtimeSignal.Event->{
-                if(LabCriticalEvents.notifies(signal.event,permissions))criticalLabMutable.value=true
+                if(LabCriticalEvents.notifies(signal.event,permissions))checkCriticalLab()
                 if(PortalEvents.matches(current,signal.event))load(current,silent=true)
             }
             RealtimeSignal.Resync->if(current!=null)load(current,silent=true)

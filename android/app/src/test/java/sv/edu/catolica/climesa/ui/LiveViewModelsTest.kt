@@ -47,24 +47,41 @@ class LiveViewModelsTest {
         assertFalse("la recarga en vivo no muestra el indicador de carga", vm.state.value.loading)
     }
 
-    @Test fun unValorCriticoAvisaAlMedicoHastaQueLoCierra() = runTest(dispatcher) {
-        val bus = SignalBus()
-        val vm = RoleViewModel({ org.json.JSONArray() }, bus)
+    /** One completed order with a critical value; `actions` is what the API allows this reader on it. */
+    private fun criticalOrders(vararg actions: String) = org.json.JSONArray().put(org.json.JSONObject()
+        .put("id", "o1").put("patientName", "Paciente").put("priority", "rutina").put("state", "completado").put("version", 3).put("reviewedAt", org.json.JSONObject.NULL)
+        .put("allowedActions", org.json.JSONArray(actions.toList()))
+        .put("items", org.json.JSONArray().put(org.json.JSONObject().put("id", "i1").put("code", "HB").put("name", "Hemoglobina")
+            .put("result", org.json.JSONObject().put("value", 5.1).put("mark", "critico_bajo").put("version", 1)))))
+
+    @Test fun unValorCriticoAvisaAlMedicoQuePuedeRevisarloHastaQueLoCierra() = runTest(dispatcher) {
+        val bus = SignalBus(); val calls = mutableListOf<String>()
+        val vm = RoleViewModel({ path -> calls += path; criticalOrders("revisar") }, bus)
         vm.start(listOf("usuario:m1"), listOf("laboratorio.revisar")); runCurrent()
         bus.signals.tryEmit(event("laboratorio.orden_actualizada", "orden_laboratorio")); runCurrent()
         assertFalse(vm.criticalLab.value)
         bus.signals.tryEmit(event("laboratorio.critico", "orden_laboratorio")); runCurrent()
+        assertEquals(listOf("/laboratorio/ordenes"), calls)
         assertTrue(vm.criticalLab.value)
         vm.dismissCriticalLab()
         assertFalse(vm.criticalLab.value)
     }
 
-    @Test fun unValorCriticoNoAvisaSinPermisoDeRevisar() = runTest(dispatcher) {
+    @Test fun unValorCriticoNoAvisaSiLaApiNoDejaRevisarLaOrden() = runTest(dispatcher) {
         val bus = SignalBus()
-        val vm = RoleViewModel({ org.json.JSONArray() }, bus)
+        val vm = RoleViewModel({ criticalOrders() }, bus)
+        vm.start(listOf("rol:MED"), listOf("laboratorio.revisar")); runCurrent()
+        bus.signals.tryEmit(event("laboratorio.critico", "orden_laboratorio")); runCurrent()
+        assertFalse(vm.criticalLab.value)
+    }
+
+    @Test fun unValorCriticoNoAvisaSinPermisoDeRevisar() = runTest(dispatcher) {
+        val bus = SignalBus(); val calls = mutableListOf<String>()
+        val vm = RoleViewModel({ path -> calls += path; criticalOrders("revisar") }, bus)
         vm.start(listOf("rol:LAB"), listOf("laboratorio.procesar")); runCurrent()
         bus.signals.tryEmit(event("laboratorio.critico", "orden_laboratorio")); runCurrent()
         assertFalse(vm.criticalLab.value)
+        assertEquals(emptyList<String>(), calls)
     }
 
     @Test fun elPortalIgnoraEventosDeOtraSeccion() = runTest(dispatcher) {
