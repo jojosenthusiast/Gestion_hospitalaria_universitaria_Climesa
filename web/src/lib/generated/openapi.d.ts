@@ -2484,6 +2484,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/avisos/estadisticas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Por aviso: cuántas cuentas dieron "Enterado" y a cuántas va dirigido (solo conteos, sin nombres) */
+        get: operations["NoticesController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/avisos/{id}": {
         parameters: {
             query?: never;
@@ -2529,6 +2546,57 @@ export interface paths {
         get: operations["MyNoticesController_mine"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/avisos/bandeja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bandeja de avisos: nivel, "Enterado", recordatorio, cuáles se destacan en el inicio y conteos de sin leer y críticos */
+        get: operations["MyNoticesController_inbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/avisos/{id}/enterado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dar "Enterado" a un aviso dirigido a mi cuenta; idempotente y auditado */
+        post: operations["MyNoticesController_acknowledge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/avisos/{id}/posponer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recordarme después: el aviso crítico deja de destacarse por avisos.recordatorio_horas (4 h) y luego vuelve */
+        post: operations["MyNoticesController_snooze"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5915,6 +5983,11 @@ export interface components {
             llamados: components["schemas"]["CalledNumberResponse"][];
         };
         /**
+         * @description Criticidad para el personal (Fase 2): solo critico se destaca en el inicio
+         * @enum {string}
+         */
+        NivelAviso: "informativo" | "importante" | "critico";
+        /**
          * @description Acciones que el servidor acepta ahora: ninguna si el aviso venció o fue retirado
          * @enum {string}
          */
@@ -5932,6 +6005,10 @@ export interface components {
             prioridad: string;
             publico: boolean;
             roles: string[];
+            /** @description Criticidad para el personal (Fase 2): solo critico se destaca en el inicio */
+            nivel: components["schemas"]["NivelAviso"];
+            /** @description Códigos de espacio (área o bahía) a cuyo personal va dirigido */
+            areas: string[];
             /** @description vigente, programado, vencido o retirado */
             estado: string;
             /** Format: date-time */
@@ -5944,6 +6021,14 @@ export interface components {
             retiradoEn: string | null;
             /** @description Motivo del retiro (D-13) */
             motivoRetiro: string | null;
+        };
+        NoticeStatsResponse: {
+            /** Format: uuid */
+            avisoId: string;
+            /** @description Cuentas que dieron "Enterado" */
+            enterados: number;
+            /** @description Cuentas activas del personal a las que va dirigido por rol o por el área de su ficha; 0 si solo es público */
+            destinatarios: number;
         };
         NoticeDto: {
             titulo: string;
@@ -5971,6 +6056,13 @@ export interface components {
             publico: boolean;
             /** @description Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol */
             roles?: string[];
+            /**
+             * @description Criticidad para el personal (Fase 2): informativo (por omisión al publicar), importante o critico. Solo critico se destaca en el inicio de su audiencia hasta el "Enterado". Al editar, sin nivel se conserva el del aviso. Sin prioridad, la prioridad sale del nivel (informativo → atencion, importante → urgente, critico → critico)
+             * @enum {string}
+             */
+            nivel?: "informativo" | "importante" | "critico";
+            /** @description Códigos de espacio (área o bahía, por ejemplo P1-EMG) a cuyo personal va dirigido: su área de ficha o la de su turno en curso. Al editar, sin áreas se conservan las del aviso */
+            areas?: string[];
             /** @description Publicar aunque el texto parezca contener un DUI, expediente o teléfono (FR-112-05) */
             confirmarDatosPersonales?: boolean;
         };
@@ -5987,6 +6079,10 @@ export interface components {
             prioridad: string;
             publico: boolean;
             roles: string[];
+            /** @description Criticidad para el personal (Fase 2): solo critico se destaca en el inicio */
+            nivel: components["schemas"]["NivelAviso"];
+            /** @description Códigos de espacio (área o bahía) a cuyo personal va dirigido */
+            areas: string[];
             /** Format: date-time */
             publicadoEn: string | null;
         };
@@ -6016,6 +6112,13 @@ export interface components {
             publico: boolean;
             /** @description Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol */
             roles?: string[];
+            /**
+             * @description Criticidad para el personal (Fase 2): informativo (por omisión al publicar), importante o critico. Solo critico se destaca en el inicio de su audiencia hasta el "Enterado". Al editar, sin nivel se conserva el del aviso. Sin prioridad, la prioridad sale del nivel (informativo → atencion, importante → urgente, critico → critico)
+             * @enum {string}
+             */
+            nivel?: "informativo" | "importante" | "critico";
+            /** @description Códigos de espacio (área o bahía, por ejemplo P1-EMG) a cuyo personal va dirigido: su área de ficha o la de su turno en curso. Al editar, sin áreas se conservan las del aviso */
+            areas?: string[];
             /** @description Publicar aunque el texto parezca contener un DUI, expediente o teléfono (FR-112-05) */
             confirmarDatosPersonales?: boolean;
             /** @description Versión que se leyó; otra distinta responde version_conflicto */
@@ -6038,6 +6141,10 @@ export interface components {
             prioridad: string;
             publico: boolean;
             roles: string[];
+            /** @description Criticidad para el personal (Fase 2): solo critico se destaca en el inicio */
+            nivel: components["schemas"]["NivelAviso"];
+            /** @description Códigos de espacio (área o bahía) a cuyo personal va dirigido */
+            areas: string[];
         };
         MyNoticesResponse: {
             /** Format: date-time */
@@ -6045,6 +6152,64 @@ export interface components {
             avisos: components["schemas"]["NoticeAudienceResponse"][];
             /** Format: date-time */
             proximoCambio: string | null;
+        };
+        MyInboxNoticeResponse: {
+            /** Format: uuid */
+            id: string;
+            titulo: string;
+            cuerpo: string;
+            /** Format: date-time */
+            desde: string | null;
+            /** Format: date-time */
+            hasta: string | null;
+            /** @description atencion, urgente o critico (D-071) */
+            prioridad: string;
+            publico: boolean;
+            roles: string[];
+            /** @description Criticidad para el personal (Fase 2): solo critico se destaca en el inicio */
+            nivel: components["schemas"]["NivelAviso"];
+            /** @description Códigos de espacio (área o bahía) a cuyo personal va dirigido */
+            areas: string[];
+            /** Format: date-time */
+            publicadoEn: string | null;
+            /** @description Dirigido al rol o al área de la cuenta (no solo público) */
+            dirigido: boolean;
+            /**
+             * Format: date-time
+             * @description Cuándo la cuenta dio "Enterado"; null si no lo ha hecho
+             */
+            enteradoEn: string | null;
+            /**
+             * Format: date-time
+             * @description Hasta cuándo pospuso el recordatorio
+             */
+            recordarEn: string | null;
+            /** @description Se destaca en el inicio: crítico, dirigido, sin "Enterado" y sin posponer */
+            destacado: boolean;
+        };
+        MyInboxResponse: {
+            /** Format: date-time */
+            actualizadoEn: string;
+            avisos: components["schemas"]["MyInboxNoticeResponse"][];
+            /** @description Avisos sin "Enterado" */
+            noLeidos: number;
+            /** @description Avisos críticos dirigidos a la cuenta sin "Enterado" */
+            criticos: number;
+            /** @description Horas que tarda en volver un crítico pospuesto (política avisos.recordatorio_horas) */
+            recordatorioHoras: number;
+            /**
+             * Format: date-time
+             * @description Siguiente instante en que la bandeja cambia sola: vence o empieza un aviso, o vuelve un recordatorio
+             */
+            proximoCambio: string | null;
+        };
+        NoticeAckResponse: {
+            /** Format: uuid */
+            avisoId: string;
+            /** Format: date-time */
+            enteradoEn: string | null;
+            /** Format: date-time */
+            recordarEn: string | null;
         };
         BedTotalsResponse: {
             total: number;
@@ -18099,6 +18264,61 @@ export interface operations {
             };
         };
     };
+    NoticesController_stats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeStatsResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     NoticesController_edit: {
         parameters: {
             query?: never;
@@ -18300,6 +18520,217 @@ export interface operations {
             };
             /** @description Sin permiso (`sin_permiso`) o regla de acceso */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    MyNoticesController_inbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyInboxResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    MyNoticesController_acknowledge: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeAckResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    MyNoticesController_snooze: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeAckResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

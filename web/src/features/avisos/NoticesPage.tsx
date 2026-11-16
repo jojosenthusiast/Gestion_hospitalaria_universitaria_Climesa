@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react';
+import { AreaTag } from '../../components/system';
 import { Field, Icon, Notice } from '../../components/ui';
-import { can, roleNames, type AccessProfile, type Api } from '../../lib/api';
-import { Dialog, Empty, CompactHeader, RemoteState, Tag, WriteError, formatDateTime, useAction, useData } from '../common';
-import { NoticeCard } from './NoticePreview';
-import { audienceRoles, audienceText, durations, isoToLocalInput, localInput, localToIso, personalDataIn, priorities, WITHDRAW_MIN, type NoticeListItem, type Priority } from './rules';
+import { can, roleNames, type AccessProfile, type Api, type Space } from '../../lib/api';
+import { useRefreshAt } from '../../lib/publico';
+import { Dialog, Empty, CompactHeader, RemoteState, Tag, WriteError, formatDateTime, useAction, useData, type Remote } from '../common';
+import { NoticeCard, NoticeLevelBadge } from './NoticePreview';
+import { audienceRoles, audienceText, durations, filterInbox, inboxFilters, isoToLocalInput, levels, localInput, localToIso, personalDataIn, priorities, priorityOfLevel, WITHDRAW_MIN, type Inbox, type InboxFilter, type InboxNotice, type Level, type NoticeListItem, type NoticeStats, type Priority } from './rules';
 import './avisos.css';
 
 export { localToIso } from './rules';
@@ -11,28 +13,97 @@ const PERSONAL_DATA = 'aviso_con_datos_personales';
 const stateLabel: Record<string, string> = { vigente: 'Vigente', programado: 'Programado', vencido: 'Vencido', retirado: 'Retirado' };
 const stateTag: Record<string, string> = { vigente: 'activo', programado: 'pendiente', vencido: 'inactivo', retirado: 'cancelado' };
 
+type View = 'mios' | 'publicados';
+const filterFromHash = (): InboxFilter => { const value = new URLSearchParams(location.hash.split('?')[1] ?? '').get('filtro'); return value === 'criticos' || value === 'sin-leer' ? value : 'todos'; };
+
 /**
- * W25 · Avisos generales: redactar con vista previa, elegir a quién llega y con qué prioridad, y ver lo ya publicado
- * (FR-112-03, FR-112-05). Editar y retirar (MA-AVI-02) solo aparecen donde el servidor los acepta (`allowedActions`).
+ * W25 · Avisos (Fase 2, S11): su propia área para toda cuenta con sesión. «Para mí» es la bandeja de pendientes de la
+ * cuenta (críticos primero, filtros y detalle con «Enterado»). Quien tiene `avisos.publicar` ve además «Publicados»:
+ * redactar con vista previa, nivel y audiencia (FR-112-03, FR-112-05), editar y retirar donde el servidor lo acepta
+ * (`allowedActions`, MA-AVI-02) y cuántas cuentas dieron «Enterado».
  */
 export function NoticesPage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
-  const list = useData<NoticeListItem[]>(api, '/avisos', version, can(profile, 'avisos.publicar'));
+  const publisher = can(profile, 'avisos.publicar');
+  const [view, setView] = useState<View>(publisher ? 'publicados' : 'mios');
+  const [filter, setFilter] = useState<InboxFilter>(filterFromHash);
+  const mine = view === 'mios' || !publisher;
+  const inbox = useData<Inbox>(api, '/me/avisos/bandeja', version, mine);
+  const views = publisher && <div className="segmented-control" role="group" aria-label="Vista">
+    <button type="button" aria-pressed={mine} onClick={() => setView('mios')}>Para mí</button>
+    <button type="button" aria-pressed={!mine} onClick={() => setView('publicados')}>Publicados</button>
+  </div>;
+  const counts: Record<InboxFilter, number | null> = { todos: null, 'sin-leer': inbox.data?.noLeidos ?? null, criticos: inbox.data?.criticos ?? null };
+  const filters = mine && <div className="segmented-control" role="group" aria-label="Filtrar avisos">{inboxFilters.map(f => <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{f.label}{counts[f.id] ? <span className="notice-count">{counts[f.id]}</span> : null}</button>)}</div>;
+  return <>
+    <CompactHeader breadcrumb="CLIMESA / Comunicación" title="Avisos" filters={filters || undefined} actions={views || undefined}/>
+    {mine ? <NoticeInbox api={api} state={inbox} filter={filter} /> : <PublishedNotices api={api} profile={profile} version={version} />}
+  </>;
+}
+
+/** «Para mí»: bandeja de pendientes (02-sistema §5) con lista y detalle; la acción principal es «Enterado». */
+function NoticeInbox({ api, state, filter }: { api: Api; state: Remote<Inbox>; filter: InboxFilter }) {
+  useRefreshAt(state.data?.proximoCambio, state.refresh);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  return <RemoteState state={state}>{data => {
+    const items = filterInbox(data.avisos, filter);
+    if (!data.avisos.length) return <Empty title="Estás al día" description="No hay avisos vigentes para tu rol ni tu área." />;
+    if (!items.length) return <Empty title={filter === 'criticos' ? 'Sin avisos críticos' : 'Todo leído'} description="Cambia el filtro para ver los demás avisos." />;
+    const selected = items.find(n => n.id === selectedId) ?? items[0];
+    return <div className="notice-inbox">
+      <ul className="notice-inbox-list" aria-label="Mis avisos">{items.map(n => <li key={n.id}>
+        <button type="button" className={`notice-row${n.enteradoEn ? ' is-read' : ''}`} aria-current={n.id === selected.id ? 'true' : undefined} onClick={() => setSelectedId(n.id)}>
+          <span className="notice-row-head"><NoticeLevelBadge level={n.nivel} /><Tag value={n.enteradoEn ? 'completado' : 'pendiente'} label={n.enteradoEn ? 'Enterado' : 'Sin leer'} /></span>
+          <strong>{n.titulo}</strong>
+          <small>{n.publicadoEn ? formatDateTime(n.publicadoEn) : ''}{n.hasta ? ` · hasta ${formatDateTime(n.hasta)}` : ''}</small>
+        </button>
+      </li>)}</ul>
+      <NoticeDetail key={selected.id} api={api} notice={selected} hours={data.recordatorioHoras} onDone={state.refresh} />
+    </div>;
+  }}</RemoteState>;
+}
+
+function NoticeDetail({ api, notice, hours, onDone }: { api: Api; notice: InboxNotice; hours: number; onDone: () => void }) {
+  const action = useAction(api);
+  const send = async (verb: 'enterado' | 'posponer') => { if (await action.run(`/me/avisos/${notice.id}/${verb}`, {})) onDone(); };
+  const snoozable = notice.nivel === 'critico' && notice.dirigido && !notice.enteradoEn;
+  return <section className="notice-detail" aria-label="Detalle del aviso">
+    <NoticeCard notice={notice} />
+    <dl className="notice-detail-meta">
+      <div><dt>Publicado</dt><dd>{notice.publicadoEn ? formatDateTime(notice.publicadoEn) : '—'}</dd></div>
+      <div><dt>Vigente hasta</dt><dd>{notice.hasta ? formatDateTime(notice.hasta) : '—'}</dd></div>
+      {notice.recordarEn && !notice.enteradoEn && <div><dt>Te lo recordamos</dt><dd>{formatDateTime(notice.recordarEn)}</dd></div>}
+    </dl>
+    <WriteError error={action.error} />
+    {notice.enteradoEn
+      ? <p className="notice-detail-done"><Tag value="completado" label="Enterado" /> {formatDateTime(notice.enteradoEn)}</p>
+      : <div className="dialog-actions">
+        {snoozable && <button type="button" className="secondary-button" disabled={action.busy} onClick={() => void send('posponer')}>Recordarme en {hours} h</button>}
+        <button type="button" className="primary-button" disabled={action.busy} onClick={() => void send('enterado')}><Icon name="check" size={18} />Enterado</button>
+      </div>}
+  </section>;
+}
+
+/** «Publicados»: redactar, editar, retirar y ver cuántas cuentas dieron «Enterado» (solo conteos). */
+function PublishedNotices({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
+  const list = useData<NoticeListItem[]>(api, '/avisos', version);
+  const stats = useData<NoticeStats[]>(api, '/avisos/estadisticas', version);
+  const statsOf = (id: string) => Array.isArray(stats.data) ? stats.data.find(s => s.avisoId === id) : undefined;
   const [editing, setEditing] = useState<NoticeListItem | null>(null), [withdrawing, setWithdrawing] = useState<NoticeListItem | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const edit = (notice: NoticeListItem) => { setMessage(null); setEditing(notice); document.querySelector('.notice-composer')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); };
   return <>
-    <CompactHeader breadcrumb="Operaciones / Comunicación" title="Avisos generales"/>
-    {can(profile, 'avisos.publicar') && <NoticeComposer key={editing ? `${editing.id}-${editing.version}` : 'nuevo'} api={api} editing={editing} onDone={() => { if (editing) setMessage(`Cambios guardados en «${editing.titulo}». Ya se ven donde se publica.`); setEditing(null); list.refresh(); }} onCancel={() => setEditing(null)} onReload={() => { setEditing(null); list.refresh(); }} />}
+    <NoticeComposer key={editing ? `${editing.id}-${editing.version}` : 'nuevo'} api={api} profile={profile} editing={editing} onDone={() => { if (editing) setMessage(`Cambios guardados en «${editing.titulo}». Ya se ven donde se publica.`); setEditing(null); list.refresh(); stats.refresh(); }} onCancel={() => setEditing(null)} onReload={() => { setEditing(null); list.refresh(); }} />
     {message && <Notice kind="success">{message}</Notice>}
     <section className="data-workbench notice-history" aria-label="Avisos publicados">
       <div className="table-caption">Publicados<span>Los más recientes primero. Un aviso vencido o retirado deja de verse solo.</span></div>
       <RemoteState state={list}>{rows => rows.length
-        ? <table className="record-table"><caption className="sr-only">Avisos publicados</caption><thead><tr><th>Aviso</th><th>Prioridad</th><th>Dónde se ve</th><th>Vigencia</th><th>Estado</th><th>Acciones</th></tr></thead>
-          <tbody>{rows.map(a => <tr key={a.id}>
+        ? <table className="record-table"><caption className="sr-only">Avisos publicados</caption><thead><tr><th>Aviso</th><th>Nivel</th><th>Dónde se ve</th><th>Vigencia</th><th>Enterado</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>{rows.map(a => { const count = statsOf(a.id); return <tr key={a.id}>
             <td data-label="Aviso"><strong>{a.titulo}</strong><small>{a.cuerpo}</small></td>
-            <td data-label="Prioridad"><span className={`notice-badge notice-${a.prioridad}`}>{priorities.find(p => p.id === a.prioridad)?.label ?? a.prioridad}</span></td>
+            <td data-label="Nivel"><NoticeLevelBadge level={a.nivel} /><small>Pantalla pública: <span>{priorities.find(p => p.id === a.prioridad)?.label ?? a.prioridad}</span></small></td>
             <td data-label="Dónde se ve">{audienceText(a)}</td>
             <td data-label="Vigencia">{a.desde ? formatDateTime(a.desde) : '—'}<small>hasta {a.hasta ? formatDateTime(a.hasta) : '—'}</small></td>
+            <td data-label="Enterado" className="numeric">{count ? (count.destinatarios ? `${count.enterados} de ${count.destinatarios}` : String(count.enterados)) : '—'}</td>
             <td data-label="Estado"><Tag value={stateTag[a.estado] ?? a.estado} label={stateLabel[a.estado] ?? a.estado} />
               {a.estado === 'retirado' && <small>{a.retiradoEn ? `${formatDateTime(a.retiradoEn)} · ` : ''}Motivo: {a.motivoRetiro ?? 'sin motivo registrado'}</small>}</td>
             <td data-label="Acciones">{(a.allowedActions ?? []).length
@@ -41,7 +112,7 @@ export function NoticesPage({ api, profile, version }: { api: Api; profile: Acce
                 {a.allowedActions.includes('retirar') && <button type="button" className="row-action" onClick={() => { setMessage(null); setWithdrawing(a); }}>Retirar</button>}
               </div>
               : <small className="muted">—</small>}</td>
-          </tr>)}</tbody></table>
+          </tr>; })}</tbody></table>
         : <Empty title="Todavía no hay avisos" description="Publica el primero con el formulario de arriba." />}</RemoteState>
     </section>
     {withdrawing && <WithdrawDialog api={api} notice={withdrawing} onClose={() => setWithdrawing(null)} onDone={() => { setMessage(`Aviso «${withdrawing.titulo}» retirado. Ya no se ve en ninguna parte.`); setWithdrawing(null); if (editing?.id === withdrawing.id) setEditing(null); list.refresh(); }} onReload={() => { setWithdrawing(null); list.refresh(); }} />}
@@ -72,28 +143,33 @@ function WithdrawDialog({ api, notice, onClose, onDone, onReload }: { api: Api; 
   </Dialog>;
 }
 
-function NoticeComposer({ api, editing, onDone, onCancel, onReload }: { api: Api; editing: NoticeListItem | null; onDone: () => void; onCancel: () => void; onReload: () => void }) {
+function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: { api: Api; profile: AccessProfile; editing: NoticeListItem | null; onDone: () => void; onCancel: () => void; onReload: () => void }) {
   // Al editar un aviso ya vigente su inicio no cambia: se envía sin `desde` y la API conserva el inicio vigente.
   const started = editing?.estado === 'vigente';
   // Al editar uno programado, vaciar «Desde» significa empezar ahora: se envía la hora actual (sin `desde` la API conservaría el inicio programado).
   const scheduled = editing?.estado === 'programado';
-  const [title, setTitle] = useState(editing?.titulo ?? ''), [body, setBody] = useState(editing?.cuerpo ?? ''), [priority, setPriority] = useState<Priority>((editing?.prioridad as Priority) ?? 'atencion');
-  const [isPublic, setPublic] = useState(editing?.publico ?? true), [roles, setRoles] = useState<string[]>(editing?.roles ?? []);
+  const [title, setTitle] = useState(editing?.titulo ?? ''), [body, setBody] = useState(editing?.cuerpo ?? ''), [level, setLevel] = useState<Level>(editing?.nivel ?? 'informativo');
+  const [isPublic, setPublic] = useState(editing?.publico ?? true), [roles, setRoles] = useState<string[]>(editing?.roles ?? []), [areas, setAreas] = useState<string[]>(editing?.areas ?? []);
+  // The public screen keeps its D-071 priority: it follows the level, except an edit that leaves the level as it was.
+  const priority: Priority = editing && level === (editing.nivel ?? 'informativo') ? editing.prioridad as Priority : priorityOfLevel[level];
+  const spaces = useData<Space[]>(api, '/espacios', 0, can(profile, 'espacios.ver'));
+  const areaOptions = (Array.isArray(spaces.data) ? spaces.data : []).filter(s => s.active && (s.type === 'area' || s.type === 'bahia'));
   const [from, setFrom] = useState(editing && !started && editing.desde ? isoToLocalInput(editing.desde) : ''), [until, setUntil] = useState(() => editing?.hasta ? isoToLocalInput(editing.hasta) : localInput(72));
   const [done, setDone] = useState(false);
   const action = useAction(api);
   const found = personalDataIn(title, body), warned = action.error?.code === PERSONAL_DATA;
-  const noAudience = !isPublic && roles.length === 0;
+  const noAudience = !isPublic && roles.length === 0 && areas.length === 0;
   const invalid = title.trim().length < 3 || body.trim().length < 3 || !until || noAudience;
   const toggle = (role: string) => setRoles(current => current.includes(role) ? current.filter(r => r !== role) : [...current, role]);
+  const toggleArea = (code: string) => setAreas(current => current.includes(code) ? current.filter(a => a !== code) : [...current, code]);
 
   async function publish(confirm: boolean) {
-    const payload = { titulo: title.trim(), cuerpo: body.trim(), prioridad: priority, publico: isPublic, roles, ...(started ? {} : from ? { desde: localToIso(from) } : scheduled ? { desde: new Date().toISOString() } : {}), hasta: localToIso(until), ...(confirm ? { confirmarDatosPersonales: true } : {}) };
+    const payload = { titulo: title.trim(), cuerpo: body.trim(), nivel: level, prioridad: priority, publico: isPublic, roles, areas, ...(started ? {} : from ? { desde: localToIso(from) } : scheduled ? { desde: new Date().toISOString() } : {}), hasta: localToIso(until), ...(confirm ? { confirmarDatosPersonales: true } : {}) };
     if (editing) {
       if (await action.run(`/avisos/${editing.id}`, { ...payload, version: editing.version }, 'PUT')) onDone();
       return;
     }
-    if (await action.run('/avisos', payload)) { setTitle(''); setBody(''); setPriority('atencion'); setPublic(true); setRoles([]); setFrom(''); setUntil(localInput(72)); setDone(true); onDone(); }
+    if (await action.run('/avisos', payload)) { setTitle(''); setBody(''); setLevel('informativo'); setPublic(true); setRoles([]); setAreas([]); setFrom(''); setUntil(localInput(72)); setDone(true); onDone(); }
   }
   const submit = (event: FormEvent) => { event.preventDefault(); setDone(false); void publish(false); };
   const label = editing ? (action.busy ? 'Guardando…' : 'Guardar cambios') : (action.busy ? 'Publicando…' : 'Publicar aviso');
@@ -109,15 +185,16 @@ function NoticeComposer({ api, editing, onDone, onCancel, onReload }: { api: Api
       <Field label="Título" value={title} onChange={setTitle} required minLength={3} maxLength={120} hint="Corto y claro: qué pasa." />
       <div className="field"><label htmlFor="aviso-cuerpo">Texto del aviso</label><textarea id="aviso-cuerpo" value={body} onChange={e => setBody(e.target.value)} required minLength={3} maxLength={1000} rows={4} /><small className="field-hint">{body.length}/1000 caracteres</small></div>
       {found.length > 0 && <Notice kind="error">El texto parece contener {found.join(', ')}. Un aviso no debe llevar datos de pacientes ni de personal: quítalos o, si es intencional, confirma al publicar.</Notice>}
-      <fieldset className="notice-fieldset"><legend>Prioridad</legend>
-        <div className="segmented-control" role="group" aria-label="Prioridad">{priorities.map(p => <button key={p.id} type="button" aria-pressed={priority === p.id} title={p.hint} onClick={() => setPriority(p.id)}>{p.label}</button>)}</div>
-        <small className="field-hint">{priorities.find(p => p.id === priority)?.hint}</small>
+      <fieldset className="notice-fieldset"><legend>Nivel</legend>
+        <div className="segmented-control" role="group" aria-label="Nivel">{levels.map(l => <button key={l.id} type="button" aria-pressed={level === l.id} title={l.hint} onClick={() => setLevel(l.id)}>{l.label}</button>)}</div>
+        <small className="field-hint">{levels.find(l => l.id === level)?.hint}</small>
       </fieldset>
       <fieldset className="notice-fieldset"><legend>¿Quién lo ve?</legend>
         <label className="notice-check"><input type="checkbox" checked={isPublic} onChange={e => setPublic(e.target.checked)} />Público: pantalla pública y apps sin iniciar sesión</label>
         <div className="notice-roles">{audienceRoles.map(r => <label key={r} className="notice-check"><input type="checkbox" checked={roles.includes(r)} onChange={() => toggle(r)} />{roleNames[r]}</label>)}</div>
-        <small className="field-hint">Los roles lo ven en su tablero de inicio, en la web y en las apps. Un aviso solo para roles no sale en la pantalla pública.</small>
-        {noAudience && <Notice kind="error">Elige a quién va dirigido: público, uno o más roles.</Notice>}
+        {areaOptions.length > 0 && <div className="notice-roles" role="group" aria-label="Áreas">{areaOptions.map(a => <label key={a.id} className="notice-check"><input type="checkbox" checked={areas.includes(a.code)} onChange={() => toggleArea(a.code)} /><AreaTag code={a.code} />{a.name}</label>)}</div>}
+        <small className="field-hint">Los roles y las áreas lo ven en Avisos, en la web y en las apps; si es crítico, también en su inicio. Un aviso solo para roles o áreas no sale en la pantalla pública.</small>
+        {noAudience && <Notice kind="error">Elige a quién va dirigido: público, uno o más roles o áreas.</Notice>}
       </fieldset>
       <fieldset className="notice-fieldset"><legend>Vigencia</legend>
         <div className="form-grid">
@@ -136,7 +213,7 @@ function NoticeComposer({ api, editing, onDone, onCancel, onReload }: { api: Api
     </form>
     <aside className="notice-preview" aria-label="Vista previa">
       <h3>Vista previa</h3>
-      <NoticeCard notice={{ titulo: title.trim(), cuerpo: body.trim(), prioridad: priority, publico: isPublic, roles, hasta: until ? localToIso(until) : null }} />
+      <NoticeCard notice={{ titulo: title.trim(), cuerpo: body.trim(), prioridad: priority, nivel: level, publico: isPublic, roles, areas, hasta: until ? localToIso(until) : null }} />
       <p className="muted">Así lo ve quien lo recibe. {isPublic ? 'En la pantalla pública solo se muestran título y texto.' : 'No saldrá en la pantalla pública.'}</p>
     </aside>
   </section>;

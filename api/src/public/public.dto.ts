@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, Matches, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, Matches, Min } from 'class-validator';
 import { Text } from '../platform/dto';
+import { NOTICE_LEVELS } from './notice.rules';
 
 export const NOTICE_PRIORITIES = ['atencion', 'urgente', 'critico'] as const;
 
@@ -14,6 +15,8 @@ export class NoticeDto {
   @ApiPropertyOptional({ enum: NOTICE_PRIORITIES, default: 'atencion', description: 'Escalera de avisos (D-071): atencion, urgente o critico' }) @IsOptional() @IsIn(NOTICE_PRIORITIES) prioridad?: (typeof NOTICE_PRIORITIES)[number];
   @ApiPropertyOptional({ default: true, description: 'Visible en la pantalla pública y en las apps sin sesión. Sin roles, debe ser true' }) @IsOptional() @IsBoolean() publico?: boolean;
   @ApiPropertyOptional({ type: [String], description: 'Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol' }) @IsOptional() @IsArray() @ArrayUnique() @Matches(/^[A-Z]{2,4}$/, { each: true }) roles?: string[];
+  @ApiPropertyOptional({ enum: NOTICE_LEVELS, description: 'Criticidad para el personal (Fase 2): informativo (por omisión al publicar), importante o critico. Solo critico se destaca en el inicio de su audiencia hasta el "Enterado". Al editar, sin nivel se conserva el del aviso. Sin prioridad, la prioridad sale del nivel (informativo → atencion, importante → urgente, critico → critico)' }) @IsOptional() @IsIn(NOTICE_LEVELS) nivel?: (typeof NOTICE_LEVELS)[number];
+  @ApiPropertyOptional({ type: [String], description: 'Códigos de espacio (área o bahía, por ejemplo P1-EMG) a cuyo personal va dirigido: su área de ficha o la de su turno en curso. Al editar, sin áreas se conservan las del aviso' }) @IsOptional() @IsArray() @ArrayUnique() @ArrayMaxSize(20) @Matches(/^[A-Z0-9][A-Z0-9-]{1,19}$/, { each: true }) areas?: string[];
   @ApiPropertyOptional({ description: 'Publicar aunque el texto parezca contener un DUI, expediente o teléfono (FR-112-05)' }) @IsOptional() @IsBoolean() confirmarDatosPersonales?: boolean;
 }
 

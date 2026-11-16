@@ -11,7 +11,18 @@ export const priorityLabel = (priority: string) => priorities.find(p => p.id ===
 /** Roles a los que se puede dirigir un aviso en su tablero de inicio (web y Android). */
 export const audienceRoles = ['ADM', 'JOP', 'REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR', 'DPD'] as const;
 
-export type NoticeAudience = { id: string; titulo: string; cuerpo: string; desde: string | null; hasta: string | null; prioridad: string; publico: boolean; roles: string[] };
+/** Fase 2, S11: criticidad para el personal. Solo «Crítico» se destaca en el inicio de quien lo recibe. */
+export type Level = 'informativo' | 'importante' | 'critico';
+export const levels: { id: Level; label: string; hint: string }[] = [
+  { id: 'informativo', label: 'Informativo', hint: 'Queda en Avisos; no interrumpe a nadie.' },
+  { id: 'importante', label: 'Importante', hint: 'Se marca en Avisos para leerlo hoy; no sale en el inicio.' },
+  { id: 'critico', label: 'Crítico', hint: 'Sale en el inicio de su rol o área hasta que cada persona da «Enterado».' },
+];
+export const levelLabel = (level: string | undefined) => levels.find(l => l.id === level)?.label ?? 'Informativo';
+/** Prioridad visual (D-071) de la pantalla pública que corresponde a cada nivel; la API aplica la misma regla. */
+export const priorityOfLevel: Record<Level, Priority> = { informativo: 'atencion', importante: 'urgente', critico: 'critico' };
+
+export type NoticeAudience = { id: string; titulo: string; cuerpo: string; desde: string | null; hasta: string | null; prioridad: string; publico: boolean; roles: string[]; nivel?: Level; areas?: string[] };
 /** Acciones que el servidor acepta sobre un aviso (MA-AVI-02); vacío si venció o fue retirado. */
 export type NoticeAction = 'editar' | 'retirar';
 export type NoticeListItem = NoticeAudience & {
@@ -21,12 +32,23 @@ export type NoticeListItem = NoticeAudience & {
 /** Motivo mínimo para retirar un aviso (D-13); la API lo vuelve a exigir. */
 export const WITHDRAW_MIN = 10;
 export type MyNotices = { actualizadoEn: string; avisos: NoticeAudience[]; proximoCambio: string | null };
+/** `GET /me/avisos/bandeja` (S11). */
+export type InboxNotice = NoticeAudience & { nivel: Level; areas: string[]; publicadoEn: string | null; dirigido: boolean; enteradoEn: string | null; recordarEn: string | null; destacado: boolean };
+export type Inbox = { actualizadoEn: string; avisos: InboxNotice[]; noLeidos: number; criticos: number; recordatorioHoras: number; proximoCambio: string | null };
+export type NoticeAck = { avisoId: string; enteradoEn: string | null; recordarEn: string | null };
+/** `GET /avisos/estadisticas` (S11): solo conteos, nunca nombres. */
+export type NoticeStats = { avisoId: string; enterados: number; destinatarios: number };
+export type InboxFilter = 'todos' | 'sin-leer' | 'criticos';
+export const inboxFilters: { id: InboxFilter; label: string }[] = [{ id: 'todos', label: 'Todos' }, { id: 'sin-leer', label: 'Sin leer' }, { id: 'criticos', label: 'Críticos' }];
+export const filterInbox = (items: InboxNotice[], filter: InboxFilter) =>
+  filter === 'sin-leer' ? items.filter(n => !n.enteradoEn) : filter === 'criticos' ? items.filter(n => n.nivel === 'critico') : items;
 
 /** Dónde se ve un aviso, en palabras: «Pantalla pública y apps sin sesión» o «Medicina y Enfermería». */
-export function audienceText(notice: Pick<NoticeAudience, 'publico' | 'roles'>) {
+export function audienceText(notice: Pick<NoticeAudience, 'publico' | 'roles' | 'areas'>) {
   const parts: string[] = [];
   if (notice.publico) parts.push('Pantalla pública y apps sin sesión');
   if (notice.roles.length) parts.push(notice.roles.map(r => roleNames[r] ?? r).join(', '));
+  if (notice.areas?.length) parts.push(`Área ${notice.areas.join(', ')}`);
   return parts.join(' + ');
 }
 

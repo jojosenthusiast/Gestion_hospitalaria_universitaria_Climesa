@@ -91,7 +91,8 @@ export const modules:Module[]=[
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
  {id:'citas',label:'Citas',permission:'citas.ver'},
  {id:'consultas',label:'Mi consultorio',permission:'consulta.iniciar'},
- {id:'avisos',label:'Avisos',permission:'avisos.publicar'},
+ // S11: Avisos es de toda cuenta con sesión (bandeja «Para mí»); publicar, editar y retirar siguen con avisos.publicar.
+ {id:'avisos',label:'Avisos'},
  {id:'metricas',label:'Métricas',permission:'metricas.ver'},
  {id:'perfil',label:'Perfil'},
 ];

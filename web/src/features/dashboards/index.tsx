@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Icon } from '../../components/ui';
 import { can, roleNames, type AccessProfile, type Api } from '../../lib/api';
 import { CompactHeader } from '../common';
-import { NoticesPanel } from '../avisos/NoticesPanel';
+import { CriticalNoticeBanner } from '../avisos/CriticalNoticeBanner';
 import { WorkInbox } from '../inbox';
 import { useDashboardData, type Source } from './data';
 import { LabFollowUpPanel } from './lab-follow-up';
@@ -13,6 +13,7 @@ import { roleDashboards, roleOrder, type RoleId } from './roles';
  * W04 · Inicio por rol. Cada rol tiene su propio tablero (cifras con estado de color, gráficos, lista de lo que
  * necesita atención con su acción directa y acciones rápidas reales). Una cuenta con varios roles ve sus tableros
  * uno tras otro, sin selector. Todo se calcula con los listados existentes y respeta los permisos de la cuenta.
+ * Los avisos viven en su propia área (S11); aquí solo aparece el crítico dirigido a la cuenta, hasta su «Enterado».
  */
 export function Dashboard({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
   const roles = useMemo(() => roleOrder.filter(role => profile.roles.includes(role)), [profile.roles]);
@@ -20,13 +21,13 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
   const data = useDashboardData(api, profile, version, needed);
   if (roles.length === 0) return <>
     <CompactHeader breadcrumb="CLIMESA / Inicio" title="Inicio" />
-    <NoticesPanel api={api} version={version} />
+    <CriticalNoticeBanner api={api} version={version} />
     <div className="dashboard-account"><Icon name="shield" size={24} /><div><h3>Tu función no tiene un tablero en la web</h3><p>Usa los módulos del menú que tu cuenta tiene habilitados. Las operaciones y los datos corresponden a los roles de tu cuenta.</p></div><a className="row-action" href="#/perfil">Ver mi cuenta <Icon name="arrow" size={16} /></a></div>
   </>;
   const many = roles.length > 1;
   return <>
     <CompactHeader breadcrumb="CLIMESA / Inicio" title={roleDashboards[roles[0]].title} />
-    <NoticesPanel api={api} version={version} />
+    <CriticalNoticeBanner api={api} version={version} />
     {roles.map((role: RoleId, index) => {
       const dash = roleDashboards[role];
       return <div className="role-dashboard" key={role}>

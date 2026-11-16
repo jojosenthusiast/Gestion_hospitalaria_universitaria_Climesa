@@ -77,11 +77,11 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); window.l
 // FR-120-02 / escenario 1: cada rol con web ve únicamente el menú que sus permisos reales habilitan.
 const menuEsperado: Record<string, string[]> = {
   // D-05 y D-091 (MA-REQ-01): el control de recursos del Administrador es Inventario + Edificio.
-  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Catálogo de laboratorio', 'Inventario', 'Métricas', 'Perfil'],
+  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Catálogo de laboratorio', 'Inventario', 'Avisos', 'Métricas', 'Perfil'],
   JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Métricas', 'Perfil'],
-  REC: ['Inicio', 'Pacientes', 'Vinculaciones', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
-  LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil'],
-  DPD: ['Inicio', 'Personal', 'Bitácora de ambulancia', 'Auditoría', 'Métricas', 'Perfil'],
+  REC: ['Inicio', 'Pacientes', 'Vinculaciones', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Perfil'],
+  LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Avisos', 'Perfil'],
+  DPD: ['Inicio', 'Personal', 'Bitácora de ambulancia', 'Auditoría', 'Avisos', 'Métricas', 'Perfil'],
 };
 const todas = [...new Set(Object.values(menuEsperado).flat())];
 
@@ -128,20 +128,20 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 
   it('el laboratorista ve lo que el catálogo le da: Pacientes, Turnos, Laboratorio e Inventario', async () => {
     const nav = await entrar(perfil('LAB'));
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Avisos', 'Perfil']);
   });
 
   it('el menú depende de los permisos de /auth/me, no del nombre del rol', async () => {
     // Un REC al que la API no le concede fila.ver ni citas.ver no ve esas entradas.
     const sinAgenda = permisosDe('REC').filter((p) => !['fila.ver', 'citas.ver'].includes(p.code));
     const nav = await entrar(perfil('REC', sinAgenda));
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Vinculaciones', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Vinculaciones', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Avisos', 'Perfil']);
   });
 
   it('un laboratorista sin laboratorio.ver_cola ni inventario.ver no ve esos módulos', async () => {
     const solo = permisosDe('LAB').filter((p) => !['laboratorio.ver_cola', 'inventario.ver'].includes(p.code));
     const nav = await entrar(perfil('LAB', solo));
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Turnos', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Turnos', 'Avisos', 'Perfil']);
   });
 
   it('una ruta ajena al rol al iniciar sesión redirige a #/inicio y no pide datos del módulo', async () => {
@@ -187,7 +187,7 @@ describe('el menú depende solo del permiso (regla 8)', () => {
   for (const [rol, modulosRol] of Object.entries(menuCatalogo)) {
     it(`${rol}, si tuviera web, ve exactamente lo que el catálogo le da: ${modulosRol.join(', ')}`, async () => {
       const nav = await entrar(perfil(rol));
-      expect(etiquetas(nav)).toEqual(['Inicio', ...modulosRol, 'Perfil']);
+      expect(etiquetas(nav)).toEqual(['Inicio', ...modulosRol, 'Avisos', 'Perfil']);
     });
   }
 
@@ -206,7 +206,7 @@ describe('el menú depende solo del permiso (regla 8)', () => {
     simular({ ...perfil('ADM', permisos), roles: ['ADM', 'LAB'] });
     render(<App />);
     const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Turnos', 'Laboratorio', 'Catálogo de laboratorio', 'Inventario', 'Métricas', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Turnos', 'Laboratorio', 'Catálogo de laboratorio', 'Inventario', 'Avisos', 'Métricas', 'Perfil']);
     expect(screen.queryByRole('combobox', { name: 'Rol de trabajo' })).toBeNull();
     expect(screen.getByText('Administración · Laboratorio')).toBeTruthy();
   });

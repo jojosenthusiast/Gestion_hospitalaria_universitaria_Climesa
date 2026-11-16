@@ -99,8 +99,8 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `vinculacion.solicitada` / `vinculacion.resuelta` | `vinculacion_paciente` | Solicitud, aprobación o rechazo | `cuentas.verificar`, `usuario:<solicitante>` | 101 |
 | `inventario.actualizado` | `articulo` | Movimiento | `inventario.ver` | 111 |
 | `inventario.bajo_minimo` | `articulo` | Movimiento o mínimo que cruza el umbral | `inventario.mover` según tipo de artículo | 111 |
-| `aviso.publicado` | `aviso` | Publicar aviso | `publico` | 112 |
-| `aviso.actualizado` | `aviso` | Editar o retirar un aviso (MA-AVI-02) | `publico` y `rol:<código>` de la audiencia anterior y la nueva | 112 |
+| `aviso.publicado` | `aviso` | Publicar aviso | `publico` y `rol:<código>` de la audiencia; un aviso por área (Fase 2, S11) va a `usuario:<id>` de cada cuenta activa de esa área (ficha o turno en curso), porque no hay canal por área | 112 |
+| `aviso.actualizado` | `aviso` | Editar o retirar un aviso (MA-AVI-02); dar «Enterado» o posponer el recordatorio (Fase 2, S11) | Editar o retirar: `publico`, `rol:<código>` y las cuentas de las áreas de la audiencia anterior y la nueva. «Enterado» o posponer: solo `usuario:<id>` de esa cuenta, para que sus otras sesiones quiten el destacado | 112 |
 | `metricas.recalculadas` | `metricas` | Derivado en la base cuando cambia un indicador | `metricas.ver` | 113 |
 
 ### Eventos del catálogo anterior que no se emiten

@@ -80,8 +80,8 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 - **Para:** REC; LAB; DPD
 - **Propósito:** Bandeja de lo que toca hacer
-- **Muestra:** REC: vinculaciones, solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: cadena de auditoría por verificar
-- **Acciones:** Abrir cada pendiente
+- **Muestra:** REC: vinculaciones, solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: cadena de auditoría por verificar. Todos: aviso crítico dirigido a su rol o área hasta su «Enterado» (S11)
+- **Acciones:** Abrir cada pendiente; Enterado
 - **En vivo:** Contadores en vivo
 - **Spec:** 113
 
@@ -260,13 +260,14 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **Acciones:** Cambiar estado
 - **Spec:** 104
 
-### W25 · Avisos generales (R)
+### W25 · Avisos (R)
 
-- **Para:** JOP
-- **Propósito:** Redactar avisos con vista previa y elegir a quién llegan
-- **Muestra:** Formulario con prioridad, audiencia (público y/o roles) y vigencia; lista de lo publicado con su estado
-- **Acciones:** Publicar
-- **Privacidad:** Nunca datos personales: la pantalla advierte; el aviso aparece en la pantalla pública y en el tablero de inicio de cada rol elegido
+- **Para:** ADM; JOP; REC; LAB; DPD
+- **Propósito:** Área de avisos (Fase 2, S11): mis avisos con «Enterado» y, para quien publica, redactar con vista previa y elegir a quién llegan
+- **Muestra:** Para mí: avisos vigentes de mi rol o área con los críticos primero, filtros Todos, Sin leer y Críticos, y detalle. Publicados (avisos.publicar): formulario con nivel, audiencia (público, roles y/o áreas) y vigencia; lista con estado y conteo de «Enterado»
+- **Acciones:** Enterado; Recordarme después; Publicar
+- **En vivo:** Evento aviso y recarga única en proximoCambio
+- **Privacidad:** Nunca datos personales: la pantalla advierte; el conteo de «Enterado» no muestra nombres
 - **Spec:** 112
 
 ### W26 · Pacientes (R)
@@ -1077,13 +1078,13 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 | Rol | Web | Android | iOS |
 |---|---|---|---|
-| Administrador | W01, W03, W05, W06, W07, W08, W09, W10, W11, W33, W35, W36 | no usa | no usa |
+| Administrador | W01, W03, W05, W06, W07, W08, W09, W10, W11, W25, W33, W35, W36 | no usa | no usa |
 | Jefe de Operaciones | W01, W03, W07, W09, W12, W13, W14, W15, W16, W17, W18, W19, W22, W23, W24, W25, W33, W35, W36 | no usa | no usa |
-| Recepcionista | W01, W04, W09, W12, W13, W14, W15, W18, W19, W26, W27, W28, W29, W35, W36 | A01, A10, A12, A26, A30, A31, A32, A33, A34, A35, A36 | no usa |
+| Recepcionista | W01, W04, W09, W12, W13, W14, W15, W18, W19, W25, W26, W27, W28, W29, W35, W36 | A01, A10, A12, A26, A30, A31, A32, A33, A34, A35, A36 | no usa |
 | Asistente | no usa | A01, A10, A12, A26, A40, A41 | no usa |
 | Enfermero/a | no usa | A01, A10, A12, A26, A41, A50, A51, A52, A53, A54 | no usa |
 | Médico | no usa | A01, A10, A12, A20, A21, A22, A23, A24, A25, A26 | I01, I10, I12, I20, I21, I22, I23, I24, I25, I26 |
-| Laboratorista | W01, W04, W20, W21, W22, W23, W35, W36 | no usa | no usa |
+| Laboratorista | W01, W04, W20, W21, W22, W23, W25, W35, W36 | no usa | no usa |
 | Paramédico | no usa | A01, A10, A12, A26, A70, A71, A72, A73, A74 | no usa |
-| Delegado de protección de datos | W01, W04, W19, W32, W33, W35, W36 | no usa | no usa |
+| Delegado de protección de datos | W01, W04, W19, W25, W32, W33, W35, W36 | no usa | no usa |
 | Paciente | no usa | A01, A02, A03, A04, A05, A06, A07, A08, A09, A10, A11, A12, A13 | I01, I02, I03, I04, I05, I06, I07, I08, I09, I10, I11, I12, I13 |

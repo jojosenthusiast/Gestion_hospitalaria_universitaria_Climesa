@@ -34,3 +34,36 @@
 .notice-history { margin-top: 0; }
 
 @media (max-width: 900px) { .notice-composer { grid-template-columns: 1fr; } .notice-preview { position: static; } }
+
+/* S11 · Aviso crítico persistente del inicio: rojo solo aquí (crítico) y con el patrón de la familia crítica (borde doble). */
+.critical-banner { margin-bottom: var(--space-6); padding: var(--space-4) var(--space-5); display: flex; gap: var(--space-4); align-items: flex-start; border: 4px double var(--critical); border-radius: var(--radius-card); background: var(--critical-soft); color: var(--ink); }
+.critical-banner-icon { flex-shrink: 0; color: var(--critical); }
+.critical-banner-body { min-width: 0; display: grid; gap: var(--space-2); }
+.critical-banner-meta { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.critical-banner h2 { margin: 0; font-size: 18px; line-height: 1.3; text-wrap: balance; }
+.critical-banner p { margin: 0; max-width: 72ch; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.critical-banner-actions { margin-top: var(--space-2); display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+
+/* S11 · «Para mí»: bandeja de pendientes con lista y detalle (02-sistema §5). */
+.notice-count { margin-left: var(--space-2); padding: 0 7px; border-radius: 999px; background: var(--soft); color: var(--primary-text); font-size: 12px; font-variant-numeric: tabular-nums; }
+.notice-inbox { display: grid; grid-template-columns: minmax(260px, 2fr) minmax(0, 3fr); gap: var(--space-6); align-items: start; }
+.notice-inbox-list { margin: 0; padding: 0; display: grid; list-style: none; border-top: 1px solid var(--line); }
+.notice-inbox-list > li { border-bottom: 1px solid var(--line); }
+.notice-row { width: 100%; min-height: 64px; padding: var(--space-3) var(--space-4); display: grid; gap: var(--space-1); border: 0; border-left: 3px solid transparent; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; transition: background-color 120ms ease-out; }
+.notice-row strong { font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.notice-row small { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.notice-row.is-read strong { font-weight: 600; color: var(--muted); }
+.notice-row[aria-current="true"] { border-left-color: var(--primary); background: var(--soft); }
+.notice-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+@media (hover: hover) { .notice-row:hover { background: var(--bg); } .notice-row[aria-current="true"]:hover { background: var(--soft); } }
+.notice-row-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.notice-detail { position: sticky; top: 96px; display: grid; gap: var(--space-4); }
+.notice-detail-meta { margin: 0; display: flex; gap: var(--space-6); flex-wrap: wrap; }
+.notice-detail-meta dt { color: var(--muted); font-size: 12.5px; }
+.notice-detail-meta dd { margin: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+.notice-detail-done { margin: 0; display: flex; align-items: center; gap: var(--space-3); color: var(--muted); font-size: 14px; }
+.notice-history td.numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.notice-history td[data-label="Nivel"] small { display: block; margin-top: var(--space-1); color: var(--muted); font-size: 12.5px; }
+
+@media (max-width: 900px) { .notice-inbox { grid-template-columns: 1fr; } .notice-detail { position: static; } }
+@media (prefers-reduced-motion: reduce) { .notice-row { transition: none; } }

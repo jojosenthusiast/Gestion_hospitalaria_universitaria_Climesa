@@ -9,7 +9,9 @@ Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#
 
 ### Menú
 
-Inicio, Pacientes, Vinculaciones, Camas, Edificio, Ambulancia, Bitácora de ambulancia, Turnos, Hospitalización, Fila del día, Citas y Perfil.
+Inicio, Pacientes, Vinculaciones, Camas, Edificio, Ambulancia, Bitácora de ambulancia, Turnos, Hospitalización, Fila del día, Citas, Avisos y Perfil.
+
+**Avisos**: tus avisos, con los críticos primero, y **Enterado**. Un aviso crítico para Recepción sale arriba en Inicio hasta que pulsas **Enterado** (ver `README.md`, "Avisos (web)").
 
 ### Inicio
 

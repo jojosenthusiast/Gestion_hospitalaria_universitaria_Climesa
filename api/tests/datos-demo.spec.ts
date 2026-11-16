@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createTestApp, TestApp } from './support/app';
+import { userId } from './support/database';
 
 /**
  * Datos de demostración (tools/demo): la semilla es idempotente y respeta todas las restricciones del esquema;
@@ -74,7 +75,9 @@ const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acc
   // Fase 2 flujo A: las solicitudes de cita por categoría nacen solo del uso real del paciente.
   'atencion.solicitud_cita',
   // Fase 2, flujo F: las plantillas de semana nacen de Jefatura; la demo no las siembra.
-  'personal.plantilla_semana'];
+  'personal.plantilla_semana',
+  // Fase 2, flujo D (S11): el «Enterado» y los recordatorios nacen solo de cada cuenta.
+  'publico.aviso_enterado'];
 
 const MINIMOS: Record<string, number> = {
   'pacientes.paciente': 120, 'pacientes.identificador': 100, 'atencion.cita': 130, 'atencion.ticket_fila': 30, 'atencion.consulta': 70,
@@ -415,6 +418,21 @@ describe('Datos de demostración (tools/demo)', () => {
       VALUES ($1, $2, $3, 'confirmada', $4, now(), $3)`, [completa.orden, completa.paciente, completa.medico, cita.id]);
     await t.pg.exec(limpieza);
     for (const tabla of ['laboratorio.adjunto', 'laboratorio.pendiente_medico', 'laboratorio.propuesta_cita']) expect({ tabla, n: await contar(tabla, `orden_id::text LIKE ${DEMO}`) }).toEqual({ tabla, n: 0 });
+    for (const [tabla, n] of Object.entries(await demo())) expect({ tabla, n }).toEqual({ tabla, n: 0 });
+    expect(await estadoGeneral()).toEqual(antes);
+  });
+
+  test('S11: con «Enterado» de cuentas reales sobre avisos demo y de cuentas demo sobre avisos reales, la limpieza no falla', async () => {
+    await t.pg.exec(semilla);
+    const avisoDemo = await t.one<{ id: string }>(`SELECT id FROM publico.aviso WHERE id::text LIKE ${DEMO} ORDER BY id LIMIT 1`);
+    const cuentaDemo = await t.one<{ id: string }>(`SELECT id FROM acceso.usuario WHERE id::text LIKE ${DEMO} ORDER BY id LIMIT 1`);
+    const real = await t.one<{ id: string }>(`INSERT INTO publico.aviso(titulo, cuerpo, vigencia, publicado_por) VALUES ('Aviso real', 'Texto real', tstzrange(now(), now() + interval '1 day'), gen_random_uuid()) RETURNING id`);
+    await t.pg.query(`INSERT INTO publico.aviso_enterado(aviso_id, usuario_id, enterado_en) VALUES ($1, $2, now())`, [avisoDemo.id, userId('MED')]);
+    await t.pg.query(`INSERT INTO publico.aviso_enterado(aviso_id, usuario_id, recordar_en) VALUES ($1, $2, now() + interval '4 hours')`, [real.id, cuentaDemo.id]);
+    await t.pg.exec(limpieza);
+    expect(await contar('publico.aviso_enterado', 'true')).toBe(0);
+    expect(await contar('publico.aviso', `id = '${real.id}'`)).toBe(1);
+    await t.pg.query('DELETE FROM publico.aviso WHERE id = $1', [real.id]);
     for (const [tabla, n] of Object.entries(await demo())) expect({ tabla, n }).toEqual({ tabla, n: 0 });
     expect(await estadoGeneral()).toEqual(antes);
   });

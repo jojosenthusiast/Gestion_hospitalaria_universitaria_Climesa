@@ -49,6 +49,14 @@ Fuente de los roles y sus plataformas: `docs/arquitectura/datos/roles.csv`. Fuen
 - Si una cuenta tiene varios roles, el selector "*Rol* ▾" cambia de rol.
 - Si la sesión vence y no se puede renovar, la app vuelve al ingreso con "Tu sesión expiró".
 
+## Avisos (web)
+
+Todas las cuentas de la web tienen **Avisos** en el menú.
+
+- **Para mí** lista los avisos vigentes para tu rol o tu área, con los críticos primero. Filtros: **Todos**, **Sin leer** y **Críticos**. Al abrir uno ves el detalle; pulsa **Enterado** cuando lo leíste.
+- Un aviso **Crítico** dirigido a tu rol o a tu área aparece arriba en **Inicio** y se queda hasta que pulsas **Enterado**. **Recordarme en 4 h** lo aparta y vuelve solo a las 4 horas si sigues sin dar **Enterado**.
+- Los avisos **Informativos** e **Importantes** no salen en Inicio; quedan en **Avisos**.
+
 ## Limitaciones de esta entrega
 
 - No hay notificaciones push: los avisos llegan solo con la app abierta.
