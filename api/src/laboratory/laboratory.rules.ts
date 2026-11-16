@@ -36,6 +36,8 @@ export type LabActionInput = {
   reviewer: boolean;
   /** The reader is the doctor who ordered it. */
   own: boolean;
+  /** S10: the order is done elsewhere; nobody takes a sample here. */
+  external?: boolean;
 };
 
 export type LabPermissions = { process: boolean; validate: boolean; review: boolean; cancelAny: boolean; cancelOwn: boolean };
@@ -43,7 +45,7 @@ export type LabPermissions = { process: boolean; validate: boolean; review: bool
 export function labOrderActions(order: LabActionInput, can: LabPermissions): LabOrderAction[] {
   const open = order.state === 'pendiente' || order.state === 'en_proceso';
   const actions: LabOrderAction[] = [];
-  if (can.process && order.state === 'pendiente') actions.push('tomar_muestra');
+  if (can.process && order.state === 'pendiente' && !order.external) actions.push('tomar_muestra');
   if (can.process && order.state === 'en_proceso') actions.push('capturar');
   if (can.validate && order.state === 'en_proceso' && order.allCaptured) actions.push('completar');
   if (can.review && order.reviewer && order.state === 'completado' && !order.reviewed) actions.push('revisar');
@@ -70,4 +72,34 @@ export function rangeProblem(ranges: RangeInput[]): string | null {
     if (a.sex === b.sex && a.ageFrom < end(b) && b.ageFrom < end(a)) return 'Dos rangos del mismo sexo se traslapan en edad.';
   }
   return null;
+}
+
+/**
+ * S10: actions on the external path of an order, apart from `allowedActions` so clients that do not know them keep
+ * decoding the list. `enviar_externo`: a pending order is done elsewhere (lab, or the doctor who ordered it).
+ * `cargar_externo`: the result of an external order comes in with its attachment and key values (lab, or a doctor who may
+ * review it).
+ */
+export const LAB_EXTERNAL_ACTIONS = ['enviar_externo', 'cargar_externo'] as const;
+export type LabExternalAction = typeof LAB_EXTERNAL_ACTIONS[number];
+
+export function labExternalActions(order: { state: string; external: boolean; own: boolean; reviewer: boolean }, can: LabPermissions & { order: boolean }): LabExternalAction[] {
+  if (order.state !== 'pendiente') return [];
+  if (!order.external) return can.process || (can.order && order.own) ? ['enviar_externo'] : [];
+  return can.process || (can.review && order.reviewer) ? ['cargar_externo'] : [];
+}
+
+/**
+ * S10: a result opens a follow-up item in the requesting doctor's "Resultados por revisar" when its mark is critical
+ * (critical wins) or the lab flagged its observation as relevant. Anything else needs no item.
+ */
+export type FollowUpReason = 'critico' | 'observacion';
+export function followUpReason(mark: string, relevant: boolean): FollowUpReason | null {
+  if (mark.startsWith('critico_')) return 'critico';
+  return relevant ? 'observacion' : null;
+}
+
+/** S10: an appointment confirms a follow-up proposal only if it is for the same patient and doctor and still active. */
+export function appointmentMatchesProposal(appointment: { patientId: string; doctorId: string; state: string }, proposal: { patientId: string; doctorId: string }) {
+  return appointment.patientId === proposal.patientId && appointment.doctorId === proposal.doctorId && ['solicitada', 'confirmada'].includes(appointment.state);
 }

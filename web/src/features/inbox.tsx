@@ -14,6 +14,8 @@ const items: Item[] = [
   { id: 'citas', permission: 'citas.agendar', label: 'Solicitudes de cita', href: '#/citas', path: '/citas', count: ((rows: Appointment[]) => rows.filter(r => r.state === 'solicitada').length) as Item['count'] },
   { id: 'ambulancia', permission: 'ambulancia.ver_estado', label: 'Solicitudes de ambulancia por confirmar', href: '#/ambulancia', path: '/ambulancia', count: ((status: AmbulanceStatus) => status.pendingRequests?.length ?? -1) as Item['count'] },
   { id: 'admisiones', permission: 'admision.ver', label: 'Admisiones sin cama', href: '#/hospitalizacion', path: '/admisiones', count: ((rows: { state: string }[]) => rows.filter(r => r.state === 'pendiente_cama').length) as Item['count'] },
+  // S10: proposed follow-up appointments wait on this same page (LabFollowUpPanel), below the tray.
+  { id: 'seguimientos', permission: 'citas.agendar', label: 'Citas de seguimiento por confirmar', href: '#/inicio', path: '/laboratorio/seguimientos', count: ((rows: unknown[]) => rows.length) as Item['count'] },
   { id: 'laboratorio', permission: 'laboratorio.ver_cola', label: 'Órdenes de laboratorio en cola', href: '#/laboratorio', path: '/laboratorio/ordenes', count: ((rows: { state: string }[]) => rows.filter(r => ['pendiente', 'en_proceso'].includes(r.state)).length) as Item['count'] },
 ];
 

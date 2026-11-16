@@ -229,6 +229,33 @@
     <string name="aviso_para">Para: %1$s</string>
     <string name="servidor_activando">El servidor se está activando, puede tardar hasta un minuto.</string>
     <string name="portal_seccion_no_disponible">Esta sección no está disponible en la aplicación.</string>
+    <!-- Fase 2, flujo C (S10): resultados por revisar, órdenes externas y lista agrupada. -->
+    <string name="lab_grupo_mostrar">Mostrar %1$s</string>
+    <string name="lab_grupo_ocultar">Ocultar %1$s</string>
+    <string name="lab_pendientes_titulo">Resultados por revisar</string>
+    <string name="lab_pendientes_cuenta">%1$d pendiente(s)</string>
+    <string name="lab_pendientes_vacio">Al día: no tienes resultados por revisar.</string>
+    <string name="lab_pendiente_observacion">Observación</string>
+    <string name="lab_expediente">Exp. %1$s</string>
+    <string name="lab_pendiente_revisado">Marcar como revisado</string>
+    <string name="lab_externo_titulo">Se realiza en otro sitio</string>
+    <string name="lab_externo_efecto">La orden de %1$s queda como externa: ya no se toma muestra aquí. El paciente ve el lugar y estas instrucciones en sus exámenes.</string>
+    <string name="lab_externo_confirmar">Enviar a externo</string>
+    <string name="lab_externo_lugar">Dónde se realiza</string>
+    <string name="lab_externo_instrucciones">Instrucciones para el paciente</string>
+    <string name="lab_externo_lugar_valor">Se realiza en otro sitio: %1$s</string>
+    <string name="lab_externo_sin_lugar">sin lugar registrado</string>
+    <string name="lab_cargar_externo">Cargar resultado externo</string>
+    <string name="lab_cargar_externo_efecto">Adjunta el informe que trajo el paciente y escribe el valor clave de cada examen. La marca la calcula el sistema; la orden queda completada y espera la revisión médica.</string>
+    <string name="lab_cargar_externo_guardar">Guardar resultado</string>
+    <string name="lab_cargar_externo_elegir">Elegir PDF o foto</string>
+    <string name="lab_cargar_externo_cambiar">Cambiar archivo</string>
+    <string name="lab_cargar_externo_nota">Nota sobre el informe (opcional)</string>
+    <string name="lab_cargar_externo_almacen">Se guarda la referencia del archivo (nombre, tipo, tamaño y huella) y los valores. El archivo original queda en tu teléfono mientras se habilita el almacenamiento clínico.</string>
+    <string name="lab_ver_detalle">Ver exámenes y avance (%1$d)</string>
+    <string name="lab_ocultar_detalle">Ocultar detalle</string>
+    <string name="lab_observacion">Observación: %1$s</string>
+    <string name="lab_observacion_relevante">Observación relevante (enviada al médico): %1$s</string>
     <!-- Fase 2, flujo A: cita por motivo (paciente) y bandeja de solicitudes por asignar (recepción). -->
     <string name="cat_pedir_cita">Pedir una cita</string>
     <string name="cat_form_detalle">Elige el motivo; recepción te asigna médico y hora.</string>

@@ -69,6 +69,8 @@ const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acc
   'atencion.reprogramacion',
   // Historial de cambios de médico tratante (BL-03): nace de una acción de Jefatura, la demo no lo siembra.
   'hospitalizacion.cambio_tratante',
+  // Fase 2, flujo C (S10): pendientes del médico, propuestas de cita y adjuntos externos nacen del uso real.
+  'laboratorio.pendiente_medico', 'laboratorio.propuesta_cita', 'laboratorio.adjunto',
   // Fase 2 flujo A: las solicitudes de cita por categoría nacen solo del uso real del paciente.
   'atencion.solicitud_cita',
   // Fase 2, flujo F: las plantillas de semana nacen de Jefatura; la demo no las siembra.
@@ -391,6 +393,28 @@ describe('Datos de demostración (tools/demo)', () => {
     expect(await huerfanos(`SELECT a.id::text AS id FROM hospitalizacion.admision a LEFT JOIN hospitalizacion.ocupacion_cama o ON o.id::text LIKE ${DEMO} AND o.admision_id = a.id AND upper_inf(o.periodo)
       WHERE a.id::text LIKE ${DEMO} GROUP BY a.id, a.estado HAVING count(o.id) <> (CASE WHEN a.estado IN ('hospitalizado', 'alta_firmada') THEN 1 ELSE 0 END)`)).toEqual([]);
     await t.pg.exec(limpieza);
+    for (const [tabla, n] of Object.entries(await demo())) expect({ tabla, n }).toEqual({ tabla, n: 0 });
+    expect(await estadoGeneral()).toEqual(antes);
+  });
+
+  test('S10: con observaciones, pendientes del médico, adjuntos y citas propuestas sobre órdenes demo, la limpieza no falla', async () => {
+    await t.pg.exec(semilla);
+    // A real capture with a relevant observation on a demo order opens a follow-up item for the doctor.
+    const abierta = await t.one<{ orden: string; item: string; version: number }>(`SELECT o.id AS orden, oi.id AS item, o.version FROM laboratorio.orden o
+      JOIN laboratorio.orden_item oi ON oi.orden_id = o.id LEFT JOIN laboratorio.resultado r ON r.orden_item_id = oi.id
+      WHERE o.id::text LIKE ${DEMO} AND o.estado = 'en_proceso' AND r.orden_item_id IS NULL ORDER BY o.id LIMIT 1`);
+    const capturado = await t.call('LAB', 'POST', `/laboratorio/ordenes/${abierta.orden}/resultados`, { orderItemId: abierta.item, value: 13.4, version: abierta.version, observation: 'Muestra hemolizada; repetir si hay duda.', relevant: true });
+    expect(capturado.status).toBe(201);
+    expect(await contar('laboratorio.pendiente_medico', `orden_id = '${abierta.orden}'`)).toBe(1);
+    // An external report reference and a confirmed follow-up proposal linked to a demo appointment.
+    const completa = await t.one<{ orden: string; paciente: string; medico: string }>(`SELECT id AS orden, paciente_id AS paciente, medico_id AS medico FROM laboratorio.orden
+      WHERE id::text LIKE ${DEMO} AND estado = 'completado' AND id <> $1 ORDER BY id LIMIT 1`, [abierta.orden]);
+    const cita = await t.one<{ id: string }>(`SELECT id FROM atencion.cita WHERE id::text LIKE ${DEMO} ORDER BY id LIMIT 1`);
+    await t.pg.query(`INSERT INTO laboratorio.adjunto(orden_id, nombre_archivo, tipo_mime, tamano_bytes, subido_por) VALUES ($1, 'informe.pdf', 'application/pdf', 2048, $2)`, [completa.orden, completa.medico]);
+    await t.pg.query(`INSERT INTO laboratorio.propuesta_cita(orden_id, paciente_id, medico_id, estado, cita_id, resuelta_en, resuelta_por)
+      VALUES ($1, $2, $3, 'confirmada', $4, now(), $3)`, [completa.orden, completa.paciente, completa.medico, cita.id]);
+    await t.pg.exec(limpieza);
+    for (const tabla of ['laboratorio.adjunto', 'laboratorio.pendiente_medico', 'laboratorio.propuesta_cita']) expect({ tabla, n: await contar(tabla, `orden_id::text LIKE ${DEMO}`) }).toEqual({ tabla, n: 0 });
     for (const [tabla, n] of Object.entries(await demo())) expect({ tabla, n }).toEqual({ tabla, n: 0 });
     expect(await estadoGeneral()).toEqual(antes);
   });

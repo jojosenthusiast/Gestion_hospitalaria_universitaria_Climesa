@@ -2,9 +2,9 @@ import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Req, UseGua
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { LabAmendDto, LabCancelDto, LabOrderDto, LabResultDto, LabSampleDto, LabVersionDto } from './laboratory.dto';
+import { LabAmendDto, LabCancelDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabProposalConfirmDto, LabProposalDiscardDto, LabResultDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
 import { LaboratoryService } from './laboratory.service';
-import { LabCompleteResponse, LabExamResponse, LabOrderCreatedResponse, LabOrderDetailResponse, LabOrderResponse, LabOrderStateResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
+import { LabCompleteResponse, LabExamResponse, LabExternalSentResponse, LabFollowUpResponse, LabFollowUpStateResponse, LabOrderCreatedResponse, LabOrderDetailResponse, LabOrderResponse, LabOrderStateResponse, LabProposalResponse, LabProposalStateResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
 
 @ApiTags('laboratory') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('laboratorio')
 export class LaboratoryController {
@@ -39,4 +39,25 @@ export class LaboratoryController {
 
   @Post('ordenes/:id/cancelar') @RequirePermission('laboratorio.cancelar') @ApiOperation({ summary: 'Cancelar una orden pendiente o en proceso' }) @ApiCreatedResponse({ type: LabOrderStateResponse })
   cancel(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabCancelDto, @Headers('idempotency-key') key?: string) { return this.laboratory.cancel(r.actor, id, dto, key); }
+
+  @Post('ordenes/:id/externa') @RequirePermission('laboratorio.procesar', 'laboratorio.ordenar') @ApiOperation({ summary: 'Enviar una orden pendiente a externo (no disponible hoy o se realiza en otro sitio) con lugar e instrucciones para el paciente' }) @ApiCreatedResponse({ type: LabExternalSentResponse })
+  sendExternal(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabSendExternalDto, @Headers('idempotency-key') key?: string) { return this.laboratory.sendExternal(r.actor, id, dto, key); }
+
+  @Post('ordenes/:id/resultado-externo') @RequirePermission('laboratorio.procesar', 'laboratorio.revisar') @ApiOperation({ summary: 'Cargar el resultado de una orden externa: referencia del adjunto (foto o PDF) y valor clave de cada examen; completa la orden' }) @ApiCreatedResponse({ type: LabCompleteResponse })
+  externalResult(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabExternalResultDto, @Headers('idempotency-key') key?: string) { return this.laboratory.externalResult(r.actor, id, dto, key); }
+
+  @Get('pendientes') @RequirePermission('laboratorio.revisar') @ApiOperation({ summary: 'Resultados por revisar: pendientes de seguimiento (valor crítico u observación relevante) de las órdenes que pidió quien lee' }) @ApiOkResponse({ type: [LabFollowUpResponse] })
+  followUps(@Req() r: ActorRequest) { return this.laboratory.followUps(r.actor); }
+
+  @Post('pendientes/:id/revisar') @RequirePermission('laboratorio.revisar') @ApiOperation({ summary: 'Marcar como revisado un pendiente de seguimiento' }) @ApiCreatedResponse({ type: LabFollowUpStateResponse })
+  reviewFollowUp(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabFollowUpReviewDto, @Headers('idempotency-key') key?: string) { return this.laboratory.reviewFollowUp(r.actor, id, dto, key); }
+
+  @Get('seguimientos') @RequirePermission('citas.agendar') @ApiOperation({ summary: 'Citas de seguimiento propuestas al llegar resultados, por confirmar en recepción (sin exámenes ni valores)' }) @ApiOkResponse({ type: [LabProposalResponse] })
+  proposals() { return this.laboratory.proposals(); }
+
+  @Post('seguimientos/:id/confirmar') @RequirePermission('citas.agendar') @ApiOperation({ summary: 'Confirmar una propuesta de seguimiento con la cita agendada (POST /citas)' }) @ApiCreatedResponse({ type: LabProposalStateResponse })
+  confirmProposal(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabProposalConfirmDto, @Headers('idempotency-key') key?: string) { return this.laboratory.confirmProposal(r.actor, id, dto, key); }
+
+  @Post('seguimientos/:id/descartar') @RequirePermission('citas.agendar') @ApiOperation({ summary: 'Descartar una propuesta de seguimiento con motivo' }) @ApiCreatedResponse({ type: LabProposalStateResponse })
+  discardProposal(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabProposalDiscardDto, @Headers('idempotency-key') key?: string) { return this.laboratory.discardProposal(r.actor, id, dto, key); }
 }

@@ -163,6 +163,9 @@ public struct LabItemResult: Decodable, Sendable, Equatable {
     public let value: Double?
     public let text: String?
     public let mark: ResultMark?
+    /// S10: nota del laboratorio sobre el valor; `relevant` indica que abrió un pendiente en «Resultados por revisar» del médico.
+    public var observation: String? = nil
+    public var relevant: Bool? = nil
 }
 
 /// `LabOrderItemResponse`
@@ -180,6 +183,11 @@ public struct LabOrderItem: Decodable, Sendable, Identifiable, Equatable {
 /// Los botones salen solo de esta lista, nunca del rol ni del estado.
 public enum LabOrderAction: String, Sendable, CaseIterable {
     case tomarMuestra = "tomar_muestra", capturar, completar, revisar, cancelar, enmendar
+}
+
+/// S10: camino externo (`LabOrderResponse.externalActions`, `AccionExternaLaboratorio`), aparte para que `allowedActions` no cambie.
+public enum LabExternalAction: String, Sendable, CaseIterable {
+    case enviarExterno = "enviar_externo", cargarExterno = "cargar_externo"
 }
 
 /// `LabOrderResponse` de `GET /me/laboratorio` y `GET /laboratorio/ordenes`. `allowedActions` y `amendedAt` se leen
@@ -202,10 +210,15 @@ public struct LabOrder: Decodable, Sendable, Identifiable, Equatable {
     public let amendedAt: String?
     /// Siempre vacío para el paciente.
     public let allowedActions: [String]
+    /// S10: el examen se hace en otro lugar; el paciente ve `externalPlace` y `externalInstructions`. Falso en un servidor anterior.
+    public let external: Bool
+    public let externalPlace: String?
+    public let externalInstructions: String?
+    public let externalActions: [String]
 
     enum CodingKeys: String, CodingKey {
         case id, consultationId, patientId, doctorId, priority, state, createdAt, sampleTakenAt, completedAt, reviewedAt, version, patientName, items
-        case amendedAt, allowedActions
+        case amendedAt, allowedActions, external, externalPlace, externalInstructions, externalActions
     }
 
     public init(from decoder: Decoder) throws {
@@ -225,10 +238,15 @@ public struct LabOrder: Decodable, Sendable, Identifiable, Equatable {
         items = try container.decode([LabOrderItem].self, forKey: .items)
         amendedAt = (try? container.decodeIfPresent(String.self, forKey: .amendedAt)) ?? nil
         allowedActions = ((try? container.decodeIfPresent([String].self, forKey: .allowedActions)) ?? nil) ?? []
+        external = ((try? container.decodeIfPresent(Bool.self, forKey: .external)) ?? nil) ?? false
+        externalPlace = (try? container.decodeIfPresent(String.self, forKey: .externalPlace)) ?? nil
+        externalInstructions = (try? container.decodeIfPresent(String.self, forKey: .externalInstructions)) ?? nil
+        externalActions = ((try? container.decodeIfPresent([String].self, forKey: .externalActions)) ?? nil) ?? []
     }
 
     /// La API permite esta acción al usuario actual.
     public func allows(_ action: LabOrderAction) -> Bool { allowedActions.contains(action.rawValue) }
+    public func allowsExternal(_ action: LabExternalAction) -> Bool { externalActions.contains(action.rawValue) }
 }
 
 /// `PatientDetailResponse` de `GET /me/paciente` (solo lo que usa la app).

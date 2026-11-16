@@ -30,6 +30,8 @@ export const PROBLEM_CODES = [
   'existencia_insuficiente', 'aviso_con_datos_personales', 'aviso_retirado', 'aviso_vencido', 'indicador_desconocido',
   // Laboratory catalog (MA-LAB-06).
   'examen_con_resultados',
+  // Laboratory follow-up, external orders and proposed appointments (Fase 2, S10).
+  'orden_no_externa', 'cita_no_coincide', 'propuesta_resuelta',
   // Ambulance.
   'ambulancia_ya_despachada', 'estado_final_invalido', 'hito_fuera_de_orden', 'servicio_cerrado', 'servicio_finalizado', 'sin_paramedico_de_turno',
   'sin_motorista_de_turno', 'sin_tripulacion_de_turno', 'tripulante_sin_turno', 'hito_hora_invalida', 'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio',

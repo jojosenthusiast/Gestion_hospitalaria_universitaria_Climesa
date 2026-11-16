@@ -29,6 +29,10 @@ Inicio, Mi día, Resultados por revisar, Mis hospitalizados, Expediente, Signos 
 - **Cancelar orden**: solo las órdenes que tú pediste.
 - Pueden revisar el médico que pidió la orden, el médico tratante de la admisión activa o un médico con relación de atención vigente. Si nadie revisa en 2 horas, puede revisarla un médico con turno en el área de origen (revisión suplente, auditada).
 - Si el laboratorio corrige un resultado ya revisado, la orden vuelve a esta lista.
+- Arriba está la bandeja **Resultados por revisar**: un pendiente por orden con valor crítico (marca roja "Valor crítico") o con una observación que el laboratorio marcó como relevante. Los críticos van primero. Léelo y pulsa **Marcar como revisado**; si llega otro hallazgo de la misma orden, se suma al mismo pendiente.
+- **Se realiza en otro sitio**: en una orden tuya pendiente, indica dónde se hace el examen y las instrucciones para el paciente. El paciente las ve en "Mis exámenes".
+- **Cargar resultado externo** (Android): elige el PDF o la foto del informe (hasta 10 MB) y escribe el valor clave de cada examen. Se guarda la referencia del archivo y los valores; el archivo queda en tu teléfono.
+- La lista se agrupa por etapa; las órdenes liberadas y canceladas empiezan plegadas. Las tarjetas sin acciones muestran solo el resumen: **Ver exámenes y avance** abre el detalle.
 
 ### Aviso de valor crítico
 
@@ -68,7 +72,7 @@ Mi día, Pacientes, Resultados, Turnos y **Más** (Agenda, Mis hospitalizados, A
 | Mi día | **Quién pasa después** (número propuesto y su motivo), **Llamar siguiente**, **Deshacer** el llamado, **Mover o cambiar prioridad**, **Llamar de nuevo**, **Atender**, **Retomar consulta** o **Reanudar**. En "Solicitudes de reprogramación": **Aceptar nuevo horario** o **Rechazar** |
 | Consulta | **Iniciar consulta**, **Guardar borrador**, **Agregar diagnóstico**, **Emitir receta**, **Ordenar exámenes**, **Firmar consulta**, en cuatro pasos (consulta, procedimientos y plan, receta y exámenes, cerrar). Al firmar puedes **Indicar hospitalización** o elegir **Ahora no**, y ves **Quién pasa después** con **Llamar a CON 4** |
 | Pacientes | Expediente e historial de tus pacientes |
-| Resultados | **Marcar revisado**, **Cancelar orden**. Un aviso indica cuántos resultados con valor crítico esperan tu revisión |
+| Resultados | Bandeja **Resultados por revisar** (críticos y observaciones relevantes) con **Marcar como revisado**. En cada orden: **Marcar revisado**, **Se realiza en otro sitio**, **Cancelar orden**. Un aviso indica cuántos resultados con valor crítico esperan tu revisión. Cargar un resultado externo aún no está en iOS: hazlo desde Android |
 | Mis hospitalizados | **Firmar alta**, **Revocar alta** |
 | Llegada de ambulancia | "Servicios por recibir", "Entrega del paciente" y **Marcar recibido** |
 | Turnos | Consultar tus turnos por día, desde hoy; los días pasados quedan debajo, en "Turnos anteriores" (la entrada es automática) |

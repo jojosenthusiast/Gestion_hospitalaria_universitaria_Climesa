@@ -54,6 +54,8 @@ Muestra tu número y su estado: "Esperando a que el médico llame", "Llamado N d
 
 Ves el estado de cada orden siempre. Los **valores** aparecen solo después de que tu médico revisa el resultado. Si el laboratorio corrige un valor, vuelve a esperar la revisión.
 
+Si un examen se hace en otro lugar, la orden dice "Se realiza en otro sitio" con el lugar y las instrucciones (preparación, qué llevar). Hazte el examen allí y trae el informe (foto o PDF) a tu próxima cita o al laboratorio. Cuando tu médico revisa el resultado, lo ves aquí como cualquier otro. Después puede que Recepción te llame para agendar una cita de seguimiento.
+
 ## Mi historial
 
 Tu historial clínico revisado: consultas firmadas, diagnósticos, recetas y resultados liberados.

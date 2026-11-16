@@ -1,0 +1,7 @@
+{
+  "method": "POST",
+  "path": "/api/v1/laboratorio/pendientes/{id}/revisar",
+  "body": {
+    "version": 1
+  }
+}

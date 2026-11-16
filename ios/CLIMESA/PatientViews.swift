@@ -603,11 +603,20 @@ struct LabOrderRow: View {
 struct LabOrderDetail: View {
     let order: LabOrder
     let showValues: Bool
+    /// Solo el personal ve la observación del laboratorio (nota para el médico); el paciente nunca.
+    var staffView = false
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PatientTag(order.state.rawValue, label: order.state.label)
             // Solo el paciente ve este aviso (sin valores): el médico ve los valores y su propia etiqueta.
-            if !showValues { PatientNotice(text: L.text(ReviewRules.isAmendedPendingReview(order) ? "exams.amended" : "exams.waiting_review")) }
+            // S10: orden externa. El paciente ve dónde hacerse el examen y las instrucciones tal como se escribieron.
+            if order.external {
+                SectionCard(title: String(format: L.text("exams.external.place"), order.externalPlace ?? L.text("exams.external.noPlace"))) {
+                    if let note = LabExternalRules.patientNote(order), !showValues { Text(verbatim: note).font(Typo.label).foregroundStyle(Theme.ink) }
+                    if let instructions = order.externalInstructions { Text(verbatim: instructions).font(Typo.body).foregroundStyle(Theme.ink) }
+                }
+            }
+            if !showValues && LabExternalRules.patientNote(order) == nil { PatientNotice(text: L.text(ReviewRules.isAmendedPendingReview(order) ? "exams.amended" : "exams.waiting_review")) }
             ForEach(order.items) { item in
                 SectionCard(title: "\(item.name) (\(item.code))") {
                     if showValues {
@@ -615,6 +624,10 @@ struct LabOrderDetail: View {
                             Text(verbatim: PatientLabRules.valueText(item.result)).font(Typo.heading).foregroundStyle(Theme.ink)
                             Spacer()
                             if let mark = item.result?.mark { PatientTag(mark.rawValue, label: mark.label) }
+                        }
+                        if let observation = LabFollowUpRules.labNote(item.result, staffView: staffView) {
+                            Text(verbatim: String(format: L.text(item.result?.relevant == true ? "exams.observation.relevant" : "exams.observation"), observation))
+                                .font(Typo.small).foregroundStyle(item.result?.relevant == true ? Theme.ink : Theme.muted)
                         }
                     }
                 }
