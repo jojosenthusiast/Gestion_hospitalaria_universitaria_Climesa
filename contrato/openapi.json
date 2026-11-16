@@ -22034,20 +22034,18 @@
           "observation": {
             "type": "string",
             "nullable": true,
-            "description": "S10: observación del laboratorio"
+            "description": "S10: observación del laboratorio; solo para el personal, nunca en lecturas del paciente"
           },
           "relevant": {
             "type": "boolean",
-            "description": "S10: la observación es relevante (abrió un pendiente para el médico)"
+            "description": "S10: la observación es relevante (abrió un pendiente para el médico); solo para el personal"
           }
         },
         "required": [
           "value",
           "text",
           "mark",
-          "version",
-          "observation",
-          "relevant"
+          "version"
         ]
       },
       "LabOrderItemResponse": {

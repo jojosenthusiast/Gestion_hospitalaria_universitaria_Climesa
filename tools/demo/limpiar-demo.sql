@@ -102,6 +102,10 @@ delete from publico.aviso where id::text like 'de300000-%';
 -- ---------------------------------------------------------------------------------------------------------
 create temp table items_demo on commit drop as
   select id from laboratorio.orden_item where id::text like 'de300000-%' or orden_id::text like 'de300000-%';
+-- Fase 2, flujo C (S10): referencias de informes externos, pendientes del médico y citas propuestas de órdenes demo.
+delete from laboratorio.adjunto where orden_id::text like 'de300000-%';
+delete from laboratorio.pendiente_medico where orden_id::text like 'de300000-%';
+delete from laboratorio.propuesta_cita where orden_id::text like 'de300000-%';
 delete from laboratorio.resultado_historial where orden_item_id in (select id from items_demo);
 delete from laboratorio.resultado where orden_item_id in (select id from items_demo);
 delete from laboratorio.orden_item where id in (select id from items_demo);
@@ -143,7 +147,9 @@ delete from atencion.relacion_atencion where id::text like 'de300000-%' or orige
 delete from atencion.consulta where id::text like 'de300000-%';
 -- Cita o número usados por una consulta real se conservan (la consulta real los referencia).
 delete from atencion.ticket_fila t where t.id::text like 'de300000-%' and not exists (select 1 from atencion.consulta c where c.ticket_id = t.id);
-delete from atencion.cita c where c.id::text like 'de300000-%' and not exists (select 1 from atencion.consulta k where k.cita_id = c.id);
+-- Una cita demo enlazada a una propuesta de seguimiento real (orden real) también se conserva: la propuesta confirmada la exige.
+delete from atencion.cita c where c.id::text like 'de300000-%' and not exists (select 1 from atencion.consulta k where k.cita_id = c.id)
+  and not exists (select 1 from laboratorio.propuesta_cita p where p.cita_id = c.id);
 
 -- ---------------------------------------------------------------------------------------------------------
 -- 6. Personal: turnos, inscripciones, vínculo de las cuentas de prueba y personas demo sin uso real

@@ -19,8 +19,8 @@ export class LabItemResultResponse {
   @StrProp({ nullable: true }) text!: string | null;
   @EnumProp(MARCA_RESULTADO, 'MarcaResultado') mark!: string;
   @IntProp() version!: number;
-  @StrProp({ nullable: true, description: 'S10: observación del laboratorio' }) observation!: string | null;
-  @BoolProp({ description: 'S10: la observación es relevante (abrió un pendiente para el médico)' }) relevant!: boolean;
+  @StrProp({ nullable: true, optional: true, description: 'S10: observación del laboratorio; solo para el personal, nunca en lecturas del paciente' }) observation?: string | null;
+  @BoolProp({ optional: true, description: 'S10: la observación es relevante (abrió un pendiente para el médico); solo para el personal' }) relevant?: boolean;
 }
 
 export class LabOrderItemResponse {

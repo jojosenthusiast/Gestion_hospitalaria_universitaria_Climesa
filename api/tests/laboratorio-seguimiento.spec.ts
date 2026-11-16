@@ -42,6 +42,18 @@ describe('Laboratorio · seguimiento, orden externa y cita propuesta (S10)', () 
   const proposals = async () => (await t.call('REC', 'GET', '/laboratorio/seguimientos')).body as any[];
   const listed = async (role: string, id: string) => ((await t.call(role, 'GET', '/laboratorio/ordenes')).body as any[]).find(o => o.id === id);
 
+  test('las tablas nuevas tienen RLS con la política api_sghu, como sus hermanas', async () => {
+    const tables = ['adjunto', 'pendiente_medico', 'propuesta_cita'];
+    const rls = await t.pg.query<{ relname: string; relrowsecurity: boolean }>(
+      "SELECT c.relname,c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='laboratorio' AND c.relname = ANY($1) ORDER BY c.relname", [tables]);
+    expect(rls.rows).toEqual(tables.map(relname => ({ relname, relrowsecurity: true })));
+    const policies = await t.pg.query<{ tablename: string }>("SELECT tablename FROM pg_policies WHERE schemaname='laboratorio' AND policyname='api_sghu' AND tablename = ANY($1) ORDER BY tablename", [tables]);
+    expect(policies.rows.map(r => r.tablename)).toEqual(tables);
+    for (const table of tables) {
+      await expect(t.pg.transaction(async tx => { await tx.exec('SET LOCAL ROLE authenticated'); await tx.query(`SELECT * FROM laboratorio.${table}`); })).rejects.toThrow();
+    }
+  });
+
   describe('pendiente del médico', () => {
     test('un valor crítico sigue avisando solo al médico que pidió y al laboratorio (comportamiento existente)', async () => {
       const o = await order('en_proceso');
@@ -72,6 +84,24 @@ describe('Laboratorio · seguimiento, orden externa y cita propuesta (S10)', () 
       expect((await t.events('laboratorio.actualizado', o.id)).at(-1)).toEqual(expect.arrayContaining([`usuario:${userId('MED')}`]));
       const listedResult = (await listed('MED', o.id)).items[0].result;
       expect([listedResult.observation, listedResult.relevant]).toEqual(['Muestra levemente hemolizada; repetir si hay duda clínica.', true]);
+    });
+
+    test('el paciente no recibe la observación del laboratorio ni la marca de relevante, tampoco con la orden revisada', async () => {
+      const o = await order('en_proceso');
+      const saved = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultados`, { orderItemId: o.item, value: 13.4, version: o.version, observation: 'Nota interna para el médico tratante.', relevant: true });
+      const done = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/completar`, { version: saved.body.orderVersion });
+      expect((await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version: done.body.version })).status).toBe(201);
+      const mine = ((await t.call('PAC', 'GET', '/me/laboratorio')).body as any[]).find(x => x.id === o.id);
+      expect(mine.items[0].result).toMatchObject({ value: 13.4, mark: 'normal' });
+      expect(Object.keys(mine.items[0].result)).not.toEqual(expect.arrayContaining(['observation']));
+      expect(Object.keys(mine.items[0].result)).not.toEqual(expect.arrayContaining(['relevant']));
+      const detail = await t.call('PAC', 'GET', `/laboratorio/ordenes/${o.id}`);
+      expect(detail.body.items[0].result).toMatchObject({ value: 13.4 });
+      expect(detail.body.items[0].result).not.toHaveProperty('observation');
+      expect(detail.body.items[0].result).not.toHaveProperty('relevant');
+      expect(JSON.stringify(detail.body)).not.toContain('Nota interna');
+      // The doctor still reads it.
+      expect((await listed('MED', o.id)).items[0].result.observation).toBe('Nota interna para el médico tratante.');
     });
 
     test('un valor normal sin observación relevante no crea pendiente', async () => {
@@ -169,6 +199,19 @@ describe('Laboratorio · seguimiento, orden externa y cita propuesta (S10)', () 
       expect(JSON.stringify(history.body)).toContain(o.id);
     });
 
+    test('el paciente nunca ve el adjunto del resultado externo, tampoco después de la revisión', async () => {
+      const o = await order('pendiente');
+      const sent = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/externa`, { version: o.version, place: 'Clínica Ficticia', instructions: 'Instrucciones de prueba suficientes.' });
+      const loaded = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultado-externo`, { version: sent.body.version, attachment: ATTACHMENT, results: [{ orderItemId: o.item, value: 12.9 }], note: 'Nota interna del laboratorio.' });
+      expect((await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version: loaded.body.version })).status).toBe(201);
+      const mine = await t.call('PAC', 'GET', `/laboratorio/ordenes/${o.id}`);
+      expect(mine.status).toBe(200);
+      expect(mine.body.reviewedAt).not.toBeNull();
+      expect(mine.body.items[0].result).toMatchObject({ value: 12.9 });
+      expect(mine.body.attachments).toEqual([]);
+      expect(JSON.stringify(mine.body)).not.toMatch(/radiografia-torax|Nota interna|aaaaaaaa/);
+    });
+
     test('cargar resultado externo en una orden que no es externa se rechaza con su código', async () => {
       const o = await order('pendiente');
       const res = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultado-externo`, { version: o.version, attachment: ATTACHMENT, results: [{ orderItemId: o.item, value: 12.9 }] });
@@ -213,6 +256,29 @@ describe('Laboratorio · seguimiento, orden externa y cita propuesta (S10)', () 
       expect((await proposals()).some(p => p.id === proposal.id)).toBe(false);
       const twice = await t.call('REC', 'POST', `/laboratorio/seguimientos/${proposal.id}/descartar`, { version: ok.body.version, reason: 'Ya no hace falta la cita.' });
       expect([twice.status, twice.body.codigo]).toEqual([409, 'propuesta_resuelta']);
+    });
+
+    test('una cita ya enlazada a otra propuesta no se puede enlazar otra vez', async () => {
+      const name = `Dup${Math.random().toString(36).slice(2, 8)}`;
+      const patientId = await t.patient({ name, linkPac: true });
+      const record = (await t.one<{ expediente: string }>('SELECT expediente FROM pacientes.paciente WHERE id=$1', [patientId])).expediente;
+      const ids: string[] = [];
+      for (let i = 0; i < 2; i++) {
+        const consultation = await t.consultation(patientId);
+        const created = await t.call('MED', 'POST', '/laboratorio/ordenes', { consultationId: consultation.id, exams: [hb] });
+        const id = created.body.id as string;
+        const item = (await t.one<{ id: string }>('SELECT id FROM laboratorio.orden_item WHERE orden_id=$1', [id])).id;
+        const v1 = (await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/muestra`, { version: created.body.version, expediente: record, nombreCompleto: `${name} Ficticio` })).body.version;
+        const v2 = (await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/resultados`, { orderItemId: item, value: 13.1, version: v1 })).body.orderVersion;
+        expect((await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/completar`, { version: v2 })).status).toBe(201);
+        ids.push(id);
+      }
+      const [first, second] = await Promise.all(ids.map(async id => (await proposals()).find(p => p.orderId === id)));
+      const cita = await t.appointment(patientId, new Date(now.valueOf() + 5 * 24 * 60 * MINUTE));
+      expect((await t.call('REC', 'POST', `/laboratorio/seguimientos/${first.id}/confirmar`, { version: first.version, appointmentId: cita })).status).toBe(201);
+      const again = await t.call('REC', 'POST', `/laboratorio/seguimientos/${second.id}/confirmar`, { version: second.version, appointmentId: cita });
+      expect([again.status, again.body.codigo]).toEqual([409, 'cita_no_coincide']);
+      expect((await proposals()).find(p => p.id === second.id)?.state).toBe('propuesta');
     });
 
     test('recepción descarta la propuesta con motivo', async () => {

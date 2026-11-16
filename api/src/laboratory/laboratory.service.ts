@@ -62,8 +62,8 @@ export class LaboratoryService {
     if (!found) throw new NotFoundException('No se encontró la orden de laboratorio.');
     const { reviewer, ...row } = found;
     const seesValues = lab || (!!doctor && (row.doctorId === doctor || !!reviewer));
-    // S10: the attachment of an external result is part of the result: the patient sees it only once reviewed (D-040).
-    const seesAttachments = seesValues || (!!patient && row.patientId === patient && !!row.reviewedAt);
+    // S10: the attachment (file name, fingerprint, lab note, uploader) is staff-only; the patient never sees it, reviewed or not.
+    const seesAttachments = seesValues;
     const extra = await this.db.transaction(async c => {
       const reason = (await c.query('SELECT motivo_cancelacion AS reason FROM laboratorio.orden WHERE id=$1', [id])).rows[0]?.reason ?? null;
       const history = seesValues ? (await c.query(`SELECT h.orden_item_id AS "orderItemId",h.version,h.valor::float8 AS value,h.texto AS text,h.marca AS mark,
@@ -115,7 +115,8 @@ export class LaboratoryService {
         coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
         p.expediente AS "patientRecord",p.sexo AS "patientSex",p.nacimiento::text AS "birthRaw",m.nombres||' '||m.apellidos AS "doctorName",
         count(oi.id)::int AS "itemCount",count(r.orden_item_id)::int AS "capturedCount",
-        coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'unit',e.unidad,'resultType',e.tipo_resultado,'result',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND (o.medico_id=$3 OR o.revisor) OR $2::boolean AND o.revisada_en IS NOT NULL) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version,'observation',r.observacion,'relevant',r.observacion_relevante) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
+        coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'unit',e.unidad,'resultType',e.tipo_resultado,'result',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND (o.medico_id=$3 OR o.revisor)) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version,'observation',r.observacion,'relevant',r.observacion_relevante)
+          WHEN $2::boolean AND o.revisada_en IS NOT NULL AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
         FROM filas o JOIN pacientes.paciente p ON p.id=o.paciente_id LEFT JOIN personal.persona m ON m.id=o.medico_id
         LEFT JOIN laboratorio.orden_item oi ON oi.orden_id=o.id LEFT JOIN laboratorio.examen e ON e.id=oi.examen_id LEFT JOIN laboratorio.resultado r ON r.orden_item_id=oi.id
         GROUP BY o.id,o.consulta_id,o.paciente_id,o.medico_id,o.prioridad,o.estado,o.creada_en,o.muestra_tomada_en,o.completada_en,o.revisada_en,o.enmendada_en,o.version,o.revisor,o.externa,o.lugar_externo,o.instrucciones_externas,p.id,m.id
@@ -530,6 +531,9 @@ export class LaboratoryService {
       if (!appointment || !appointmentMatchesProposal(appointment as any, proposal as any)) {
         throw new ProblemException('cita_no_coincide', 409, 'La cita debe ser del mismo paciente con el médico que pidió los exámenes, y estar vigente.', 'appointmentId');
       }
+      // One appointment backs at most one proposal (unique index propuesta_cita_cita_unica guards concurrent links).
+      const linked = (await c.query('SELECT 1 FROM laboratorio.propuesta_cita WHERE cita_id=$1 AND id<>$2', [dto.appointmentId, id])).rowCount;
+      if (linked) throw new ProblemException('cita_no_coincide', 409, 'Esa cita ya está enlazada a otro seguimiento de laboratorio; agenda una nueva.', 'appointmentId');
       const row = (await c.query(`UPDATE laboratorio.propuesta_cita SET estado='confirmada',cita_id=$2,resuelta_en=$3,resuelta_por=$4,version=version+1 WHERE id=$1
         RETURNING id,estado AS state,version,cita_id AS "appointmentId"`, [id, dto.appointmentId, this.clock.now(), actor.staffId])).rows[0];
       await this.commands.audit(c, actor, { action: 'laboratorio.seguimiento_confirmado', entity: 'orden_laboratorio', entityId: proposal.orderId, patientId: proposal.patientId, permission: 'citas.agendar', detail: { proposalId: id, appointmentId: dto.appointmentId } });

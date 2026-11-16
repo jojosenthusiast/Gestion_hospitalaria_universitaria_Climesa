@@ -108,6 +108,43 @@ create table laboratorio.propuesta_cita (
   check (estado = 'propuesta' or (resuelta_en is not null and resuelta_por is not null))
 );
 create index propuesta_cita_abierta on laboratorio.propuesta_cita (estado, creada_en);
+-- Una cita respalda a lo sumo una propuesta de seguimiento.
+create unique index propuesta_cita_cita_unica on laboratorio.propuesta_cita (cita_id) where cita_id is not null;
 
 grant select, insert on laboratorio.adjunto to sghu_api;
 grant select, insert, update on laboratorio.pendiente_medico, laboratorio.propuesta_cita to sghu_api;
+
+-- Solo la API lee y escribe estas tablas (mismo patrón que atencion.reprogramacion).
+alter table laboratorio.adjunto enable row level security;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'laboratorio' and tablename = 'adjunto' and policyname = 'api_sghu') then
+    create policy api_sghu on laboratorio.adjunto for all to sghu_api using (true) with check (true);
+  end if;
+end $$;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on laboratorio.adjunto from anon, authenticated;
+  end if;
+end $$;
+alter table laboratorio.pendiente_medico enable row level security;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'laboratorio' and tablename = 'pendiente_medico' and policyname = 'api_sghu') then
+    create policy api_sghu on laboratorio.pendiente_medico for all to sghu_api using (true) with check (true);
+  end if;
+end $$;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on laboratorio.pendiente_medico from anon, authenticated;
+  end if;
+end $$;
+alter table laboratorio.propuesta_cita enable row level security;
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'laboratorio' and tablename = 'propuesta_cita' and policyname = 'api_sghu') then
+    create policy api_sghu on laboratorio.propuesta_cita for all to sghu_api using (true) with check (true);
+  end if;
+end $$;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on laboratorio.propuesta_cita from anon, authenticated;
+  end if;
+end $$;
