@@ -100,8 +100,9 @@ public enum AreaCode: String, CaseIterable, Sendable {
     /// Área de un código de espacio o de área (`P1-EMG` → EMG, `P3-VIP` → HOS); lo desconocido cae en el neutro.
     public static func of(_ code: String?) -> AreaCode {
         let parts = (code ?? "").uppercased().split(separator: "-").map { $0.trimmingCharacters(in: .whitespaces) }
-        guard let key = parts.first(where: { AreaCode(rawValue: $0) != nil || aliases[$0] != nil }) else { return .gen }
-        return aliases[key] ?? AreaCode(rawValue: key) ?? .gen
+        // A real area code wins over an alias: `BOD-LAB` is LAB, `BOD-CEN` falls back to the BOD alias (GEN).
+        if let area = parts.lazy.compactMap({ AreaCode(rawValue: $0) }).first { return area }
+        return parts.lazy.compactMap({ aliases[$0] }).first ?? .gen
     }
 }
 
