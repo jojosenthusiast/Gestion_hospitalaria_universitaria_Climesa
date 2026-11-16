@@ -286,9 +286,9 @@
 @media (min-width: 768px) and (max-width: 1199px) {
   .hospital-frame { grid-template-columns: 72px minmax(0, 1fr); }
   .module-nav.shell-sidebar { padding: 18px 9px; }
-  .sidebar-heading { padding: 8px 2px 16px; text-align: center; }
-  .sidebar-heading strong { font-size: 13px; }
-  .sidebar-heading .mono-label, .module-label, .module-future { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  /* The 72px rail cannot fit the workspace name; the header logo already shows it. */
+  .sidebar-heading { padding: 0; border-bottom: 0; }
+  .sidebar-heading strong, .sidebar-heading .mono-label, .module-label, .module-future { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
   .module-nav.shell-sidebar a { justify-content: center; padding: 11px 8px; }
   .module-nav.shell-sidebar a:hover { transform: none; }
 }
