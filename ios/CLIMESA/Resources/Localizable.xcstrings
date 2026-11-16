@@ -4851,6 +4851,61 @@
           }
         }
       }
+    },
+    "consultation.sign.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Firmar la consulta?"
+          }
+        }
+      }
+    },
+    "discharge.sign.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Firmar el alta?"
+          }
+        }
+      }
+    },
+    "revoke.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Revocar el alta?"
+          }
+        }
+      }
+    },
+    "day.consultation.start": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar consulta"
+          }
+        }
+      }
+    },
+    "day.consultation.view": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver consulta"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

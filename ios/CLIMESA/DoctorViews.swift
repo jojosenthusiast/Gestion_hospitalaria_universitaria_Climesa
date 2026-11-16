@@ -77,9 +77,11 @@ struct DoctorDayView: View {
             ForEach(pending) { item in
                 ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.display(item.start),
                         meta: item.reschedule.map { "→ \(ClimesaDates.display($0.start))" })
+                // S13: a list of decisions has no primary of its own; "Llamar siguiente" / "Atender" is the day's primary.
                 HStack(spacing: Spacing.m) {
-                    ClimesaButton(title: L.text("day.reschedules.accept"), loading: deciding.busy) { Task { await accept(item) } }
+                    ClimesaButton(title: L.text("day.reschedules.accept"), kind: .secondary, loading: deciding.busy) { Task { await accept(item) } }
                     ClimesaButton(title: L.text("day.reschedules.reject"), kind: .secondary) { rejecting = item }
+                        .disabled(deciding.busy)
                 }
             }
         }
@@ -122,12 +124,14 @@ struct DoctorDayView: View {
 
     @ViewBuilder private func queueSection(_ tickets: [QueueTicket], next: QueueNextProposal?) -> some View {
         let waiting = tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count
+        // S13: one primary on the day: attend the number already called, otherwise call the next one.
+        let primary = DoctorDayActionRules.primary(tickets: tickets, canAttend: account.can("consulta.iniciar"), canCallNext: account.can("fila.llamar"))
         SectionCard(title: L.text("day.queue")) {
             Text(verbatim: String(format: L.text("day.queue.waiting"), waiting)).font(Typo.body).foregroundStyle(Theme.ink)
             // S9 / RN-FILA-SIGUIENTE: the server proposes who goes next and says why; "Llamar siguiente" calls that number.
             if let next { nextCard(next) }
             if account.can("fila.llamar"), QueueRules.nextToCall(tickets) != nil {
-                ClimesaButton(title: L.text("day.queue.callNext"), loading: calling.busy) { Task { await callNext() } }
+                ClimesaButton(title: L.text("day.queue.callNext"), kind: primary == .callNext ? .primary : .secondary, loading: calling.busy) { Task { await callNext() } }
             }
             if let undo {
                 HStack(spacing: Spacing.m) {
@@ -168,7 +172,7 @@ struct DoctorDayView: View {
                 if account.can("consulta.iniciar") {
                     // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
                     NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
-                        .buttonStyle(ClimesaButtonStyle())
+                        .buttonStyle(ClimesaButtonStyle(kind: primary == .attend(ticket.id) ? .primary : .secondary))
                 }
             }
         }
@@ -233,8 +237,8 @@ struct DoctorDayView: View {
                 HStack(spacing: Spacing.m) {
                     // MA-CIT-03: iniciar solo el día de la cita (lo decide el servidor con `allowedActions`).
                     if entry.consultationId != nil || (account.can("consulta.iniciar") && (entry.allowedActions?.contains(.iniciarConsulta) ?? (entry.appointmentState == .confirmada))) {
-                        NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: { Text("day.consultation") }
-                            .buttonStyle(ClimesaButtonStyle())
+                        NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: { Text(LocalizedStringKey(Self.consultationLinkKey(entry))) }
+                            .buttonStyle(ClimesaButtonStyle(kind: .secondary))
                     } else if let reason = entry.blockedActions?.first(where: { $0.action == .iniciarConsulta })?.reason {
                         Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted)
                     }
@@ -247,6 +251,12 @@ struct DoctorDayView: View {
                 }
             }
         }
+    }
+
+    /// Start, resume an open consultation, or view a signed one: the label says which.
+    static func consultationLinkKey(_ entry: AgendaEntry) -> String {
+        guard entry.consultationId != nil else { return "day.consultation.start" }
+        return entry.consultationState == .abierta ? "day.resume" : "day.consultation.view"
     }
 
     @ViewBuilder private func moreSection(_ day: DoctorDay) -> some View {
@@ -685,9 +695,10 @@ private struct HospitalizedRow: View {
                 NavigationLink { DischargeView(admission: admission, reload: reload) } label: { Text("hospitalized.discharge") }
                     .buttonStyle(ClimesaButtonStyle(kind: .secondary))
             }
+            // S13: revoking undoes a signed discharge, so it reads as destructive and asks for confirmation.
             if actions.revoke {
                 NavigationLink { RevokeDischargeView(admission: admission, reload: reload) } label: { Text("hospitalized.revoke") }
-                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+                    .buttonStyle(ClimesaButtonStyle(kind: .destructive))
             }
         }
     }
@@ -739,6 +750,7 @@ private struct DischargeView: View {
     @State private var consent = false
     @State private var pending: [PendingLine] = []
     @State private var errors: [String: String] = [:]
+    @State private var confirming = false
 
     var body: some View {
         ScreenFrame(title: "hospitalized.discharge") {
@@ -772,12 +784,25 @@ private struct DischargeView: View {
                 ClimesaButton(title: L.text("discharge.pending.add"), kind: .secondary) { pending.append(PendingLine()) }
             }
             WriteNotice(submission: submission, reload: reload)
-            ClimesaButton(title: L.text("discharge.sign"), loading: submission.busy) { Task { await sign() } }
+            ClimesaButton(title: L.text("discharge.sign"), loading: submission.busy) {
+                // Check the form first, so the confirmation only appears when the signature can go through.
+                errors = DischargeRules.errors(type: type, summary: summary, voluntaryConsent: consent, pending: lines)
+                if errors.isEmpty { confirming = true }
+            }
+            .confirmationDialog(L.text("discharge.sign.confirm"), isPresented: $confirming, titleVisibility: .visible) {
+                Button(L.text("discharge.sign")) { Task { await sign() } }
+            } message: {
+                Text(verbatim: DischargeConfirmRules.signSummary(type: type, pendingCount: lines.count))
+            }
         }
     }
 
+    private var lines: [DischargePendingBody] {
+        pending.map { DischargePendingBody(description: $0.description.trimmingCharacters(in: .whitespaces), responsible: $0.responsible.trimmingCharacters(in: .whitespaces)) }
+    }
+
     private func sign() async {
-        let lines = pending.map { DischargePendingBody(description: $0.description.trimmingCharacters(in: .whitespaces), responsible: $0.responsible.trimmingCharacters(in: .whitespaces)) }
+        let lines = self.lines
         errors = DischargeRules.errors(type: type, summary: summary, voluntaryConsent: consent, pending: lines)
         guard errors.isEmpty else { return }
         let text = summary.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -799,6 +824,7 @@ private struct RevokeDischargeView: View {
     @State private var submission = Submission()
     @State private var reason = ""
     @State private var reasonError: String?
+    @State private var confirming = false
 
     var body: some View {
         ScreenFrame(title: "hospitalized.revoke") {
@@ -815,7 +841,15 @@ private struct RevokeDischargeView: View {
                 }
             }
             WriteNotice(submission: submission, reload: reload)
-            ClimesaButton(title: L.text("hospitalized.revoke"), loading: submission.busy) { Task { await revoke() } }
+            ClimesaButton(title: L.text("hospitalized.revoke"), kind: .destructive, loading: submission.busy) {
+                reasonError = DischargeRevocationRules.reasonError(reason)
+                if reasonError == nil { confirming = true }
+            }
+            .confirmationDialog(L.text("revoke.confirm"), isPresented: $confirming, titleVisibility: .visible) {
+                Button(L.text("hospitalized.revoke"), role: .destructive) { Task { await revoke() } }
+            } message: {
+                Text(verbatim: DischargeConfirmRules.revokeSummary)
+            }
         }
     }
 
