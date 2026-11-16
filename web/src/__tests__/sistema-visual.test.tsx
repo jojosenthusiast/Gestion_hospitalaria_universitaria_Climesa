@@ -85,6 +85,12 @@ describe('área de un código de espacio (02-sistema §1)', () => {
     expect(areaOf('P3-VIP')).toBe('HOS');
     expect(areaOf('P1-EMG')).toBe('EMG');
     expect(areaOf('C-101')).toBe('CON');
+  });
+
+  it('el número de fila atendido es de la familia "listo", como en Android e iOS', () => {
+    render(<StatusBadge value="atendido" />);
+    expect(screen.getByText('Atendido')).toBeTruthy();
+    expect(document.querySelector('.fam-listo')).toBeTruthy();
     expect(areaOf(null)).toBe('GEN');
   });
 });
