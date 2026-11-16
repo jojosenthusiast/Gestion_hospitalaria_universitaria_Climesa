@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ExportMenu } from '../../components/export-menu';
 import { Icon } from '../../components/ui';
 import type { Api } from '../../lib/api';
-import { Empty, RemoteState, WriteError, formatDate, formatDateTime, useAction, useData } from '../common';
+import { Empty, RemoteState, Tag, WriteError, formatDate, formatDateTime, useAction, useData } from '../common';
 import { CategoryIcon, StatusChip, StockGauge } from './parts';
 import { categories, expiryText, movementLabels, movementsExport, quantityText, todayIso, type ArticleDetail, type Lot, type MovementType } from './model';
 
@@ -46,7 +46,7 @@ function Body({ api, article, canMove, canConfigure, onBack, onMove, onEdit, onL
     <section className="inv-section" aria-label="Lotes"><header><h3>Lotes y vencimientos</h3></header>
       {lotsInUse.length || retired.length ? <div className="inv-table-wrap"><table className="inv-table"><caption className="sr-only">Lotes del artículo</caption><thead><tr><th>Lote</th><th>Vencimiento</th><th>Existencia</th><th>Bodegas</th>{canConfigure && <th><span className="sr-only">Acción</span></th>}</tr></thead>
         <tbody>{[...lotsInUse, ...retired].map(lot => <tr key={lot.id}>
-          <td><strong>{lot.number}</strong>{!lot.active && <> <span className="inv-tag inv-tag-inactivo">Dado de baja</span></>}</td>
+          <td><strong>{lot.number}</strong>{!lot.active && <> <Tag value="inactivo" label="Dado de baja" /></>}</td>
           <td>{lot.expiresAt ? formatDate(lot.expiresAt) : 'No vence'}<br /><span className={lot.expired ? 'inv-expired' : expiryText(lot.expiresAt, today).startsWith('Vence') ? 'inv-soon' : 'inv-muted'}>{expiryText(lot.expiresAt, today)}</span></td>
           <td>{quantityText(lot.total, article.unit)}</td>
           <td>{lot.warehouses.length ? lot.warehouses.map(w => `${w.warehouseCode}: ${w.quantity}`).join(' · ') : '—'}</td>

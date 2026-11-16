@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { can, roleNames, type AccessProfile, type Api } from '../lib/api';
 import { Notice } from '../components/ui';
 import { HBarList, StackedBar, type Tone } from '../components/charts';
-import { RemoteState, formatDateTime, useData } from './common';
+import { RemoteState, Tag, formatDateTime, useData } from './common';
 
 /** Respuesta de `GET /metricas/tablero` (spec 113): solo agregados, sin datos personales. */
 export type MetricsBoard = {
@@ -68,7 +68,7 @@ export function BoardView({ board: t }: { board: MetricsBoard }) {
       </Tarjeta>
       <Tarjeta titulo="Ambulancia">
         {t.ambulancia
-          ? <><p><span className={`status-tag status-${t.ambulancia.estado}`}>{ambulanceStates[t.ambulancia.estado] ?? t.ambulancia.estado}</span></p><p className="board-note">{t.ambulancia.paramedicoDeTurno ? 'Paramédico de turno' : 'Sin paramédico con turno en curso'}</p></>
+          ? <><p><Tag value={t.ambulancia.estado} label={ambulanceStates[t.ambulancia.estado]} /></p><p className="board-note">{t.ambulancia.paramedicoDeTurno ? 'Paramédico de turno' : 'Sin paramédico con turno en curso'}</p></>
           : <p className="muted">No hay una unidad registrada.</p>}
       </Tarjeta>
       <Tarjeta titulo="Números en fila">

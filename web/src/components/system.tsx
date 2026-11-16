@@ -76,15 +76,15 @@ export const STATUS_FAMILIES: { id: StatusFamilyId; label: string; icon: IconNam
   { id: 'critico', label: 'Crítico', icon: 'alert', pattern: 'doble' },
 ];
 const familyOfValue: Record<string, StatusFamilyId> = {
-  en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera',
-  llamado: 'llamado', confirmada: 'llamado', en_proceso: 'llamado', limpieza: 'llamado', reprogramada: 'llamado',
+  en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera', por_vencer: 'espera', revisar: 'espera',
+  llamado: 'llamado', confirmada: 'llamado', en_proceso: 'llamado', limpieza: 'llamado', reprogramada: 'llamado', bajo_minimo: 'llamado',
   en_atencion: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion',
-  atendida: 'listo', atendido: 'listo', completado: 'listo', firmada: 'listo', alta_firmada: 'listo', egresado: 'listo', libre: 'listo', disponible: 'listo', activo: 'listo', exito: 'listo', normal: 'listo', aprobada: 'listo',
-  cancelado: 'cerrado', cancelada: 'cerrado', no_asistio: 'cerrado', no_se_presento: 'cerrado', cerrado: 'cerrado', rechazada: 'cerrado', vencida: 'cerrado', vencido: 'cerrado', bloqueada: 'cerrado', inactivo: 'cerrado', desactivado: 'cerrado', denegado: 'cerrado', fallido: 'cerrado', en_mantenimiento: 'cerrado',
+  atendida: 'listo', atendido: 'listo', completado: 'listo', firmada: 'listo', alta_firmada: 'listo', egresado: 'listo', libre: 'listo', disponible: 'listo', activo: 'listo', exito: 'listo', normal: 'listo', aprobada: 'listo', ok: 'listo', coincide: 'listo',
+  cancelado: 'cerrado', cancelada: 'cerrado', no_asistio: 'cerrado', no_se_presento: 'cerrado', cerrado: 'cerrado', rechazada: 'cerrado', vencida: 'cerrado', vencido: 'cerrado', bloqueada: 'cerrado', inactivo: 'cerrado', desactivado: 'cerrado', denegado: 'cerrado', fallido: 'cerrado', en_mantenimiento: 'cerrado', agotado: 'cerrado',
   critico_alto: 'critico', critico_bajo: 'critico',
 };
 export const statusFamily = (value: string): StatusFamilyId | null => familyOfValue[value] ?? null;
-export const statusNames: Record<string, string> = { activo: 'Activo', inactivo: 'Inactivo', provisional: 'Provisional', libre: 'Libre', ocupada: 'Ocupada', reservada: 'Reservada', limpieza: 'En limpieza', bloqueada: 'Bloqueada', borrador: 'Borrador', publicado: 'Pendiente de iniciar', pendiente: 'Pendiente de iniciar', en_curso: 'En curso', completado: 'Completado', cancelado: 'Cancelado', cancelada: 'Cancelada', solicitada: 'Solicitada', confirmada: 'Confirmada', atendida: 'Atendida', atendido: 'Atendido', firmada: 'Firmada', rechazada: 'Rechazada', no_asistio: 'No asistió', vencida: 'Vencida', reprogramada: 'Reprogramada', cerrado: 'Cerrado sin atender', desactivado: 'Desactivado', pendiente_cama: 'Pendiente de cama', hospitalizado: 'Hospitalizado', alta_firmada: 'Alta firmada', egresado: 'Egresado', exito: 'Correcto', denegado: 'Denegado', fallido: 'Fallido', en_espera: 'En espera', llamado: 'Llamado', en_atencion: 'En atención', no_se_presento: 'No se presentó', en_proceso: 'En proceso', abierta: 'Abierta', bajo_minimo: 'Bajo mínimo', vencido: 'Vencido', normal: 'Normal', alto: 'Alto', bajo: 'Bajo', critico_alto: 'Crítico alto', critico_bajo: 'Crítico bajo', sin_rango: 'Sin rango', disponible: 'Disponible', en_servicio: 'En servicio', en_mantenimiento: 'En mantenimiento' };
+export const statusNames: Record<string, string> = { activo: 'Activo', inactivo: 'Inactivo', provisional: 'Provisional', libre: 'Libre', ocupada: 'Ocupada', reservada: 'Reservada', limpieza: 'En limpieza', bloqueada: 'Bloqueada', borrador: 'Borrador', publicado: 'Pendiente de iniciar', pendiente: 'Pendiente de iniciar', en_curso: 'En curso', completado: 'Completado', cancelado: 'Cancelado', cancelada: 'Cancelada', solicitada: 'Solicitada', confirmada: 'Confirmada', atendida: 'Atendida', atendido: 'Atendido', firmada: 'Firmada', rechazada: 'Rechazada', no_asistio: 'No asistió', vencida: 'Vencida', reprogramada: 'Reprogramada', cerrado: 'Cerrado sin atender', desactivado: 'Desactivado', pendiente_cama: 'Pendiente de cama', hospitalizado: 'Hospitalizado', alta_firmada: 'Alta firmada', egresado: 'Egresado', exito: 'Correcto', denegado: 'Denegado', fallido: 'Fallido', en_espera: 'En espera', llamado: 'Llamado', en_atencion: 'En atención', no_se_presento: 'No se presentó', en_proceso: 'En proceso', abierta: 'Abierta', bajo_minimo: 'Bajo mínimo', vencido: 'Vencido', normal: 'Normal', alto: 'Alto', bajo: 'Bajo', critico_alto: 'Crítico alto', critico_bajo: 'Crítico bajo', sin_rango: 'Sin rango', disponible: 'Disponible', en_servicio: 'En servicio', en_mantenimiento: 'En mantenimiento', agotado: 'Agotado', por_vencer: 'Por vencer', ok: 'En orden', coincide: 'Coincide', revisar: 'Revisar' };
 
 /**
  * Estado con ícono + etiqueta + patrón. Conserva las clases `status-tag status-<valor>` para las vistas que ya las usan.
@@ -106,9 +106,9 @@ export const PRIORITIES: { id: Priority; label: string; icon: IconName }[] = [
   { id: 'rutina', label: 'Rutina', icon: 'minus' },
 ];
 /** El rojo (`--critical`) es solo de emergencia y de valores críticos. */
-export function PriorityBadge({ value }: { value: Priority }) {
+export function PriorityBadge({ value, label }: { value: Priority; label?: string }) {
   const p = PRIORITIES.find(x => x.id === value) ?? PRIORITIES[2];
-  return <span className={`priority-badge priority-${p.id}`}><Icon name={p.icon} size={14} /><span>{p.label}</span></span>;
+  return <span className={`priority-badge priority-${p.id}`}><Icon name={p.icon} size={14} /><span>{label ?? p.label}</span></span>;
 }
 
 /** Leyenda con exactamente las mismas piezas que las tarjetas y los filtros. */

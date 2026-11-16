@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Field, Notice } from '../components/ui';
 import { can, type AccessProfile, type Api } from '../lib/api';
 import './account-links.css';
-import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, WriteError, formatDate, formatDateTime, useAction, useData } from './common';
+import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDate, formatDateTime, useAction, useData } from './common';
 
 /** Row of `GET /cuentas/vinculaciones` (spec 101, W27). */
 export type LinkRequest = {
@@ -45,10 +45,10 @@ function LinkingGuide() {
       <li><strong>3. Decide.</strong><span>Aprueba si coinciden; rechaza con un motivo si no.</span></li>
     </ol>
     <ul className="link-states" aria-label="Estados">
-      <li><span className="status-tag status-normal">Coincide</span> El dato declarado es igual al del expediente.</li>
-      <li><span className="status-tag status-pendiente">Revisar</span> No hay coincidencia: verifica con el paciente o busca el expediente.</li>
-      <li><span className="status-tag status-aprobada">Aprobada</span> La cuenta ya ve su expediente.</li>
-      <li><span className="status-tag status-rechazada">Rechazada</span> El paciente lee tu motivo y puede volver a pedirlo.</li>
+      <li><Tag value="coincide" /> El dato declarado es igual al del expediente.</li>
+      <li><Tag value="revisar" /> No hay coincidencia: verifica con el paciente o busca el expediente.</li>
+      <li><Tag value="aprobada" /> La cuenta ya ve su expediente.</li>
+      <li><Tag value="rechazada" /> El paciente lee tu motivo y puede volver a pedirlo.</li>
     </ul>
   </section>;
 }
@@ -57,7 +57,7 @@ function LinkRequestCard({ api, row, allowed, onReject, onSaved }: { api: Api; r
   const action = useAction(api);
   const candidate = row.candidate;
   async function approve() { if (await action.run(`/cuentas/vinculaciones/${row.id}/aprobar`, { version: row.version })) onSaved(); }
-  const match = (ok: boolean) => <span className={`status-tag status-${ok ? 'normal' : 'pendiente'}`}>{ok ? 'Coincide' : 'Revisar'}</span>;
+  const match = (ok: boolean) => <Tag value={ok ? 'coincide' : 'revisar'} />;
   return <li aria-label={`Solicitud de ${row.account.email}`}>
     <div className="history-item-head"><div><strong>{row.account.email}</strong><small>{formatDateTime(row.createdAt)}</small></div></div>
     <table className="record-table"><caption className="sr-only">Datos declarados frente al expediente candidato</caption>

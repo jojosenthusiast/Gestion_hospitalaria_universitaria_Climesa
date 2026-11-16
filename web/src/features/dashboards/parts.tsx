@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../../components/ui';
-import { Skeleton } from '../../components/system';
+import { AreaTag, Skeleton, StatusBadge, type AreaCode } from '../../components/system';
 import { toneColor, type Tone } from '../../components/charts';
 import { can, type AccessProfile } from '../../lib/api';
 import type { Remote } from '../common';
@@ -47,13 +47,14 @@ export function PanelState<T>({ state, children, empty }: { state: Remote<T>; ch
   return message ? <p className="panel-empty" role="status">{message}</p> : <>{children(state.data)}</>;
 }
 
-export type AttentionItem = { id: string; title: string; detail?: string; tone: Tone; href: string; action: string; tag?: string };
+/** `tag` is the visible label; with `status` it shows as a StatusBadge, with `area` as an AreaTag, otherwise as plain text. */
+export type AttentionItem = { id: string; title: string; detail?: string; tone: Tone; href: string; action: string; tag?: string; status?: string; area?: AreaCode };
 /** Lista de «qué necesita mi atención»: cada fila lleva su acción directa; vacía, lo dice con claridad. */
 export function AttentionList({ items, empty = 'Nada pendiente por ahora.', limit = 6 }: { items: AttentionItem[]; empty?: string; limit?: number }) {
   if (items.length === 0) return <p className="panel-empty attention-empty" role="status"><Icon name="check" size={18} />{empty}</p>;
   return <ul className="attention-list">{items.slice(0, limit).map(item => <li key={item.id} style={{ ['--attn' as string]: toneColor[item.tone] }}>
     <div><strong>{item.title}</strong>{item.detail && <span>{item.detail}</span>}</div>
-    {item.tag && <span className="attention-tag">{item.tag}</span>}
+    {item.status ? <StatusBadge value={item.status} label={item.tag} /> : item.area ? <AreaTag code={item.area} showName /> : item.tag && <span className="attention-tag">{item.tag}</span>}
     <a className="row-action" href={item.href}>{item.action}<Icon name="arrow" size={16} /></a>
   </li>)}{items.length > limit && <li className="attention-more">y {items.length - limit} más</li>}</ul>;
 }

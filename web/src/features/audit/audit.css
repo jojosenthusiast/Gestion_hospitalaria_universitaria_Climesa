@@ -12,6 +12,8 @@
 .audit-chain-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 .audit-presets { margin: 18px 24px 0; }
+.audit-active-filters { padding: 12px 24px 0; }
+.audit-active-filters:empty { display: none; }
 .audit-toolbar { align-items: flex-end; }
 .audit-toolbar > .select-field { flex: 0 1 160px; }
 .audit-filters { padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px 20px; border-bottom: 1px solid var(--line); background: var(--bg); }
@@ -20,10 +22,6 @@
 .audit-results label { min-height: 42px; display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; }
 .audit-results input { width: 18px; height: 18px; accent-color: var(--primary); }
 
-.audit-chips { padding: 12px 24px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
-.audit-chip { padding: 4px 4px 4px 12px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid color-mix(in srgb, var(--primary-text) 28%, transparent); border-radius: 999px; background: var(--soft); color: var(--primary-text); font-size: 13px; font-weight: 700; }
-.audit-chip button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
-.audit-chip button:hover { background: color-mix(in srgb, var(--primary-text) 14%, transparent); }
 
 .audit-table th { white-space: nowrap; }
 .audit-sort { padding: 0; display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
@@ -54,7 +52,7 @@
 .audit-drawer-nav { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
 
 @media (max-width: 640px) {
-  .audit-presets, .audit-chips, .audit-pager { padding-inline: 16px; margin-inline: 0; }
+  .audit-presets, .audit-active-filters, .audit-pager { padding-inline: 16px; margin-inline: 0; }
   .audit-facts > div, .audit-meta > div { grid-template-columns: 1fr; gap: 4px; }
   .audit-diff-grid { grid-template-columns: 1fr; }
 }

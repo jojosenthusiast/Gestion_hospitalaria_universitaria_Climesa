@@ -54,7 +54,7 @@ function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
 function LowStock({ d, tone = 'warn' as Tone }: { d: DashboardData; tone?: Tone }) {
   return <Panel title="Inventario bajo el mínimo" icon="inventory" action={{ label: 'Abrir inventario', href: '#/inventario' }} hint="Artículos con menos existencias que su mínimo o con lotes vencidos.">
     <PanelState state={d.stock}>{rows => {
-      const items: AttentionItem[] = rows.filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: `${r.disponible} disponibles · mínimo ${r.minimo}${r.vencido > 0 ? ` · ${r.vencido} vencidos` : ''}`, tone: r.vencido > 0 ? 'danger' : tone, href: '#/inventario', action: 'Ver', tag: r.vencido > 0 ? 'Vencido' : 'Bajo mínimo' }));
+      const items: AttentionItem[] = rows.filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: `${r.disponible} disponibles · mínimo ${r.minimo}${r.vencido > 0 ? ` · ${r.vencido} vencidos` : ''}`, tone: r.vencido > 0 ? 'danger' : tone, href: '#/inventario', action: 'Ver', tag: r.vencido > 0 ? 'Vencido' : 'Bajo mínimo', status: r.vencido > 0 ? 'vencido' : 'bajo_minimo' }));
       return <AttentionList items={items} empty="Todo el inventario está sobre su mínimo." />;
     }}</PanelState>
   </Panel>;
@@ -175,7 +175,7 @@ const dpd: RoleDashboard = {
         }}</PanelState>
       </Panel>
       <Panel title="Requiere tu atención" icon="alert" action={{ label: 'Abrir auditoría', href: '#/auditoria' }} hint="Eventos denegados o fallidos más recientes.">
-        <PanelState state={d.audit}>{rows => <AttentionList empty="No hay eventos denegados ni fallidos." items={rows.filter(r => r.result !== 'exito').map(r => ({ id: r.seq, title: r.action, detail: `${r.role} · ${timeLabel(r.at)}`, tone: resultTone[r.result] ?? 'warn', href: '#/auditoria', action: 'Revisar', tag: r.result === 'denegado' ? 'Denegado' : 'Fallido' }))} />}</PanelState>
+        <PanelState state={d.audit}>{rows => <AttentionList empty="No hay eventos denegados ni fallidos." items={rows.filter(r => r.result !== 'exito').map(r => ({ id: r.seq, title: r.action, detail: `${r.role} · ${timeLabel(r.at)}`, tone: resultTone[r.result] ?? 'warn', href: '#/auditoria', action: 'Revisar', tag: r.result === 'denegado' ? 'Denegado' : 'Fallido', status: r.result === 'denegado' ? 'denegado' : 'fallido' }))} />}</PanelState>
       </Panel>
     </>)}
   </>,
@@ -202,11 +202,11 @@ const rec: RoleDashboard = {
     {grid(<>
       <Panel title="Requiere tu atención" icon="alert" hint="Cada fila tiene su botón: resuélvelo desde aquí.">
         <AttentionList empty="No hay vinculaciones, solicitudes ni admisiones esperando." items={[
-          ...(d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name, detail: `Pide vincular su cuenta${l.candidate ? ` con el expediente ${l.candidate.record}` : ''}`, tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar', tag: 'Vinculación' })),
-          ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `Solicita cita el ${new Intl.DateTimeFormat('es-SV', { day: 'numeric', month: 'short', timeZone: 'America/El_Salvador' }).format(new Date(a.start))} a las ${timeLabel(a.start)}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Cita solicitada' })),
-          ...(d.apptRequests.data ?? []).filter(r => r.state === 'pendiente').map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: `Pide cita por ${r.categories.map(c => c.name.toLowerCase()).join(', ')}${r.note ? `: ${r.note}` : ''}`, tone: 'warn' as Tone, href: '#/citas', action: 'Asignar', tag: 'Por asignar' })),
-          ...(d.admissions.data ?? []).filter(a => a.state === 'pendiente_cama').map(a => ({ id: `a-${a.id}`, title: a.patientName, detail: 'Admisión sin cama asignada', tone: 'warn' as Tone, href: '#/hospitalizacion', action: 'Asignar cama', tag: 'Sin cama' })),
-          ...(d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: r.address, tone: 'danger' as Tone, href: '#/ambulancia', action: 'Despachar', tag: 'Ambulancia' })),
+          ...(d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name, detail: `Pide vincular su cuenta${l.candidate ? ` con el expediente ${l.candidate.record}` : ''}`, tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar', tag: 'Vinculación', status: 'revisar' })),
+          ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `Solicita cita el ${new Intl.DateTimeFormat('es-SV', { day: 'numeric', month: 'short', timeZone: 'America/El_Salvador' }).format(new Date(a.start))} a las ${timeLabel(a.start)}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Cita solicitada', status: 'solicitada' })),
+          ...(d.apptRequests.data ?? []).filter(r => r.state === 'pendiente').map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: `Pide cita por ${r.categories.map(c => c.name.toLowerCase()).join(', ')}${r.note ? `: ${r.note}` : ''}`, tone: 'warn' as Tone, href: '#/citas', action: 'Asignar', tag: 'Por asignar', status: 'pendiente' })),
+          ...(d.admissions.data ?? []).filter(a => a.state === 'pendiente_cama').map(a => ({ id: `a-${a.id}`, title: a.patientName, detail: 'Admisión sin cama asignada', tone: 'warn' as Tone, href: '#/hospitalizacion', action: 'Asignar cama', tag: 'Sin cama', status: 'pendiente_cama' })),
+          ...(d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: r.address, tone: 'danger' as Tone, href: '#/ambulancia', action: 'Despachar', tag: 'Ambulancia', area: 'AMB' as const })),
         ]} />
       </Panel>
       <QueuePanel queue={d.queue} />

@@ -26,6 +26,8 @@ export function crewProblem(pool:CrewCandidate[],chosen:string[]){const picked=p
 export type PrehospitalView={serviceId:string;version:number;active:boolean;arrived:boolean;priority:string;patientLinked:boolean;clinical:boolean;handover:{receivedAt:string;receivedByName:string|null}|null;allowedActions:string[];reports:{id:string;priority:string;estimatedArrival?:string|null;capturedAt:string;receivedAt:string;reason?:string;vitalSigns?:Record<string,number>}[]};
 export const stateNames:Record<string,string>={disponible:'Disponible',en_servicio:'En servicio',en_mantenimiento:'En mantenimiento'};
 export const priorityNames:Record<string,string>={roja:'Roja',naranja:'Naranja',amarilla:'Amarilla',verde:'Verde'};
+/** Triage colour on the shared priority scale: red is the only emergency; orange and yellow are urgent; green is routine. */
+export const priorityLevel=(priority:string):'emergencia'|'urgente'|'rutina'=>priority==='roja'?'emergencia':priority==='naranja'||priority==='amarilla'?'urgente':'rutina';
 export const typeNames:Record<string,string>={emergencia_domicilio:'Emergencia a domicilio',traslado_interhospitalario:'Traslado interhospitalario'};
 export const milestoneNames:Record<string,string>={salida:'Salida',en_escena:'En escena',trasladando:'Trasladando',en_hospital:'En hospital',finalizado:'Finalizado'};
 export const finalStateNames:Record<string,string>={completado:'Completado',cancelado:'Cancelado',sin_traslado:'Sin traslado',rechaza_traslado:'Paciente rechaza traslado',fallecido:'Paciente fallecido',desviado:'Desviado a otro centro'};
