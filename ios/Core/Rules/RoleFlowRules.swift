@@ -42,12 +42,15 @@ public enum DoctorDayAction: Equatable, Sendable {
 }
 
 public enum DoctorDayActionRules {
-    /// The patient already in attention (or called, lowest number first) is the day's next step; otherwise calling the
-    /// next waiting number. Nil when there is nothing to do, so no button looks primary.
+    /// The doctor's own patient in attention (or a general-consultation number already called, lowest first) is the
+    /// day's next step; otherwise calling the next waiting number. Nil when there is nothing to do.
+    /// `/fila` is not scoped to the doctor: a ticket in attention is this doctor's only when it carries `consultationId`
+    /// (the API returns it only for the reader's own consultation), and other services' calls belong to other areas.
     public static func primary(tickets: [QueueTicket], canAttend: Bool, canCallNext: Bool) -> DoctorDayAction? {
         if canAttend {
-            let inAttention = tickets.filter { $0.state == .enAtencion }.min { $0.number < $1.number }
-            let called = tickets.filter { $0.state == .llamado }.min { $0.number < $1.number }
+            let mine = tickets.filter { $0.service == .consultaGeneral }
+            let inAttention = mine.filter { $0.state == .enAtencion && $0.consultationId != nil }.min { $0.number < $1.number }
+            let called = mine.filter { $0.state == .llamado }.min { $0.number < $1.number }
             if let current = inAttention ?? called { return .attend(current.id) }
         }
         if canCallNext, QueueRules.nextToCall(tickets) != nil { return .callNext }
@@ -72,13 +75,33 @@ public enum DischargeConfirmRules {
 
 /// I09 · Ambulance request: the form starts with the contact the patient already has on file (`GET /me/paciente`).
 public enum AmbulancePrefillRules {
+    public struct Result: Equatable, Sendable {
+        public let address: String
+        public let phone: String
+        public let filledAddress: Bool
+        public let filledPhone: Bool
+
+        /// The notice that names only what was actually filled; nil when nothing was.
+        public var noticeKey: String? {
+            switch (filledAddress, filledPhone) {
+            case (true, true): return "ambulance.prefilled.both"
+            case (true, false): return "ambulance.prefilled.address"
+            case (false, true): return "ambulance.prefilled.phone"
+            case (false, false): return nil
+            }
+        }
+    }
+
     /// Fills only the empty fields, so what the person already typed is never overwritten.
-    public static func prefill(address: String, phone: String, from patient: PatientProfile?) -> (address: String, phone: String) {
+    public static func prefill(address: String, phone: String, from patient: PatientProfile?) -> Result {
         func value(_ current: String, _ known: String?) -> String {
             guard current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return current }
-            return known?.trimmingCharacters(in: .whitespacesAndNewlines) ?? current
+            let text = known?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return text.isEmpty ? current : text
         }
-        return (value(address, patient?.address), value(phone, patient?.phone))
+        let newAddress = value(address, patient?.address)
+        let newPhone = value(phone, patient?.phone)
+        return Result(address: newAddress, phone: newPhone, filledAddress: newAddress != address, filledPhone: newPhone != phone)
     }
 }
 

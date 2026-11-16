@@ -3,8 +3,10 @@ import XCTest
 
 /// Fase 2, S13 (iOS): one primary action per screen, prefilled forms and filters that apply on change.
 final class RoleFlowRulesTests: XCTestCase {
-    private func ticket(_ id: String, state: String, number: Int, service: String = "consulta_general") -> QueueTicket {
-        let json = #"{"id":"\#(id)","service":"\#(service)","fecha":"2026-11-20","numero":\#(number),"patientId":null,"patientName":"Paciente Ficticio","state":"\#(state)","officeId":null,"llamados":1,"version":3,"issuedAt":"2026-11-20T14:00:00Z"}"#
+    /// `consultation` is the doctor's own consultation id: `/fila` returns it only for the reader's own consultation.
+    private func ticket(_ id: String, state: String, number: Int, service: String = "consulta_general", consultation: String? = nil) -> QueueTicket {
+        let own = consultation.map { #","consultationId":"\#($0)""# } ?? ""
+        let json = #"{"id":"\#(id)","service":"\#(service)","fecha":"2026-11-20","numero":\#(number),"patientId":null,"patientName":"Paciente Ficticio","state":"\#(state)","officeId":null,"llamados":1,"version":3,"issuedAt":"2026-11-20T14:00:00Z"\#(own)}"#
         return try! JSONDecoder().decode(QueueTicket.self, from: Data(json.utf8))
     }
 
@@ -46,8 +48,21 @@ final class RoleFlowRulesTests: XCTestCase {
     }
 
     func testMiDiaEnAtencionVaAntesQueUnLlamado() {
-        let tickets = [ticket("b", state: "llamado", number: 2), ticket("d", state: "en_atencion", number: 9)]
+        let tickets = [ticket("b", state: "llamado", number: 2), ticket("d", state: "en_atencion", number: 9, consultation: "c-d")]
         XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true), .attend("d"))
+    }
+
+    func testMiDiaEnAtencionDeOtroMedicoNoEsMiAtender() {
+        // Without consultationId the consultation belongs to another doctor: «Llamar siguiente» stays primary.
+        let tickets = [ticket("x", state: "en_atencion", number: 1), ticket("a", state: "en_espera", number: 3)]
+        XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true), .callNext)
+    }
+
+    func testMiDiaIgnoraLlamadosDeOtroServicio() {
+        let tickets = [ticket("l", state: "llamado", number: 1, service: "laboratorio"),
+                       ticket("e", state: "en_atencion", number: 2, service: "laboratorio", consultation: "c-e"),
+                       ticket("a", state: "en_espera", number: 3)]
+        XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true), .callNext)
     }
 
     func testMiDiaSinLlamadosLlamarSiguienteEsLaPrincipal() {
@@ -74,17 +89,30 @@ final class RoleFlowRulesTests: XCTestCase {
         let filled = AmbulancePrefillRules.prefill(address: "", phone: "", from: patient(phone: " 7000-0000 ", address: "Col. Ficticia, casa 1"))
         XCTAssertEqual(filled.address, "Col. Ficticia, casa 1")
         XCTAssertEqual(filled.phone, "7000-0000")
+        XCTAssertEqual(filled.noticeKey, "ambulance.prefilled.both")
     }
 
     func testElPrellenadoNuncaPisaLoQueYaEscribio() {
         let kept = AmbulancePrefillRules.prefill(address: "Otra dirección", phone: "2222-2222", from: patient(phone: "7000-0000", address: "Col. Ficticia"))
         XCTAssertEqual(kept.address, "Otra dirección")
         XCTAssertEqual(kept.phone, "2222-2222")
+        XCTAssertNil(kept.noticeKey, "nothing was filled: no notice")
         let none = AmbulancePrefillRules.prefill(address: "", phone: "", from: patient(phone: nil, address: "  "))
         XCTAssertEqual(none.address, "")
         XCTAssertEqual(none.phone, "")
+        XCTAssertNil(none.noticeKey)
         let noProfile = AmbulancePrefillRules.prefill(address: "", phone: "", from: nil)
         XCTAssertEqual(noProfile.phone, "")
+        XCTAssertNil(noProfile.noticeKey)
+    }
+
+    func testElAvisoDelPrellenadoNombraSoloLoQueSeLleno() {
+        let phoneOnly = AmbulancePrefillRules.prefill(address: "", phone: "", from: patient(phone: "7000-0000", address: nil))
+        XCTAssertEqual(phoneOnly.noticeKey, "ambulance.prefilled.phone")
+        XCTAssertEqual(phoneOnly.address, "")
+        let addressOnly = AmbulancePrefillRules.prefill(address: "", phone: "2222-2222", from: patient(phone: "7000-0000", address: "Col. Ficticia"))
+        XCTAssertEqual(addressOnly.noticeKey, "ambulance.prefilled.address")
+        XCTAssertEqual(addressOnly.phone, "2222-2222")
     }
 
     func testUnRechazoDeCampoDelFormularioSeNombraEnEspanol() {

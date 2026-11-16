@@ -86,6 +86,10 @@ struct ConsultationView: View {
     @State private var draftFailed = false
     /// S13 / §4.7: signing is clinical and irreversible, so it asks first with a summary of what happens.
     @State private var confirmingSign = false
+    /// The whole save → reload → sign sequence, so «Firmar» stays disabled until it ends (no double signature).
+    @State private var signFlow = false
+    /// The notes save that runs before signing failed: its error shows next to «Firmar» too.
+    @State private var signSaveFailed = false
 
     init(origin: ConsultationOrigin, profile: AccessProfile) {
         self.origin = origin
@@ -206,7 +210,11 @@ struct ConsultationView: View {
             Text("consultation.step.4").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
             Text("consultation.step.4.hint").font(Typo.small).foregroundStyle(Theme.muted)
             WriteNotice(submission: signing, reload: loadDetail)
-            ClimesaButton(title: L.text("consultation.sign"), kind: kind(.sign, editable: editable), loading: signing.busy || saving.busy) { confirmingSign = true }
+            if signSaveFailed {
+                Text("consultation.sign.saveFailed").font(Typo.small).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
+                WriteNotice(submission: saving, reload: loadDetail)
+            }
+            ClimesaButton(title: L.text("consultation.sign"), kind: kind(.sign, editable: editable), loading: signFlow || signing.busy || saving.busy) { confirmingSign = true }
                 .confirmationDialog(L.text("consultation.sign.confirm"), isPresented: $confirmingSign, titleVisibility: .visible) {
                     Button(L.text("consultation.sign")) { Task { await sign(value) } }
                 } message: {
@@ -385,13 +393,15 @@ struct ConsultationView: View {
         }
     }
 
+    /// Saves the notes; returns the consultation version the API answered with, or nil if the save did not go through.
     @discardableResult
-    private func save(_ value: ConsultationDetail) async -> Bool {
+    private func save(_ value: ConsultationDetail) async -> Int? {
         draftErrors = ConsultationRules.draftErrors(reason: reason, physicalExam: exam, plan: plan)
-        guard draftErrors.isEmpty, let id = consultationId else { return false }
+        guard draftErrors.isEmpty, let id = consultationId else { return nil }
         let body = ConsultationUpdateBody(version: value.consultation.version, reason: reason, physicalExam: exam, plan: plan)
+        var saved: ConsultationCommandResult?
         let ok = await saving.run(id, body: body, success: L.text("consultation.saved")) { key in
-            _ = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
+            saved = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
         }
         if ok {
             // Las notas ya están en la API: el borrador local solo conserva el diagnóstico o la receta pendientes.
@@ -400,7 +410,7 @@ struct ConsultationView: View {
             persistDraft()
         }
         await loadDetail()
-        return ok
+        return ok ? saved?.version : nil
     }
 
     private func addDiagnosis() async {
@@ -436,12 +446,16 @@ struct ConsultationView: View {
     }
 
     private func sign(_ value: ConsultationDetail) async {
-        guard let id = consultationId else { return }
+        guard !signFlow, let id = consultationId else { return }
+        signFlow = true
+        signSaveFailed = false
+        defer { signFlow = false }
         var version = value.consultation.version
-        // Signing never loses typed notes: they are saved first, then the consultation is signed at the new version.
+        // Signing never loses typed notes: they are saved first, then the consultation is signed at the version the
+        // save returned.
         if notesPending {
-            guard await save(value) else { return }
-            version = detail.value?.consultation.version ?? version
+            guard let saved = await save(value) else { signSaveFailed = true; return }
+            version = saved
         }
         let body = VersionBody(version: version)
         var signed: ConsultationCommandResult?

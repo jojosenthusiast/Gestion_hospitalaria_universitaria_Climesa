@@ -920,8 +920,10 @@ struct AmbulanceRequestView: View {
     @State private var reason = ""
     @State private var phone = ""
     @State private var errors: [String: String] = [:]
-    /// S13: true once the contact on file filled the form, to say where the data came from.
-    @State private var prefilled = false
+    /// S13: the notice naming what the contact on file filled (address, phone or both), to say where it came from.
+    @State private var prefillNotice: String?
+    /// The prefill runs once per screen, so a field the patient cleared is not filled again when the view reappears.
+    @State private var didPrefill = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -978,7 +980,7 @@ struct AmbulanceRequestView: View {
     private var form: some View {
         VStack(alignment: .leading, spacing: 16) {
                 SectionCard {
-                    if prefilled { Text("ambulance.prefilled").font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true) }
+                    if let prefillNotice { Text(LocalizedStringKey(prefillNotice)).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true) }
                     PatientTextArea(label: L.text("ambulance.address"), text: $address, lines: 1...3, error: errors["address"] ?? submission.fieldErrors["address"])
                     FormField(label: L.text("ambulance.municipality"), text: $municipality)
                     PatientTextArea(label: L.text("ambulance.reason"), text: $reason, lines: 2...5, error: errors["reason"] ?? submission.fieldErrors["reason"])
@@ -995,13 +997,16 @@ struct AmbulanceRequestView: View {
     /// Fills address and phone from "Mis datos" (`GET /me/paciente`) without overwriting what was typed. Best effort:
     /// if the read fails, the form stays empty and works as before.
     private func prefill() async {
+        guard !didPrefill else { return }
+        didPrefill = true
         guard let profile = account.profile, profile.patientId != nil,
               profile.hasPermission(AppSection.misDatos.requiredPermission ?? "") else { return }
         guard let patient = try? await account.client().get("/me/paciente", as: PatientProfile.self) else { return }
+        // Recompute against the fields as they are now: the patient may have typed while the read was in flight.
         let filled = AmbulancePrefillRules.prefill(address: address, phone: phone, from: patient)
-        prefilled = filled.address != address || filled.phone != phone
         address = filled.address
         phone = filled.phone
+        prefillNotice = filled.noticeKey
     }
 
     private func cancel(_ request: OwnAmbulanceRequest) async {

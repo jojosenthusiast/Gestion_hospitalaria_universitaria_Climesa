@@ -1563,17 +1563,6 @@
         }
       }
     },
-    "day.consultation": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consulta"
-          }
-        }
-      }
-    },
     "day.more": {
       "extractionState": "manual",
       "localizations": {
@@ -3631,17 +3620,6 @@
         }
       }
     },
-    "ambulance.log.apply": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aplicar filtros"
-          }
-        }
-      }
-    },
     "day.resume": {
       "extractionState": "manual",
       "localizations": {
@@ -4907,17 +4885,6 @@
         }
       }
     },
-    "ambulance.prefilled": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Usamos la dirección y el teléfono de Mis datos. Cámbialos si estás en otro lugar."
-          }
-        }
-      }
-    },
     "accesses.row": {
       "extractionState": "manual",
       "localizations": {
@@ -4936,6 +4903,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Motivo: %@"
+          }
+        }
+      }
+    },
+    "ambulance.prefilled.both": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usamos la dirección y el teléfono de Mis datos. Cámbialos si estás en otro lugar."
+          }
+        }
+      }
+    },
+    "ambulance.prefilled.address": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usamos la dirección de Mis datos. Cámbiala si estás en otro lugar."
+          }
+        }
+      }
+    },
+    "ambulance.prefilled.phone": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usamos el teléfono de Mis datos. Cámbialo si es otro."
+          }
+        }
+      }
+    },
+    "consultation.sign.saveFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron guardar las notas, así que la consulta no se firmó. Revisa el error y vuelve a firmar."
           }
         }
       }
