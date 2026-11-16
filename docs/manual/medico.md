@@ -70,11 +70,12 @@ Mi día, Pacientes, Resultados, Turnos y **Más** (Agenda, Mis hospitalizados, A
 
 | Pantalla | Qué haces |
 |---|---|
-| Mi día | **Quién pasa después** (número propuesto y su motivo), **Llamar siguiente**, **Deshacer** el llamado, **Mover o cambiar prioridad**, **Llamar de nuevo**, **Atender**, **Retomar consulta** o **Reanudar**. En "Solicitudes de reprogramación": **Aceptar nuevo horario** o **Rechazar** |
-| Consulta | **Iniciar consulta**, **Guardar borrador**, **Agregar diagnóstico**, **Emitir receta**, **Ordenar exámenes**, **Firmar consulta**, en cuatro pasos (consulta, procedimientos y plan, receta y exámenes, cerrar). Al firmar puedes **Indicar hospitalización** o elegir **Ahora no**, y ves **Quién pasa después** con **Llamar a CON 4** |
+| Mi día | **Quién pasa después** (número propuesto y su motivo), **Llamar siguiente**, **Deshacer** el llamado, **Mover o cambiar prioridad**, **Llamar de nuevo**, **Atender**, **Retomar consulta** o **Reanudar**. En "Solicitudes de reprogramación": **Aceptar nuevo horario** o **Rechazar**. Un solo botón resalta: **Retomar consulta** del paciente que ya atiendes o **Atender** un número de consulta general ya llamado; si no hay, **Llamar siguiente**. Los números de otros servicios y los que atiende otro médico no se resaltan. En la agenda, **Iniciar consulta** o **Retomar consulta** |
+| Consulta | **Iniciar consulta**, **Guardar borrador**, **Agregar diagnóstico**, **Emitir receta**, **Ordenar exámenes**, **Firmar consulta**, en cuatro pasos (consulta, procedimientos y plan, receta y exámenes, cerrar). **Firmar consulta** es el botón principal y pide confirmación con un resumen; si hay notas sin guardar, se guardan antes de firmar. Al firmar puedes **Indicar hospitalización** o elegir **Ahora no**, y ves **Quién pasa después** con **Llamar a CON 4** |
 | Pacientes | Expediente e historial de tus pacientes |
 | Resultados | Bandeja **Resultados por revisar** (críticos y observaciones relevantes) con **Marcar como revisado**. En cada orden: **Marcar revisado**, **Se realiza en otro sitio**, **Cancelar orden**. Un aviso indica cuántos resultados con valor crítico esperan tu revisión. Cargar un resultado externo aún no está en iOS: hazlo desde Android |
-| Mis hospitalizados | **Firmar alta**, **Revocar alta** |
+| Mis hospitalizados | **Firmar alta** (pide confirmación con el tipo y los pendientes), **Revocar alta** (en rojo, con motivo y confirmación) |
+| Ambulancia | Estado de la unidad y **Bitácora**: prioridad, estado y fechas se aplican al elegirlos; el texto se busca con **Buscar** del teclado; **Quitar filtros** |
 | Llegada de ambulancia | "Servicios por recibir", "Entrega del paciente" y **Marcar recibido** |
 | Turnos | Consultar tus turnos por día, desde hoy; los días pasados quedan debajo, en "Turnos anteriores" (la entrada es automática) |
 

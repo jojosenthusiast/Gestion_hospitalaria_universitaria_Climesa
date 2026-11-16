@@ -84,6 +84,12 @@ struct ConsultationView: View {
     @State private var draftRecovered = false
     @State private var draftSaved = false
     @State private var draftFailed = false
+    /// S13 / §4.7: signing is clinical and irreversible, so it asks first with a summary of what happens.
+    @State private var confirmingSign = false
+    /// The whole save → reload → sign sequence, so «Firmar» stays disabled until it ends (no double signature).
+    @State private var signFlow = false
+    /// The notes save that runs before signing failed: its error shows next to «Firmar» too.
+    @State private var signSaveFailed = false
 
     init(origin: ConsultationOrigin, profile: AccessProfile) {
         self.origin = origin
@@ -156,6 +162,23 @@ struct ConsultationView: View {
         lines = restored.isEmpty ? [PrescriptionDraft()] : restored
     }
 
+    // MARK: - Una acción principal (S13)
+
+    /// Notes typed and not yet saved in the API.
+    private var notesPending: Bool { reason != savedNotes.reason || exam != savedNotes.exam || plan != savedNotes.plan }
+
+    /// A diagnosis, prescription line or lab selection started and not sent.
+    private var unsentWork: Bool {
+        !code.trimmingCharacters(in: .whitespaces).isEmpty || currentDraft.lines.contains { !$0.isBlank } || !selectedExams.isEmpty
+    }
+
+    private var canCallProposed: Bool { handoff?.proposal != nil && profile.hasPermission("fila.llamar") }
+
+    /// «Firmar» is the one primary while the consultation is open; every other write is secondary.
+    private func kind(_ action: ConsultationAction, editable: Bool) -> ClimesaButtonKind {
+        ClimesaButtonKind(ConsultationActionRules.emphasis(action, editable: editable, canCallProposed: canCallProposed))
+    }
+
     @ViewBuilder private var draftStatus: some View {
         if draftFailed {
             Text("consultation.draft.unsaved").font(Typo.small).foregroundStyle(Theme.danger)
@@ -168,7 +191,7 @@ struct ConsultationView: View {
     @ViewBuilder private func editor(_ value: ConsultationDetail) -> some View {
         let editable = ConsultationRules.isEditable(value.consultation.state) && profile.hasPermission("consulta.registrar")
         MedicoTag(value.consultation.state.rawValue, label: value.consultation.state.label)
-        if let handoff { nextPatient(handoff) }
+        if let handoff { nextPatient(handoff, editable: editable) }
         if editable {
             // S9: consultation → procedures → prescription and/or exams → close, in that order.
             Text("consultation.steps").font(Typo.small).foregroundStyle(Theme.muted)
@@ -187,7 +210,16 @@ struct ConsultationView: View {
             Text("consultation.step.4").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
             Text("consultation.step.4.hint").font(Typo.small).foregroundStyle(Theme.muted)
             WriteNotice(submission: signing, reload: loadDetail)
-            ClimesaButton(title: L.text("consultation.sign"), loading: signing.busy) { Task { await sign(value) } }
+            if signSaveFailed {
+                Text("consultation.sign.saveFailed").font(Typo.small).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
+                WriteNotice(submission: saving, reload: loadDetail)
+            }
+            ClimesaButton(title: L.text("consultation.sign"), kind: kind(.sign, editable: editable), loading: signFlow || signing.busy || saving.busy) { confirmingSign = true }
+                .confirmationDialog(L.text("consultation.sign.confirm"), isPresented: $confirmingSign, titleVisibility: .visible) {
+                    Button(L.text("consultation.sign")) { Task { await sign(value) } }
+                } message: {
+                    Text(verbatim: ConsultationActionRules.signSummary(notesPending: notesPending, unsentWork: unsentWork))
+                }
         }
     }
 
@@ -222,7 +254,7 @@ struct ConsultationView: View {
                 MedicoTextArea(label: L.text("consultation.plan"), text: $plan, error: draftErrors["plan"], lines: 2...6)
                 draftStatus
                 WriteNotice(submission: saving, reload: loadDetail)
-                ClimesaButton(title: L.text("consultation.save"), kind: .secondary, loading: saving.busy) { Task { await save(value) } }
+                ClimesaButton(title: L.text("consultation.save"), kind: kind(.save, editable: editable), loading: saving.busy) { Task { await save(value) } }
             } else {
                 if let text = value.consultation.reason, !text.isEmpty { readOnly("consultation.reason", text) }
                 if let text = value.consultation.physicalExam, !text.isEmpty { readOnly("consultation.exam", text) }
@@ -251,7 +283,7 @@ struct ConsultationView: View {
                 Toggle("consultation.principal", isOn: $principal).font(Typo.body).tint(Theme.primary)
                 FormField(label: L.text("consultation.diagnosis.note"), text: $note)
                 WriteNotice(submission: diagnosing, reload: loadDetail)
-                ClimesaButton(title: L.text("consultation.diagnosis.add"), kind: .secondary, loading: diagnosing.busy) { Task { await addDiagnosis() } }
+                ClimesaButton(title: L.text("consultation.diagnosis.add"), kind: kind(.addDiagnosis, editable: editable), loading: diagnosing.busy) { Task { await addDiagnosis() } }
             }
         }
     }
@@ -284,7 +316,7 @@ struct ConsultationView: View {
                 if let lineError { Text(verbatim: lineError).font(Typo.caption).foregroundStyle(Theme.danger) }
                 ClimesaButton(title: L.text("rx.addLine"), kind: .secondary) { lines.append(PrescriptionDraft()) }
                 WriteNotice(submission: prescribing, reload: loadDetail)
-                ClimesaButton(title: L.text("rx.issue"), loading: prescribing.busy) { Task { await prescribe() } }
+                ClimesaButton(title: L.text("rx.issue"), kind: kind(.issuePrescription, editable: editable), loading: prescribing.busy) { Task { await prescribe() } }
             }
         }
     }
@@ -309,7 +341,7 @@ struct ConsultationView: View {
             }
             .task { if catalog.value == nil { await loadCatalog() } }
             WriteNotice(submission: ordering, reload: loadDetail)
-            ClimesaButton(title: L.text("lab.submit"), loading: ordering.busy) { Task { await order(value) } }
+            ClimesaButton(title: L.text("lab.submit"), kind: kind(.orderLab, editable: true), loading: ordering.busy) { Task { await order(value) } }
                 .disabled(selectedExams.isEmpty || ordering.busy)
         }
     }
@@ -361,12 +393,15 @@ struct ConsultationView: View {
         }
     }
 
-    private func save(_ value: ConsultationDetail) async {
+    /// Saves the notes; returns the consultation version the API answered with, or nil if the save did not go through.
+    @discardableResult
+    private func save(_ value: ConsultationDetail) async -> Int? {
         draftErrors = ConsultationRules.draftErrors(reason: reason, physicalExam: exam, plan: plan)
-        guard draftErrors.isEmpty, let id = consultationId else { return }
+        guard draftErrors.isEmpty, let id = consultationId else { return nil }
         let body = ConsultationUpdateBody(version: value.consultation.version, reason: reason, physicalExam: exam, plan: plan)
+        var saved: ConsultationCommandResult?
         let ok = await saving.run(id, body: body, success: L.text("consultation.saved")) { key in
-            _ = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
+            saved = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
         }
         if ok {
             // Las notas ya están en la API: el borrador local solo conserva el diagnóstico o la receta pendientes.
@@ -375,6 +410,7 @@ struct ConsultationView: View {
             persistDraft()
         }
         await loadDetail()
+        return ok ? saved?.version : nil
     }
 
     private func addDiagnosis() async {
@@ -410,8 +446,18 @@ struct ConsultationView: View {
     }
 
     private func sign(_ value: ConsultationDetail) async {
-        guard let id = consultationId else { return }
-        let body = VersionBody(version: value.consultation.version)
+        guard !signFlow, let id = consultationId else { return }
+        signFlow = true
+        signSaveFailed = false
+        defer { signFlow = false }
+        var version = value.consultation.version
+        // Signing never loses typed notes: they are saved first, then the consultation is signed at the version the
+        // save returned.
+        if notesPending {
+            guard let saved = await save(value) else { signSaveFailed = true; return }
+            version = saved
+        }
+        let body = VersionBody(version: version)
         var signed: ConsultationCommandResult?
         let ok = await signing.run(id, body: body, success: L.text("consultation.signed")) { key in
             signed = try await account.client().send("POST", "/consultas/\(id)/firmar", body: body, key: key, as: ConsultationCommandResult.self)
@@ -426,7 +472,7 @@ struct ConsultationView: View {
 
     // MARK: - Quién pasa después (S9)
 
-    @ViewBuilder private func nextPatient(_ next: QueueNextProposal) -> some View {
+    @ViewBuilder private func nextPatient(_ next: QueueNextProposal, editable: Bool) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             Text("consultation.next.title").font(Typo.label).foregroundStyle(Theme.muted)
             if let proposal = next.proposal {
@@ -443,7 +489,7 @@ struct ConsultationView: View {
             Text(verbatim: String(format: L.text("queue.next.rule"), next.rule)).font(Typo.small).foregroundStyle(Theme.muted)
             WriteNotice(submission: handoffCall, reload: loadDetail)
             if let proposal = next.proposal, profile.hasPermission("fila.llamar") {
-                ClimesaButton(title: String(format: L.text("consultation.next.call"), proposal.code), loading: handoffCall.busy) { Task { await callProposed(proposal) } }
+                ClimesaButton(title: String(format: L.text("consultation.next.call"), proposal.code), kind: kind(.callNext, editable: editable), loading: handoffCall.busy) { Task { await callProposed(proposal) } }
             }
             ClimesaButton(title: L.text("consultation.next.dismiss"), kind: .secondary) { handoff = nil }
         }

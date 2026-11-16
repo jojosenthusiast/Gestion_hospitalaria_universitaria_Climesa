@@ -95,6 +95,8 @@ struct AmbulanceOverviewView: View {
     @State private var log = Loader<[AmbulanceLogEntry]>()
     @State private var query = AmbulanceLogQuery()
     @State private var filtersOpen = false
+    /// Filters of the last request, so a filter change reloads once and the first appearance does not load twice.
+    @State private var filtersApplied: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
@@ -108,6 +110,11 @@ struct AmbulanceOverviewView: View {
         .task(id: live.snapshot.version(.ambulance)) {
             await loadStatus()
             if account.can("ambulancia.ver_bitacora") { await loadLog() }
+        }
+        // S13: priority, state and dates apply as soon as they change; there is no separate «Aplicar» step.
+        .task(id: query.autoApplyKey) {
+            guard filtersApplied != nil, filtersApplied != query.autoApplyKey, account.can("ambulancia.ver_bitacora") else { return }
+            await loadLog()
         }
     }
 
@@ -151,7 +158,12 @@ struct AmbulanceOverviewView: View {
             }
             if filtersOpen { filterPanel }
             if query.activeCount > 0 {
-                ClimesaButton(title: L.text("ambulance.log.clear"), kind: .secondary) { query = AmbulanceLogQuery(); Task { await loadLog() } }
+                ClimesaButton(title: L.text("ambulance.log.clear"), kind: .secondary) {
+                    // Only the text was active: no filter key changes, so reload here.
+                    let textOnly = query.autoApplyKey == AmbulanceLogQuery().autoApplyKey
+                    query = AmbulanceLogQuery()
+                    if textOnly { Task { await loadLog() } }
+                }
             }
         }
         LoadState(loader: log, retry: loadLog) { entries in
@@ -177,7 +189,6 @@ struct AmbulanceOverviewView: View {
             if query.to != nil { DatePicker("ambulance.log.to", selection: dayBinding(\.to), displayedComponents: .date).labelsHidden()
                 .environment(\.timeZone, ClimesaDates.zone).environment(\.calendar, ClimesaDates.calendar) }
             FieldError(text: query.rangeError)
-            ClimesaButton(title: L.text("ambulance.log.apply"), loading: log.loading) { Task { await loadLog() } }.disabled(query.rangeError != nil)
         }
     }
 
@@ -211,6 +222,7 @@ struct AmbulanceOverviewView: View {
 
     private func loadLog() async {
         guard query.rangeError == nil else { return }
+        filtersApplied = query.autoApplyKey
         let path = query.path
         await log.load { try await account.client().get(path, as: [AmbulanceLogEntry].self) }
     }

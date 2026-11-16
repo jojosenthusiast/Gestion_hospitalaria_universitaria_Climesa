@@ -194,7 +194,9 @@ struct RoomCard: View {
     let admission: Admission
     var body: some View {
         SectionCard(eyebrow: L.text("room.eyebrow")) {
-            Text(verbatim: String(format: L.text("hospitalized.bed"), admission.bed)).font(Typo.heading).foregroundStyle(Theme.ink)
+            // Without a bed yet, say so instead of an empty "Cama ".
+            Text(verbatim: admission.bed.isEmpty ? L.text("hospitalized.noBed") : String(format: L.text("hospitalized.bed"), admission.bed))
+                .font(Typo.heading).foregroundStyle(Theme.ink)
             HStack(spacing: Spacing.s) {
                 PatientTag(admission.state.rawValue, label: admission.state.label)
                 Text(verbatim: admission.requestedCategory.label + (admission.isolation ? " · " + L.text("hospitalized.isolation") : "")).font(Typo.small).foregroundStyle(Theme.muted)

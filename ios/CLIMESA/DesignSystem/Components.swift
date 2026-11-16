@@ -127,7 +127,18 @@ struct FormField: View {
 
 // MARK: - Botones
 
-enum ClimesaButtonKind { case primary, secondary, destructive }
+enum ClimesaButtonKind {
+    case primary, secondary, destructive
+
+    /// S13: the button style for an action's emphasis on its screen (one primary per screen).
+    init(_ emphasis: ActionEmphasis) {
+        switch emphasis {
+        case .primary: self = .primary
+        case .secondary: self = .secondary
+        case .destructive: self = .destructive
+        }
+    }
+}
 
 /// Estilo de botón de 48 pt de alto con estado de carga (`.primary-button` / `.secondary-button` de web).
 struct ClimesaButtonStyle: ButtonStyle {

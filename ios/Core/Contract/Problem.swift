@@ -188,6 +188,15 @@ public enum ProblemText {
         case "requestedCategory": return "categoría"
         case "attendingDoctorId": return "médico tratante"
         case "note": return "nota"
+        // S13: fields of the consultation, lab order and ambulance request forms.
+        case "address": return "dirección"
+        case "contactPhone", "phone": return "teléfono"
+        case "municipality": return "municipio"
+        case "email": return "correo"
+        case "code": return "código CIE-10"
+        case "items": return "receta"
+        case "exams": return "exámenes"
+        case "priority": return "prioridad"
         default: return nil
         }
     }

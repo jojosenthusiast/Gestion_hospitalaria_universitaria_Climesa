@@ -163,27 +163,6 @@ struct SectionTitle: View {
     var body: some View { Text(key).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).padding(.top, 6).accessibilityAddTraits(.isHeader) }
 }
 
-enum PillTone { case neutral, good, warning, danger }
-
-struct Pill: View {
-    let text: String
-    var tone: PillTone = .neutral
-    var body: some View {
-        let colors = Theme.colors(for: statusTone)
-        Text(verbatim: text).font(Typo.tag).padding(.horizontal, 9).padding(.vertical, 5)
-            .background(colors.background, in: Capsule()).foregroundStyle(colors.foreground)
-            .overlay(Capsule().stroke(colors.foreground.opacity(0.24), lineWidth: 1))
-    }
-    private var statusTone: StatusTone {
-        switch tone {
-        case .neutral: return .neutral
-        case .good: return .success
-        case .warning: return .warning
-        case .danger: return .danger
-        }
-    }
-}
-
 struct FieldError: View {
     let text: String?
     var body: some View {
