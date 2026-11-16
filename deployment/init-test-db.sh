@@ -5,3 +5,5 @@ for migration in /checks/migrations/*.sql; do
   psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f "$migration"
 done
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /checks/seed.sql
+# Healthcheck sentinel: written only after migrations and seed succeed.
+touch /tmp/climesa-init-done
