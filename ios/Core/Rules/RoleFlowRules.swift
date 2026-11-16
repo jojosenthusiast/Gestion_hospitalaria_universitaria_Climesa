@@ -42,15 +42,16 @@ public enum DoctorDayAction: Equatable, Sendable {
 }
 
 public enum DoctorDayActionRules {
-    /// The doctor's own patient in attention (or a general-consultation number already called, lowest first) is the
+    /// The doctor's own patient in attention (or the general-consultation number this doctor called) is the
     /// day's next step; otherwise calling the next waiting number. Nil when there is nothing to do.
     /// `/fila` is not scoped to the doctor: a ticket in attention is this doctor's only when it carries `consultationId`
     /// (the API returns it only for the reader's own consultation), and other services' calls belong to other areas.
-    public static func primary(tickets: [QueueTicket], canAttend: Bool, canCallNext: Bool) -> DoctorDayAction? {
+    /// `/fila` also lists the called numbers of every office, so a called number counts only when this doctor called it.
+    public static func primary(tickets: [QueueTicket], canAttend: Bool, canCallNext: Bool, calledByMe: String? = nil) -> DoctorDayAction? {
         if canAttend {
             let mine = tickets.filter { $0.service == .consultaGeneral }
             let inAttention = mine.filter { $0.state == .enAtencion && $0.consultationId != nil }.min { $0.number < $1.number }
-            let called = mine.filter { $0.state == .llamado }.min { $0.number < $1.number }
+            let called = mine.first { $0.id == calledByMe && $0.state == .llamado }
             if let current = inAttention ?? called { return .attend(current.id) }
         }
         if canCallNext, QueueRules.nextToCall(tickets) != nil { return .callNext }
