@@ -301,9 +301,24 @@ public struct LooseText: Decodable, Sendable, Equatable {
     }
 }
 
-/// `ArrivalServiceResponse` de `GET /ambulancia/llegada` (MA-AMB-04): el servicio que llega o llegó sin entrega registrada.
+/// `ArrivalServiceResponse` de `GET /ambulancia/llegada` (MA-AMB-04): los servicios por recibir, sin datos clínicos. Primero los que
+/// llegaron sin entrega registrada (aunque la unidad ya salió a otro), después el activo; `serviceId` es el primero.
 public struct ArrivalService: Decodable, Sendable, Equatable {
+    public struct Candidate: Decodable, Sendable, Equatable, Identifiable {
+        public let serviceId: String
+        public let dispatchedAt: String
+        public let active: Bool
+        public let arrived: Bool
+        public var id: String { serviceId }
+    }
     public let serviceId: String?
+    public let services: [Candidate]
+
+    /// El elegido mientras siga en la lista; si no, el primero.
+    public func pick(_ chosen: String?) -> String? {
+        if let chosen, services.contains(where: { $0.serviceId == chosen }) { return chosen }
+        return services.first?.serviceId ?? serviceId
+    }
 }
 
 /// `HandoverResponse` de `POST /ambulancia/servicios/{id}/recepcion` (MA-AMB-04).

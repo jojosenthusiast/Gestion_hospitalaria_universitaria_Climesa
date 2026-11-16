@@ -159,7 +159,12 @@ final class DatesAndLiveTopicTests: XCTestCase {
         XCTAssertEqual(view.version, 7)
         // La entrega no lleva cuerpo ni versión; la llegada se encuentra aunque no haya evento ni reporte.
         XCTAssertEqual(String(decoding: try JSONBody.encode(EmptyBody()), as: UTF8.self), "{}")
-        XCTAssertNil(try JSONDecoder().decode(ArrivalService.self, from: Data(#"{"serviceId":null}"#.utf8)).serviceId)
-        XCTAssertEqual(try JSONDecoder().decode(ArrivalService.self, from: Data(#"{"serviceId":"s1"}"#.utf8)).serviceId, "s1")
+        let none = try JSONDecoder().decode(ArrivalService.self, from: Data(#"{"serviceId":null,"services":[]}"#.utf8))
+        XCTAssertNil(none.pick(nil))
+        // Re-revisión #117: el que llegó sin entrega va primero aunque la unidad ya salió a otro; la elección se respeta mientras siga listada.
+        let two = try JSONDecoder().decode(ArrivalService.self, from: Data(#"{"serviceId":"a1","services":[{"serviceId":"a1","dispatchedAt":"2026-11-15T14:00:00Z","active":false,"arrived":true},{"serviceId":"s1","dispatchedAt":"2026-11-15T15:00:00Z","active":true,"arrived":false}]}"#.utf8))
+        XCTAssertEqual(two.pick(nil), "a1")
+        XCTAssertEqual(two.pick("s1"), "s1")
+        XCTAssertEqual(two.pick("gone"), "a1")
     }
 }

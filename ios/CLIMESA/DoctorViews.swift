@@ -628,6 +628,7 @@ private struct RevokeDischargeView: View {
 struct AmbulanceArrival: Sendable {
     var status: AmbulanceStatus
     var prehospital: PrehospitalView?
+    var services: [ArrivalService.Candidate] = []
 }
 
 /// I25 · Llegada de ambulancia: prioridad, hora estimada, motivo y signos del reporte prehospital.
@@ -637,9 +638,26 @@ struct AmbulanceArrivalView: View {
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<AmbulanceArrival>()
     @State private var submission = Submission()
+    @State private var chosen: String?
 
     var body: some View {
         LoadState(loader: loader, retry: load) { arrival in
+            // MA-AMB-04: un servicio que llegó sin entrega sigue en la lista aunque la unidad salga a otro.
+            if arrival.services.count > 1 {
+                SectionCard(title: L.text("arrival.pending")) {
+                    ForEach(arrival.services) { candidate in
+                        Button {
+                            chosen = candidate.serviceId
+                            Task { await load() }
+                        } label: {
+                            ListRow(title: String(format: L.text(candidate.arrived ? "arrival.pending.arrived" : "arrival.pending.onTheWay"), ClimesaDates.display(candidate.dispatchedAt, .time))) {
+                                if candidate.serviceId == arrival.prehospital?.serviceId { Image(systemName: "checkmark").foregroundStyle(Theme.ink) }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
             if let service = arrival.status.activeService {
                 SectionCard {
                     ListRow(
@@ -690,11 +708,10 @@ struct AmbulanceArrivalView: View {
         await loader.load {
             let api = try account.client()
             let status = try await api.get("/ambulancia", as: AmbulanceStatus.self)
-            var arrival = AmbulanceArrival(status: status, prehospital: nil)
-            // MA-AMB-04: también después de que la tripulación finalizó, mientras falte la entrega (24 h).
-            var serviceId = status.activeService?.id
-            if serviceId == nil { serviceId = try await api.get("/ambulancia/llegada", as: ArrivalService.self).serviceId }
-            if let serviceId {
+            // MA-AMB-04: la API lista qué recibir (también después de que la tripulación finalizó, mientras falte la entrega, 24 h).
+            let pending = try await api.get("/ambulancia/llegada", as: ArrivalService.self)
+            var arrival = AmbulanceArrival(status: status, prehospital: nil, services: pending.services)
+            if let serviceId = pending.pick(chosen) {
                 arrival.prehospital = try await api.get("/ambulancia/servicios/\(serviceId)/prehospital", as: PrehospitalView.self)
             }
             return arrival

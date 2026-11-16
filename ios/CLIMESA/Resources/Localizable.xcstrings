@@ -3994,13 +3994,46 @@
         }
       }
     },
+    "arrival.pending": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servicios por recibir"
+          }
+        }
+      }
+    },
+    "arrival.pending.arrived": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Despachado %@ · llegó, falta la entrega"
+          }
+        }
+      }
+    },
+    "arrival.pending.onTheWay": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Despachado %@ · en camino"
+          }
+        }
+      }
+    },
     "arrival.receive.otherRole": {
       "extractionState": "manual",
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La ambulancia llegó. La entrega la marca el personal clínico que recibe al paciente."
+            "value": "La ambulancia llegó. La entrega la marca el personal de turno en Emergencia o con relación de atención con el paciente."
           }
         }
       }
