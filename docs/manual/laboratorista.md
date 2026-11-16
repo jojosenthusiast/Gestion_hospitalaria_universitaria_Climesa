@@ -9,7 +9,7 @@ Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#
 
 Inicio, Pacientes, Turnos, Laboratorio, Inventario, Avisos y Perfil.
 
-**Avisos**: tus avisos, con los críticos primero, y **Enterado**. Un aviso crítico para Laboratorio sale arriba en Inicio hasta que pulsas **Enterado** (ver `README.md`, "Avisos (web)").
+**Avisos**: tus avisos, con los críticos primero, y **Enterado**. Un aviso crítico para Laboratorio sale arriba en Inicio hasta que pulsas **Enterado** (ver `README.md`, "Avisos").
 
 ## Inicio
 

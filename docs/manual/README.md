@@ -1,6 +1,6 @@
 # Manual de usuario de CLIMESA
 
-Una página por rol, con las pantallas reales de cada plataforma que usa ese rol. Describe el código de `main` en el commit `c7f31a6` (16-nov-2026). Todos los datos del sistema son ficticios.
+Una página por rol, con las pantallas reales de cada plataforma que usa ese rol. Describe el código de `main` en el commit `1b2cf2d` (16-nov-2026), con la Fase 2 (PR #124 a #145). Todos los datos del sistema son ficticios.
 
 | Rol | Código | Plataformas | Página |
 |---|---|---|---|
@@ -49,19 +49,20 @@ Fuente de los roles y sus plataformas: `docs/arquitectura/datos/roles.csv`. Fuen
 - Si una cuenta tiene varios roles, el selector "*Rol* ▾" cambia de rol.
 - Si la sesión vence y no se puede renovar, la app vuelve al ingreso con "Tu sesión expiró".
 
-## Avisos (web y Android)
+## Avisos
 
-Todas las cuentas de la web tienen **Avisos** en el menú. En Android, **Avisos** está en **Más** → "Hospital" (en una tableta, en el riel o el menú lateral), para todos los roles.
+Todas las cuentas de la web tienen **Avisos** en el menú. En Android, **Avisos** está en **Más** → "Hospital" (en una tableta, en el riel o el menú lateral), para todos los roles. En iOS, **Avisos** está en **Más**, para MED y PAC.
 
 - **Para mí** lista los avisos vigentes para tu rol o tu área, con los críticos primero. Filtros: **Todos**, **Sin leer** y **Críticos**. Al abrir uno ves el detalle; pulsa **Enterado** cuando lo leíste.
 - Un aviso **Crítico** dirigido a tu rol o a tu área aparece arriba en **Inicio** y se queda hasta que pulsas **Enterado**. **Recordarme en 4 h** lo aparta y vuelve solo a las 4 horas si sigues sin dar **Enterado**.
 - Los avisos **Informativos** e **Importantes** no salen en Inicio; quedan en **Avisos**.
 - Un aviso solo para tu área dice "Para: Tu área". La lista se actualiza sola cuando se publica, edita o retira un aviso, y una vez más en el momento en que vence o vuelve un recordatorio; no se recarga cada cierto tiempo.
-- En Android, el aviso crítico de Inicio trae **Enterado**, **Recordarme en 4 h** y **Ver en Avisos** (abre Avisos con el filtro **Críticos**). Si el aviso ya fue retirado o venció, la app lo dice y actualiza la lista. Publicar avisos sigue siendo solo en la web.
+- En Android, el aviso crítico de Inicio trae **Enterado**, **Recordarme en 4 h** y **Ver en Avisos** (abre Avisos con el filtro **Críticos**). Si el aviso ya fue retirado o venció, la app lo dice y actualiza la lista. En iOS, el aviso crítico sale arriba de **Inicio** (PAC) o de **Mi día** (MED), con **Enterado** y **Recordarme en 4 h**. Publicar avisos sigue siendo solo en la web.
 
 ## Limitaciones de esta entrega
 
 - No hay notificaciones push: los avisos llegan solo con la app abierta.
-- La app iOS no se ha probado en un iPhone.
+- La app iOS no se ha probado en un iPhone, y las pantallas de Android de la Fase 2 no se han probado a mano en un teléfono; ambas pasan su CI.
+- En Android e iOS, la acción principal de la fila (**Iniciar consulta** o **Atender**) se resalta solo para el número que llamaste desde esa sesión de la app. La app todavía no usa el dato de la API que distingue el llamado de otro médico; la web sí.
 - Una consulta firmada no se puede corregir (addendum pendiente).
 - Figma no está sincronizado con estas pantallas; la referencia visual vigente es `docs/diseno/claude-design/`.
