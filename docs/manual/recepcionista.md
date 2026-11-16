@@ -90,7 +90,7 @@ Inicio, Emitir número, Pacientes, Citas, Vinculaciones, Admisión y cama, Table
 |---|---|
 | Emitir número | **Emitir número** → eliges el servicio → **Emitir** |
 | Pacientes | **Buscar paciente** y registrar después de buscar |
-| Citas | **Agendar cita** → **Confirmar cita**. En cada cita: **Confirmar**, **Rechazar**, **Reprogramar**, **Cancelar cita**, **No asistió**, **Aceptar nuevo horario**, **Rechazar nuevo horario**, según lo que permita el servidor |
+| Citas | **Solicitudes por asignar**: **Asignar** (médico y franja ya prellenados; **Ver todo el día** si no hay libres en la franja pedida) → **Confirmar cita**, o **Rechazar** con motivo. **Agendar cita** → **Confirmar cita**. En cada cita: **Confirmar**, **Rechazar**, **Reprogramar**, **Cancelar cita**, **No asistió**, **Aceptar nuevo horario**, **Rechazar nuevo horario**, según lo que permita el servidor |
 | Vinculaciones | **Aprobar**, **Rechazar con motivo** |
 | Admisión y cama | **Ingresar paciente**, **Asignar cama** → **Confirmar cama**, **Cancelar admisión** |
 | Tablero de camas | Estado de las camas |
