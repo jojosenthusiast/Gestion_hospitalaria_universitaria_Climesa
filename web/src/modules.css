@@ -557,7 +557,6 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .metric-summary strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 .metric-figure { border-left: 4px solid currentColor !important; grid-column: span 2; }
 .metric-figure strong { color: var(--ink); }
-.metric-figure em { font-weight: 700; color: inherit; }
 .metric-figure.tone-neutral { color: var(--control-line); }
 .export-menu { position: relative; display: inline-block; }
 .export-trigger { min-height: 42px; padding-block: 8px; }

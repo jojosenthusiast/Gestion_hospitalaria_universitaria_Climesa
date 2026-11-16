@@ -25,6 +25,8 @@ describe('W33 · métricas por rango', () => {
     expect(within(lab).getByText(/Minutos entre que se pide el examen/)).toBeTruthy();
     expect(within(lab).getByText(/Menos es mejor/)).toBeTruthy();
     expect(await within(lab).findByText('Crítico')).toBeTruthy();
+    // S13 (T10w): the reading is a shared StatusBadge, so it carries icon and pattern, not only colour.
+    expect(within(lab).getByText('Crítico').closest('.status-badge')!.className).toContain('fam-critico');
     expect(within(lab).getByRole('img', { name: /Tiempo de laboratorio \(orden a completado\) por día/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Últimos 7 días' }).getAttribute('aria-pressed')).toBe('true');
     await userEvent.click(screen.getByRole('button', { name: 'Últimos 30 días' }));

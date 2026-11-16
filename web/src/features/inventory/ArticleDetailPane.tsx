@@ -24,13 +24,13 @@ function Body({ api, article, canMove, canConfigure, onBack, onMove, onEdit, onL
     <header className="inv-detail-head">
       <div className="inv-detail-title"><CategoryIcon type={article.type} size={26} /><div><h2>{article.name}</h2><span className="inv-muted">{article.code} · {categories[article.type].label} · {article.unit}</span></div></div>
       <div className="inv-detail-actions">
-        {canMove && article.active && <button type="button" className="primary-button" onClick={() => onMove(article.id)}><Icon name="plus" size={18} />Registrar movimiento</button>}
+        {canMove && article.active && <button type="button" className="secondary-button" onClick={() => onMove(article.id)}><Icon name="plus" size={18} />Registrar movimiento</button>}
         {canConfigure && <button type="button" className="secondary-button" onClick={() => onEdit(article)}>Editar artículo</button>}
         {canConfigure && <button type="button" className="secondary-button" onClick={() => onLot(article, null)}>Nuevo lote</button>}
         {canConfigure && (removable ? <button type="button" className="secondary-button" onClick={() => setConfirming(true)}>Eliminar</button> : article.active && <button type="button" className="secondary-button" onClick={() => onEdit(article)} title="Con lotes o historial no se elimina; se desactiva al editarlo">Desactivar</button>)}
       </div>
     </header>
-    {confirming && <div className="conflict-notice" role="alertdialog" aria-label="Confirmar eliminación"><p>¿Eliminar «{article.name}»? Solo se puede porque no tiene lotes ni historial. No se puede deshacer.</p><div className="inv-detail-actions"><button type="button" className="secondary-button" onClick={() => setConfirming(false)}>Conservar</button><button type="button" className="primary-button" disabled={action.busy} onClick={() => void remove()}>Sí, eliminar</button></div></div>}
+    {confirming && <div className="conflict-notice" role="alertdialog" aria-label="Confirmar eliminación"><p>¿Eliminar «{article.name}»? Solo se puede porque no tiene lotes ni historial. No se puede deshacer.</p><div className="inv-detail-actions"><button type="button" className="secondary-button" onClick={() => setConfirming(false)}>Conservar</button><button type="button" className="secondary-button" disabled={action.busy} onClick={() => void remove()}>Sí, eliminar</button></div></div>}
     <WriteError error={action.error} />
     <div className="inv-stats">
       <div><span className="inv-muted">Existencia usable</span><strong>{quantityText(article.available, article.unit)}</strong><StockGauge article={article} /></div>

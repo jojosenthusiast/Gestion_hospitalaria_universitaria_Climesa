@@ -5,6 +5,7 @@ import { Field, Notice } from '../components/ui';
 import { exportName, type ExportTable } from '../lib/export';
 import { can, type AccessProfile, type Api } from '../lib/api';
 import { CompactHeader, RemoteState, useData, type Remote } from './common';
+import { StatusBadge } from '../components/system';
 
 /** Respuesta de `GET /metricas/{indicador}` (FR-113-05). */
 export type IndicatorSeries = { indicador: string; unidad: string; desde: string; hasta: string; actualizadoEn: string; serie: { fecha: string; valor: number | null; muestras: number }[] };
@@ -32,6 +33,8 @@ const presets = [{ days: 7, label: 'Últimos 7 días' }, { days: 14, label: 'Úl
 
 const readTone = (value: number | null, spec: Indicator): Tone | 'neutral' => value == null ? 'neutral' : value >= spec.danger ? 'danger' : value >= spec.warn ? 'warn' : 'ok';
 const toneWord = { ok: 'Dentro de lo esperado', warn: 'Requiere atención', danger: 'Crítico', neutral: 'Sin datos' } as const;
+/** S13: the reading uses the shared state families (red only for critical). */
+const toneStatus = { ok: 'normal', warn: 'bajo_minimo', danger: 'critico_alto', neutral: 'sin_rango' } as const;
 const toneKey = (tone: Tone | 'neutral') => (tone === 'ok' || tone === 'warn' || tone === 'danger' ? tone : 'neutral');
 const stats = (series: IndicatorSeries) => {
   const values = series.serie.map(p => p.valor).filter((v): v is number => v != null);
@@ -55,7 +58,7 @@ function IndicatorCard({ spec, state }: { spec: Indicator; state: Remote<Indicat
       return <>
         {summary
           ? <div className="metric-summary">
-            <div className={`metric-figure tone-${toneKey(tone)}`}><span>Promedio del rango</span><strong>{fmt(summary.avg, unit)}</strong><em>{toneWord[toneKey(tone)]}</em></div>
+            <div className={`metric-figure tone-${toneKey(tone)}`}><span>Promedio del rango</span><strong>{fmt(summary.avg, unit)}</strong><StatusBadge value={toneStatus[toneKey(tone)]} label={toneWord[toneKey(tone)]} /></div>
             <div><span>Último dato</span><strong>{fmt(summary.last, unit)}</strong></div>
             <div><span>Mínimo</span><strong>{fmt(summary.min, unit)}</strong></div>
             <div><span>Máximo</span><strong>{fmt(summary.max, unit)}</strong></div>

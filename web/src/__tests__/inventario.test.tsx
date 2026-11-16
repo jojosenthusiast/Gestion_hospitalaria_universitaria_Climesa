@@ -102,6 +102,14 @@ describe('inventario · maestro-detalle', () => {
     expect(within(detailPane).getByRole('button', { name: 'Nuevo lote' })).toBeTruthy();
   });
 
+  // S13 (T10w, W2): the header keeps the only primary action; the article detail no longer repeats it as primary.
+  it('con un artículo abierto hay una sola acción principal en la pantalla', async () => {
+    mount(jop());
+    await userEvent.click(await screen.findByRole('button', { name: /Paracetamol 500 mg/ }));
+    await screen.findByRole('region', { name: 'Detalle del artículo' });
+    expect([...document.querySelectorAll('.primary-button')].map(b => b.textContent)).toEqual(['Registrar movimiento']);
+  });
+
   it('filtra mientras se escribe, muestra chips y «Quitar filtros»', async () => {
     mount(jop());
     await screen.findByText('Suero oral');
