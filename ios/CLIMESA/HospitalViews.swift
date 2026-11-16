@@ -27,11 +27,10 @@ struct OccupancyBar: View {
 struct HospitalInfo: Sendable {
     var occupancy: Part<PublicOccupancy>
     var doctors: Part<DoctorsOnDuty>
-    var notices: Part<PublicNotices>
 }
 
-/// I10 · Información del hospital: ocupación total y por piso, médicos de turno (datos públicos) y los avisos
-/// vigentes para los roles de la persona, incluidos los públicos (`GET /me/avisos`).
+/// I10 · Información del hospital: ocupación total y por piso y médicos de turno (datos públicos). Fase 2, S11: los
+/// avisos salieron de aquí a su propia área (Avisos, en Más).
 struct HospitalInfoView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
@@ -41,10 +40,8 @@ struct HospitalInfoView: View {
         LoadState(loader: loader, retry: load) { info in
             occupancySection(info.occupancy)
             doctorsSection(info.doctors)
-            noticesSection(info.notices)
         }
         .task(id: live.snapshot.version(.hospitalInfo)) { await load() }
-        .task(id: loader.value?.notices.value?.nextChange) { await reloadAtNextChange(loader.value?.notices.value, reload: load) }
     }
 
     @ViewBuilder private func occupancySection(_ part: Part<PublicOccupancy>) -> some View {
@@ -93,24 +90,12 @@ struct HospitalInfoView: View {
         }
     }
 
-    @ViewBuilder private func noticesSection(_ part: Part<PublicNotices>) -> some View {
-        SectionTitle("home.notices")
-        if let error = part.error {
-            SectionCard { PartError(message: error, retry: load) }
-        } else if let list = part.value?.byPriority, !list.isEmpty {
-            ForEach(list) { notice in NoticeCard(notice: notice) }
-        } else {
-            EmptyStateView(title: L.text("hospital.notices.none"), symbol: "bell")
-        }
-    }
-
     private func load() async {
         await loader.load {
             let api = try account.client()
             let occupancy = try await Part<PublicOccupancy>.load { try await api.get("/publico/ocupacion", as: PublicOccupancy.self) }
             let doctors = try await Part<DoctorsOnDuty>.load { try await api.get("/publico/medicos-de-turno", as: DoctorsOnDuty.self) }
-            let notices = try await Part<PublicNotices>.load { try await api.get("/me/avisos", as: PublicNotices.self) }
-            return HospitalInfo(occupancy: occupancy, doctors: doctors, notices: notices)
+            return HospitalInfo(occupancy: occupancy, doctors: doctors)
         }
     }
 }
@@ -304,41 +289,5 @@ private struct EditMyDataSheet: View {
         }
         await reload()
         if ok { dismiss() }
-    }
-}
-
-/// Un aviso con su prioridad (D-071), igual que en Android y la web: Crítico en rojo, Urgente en amarillo (MA-AVI-01).
-struct NoticeCard: View {
-    let notice: PublicNotices.Notice
-
-    var body: some View {
-        let tone: (Color, Color) = {
-            switch notice.priority {
-            case .critico: return (Theme.danger, Theme.dangerSoft)
-            case .urgente: return (Theme.warning, Theme.warningSoft)
-            case .atencion: return (Theme.primaryText, Theme.surface)
-            }
-        }()
-        HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: notice.priority == .atencion ? "megaphone" : "exclamationmark.triangle.fill")
-                .foregroundStyle(tone.0).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Spacing.s) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(verbatim: notice.title).font(Typo.subheading).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
-                    Spacer(minLength: Spacing.s)
-                    Text(verbatim: notice.priority.label).font(Typo.tag).foregroundStyle(tone.0)
-                }
-                Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink)
-                if let until = notice.until {
-                    Text(verbatim: String(format: L.text("notice.until"), ClimesaDates.display(until))).font(Typo.small).foregroundStyle(Theme.muted)
-                }
-            }
-        }
-        .padding(Spacing.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(tone.1, in: RoundedRectangle(cornerRadius: Radius.card))
-        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(notice.priority == .atencion ? Theme.line : tone.0, lineWidth: 1))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: "\(notice.priority.label): \(notice.title). \(notice.body)"))
     }
 }

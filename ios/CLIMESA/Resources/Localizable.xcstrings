@@ -4950,6 +4950,303 @@
           }
         }
       }
+    },
+    "section.avisos": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos"
+          }
+        }
+      }
+    },
+    "notices.filter": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar avisos"
+          }
+        }
+      }
+    },
+    "notices.ack": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enterado"
+          }
+        }
+      }
+    },
+    "notices.snooze": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recordarme en %@ h"
+          }
+        }
+      }
+    },
+    "notices.snooze.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Te lo recordamos en %@ h."
+          }
+        }
+      }
+    },
+    "notices.banner.more": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 de %d sin «Enterado»"
+          }
+        }
+      }
+    },
+    "notices.banner.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver en Avisos"
+          }
+        }
+      }
+    },
+    "notices.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estás al día"
+          }
+        }
+      }
+    },
+    "notices.empty.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay avisos vigentes para tu rol ni tu área."
+          }
+        }
+      }
+    },
+    "notices.empty.critical": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin avisos críticos"
+          }
+        }
+      }
+    },
+    "notices.empty.read": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo leído"
+          }
+        }
+      }
+    },
+    "notices.empty.filter": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambia el filtro para ver los demás avisos."
+          }
+        }
+      }
+    },
+    "notices.unread": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin leer"
+          }
+        }
+      }
+    },
+    "notices.read": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enterado"
+          }
+        }
+      }
+    },
+    "notices.until.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hasta %@"
+          }
+        }
+      }
+    },
+    "notices.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aviso"
+          }
+        }
+      }
+    },
+    "notices.published": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publicado"
+          }
+        }
+      }
+    },
+    "notices.until": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vigente hasta"
+          }
+        }
+      }
+    },
+    "notices.remind": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Te lo recordamos"
+          }
+        }
+      }
+    },
+    "notices.for": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para: %@"
+          }
+        }
+      }
+    },
+    "lab.attachments.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Informe externo"
+          }
+        }
+      }
+    },
+    "lab.attachments.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin adjuntos visibles."
+          }
+        }
+      }
+    },
+    "lab.attachments.privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cada archivo se abre con un enlace que dura 5 minutos y queda registrado."
+          }
+        }
+      }
+    },
+    "lab.attachments.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver archivo"
+          }
+        }
+      }
+    },
+    "lab.attachments.opening": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparando…"
+          }
+        }
+      }
+    },
+    "lab.attachments.open.a11y": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver archivo %@"
+          }
+        }
+      }
+    },
+    "lab.attachments.referenceOnly": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo hay la referencia del archivo: no se guardó en el sistema."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

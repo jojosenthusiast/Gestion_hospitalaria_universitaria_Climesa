@@ -66,18 +66,20 @@ Tus turnos publicados, agrupados por día y por hora. La entrada se confirma sol
 
 ### Pestañas
 
-Mi día, Pacientes, Resultados, Turnos y **Más** (Agenda, Mis hospitalizados, Ambulancia, Llegada de ambulancia, Información del hospital, Ubicación y Perfil).
+Mi día, Pacientes, Resultados, Turnos y **Más** (Avisos, Agenda, Mis hospitalizados, Ambulancia, Llegada de ambulancia, Información del hospital, Ubicación y Perfil).
 
 | Pantalla | Qué haces |
 |---|---|
 | Mi día | **Quién pasa después** (número propuesto y su motivo), **Llamar siguiente**, **Deshacer** el llamado, **Mover o cambiar prioridad**, **Llamar de nuevo**, **Atender**, **Retomar consulta** o **Reanudar**. En "Solicitudes de reprogramación": **Aceptar nuevo horario** o **Rechazar**. Un solo botón resalta: **Retomar consulta** del paciente que ya atiendes o **Atender** un número de consulta general ya llamado; si no hay, **Llamar siguiente**. Los números de otros servicios y los que atiende otro médico no se resaltan. En la agenda, **Iniciar consulta** o **Retomar consulta** |
 | Consulta | **Iniciar consulta**, **Guardar borrador**, **Agregar diagnóstico**, **Emitir receta**, **Ordenar exámenes**, **Firmar consulta**, en cuatro pasos (consulta, procedimientos y plan, receta y exámenes, cerrar). **Firmar consulta** es el botón principal y pide confirmación con un resumen; si hay notas sin guardar, se guardan antes de firmar. Al firmar puedes **Indicar hospitalización** o elegir **Ahora no**, y ves **Quién pasa después** con **Llamar a CON 4** |
 | Pacientes | Expediente e historial de tus pacientes |
-| Resultados | Bandeja **Resultados por revisar** (críticos y observaciones relevantes) con **Marcar como revisado**. En cada orden: **Marcar revisado**, **Se realiza en otro sitio**, **Cancelar orden**. Un aviso indica cuántos resultados con valor crítico esperan tu revisión. Cargar un resultado externo aún no está en iOS: hazlo desde Android |
+| Resultados | Bandeja **Resultados por revisar** (críticos y observaciones relevantes) con **Marcar como revisado**. En cada orden: **Marcar revisado**, **Se realiza en otro sitio**, **Cancelar orden**. Un aviso indica cuántos resultados con valor crítico esperan tu revisión. En una orden externa completada, **Informe externo** lista la foto o el PDF: **Ver archivo** pide un enlace que dura 5 minutos y abre el archivo en el iPhone (cada apertura queda en la auditoría). Si solo hay la referencia, dice "Solo hay la referencia del archivo: no se guardó en el sistema." Cargar o subir un resultado externo no está en iOS: hazlo desde Android o la web |
 | Mis hospitalizados | **Firmar alta** (pide confirmación con el tipo y los pendientes), **Revocar alta** (en rojo, con motivo y confirmación) |
 | Ambulancia | Estado de la unidad y **Bitácora**: prioridad, estado y fechas se aplican al elegirlos; el texto se busca con **Buscar** del teclado; **Quitar filtros** |
 | Llegada de ambulancia | "Servicios por recibir", "Entrega del paciente" y **Marcar recibido** |
 | Turnos | Consultar tus turnos por día, desde hoy; los días pasados quedan debajo, en "Turnos anteriores" (la entrada es automática) |
+| Avisos (Más) | Todos los avisos vigentes para tu rol o tu área, con los filtros **Todos**, **Sin leer** y **Críticos**. Cada aviso muestra su nivel (Informativo, Importante o Crítico), para quién es (por ejemplo "Medicina" o "Tu área") y hasta cuándo; al abrirlo, **Enterado** es el botón principal. En un crítico dirigido a ti también está **Recordarme en 4 h** |
+| Aviso crítico en Mi día | Arriba de Mi día solo sale el aviso **Crítico** dirigido a tu rol o tu área que todavía no marcaste: tarjeta roja con **Enterado**, **Recordarme en 4 h** y **Ver en Avisos**. Se queda hasta que das **Enterado**; si lo pospones, vuelve solo a la hora indicada. Los demás avisos ya no salen en Mi día ni en Información del hospital |
 
 La app iOS compila y pasa sus pruebas en CI, pero no se ha probado en un iPhone.
 

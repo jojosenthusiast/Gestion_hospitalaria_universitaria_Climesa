@@ -27,9 +27,13 @@ Secciones: Inicio, Mi turno, Mis citas, Mis exámenes, Vincular expediente, Mi h
 
 ## iOS
 
-Pestañas: Inicio, Fila, Citas, Exámenes y **Más** (Vincular expediente, si todavía no lo vinculaste; Mis datos, Mi historial, Mi habitación, Pedir ambulancia, Información del hospital, Ubicación, Quién vio mi expediente y Perfil).
+Pestañas: Inicio, Fila, Citas, Exámenes y **Más** (Avisos, Vincular expediente, si todavía no lo vinculaste; Mis datos, Mi historial, Mi habitación, Pedir ambulancia, Información del hospital, Ubicación, Quién vio mi expediente y Perfil).
 
 En **Inicio**, cada tarjeta (fila, próxima cita, exámenes) abre su pestaña al tocarla. Si tu cuenta no está vinculada, **Vincular expediente** abre el formulario directamente.
+
+## Avisos
+
+En iOS, **Más → Avisos** reúne los avisos vigentes del hospital (los públicos y los que van a pacientes), con los filtros **Todos**, **Sin leer** y **Críticos**. Abre un aviso y toca **Enterado** para marcarlo como leído. Solo un aviso **Crítico** dirigido a ti sale arriba en **Inicio**, con **Enterado** y **Recordarme en 4 h**, hasta que lo marcas; los demás ya no ocupan el Inicio. Los adjuntos de laboratorio (fotos o PDF de informes externos) nunca se muestran en la app del paciente.
 
 ## Mi turno (Fila)
 
@@ -70,7 +74,7 @@ Tu historial clínico revisado: consultas firmadas, diagnósticos, recetas y res
 
 ## Hospital
 
-Información pública: ocupación por planta, médicos de turno y avisos. En iOS, **Ubicación** ofrece **Llamar al hospital** y **Abrir en Mapas**; **Mi habitación** muestra tu cama si estás hospitalizado.
+Información pública: ocupación por planta, médicos de turno y avisos. En iOS los avisos están en **Más → Avisos**, no en Información del hospital; **Ubicación** ofrece **Llamar al hospital** y **Abrir en Mapas**; **Mi habitación** muestra tu cama si estás hospitalizado.
 
 ## Quién vio mi expediente
 
