@@ -46,7 +46,7 @@ Lo que la API todavía no ofrece (cuántos faltan exacto, seguimiento y cancelac
 - Tiempo real sin sondeo: `Core/Realtime` implementa el protocolo Phoenix de Supabase (igual que web y Android) sobre `URLSessionWebSocketTask` con canales privados de `/auth/me`. `LiveReducer` sube un contador por grupo (`LiveTopic`: fila, citas, consultas, laboratorio, admisiones, ambulancia, ...) y cada pantalla vuelve a pedir sus datos con `.task(id:)`. Tras una caída hay una sola consulta `GET /eventos?after=<seq>` que invalida todo.
 - La sesión se cierra al volver después de cinco minutos en segundo plano; antes de ese límite solo se verifica de nuevo el perfil.
 
-La UI usa DM Sans/IBM Plex Mono, azul cobalto, tinta oscura y superficies sin sombras. Los textos están en `CLIMESA/Resources/Localizable.xcstrings`.
+La UI usa Atkinson Hyperlegible Next y Mono (cifras tabulares), azul cobalto, tinta oscura y superficies sin sombras. Los tokens de área, estado y prioridad (Fase 2, `docs/diseno/fase2/02-sistema.md`) viven en `Core/DesignTokens.swift` y los componentes comunes (`CompactHeader`, `AreaTag`, `StatusBadge`, `PriorityBadge`, `StatusLegend`, `Skeleton`) en `CLIMESA/DesignSystem/Components.swift`. Los textos están en `CLIMESA/Resources/Localizable.xcstrings`.
 
 ## Sistema de diseño (`CLIMESA/DesignSystem/`)
 

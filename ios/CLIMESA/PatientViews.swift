@@ -193,7 +193,7 @@ private struct QueueTicketCard: View {
             }
             SectionCard(eyebrow: ticket.service.label) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(verbatim: "\(ticket.number)").font(.custom("DMSans-Bold", size: 96, relativeTo: .largeTitle)).foregroundStyle(Theme.ink).minimumScaleFactor(0.5)
+                    Text(verbatim: "\(ticket.number)").font(Typo.number(96)).foregroundStyle(Theme.ink).minimumScaleFactor(0.5)
                         .accessibilityLabel(Text(verbatim: "\(L.text("ds.paciente.queue.number")) \(ticket.number)"))
                 }
                 PatientTag(ticket.state.rawValue, label: ticket.state.label)

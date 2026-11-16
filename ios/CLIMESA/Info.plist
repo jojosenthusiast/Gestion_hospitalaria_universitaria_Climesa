@@ -37,12 +37,8 @@
 	</dict>
 	<key>UIAppFonts</key>
 	<array>
-		<string>dm_sans_semibold.ttf</string>
-		<string>dm_sans_bold.ttf</string>
-		<string>dm_sans_regular.ttf</string>
-		<string>dm_sans_medium.ttf</string>
-		<string>ibm_plex_mono_regular.ttf</string>
-		<string>ibm_plex_mono_medium.ttf</string>
+		<string>atkinson_hyperlegible_next.ttf</string>
+		<string>atkinson_hyperlegible_mono.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

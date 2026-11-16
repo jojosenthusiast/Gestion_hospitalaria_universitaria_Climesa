@@ -12,9 +12,10 @@ enum Brand {
     static let ink=Theme.ink
     static let paper=Theme.bg
     static let lime=Theme.accent
-    static func body(_ size:CGFloat=16)->Font { .custom("DMSans-Regular",size:size,relativeTo:.body) }
-    static func bold(_ size:CGFloat)->Font { .custom("DMSans-Bold",size:size,relativeTo:.title) }
-    static func mono(_ size:CGFloat=11)->Font { .custom("IBMPlexMono-Regular",size:size,relativeTo:.caption) }
+    // Fase 2: Atkinson Hyperlegible (DesignSystem/Theme.swift) en lugar de DM Sans e IBM Plex Mono.
+    static func body(_ size:CGFloat=16)->Font { Atkinson.text(size,.regular,relativeTo:.body) }
+    static func bold(_ size:CGFloat)->Font { Atkinson.text(size,.bold,relativeTo:.title) }
+    static func mono(_ size:CGFloat=11)->Font { Atkinson.mono(size,.regular,relativeTo:.caption) }
 }
 struct BrandHeader:View {
     var body:some View { HStack(spacing:12) { Text(verbatim:"+").font(.system(size:27,weight:.bold)).frame(width:38,height:38).background(Brand.lime).foregroundStyle(Brand.ink); VStack(alignment:.leading,spacing:2) { Text(verbatim:"climesa").font(Brand.bold(26)); Text("brand.tagline").font(Brand.body(10)) }; Spacer() }.padding(22).foregroundStyle(.white).background(Brand.ink) }

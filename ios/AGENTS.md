@@ -12,7 +12,7 @@ Lee antes `../AGENTS.md`. Spec base: `specs/122-cliente-ios/`. Roles en iOS: Mé
     AccountModel.swift     ingreso, registro, perfil de /auth/me, fábrica del tiempo real
     Network.swift          AuthService y APIClient (URLSession, async/await)
     KeychainStore.swift    sesión en Keychain
-    DesignSystem/          Theme.swift (tokens) y Components.swift (SectionCard, StatTile, StatusTag, estados...)
+    DesignSystem/          Theme.swift (tokens, Atkinson) y Components.swift (CompactHeader, StatusBadge, AreaTag, Skeleton, estados...)
     Views.swift            marca, componentes, ingreso, raíz
     WorkspaceView.swift    pestañas por rol, rol sin iOS, banda de conexión
     LiveViewModel.swift    @MainActor @Observable: consume el flujo de tiempo real
@@ -25,6 +25,7 @@ Lee antes `../AGENTS.md`. Spec base: `specs/122-cliente-ios/`. Roles en iOS: Mé
     Resources/             Localizable.xcstrings, Configuration.plist, fuentes
   Core/                    Swift puro (Foundation), compilado por la app y por Package.swift
     Access.swift           perfil, pestañas por rol y permiso (TabPolicy), secciones (AppSection), registro
+    DesignTokens.swift     tokens de Fase 2: área, familia de estado, prioridad, espaciado, radios, movimiento
     Contract/              modelos Codable del contrato, Problem, SubmissionIntent, fechas
     Rules/                 reglas puras de Paciente y Médico
     Realtime/              protocolo Phoenix, servicio, transporte URLSession, estado en vivo (LiveTopic)
