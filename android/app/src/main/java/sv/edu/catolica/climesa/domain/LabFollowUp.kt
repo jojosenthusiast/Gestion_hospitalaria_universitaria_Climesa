@@ -3,8 +3,8 @@ package sv.edu.catolica.climesa.domain
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Metadata of the external report the doctor or the lab picked. The file itself stays on the device (no clinical storage yet). */
-data class LabAttachment(val fileName: String, val mimeType: String, val sizeBytes: Long, val sha256: String? = null)
+/** Metadata of the external report picked on the phone; [uri] is the document to read when the file is uploaded (T07c). */
+data class LabAttachment(val fileName: String, val mimeType: String, val sizeBytes: Long, val sha256: String? = null, val uri: String? = null)
 
 /**
  * Fase 2, flujo C (S10): orders done at another place. Send to external (`POST /laboratorio/ordenes/{id}/externa`) and load the

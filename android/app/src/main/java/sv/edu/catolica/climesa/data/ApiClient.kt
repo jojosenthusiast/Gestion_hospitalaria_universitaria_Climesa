@@ -13,6 +13,8 @@ internal fun apiErrorCode(body:String):String?=runCatching{JSONObject(body).optS
 /** Port to the REST API, so ViewModels can be tested on the JVM with a fake. [ApiClient] is the real adapter. */
 interface ApiGateway {
     suspend fun request(path:String,method:String="GET",body:JSONObject?=null):Any
+    /** POST of one file as multipart/form-data in [field] (lab attachments, T07c). Read-only fakes do not upload. */
+    suspend fun upload(path:String,field:String,fileName:String,mimeType:String,bytes:ByteArray):Any=throw UnsupportedOperationException("Este origen de datos no sube archivos.")
 }
 /**
  * REST adapter. A 401 renews the session once and repeats the call ([authorizedCall]); if it fails again the session
@@ -39,15 +41,32 @@ class ApiClient(
             if(key!=null&&intent==null)keys.settle(signature,status)
         }
     }
-    private fun send(path:String,method:String,body:JSONObject?,token:String,key:String?):Any {
+    /** Same session renewal and idempotency as [request]; a write is never repeated on its own (the person retries). */
+    override suspend fun upload(path:String,field:String,fileName:String,mimeType:String,bytes:ByteArray):Any=withContext(Dispatchers.IO) {
+        if(baseUrl.isBlank())throw AuthRequestException("Configura la dirección de la API de CLIMESA.")
+        val signature="POST"+path+fileName+bytes.size
+        val intent=coroutineContext[RequestIntent]?.idempotencyKey
+        val key=intent?:keys.keyFor(signature)
+        var status:Int?=null
+        try {
+            val boundary=Multipart.boundary()
+            val payload=Multipart.body(boundary,field,fileName,mimeType,bytes)
+            authorizedCall(tokens,expiry){token->send(path,"POST",null,token,key,payload to Multipart.contentType(boundary)).also{status=200}}
+        } catch(e:AuthRequestException){status=e.statusCode;throw e} finally {
+            if(intent==null)keys.settle(signature,status)
+        }
+    }
+    private fun send(path:String,method:String,body:JSONObject?,token:String,key:String?,raw:Pair<ByteArray,String>?=null):Any {
         val c=(URL(baseUrl.trimEnd('/')+path).openConnection() as HttpURLConnection).apply {
             useCaches=false;requestMethod=method;connectTimeout=ColdStart.CONNECT_TIMEOUT_MS;readTimeout=ColdStart.READ_TIMEOUT_MS
             setRequestProperty("Accept","application/json");setRequestProperty("Authorization","Bearer $token")
             key?.let{setRequestProperty("Idempotency-Key",it)}
             if(body!=null){doOutput=true;setRequestProperty("Content-Type","application/json; charset=utf-8")}
+            raw?.let{(bytes,type)->doOutput=true;setRequestProperty("Content-Type",type);setFixedLengthStreamingMode(bytes.size)}
         }
         try {
             body?.let { payload -> c.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) } }
+            raw?.let { (bytes,_) -> c.outputStream.use { it.write(bytes) } }
             val status=c.responseCode
             val text=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}.orEmpty()
             if(status !in 200..299)throw AuthRequestException(apiErrorMessage(text,status),status,apiErrorCode(text),text)

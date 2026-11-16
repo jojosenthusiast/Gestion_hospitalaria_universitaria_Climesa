@@ -82,7 +82,7 @@ class ClinicalLiveViewModelsTest {
     private fun cancellableOrder() = sv.edu.catolica.climesa.domain.LaboratoryOrder("o1", "Ana", "rutina", "pendiente", 3, emptyList(), false, allowedActions = setOf("cancelar"))
 
     @Test fun laboratoryCancelNeedsAReasonBeforeCallingTheApi() = runTest(dispatcher) {
-        val api = FakeGateway(); val vm = LaboratoryViewModel(api, ClinicalSignalBus())
+        val api = FakeGateway(); val vm = LaboratoryViewModel(api, ClinicalSignalBus(), NoDocuments)
         vm.openCancel("o1"); vm.setCancelReason("corto"); vm.confirmCancel(cancellableOrder()); runCurrent()
         assertEquals(0, api.calls.count { it.second == "POST" })
         assertEquals("Indica el motivo, de al menos 10 caracteres.", vm.state.value.cancelError)
@@ -90,7 +90,7 @@ class ClinicalLiveViewModelsTest {
     }
 
     @Test fun laboratoryCancelSendsVersionAndReasonThenClosesTheDialog() = runTest(dispatcher) {
-        val api = FakeGateway(); val vm = LaboratoryViewModel(api, ClinicalSignalBus())
+        val api = FakeGateway(); val vm = LaboratoryViewModel(api, ClinicalSignalBus(), NoDocuments)
         vm.openCancel("o1"); vm.setCancelReason("  Paciente no se presentó  "); vm.confirmCancel(cancellableOrder()); runCurrent()
         val post = api.calls.single { it.second == "POST" }
         assertEquals("/laboratorio/ordenes/o1/cancelar", post.first)
@@ -102,7 +102,7 @@ class ClinicalLiveViewModelsTest {
     }
 
     @Test fun laboratoryCancelErrorStaysInTheDialogInSpanish() = runTest(dispatcher) {
-        val api = FakeGateway(); val vm = LaboratoryViewModel(api, ClinicalSignalBus())
+        val api = FakeGateway(); val vm = LaboratoryViewModel(api, ClinicalSignalBus(), NoDocuments)
         api.failures["/laboratorio/ordenes/o1/cancelar"] = sv.edu.catolica.climesa.data.AuthRequestException("La orden cambió.", 409, "version_conflicto")
         vm.openCancel("o1"); vm.setCancelReason("Paciente no se presentó"); vm.confirmCancel(cancellableOrder()); runCurrent()
         assertEquals("o1", vm.state.value.cancelOrderId)
@@ -112,7 +112,7 @@ class ClinicalLiveViewModelsTest {
 
     @Test fun laboratoryReloadsOnLaboratoryEvents() = runTest(dispatcher) {
         val api = FakeGateway(); val bus = ClinicalSignalBus()
-        val vm = LaboratoryViewModel(api, bus)
+        val vm = LaboratoryViewModel(api, bus, NoDocuments)
         vm.load(); vm.startLive(listOf("rol:LAB")); runCurrent()
         bus.signals.tryEmit(event("fila.actualizada", "ticket_fila")); runCurrent()
         assertEquals(1, api.gets("/laboratorio/ordenes"))

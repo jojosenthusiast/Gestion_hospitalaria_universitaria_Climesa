@@ -115,7 +115,7 @@ class PatientRecordViewModelsTest {
 
     @Test fun patientResultsUseTheOwnEndpoint() = runTest(dispatcher) {
         val api = FakeGateway()
-        val vm = LaboratoryViewModel(api, RecordSignalBus())
+        val vm = LaboratoryViewModel(api, RecordSignalBus(), NoDocuments)
         vm.path = "/me/laboratorio"
         vm.load(); runCurrent()
         assertEquals(listOf("/me/laboratorio"), api.calls.map { it.first })

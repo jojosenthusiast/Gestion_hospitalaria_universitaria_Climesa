@@ -11,7 +11,7 @@ Lo clínico se abre solo con relación de atención: el paciente de tu cita o tu
 
 ### Secciones
 
-Inicio, Mi día, Resultados por revisar, Mis hospitalizados, Expediente, Signos vitales (solo consulta), Llegada de ambulancia, Unidad, Bitácora, Mis turnos, Hospital y Perfil. La barra inferior muestra Inicio, Mi día, Resultados e Internados; el resto está en **Más**.
+Inicio, Avisos, Mi día, Resultados por revisar, Mis hospitalizados, Expediente, Signos vitales (solo consulta), Llegada de ambulancia, Unidad, Bitácora, Mis turnos, Hospital y Perfil. La barra inferior muestra Inicio, Mi día, Resultados e Internados; el resto está en **Más**.
 
 ### Mi día (consulta)
 
@@ -31,9 +31,13 @@ Inicio, Mi día, Resultados por revisar, Mis hospitalizados, Expediente, Signos 
 - Si el laboratorio corrige un resultado ya revisado, la orden vuelve a esta lista.
 - Arriba está la bandeja **Resultados por revisar**: un pendiente por orden con valor crítico (marca roja "Valor crítico") o con una observación que el laboratorio marcó como relevante. Los críticos van primero. Léelo y pulsa **Marcar como revisado**; si llega otro hallazgo de la misma orden, se suma al mismo pendiente.
 - **Se realiza en otro sitio**: en una orden tuya pendiente, indica dónde se hace el examen y las instrucciones para el paciente. El paciente las ve en "Mis exámenes".
-- **Cargar resultado externo** (Android): elige el PDF o la foto del informe (hasta 10 MB) y escribe el valor clave de cada examen. Desde Android se guarda la referencia del archivo y los valores; el archivo queda en tu teléfono y se puede subir después desde la web.
-- **Informe externo** (web): en una orden externa completada, **Descargar** baja la foto o el PDF guardado con un enlace que dura 5 minutos; cada descarga queda en la auditoría. El paciente nunca ve el archivo.
+- **Cargar resultado externo** (Android): elige el PDF o la foto del informe (hasta 10 MB) y escribe el valor clave de cada examen. Al guardar, primero quedan los valores y enseguida el archivo sube al almacenamiento clínico privado. Un archivo de más de 10 MB se rechaza antes de enviar nada. Si el archivo no sube, la app dice "Los valores se guardaron, pero el archivo no se subió" y lo puedes subir después desde **Informe externo**.
+- **Informe externo** (Android y web): en una orden externa completada, cada archivo muestra si es PDF o foto, su tamaño, la fecha y quién lo cargó. En Android, **Abrir archivo** pide un enlace nuevo que dura 5 minutos y lo abre con la app del teléfono; en la web, **Descargar**. Cada apertura queda en la auditoría. Si solo existe la referencia, lo dice ("Solo hay la referencia del archivo") y puedes subir ahí la foto o el PDF. El paciente nunca ve el archivo.
 - La lista se agrupa por etapa; las órdenes liberadas y canceladas empiezan plegadas. Las tarjetas sin acciones muestran solo el resumen: **Ver exámenes y avance** abre el detalle.
+
+### Avisos
+
+**Avisos** (en **Más**) reúne los avisos vigentes para tu rol o tu área, con filtros **Todos**, **Sin leer** y **Críticos**. Al abrir uno, **Enterado** es la acción principal; en un crítico dirigido a ti también aparece **Recordarme en 4 h**. Inicio ya no lista avisos: solo muestra arriba el aviso **Crítico** pendiente hasta que das **Enterado** (ver `README.md`, "Avisos").
 
 ### Aviso de valor crítico
 
