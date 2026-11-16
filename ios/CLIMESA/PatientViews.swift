@@ -523,6 +523,8 @@ struct LabOrderRow: View {
 struct LabOrderDetail: View {
     let order: LabOrder
     let showValues: Bool
+    /// Solo el personal ve la observación del laboratorio (nota para el médico); el paciente nunca.
+    var staffView = false
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PatientTag(order.state.rawValue, label: order.state.label)
@@ -543,7 +545,7 @@ struct LabOrderDetail: View {
                             Spacer()
                             if let mark = item.result?.mark { PatientTag(mark.rawValue, label: mark.label) }
                         }
-                        if let observation = item.result?.observation {
+                        if let observation = LabFollowUpRules.labNote(item.result, staffView: staffView) {
                             Text(verbatim: String(format: L.text(item.result?.relevant == true ? "exams.observation.relevant" : "exams.observation"), observation))
                                 .font(Typo.small).foregroundStyle(item.result?.relevant == true ? Theme.ink : Theme.muted)
                         }

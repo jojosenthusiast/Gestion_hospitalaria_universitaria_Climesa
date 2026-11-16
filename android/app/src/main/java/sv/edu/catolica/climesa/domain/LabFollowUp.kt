@@ -80,6 +80,9 @@ object LabFollowUpRules {
         }.filter { it.id.isNotBlank() }.sortedWith(compareBy<LabFollowUp>({ if (it.critical) 0 else 1 }, { it.createdAtMillis ?: Long.MAX_VALUE }))
     }
 
+    /** The lab observation is a note from the lab to the doctor: never shown in the patient's own view. */
+    fun labNote(result: LaboratoryResult, ownView: Boolean): String? = if (ownView) null else result.observation
+
     fun reviewPath(id: String) = "/laboratorio/pendientes/$id/revisar"
     fun reviewBody(version: Int): JSONObject = JSONObject().put("version", version)
 }

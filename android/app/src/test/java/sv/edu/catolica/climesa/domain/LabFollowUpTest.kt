@@ -31,6 +31,13 @@ class LabFollowUpTest {
         assertTrue(order.items.single().result?.relevant == true)
     }
 
+    @Test fun theLabObservationIsStaffOnly() {
+        val result = LaboratoryResult(13.4, null, "normal", 1, observation = "Muestra hemolizada", relevant = true)
+        assertEquals("Muestra hemolizada", LabFollowUpRules.labNote(result, ownView = false))
+        assertNull(LabFollowUpRules.labNote(result, ownView = true))
+        assertNull(LabFollowUpRules.labNote(result.copy(observation = null), ownView = false))
+    }
+
     @Test fun olderRowsWithoutExternalFieldsStillParse() {
         val order = LaboratoryParser.orders(JSONArray().put(row("pendiente"))).single()
         assertFalse(order.external)

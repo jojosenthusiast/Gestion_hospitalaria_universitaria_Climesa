@@ -415,7 +415,7 @@ private struct ReviewDetailView: View {
             if ReviewRules.isAmendedPendingReview(order) {
                 Text("results.amended").font(Typo.label).foregroundStyle(Theme.warning)
             }
-            LabOrderDetail(order: order, showValues: true)
+            LabOrderDetail(order: order, showValues: true, staffView: true)
             WriteNotice(submission: submission, reload: reload)
             // Los botones salen de `allowedActions` de la API para este médico, nunca del rol ni del estado.
             if order.allows(.revisar) {

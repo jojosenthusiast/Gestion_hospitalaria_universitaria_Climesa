@@ -56,8 +56,8 @@ import sv.edu.catolica.climesa.domain.LabAttachment
 import sv.edu.catolica.climesa.domain.LabExternalAction
 import sv.edu.catolica.climesa.domain.LabExternalRules
 import sv.edu.catolica.climesa.domain.LabFollowUp
+import sv.edu.catolica.climesa.domain.LabFollowUpRules
 import sv.edu.catolica.climesa.domain.LabGroups
-import sv.edu.catolica.climesa.domain.LaboratoryResult
 import androidx.compose.ui.res.stringResource
 import sv.edu.catolica.climesa.R
 import androidx.compose.ui.unit.dp
@@ -307,7 +307,7 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
                 if (result != null) LabMarkTag(result.mark, LaboratoryLabels.valueAndMark(result, item.unit))
                 else Text(if (inReview) stringResource(R.string.lab_valor_en_revision) else stringResource(R.string.clin_lab_pendiente), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            item.result?.let { ObservationLine(it) }
+            item.result?.let { result -> LabFollowUpRules.labNote(result, ownView)?.let { ObservationLine(it, result.relevant) } }
         }
         if (canLoadExternal) PrimaryButton(stringResource(R.string.lab_cargar_externo), { model.openExternalLoad(order.id) }, enabled = !busy)
         if (canReview) PrimaryButton(stringResource(R.string.lab_revisar), { model.review(order) }, enabled = !busy, loading = busy)
@@ -327,13 +327,12 @@ private fun ExternalNote(order: LaboratoryOrder) {
 }
 
 @Composable
-private fun ObservationLine(result: LaboratoryResult) {
-    val note = result.observation ?: return
+private fun ObservationLine(note: String, relevant: Boolean) {
     Text(
-        stringResource(if (result.relevant) R.string.lab_observacion_relevante else R.string.lab_observacion, note),
+        stringResource(if (relevant) R.string.lab_observacion_relevante else R.string.lab_observacion, note),
         style = MaterialTheme.typography.bodySmall,
-        fontWeight = if (result.relevant) FontWeight.Bold else FontWeight.Normal,
-        color = if (result.relevant) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = if (relevant) FontWeight.Bold else FontWeight.Normal,
+        color = if (relevant) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 

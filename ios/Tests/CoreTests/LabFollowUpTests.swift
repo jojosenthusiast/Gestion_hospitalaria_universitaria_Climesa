@@ -20,6 +20,13 @@ final class LabFollowUpTests: XCTestCase {
         XCTAssertEqual(LabExternalRules.patientNote(external), "Hazte el examen en Clínica Ficticia y trae el informe.")
     }
 
+    func testLaObservacionDelLaboratorioEsSoloParaElPersonal() {
+        let result = order("1", state: "completado", reviewed: true).items.first?.result
+        XCTAssertEqual(LabFollowUpRules.labNote(result, staffView: true), "Muestra hemolizada")
+        XCTAssertNil(LabFollowUpRules.labNote(result, staffView: false))
+        XCTAssertNil(LabFollowUpRules.labNote(nil, staffView: true))
+    }
+
     func testServidorAnteriorSinCamposExternos() {
         let old = order("1", state: "pendiente")
         XCTAssertFalse(old.external)

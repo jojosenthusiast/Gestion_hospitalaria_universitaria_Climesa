@@ -42,6 +42,9 @@ public enum LabFollowUpRules {
     public static func sorted(_ items: [LabFollowUp]) -> [LabFollowUp] {
         items.sorted { a, b in a.critical != b.critical ? a.critical : a.createdAt < b.createdAt }
     }
+    /// La observación del laboratorio es una nota para el médico: nunca se muestra en la vista del paciente.
+    public static func labNote(_ result: LabItemResult?, staffView: Bool) -> String? { staffView ? result?.observation : nil }
+
     public static func reviewPath(_ id: String) -> String { "/laboratorio/pendientes/\(id)/revisar" }
     public static func reviewBody(version: Int) -> VersionBody { VersionBody(version: version) }
 }
