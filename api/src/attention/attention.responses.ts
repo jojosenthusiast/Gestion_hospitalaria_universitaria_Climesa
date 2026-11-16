@@ -1,7 +1,10 @@
 import { BoolProp, EnumArrayProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, DecimalProp, EnumProp, IntProp, NumProp, PeriodResponse, StrProp, UuidProp } from '../platform/responses';
 import { ESTADO_ADMISION, ESTADO_CITA, ESTADO_REPROGRAMACION, ESTADO_CONSULTA, ESTADO_FILA, ESTADO_ORDEN_LABORATORIO, MARCA_RESULTADO, PRIORIDAD_LABORATORIO } from '../platform/states';
 import { QUEUE_SERVICES } from './queue.dto';
-import { APPOINTMENT_ACTIONS, QUEUE_ACTIONS } from './attention.rules';
+import { APPOINTMENT_ACTIONS, QUEUE_ACTIONS, QUEUE_PRIORITIES, QUEUE_UNDO_ACTIONS } from './attention.rules';
+import { AREA_FILA } from './queue-areas';
+
+export const MOTIVO_SIGUIENTE = ['emergencia', 'urgente', 'cita', 'llegada'] as const;
 
 export const ORIGEN_CITA = ['recepcion', 'paciente'] as const;
 export const ACCESO_HISTORIAL = ['propio', 'relacion'] as const;
@@ -144,10 +147,6 @@ export class ConsultationCommandResponse {
   @UuidProp() id!: string;
   @IntProp() version!: number;
   @EnumProp(ESTADO_CONSULTA, 'EstadoConsulta') state!: string;
-}
-
-export class ConsultationSignResponse extends ConsultationCommandResponse {
-  @DateTimeProp() signedAt!: string;
 }
 
 // ---- Detalle clínico (clinical-record.controller.ts) ----
@@ -340,9 +339,15 @@ export class QueueTicketResponse {
   @StrProp({ nullable: true }) patientName!: string | null;
   @EnumProp(ESTADO_FILA, 'EstadoFila') state!: string;
   @UuidProp({ nullable: true }) officeId!: string | null;
+  @StrProp({ nullable: true, description: 'Código del consultorio asignado (C-101)' }) officeCode!: string | null;
   @IntProp() llamados!: number;
   @IntProp() version!: number;
   @DateTimeProp() issuedAt!: string;
+  @EnumProp(AREA_FILA, 'AreaFila', { description: 'Código del área del servicio; el número cuenta desde 1 por área y día' }) area!: string;
+  @EnumProp(QUEUE_PRIORITIES, 'PrioridadFila') priority!: string;
+  @DateTimeProp({ nullable: true, description: 'Hora de la cita de hoy del paciente (solo consulta general); null si llegó sin cita' }) appointmentAt!: string | null;
+  @BoolProp({ description: 'Llegó sin cita' }) walkIn!: boolean;
+  @EnumArrayProp(QUEUE_UNDO_ACTIONS, 'DeshacerFila', { description: 'Acciones reversibles que el servidor acepta ahora' }) undoActions!: string[];
   @UuidProp({ nullable: true, description: 'Consulta iniciada desde este número por quien consulta la fila; null si no hay o es de otro profesional' }) consultationId!: string | null;
   @EnumProp(ESTADO_CONSULTA, 'EstadoConsulta', { nullable: true }) consultationState!: string | null;
   @IntProp({ description: 'Llamados máximos (política fila.llamados_maximos)' }) maxCalls!: number;
@@ -359,6 +364,8 @@ export class QueueIssuedResponse {
   @EnumProp(ESTADO_FILA, 'EstadoFila') state!: string;
   @IntProp() version!: number;
   @StrProp() serviceName!: string;
+  @EnumProp(AREA_FILA, 'AreaFila') area!: string;
+  @EnumProp(QUEUE_PRIORITIES, 'PrioridadFila') priority!: string;
   @UuidProp() patientId!: string;
 }
 
@@ -375,4 +382,37 @@ export class QueueCallResponse extends QueueTransitionResponse {
 export class QueueCallNextResponse extends QueueCallResponse {
   @IntProp() numero!: number;
   @StrProp({ nullable: true }) patientName!: string | null;
+  @EnumProp(AREA_FILA, 'AreaFila') area!: string;
+  @EnumProp(MOTIVO_SIGUIENTE, 'MotivoSiguiente', { description: 'Por qué la regla eligió este número' }) reason!: string;
+  @StrProp() reasonText!: string;
+}
+
+export class QueuePriorityResponse extends QueueTransitionResponse {
+  @EnumProp(QUEUE_PRIORITIES, 'PrioridadFila') priority!: string;
+}
+
+export class QueueProposalResponse {
+  @UuidProp() id!: string;
+  @IntProp() numero!: number;
+  @EnumProp(AREA_FILA, 'AreaFila') area!: string;
+  @UuidProp({ nullable: true }) patientId!: string | null;
+  @StrProp({ nullable: true }) patientName!: string | null;
+  @EnumProp(QUEUE_PRIORITIES, 'PrioridadFila') priority!: string;
+  @DateTimeProp({ nullable: true }) appointmentAt!: string | null;
+  @IntProp() version!: number;
+  @EnumProp(MOTIVO_SIGUIENTE, 'MotivoSiguiente') reason!: string;
+  @StrProp() reasonText!: string;
+}
+
+export class QueueNextProposalResponse {
+  @EnumProp(QUEUE_SERVICES, 'ServicioFila') service!: string;
+  @EnumProp(AREA_FILA, 'AreaFila') area!: string;
+  @StrProp({ description: 'Regla documentada RN-FILA-SIGUIENTE' }) rule!: string;
+  @ClassProp(QueueProposalResponse, { nullable: true, description: 'null cuando nadie espera' }) proposal!: QueueProposalResponse | null;
+}
+
+// Declared after the queue responses it embeds (decorators run at class definition).
+export class ConsultationSignResponse extends ConsultationCommandResponse {
+  @DateTimeProp() signedAt!: string;
+  @ClassProp(QueueNextProposalResponse, { nullable: true, description: 'Quién pasa después en el área de la consulta; null sin permiso de ver la fila completa' }) nextProposal!: QueueNextProposalResponse | null;
 }

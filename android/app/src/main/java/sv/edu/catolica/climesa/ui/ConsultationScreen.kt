@@ -71,6 +71,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     PageList(modifier) {
         item { SectionIntro("Medicina / Atención", "Mi consultorio", "Agenda propia y registro clínico conectado a cada cita confirmada.") }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        state.handoff?.let { handoff -> item { NextPatientHandoff(handoff, "fila.llamar" in permissions, state.saving, onCall = { model.callProposed() }, onDismiss = { model.dismissHandoff() }) } }
         actionState.done?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         if (state.unsigned.isNotEmpty()) {
             item { Text(stringResource(R.string.clin_sin_firmar_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
@@ -189,9 +190,11 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             DraftStatus.NONE -> Unit
         }
         if (signed) NoticeBanner(NoticeKind.INFO, stringResource(R.string.clin_consulta_firmada_aviso))
+        // S9: consultation → procedures → prescription and/or exams → close, in that order.
+        Text(stringResource(R.string.consulta_pasos), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("1. Consulta", style = MaterialTheme.typography.titleSmall)
         FormField("Motivo de consulta", reason, { reason = it.take(2000) }, enabled = !signed, singleLine = false)
         FormField("Examen físico", physicalExam, { physicalExam = it.take(10000) }, enabled = !signed, singleLine = false)
-        FormField("Plan", plan, { plan = it.take(5000) }, enabled = !signed, singleLine = false)
         if (item.consultationId != null && "signos.registrar" in permissions) {
             Text(stringResource(R.string.clin_consulta_signos), style = MaterialTheme.typography.titleSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField("PA sis.", systolic, { systolic = it }, Modifier.weight(1f)); FormField("PA dia.", diastolic, { diastolic = it }, Modifier.weight(1f)) }
@@ -204,6 +207,9 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(diagnosisPrincipal, { diagnosisPrincipal = it }); Text("Principal") }
             SecondaryButton("Registrar diagnóstico", { model.diagnosis(item, diagnosisCode, diagnosisNote, diagnosisPrincipal) { diagnosisCode = ""; diagnosisNote = ""; diagnosisPrincipal = false } }, enabled = !busy && diagnosisCode.trim().isNotBlank())
         }
+        Text("2. Procedimientos y plan", style = MaterialTheme.typography.titleSmall)
+        FormField("Plan", plan, { plan = it.take(5000) }, enabled = !signed, singleLine = false)
+        if (item.consultationId != null) Text("3. Receta y exámenes", style = MaterialTheme.typography.titleSmall)
         if (item.consultationId != null && !signed && "recetas.emitir" in permissions) {
             Text(stringResource(R.string.clin_consulta_receta), style = MaterialTheme.typography.titleSmall)
             FormField("Medicamento", medication, { medication = it.take(200) })
@@ -223,9 +229,34 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(labUrgent, { labUrgent = it }, enabled = !busy); Text(stringResource(R.string.lab_orden_urgente)) }
             SecondaryButton(stringResource(R.string.lab_orden_emitir), { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty())
         }
+        if (item.consultationId != null && !signed) {
+            Text("4. Cerrar consulta", style = MaterialTheme.typography.titleSmall)
+            Text("Firmar cierra la consulta y el número de fila; luego te proponemos quién pasa después.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     } }, confirmButton = { if (!signed && (item.consultationId != null || item.canStart)) TextButton(onClick = { if (item.consultationId == null) model.start(item, reason) else model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(if (busy) stringResource(R.string.ui_un_momento) else if (item.consultationId == null) "Iniciar consulta" else "Guardar borrador", style = MaterialTheme.typography.labelLarge) } }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (!signed && item.consultationId != null) TextButton(onClick = { model.sign(item, reason, physicalExam, plan, onClose) }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) { Text("Firmar", style = MaterialTheme.typography.labelLarge) }; TextButton(onClick = leave, enabled = !busy) { Text("Cerrar", style = MaterialTheme.typography.labelLarge) } } })
 }
 
 private fun appointmentState(value: String) = mapOf("confirmada" to "Confirmada", "atendida" to "Atendida")[value] ?: value
 private fun formatDateTime(value: String) = runCatching { appointmentFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
 private fun formatTime(value: String) = runCatching { DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
+
+/** After closing a consultation: who goes next in its area by the server rule, with the call one tap away (S9). */
+@Composable
+private fun NextPatientHandoff(handoff: sv.edu.catolica.climesa.domain.NextProposal, canCall: Boolean, busy: Boolean, onCall: () -> Unit, onDismiss: () -> Unit) {
+    val proposal = handoff.proposal
+    Column(Modifier.fillMaxWidth().areaSurface(handoff.area).padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(stringResource(R.string.consulta_quien_sigue), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (proposal != null) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                AreaTag(proposal.area)
+                Text(proposal.number.toString(), style = MaterialTheme.typography.displaySmall)
+                if (proposal.priority != "rutina") PriorityBadge(Priority.of(proposal.priority))
+            }
+            Text(proposal.patientName, style = MaterialTheme.typography.bodyLarge)
+            Text(proposal.reasonText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else Text(stringResource(R.string.fila_nadie_espera), style = MaterialTheme.typography.bodyMedium)
+        if (handoff.rule.isNotBlank()) Text(stringResource(R.string.fila_regla, handoff.rule), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (proposal != null && canCall) PrimaryButton(stringResource(R.string.consulta_llamar_a, proposal.code), onCall, enabled = !busy)
+        SecondaryButton(stringResource(R.string.consulta_ahora_no), onDismiss, enabled = !busy)
+    }
+}

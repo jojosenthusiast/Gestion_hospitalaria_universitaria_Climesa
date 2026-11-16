@@ -226,7 +226,10 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/citas/reprogramaciones/{id}/aceptar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/citas/reprogramaciones/{id}/rechazar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita, motivo | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/citas/{id}/no-asistio` | `citas.agendar` | Hora alcanzada y sin consulta | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
-| POST | `/api/v1/fila/llamar-siguiente` | `fila.llamar` | Primer número en espera del servicio | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/llamar-siguiente` | `fila.llamar` | Número que propone la regla RN-FILA-SIGUIENTE | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| GET | `/api/v1/fila/siguiente` | `fila.ver` | Solo con fila completa; emergencias, urgentes, citas en ventana y llegada | R | 4 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
+| POST | `/api/v1/fila/{id}/deshacer-llamado` | `fila.llamar` | Solo un número llamado | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/{id}/prioridad` | `fila.gestionar` | Solo antes de la atención | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 
 ### Spec 106
 

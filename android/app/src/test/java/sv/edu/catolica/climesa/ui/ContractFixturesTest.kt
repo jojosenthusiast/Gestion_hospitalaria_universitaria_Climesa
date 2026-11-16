@@ -126,6 +126,15 @@ class ContractFixturesTest {
         assertContract("fila-llamar-siguiente", "POST", "/fila/llamar-siguiente", sv.edu.catolica.climesa.domain.QueueRules.callNextBody("consulta_general"))
     }
 
+    @Test fun queueFase2Bodies() {
+        val ticket = "77777777-7777-4777-8777-777777777777"
+        val rules = sv.edu.catolica.climesa.domain.QueueRules
+        assertContract("fila-emitir-prioridad", "POST", "/fila", rules.issueBody("emergencia", "urgente"))
+        assertContract("fila-deshacer-llamado", "POST", "/fila/$ticket/deshacer-llamado", rules.undoBody(3), ticket)
+        assertContract("fila-prioridad", "POST", "/fila/$ticket/prioridad", rules.priorityBody(2, "emergencia"), ticket)
+        assertContract("fila-llamar-siguiente-consultorio", "POST", "/fila/llamar-siguiente", rules.callNextBody("consulta_general", "99999999-9999-4999-8999-999999999999"))
+    }
+
     private fun agenda() = JSONArray().put(JSONObject()
         .put("appointmentId", APPOINTMENT).put("patientId", PATIENT).put("patientName", "Ana Ejemplo")
         .put("start", START).put("end", END).put("appointmentState", "confirmada").put("version", 1)

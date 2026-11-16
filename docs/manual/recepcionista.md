@@ -43,8 +43,13 @@ Un paciente que creó su cuenta en la app pide vincularla a su expediente con su
 
 ### Fila del día
 
-- **Emitir número** para un paciente y un servicio.
-- Elige el servicio y usa **Llamar siguiente**: llama al primer número en espera de ese servicio. Un número en espera se llama antes de atenderlo. En cada número: **Llamar** o **Llamar de nuevo**, **Iniciar atención** y **Completar**.
+- **Emitir número** para un paciente y un servicio, con su **prioridad** (Rutina, Urgente o Emergencia; por omisión Rutina). El número cuenta desde 1 en cada área y se muestra grande junto al código del área: **CON 7** (consulta general), **EMG** (emergencia), **LAB** (laboratorio), **REC** (admisiones).
+- Cada tarjeta dice si el paciente tiene cita hoy (**Cita 10:30**) o llegó sin cita (**Sin cita**), y muestra la prioridad cuando no es rutina.
+- Arriba está la fila y abajo el tablero por estado: **En espera**, **Llamados**, **En atención** y **Terminados**.
+- Elige un área: el recuadro **Quién pasa después** muestra el número propuesto, el paciente y el motivo. **Llamar siguiente** llama exactamente a ese número; si eliges un **Consultorio**, el número queda llamado hacia ese consultorio. La regla es fija y la decide el servidor: *emergencias primero; luego urgentes; luego citas dentro de su ventana (de 15 min antes a 15 min después de la hora, por hora de cita); luego el resto en orden de llegada (número del área).*
+- Mueve una tarjeta arrastrándola a otra columna o, sin arrastrar, con su menú **Mover o cambiar prioridad** (sirve con teclado y en el celular). Solo aparecen los cambios que el servidor acepta ahora; si sueltas una tarjeta donde no se puede, el tablero explica por qué y no cambia nada. El menú también cambia la prioridad mientras el número espera o está llamado.
+- Después de llamar aparece **Llamaste CON 7.** con **Deshacer**: el número vuelve a la espera (si ya tenía otros llamados, solo se resta uno). Un número llamado una sola vez también vuelve a **En espera** arrastrándolo o desde su menú; con 2 o más llamados el menú ofrece **Quitar un llamado**, que resta uno y lo deja en **Llamados**. Lo demás no se deshace: iniciar la atención, completar y "no se presentó" son definitivos.
+- Un número en espera se llama antes de atenderlo. En cada número: **Llamar** o **Llamar de nuevo**, **Iniciar atención** y **Completar**.
 - **No se presentó** aparece solo después de los llamados exigidos (3 por omisión).
 - Al día siguiente, el sistema cierra solo los números que quedaron abiertos.
 
