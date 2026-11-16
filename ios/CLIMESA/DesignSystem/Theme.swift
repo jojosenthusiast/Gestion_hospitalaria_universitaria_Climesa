@@ -188,7 +188,8 @@ enum Atkinson {
 
     /// The bundled files are variable fonts whose named instances have no PostScript names, and the Mono default
     /// instance is ExtraLight. The weight is therefore set on the `wght` axis of the base font, and the result is scaled
-    /// with Dynamic Type for its text style.
+    /// with Dynamic Type for its text style. The scale is taken when the font is built (the `Typo` fonts are static), so
+    /// a text-size change applies after the app is relaunched.
     private static func font(prefix: String, base: String, size: CGFloat, weight: Weight, style: Font.TextStyle) -> Font {
         guard let baseFont = UIFont(name: base, size: size) else { return .system(size: size, weight: weight.swiftUI) }
         let variation = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)

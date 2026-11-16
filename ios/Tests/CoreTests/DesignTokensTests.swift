@@ -86,6 +86,7 @@ final class DesignTokensTests: XCTestCase {
         XCTAssertEqual(AreaCode.of(nil), .gen)
         XCTAssertEqual(AreaCode.of(""), .gen)
         XCTAssertEqual(AreaCode.of("C"), .gen)
+        XCTAssertEqual(AreaCode.of("C-XYZ"), .gen)
         XCTAssertEqual(AreaCode.of("XYZ"), .gen)
     }
 
