@@ -49,7 +49,7 @@ export function StaffFicha({api,profile,person,version,onClose,onEdit,onChanged}
     <RemoteState state={shifts}>{()=>upcoming.length?<table className="record-table"><caption className="sr-only">Turnos próximos publicados</caption><thead><tr><th>Inicio</th><th>Fin</th><th>Área</th><th>Tipo</th></tr></thead><tbody>{upcoming.map(s=><tr key={s.id}><td data-label="Inicio">{formatDateTime(s.start)}</td><td data-label="Fin">{formatDateTime(s.end)}</td><td data-label="Área">{s.area}</td><td data-label="Tipo">{shiftTypes[s.type]??s.type}</td></tr>)}</tbody></table>
      :<Empty title="Sin turnos próximos" description="Esta persona no tiene turnos publicados por venir."/>}</RemoteState>
    </section>}
-   <div className="dialog-actions">{manage&&<button type="button" className="secondary-button" onClick={onEdit}>Editar datos</button>}<button type="button" className="primary-button" onClick={onClose}>Cerrar</button></div>
+   <div className="dialog-actions"><button type="button" className={manage?'secondary-button':'primary-button'} onClick={onClose}>Cerrar</button>{manage&&<button type="button" className="primary-button" onClick={onEdit}>Editar datos</button>}</div>
   </div>
  </Dialog>;
 }

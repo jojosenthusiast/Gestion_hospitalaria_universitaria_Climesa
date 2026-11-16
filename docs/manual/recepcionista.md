@@ -27,7 +27,7 @@ Accesos rápidos: **Registrar paciente**, **Agendar cita**, **Emitir número**, 
 
 - Busca siempre antes de registrar: por nombre (también por sonido), DUI o expediente.
 - Filtros de la lista: **Expediente** (Vigentes, Provisionales, Inactivos o Todos), **Hoy** (Hospitalizados, Esperan cama, Con alta firmada, En la fila de hoy o Con cita hoy), **Área de la cama** y **Médico tratante**. Quedan en la dirección de la página; lo que escribes en la búsqueda no.
-- **Registrar paciente** crea el expediente. Si el sistema detecta un posible duplicado, lo avisa. Solo si es otra persona, regístrala con el botón que lo confirma.
+- **Registrar paciente** abre un solo formulario: arriba la búsqueda y abajo los datos. Lo que buscas se copia a los campos vacíos y el aviso dice cuáles llenó. Si no buscaste, el sistema busca al registrar; si encuentra expedientes parecidos, se detiene para que los revises y el segundo clic registra. Si detecta un posible duplicado, lo avisa. Solo si es otra persona, regístrala con el botón que lo confirma.
 - **Editar datos** corrige los datos personales con motivo; el historial guarda la versión anterior.
 - Ves datos personales y de contacto, nunca diagnósticos ni resultados.
 

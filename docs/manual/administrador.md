@@ -28,6 +28,8 @@ El tablero tiene accesos rápidos: **Invitar persona**, **Agregar espacio** y **
 - **Filtros:** **Mostrar** (activo, inactivo o todo), **Filtrar por función**, **Área** (incluye "Sin área asignada"), **Cuenta de acceso** (con cuenta, cuenta activa, cuenta desactivada, invitación pendiente o sin cuenta todavía), **Rol** y **Turno de hoy** (De turno ahora, Turno más tarde, Ausentes o Libres).
 - **Registrar personal:** crea la ficha de una persona del hospital, con sus inscripciones profesionales.
 - **Invitar:** crea la cuenta de una persona y le envía el correo de invitación. Los roles son obligatorios.
+  - A alguien que ya tiene ficha se le invita desde su fila (**Invitar**): el nombre, el vínculo y el rol sugerido ya vienen llenos.
+  - A alguien sin ficha (por ejemplo Protección de datos) se le invita con el enlace **Invitar persona** debajo de los filtros.
   - Los pacientes no se invitan: crean su cuenta en la app.
   - Solo el administrador principal puede invitar o cambiar a otro administrador.
 - **Reenviar** y **Cancelar invitación:** aparecen mientras la invitación está pendiente. Cancelar pide un motivo.

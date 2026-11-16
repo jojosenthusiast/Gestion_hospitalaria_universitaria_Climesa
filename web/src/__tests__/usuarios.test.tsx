@@ -64,6 +64,16 @@ describe('Personal · cuentas de acceso (W05, W06)', () => {
     expect(screen.getAllByText('Solo consulta').length).toBe(1);
   });
 
+  // S13 (T10w, W1): with both permissions the header keeps one action; inviting someone without a record is a quiet link.
+  it('con registrar e invitar, el encabezado tiene una sola acción y la invitación sigue a mano', async () => {
+    montar(['usuarios.ver', 'usuarios.invitar', 'personal.ver', 'personal.gestionar']);
+    const encabezado = (await screen.findByRole('heading', { level: 1, name: 'Personal' })).closest('header')!;
+    expect(within(encabezado).getAllByRole('button').map(b => b.textContent)).toEqual(['Registrar personal']);
+    expect(document.querySelectorAll('.primary-button')).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Invitar persona' }));
+    expect(await screen.findByRole('dialog', { name: 'Invitar persona' })).toBeTruthy();
+  });
+
   it('?accion=invitar abre la invitación y limpia el parámetro', async () => {
     location.hash = '#/personal?accion=invitar';
     montar(['usuarios.ver', 'usuarios.invitar']);
