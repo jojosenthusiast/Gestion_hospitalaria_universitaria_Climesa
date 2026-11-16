@@ -85,7 +85,7 @@ final class DesignTokensTests: XCTestCase {
     func testUnknownAreaFallsBackToNeutral() {
         XCTAssertEqual(AreaCode.of(nil), .gen)
         XCTAssertEqual(AreaCode.of(""), .gen)
-        XCTAssertEqual(AreaCode.of("C-101"), .gen)
+        XCTAssertEqual(AreaCode.of("C"), .gen)
         XCTAssertEqual(AreaCode.of("XYZ"), .gen)
     }
 
