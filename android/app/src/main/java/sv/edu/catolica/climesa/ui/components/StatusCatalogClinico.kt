@@ -42,14 +42,25 @@ private fun labelRes(code: String): Int? = when (code) {
     else -> null
 }
 
-/** [StatusTag] that also understands the clinical codes above. */
+/**
+ * [StatusTag] that also understands the clinical codes above. `urgente` and `rutina` are priorities, so they render as
+ * [PriorityBadge] (amber and gray, never red); the other codes go through [StatusBadge].
+ */
 @Composable
 internal fun ClinicalStatusTag(code: String, modifier: Modifier = Modifier) {
-    val tone = StatusCatalogClinico.tone(code)
-    if (tone == null) StatusTag(code, modifier) else StatusPill(stringResource(labelRes(code) ?: R.string.clin_estado_sin_iniciar), tone, modifier)
+    val tone = StatusCatalogClinico.tone(code) ?: return StatusTag(code, modifier)
+    val label = stringResource(labelRes(code) ?: R.string.clin_estado_sin_iniciar)
+    when (code) {
+        StatusCatalogClinico.URGENT -> PriorityBadge(Priority.URGENTE, modifier, label)
+        StatusCatalogClinico.ROUTINE -> PriorityBadge(Priority.RUTINA, modifier, label)
+        else -> FamilyBadge(label, StatusFamily.fromTone(tone), modifier)
+    }
 }
 
-/** Pill for a laboratory result mark, coloured like the web (`Normal` green, `Alto` amber, `Crítico` red). */
+/**
+ * Badge for a laboratory result mark, like the web: `normal` done (check), `critico_*` critical (alert, double border),
+ * `alto`/`bajo`/`sin_rango` neutral with a dot.
+ */
 @Composable
 internal fun LabMarkTag(mark: String, label: String, modifier: Modifier = Modifier) =
-    StatusPill(label, StatusCatalogClinico.markTone(mark), modifier)
+    StatusBadge(mark, modifier, label, fallback = null)

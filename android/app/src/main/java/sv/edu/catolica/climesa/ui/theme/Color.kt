@@ -101,3 +101,116 @@ internal val DarkScheme: ColorScheme = darkColorScheme(
     error = Color(0xFFF2918A), onError = Color(0xFF0C1220),
     errorContainer = Color(0xFF3A1A17), onErrorContainer = Color(0xFFF2918A),
 )
+
+/**
+ * Fase 2 system tokens (docs/diseno/fase2/02-sistema.md, section 7): area, status family and priority colours, light and
+ * dark, copied 1:1 from the table (web `--area-*`, `--status-*`, `--critical`, `--priority-*`). Material's `ColorScheme`
+ * stays as it is; these travel as an extension. Read them with `MaterialTheme.system`.
+ */
+@Immutable
+internal data class SystemColors(
+    val areaEmg: Color, val areaEmgSoft: Color,
+    val areaCon: Color, val areaConSoft: Color,
+    val areaLab: Color, val areaLabSoft: Color,
+    val areaHos: Color, val areaHosSoft: Color,
+    val areaRec: Color, val areaRecSoft: Color,
+    val areaAmb: Color, val areaAmbSoft: Color,
+    val areaGen: Color, val areaGenSoft: Color,
+    val onArea: Color,
+    val statusEspera: Color, val statusEsperaSoft: Color,
+    val statusLlamado: Color, val statusLlamadoSoft: Color,
+    val statusAtencion: Color, val statusAtencionSoft: Color,
+    val statusListo: Color, val statusListoSoft: Color,
+    val statusCerrado: Color, val statusCerradoSoft: Color,
+    val onStatus: Color,
+    val critical: Color, val criticalSoft: Color,
+    val priorityUrgente: Color, val priorityUrgenteSoft: Color,
+    val priorityRutina: Color, val priorityRutinaSoft: Color,
+) {
+    /** Strong colour (top stripe, code chip, text) and soft tint (card background) of an area. */
+    fun area(area: Area): Pair<Color, Color> = when (area) {
+        Area.EMG -> areaEmg to areaEmgSoft
+        Area.CON -> areaCon to areaConSoft
+        Area.LAB -> areaLab to areaLabSoft
+        Area.HOS -> areaHos to areaHosSoft
+        Area.REC -> areaRec to areaRecSoft
+        Area.AMB -> areaAmb to areaAmbSoft
+        Area.GEN -> areaGen to areaGenSoft
+    }
+
+    /** Strong and soft colour of a status family. Red belongs only to the critical family. */
+    fun status(family: StatusFamily): Pair<Color, Color> = when (family) {
+        StatusFamily.ESPERA -> statusEspera to statusEsperaSoft
+        StatusFamily.LLAMADO -> statusLlamado to statusLlamadoSoft
+        StatusFamily.ATENCION -> statusAtencion to statusAtencionSoft
+        StatusFamily.LISTO -> statusListo to statusListoSoft
+        StatusFamily.CERRADO -> statusCerrado to statusCerradoSoft
+        StatusFamily.CRITICO -> critical to criticalSoft
+    }
+
+    /** Foreground and background of a priority badge: emergency is solid critical red with light text. */
+    fun priority(priority: Priority): Pair<Color, Color> = when (priority) {
+        Priority.EMERGENCIA -> critical to onStatus
+        Priority.URGENTE -> priorityUrgente to priorityUrgenteSoft
+        Priority.RUTINA -> priorityRutina to priorityRutinaSoft
+    }
+
+    /** Tokens by their Kotlin name in the section 7 table (`AreaEmg`, `StatusListoSoft`...), for checks against the doc. */
+    fun byName(): Map<String, Color> = linkedMapOf(
+        "AreaEmg" to areaEmg, "AreaEmgSoft" to areaEmgSoft, "AreaCon" to areaCon, "AreaConSoft" to areaConSoft,
+        "AreaLab" to areaLab, "AreaLabSoft" to areaLabSoft, "AreaHos" to areaHos, "AreaHosSoft" to areaHosSoft,
+        "AreaRec" to areaRec, "AreaRecSoft" to areaRecSoft, "AreaAmb" to areaAmb, "AreaAmbSoft" to areaAmbSoft,
+        "AreaGen" to areaGen, "AreaGenSoft" to areaGenSoft, "OnArea" to onArea,
+        "StatusEspera" to statusEspera, "StatusEsperaSoft" to statusEsperaSoft, "StatusLlamado" to statusLlamado,
+        "StatusLlamadoSoft" to statusLlamadoSoft, "StatusAtencion" to statusAtencion, "StatusAtencionSoft" to statusAtencionSoft,
+        "StatusListo" to statusListo, "StatusListoSoft" to statusListoSoft, "StatusCerrado" to statusCerrado,
+        "StatusCerradoSoft" to statusCerradoSoft, "OnStatus" to onStatus, "Critical" to critical, "CriticalSoft" to criticalSoft,
+        "PriorityUrgente" to priorityUrgente, "PriorityUrgenteSoft" to priorityUrgenteSoft,
+        "PriorityRutina" to priorityRutina, "PriorityRutinaSoft" to priorityRutinaSoft,
+    )
+}
+
+internal val LightSystemColors = SystemColors(
+    areaEmg = Color(0xFF9B2C6F), areaEmgSoft = Color(0xFFFAEAF3),
+    areaCon = Color(0xFF0B6B63), areaConSoft = Color(0xFFE0F2EF),
+    areaLab = Color(0xFF5A3EA6), areaLabSoft = Color(0xFFEEEAFA),
+    areaHos = Color(0xFF1D5C9A), areaHosSoft = Color(0xFFE4EEF8),
+    areaRec = Color(0xFF2D6B33), areaRecSoft = Color(0xFFE4F1E5),
+    areaAmb = Color(0xFF5C6213), areaAmbSoft = Color(0xFFF0F2DA),
+    areaGen = Color(0xFF4A5865), areaGenSoft = Color(0xFFEDF0F2),
+    onArea = Color(0xFFFFFFFF),
+    statusEspera = Color(0xFF6A45A6), statusEsperaSoft = Color(0xFFF1EBFA),
+    statusLlamado = Color(0xFF8A5300), statusLlamadoSoft = Color(0xFFFFF2D9),
+    statusAtencion = Color(0xFF1F55A3), statusAtencionSoft = Color(0xFFE8EFF9),
+    statusListo = Color(0xFF1D7444), statusListoSoft = Color(0xFFE7F4EC),
+    statusCerrado = Color(0xFF4A5865), statusCerradoSoft = Color(0xFFEDF0F2),
+    onStatus = Color(0xFFFFFFFF),
+    critical = Color(0xFFB71C1C), criticalSoft = Color(0xFFFCEAEA),
+    priorityUrgente = Color(0xFFA3480A), priorityUrgenteSoft = Color(0xFFFDEBDD),
+    priorityRutina = Color(0xFF55617A), priorityRutinaSoft = Color(0xFFEEF1F5),
+)
+
+internal val DarkSystemColors = SystemColors(
+    areaEmg = Color(0xFFF09AC9), areaEmgSoft = Color(0xFF3A1A2D),
+    areaCon = Color(0xFF6FD1C3), areaConSoft = Color(0xFF10302C),
+    areaLab = Color(0xFFBBA8F2), areaLabSoft = Color(0xFF2A2142),
+    areaHos = Color(0xFF8DB9EC), areaHosSoft = Color(0xFF16273D),
+    areaRec = Color(0xFF8CCF93), areaRecSoft = Color(0xFF172F1A),
+    areaAmb = Color(0xFFCCD27A), areaAmbSoft = Color(0xFF2C2E12),
+    areaGen = Color(0xFFAAB7C1), areaGenSoft = Color(0xFF222B36),
+    onArea = Color(0xFF0C1220),
+    statusEspera = Color(0xFFBCA3EE), statusEsperaSoft = Color(0xFF2B2140),
+    statusLlamado = Color(0xFFE8B25E), statusLlamadoSoft = Color(0xFF33260E),
+    statusAtencion = Color(0xFF8CB2F0), statusAtencionSoft = Color(0xFF18284A),
+    statusListo = Color(0xFF6CCB92), statusListoSoft = Color(0xFF13301F),
+    statusCerrado = Color(0xFFAAB7C1), statusCerradoSoft = Color(0xFF222B36),
+    onStatus = Color(0xFF0C1220),
+    critical = Color(0xFFF2918A), criticalSoft = Color(0xFF3A1A17),
+    priorityUrgente = Color(0xFFF0A36B), priorityUrgenteSoft = Color(0xFF3A2314),
+    priorityRutina = Color(0xFF9AA6BA), priorityRutinaSoft = Color(0xFF1B2538),
+)
+
+internal val LocalSystemColors = staticCompositionLocalOf { LightSystemColors }
+
+internal val MaterialTheme.system: SystemColors
+    @Composable @ReadOnlyComposable get() = LocalSystemColors.current

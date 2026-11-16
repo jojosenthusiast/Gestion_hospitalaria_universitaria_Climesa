@@ -16,7 +16,10 @@ internal val ClimesaShapes = Shapes(
 
 @Composable
 fun ClimesaTheme(dark: Boolean, content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalClimesaColors provides if (dark) DarkClimesaColors else LightClimesaColors) {
+    CompositionLocalProvider(
+        LocalClimesaColors provides if (dark) DarkClimesaColors else LightClimesaColors,
+        LocalSystemColors provides if (dark) DarkSystemColors else LightSystemColors,
+    ) {
         MaterialTheme(
             colorScheme = if (dark) DarkScheme else LightScheme,
             typography = ClimesaTypography,
