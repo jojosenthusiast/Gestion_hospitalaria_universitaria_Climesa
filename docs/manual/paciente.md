@@ -35,7 +35,14 @@ Muestra tu número y su estado: "Esperando a que el médico llame", "Llamado N d
 
 ## Mis citas
 
-- **Solicitar cita** (en iOS, **Pedir cita**): eliges médico, fecha y una franja libre de 20 minutos y **Enviar solicitud**. Recepción la confirma o la rechaza.
+- **Pedir una cita**: eliges el motivo, no el médico. Toca una o hasta tres categorías con ícono (por ejemplo **Piel**,
+  **Corazón y presión** o **Consulta general** si no sabes cuál) o escribe en **Buscar motivo** ("fiebre",
+  "embarazo"). Elige tu **Franja preferida** (mañana, tarde o cualquier hora), deja una **Nota** breve si quieres y
+  **Enviar solicitud**. Recepción te asigna médico y hora; la verás en **Mis solicitudes** y en tus citas.
+- **Ya tengo médico (opcional)**: si ya conoces a tu médico, búscalo por su nombre; Recepción intentará darte cita con
+  él o ella.
+- **Retirar solicitud** mientras siga "Por asignar". Si Recepción la rechaza, ves el motivo.
+- Puedes tener hasta 2 solicitudes esperando a la vez (por motivo o con médico y hora).
 - **Solicitar reprogramación** (en iOS, **Reprogramar → Pedir el cambio**): tu cita original sigue vigente hasta que Recepción o tu médico acepten el cambio.
 - **Cancelar** (en iOS, **Cancelar cita → Confirmar cancelación**).
 - La cita muestra "Puedes cancelar o reprogramar hasta las …": puedes hacerlo hasta 2 horas antes.

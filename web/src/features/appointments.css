@@ -14,3 +14,46 @@
 .slot-key { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 2px solid var(--line); }
 .cl-doctor-filter { flex: 0 1 260px; min-width: 200px; }
 .cl-day-nav { display: inline-flex; align-items: flex-end; gap: 6px; }
+
+/* Fase 2, flujo A: bandeja de solicitudes por asignar (Recepción) y "Mis solicitudes" (paciente). Patrón bandeja de
+   pendientes: lista con líneas de 1 px, lo más antiguo arriba, la acción en la fila. */
+.rq-inbox { display: grid; gap: var(--space-3); margin-bottom: var(--space-6); }
+.rq-head { display: flex; align-items: baseline; gap: var(--space-2); }
+.rq-head h2 { margin: 0; font-size: var(--text-lg); font-weight: 700; }
+.rq-count { min-width: 24px; padding: 0 var(--space-2); border-radius: 999px; background: var(--soft); color: var(--primary-text); font-size: var(--text-sm); font-weight: 800; font-variant-numeric: tabular-nums; text-align: center; }
+.rq-list { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.rq-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); align-items: start; padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+.rq-main { display: grid; gap: var(--space-1); min-width: 0; }
+.rq-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); margin: 0; }
+.rq-who strong { font-size: var(--text-base); }
+.rq-who code { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.rq-who small { font-size: var(--text-xs); }
+.rq-cats { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; padding: 0; list-style: none; color: var(--ink); font-size: var(--text-sm); font-weight: 700; }
+.rq-cats li { display: inline-flex; align-items: center; gap: var(--space-1); }
+.rq-cats svg { color: var(--primary-text); }
+.rq-note { margin: 0; max-width: 70ch; font-size: var(--text-md); line-height: 1.45; overflow-wrap: anywhere; }
+.rq-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; color: var(--muted); font-size: var(--text-sm); }
+.rq-meta strong { color: var(--ink); }
+.rq-primary { padding-inline: var(--space-3); background: var(--soft); }
+.rq-empty { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: var(--space-3) 0; color: var(--muted); font-size: var(--text-md); border-top: 1px solid var(--line); }
+.rq-assign { grid-column: 1 / -1; display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+
+/* Formulario del paciente: motivos con ícono como botones de alternar (no tarjetas), dos columnas en pantalla ancha. */
+.rq-fieldset { display: grid; gap: var(--space-2); min-width: 0; margin: 0; padding: 0; border: 0; }
+.rq-fieldset legend { padding: 0; margin-bottom: var(--space-2); font-size: var(--text-md); font-weight: 700; }
+.rq-cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-2); max-height: 340px; overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
+.rq-cat { display: flex; align-items: flex-start; gap: var(--space-3); min-height: 48px; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: background-color var(--motion-instant) var(--ease-out), border-color var(--motion-instant) var(--ease-out); }
+.rq-cat span:last-child { display: grid; gap: 2px; min-width: 0; }
+.rq-cat strong { font-size: var(--text-md); }
+.rq-cat small { color: var(--muted); font-size: var(--text-xs); line-height: 1.35; }
+.rq-cat-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: var(--radius-chip); background: var(--bg); color: var(--primary-text); }
+.rq-cat[aria-pressed='true'] { border-color: var(--primary); background: var(--soft); box-shadow: inset 0 0 0 1px var(--primary); }
+.rq-cat[aria-pressed='true'] .rq-cat-icon { background: var(--primary); color: var(--on-primary); }
+.rq-cat:disabled { opacity: 0.55; cursor: not-allowed; }
+@media (hover: hover) { .rq-cat:not(:disabled):hover { border-color: var(--primary); } }
+.rq-secondary { justify-self: start; padding-inline: 0; }
+@media (max-width: 640px) {
+  .rq-row { grid-template-columns: 1fr; }
+  .rq-cat-grid { grid-template-columns: 1fr; max-height: none; }
+}
+@media (prefers-reduced-motion: reduce) { .rq-cat { transition: none; } }
