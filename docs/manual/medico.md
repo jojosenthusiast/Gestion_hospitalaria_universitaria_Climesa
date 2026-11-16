@@ -22,6 +22,7 @@ Inicio, Mi día, Resultados por revisar, Mis hospitalizados, Expediente, Signos 
 - La consulta sigue cuatro pasos: **1. Consulta** (motivo y examen), **2. Procedimientos y plan**, **3. Receta y exámenes** y **4. Cerrar consulta** (firmar).
 - Al firmar aparece **Quién pasa después**: el siguiente número de tu área según la regla de la fila (*emergencias primero; luego urgentes; luego citas dentro de su ventana de 15 min antes a 15 min después; luego el resto en orden de llegada*), con el motivo. **Llamar a CON 4** lo llama; **Ahora no** lo cierra. Recepción ve la misma propuesta.
 - En la fila: cada número muestra el código del área junto al número (**CON 7**), la prioridad y si tiene cita (**Cita 10:30**) o no (**Sin cita**). El menú **Mover o cambiar prioridad** ofrece solo lo que el servidor acepta, y después de llamar puedes **Deshacer** el llamado.
+- Un número que llamó otro consultorio muestra su estado y no ofrece **Iniciar consulta**. La fila de la API indica si el último llamado fue tuyo, sin decir qué colega llamó; en la web (Mi consultorio) se lee **Llamado desde otro consultorio**.
 
 ### Resultados por revisar
 

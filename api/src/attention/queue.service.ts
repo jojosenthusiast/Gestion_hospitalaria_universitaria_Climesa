@@ -75,6 +75,7 @@ export class QueueService {
   /**
    * The day's queue. `consultationId`/`consultationState` describe the consultation started from each number only when
    * it belongs to the reading professional, so the doctor resumes their own consultation; nobody else sees the id.
+   * `calledByMe` says whether the reader made the last call (T10f); the colleague who called is never exposed.
    */
   async list(actor: Actor, dateText?: string, service?: string) {
     const date = this.date(dateText);
@@ -88,7 +89,7 @@ export class QueueService {
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       t.estado AS state,t.consultorio_id AS "officeId",e.codigo AS "officeCode",t.llamados,t.version,t.emitido_en AS "issuedAt",
       t.prioridad AS priority,ap.start AS "appointmentAt",
-      k.id AS "consultationId",k.estado AS "consultationState"
+      k.id AS "consultationId",k.estado AS "consultationState",coalesce(t.llamado_por=$4::uuid,false) AS "calledByMe"
       FROM atencion.ticket_fila t LEFT JOIN pacientes.paciente p ON p.id=t.paciente_id
       LEFT JOIN infra.espacio e ON e.id=t.consultorio_id
       ${APPOINTMENT_JOIN}
@@ -135,7 +136,7 @@ export class QueueService {
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
       const { maxCalls } = await this.queuePolicies(c);
       if (old.llamados >= maxCalls) throw new ProblemException('fila_max_llamados', 409, `Este número ya se llamó ${maxCalls} veces.`);
-      const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [id, dto.officeId ?? null])).rows[0];
+      const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),llamado_por=$3::uuid,version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [id, dto.officeId ?? null, actor.staffId ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.llamar', entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.llamar', detail: { officeId: dto.officeId ?? null } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));
       return row;
@@ -209,7 +210,7 @@ export class QueueService {
       const chosen = proposeNext(await this.waiting(c, dto.service, true) as any[], this.clock.now());
       if (!chosen) throw new ProblemException('fila_sin_espera', 409, 'No hay números en espera en este servicio.');
       const next = chosen.ticket as QueueRow;
-      const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [next.id, dto.officeId ?? null])).rows[0];
+      const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),llamado_por=$3::uuid,version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [next.id, dto.officeId ?? null, actor.staffId ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.llamar', entity: 'ticket_fila', entityId: next.id, patientId: next.patientId ?? undefined, permission: 'fila.llamar', detail: { officeId: dto.officeId ?? null, next: true, reason: chosen.reason } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', next.id, row.version, await this.channels(c, next.patientId));
       return { ...row, numero: next.numero, patientName: next.patientName, area: QUEUE_AREA[dto.service], reason: chosen.reason, reasonText: nextReasonText(chosen.reason, next.appointmentAt) };
@@ -222,7 +223,8 @@ export class QueueService {
       const old = await this.ownTicket(c, actor, id);
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
       if (old.state !== 'llamado' || old.llamados < 1) throw new ProblemException('transicion_invalida', 409, 'Solo se deshace el llamado de un número llamado.');
-      const row = (await c.query(`UPDATE atencion.ticket_fila SET llamados=llamados-1,estado=CASE WHEN llamados-1=0 THEN 'en_espera' ELSE estado END,version=version+1
+      const row = (await c.query(`UPDATE atencion.ticket_fila SET llamados=llamados-1,estado=CASE WHEN llamados-1=0 THEN 'en_espera' ELSE estado END,
+        llamado_por=CASE WHEN llamados-1=0 THEN NULL ELSE llamado_por END,version=version+1
         WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [id])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.deshacer_llamado', entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.llamar', detail: { from: old.state, to: row.state, calls: row.llamados } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));
