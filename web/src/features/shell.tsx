@@ -1,25 +1,76 @@
-import { useEffect,useLayoutEffect,useRef,useState,type ReactNode } from 'react';
+import { Component,lazy,Suspense,useEffect,useLayoutEffect,useRef,useState,type ComponentType,type ReactNode } from 'react';
 import { Brand,Icon,StatusView,type IconName } from '../components/ui';
+import { Skeleton } from '../components/system';
 import { can,roleNames,type AccessProfile,type Api } from '../lib/api';
-import { AmbulancePage } from './ambulance';
-import { AmbulanceLogPage } from './ambulance-log';
-import { Heading,Tag } from './common';
-import { PatientsPage } from './patients';
-import { PersonnelPage,ShiftsPage } from './personnel';
-import { BedsPage,SpacesPage } from './spaces';
-import { AppointmentsPage } from './appointments';
-import { ConsultationsPage } from './consultations';
-import { QueuePage } from './queue';
-import { LaboratoryPage } from './laboratory';
-import { LabCatalogPage } from './lab-catalog';
-import { InventoryPage } from './inventory';
-import { HospitalizationPage } from './hospitalization';
-import { AuditPage } from './privacy';
-import { AccountLinksPage } from './account-links';
-import { NoticesPage } from './notices';
-import { MetricsPage } from './metrics';
+import { CompactHeader,Tag } from './common';
 import { ChangePasswordForm } from './password';
 import { Dashboard } from './dashboards';
+/**
+ * Fase 2, S3: división de código por ruta. Inicio (la primera pantalla tras el ingreso) va en el paquete principal;
+ * cada otro módulo es un archivo aparte. Para que abrir un módulo no espere su descarga, el armazón descarga en
+ * segundo plano, una sola vez, el código de los módulos que la cuenta ve (`preloadModules`).
+ */
+const loaders={
+ patients:()=>import('./patients'),personnel:()=>import('./personnel'),spaces:()=>import('./spaces'),ambulance:()=>import('./ambulance'),
+ ambulanceLog:()=>import('./ambulance-log'),appointments:()=>import('./appointments'),consultations:()=>import('./consultations'),
+ queue:()=>import('./queue'),laboratory:()=>import('./laboratory'),labCatalog:()=>import('./lab-catalog'),inventory:()=>import('./inventory'),
+ hospitalization:()=>import('./hospitalization'),privacy:()=>import('./privacy'),accountLinks:()=>import('./account-links'),
+ notices:()=>import('./notices'),metrics:()=>import('./metrics'),
+};
+type LoaderId=keyof typeof loaders;
+const moduleCode:Record<string,LoaderId>={pacientes:'patients',vinculaciones:'accountLinks',personal:'personnel',turnos:'personnel',camas:'spaces',espacios:'spaces',ambulancia:'ambulance','bitacora-ambulancia':'ambulanceLog',auditoria:'privacy',laboratorio:'laboratory','catalogo-laboratorio':'labCatalog',inventario:'inventory',hospitalizacion:'hospitalization',fila:'queue',citas:'appointments',consultas:'consultations',avisos:'notices',metricas:'metrics'};
+type Loaded={[I in LoaderId]:Awaited<ReturnType<(typeof loaders)[I]>>};
+const warmers:Partial<Record<LoaderId,(()=>Promise<void>)[]>>={};
+/**
+ * Un módulo con carga diferida. Si su código ya llegó (por la precarga), se pinta directo, sin pasar por Suspense:
+ * React mantiene un respaldo de Suspense ya mostrado unos 300 ms, y eso retrasaba la lectura de datos del módulo.
+ * La elección se hace al montar, para que un módulo abierto nunca cambie de componente y pierda su estado.
+ */
+function page<I extends LoaderId,P extends object>(id:I,pick:(module:Loaded[I])=>ComponentType<P>){
+ let ready:ComponentType<P>|null=null;
+ const load=()=>(loaders[id]() as Promise<Loaded[I]>).then(m=>{ready=pick(m);return ready;});
+ const list:(()=>Promise<void>)[]=warmers[id as LoaderId]??=[];list.push(()=>load().then(()=>undefined));
+ // React memoizes a rejected lazy import: after a failed download a new lazy is made, so "Reintentar" downloads again.
+ const deferred=():ComponentType<P>=>lazy(()=>load().then(component=>({default:component})).catch(error=>{Deferred=deferred();throw error;})) as unknown as ComponentType<P>;
+ let Deferred=deferred();
+ return function ModulePage(props:P){const [Loaded]=useState(()=>ready);const [Current]=useState(()=>Deferred);return Loaded?<Loaded {...props}/>:<Current {...props}/>;};
+}
+const PatientsPage=page('patients',m=>m.PatientsPage);
+const PersonnelPage=page('personnel',m=>m.PersonnelPage);
+const ShiftsPage=page('personnel',m=>m.ShiftsPage);
+const BedsPage=page('spaces',m=>m.BedsPage);
+const SpacesPage=page('spaces',m=>m.SpacesPage);
+const AmbulancePage=page('ambulance',m=>m.AmbulancePage);
+const AmbulanceLogPage=page('ambulanceLog',m=>m.AmbulanceLogPage);
+const AppointmentsPage=page('appointments',m=>m.AppointmentsPage);
+const ConsultationsPage=page('consultations',m=>m.ConsultationsPage);
+const QueuePage=page('queue',m=>m.QueuePage);
+const LaboratoryPage=page('laboratory',m=>m.LaboratoryPage);
+const LabCatalogPage=page('labCatalog',m=>m.LabCatalogPage);
+const InventoryPage=page('inventory',m=>m.InventoryPage);
+const HospitalizationPage=page('hospitalization',m=>m.HospitalizationPage);
+const AuditPage=page('privacy',m=>m.AuditPage);
+const AccountLinksPage=page('accountLinks',m=>m.AccountLinksPage);
+const NoticesPage=page('notices',m=>m.NoticesPage);
+const MetricsPage=page('metrics',m=>m.MetricsPage);
+/** Descarga el código de los módulos visibles cuando el navegador queda libre. Es una sola vez por sesión, no un sondeo. */
+export function preloadModules(ids:string[]){const wanted=[...new Set(ids.map(id=>moduleCode[id]).filter((id):id is LoaderId=>!!id))];for(const id of wanted)for(const warm of warmers[id]??[])void warm().catch(()=>undefined);}
+/**
+ * A module whose code or render failed (for example a tab left open across a deploy that replaced the files) shows a
+ * notice in the content area; the navigation stays usable. "Reintentar" mounts the module again; "Recargar la página"
+ * brings the current files.
+ */
+class ModuleBoundary extends Component<{label:string;children:ReactNode},{failed:boolean;attempt:number}>{
+ state={failed:false,attempt:0};
+ static getDerivedStateFromError(){return {failed:true};}
+ componentDidCatch(error:unknown){console.error(error);}
+ render(){
+  if(!this.state.failed)return <Suspense key={this.state.attempt} fallback={<ModuleFallback label={this.props.label}/>}>{this.props.children}</Suspense>;
+  return <><CompactHeader title={this.props.label}/><div className="notice notice-error" role="alert"><p><strong>No se pudo abrir este módulo.</strong> Revisa tu conexión. Si el sistema se actualizó, recarga la página.</p><div className="row-actions"><button type="button" className="secondary-button" onClick={()=>this.setState(s=>({failed:false,attempt:s.attempt+1}))}>Reintentar</button><button type="button" className="primary-button" onClick={()=>window.location.reload()}>Recargar la página</button></div></div></>;
+ }
+}
+/** Lo que se ve mientras llega el código de un módulo: la barra y el contenido reservan su lugar. */
+function ModuleFallback({label}:{label:string}){return <><CompactHeader title={label}/><Skeleton rows={6} label={`Cargando ${label.toLowerCase()}…`}/></>;}
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión; `alsoPermissions` abre el mismo módulo a otros permisos. */
 export type Module={id:string;label:string;permission?:string;alsoPermissions?:string[];future?:boolean};
 export const modules:Module[]=[
@@ -63,7 +114,10 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  // Una ruta de la sesión anterior (o escrita a mano) que esta cuenta no ve vuelve a Inicio: nunca queda una pantalla «Sin permiso» fuera del menú.
  const menuIds=menu.map(m=>m.id).join('|');
  useLayoutEffect(()=>{const current=readRoute();if(modules.some(m=>m.id===current)&&!menuIds.split('|').includes(current)){history.replaceState(null,'','#/inicio');setRoute('inicio');}},[menuIds]);
+ useEffect(()=>{try{window.scrollTo(0,0);document.getElementById('main-content')?.scrollTo?.(0,0);}catch{/* jsdom has no scrolling */}},[route]);
  useEffect(()=>{const handle=()=>{setRoute(readRoute());setNavOpen(false);};window.addEventListener('hashchange',handle);return()=>window.removeEventListener('hashchange',handle);},[]);
+ // S3: con el armazón ya pintado, se descarga en segundo plano el código de los módulos del menú (una vez).
+ useEffect(()=>{const ids=menuIds.split('|'),run=()=>preloadModules(ids);if(typeof window.requestIdleCallback==='function'){const handle=window.requestIdleCallback(run,{timeout:2000});return()=>window.cancelIdleCallback(handle);}const timer=window.setTimeout(run,300);return()=>window.clearTimeout(timer);},[menuIds]);
  useEffect(()=>{if(!window.matchMedia)return;const media=window.matchMedia('(max-width: 767px)'),sync=()=>setMobileNav(media.matches);sync();media.addEventListener('change',sync);return()=>media.removeEventListener('change',sync);},[]);
  useEffect(()=>{
   if(!navOpen)return;
@@ -81,8 +135,8 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  if(!hasWebModule(profile))return <StatusView title="Tu rol no usa esta aplicación" detail="Tu cuenta no tiene módulos habilitados en la web. Ingresa desde la aplicación que corresponde a tu función." action="Cerrar sesión" onAction={onLogout}/>;
  const active=menu.find(m=>m.id===route);
  let content:ReactNode;
- if(!modules.some(m=>m.id===route))content=<><Heading eyebrow="CLIMESA" title="Página no encontrada" description="La dirección que abriste no corresponde a ninguna sección del sistema."/><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
- else if(!active)content=<><Heading eyebrow="Acceso restringido" title="Sin permiso" description="Esta sección no corresponde a los permisos de tu cuenta."/><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
+ if(!modules.some(m=>m.id===route))content=<><CompactHeader breadcrumb="CLIMESA" title="Página no encontrada"/><p className="module-message">La dirección que abriste no corresponde a ninguna sección del sistema.</p><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
+ else if(!active)content=<><CompactHeader breadcrumb="Acceso restringido" title="Sin permiso"/><p className="module-message">Esta sección no corresponde a los permisos de tu cuenta.</p><a href="#/inicio" className="secondary-button">Volver al inicio</a></>;
  else if(route==='inicio')content=<Dashboard api={api} profile={profile} version={version}/>;
  else if(route==='pacientes')content=<PatientsPage api={api} profile={profile} version={version}/>;
  else if(route==='personal')content=<PersonnelPage api={api} profile={profile} version={version}/>;
@@ -103,7 +157,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  else if(route==='metricas')content=<MetricsPage api={api} profile={profile} version={version}/>;
  else if(route==='auditoria')content=<AuditPage api={api} version={version}/>;
  else if(route==='perfil')content=<ProfilePage profile={profile} onLogout={onLogout} onChangePassword={onChangePassword}/>;
- else content=<><Heading eyebrow={`CLIMESA / ${active.label}`} title={active.label} description="Espacio de trabajo del módulo."/><div className="future-module" role="status"><span className="eyebrow">Sin operaciones disponibles</span><h2>Este módulo no tiene operaciones habilitadas.</h2><p>Tu cuenta tiene acceso a esta sección, pero el sistema todavía no ofrece sus operaciones. Mientras tanto, no hay datos que mostrar.</p><a href="#/inicio" className="row-action">Volver al inicio <Icon name="arrow" size={18}/></a></div></>;
+ else content=<><CompactHeader breadcrumb={`CLIMESA / ${active.label}`} title={active.label}/><div className="future-module" role="status"><span className="eyebrow">Sin operaciones disponibles</span><h2>Este módulo no tiene operaciones habilitadas.</h2><p>Tu cuenta tiene acceso a esta sección, pero el sistema todavía no ofrece sus operaciones. Mientras tanto, no hay datos que mostrar.</p><a href="#/inicio" className="row-action">Volver al inicio <Icon name="arrow" size={18}/></a></div></>;
  return <div className={`hospital-shell${navOpen?' nav-open':''}`}>
   <a href="#main-content" className="skip-link">Ir al contenido</a>
   <header className="hospital-header">
@@ -122,10 +176,11 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
    {navOpen&&<button className="nav-backdrop" type="button" aria-label="Cerrar panel de navegación" onClick={()=>{setNavOpen(false);toggleRef.current?.focus();}}/>}
    <div className="hospital-workspace">
     {connection!=='live'&&<div role="status" className={`connection-band connection-${connection}`}><Icon name="info" size={16}/>{connection==='offline'?'Sin conexión. No se pueden guardar cambios.':'Recuperando la conexión…'}</div>}
-    <main id="main-content" className="hospital-main" key={route}>{content}</main>
+    {/* S3: sin `key` por ruta. Cada módulo es su propio componente y se monta solo; la caché de `useData` muestra al instante lo ya leído. */}
+    <main id="main-content" className="hospital-main"><ModuleBoundary key={route} label={active?.label??'Módulo'}>{content}</ModuleBoundary></main>
     <footer className="hospital-footer"><Brand/><span>Hospital universitario CLIMESA</span><span><Icon name="lock" size={13}/>Acceso personal</span></footer>
    </div>
   </div>
  </div>;
 }
-function ProfilePage({profile,onLogout,onChangePassword}:{profile:AccessProfile;onLogout:()=>void;onChangePassword?:(current:string,next:string)=>Promise<string|null>}){return <><Heading eyebrow="CLIMESA / Cuenta personal" title="Mi cuenta" description="Tu identidad y acceso dentro del hospital."/><section className="profile-sheet"><div className="profile-identity"><span>{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><div><h2>{profile.name||'Cuenta de CLIMESA'}</h2><p>{profile.email}</p></div></div><dl className="detail-grid"><div><dt>Estado</dt><dd><Tag value="activo"/></dd></div><div><dt>Plataformas habilitadas</dt><dd>{profile.platforms.map(p=>({web:'Web',android:'Android',ios:'iOS'} as Record<string,string>)[p]??p).join(' · ')}</dd></div><div className="full-width"><dt>Roles asignados</dt><dd>{profile.roles.map(r=>roleNames[r]??r).join(' · ')}</dd></div></dl><div className="profile-security"><Icon name="lock" size={20}/><p>Tu contraseña es personal. El administrador gestiona tus roles, sin conocerla.</p></div>{onChangePassword&&<ChangePasswordForm onChange={onChangePassword}/>}<button className="secondary-button" onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></section></>;}
+function ProfilePage({profile,onLogout,onChangePassword}:{profile:AccessProfile;onLogout:()=>void;onChangePassword?:(current:string,next:string)=>Promise<string|null>}){return <><CompactHeader breadcrumb="CLIMESA / Cuenta personal" title="Mi cuenta"/><section className="profile-sheet"><div className="profile-identity"><span>{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><div><h2>{profile.name||'Cuenta de CLIMESA'}</h2><p>{profile.email}</p></div></div><dl className="detail-grid"><div><dt>Estado</dt><dd><Tag value="activo"/></dd></div><div><dt>Plataformas habilitadas</dt><dd>{profile.platforms.map(p=>({web:'Web',android:'Android',ios:'iOS'} as Record<string,string>)[p]??p).join(' · ')}</dd></div><div className="full-width"><dt>Roles asignados</dt><dd>{profile.roles.map(r=>roleNames[r]??r).join(' · ')}</dd></div></dl><div className="profile-security"><Icon name="lock" size={20}/><p>Tu contraseña es personal. El administrador gestiona tus roles, sin conocerla.</p></div>{onChangePassword&&<ChangePasswordForm onChange={onChangePassword}/>}<button className="secondary-button" onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></section></>;}

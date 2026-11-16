@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../../components/ui';
+import { Skeleton } from '../../components/system';
 import { toneColor, type Tone } from '../../components/charts';
 import { can, type AccessProfile } from '../../lib/api';
 import type { Remote } from '../common';
@@ -39,7 +40,7 @@ export function Panel({ title, icon, action, children, wide = false, hint }: { t
 
 /** Estado de carga, error y permiso dentro de una tarjeta: una fuente que falla no tumba el resto del inicio. */
 export function PanelState<T>({ state, children, empty }: { state: Remote<T>; children: (data: T) => ReactNode; empty?: (data: T) => string | null }) {
-  if (state.loading && !state.data) return <p className="panel-state" role="status"><span className="spinner" />Cargando…</p>;
+  if (state.loading && !state.data) return <Skeleton rows={2} label="Cargando…" />;
   if (state.error) return <div className="panel-state panel-state-error" role="alert"><span>{state.error.status === 403 ? 'Tu cuenta no tiene permiso para ver esta información.' : state.error.message}</span><button type="button" className="row-action" onClick={state.refresh}><Icon name="retry" size={16} />Reintentar</button></div>;
   if (!state.data) return null;
   const message = empty?.(state.data);

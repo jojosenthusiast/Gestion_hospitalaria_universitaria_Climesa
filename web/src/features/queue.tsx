@@ -5,7 +5,7 @@ import { Icon } from '../components/ui';
 import { can, type AccessProfile, type Api } from '../lib/api';
 import { patientPicker } from './appointments';
 import { useQuickAction } from './personal/accion';
-import { Dialog, Empty, Heading, RemoteState, SaveButton, Select, Tag, WriteError, formatDateTime, useAction, useData } from './common';
+import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
 import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, serviceNames, sortColumn, waitLevel, waitMinutes, type BoardTicket, type Column } from './listas/queue-board';
 import './listas/lists.css';
@@ -39,7 +39,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const now = Date.now();
   const filters = [...(service !== 'todos' ? [{ key: 'servicio', label: serviceNames[service] ?? service, remove: () => setService('todos') }] : []), ...(query.trim() ? [{ key: 'texto', label: `«${query.trim()}»`, remove: () => setQuery('') }] : [])];
   return <>
-    <Heading eyebrow="Atención / Flujo de llegada" title="Fila del día" description="Emisión, llamado y atención de pacientes sin confundir la fila con el horario de la cita." actions={issue && <button className="primary-button" onClick={() => setIssueOpen(true)}><Icon name="plus" size={18} />Emitir número</button>} />
+    <CompactHeader breadcrumb="Atención / Flujo de llegada" title="Fila del día" actions={issue && <button className="primary-button" onClick={() => setIssueOpen(true)}><Icon name="plus" size={18}/>Emitir número</button>}/>
     <section className="data-workbench" aria-label="Tablero de la fila">
       <RemoteState state={data}>{all => {
         const visible = all.filter(t => (service === 'todos' || t.service === service) && matches(query, String(t.numero), t.patientName, serviceNames[t.service]));

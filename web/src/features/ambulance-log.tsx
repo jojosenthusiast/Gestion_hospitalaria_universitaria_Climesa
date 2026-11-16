@@ -2,7 +2,7 @@ import { useEffect,useId,useState } from 'react';
 import { Field,Icon } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
 import { exportName,type ExportTable } from '../lib/export';
-import { Empty,Heading,RemoteState,Select,formatDateTime,useData } from './common';
+import { Empty,CompactHeader,RemoteState,Select,formatDateTime,useData } from './common';
 import { type Api } from '../lib/api';
 import { finalStateNames,priorityNames,roleNames,typeNames } from './ambulance/types';
 import { activeFilters,emptyFilters,logPath,narrate,timeline,type AmbulanceLogRow,type LogFilters } from './ambulance/narrative';
@@ -27,7 +27,7 @@ export function AmbulanceLogPage({api,version}:{api:Api;version:number}){
  const set=(k:keyof LogFilters)=>(v:string)=>setFilters(f=>({...f,[k]:v}));
  const chips=activeFilters(filters),anyActive=chips.length>0||filters.q!=='';
  const clear=()=>{setFilters(emptyFilters);setText('');};
- return <><Heading eyebrow="Operaciones / Ambulancia" title="Bitácora de ambulancia" description="Historia de cada servicio con sus tiempos y destinos, sin datos del paciente"/>
+ return <><CompactHeader breadcrumb="Operaciones / Ambulancia" title="Bitácora de ambulancia"/>
  <section className="data-workbench amb-log" aria-label="Bitácora de servicios">
   <div className="amb-toolbar">
    <div className="amb-search"><Field label="Buscar en la bitácora" type="search" placeholder="Lugar, municipio o tripulación" value={text} onChange={setText} maxLength={80}/></div>

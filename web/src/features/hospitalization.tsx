@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Field, Icon } from '../components/ui';
 import { can, type AccessProfile, type Api, type Bed } from '../lib/api';
-import { Dialog, Empty, Heading, RemoteState, SaveButton, Select, Tag, WriteError, useAction, useData } from './common';
+import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, Tag, WriteError, useAction, useData } from './common';
 import { AdmissionStepper } from './hospitalization/admission-stepper';
 import { ExitDialog, ReasonDialog, ReassignDoctorDialog, RequestDischargeDialog, categoryNames, relativeTime, type Admission } from './hospitalization/admission-actions';
 import { spanishProblem } from './problems';
@@ -50,7 +50,7 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
   const close = () => setDialog(null), saved = () => { setDialog(null); data.refresh(); };
   const props = dialog && { api, admission: dialog.admission, onClose: close, onSaved: saved };
   return <>
-    <Heading eyebrow="Hospital / Admisiones" title="Hospitalización" description="Admisiones activas, cama asignada, aislamiento, alta y salida física." actions={can(profile, 'admision.crear') && <button className="primary-button" onClick={() => setCreating(true)}><Icon name="plus" size={18} />Ingresar paciente</button>} />
+    <CompactHeader breadcrumb="Hospital / Admisiones" title="Hospitalización" actions={can(profile, 'admision.crear') && <button className="primary-button" onClick={() => setCreating(true)}><Icon name="plus" size={18}/>Ingresar paciente</button>}/>
     <section className="data-workbench"><RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Admisiones activas</caption><thead><tr><th>Paciente</th><th>Origen</th><th>Categoría</th><th>Estado</th><th>Cama</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}>
       <td data-label="Paciente"><strong>{row.patientName}</strong><small>{[row.isolation ? 'Aislamiento' : 'Sin aislamiento', row.unstable ? 'Inestable' : null, row.postSurgical ? 'Posquirúrgico' : null].filter(Boolean).join(' · ')}</small>{row.motive && <small>{row.motive}</small>}</td>
       <td data-label="Origen">{originNames[row.origin] ?? row.origin}</td>

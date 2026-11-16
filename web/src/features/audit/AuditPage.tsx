@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Field, Icon } from '../../components/ui';
 import { SearchPicker, type PickerItem } from '../../components/search-picker';
 import { roleNames, type Api } from '../../lib/api';
-import { Empty, Heading, RemoteState, Select, Tag, formatDateTime, useData } from '../common';
+import { Empty, CompactHeader, RemoteState, Select, Tag, formatDateTime, useData } from '../common';
 import { AuditDrawer } from './AuditDrawer';
 import { AuditExport } from './AuditExport';
 import { ChainPanel } from './ChainPanel';
@@ -53,8 +53,7 @@ export function AuditPage({ api, version }: { api: Api; version: number }) {
   const subtitle = filterChips.length ? `Filtros: ${filterChips.map(c => c.label).join('; ')}` : 'Sin filtros';
 
   return <>
-    <Heading eyebrow="Protección de datos / Trazabilidad" title="Auditoría" description="Quién hizo cada operación, cuándo y con qué resultado, sin valores clínicos"
-      actions={<AuditExport api={api} total={total} subtitle={subtitle} queryFor={(p, s) => pageQuery(applied, sort, p, s, { exportar: 'true' })} />} />
+    <CompactHeader breadcrumb="Protección de datos / Trazabilidad" title="Auditoría" actions={<AuditExport api={api} total={total} subtitle={subtitle} queryFor={(p, s) => pageQuery(applied, sort, p, s, { exportar: 'true' })}/>}/>
     <ChainPanel api={api} onOpen={setDetail} />
     <section className="data-workbench audit-workbench">
       <div className="audit-presets segmented-control" role="group" aria-label="Vistas rápidas">

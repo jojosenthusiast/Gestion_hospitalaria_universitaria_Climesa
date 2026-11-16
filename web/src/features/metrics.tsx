@@ -4,7 +4,7 @@ import { ExportMenu } from '../components/export-menu';
 import { Field, Notice } from '../components/ui';
 import { exportName, type ExportTable } from '../lib/export';
 import { can, type AccessProfile, type Api } from '../lib/api';
-import { Heading, RemoteState, useData, type Remote } from './common';
+import { CompactHeader, RemoteState, useData, type Remote } from './common';
 
 /** Respuesta de `GET /metricas/{indicador}` (FR-113-05). */
 export type IndicatorSeries = { indicador: string; unidad: string; desde: string; hasta: string; actualizadoEn: string; serie: { fecha: string; valor: number | null; muestras: number }[] };
@@ -92,7 +92,7 @@ export function MetricsPage({ api, profile, version }: { api: Api; profile: Acce
   });
   const active = (days: number) => from === localDay(-(days - 1)) && to === localDay();
   return <>
-    <Heading eyebrow="CLIMESA / Métricas" title="Métricas" description="Indicadores agregados por día, sin datos personales" actions={<ExportMenu label="Exportar todo" table={everything} disabled={!ready} />} />
+    <CompactHeader breadcrumb="CLIMESA / Métricas" title="Métricas" actions={<ExportMenu label="Exportar todo" table={everything} disabled={!ready}/>}/>
     <div className="metric-controls">
       <div className="segmented-control" role="group" aria-label="Rangos rápidos">{presets.map(p => <button key={p.days} type="button" aria-pressed={active(p.days)} onClick={() => { setFrom(localDay(-(p.days - 1))); setTo(localDay()); }}>{p.label}</button>)}</div>
       <div className="form-grid"><Field label="Desde" type="date" value={from} onChange={setFrom} /><Field label="Hasta" type="date" value={to} onChange={setTo} /></div>

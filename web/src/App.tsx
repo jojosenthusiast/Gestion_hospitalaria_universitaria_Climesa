@@ -15,6 +15,11 @@ import { PublicScreen } from './features/public-screen';
 import { PasswordRecoveryView } from './features/password';
 import { ConfirmEmail,LANDING_PATHS,PlatformGuidanceScreen,SetPasswordLanding } from './features/auth-landing';
 import './modules.css';
+/**
+ * Fase 2, S3: una sola pantalla de arranque. Comprobar la sesión y validar los permisos se ven como un mismo paso,
+ * con el mismo título, en lugar de dos pantallas completas seguidas. Si el servidor está despertando, lo dice.
+ */
+function StartupView({slow=false}:{slow?:boolean}){return <StatusView title="Abriendo tu espacio de trabajo" detail={slow?SLOW_SERVER_MESSAGE:'Comprobando tu sesión y los permisos de tu cuenta.'}/>;}
 /** La ruta del hash pertenece a la sesión: al salir se limpia para que la siguiente cuenta no herede una sección ajena (obs. 15). */
 const resetRoute=()=>{if(location.hash)history.replaceState(null,'',location.pathname+location.search);};
 export default function App(){
@@ -32,7 +37,7 @@ export default function App(){
  // WEB-13: the recovery e-mail links to /restablecer (Supabase redirect URL, owner setting).
  if(location.pathname==='/recuperar')return <PasswordRecoveryView onRequest={async email=>{await supabase!.auth.resetPasswordForEmail(email,{redirectTo:`${location.origin}${LANDING_PATHS.reset}`});}}/>;
  if(location.pathname===LANDING_PATHS.reset)return <SetPasswordLanding reset/>;
- if(!ready)return <StatusView title="Comprobando tu sesión" detail="Estamos preparando tu espacio de trabajo."/>;
+ if(!ready)return <StartupView/>;
  if(!session)return <Login notice={expired?'Tu sesión se cerró por inactividad. Ingresa nuevamente.':new URLSearchParams(location.search).get('contrasena')==='actualizada'?'Contraseña actualizada. Ingresa con tu nueva contraseña.':undefined} onAttempt={()=>setExpired(false)}/>;
  return <Portal session={session} onExpired={()=>{setExpired(true);void supabase?.auth.signOut({scope:'local'});}}/>;
 }
@@ -52,7 +57,7 @@ function Portal({session,onExpired}:{session:Session;onExpired:()=>void}){
  // MA-OPS-01: /auth/me is usually the request that wakes the API; it is retried and, after 5 s, the screen says why it waits.
  const load=useCallback(()=>{setLoading(true);setError(null);setSlow(false);void retryColdStart(()=>api.request<AccessProfile>('/auth/me'),()=>setSlow(true)).then(setProfile).catch(e=>setError(e instanceof Error?e.message:'No se pudo verificar el acceso.')).finally(()=>{setLoading(false);setSlow(false);});},[api]);
  useEffect(load,[load]);
- if(loading&&!profile)return <StatusView title="Validando tu acceso" detail={slow?SLOW_SERVER_MESSAGE:'Consultando los permisos vigentes de tu cuenta.'}/>;
+ if(loading&&!profile)return <StartupView slow={slow}/>;
  if(error||!profile)return <div><StatusView title="No pudimos validar el acceso" detail={error??'Intenta nuevamente.'} action="Volver a intentar" onAction={load}/><button className="access-logout" onClick={()=>void supabase?.auth.signOut({scope:'local'})}>Cerrar sesión</button></div>;
  if(!profile.platforms.includes('web'))return <PlatformGuidanceScreen profile={profile} title="Tu rol no usa esta aplicación" action={{label:'Cerrar sesión',onClick:()=>void supabase?.auth.signOut({scope:'local'})}}/>;
  return <LivePortal {...{api,profile,session,onExpired}} refreshProfile={load}/>;

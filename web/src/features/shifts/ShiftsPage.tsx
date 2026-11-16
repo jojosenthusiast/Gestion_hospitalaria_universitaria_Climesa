@@ -5,7 +5,7 @@ import { SearchPicker, type PickerItem } from '../../components/search-picker';
 import { Icon, Notice } from '../../components/ui';
 import { can, type AccessProfile, type Api, type Shift } from '../../lib/api';
 import { exportName, type ExportTable } from '../../lib/export';
-import { Dialog, Empty, Heading, RemoteState, SaveButton, WriteError, formatDateTime, isVersionConflict, useAction, useData } from '../common';
+import { CompactHeader, Dialog, Empty, RemoteState, SaveButton, WriteError, formatDateTime, isVersionConflict, useAction, useData } from '../common';
 import { useQuickAction } from '../personal/accion';
 import { Field } from '../../components/ui';
 import { ShiftForm, type ShiftDraft } from './ShiftForm';
@@ -121,7 +121,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const isThisWeek = monday === mondayOf(at);
 
   return <>
-    <Heading eyebrow="Operaciones / Jornada" title="Turnos" description="Asigna horarios según el área, el rol y la disponibilidad real del personal"
+    <CompactHeader breadcrumb="Operaciones / Jornada" title="Turnos"
       actions={<>
         <ExportMenu table={table} disabled={!rows.length} />
         {plan && view !== 'especialistas' && <button className="primary-button" onClick={() => { setEditing(null); setDraft(undefined); setOpen(true); }}><Icon name="plus" size={18} />Asignar turno</button>}

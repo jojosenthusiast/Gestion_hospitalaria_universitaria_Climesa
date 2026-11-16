@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Field, Notice } from '../components/ui';
 import { can, type AccessProfile, type Api } from '../lib/api';
 import './account-links.css';
-import { Dialog, Empty, Heading, RemoteState, SaveButton, WriteError, formatDate, formatDateTime, useAction, useData } from './common';
+import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, WriteError, formatDate, formatDateTime, useAction, useData } from './common';
 
 /** Row of `GET /cuentas/vinculaciones` (spec 101, W27). */
 export type LinkRequest = {
@@ -23,7 +23,7 @@ export function AccountLinksPage({ api, profile, version }: { api: Api; profile:
   const reload = () => { setRejecting(null); data.refresh(); };
   const allowed = can(profile, 'cuentas.verificar');
   return <>
-    <Heading eyebrow="Pacientes / Cuentas" title="Vinculaciones por verificar" description="Cuentas de pacientes que piden unirse a su expediente, actualizadas en vivo" />
+    <CompactHeader breadcrumb="Pacientes / Cuentas" title="Vinculaciones por verificar"/>
     <LinkingGuide />
     <section className="data-workbench" aria-label="Solicitudes de vinculación">
       <RemoteState state={data}>{rows => rows.length

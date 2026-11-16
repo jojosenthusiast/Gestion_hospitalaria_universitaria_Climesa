@@ -2,13 +2,37 @@ import { useEffect,useId,useMemo,useRef,useState,type ReactNode } from 'react';
 import { ApiError,type Api } from '../lib/api';
 import { liveScope,scopedVersion,useLiveSignal } from './live-scope';
 import { Icon,Notice } from '../components/ui';
+import { Skeleton,StatusBadge } from '../components/system';
 import { newIntentKey,withIntentKey } from './intent';
 export type Remote<T>={data:T|null;loading:boolean;error:ApiError|null;refresh:()=>void};
-/** `version` sube al reconectar (todo se vuelve a pedir); `live` sube solo con eventos de las entidades que afectan a `path` (WEB-01). */
+/**
+ * Fase 2, S3 (stale-while-revalidate): la última respuesta de cada ruta queda en memoria, una caché por cliente de API.
+ * El portal crea un cliente por sesión, así que al cerrar sesión la caché se va con él y otra cuenta nunca ve datos ajenos.
+ * Solo vive en memoria: nada se guarda en el navegador.
+ */
+const caches=new WeakMap<object,Map<string,unknown>>();
+const cacheOf=(api:Api)=>{let cache=caches.get(api);if(!cache){cache=new Map();caches.set(api,cache);}return cache;};
+/** Bounded cache (least recently written out first): patient searches and records are not kept for the whole session. */
+const CACHE_LIMIT=30;
+const remember=(cache:Map<string,unknown>,path:string,value:unknown)=>{cache.delete(path);cache.set(path,value);while(cache.size>CACHE_LIMIT)cache.delete(cache.keys().next().value as string);};
+/**
+ * `version` sube al reconectar (todo se vuelve a pedir); `live` sube solo con eventos de las entidades que afectan a `path` (WEB-01).
+ * Al montar, si la ruta ya se leyó en esta sesión, el dato guardado se muestra al instante (`loading` sigue en `true`
+ * mientras se revalida en segundo plano). La lectura se repite siempre: la caché nunca reemplaza a la API.
+ */
 export function useData<T>(api:Api,path:string,version=0,enabled=true):Remote<T>{
- const [data,setData]=useState<T|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState<ApiError|null>(null),[tick,setTick]=useState(0);
+ const cache=cacheOf(api);
+ const [data,setData]=useState<T|null>(()=>enabled?(cache.get(path) as T|undefined)??null:null),[loading,setLoading]=useState(true),[error,setError]=useState<ApiError|null>(null),[tick,setTick]=useState(0);
  const scope=useMemo(()=>liveScope(path),[path]),live=scopedVersion(useLiveSignal(),scope);
- useEffect(()=>{if(!enabled){setLoading(false);setError(null);setData(null);return;}const controller=new AbortController();setLoading(true);setError(null);api.request<T>(path,{signal:controller.signal}).then(v=>{if(!controller.signal.aborted)setData(v);}).catch(e=>{if(!controller.signal.aborted)setError(e instanceof ApiError?e:new ApiError('No se pudo cargar la información.'));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return()=>controller.abort();},[api,path,version,live,tick,enabled]);
+ useEffect(()=>{
+  if(!enabled){setLoading(false);setError(null);setData(null);return;}
+  // Otra ruta en el mismo componente (filtro, página): si ya se leyó, se muestra su dato; si no, se muestra la carga.
+  // Nunca se dejan a la vista filas de otros filtros bajo los filtros nuevos.
+  setData(cache.has(path)?cache.get(path) as T:null);
+  const controller=new AbortController();setLoading(true);setError(null);
+  api.request<T>(path,{signal:controller.signal}).then(v=>{if(!controller.signal.aborted){remember(cache,path,v);setData(v);}}).catch(e=>{if(!controller.signal.aborted)setError(e instanceof ApiError?e:new ApiError('No se pudo cargar la información.'));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+  return()=>controller.abort();
+ },[api,cache,path,version,live,tick,enabled]);
  return {data,loading,error,refresh:()=>setTick(v=>v+1)};
 }
 export function useAction(api:Api){
@@ -27,17 +51,17 @@ export function useAction(api:Api){
  }
  return {busy,error,run};
 }
-/** Títulos y subtítulos de cabecera van sin punto final; un texto de varias oraciones conserva su puntuación. */
-export const headerText=(text:string)=>{const t=text.trim();return t.endsWith('.')&&!t.endsWith('..')&&!/[.!?…]\s/.test(t.slice(0,-1))?t.slice(0,-1):t;};
-/** Cabecera común de todos los módulos: título (h1) y una descripción breve a la izquierda, acción principal a la derecha. */
-export function Heading({eyebrow,title,description,actions}:{eyebrow:string;title:string;description?:string;actions?:ReactNode}){const detail=description?headerText(description):'';return <header className="module-heading"><div className="module-heading-text"><span className="eyebrow">{eyebrow}</span><h1>{headerText(title)}</h1>{detail&&<p>{detail}</p>}</div>{actions&&<div className="heading-actions">{actions}</div>}</header>;}
-export function RemoteState<T>({state,children}:{state:Remote<T>;children:(data:T)=>ReactNode}){
- if(state.loading&&!state.data)return <div className="module-state module-state-loading" role="status" aria-live="polite"><span className="status-symbol"><span className="status-spinner"/></span><div><strong>Cargando información…</strong><span>Estamos preparando esta sección…</span></div></div>;
+/** Fase 2, S1: la cabecera de cada módulo es `CompactHeader` (components/system.tsx). */
+export { CompactHeader,headerText } from '../components/system';
+export function RemoteState<T>({state,children,skeletonRows=4}:{state:Remote<T>;children:(data:T)=>ReactNode;skeletonRows?:number}){
+ // S3: la sección reserva su lugar con un esqueleto; nunca un spinner que tape la pantalla.
+ if(state.loading&&!state.data)return <Skeleton rows={skeletonRows}/>;
  // WEB-04 (diseño 04): "sin permiso" y "error de carga" son estados distintos; ambos permiten reintentar (un acceso puede concederse).
  if(state.error?.status===403)return <div className="module-state module-state-error"><strong>No tienes acceso a esta información</strong><Notice kind="error">Tu cuenta no tiene permiso para consultar esta sección.</Notice><p className="muted">Si la necesitas para tu trabajo, pide a un administrador que revise los permisos de tu cuenta y vuelve a intentar.</p><button className="secondary-button" onClick={state.refresh}><Icon name="retry" size={18}/>Volver a intentar</button></div>;
  if(state.error)return <div className="module-state module-state-error"><strong>No pudimos cargar esta información</strong><Notice kind="error">{state.error.message}</Notice><button className="secondary-button" onClick={state.refresh}><Icon name="retry" size={18}/>Volver a intentar</button></div>;
  if(!state.data)return null;
- return <>{state.loading&&<p className="refresh-hint" role="status" aria-live="polite"><span className="spinner"/>Actualizando información…</p>}{children(state.data)}</>;
+ // Revalidación en segundo plano: una línea fina que no empuja el contenido; el texto queda para lectores de pantalla.
+ return <>{state.loading&&<span className="refresh-line" role="status" aria-live="polite"><span className="sr-only">Actualizando información…</span></span>}{children(state.data)}</>;
 }
 export function Empty({title,description}:{title:string;description:string}){return <div className="empty-state" role="status"><span className="empty-state-icon"><Icon name="search" size={28}/></span><h2>{title}</h2><p>{description}</p></div>;}
 /** WEB-04: with `onReload`, a version conflict offers the common "Cerrar y recargar" action (design 04, state "Conflicto"). */
@@ -57,9 +81,8 @@ export function Dialog({title,onClose,busy=false,children}:{title:string;onClose
 }
 export const formatDate=(s:string|undefined|null)=>s?new Intl.DateTimeFormat('es-SV',{timeZone:'UTC'}).format(new Date(s.length===10?s+'T12:00:00Z':s)):'Sin registrar';
 export const formatDateTime=(s:string)=>new Intl.DateTimeFormat('es-SV',{dateStyle:'medium',timeStyle:'short',timeZone:'America/El_Salvador'}).format(new Date(s));
-const statusNames:Record<string,string>={activo:'Activo',inactivo:'Inactivo',provisional:'Provisional',libre:'Libre',ocupada:'Ocupada',reservada:'Reservada',limpieza:'En limpieza',bloqueada:'Bloqueada',borrador:'Borrador',publicado:'Pendiente de iniciar',pendiente:'Pendiente de iniciar',en_curso:'En curso',completado:'Completado',cancelado:'Cancelado',cancelada:'Cancelada',solicitada:'Solicitada',confirmada:'Confirmada',atendida:'Atendida',firmada:'Firmada',rechazada:'Rechazada',no_asistio:'No asistió',vencida:'Vencida',reprogramada:'Reprogramada',cerrado:'Cerrado sin atender',desactivado:'Desactivado',pendiente_cama:'Pendiente de cama',hospitalizado:'Hospitalizado',alta_firmada:'Alta firmada',egresado:'Egresado',exito:'Correcto',denegado:'Denegado',fallido:'Fallido',en_espera:'En espera',llamado:'Llamado',en_atencion:'En atención',no_se_presento:'No se presentó',en_proceso:'En proceso',abierta:'Abierta',bajo_minimo:'Bajo mínimo',vencido:'Vencido',normal:'Normal',alto:'Alto',bajo:'Bajo',critico_alto:'Crítico alto',critico_bajo:'Crítico bajo',sin_rango:'Sin rango',disponible:'Disponible',en_servicio:'En servicio',en_mantenimiento:'En mantenimiento'};
 /** `label` reemplaza la etiqueta común cuando el mismo código significa otra cosa en un módulo (por ejemplo `pendiente` en laboratorio). */
-export function Tag({value,label}:{value:string;label?:string}){return <span className={`status-tag status-${value}`}>{label??statusNames[value]??value.replace(/_/g,' ')}</span>;}
+export function Tag({value,label}:{value:string;label?:string}){return <StatusBadge value={value} label={label}/>;}
 export function Select({label,value,onChange,children,required=false,disabled=false}:{label:string;value:string;onChange:(v:string)=>void;children:ReactNode;required?:boolean;disabled?:boolean}){const id=useId();return <div className="select-field"><label htmlFor={id}>{label}</label><select id={id} value={value} onChange={e=>onChange(e.target.value)} required={required} disabled={disabled}>{children}</select></div>;}
 /** FR-102-07: la API responde 409 con `codigo` `version_conflicto` y `versionActual`; se reconoce por esos datos, no por el texto. */
 export const isVersionConflict=(e:ApiError|null)=>e?.status===409&&(e.code==='version_conflicto'||e.currentVersion!==undefined);
