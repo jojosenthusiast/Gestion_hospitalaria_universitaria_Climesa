@@ -35,7 +35,7 @@ describe('command scopes', () => {
 // body on another record never replays the first answer. Only creations (and singletons) may use a scope without id.
 const creationScopes = [
   'admision.crear', 'admision.solicitar', 'ambulancia.despachar:servicio', 'ambulancia.mantenimiento:unidad', 'ambulancia.operar:ubicacion',
-  'ambulancia.solicitar:solicitud', 'avisos.publicar:aviso', 'citas.solicitar:categoria', 'cuenta.vincular', 'fila.emitir', 'laboratorio.ordenar', 'turnos.publicar:rango', 'usuarios.invitar',
+  'ambulancia.solicitar:solicitud', 'avisos.publicar:aviso', 'citas.solicitar:categoria', 'cuenta.vincular', 'fila.emitir', 'laboratorio.ordenar', 'turnos.planificar:lote', 'turnos.planificar:plantilla', 'turnos.publicar:rango', 'usuarios.invitar',
 ];
 describe('command scopes include the target id (CON-07, API-11)', () => {
   it.each(literalScopes.filter(({ scope }) => !scope.includes('${')))('$file: "$scope" is a creation', ({ scope }) => {

@@ -1,4 +1,4 @@
-import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, EnumArrayProp, EnumProp, IntProp, NumProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, EnumArrayProp, EnumProp, IntProp, JsonProp, NumProp, StrProp, UuidArrayProp, UuidProp } from '../platform/responses';
 import { CATEGORIA_HABITACION, ESTADO_CAMA, ESTADO_TURNO } from '../platform/states';
 
 export const TIPO_PERSONAL = ['medico', 'enfermero', 'asistente', 'recepcionista', 'laboratorista', 'paramedico', 'motorista', 'limpieza', 'administrativo', 'otro'] as const;
@@ -211,6 +211,65 @@ export class ShiftSavedResponse {
   @IntProp() version!: number;
   @ClassArrayProp(ShiftWarningResponse) advertencias!: ShiftWarningResponse[];
   @ClassArrayProp(CoverageGapResponse, { optional: true, description: 'Al cancelar: huecos de cobertura que deja el turno (RN-15)' }) huecos?: CoverageGapResponse[];
+}
+
+/** Fase 2, flujo F: resultado de un turno de un lote, en el orden recibido. */
+export class BatchItemResultResponse {
+  @IntProp({ description: 'Posición del turno en el lote (desde 0)' }) index!: number;
+  @BoolProp() ok!: boolean;
+  @UuidProp({ optional: true, description: 'Solo al crear el lote' }) id?: string;
+  @IntProp({ optional: true }) version?: number;
+  @ClassArrayProp(ShiftWarningResponse, { optional: true }) advertencias?: ShiftWarningResponse[];
+  @StrProp({ optional: true, description: 'Mismo código que respondería POST /turnos (personal_en_descanso, carga_semanal_excedida, conflicto...)' }) codigo?: string;
+  @StrProp({ optional: true }) mensaje?: string;
+  @StrProp({ optional: true, nullable: true }) campo?: string | null;
+  @JsonProp({ optional: true }) detalle?: Record<string, unknown>;
+}
+export class BatchValidationResponse {
+  @ClassArrayProp(BatchItemResultResponse) resultados!: BatchItemResultResponse[];
+  @ClassArrayProp(CoverageGapResponse, { description: 'Huecos de cobertura contando el lote como borradores' }) huecos!: CoverageGapResponse[];
+}
+export class BatchCreatedResponse {
+  @IntProp() creados!: number;
+  @UuidArrayProp() ids!: string[];
+  @ClassArrayProp(BatchItemResultResponse) resultados!: BatchItemResultResponse[];
+  @ClassArrayProp(CoverageGapResponse) huecos!: CoverageGapResponse[];
+}
+export class RotationItemResponse {
+  @UuidProp() staffId!: string;
+  @StrProp() person!: string;
+  @UuidProp() areaId!: string;
+  @DateTimeProp() start!: string;
+  @DateTimeProp() end!: string;
+  @EnumProp(TIPO_TURNO, 'TipoTurno') type!: string;
+  @BoolProp() ok!: boolean;
+  @UuidProp({ optional: true, description: 'Persona del patrón a la que este turno reemplaza porque ella no podía' }) reemplazaA?: string;
+  @ClassArrayProp(ShiftWarningResponse, { optional: true }) advertencias?: ShiftWarningResponse[];
+  @StrProp({ optional: true }) codigo?: string;
+  @StrProp({ optional: true }) mensaje?: string;
+  @StrProp({ optional: true, nullable: true }) campo?: string | null;
+  @JsonProp({ optional: true }) detalle?: Record<string, unknown>;
+}
+export class RotationPreviewResponse {
+  @ClassArrayProp(RotationItemResponse) items!: RotationItemResponse[];
+  @IntProp() personas!: number;
+  @ClassArrayProp(CoverageGapResponse) huecos!: CoverageGapResponse[];
+}
+export class TemplateShiftResponse {
+  @IntProp({ description: '0 = lunes' }) day!: number;
+  @StrProp({ description: 'Hora local HH:MM' }) startTime!: string;
+  @IntProp() hours!: number;
+  @EnumProp(TIPO_TURNO, 'TipoTurno') type!: string;
+  @UuidProp() staffId!: string;
+}
+export class WeekTemplateResponse {
+  @UuidProp() id!: string;
+  @UuidProp() areaId!: string;
+  @StrProp() area!: string;
+  @StrProp() name!: string;
+  @IntProp() version!: number;
+  @DateTimeProp() createdAt!: string;
+  @ClassArrayProp(TemplateShiftResponse) shifts!: TemplateShiftResponse[];
 }
 
 // ---- Espacios y camas ----

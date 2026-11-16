@@ -3307,6 +3307,598 @@
         "x-permiso": "turnos.publicar"
       }
     },
+    "/api/v1/turnos/lote/validar": {
+      "post": {
+        "operationId": "OperationsController_validateBatch",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchValidationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Validar un lote de turnos sin guardarlo: un resultado por turno con las reglas de un turno suelto y los huecos de cobertura",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
+    "/api/v1/turnos/lote": {
+      "post": {
+        "operationId": "OperationsController_createBatch",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchCreatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear un lote de turnos como borradores, todo o nada: con un solo conflicto no se crea ninguno (409 lote_con_conflictos con el resultado de cada turno)",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
+    "/api/v1/turnos/generar": {
+      "post": {
+        "operationId": "OperationsController_generate",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotationPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de una rotación (rotativo, 12x36, 24x72 o personalizado) con descanso, tope de 7 días y cobertura; no guarda nada",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
+    "/api/v1/turnos/plantillas": {
+      "get": {
+        "operationId": "OperationsController_templates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WeekTemplateResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plantillas de semana vigentes por área",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      },
+      "post": {
+        "operationId": "OperationsController_saveTemplate",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeekTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Guardar una semana de un área como plantilla",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
+    "/api/v1/turnos/plantillas/{id}": {
+      "patch": {
+        "operationId": "OperationsController_retireTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeekTemplateRetireDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retirar una plantilla de semana con versión",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
     "/api/v1/turnos/{id}": {
       "patch": {
         "operationId": "OperationsController_editShift",
@@ -18925,6 +19517,520 @@
           "warnings"
         ]
       },
+      "ShiftBatchItemDto": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "areaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "diurno",
+              "nocturno",
+              "guardia"
+            ]
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "staffId",
+          "areaId",
+          "start",
+          "end",
+          "type"
+        ]
+      },
+      "ShiftBatchDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "minItems": 1,
+            "maxItems": 400,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShiftBatchItemDto"
+            }
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ShiftWarningResponse": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "description": "Código de la advertencia, por ejemplo horas_semanales_excedidas"
+          },
+          "horasSemana": {
+            "type": "number"
+          },
+          "limite": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "codigo",
+          "horasSemana",
+          "limite"
+        ]
+      },
+      "BatchItemResultResponse": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "Posición del turno en el lote (desde 0)"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Solo al crear el lote"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "advertencias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShiftWarningResponse"
+            }
+          },
+          "codigo": {
+            "type": "string",
+            "description": "Mismo código que respondería POST /turnos (personal_en_descanso, carga_semanal_excedida, conflicto...)"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "campo": {
+            "type": "string",
+            "nullable": true
+          },
+          "detalle": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "index",
+          "ok"
+        ]
+      },
+      "BatchValidationResponse": {
+        "type": "object",
+        "properties": {
+          "resultados": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchItemResultResponse"
+            }
+          },
+          "huecos": {
+            "description": "Huecos de cobertura contando el lote como borradores",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverageGapResponse"
+            }
+          }
+        },
+        "required": [
+          "resultados",
+          "huecos"
+        ]
+      },
+      "BatchCreatedResponse": {
+        "type": "object",
+        "properties": {
+          "creados": {
+            "type": "integer"
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "resultados": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchItemResultResponse"
+            }
+          },
+          "huecos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverageGapResponse"
+            }
+          }
+        },
+        "required": [
+          "creados",
+          "ids",
+          "resultados",
+          "huecos"
+        ]
+      },
+      "RotationDto": {
+        "type": "object",
+        "properties": {
+          "areaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Área donde se asignan los turnos"
+          },
+          "staffIds": {
+            "description": "Personas elegidas; sin ellas se usa el grupo de `role` asignado al área",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "medico",
+              "enfermero",
+              "asistente",
+              "recepcionista",
+              "laboratorista",
+              "paramedico",
+              "motorista",
+              "limpieza",
+              "administrativo",
+              "otro"
+            ],
+            "description": "Función del grupo (con el área de cada persona igual a `areaId`)"
+          },
+          "pattern": {
+            "type": "string",
+            "enum": [
+              "rotativo",
+              "12x36",
+              "24x72",
+              "personalizado"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-16"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-22"
+          },
+          "startTime": {
+            "type": "string",
+            "example": "07:00",
+            "description": "Hora local de inicio; por omisión 07:00"
+          },
+          "hours": {
+            "type": "number",
+            "minimum": 4,
+            "maximum": 24,
+            "description": "Solo en personalizado"
+          },
+          "workDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 6,
+            "description": "Solo en personalizado"
+          },
+          "restDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 6,
+            "description": "Solo en personalizado"
+          },
+          "justification": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "areaId",
+          "pattern",
+          "from",
+          "to"
+        ]
+      },
+      "RotationItemResponse": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "person": {
+            "type": "string"
+          },
+          "areaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoTurno"
+              }
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "reemplazaA": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Persona del patrón a la que este turno reemplaza porque ella no podía"
+          },
+          "advertencias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShiftWarningResponse"
+            }
+          },
+          "codigo": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "campo": {
+            "type": "string",
+            "nullable": true
+          },
+          "detalle": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "staffId",
+          "person",
+          "areaId",
+          "start",
+          "end",
+          "type",
+          "ok"
+        ]
+      },
+      "RotationPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RotationItemResponse"
+            }
+          },
+          "personas": {
+            "type": "integer"
+          },
+          "huecos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverageGapResponse"
+            }
+          }
+        },
+        "required": [
+          "items",
+          "personas",
+          "huecos"
+        ]
+      },
+      "TemplateShiftResponse": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "integer",
+            "description": "0 = lunes"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "Hora local HH:MM"
+          },
+          "hours": {
+            "type": "integer"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoTurno"
+              }
+            ]
+          },
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "day",
+          "startTime",
+          "hours",
+          "type",
+          "staffId"
+        ]
+      },
+      "WeekTemplateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "areaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "area": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shifts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateShiftResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "areaId",
+          "area",
+          "name",
+          "version",
+          "createdAt",
+          "shifts"
+        ]
+      },
+      "TemplateShiftDto": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 6,
+            "description": "0 = lunes"
+          },
+          "startTime": {
+            "type": "string",
+            "example": "07:00"
+          },
+          "hours": {
+            "type": "number",
+            "minimum": 4,
+            "maximum": 24
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "diurno",
+              "nocturno",
+              "guardia"
+            ]
+          },
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "day",
+          "startTime",
+          "hours",
+          "type",
+          "staffId"
+        ]
+      },
+      "WeekTemplateDto": {
+        "type": "object",
+        "properties": {
+          "areaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80
+          },
+          "shifts": {
+            "minItems": 1,
+            "maxItems": 400,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateShiftDto"
+            }
+          }
+        },
+        "required": [
+          "areaId",
+          "name",
+          "shifts"
+        ]
+      },
+      "WeekTemplateRetireDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
       "ShiftDto": {
         "type": "object",
         "properties": {
@@ -18984,26 +20090,6 @@
           "start",
           "end",
           "type"
-        ]
-      },
-      "ShiftWarningResponse": {
-        "type": "object",
-        "properties": {
-          "codigo": {
-            "type": "string",
-            "description": "Código de la advertencia, por ejemplo horas_semanales_excedidas"
-          },
-          "horasSemana": {
-            "type": "number"
-          },
-          "limite": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "codigo",
-          "horasSemana",
-          "limite"
         ]
       },
       "ShiftSavedResponse": {
@@ -28208,6 +29294,8 @@
           "entrada_automatica",
           "medico_ausente",
           "tripulante_ausente",
+          "lote_con_conflictos",
+          "plantilla_duplicada",
           "franja_desalineada",
           "franja_ocupada",
           "medico_sin_jornada",

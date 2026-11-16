@@ -70,7 +70,9 @@ const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acc
   // Historial de cambios de médico tratante (BL-03): nace de una acción de Jefatura, la demo no lo siembra.
   'hospitalizacion.cambio_tratante',
   // Fase 2 flujo A: las solicitudes de cita por categoría nacen solo del uso real del paciente.
-  'atencion.solicitud_cita'];
+  'atencion.solicitud_cita',
+  // Fase 2, flujo F: las plantillas de semana nacen de Jefatura; la demo no las siembra.
+  'personal.plantilla_semana'];
 
 const MINIMOS: Record<string, number> = {
   'pacientes.paciente': 120, 'pacientes.identificador': 100, 'atencion.cita': 130, 'atencion.ticket_fila': 30, 'atencion.consulta': 70,

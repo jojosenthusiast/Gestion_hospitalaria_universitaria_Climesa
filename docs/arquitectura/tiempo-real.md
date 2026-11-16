@@ -76,6 +76,8 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `personal.actualizado` | `personal` | Ficha e inscripción | `rol:ADM`, `rol:JOP` | 103 |
 | `signos.registrados` | `paciente` | Toma de signos vitales fuera de consulta | `signos.registrar` y `expediente.ver` | 106 |
 | `turno.actualizado` / `turno.publicado` | `turno` | Planificar, publicar, cambio de estado por reloj | `rol:JOP`, `rol:ADM`, `usuario:<persona>` | 103 |
+| `turno.actualizado` | `turno` | Borradores creados en lote (`POST /turnos/lote`); sin canal `usuario:` porque el personal no ve borradores | `rol:JOP`, `rol:ADM` (la base agrega los roles con `turnos.ver`) | 103 |
+| `turno.actualizado` | `plantilla_semana` | Guardar o retirar una plantilla de semana | `rol:JOP`, `rol:ADM` | 103 |
 | `turno.publicado` / `turno.cambiado` | `publico` | Derivado en la base (turnos de médicos) | `publico` | 112 |
 | `espacio.actualizado` | `espacio` | Crear o editar espacio | `camas.ver_tablero`, `espacios.ver` | 104 |
 | `cama.estado_cambiado` | `cama` | Bloqueo, limpieza, asignación, traslado, salida | `camas.ver_tablero` (y `espacios.ver` desde infraestructura) | 104, 108 |
