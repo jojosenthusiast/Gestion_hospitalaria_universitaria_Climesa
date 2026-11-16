@@ -52,6 +52,8 @@ export function areaOf(code: string | null | undefined): AreaCode {
   // A real area code wins over an alias (02-sistema §1): `BOD-LAB` is LAB, `BOD-CEN` falls back to the BOD alias (GEN).
   const area = parts.find(p => AREAS.some(a => a.code === p));
   if (area) return area as AreaCode;
+  // Consulting rooms are coded `C-101`: 02-sistema section 1 lists them under CON.
+  if (parts[0] === 'C' && parts.length > 1) return 'CON';
   const alias = parts.find(p => p in AREA_ALIASES);
   return (alias ? AREA_ALIASES[alias] : 'GEN') as AreaCode;
 }

@@ -84,6 +84,7 @@ describe('área de un código de espacio (02-sistema §1)', () => {
     expect(areaOf('BOD-CEN')).toBe('GEN');
     expect(areaOf('P3-VIP')).toBe('HOS');
     expect(areaOf('P1-EMG')).toBe('EMG');
+    expect(areaOf('C-101')).toBe('CON');
     expect(areaOf(null)).toBe('GEN');
   });
 });
