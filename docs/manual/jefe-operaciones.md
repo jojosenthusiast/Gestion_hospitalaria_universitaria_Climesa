@@ -109,6 +109,8 @@ Consulta del directorio, sin cambios. Filtros: **Mostrar** (personal activo, ina
   - **Área de la cama:** pacientes que ocupan ahora una cama en esa área (o en una habitación dentro de ella).
   - **Médico tratante:** pacientes con una admisión activa a cargo de ese médico.
 - **Fila del día** y **Citas** son de consulta para ti; las operan Recepción y el consultorio.
+- En la fila ves el tablero por estado (En espera, Llamados, En atención, Terminados), cada número con su área (**CON 7**), su prioridad y si tiene cita o llegó sin cita. No puedes mover tarjetas, llamar ni cambiar prioridades.
+- **Quién pasa después** sigue una regla fija del servidor: emergencias primero; luego urgentes; luego citas dentro de su ventana (15 min antes a 15 min después); luego el resto en orden de llegada. Es la misma que ven Recepción y el médico.
 
 ## Métricas
 
