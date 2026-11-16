@@ -24,6 +24,7 @@ SALIDA_RONDA3 = RAIZ / "supabase" / "migrations" / "20261118007000_permisos_rond
 SALIDA_PLATAFORMAS = RAIZ / "supabase" / "migrations" / "20261118008000_plataformas_sin_android.sql"
 SALIDA_FASE01 = RAIZ / "supabase" / "migrations" / "20261120001200_permisos_fase01_hospitalizacion.sql"
 SALIDA_RECURSOS = RAIZ / "supabase" / "migrations" / "20261121003100_recursos_inventario_adm.sql"
+SALIDA_FASE2 = RAIZ / "supabase" / "migrations" / "20261125001000_permisos_fase2_fila_recepcion.sql"
 
 # Permisos que se agregaron al catálogo después de aplicada la semilla (regla 10 de AGENTS.md: la semilla no se edita). La semilla
 # no los emite; la migración de SALIDA_ATRIBUTOS los inserta. Son permisos de atributo: deciden qué campos o filas ve quien ya
@@ -48,6 +49,10 @@ ADICIONES_ROL_FASE01 = [("JOP", "camas.registrar_limpieza")]
 # Administrador ya configura el inventario (inventario.configurar) y ahora también lo ve (inventario.ver), así que abre Inventario.
 # Lo inserta la migración de SALIDA_RECURSOS, que además borra los permisos recursos.* (PERMISOS_RETIRADOS).
 ADICIONES_ROL_RECURSOS = [("ADM", "inventario.ver")]
+
+# Fase 2, flujo B (S9): Recepción usa la Web y "llama siguiente" por área o consultorio. Sin fila.llamar en un rol web, la
+# fila del día no avanzaba en la Web (desde FILA-01 solo un número llamado se atiende). Lo inserta la migración de SALIDA_FASE2.
+ADICIONES_ROL_FASE2 = [("REC", "fila.llamar")]
 
 # Permisos que se retiraron del catálogo (observación 12: módulo de acceso excepcional) después de aplicada la semilla. Ya no están en
 # permisos.csv ni en los documentos RBAC, pero la semilla (aplicada, regla 10 de AGENTS.md) los sigue emitiendo tal como estaban, en su
@@ -338,7 +343,7 @@ def generar_sql(roles, permisos):
     filas = []
     for p in permisos:
         for c in codigos:
-            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL + ADICIONES_ROL_FASE01 + ADICIONES_ROL_RECURSOS:
+            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL + ADICIONES_ROL_FASE01 + ADICIONES_ROL_RECURSOS + ADICIONES_ROL_FASE2:
                 filas.append(f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(historico.get((c, p['permiso']), p[c]))})")
     l.append(",\n".join(filas) + ";")
     return "\n".join(l) + "\n"
@@ -466,6 +471,28 @@ def generar_sql_recursos(permisos):
     return "\n".join(l) + "\n"
 
 
+def generar_sql_fase2(permisos):
+    por_nombre = {p["permiso"]: p for p in permisos}
+    adiciones = " or ".join(f"(rol_codigo = {sql_txt(r)} and permiso_codigo = {sql_txt(p)})" for r, p in ADICIONES_ROL_FASE2)
+    l = [
+        "-- Generado por tools/generar_docs.py desde ADICIONES_ROL_FASE2 y permisos.csv. No editar a mano.",
+        "-- Fase 2, flujo B: Recepción llama el siguiente número desde la Web. Antes solo AST y MED (roles sin Web) tenían",
+        "-- fila.llamar y, desde FILA-01, un número en espera no se puede atender sin llamarlo: la fila no avanzaba en la Web.",
+        "-- Idempotente: no duplica asignaciones que ya existan.",
+        "--",
+        "-- Pre-comprobación en producción (ninguna fila debe existir todavía):",
+        f"--   select rol_codigo, permiso_codigo from acceso.rol_permiso where {adiciones};",
+        "--",
+        "-- Reversa:",
+        f"--   delete from acceso.rol_permiso where {adiciones};",
+        "",
+        "insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values",
+        ",\n".join(f"  ({sql_txt(r)}, {sql_txt(perm)}, {sql_txt(por_nombre[perm][r])})" for r, perm in ADICIONES_ROL_FASE2),
+        "on conflict (rol_codigo, permiso_codigo) do nothing;",
+    ]
+    return "\n".join(l) + "\n"
+
+
 def generar_sql_plataformas(roles):
     por_codigo = {r["codigo"]: r for r in roles}
     l = [
@@ -528,6 +555,9 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
     for r, perm in ADICIONES_ROL_RECURSOS:
         if not por_permiso.get(perm, {}).get(r):
             errores.append(f"ADICIONES_ROL_RECURSOS dice {r} {perm} y permisos.csv no se lo asigna")
+    for r, perm in ADICIONES_ROL_FASE2:
+        if not por_permiso.get(perm, {}).get(r):
+            errores.append(f"ADICIONES_ROL_FASE2 dice {r} {perm} y permisos.csv no se lo asigna")
     usados = {parte for e in endpoints for parte in partes_permiso(e["permiso"])}
     for p in permisos:
         if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante" and p["permiso"] not in PERMISOS_POSTERIORES:
@@ -637,6 +667,7 @@ def main():
         SALIDA_PLATAFORMAS: generar_sql_plataformas(roles),
         SALIDA_FASE01: generar_sql_fase01(permisos),
         SALIDA_RECURSOS: generar_sql_recursos(permisos),
+        SALIDA_FASE2: generar_sql_fase2(permisos),
     }
     if "--verificar" in sys.argv:
         for ruta, contenido in salidas.items():

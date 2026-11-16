@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ExportMenu } from '../components/export-menu';
 import { SearchPicker, type PickerItem } from '../components/search-picker';
 import { Icon } from '../components/ui';
 import { can, type AccessProfile, type Api } from '../lib/api';
 import { patientPicker } from './appointments';
+import { useQuickAction } from './personal/accion';
 import { Dialog, Empty, Heading, RemoteState, SaveButton, Select, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
 import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, serviceNames, sortColumn, waitLevel, waitMinutes, type BoardTicket, type Column } from './listas/queue-board';
@@ -24,6 +25,9 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const manage = can(profile, 'fila.gestionar'), call = can(profile, 'fila.llamar'), issue = can(profile, 'fila.emitir');
   const readOnly = !manage && !call && !issue;
   const action = useAction(api);
+  // Quick actions from the dashboards: `emitir` opens the issue form; `llamar` lands here, where the service is chosen.
+  const [quick, consumeQuick] = useQuickAction();
+  useEffect(() => { if (quick === 'emitir' && issue) setIssueOpen(true); if (quick) consumeQuick(); }, [quick, issue, consumeQuick]);
   async function transition(ticket: QueueTicket, path: string, method = 'POST', extra: Record<string, unknown> = {}) {
     if (await action.run(`/fila/${ticket.id}/${path}`, { version: ticket.version, ...extra }, method)) data.refresh();
   }

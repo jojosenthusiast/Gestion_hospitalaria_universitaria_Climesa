@@ -30,7 +30,8 @@ describe('Fase 0/1 · fila y citas guiadas por el servidor', () => {
       const patientId = await t.patient();
       const issued = (await t.call('REC', 'POST', '/fila', { service: 'consulta_general', patientId })).body;
       const waiting = await ticketOf('REC', issued.id);
-      expect(waiting.allowedActions).toEqual([]);
+      // Fase 2 (flujo B): Recepción llama desde la Web; en espera solo puede llamar, todavía no atender ni marcar ausencia.
+      expect(waiting.allowedActions).toEqual(['llamar']);
       expect(waiting.callsForAbsence).toBe(3);
       expect(waiting.maxCalls).toBe(3);
       const early = await t.call('REC', 'POST', `/fila/${issued.id}/no-se-presento`, { version: issued.version });
@@ -41,7 +42,7 @@ describe('Fase 0/1 · fila y citas guiadas por el servidor', () => {
       const call = async () => { const r = await t.call('MED', 'POST', `/fila/${issued.id}/llamar`, { version }); version = r.body.version; return r; };
       expect((await call()).status).toBe(201);
       const once = await ticketOf('REC', issued.id);
-      expect(once.allowedActions).toEqual(['atender']);
+      expect(once.allowedActions).toEqual(['llamar', 'atender']);
       expect(once.blockedActions).toEqual([{ action: 'no_se_presento', reason: 'Disponible después de 3 llamados (van 1).' }]);
       const tooSoon = await t.call('REC', 'POST', `/fila/${issued.id}/no-se-presento`, { version });
       expect(tooSoon.status).toBe(409);
@@ -79,7 +80,19 @@ describe('Fase 0/1 · fila y citas guiadas por el servidor', () => {
       const empty = await t.call('MED', 'POST', '/fila/llamar-siguiente', { service: 'admisiones' });
       expect(empty.status).toBe(409);
       expect(empty.body.codigo).toBe('fila_sin_espera');
-      expect((await t.call('REC', 'POST', '/fila/llamar-siguiente', { service: 'admisiones' })).status).toBe(403);
+      expect((await t.call('JOP', 'POST', '/fila/llamar-siguiente', { service: 'admisiones' })).status).toBe(403);
+    });
+
+    test('Fase 2 · recepción llama el siguiente desde la Web y lo pasa a atención', async () => {
+      const first = (await t.call('REC', 'POST', '/fila', { service: 'consulta_general', patientId: await t.patient() })).body;
+      const called = await t.call('REC', 'POST', '/fila/llamar-siguiente', { service: 'consulta_general' });
+      expect(called.status).toBe(201);
+      expect(called.body).toMatchObject({ id: first.id, state: 'llamado', llamados: 1 });
+      expect((await ticketOf('REC', first.id)).allowedActions).toEqual(['llamar', 'atender']);
+      const attended = await t.call('REC', 'POST', `/fila/${first.id}/atender`, { version: called.body.version });
+      expect(attended.status).toBe(201);
+      expect((await ticketOf('REC', first.id)).state).toBe('en_atencion');
+      expect((await ticketOf('JOP', first.id)).allowedActions).toEqual([]);
     });
   });
 

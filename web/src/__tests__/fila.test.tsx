@@ -90,6 +90,14 @@ describe('Fila del día · acciones según el servidor (FILA-01, FILA-02)', () =
     expect(screen.queryByRole('button', { name: /No se presentó|Llamar/ })).toBeNull();
   });
 
+  it('la acción rápida del tablero ?accion=emitir abre el formulario y se consume del hash', async () => {
+    location.hash = '#/fila?accion=emitir';
+    montar(['fila.ver', 'fila.emitir', 'fila.gestionar', 'fila.llamar']);
+    expect(await screen.findByRole('dialog', { name: 'Emitir número de fila' })).toBeTruthy();
+    expect(location.hash).not.toContain('accion=');
+    location.hash = '';
+  });
+
   it('llamar siguiente pide al servidor el primer número del servicio elegido', async () => {
     const api = montar(['fila.ver', 'fila.llamar'], [ticket('en_espera', 7, ['llamar'])]);
     await userEvent.click(await screen.findByRole('radio', { name: /Consulta general/ }).catch(() => screen.findByRole('button', { name: /Consulta general/ })));

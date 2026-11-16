@@ -744,7 +744,7 @@ Seis permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo
 | `camas.verificar_limpieza` | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | `fila.emitir` | · | · | ✔ | · | · | · | · | · | · | · |
 | `fila.ver` | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
-| `fila.llamar` | · | · | · | ✔ | · | ✔ | · | · | · | · |
+| `fila.llamar` | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | `fila.gestionar` | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
 | `citas.ver` | · | ✔ | ✔ | ✔ | · | propio | · | · | · | propio |
 | `citas.agendar` | · | · | ✔ | · | · | · | · | · | · | · |

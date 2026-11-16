@@ -13,7 +13,7 @@ Inicio, Pacientes, Vinculaciones, Camas, Edificio, Ambulancia, Bitácora de ambu
 
 ### Inicio
 
-Accesos rápidos: **Registrar paciente**, **Agendar cita**, **Emitir número** y **Solicitar ambulancia**.
+Accesos rápidos: **Registrar paciente**, **Agendar cita**, **Emitir número**, **Llamar siguiente** y **Solicitar ambulancia**. **Emitir número** abre directamente el formulario de la fila.
 
 ### Pacientes
 
@@ -44,7 +44,7 @@ Un paciente que creó su cuenta en la app pide vincularla a su expediente con su
 ### Fila del día
 
 - **Emitir número** para un paciente y un servicio.
-- **Llamar siguiente** llama al primer número en espera. En cada número: **Llamar** o **Llamar de nuevo**, **Iniciar atención** y **Completar**.
+- Elige el servicio y usa **Llamar siguiente**: llama al primer número en espera de ese servicio. Un número en espera se llama antes de atenderlo. En cada número: **Llamar** o **Llamar de nuevo**, **Iniciar atención** y **Completar**.
 - **No se presentó** aparece solo después de los llamados exigidos (3 por omisión).
 - Al día siguiente, el sistema cierra solo los números que quedaron abiertos.
 
