@@ -67,4 +67,11 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertNotNil(expected, file: file, line: line)
         XCTAssertEqual(actual, expected, "\(name): \(text)", file: file, line: line)
     }
+
+    /// MA-AMB-04 y MA-AMB-05: cancelación de la solicitud propia y entrega al hospital.
+    func testCancelacionDeSolicitudDeAmbulanciaYEntrega() throws {
+        try assertMatches(AmbulanceCancelBody(version: 1, reason: "  Me llevó un familiar \n"), fixture: "ambulance-request-cancel")
+        try assertMatches(VersionBody(version: 7), fixture: "ambulance-handover")
+        XCTAssertNil(AmbulanceCancelBody(version: 1, reason: "   ").reason)
+    }
 }

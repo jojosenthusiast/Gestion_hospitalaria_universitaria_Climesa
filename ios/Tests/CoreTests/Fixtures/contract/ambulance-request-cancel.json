@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/api/v1/ambulancia/solicitudes/{id}/cancelar",
+  "body": {
+    "version": 1,
+    "reason": "Me llevó un familiar"
+  }
+}

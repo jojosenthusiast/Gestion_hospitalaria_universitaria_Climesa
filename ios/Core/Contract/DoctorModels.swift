@@ -301,6 +301,14 @@ public struct LooseText: Decodable, Sendable, Equatable {
     }
 }
 
+/// `HandoverResponse` de `POST /ambulancia/servicios/{id}/recepcion` (MA-AMB-04).
+public struct HandoverResult: Decodable, Sendable, Equatable {
+    public let serviceId: String
+    public let version: Int
+    public let receivedAt: String
+    public let receivedByName: String?
+}
+
 /// `PrehospitalViewResponse` de `GET /ambulancia/servicios/{id}/prehospital`.
 public struct PrehospitalView: Decodable, Sendable, Equatable {
     public struct Report: Decodable, Sendable, Identifiable, Equatable {
@@ -312,9 +320,21 @@ public struct PrehospitalView: Decodable, Sendable, Equatable {
         public let reason: String?
         public let vitalSigns: [String: LooseText]?
     }
+    /// MA-AMB-04: quién recibió al paciente en el hospital y cuándo.
+    public struct Handover: Decodable, Sendable, Equatable {
+        public let receivedAt: String
+        public let receivedByName: String?
+    }
     public let serviceId: String
     public let active: Bool
     public let priority: AmbulancePriority
     public let clinical: Bool
     public let reports: [Report]
+    /// Versión del servicio; la entrega la envía (`HandoverBody`).
+    public let version: Int?
+    public let arrived: Bool?
+    public let handover: Handover?
+    /// `recibir`: la API permite marcar recibido al paciente (personal clínico, después de la llegada).
+    public let allowedActions: [String]?
+    public var canReceive: Bool { allowedActions?.contains("recibir") == true }
 }

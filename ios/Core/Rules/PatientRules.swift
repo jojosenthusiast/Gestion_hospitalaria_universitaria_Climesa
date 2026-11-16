@@ -174,6 +174,32 @@ public enum AmbulanceRules {
         return errors
     }
 
+    /// Nombre del hito para el paciente.
+    public static func milestoneLabel(_ type: String) -> String {
+        ["salida": "Salida", "en_escena": "En el lugar", "trasladando": "Hacia el hospital", "en_hospital": "En el hospital", "finalizado": "Finalizado"][type] ?? "Avance"
+    }
+
+    /// MA-AMB-05: la solicitud que sigue la pantalla: la activa más reciente (por confirmar o en camino).
+    public static func active(_ requests: [OwnAmbulanceRequest]) -> OwnAmbulanceRequest? { requests.first { $0.isActive } }
+
+    /// Qué pasa con la solicitud, en una frase para el paciente; sale del estado del servidor, no de los eventos.
+    public static func progress(_ request: OwnAmbulanceRequest) -> String {
+        let done = Set(request.service?.milestones.map(\.type) ?? [])
+        switch request.state {
+        case .porConfirmar: return "Despacho te llamará para confirmar antes de mover la ambulancia."
+        case .cancelada: return "Cancelaste esta solicitud."
+        case .descartada: return "Despacho no pudo atender esta solicitud. Si hay riesgo de vida, llama al 911."
+        default: break
+        }
+        guard let service = request.service else { return "Despacho confirmó tu solicitud." }
+        if let final = service.finalState { return "El servicio terminó: \((AmbulanceFinalState(rawValue: final)?.label ?? "finalizado").lowercased())." }
+        if done.contains("en_hospital") { return "La ambulancia llegó al hospital." }
+        if done.contains("trasladando") { return "La ambulancia va hacia el hospital." }
+        if done.contains("en_escena") { return "La ambulancia llegó al lugar." }
+        if done.contains("salida") { return "La ambulancia va en camino." }
+        return "Despacho confirmó tu solicitud: la ambulancia saldrá en breve."
+    }
+
     public static func body(address: String, municipality: String, reason: String, phone: String) -> AmbulanceRequestBody {
         let place = municipality.trimmingCharacters(in: .whitespacesAndNewlines)
         return AmbulanceRequestBody(

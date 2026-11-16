@@ -3916,6 +3916,138 @@
           }
         }
       }
+    },
+    "arrival.handover": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entrega del paciente"
+          }
+        }
+      }
+    },
+    "arrival.received": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recibido"
+          }
+        }
+      }
+    },
+    "arrival.receivedBy": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recibido por %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "arrival.clinicalStaff": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "personal clínico"
+          }
+        }
+      }
+    },
+    "arrival.receive": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marcar recibido"
+          }
+        }
+      }
+    },
+    "arrival.receive.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paciente recibido en el hospital."
+          }
+        }
+      }
+    },
+    "arrival.receive.wait": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Podrás marcar recibido al paciente cuando la ambulancia registre su llegada al hospital."
+          }
+        }
+      }
+    },
+    "arrival.receive.otherRole": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La ambulancia llegó. La entrega la marca el personal clínico que recibe al paciente."
+          }
+        }
+      }
+    },
+    "ambulance.cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar solicitud"
+          }
+        }
+      }
+    },
+    "ambulance.cancel.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Despacho dejará de ver tu solicitud. Si la emergencia sigue, llama al 911."
+          }
+        }
+      }
+    },
+    "ambulance.cancel.reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motivo (opcional)"
+          }
+        }
+      }
+    },
+    "ambulance.cancel.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solicitud cancelada."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

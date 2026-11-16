@@ -775,16 +775,20 @@ struct LabeledText: View {
 }
 
 /// I09 · Pedir ambulancia: aviso del 911, ubicación, motivo y teléfono. Queda "por confirmar" (la central llama).
+/// MA-AMB-05: el estado sale de `GET /ambulancia/solicitudes/mias` (sobrevive a cerrar la app) y se vuelve a pedir con cada
+/// evento de ambulancia del canal propio; "Cancelar solicitud" solo aparece cuando la API la permite.
 struct AmbulanceRequestView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
+    @State private var loader = Loader<[OwnAmbulanceRequest]>()
     @State private var submission = Submission()
+    @State private var cancelling: OwnAmbulanceRequest?
+    @State private var cancelReason = ""
     @State private var address = ""
     @State private var municipality = ""
     @State private var reason = ""
     @State private var phone = ""
     @State private var errors: [String: String] = [:]
-    @State private var created: AmbulanceRequestCreated?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -795,13 +799,50 @@ struct AmbulanceRequestView: View {
             .padding(Spacing.l).frame(maxWidth: .infinity, alignment: .leading)
             .foregroundStyle(Theme.danger).background(Theme.dangerSoft, in: RoundedRectangle(cornerRadius: Radius.card))
             .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Theme.danger, lineWidth: 1))
-            if let created {
-                SectionCard(eyebrow: L.text("ambulance.status")) {
-                    PatientTag(created.state.rawValue, label: created.state.label)
-                    Text(verbatim: created.notice).font(Typo.body).foregroundStyle(Theme.ink)
-                    if let update = updateText { PatientNotice(text: update) }
+            LoadState(loader: loader, retry: load) { requests in
+                if let active = AmbulanceRules.active(requests) { activeCard(active) } else { form }
+            }
+        }
+        .task(id: live.snapshot.version(.ambulance)) { await load() }
+        .sheet(item: $cancelling) { request in cancelSheet(request) }
+    }
+
+    private func activeCard(_ request: OwnAmbulanceRequest) -> some View {
+        SectionCard(eyebrow: L.text("ambulance.status")) {
+            PatientTag(request.state.rawValue, label: request.state.label)
+            Text(verbatim: AmbulanceRules.progress(request)).font(Typo.body).foregroundStyle(Theme.ink)
+            Text(verbatim: request.address).font(Typo.small).foregroundStyle(Theme.muted)
+            if let service = request.service {
+                ForEach(["salida", "en_escena", "trasladando", "en_hospital"], id: \.self) { type in
+                    let done = service.milestones.first { $0.type == type }
+                    HStack {
+                        Text(verbatim: AmbulanceRules.milestoneLabel(type)).font(Typo.small).foregroundStyle(done == nil ? Theme.muted : Theme.ink)
+                        Spacer()
+                        Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.mono).foregroundStyle(Theme.muted)
+                    }
                 }
-            } else {
+            }
+            Text(verbatim: request.notice).font(Typo.small).foregroundStyle(Theme.muted)
+            PatientSubmissionNotice(submission: submission)
+            if request.canCancel {
+                ClimesaButton(title: L.text("ambulance.cancel"), kind: .secondary, loading: submission.busy) { cancelReason = ""; cancelling = request }
+            }
+        }
+    }
+
+    private func cancelSheet(_ request: OwnAmbulanceRequest) -> some View {
+        NavigationStack {
+            ScreenFrame(title: "ambulance.cancel") {
+                Text("ambulance.cancel.detail").font(Typo.body).foregroundStyle(Theme.ink)
+                PatientTextArea(label: L.text("ambulance.cancel.reason"), text: $cancelReason, lines: 2...4, error: nil)
+                ClimesaButton(title: L.text("ambulance.cancel"), kind: .destructive, loading: submission.busy) { Task { await cancel(request) } }
+                ClimesaButton(title: L.text("common.close"), kind: .secondary) { cancelling = nil }
+            }
+        }
+    }
+
+    private var form: some View {
+        VStack(alignment: .leading, spacing: 16) {
                 SectionCard {
                     PatientTextArea(label: L.text("ambulance.address"), text: $address, lines: 1...3, error: errors["address"])
                     FormField(label: L.text("ambulance.municipality"), text: $municipality)
@@ -811,26 +852,28 @@ struct AmbulanceRequestView: View {
                 }
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("ambulance.submit"), loading: submission.busy) { Task { await send() } }
-            }
         }
     }
 
-    /// Los eventos delgados no traen el estado nuevo y el paciente no tiene lectura de su solicitud (ver preguntas-abiertas).
-    private var updateText: String? {
-        guard let created, let event = live.snapshot.lastEvent, event.id == created.id || event.type == "ambulancia.hito" else { return nil }
-        guard event.type.hasPrefix("ambulancia.") else { return nil }
-        return L.text(event.type == "ambulancia.hito" ? "ambulance.update.milestone" : "ambulance.update.state")
+    private func load() async { await loader.load { try await account.client().get("/ambulancia/solicitudes/mias", as: [OwnAmbulanceRequest].self) } }
+
+    private func cancel(_ request: OwnAmbulanceRequest) async {
+        let body = AmbulanceCancelBody(version: request.version, reason: cancelReason)
+        let ok = await submission.run(request.id, body: body, success: L.text("ambulance.cancel.done")) { key in
+            _ = try await account.client().send("POST", "/ambulancia/solicitudes/\(request.id)/cancelar", body: body, key: key, as: AmbulanceRequestStateResult.self)
+        }
+        if ok { cancelling = nil }
+        await load()
     }
 
     private func send() async {
         errors = AmbulanceRules.errors(address: address, reason: reason, phone: phone)
         guard errors.isEmpty else { return }
         let body = AmbulanceRules.body(address: address, municipality: municipality, reason: reason, phone: phone)
-        var result: AmbulanceRequestCreated?
         let ok = await submission.run(body: body) { key in
-            result = try await account.client().send("POST", "/ambulancia/solicitudes", body: body, key: key, as: AmbulanceRequestCreated.self)
+            _ = try await account.client().send("POST", "/ambulancia/solicitudes", body: body, key: key, as: AmbulanceRequestCreated.self)
         }
-        if ok { created = result }
+        if ok { await load() }
     }
 }
 

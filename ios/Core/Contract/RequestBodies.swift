@@ -39,7 +39,18 @@ public struct AmbulanceRequestBody: Encodable, Sendable, Equatable {
     }
 }
 
+/// MA-AMB-05: `CancelRequestDto`; el motivo es opcional y no se envía vacío.
+public struct AmbulanceCancelBody: Encodable, Sendable, Equatable {
+    public let version: Int
+    public let reason: String?
+    public init(version: Int, reason: String) {
+        let text = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.version = version; self.reason = text.isEmpty ? nil : String(text.prefix(300))
+    }
+}
+
 /// `QueueTransitionDto`, `ConsultationSignDto` y `LabVersionDto`: solo la versión vigente.
+/// También `HandoverDto` (MA-AMB-04: entrega al hospital con la versión del servicio).
 public struct VersionBody: Encodable, Sendable, Equatable {
     public let version: Int
     public init(version: Int) { self.version = version }

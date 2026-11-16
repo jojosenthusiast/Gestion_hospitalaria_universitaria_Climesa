@@ -631,10 +631,12 @@ struct AmbulanceArrival: Sendable {
 }
 
 /// I25 · Llegada de ambulancia: prioridad, hora estimada, motivo y signos del reporte prehospital.
+/// MA-AMB-04: "Marcar recibido" solo aparece cuando la API lo ofrece (`allowedActions`), después de la llegada al hospital.
 struct AmbulanceArrivalView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<AmbulanceArrival>()
+    @State private var submission = Submission()
 
     var body: some View {
         LoadState(loader: loader, retry: load) { arrival in
@@ -647,10 +649,11 @@ struct AmbulanceArrivalView: View {
                     ) { MedicoTag(service.priority.rawValue, label: service.priority.label) }
                 }
                 if let view = arrival.prehospital {
+                    handover(view)
                     if !view.clinical { Text("arrival.noClinical").font(Typo.small).foregroundStyle(Theme.muted) }
+                    if view.reports.isEmpty { Text("arrival.noReport").font(Typo.small).foregroundStyle(Theme.muted) }
                     ForEach(view.reports) { report in PrehospitalReportCard(report: report) }
                 } else { Text("arrival.noReport").font(Typo.small).foregroundStyle(Theme.muted) }
-                Text("arrival.receive.pending").font(Typo.small).foregroundStyle(Theme.muted)
             } else {
                 EmptyStateView(title: L.text("arrival.none"), symbol: "cross.case")
             }
@@ -658,12 +661,35 @@ struct AmbulanceArrivalView: View {
         .task(id: live.snapshot.version(.ambulance)) { await load() }
     }
 
+    @ViewBuilder private func handover(_ view: PrehospitalView) -> some View {
+        SectionCard(title: L.text("arrival.handover")) {
+            if let done = view.handover {
+                MedicoTag("atendido", label: L.text("arrival.received"))
+                Text(verbatim: String(format: L.text("arrival.receivedBy"), done.receivedByName ?? L.text("arrival.clinicalStaff"), ClimesaDates.display(done.receivedAt, .time)))
+                    .font(Typo.body).foregroundStyle(Theme.ink)
+            } else if view.canReceive {
+                SubmissionNotice(submission: submission)
+                ClimesaButton(title: L.text("arrival.receive"), loading: submission.busy) { Task { await receive(view) } }
+            } else {
+                Text(verbatim: L.text(view.arrived == true ? "arrival.receive.otherRole" : "arrival.receive.wait")).font(Typo.small).foregroundStyle(Theme.muted)
+            }
+        }
+    }
+
+    private func receive(_ view: PrehospitalView) async {
+        let body = VersionBody(version: view.version ?? 1)
+        _ = await submission.run(view.serviceId, body: body, success: L.text("arrival.receive.done")) { key in
+            _ = try await account.client().send("POST", "/ambulancia/servicios/\(view.serviceId)/recepcion", body: body, key: key, as: HandoverResult.self)
+        }
+        await load()
+    }
+
     private func load() async {
         await loader.load {
             let api = try account.client()
             let status = try await api.get("/ambulancia", as: AmbulanceStatus.self)
             var arrival = AmbulanceArrival(status: status, prehospital: nil)
-            if let service = status.activeService, service.hasPrehospital {
+            if let service = status.activeService {
                 arrival.prehospital = try await api.get("/ambulancia/servicios/\(service.id)/prehospital", as: PrehospitalView.self)
             }
             return arrival
