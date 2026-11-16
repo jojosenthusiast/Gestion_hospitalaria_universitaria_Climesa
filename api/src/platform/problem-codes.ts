@@ -24,6 +24,8 @@ export const PROBLEM_CODES = [
   'sin_expediente', 'rol_no_invitable', 'invitacion_no_pendiente', 'jerarquia_administrador', 'trabajo_abierto',
   // Inventory, public information and metrics.
   'existencia_insuficiente', 'aviso_con_datos_personales', 'indicador_desconocido',
+  // Laboratory catalog (MA-LAB-06).
+  'examen_con_resultados',
   // Ambulance.
   'ambulancia_ya_despachada', 'estado_final_invalido', 'hito_fuera_de_orden', 'servicio_cerrado', 'servicio_finalizado', 'sin_paramedico_de_turno',
   'sin_motorista_de_turno', 'sin_tripulacion_de_turno', 'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio',

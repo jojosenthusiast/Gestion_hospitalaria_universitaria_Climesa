@@ -45,8 +45,8 @@ Una sola lista de las reglas que el sistema hace cumplir. Cada spec las referenc
 - **RN-22** Se consulta desde un número llamado o una cita. Iniciar la consulta crea la relación de atención.
 - **RN-23** Firmar exige inscripción vigente en el instante (D-012). Lo firmado no se edita: se corrige con addendum que conserva el original.
 - **RN-24** Estados de orden: Pendiente, En Proceso (muestra tomada), Completado (todos los valores capturados y validados por el laboratorista), Cancelado (con motivo). Revisado es una marca aparte (D-059).
-- **RN-25** Rango de referencia según sexo y edad vigentes a la fecha de la muestra. Valor fuera de rango: alto o bajo; fuera del rango crítico: crítico, con aviso inmediato al médico.
-- **RN-26** El paciente ve siempre el estado; los valores solo después de la revisión médica (D-040).
+- **RN-25** Rango de referencia según sexo y edad vigentes a la fecha de la muestra. Valor fuera de rango: alto o bajo; fuera del rango crítico: crítico, con aviso inmediato al médico (evento `laboratorio.critico` también en el canal `usuario:` del médico que pidió la orden y del tratante de la admisión activa; los móviles lo muestran como franja de aviso).
+- **RN-26** El paciente ve siempre el estado; los valores solo después de la revisión médica (D-040). Revisa y libera el médico que pidió la orden, el tratante de la admisión activa, un médico con relación de atención vigente o, si quien la pidió no tiene turno en ese momento, un médico de turno (`laboratorio.puede_revisar`). Un resultado de una orden completada se enmienda con motivo de 10 caracteres o más (D-13 de la auditoría final): el valor anterior queda en el historial y la orden vuelve a revisión médica.
 - **RN-27** Un panel se expande a sus exámenes hoja de forma recursiva, sin ciclos (D-062).
 
 ## Ambulancia

@@ -7965,6 +7965,93 @@
         "x-permiso": "laboratorio.ordenar"
       }
     },
+    "/api/v1/laboratorio/ordenes/{id}": {
+      "get": {
+        "operationId": "LaboratoryController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabOrderDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una orden: resultados permitidos, motivo de cancelación e historial de correcciones",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "resultados.ver"
+      }
+    },
     "/api/v1/laboratorio/ordenes/{id}/muestra": {
       "post": {
         "operationId": "LaboratoryController_sample",
@@ -8201,6 +8288,125 @@
           "laboratory"
         ],
         "x-permiso": "laboratorio.procesar"
+      }
+    },
+    "/api/v1/laboratorio/ordenes/{id}/enmendar": {
+      "post": {
+        "operationId": "LaboratoryController_amend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabAmendDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enmendar un resultado de una orden completada; vuelve a revisión médica",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "laboratorio.validar"
       }
     },
     "/api/v1/laboratorio/ordenes/{id}/completar": {
@@ -8629,6 +8835,196 @@
           "laboratory"
         ],
         "x-permiso": "resultados.ver"
+      }
+    },
+    "/api/v1/catalogo/examenes": {
+      "get": {
+        "operationId": "LabCatalogController_exams",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LabCatalogExamResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catálogo completo de exámenes con componentes y rangos vigentes",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "catalogo.configurar"
+      }
+    },
+    "/api/v1/catalogo/examenes/{id}": {
+      "put": {
+        "operationId": "LabCatalogController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabExamUpdateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabCatalogExamResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar nombre, unidad, estado y rangos de un examen (los rangos se versionan por vigencia)",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "catalogo.configurar"
       }
     },
     "/api/v1/admisiones/origenes": {
@@ -20245,6 +20641,11 @@
           "name": {
             "type": "string"
           },
+          "unit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Unidad del catálogo"
+          },
           "result": {
             "nullable": true,
             "description": "null sin resultado o si el actor aún no puede ver valores",
@@ -20261,8 +20662,21 @@
           "examId",
           "code",
           "name",
+          "unit",
           "result"
         ]
+      },
+      "AccionOrdenLaboratorio": {
+        "type": "string",
+        "enum": [
+          "tomar_muestra",
+          "capturar",
+          "completar",
+          "revisar",
+          "cancelar",
+          "enmendar"
+        ],
+        "description": "Acciones que el servidor acepta ahora para quien lee"
       },
       "LabOrderResponse": {
         "type": "object",
@@ -20316,6 +20730,12 @@
             "format": "date-time",
             "nullable": true
           },
+          "amendedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Última enmienda de un resultado ya completado (vuelve a revisión médica)"
+          },
           "version": {
             "type": "integer"
           },
@@ -20352,6 +20772,13 @@
             "items": {
               "$ref": "#/components/schemas/LabOrderItemResponse"
             }
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "Acciones que el servidor acepta ahora para quien lee",
+            "items": {
+              "$ref": "#/components/schemas/AccionOrdenLaboratorio"
+            }
           }
         },
         "required": [
@@ -20365,6 +20792,7 @@
           "sampleTakenAt",
           "completedAt",
           "reviewedAt",
+          "amendedAt",
           "version",
           "patientName",
           "patientRecord",
@@ -20372,7 +20800,196 @@
           "patientAge",
           "patientAgeRange",
           "doctorName",
-          "items"
+          "items",
+          "allowedActions"
+        ]
+      },
+      "LabResultHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "orderItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Versión del resultado que se reemplazó"
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          },
+          "mark": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MarcaResultado"
+              }
+            ]
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderItemId",
+          "version",
+          "value",
+          "text",
+          "mark",
+          "changedAt",
+          "changedByName",
+          "reason"
+        ]
+      },
+      "LabOrderDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "consultationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priority": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioridadLaboratorio"
+              }
+            ]
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoOrdenLaboratorio"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sampleTakenAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "amendedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Última enmienda de un resultado ya completado (vuelve a revisión médica)"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "patientName": {
+            "type": "string",
+            "nullable": true
+          },
+          "patientRecord": {
+            "type": "string",
+            "nullable": true,
+            "description": "Número de expediente"
+          },
+          "patientSex": {
+            "type": "string",
+            "nullable": true
+          },
+          "patientAge": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Edad exacta; solo con permiso de ver la fecha de nacimiento"
+          },
+          "patientAgeRange": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decenio de edad («30-39») para quien solo ve el rango"
+          },
+          "doctorName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Médico que ordenó los estudios"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabOrderItemResponse"
+            }
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "Acciones que el servidor acepta ahora para quien lee",
+            "items": {
+              "$ref": "#/components/schemas/AccionOrdenLaboratorio"
+            }
+          },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "history": {
+            "description": "Vacío para quien no ve valores",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabResultHistoryResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "consultationId",
+          "patientId",
+          "doctorId",
+          "priority",
+          "state",
+          "createdAt",
+          "sampleTakenAt",
+          "completedAt",
+          "reviewedAt",
+          "amendedAt",
+          "version",
+          "patientName",
+          "patientRecord",
+          "patientSex",
+          "patientAge",
+          "patientAgeRange",
+          "doctorName",
+          "items",
+          "allowedActions",
+          "cancellationReason",
+          "history"
         ]
       },
       "LabOrderDto": {
@@ -20532,7 +21149,8 @@
           }
         },
         "required": [
-          "orderItemId"
+          "orderItemId",
+          "version"
         ]
       },
       "LabResultResponse": {
@@ -20574,6 +21192,41 @@
           "marca",
           "version",
           "orderVersion"
+        ]
+      },
+      "LabAmendDto": {
+        "type": "object",
+        "properties": {
+          "orderItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Versión vigente de la orden."
+          },
+          "value": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unidad del catálogo; si se envía debe coincidir."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500,
+            "description": "Por qué se corrige el resultado; queda en el historial y en la auditoría."
+          }
+        },
+        "required": [
+          "orderItemId",
+          "version",
+          "reason"
         ]
       },
       "LabVersionDto": {
@@ -20678,6 +21331,241 @@
         "required": [
           "id",
           "state",
+          "version"
+        ]
+      },
+      "LabCatalogComponentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "SexoRangoReferencia": {
+        "type": "string",
+        "enum": [
+          "femenino",
+          "masculino",
+          "cualquiera"
+        ]
+      },
+      "LabRangeResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sex": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SexoRangoReferencia"
+              }
+            ]
+          },
+          "ageFrom": {
+            "type": "integer"
+          },
+          "ageTo": {
+            "type": "integer",
+            "nullable": true
+          },
+          "min": {
+            "type": "number",
+            "nullable": true
+          },
+          "max": {
+            "type": "number",
+            "nullable": true
+          },
+          "criticalLow": {
+            "type": "number",
+            "nullable": true
+          },
+          "criticalHigh": {
+            "type": "number",
+            "nullable": true
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sex",
+          "ageFrom",
+          "ageTo",
+          "min",
+          "max",
+          "criticalLow",
+          "criticalHigh",
+          "validFrom",
+          "source"
+        ]
+      },
+      "LabCatalogExamResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isPanel": {
+            "type": "boolean"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "resultType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoResultadoLaboratorio"
+              }
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "hasResults": {
+            "type": "boolean",
+            "description": "Ya tiene resultados capturados (la unidad no se cambia)"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabCatalogComponentResponse"
+            }
+          },
+          "ranges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabRangeResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isPanel",
+          "unit",
+          "resultType",
+          "active",
+          "version",
+          "hasResults",
+          "components",
+          "ranges"
+        ]
+      },
+      "LabRangeDto": {
+        "type": "object",
+        "properties": {
+          "sex": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SexoRangoReferencia"
+              }
+            ]
+          },
+          "ageFrom": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 150
+          },
+          "ageTo": {
+            "type": "object",
+            "minimum": 1,
+            "maximum": 151,
+            "nullable": true,
+            "description": "Edad en años excluida; null = sin límite."
+          },
+          "min": {
+            "type": "object",
+            "nullable": true
+          },
+          "max": {
+            "type": "object",
+            "nullable": true
+          },
+          "criticalLow": {
+            "type": "object",
+            "nullable": true
+          },
+          "criticalHigh": {
+            "type": "object",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "description": "Fuente bibliográfica o del laboratorio."
+          }
+        },
+        "required": [
+          "sex",
+          "ageFrom",
+          "source"
+        ]
+      },
+      "LabExamUpdateDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Solo exámenes numéricos; no cambia si el examen ya tiene resultados."
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "ranges": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabRangeDto"
+            }
+          }
+        },
+        "required": [
           "version"
         ]
       },
@@ -25307,6 +26195,7 @@
           "existencia_insuficiente",
           "aviso_con_datos_personales",
           "indicador_desconocido",
+          "examen_con_resultados",
           "ambulancia_ya_despachada",
           "estado_final_invalido",
           "hito_fuera_de_orden",

@@ -2,9 +2,9 @@ import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Req, UseGua
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { LabCancelDto, LabOrderDto, LabResultDto, LabSampleDto, LabVersionDto } from './laboratory.dto';
+import { LabAmendDto, LabCancelDto, LabOrderDto, LabResultDto, LabSampleDto, LabVersionDto } from './laboratory.dto';
 import { LaboratoryService } from './laboratory.service';
-import { LabCompleteResponse, LabExamResponse, LabOrderCreatedResponse, LabOrderResponse, LabOrderStateResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
+import { LabCompleteResponse, LabExamResponse, LabOrderCreatedResponse, LabOrderDetailResponse, LabOrderResponse, LabOrderStateResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
 
 @ApiTags('laboratory') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('laboratorio')
 export class LaboratoryController {
@@ -16,6 +16,9 @@ export class LaboratoryController {
   @Get('ordenes') @RequirePermission('laboratorio.ver_cola', 'resultados.ver') @ApiOperation({ summary: 'Cola de laboratorio o resultados permitidos' }) @ApiOkResponse({ type: [LabOrderResponse] })
   list(@Req() r: ActorRequest) { return this.laboratory.list(r.actor); }
 
+  @Get('ordenes/:id') @RequirePermission('resultados.ver') @ApiOperation({ summary: 'Detalle de una orden: resultados permitidos, motivo de cancelación e historial de correcciones' }) @ApiOkResponse({ type: LabOrderDetailResponse })
+  detail(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string) { return this.laboratory.detail(r.actor, id); }
+
   @Post('ordenes') @RequirePermission('laboratorio.ordenar') @ApiOperation({ summary: 'Crear una orden de laboratorio desde una consulta' }) @ApiCreatedResponse({ type: LabOrderCreatedResponse })
   create(@Req() r: ActorRequest, @Body() dto: LabOrderDto, @Headers('idempotency-key') key?: string) { return this.laboratory.create(r.actor, dto, key); }
 
@@ -24,6 +27,9 @@ export class LaboratoryController {
 
   @Post('ordenes/:id/resultados') @RequirePermission('laboratorio.procesar') @ApiOperation({ summary: 'Capturar o actualizar el resultado de un examen' }) @ApiCreatedResponse({ type: LabResultResponse })
   result(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabResultDto, @Headers('idempotency-key') key?: string) { return this.laboratory.result(r.actor, id, dto, key); }
+
+  @Post('ordenes/:id/enmendar') @RequirePermission('laboratorio.validar') @ApiOperation({ summary: 'Enmendar un resultado de una orden completada; vuelve a revisión médica' }) @ApiCreatedResponse({ type: LabResultResponse })
+  amend(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabAmendDto, @Headers('idempotency-key') key?: string) { return this.laboratory.amend(r.actor, id, dto, key); }
 
   @Post('ordenes/:id/completar') @RequirePermission('laboratorio.validar') @ApiOperation({ summary: 'Completar una orden con todos sus resultados' }) @ApiCreatedResponse({ type: LabCompleteResponse })
   complete(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabVersionDto, @Headers('idempotency-key') key?: string) { return this.laboratory.complete(r.actor, id, dto, key); }

@@ -71,7 +71,7 @@ describe('contrato OpenAPI', () => {
   it('keeps endpoints.csv aligned with the contract', () => {
     const pending = [
       'PUT /api/v1/me/dispositivos', 'GET /api/v1/recursos/equipos', 'POST /api/v1/recursos/equipos/{id}/estado', 'PUT /api/v1/recursos/tipos/{id}',
-      'GET /api/v1/me/fila', 'POST /api/v1/consultas/{id}/addendum', 'GET /api/v1/laboratorio/ordenes/{id}', 'PUT /api/v1/catalogo/examenes/{id}',
+      'GET /api/v1/me/fila', 'POST /api/v1/consultas/{id}/addendum',
     ];
     const rows = readFileSync(resolve(root, '../docs/arquitectura/datos/endpoints.csv'), 'utf8').replace(/^﻿/, '').split(/\r?\n/).slice(1).filter(Boolean).map(line => line.split(','));
     const catalog = rows.map(([, method, path]) => `${method} ${path}`);
