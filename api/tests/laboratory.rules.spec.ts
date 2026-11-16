@@ -1,5 +1,5 @@
 import { LabMark } from '../src/laboratory/laboratory.dto';
-import { appointmentMatchesProposal, classifyLabValue, followUpReason, labExternalActions, matchesDoubleIdentification } from '../src/laboratory/laboratory.rules';
+import { appointmentMatchesProposal, classifyLabValue, detectAttachmentType, followUpReason, labExternalActions, matchesDoubleIdentification } from '../src/laboratory/laboratory.rules';
 
 describe('clasificación de resultados de laboratorio', () => {
   const range = { minimo: '3.5', maximo: '5.0', critico_bajo: '2.5', critico_alto: '6.0' };
@@ -55,4 +55,23 @@ describe('S10 reglas de seguimiento', () => {
     expect(appointmentMatchesProposal({ patientId: 'p', doctorId: 'x', state: 'confirmada' }, proposal)).toBe(false);
     expect(appointmentMatchesProposal({ patientId: 'p', doctorId: 'd', state: 'cancelada' }, proposal)).toBe(false);
   });
+});
+
+describe('detectAttachmentType (T07b): tipo por bytes iniciales', () => {
+  const bytes = (...parts: Array<string | number[]>) => Buffer.concat(parts.map(p => typeof p === 'string' ? Buffer.from(p, 'latin1') : Buffer.from(p)));
+  test.each([
+    ['PDF', bytes('%PDF-1.4\n'), 'application/pdf'],
+    ['JPEG', bytes([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]), 'image/jpeg'],
+    ['PNG', bytes([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]), 'image/png'],
+    ['WEBP', bytes('RIFF', [0, 0, 0, 0], 'WEBPVP8 '), 'image/webp'],
+    ['HEIC', bytes([0, 0, 0, 0x18], 'ftypheic', [0, 0, 0, 0]), 'image/heic'],
+    ['HEIF mif1', bytes([0, 0, 0, 0x18], 'ftypmif1', [0, 0, 0, 0]), 'image/heic'],
+  ])('%s', (_name, content, expected) => { expect(detectAttachmentType(content)).toBe(expected); });
+  test.each([
+    ['vacío', bytes()],
+    ['ejecutable', bytes('MZ\x90\x00')],
+    ['ZIP', bytes('PK\x03\x04')],
+    ['MP4 (ftyp sin marca HEIF)', bytes([0, 0, 0, 0x18], 'ftypisom', [0, 0, 0, 0])],
+    ['RIFF que no es WEBP', bytes('RIFF', [0, 0, 0, 0], 'WAVEfmt ')],
+  ])('%s se rechaza', (_name, content) => { expect(detectAttachmentType(content)).toBeNull(); });
 });

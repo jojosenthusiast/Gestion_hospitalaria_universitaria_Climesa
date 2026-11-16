@@ -10557,6 +10557,222 @@
         "x-permiso": "laboratorio.procesar OR laboratorio.revisar"
       }
     },
+    "/api/v1/laboratorio/adjuntos/{id}/archivo": {
+      "post": {
+        "operationId": "LaboratoryController_storeAttachment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "archivo"
+                ],
+                "properties": {
+                  "archivo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PDF, JPG, PNG, HEIC o WEBP de hasta 10 MB"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabAttachmentStoredResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subir la foto o el PDF de un adjunto que solo tiene la referencia (T07b): bucket privado, tipo leído del contenido, huella SHA-256 calculada en el servidor; no reemplaza un archivo guardado",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "laboratorio.procesar OR laboratorio.revisar"
+      }
+    },
+    "/api/v1/laboratorio/adjuntos/{id}/enlace": {
+      "get": {
+        "operationId": "LaboratoryController_attachmentLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabAttachmentLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enlace firmado de 5 minutos para descargar un adjunto (T07b); solo personal que ve los valores de la orden, nunca el paciente; cada enlace queda auditado",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "resultados.ver"
+      }
+    },
     "/api/v1/laboratorio/pendientes": {
       "get": {
         "operationId": "LaboratoryController_followUps",
@@ -25104,7 +25320,7 @@
           },
           "stored": {
             "type": "boolean",
-            "description": "El archivo está guardado en el almacenamiento clínico (hoy siempre false: solo la referencia)"
+            "description": "El archivo está guardado en el almacenamiento clínico privado; false si solo existe la referencia"
           },
           "note": {
             "type": "string",
@@ -25815,6 +26031,77 @@
           "version",
           "attachment",
           "results"
+        ]
+      },
+      "LabAttachmentStoredResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stored": {
+            "type": "boolean"
+          },
+          "mimeType": {
+            "description": "Tipo leído del contenido del archivo (bytes iniciales), no del nombre",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoAdjuntoLaboratorio"
+              }
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Huella SHA-256 calculada en el servidor"
+          }
+        },
+        "required": [
+          "id",
+          "stored",
+          "mimeType",
+          "sizeBytes",
+          "sha256"
+        ]
+      },
+      "LabAttachmentLinkResponse": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Enlace firmado de descarga; deja de funcionar en `expiresAt`. No se guarda ni se comparte."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresInSeconds": {
+            "type": "integer"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoAdjuntoLaboratorio"
+              }
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt",
+          "expiresInSeconds",
+          "fileName",
+          "mimeType",
+          "sizeBytes"
         ]
       },
       "MotivoPendienteLaboratorio": {
@@ -31372,6 +31659,10 @@
           "orden_no_externa",
           "cita_no_coincide",
           "propuesta_resuelta",
+          "adjunto_tipo_invalido",
+          "adjunto_muy_grande",
+          "adjunto_sin_archivo",
+          "adjunto_ya_almacenado",
           "ambulancia_ya_despachada",
           "estado_final_invalido",
           "hito_fuera_de_orden",

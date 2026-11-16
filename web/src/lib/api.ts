@@ -37,7 +37,7 @@ export class HttpApi implements Api {
  constructor(private readonly token:()=>Promise<string>,private readonly unauthorized?:()=>void){}
  async request<T>(path:string,init:RequestInit={}):Promise<T>{
   let response:Response;
-  try{response=await fetch(base+path,{...init,cache:'no-store',headers:{Accept:'application/json',Authorization:`Bearer ${await this.token()}`,...(init.body?{'Content-Type':'application/json'}:{}),...init.headers}});}catch(e){if(e instanceof DOMException&&e.name==='AbortError')throw e;throw new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.');}
+  try{response=await fetch(base+path,{...init,cache:'no-store',headers:{Accept:'application/json',Authorization:`Bearer ${await this.token()}`,...(init.body&&!(init.body instanceof FormData)?{'Content-Type':'application/json'}:{}),...init.headers}});}catch(e){if(e instanceof DOMException&&e.name==='AbortError')throw e;throw new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.');}
   const body=await response.json().catch(()=>({}));
   if(!response.ok){if(response.status===401)this.unauthorized?.();throw new ApiError(body.detail??body.error?.message??body.message??'No se pudo completar la operación.',response.status,typeof body.codigo==='string'?body.codigo:undefined,typeof body.versionActual==='number'?body.versionActual:undefined,body&&typeof body==='object'?body:undefined);}
   return body as T;

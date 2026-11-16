@@ -105,6 +105,16 @@ delete from publico.aviso where id::text like 'de300000-%';
 create temp table items_demo on commit drop as
   select id from laboratorio.orden_item where id::text like 'de300000-%' or orden_id::text like 'de300000-%';
 -- Fase 2, flujo C (S10): referencias de informes externos, pendientes del médico y citas propuestas de órdenes demo.
+-- T07b: la semilla no crea archivos, pero si alguien subió uno a un adjunto demo, el objeto vive en el bucket privado
+-- laboratorio-adjuntos (carpeta <orden_id>/) y este SQL no puede borrarlo: se avisa para retirarlo a mano en Storage.
+do $$
+declare guardados int;
+begin
+  select count(*) into guardados from laboratorio.adjunto where orden_id::text like 'de300000-%' and ruta_almacenamiento is not null;
+  if guardados > 0 then
+    raise notice 'Hay % archivo(s) de adjuntos demo en el bucket laboratorio-adjuntos (carpetas de300000-...): retíralos a mano en Supabase Storage.', guardados;
+  end if;
+end $$;
 delete from laboratorio.adjunto where orden_id::text like 'de300000-%';
 delete from laboratorio.pendiente_medico where orden_id::text like 'de300000-%';
 delete from laboratorio.propuesta_cita where orden_id::text like 'de300000-%';

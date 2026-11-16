@@ -31,7 +31,8 @@ Inicio, Mi día, Resultados por revisar, Mis hospitalizados, Expediente, Signos 
 - Si el laboratorio corrige un resultado ya revisado, la orden vuelve a esta lista.
 - Arriba está la bandeja **Resultados por revisar**: un pendiente por orden con valor crítico (marca roja "Valor crítico") o con una observación que el laboratorio marcó como relevante. Los críticos van primero. Léelo y pulsa **Marcar como revisado**; si llega otro hallazgo de la misma orden, se suma al mismo pendiente.
 - **Se realiza en otro sitio**: en una orden tuya pendiente, indica dónde se hace el examen y las instrucciones para el paciente. El paciente las ve en "Mis exámenes".
-- **Cargar resultado externo** (Android): elige el PDF o la foto del informe (hasta 10 MB) y escribe el valor clave de cada examen. Se guarda la referencia del archivo y los valores; el archivo queda en tu teléfono.
+- **Cargar resultado externo** (Android): elige el PDF o la foto del informe (hasta 10 MB) y escribe el valor clave de cada examen. Desde Android se guarda la referencia del archivo y los valores; el archivo queda en tu teléfono y se puede subir después desde la web.
+- **Informe externo** (web): en una orden externa completada, **Descargar** baja la foto o el PDF guardado con un enlace que dura 5 minutos; cada descarga queda en la auditoría. El paciente nunca ve el archivo.
 - La lista se agrupa por etapa; las órdenes liberadas y canceladas empiezan plegadas. Las tarjetas sin acciones muestran solo el resumen: **Ver exámenes y avance** abre el detalle.
 
 ### Aviso de valor crítico

@@ -13,6 +13,10 @@ const fixed: Record<string, string> = {
   servicio_cerrado: 'El servicio ya terminó; vuelve a cargar.',
   sin_servicio_activo: 'La unidad ya no tiene un servicio activo; vuelve a cargar.',
   sin_paramedico_de_turno: 'No hay paramédico con cuenta en la app con turno en curso.',
+  adjunto_tipo_invalido: 'El archivo no es un PDF ni una foto JPG, PNG, HEIC o WEBP.',
+  adjunto_muy_grande: 'El archivo pasa de 10 MB; toma una foto más liviana o comprime el PDF.',
+  adjunto_sin_archivo: 'Este adjunto solo tiene la referencia: el archivo no se guardó en el sistema.',
+  adjunto_ya_almacenado: 'Este adjunto ya tiene su archivo guardado.',
 };
 const fallback: Record<string, string> = {
   validacion: 'Revisa los datos e intenta de nuevo.',
