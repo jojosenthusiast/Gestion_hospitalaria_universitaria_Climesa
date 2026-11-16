@@ -42,9 +42,16 @@ final class RoleFlowRulesTests: XCTestCase {
 
     // MARK: - I20 doctor's day
 
-    func testMiDiaAtenderAlLlamadoGanaALlamarSiguiente() {
+    func testMiDiaAtenderAlQueYoLlameGanaALlamarSiguiente() {
         let tickets = [ticket("a", state: "en_espera", number: 3), ticket("b", state: "llamado", number: 5), ticket("c", state: "llamado", number: 4)]
-        XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true), .attend("c"))
+        XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true, calledByMe: "b"), .attend("b"))
+    }
+
+    func testMiDiaUnLlamadoDeOtroMedicoNoEsMiAtender() {
+        // /fila lists the called numbers of every office: a number a colleague called is never this doctor's primary.
+        let tickets = [ticket("a", state: "en_espera", number: 3), ticket("c", state: "llamado", number: 4)]
+        XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true), .callNext)
+        XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true, calledByMe: "z"), .callNext)
     }
 
     func testMiDiaEnAtencionVaAntesQueUnLlamado() {

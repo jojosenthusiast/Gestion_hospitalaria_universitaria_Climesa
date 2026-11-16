@@ -33,6 +33,8 @@ struct DoctorDayView: View {
     @State private var deciding = Submission()
     /// Last call made here, undoable while it is still "llamado" (S9): ticket id, returned version and "CON 7".
     @State private var undo: (id: String, version: Int, code: String)?
+    /// Ticket this doctor called; only that called number may be the day's primary (`/fila` lists every office's calls).
+    @State private var calledByMe: String?
     @State private var rejecting: Appointment?
 
     var body: some View {
@@ -125,7 +127,7 @@ struct DoctorDayView: View {
     @ViewBuilder private func queueSection(_ tickets: [QueueTicket], next: QueueNextProposal?) -> some View {
         let waiting = tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count
         // S13: one primary on the day: attend the number already called, otherwise call the next one.
-        let primary = DoctorDayActionRules.primary(tickets: tickets, canAttend: account.can("consulta.iniciar"), canCallNext: account.can("fila.llamar"))
+        let primary = DoctorDayActionRules.primary(tickets: tickets, canAttend: account.can("consulta.iniciar"), canCallNext: account.can("fila.llamar"), calledByMe: calledByMe)
         SectionCard(title: L.text("day.queue")) {
             Text(verbatim: String(format: L.text("day.queue.waiting"), waiting)).font(Typo.body).foregroundStyle(Theme.ink)
             // S9 / RN-FILA-SIGUIENTE: the server proposes who goes next and says why; "Llamar siguiente" calls that number.
@@ -335,6 +337,7 @@ struct DoctorDayView: View {
         if let called {
             calling.notice = String(format: L.text("day.queue.called"), called.number)
             undo = (called.id, called.version, "\(QueueBoardRules.area(of: .consultaGeneral)) \(called.number)")
+            calledByMe = called.id
         }
         await load()
     }
@@ -345,7 +348,7 @@ struct DoctorDayView: View {
         let ok = await calling.run(last.id, body: body, success: String(format: L.text("queue.undone"), last.code)) { key in
             _ = try await account.client().send("POST", "/fila/\(last.id)/deshacer-llamado", body: body, key: key, as: QueueTransitionResult.self)
         }
-        if ok { undo = nil }
+        if ok { if calledByMe == last.id { calledByMe = nil }; undo = nil }
         await load()
     }
 
@@ -355,7 +358,7 @@ struct DoctorDayView: View {
         await calling.run(ticket.id, body: body, success: "\(QueueBoardRules.code(ticket)): \(move.label)") { key in
             result = try await account.client().send("POST", QueueBoardRules.path(ticket, move), body: body, key: key, as: QueueTransitionResult.self)
         }
-        if move == .llamar, let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)) } else if result != nil { undo = nil }
+        if move == .llamar, let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)); calledByMe = ticket.id } else if result != nil { undo = nil }
         await load()
     }
 
@@ -381,7 +384,7 @@ struct DoctorDayView: View {
         await calling.run(ticket.id, body: body, success: String(format: L.text("day.queue.called"), ticket.number)) { key in
             result = try await account.client().send("POST", "/fila/\(ticket.id)/llamar", body: body, key: key, as: QueueCallResult.self)
         }
-        if let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)) }
+        if let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)); calledByMe = ticket.id }
         await load()
     }
 }
