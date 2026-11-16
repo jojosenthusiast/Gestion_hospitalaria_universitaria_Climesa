@@ -993,7 +993,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Llamar el siguiente número en espera del servicio (orden de llegada) */
+        /** Llamar al siguiente según RN-FILA-SIGUIENTE (emergencias, urgentes, citas en su ventana y luego orden de llegada) */
         post: operations["QueueController_callNext"];
         delete?: never;
         options?: never;

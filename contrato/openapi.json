@@ -6543,7 +6543,7 @@
             "bearer": []
           }
         ],
-        "summary": "Llamar el siguiente número en espera del servicio (orden de llegada)",
+        "summary": "Llamar al siguiente según RN-FILA-SIGUIENTE (emergencias, urgentes, citas en su ventana y luego orden de llegada)",
         "tags": [
           "queue"
         ],

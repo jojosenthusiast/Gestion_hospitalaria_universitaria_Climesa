@@ -146,4 +146,40 @@ describe('Fase 2 · fila del día y tablero (S9)', () => {
     expect(signed.status).toBe(201);
     expect(signed.body.nextProposal).toMatchObject({ service: 'consulta_general', proposal: { id: waiting.id, reason: 'emergencia', area: 'CON' } });
   });
+
+  test('call-next serializes per service: no SKIP LOCKED, an advisory lock first, and two concurrent calls get two numbers', async () => {
+    // PGlite runs one connection, so a true two-session race cannot run here (it was reproduced on Postgres by the
+    // verifier). This pins the lock shape that prevents it and the observable outcome of two overlapping requests.
+    const service = 'emergencia';
+    for (let i = 0; i < 3; i++) await issue(service);
+    const sql: string[] = [];
+    const original = t.pg.transaction.bind(t.pg);
+    const spy = jest.spyOn(t.pg, 'transaction').mockImplementation(((work: any) => original(async (tx: any) => {
+      const query = tx.query.bind(tx);
+      tx.query = (text: string, params?: unknown[]) => { sql.push(text); return query(text, params); };
+      return work(tx);
+    })) as any);
+    try {
+      const [a, b] = await Promise.all([
+        t.call('REC', 'POST', '/fila/llamar-siguiente', { service }),
+        t.call('REC', 'POST', '/fila/llamar-siguiente', { service }),
+      ]);
+      expect([a.status, b.status]).toEqual([201, 201]);
+      expect(a.body.id).not.toBe(b.body.id);
+    } finally { spy.mockRestore(); }
+    expect(sql.some(text => /SKIP LOCKED/i.test(text))).toBe(false);
+    const lock = sql.findIndex(text => /pg_advisory_xact_lock/.test(text));
+    const read = sql.findIndex(text => /t\.estado='en_espera'/.test(text) && /FOR UPDATE/.test(text));
+    expect(lock).toBeGreaterThanOrEqual(0);
+    expect(read).toBeGreaterThan(lock);
+  });
+
+  test('an appointment already attended does not mark a later number as cited (it is a walk-in)', async () => {
+    const seen = await t.patient();
+    await t.appointment(seen, at(-120), 'atendida');
+    const back = (await t.call('REC', 'POST', '/fila', { service: 'consulta_general', patientId: seen })).body;
+    const row = await ticketOf('REC', back.id);
+    expect(row.walkIn).toBe(true);
+    expect(row.appointmentAt).toBeNull();
+  });
 });

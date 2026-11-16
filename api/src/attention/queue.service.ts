@@ -15,11 +15,13 @@ import { NEXT_PATIENT_RULE, nextReasonText, proposeNext, queueActions, queueUndo
 type QueueRow = Record<string, any>;
 
 /**
- * Today's confirmed (or already attended) appointment of a consulta_general number's patient: the "cited" mark and
- * the time used by the next-patient rule. Other areas have no appointments, so their numbers are always walk-ins.
+ * Today's confirmed appointment of a consulta_general number's patient: the "cited" mark and the time used by the
+ * next-patient rule. An appointment in a final state (attended, cancelled, no-show) does not count: a patient seen
+ * earlier who comes back without an appointment is a walk-in. Other areas have no appointments, so their numbers are
+ * always walk-ins.
  */
 const APPOINTMENT_JOIN = `LEFT JOIN LATERAL (SELECT lower(c.horario) AS start FROM atencion.cita c
-      WHERE t.servicio='consulta_general' AND c.paciente_id=t.paciente_id AND c.estado IN ('confirmada','atendida')
+      WHERE t.servicio='consulta_general' AND c.paciente_id=t.paciente_id AND c.estado='confirmada'
         AND (lower(c.horario) AT TIME ZONE 'America/El_Salvador')::date=t.fecha
       ORDER BY lower(c.horario) LIMIT 1) ap ON true`;
 const PATIENT_NAME = `coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional)`;
@@ -165,7 +167,7 @@ export class QueueService {
       ap.start AS "appointmentAt",t.version
       FROM atencion.ticket_fila t LEFT JOIN pacientes.paciente p ON p.id=t.paciente_id
       ${APPOINTMENT_JOIN}
-      WHERE t.fecha=$1::date AND t.servicio=$2 AND t.estado='en_espera' ORDER BY t.numero ${lock ? 'FOR UPDATE OF t SKIP LOCKED' : ''}`,
+      WHERE t.fecha=$1::date AND t.servicio=$2 AND t.estado='en_espera' ORDER BY t.numero ${lock ? 'FOR UPDATE OF t' : ''}`,
     [this.clock.today(), service])).rows.map(row => ({ ...row, appointmentAt: row.appointmentAt ? new Date(row.appointmentAt) : null })) as QueueRow[];
   }
 
@@ -201,6 +203,9 @@ export class QueueService {
    */
   async callNext(actor: Actor, dto: QueueCallNextDto, key?: string) {
     return this.commands.run(actor, `fila.llamar:siguiente:${dto.service}`, key, dto, async c => {
+      // Serialize call-next per service and day: a second caller waits for the first to commit and then sees the
+      // remaining queue. SKIP LOCKED would hide every waiting row (or the proposed one) from it instead.
+      await c.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`atencion.fila.llamar_siguiente:${dto.service}:${this.clock.today()}`]);
       const chosen = proposeNext(await this.waiting(c, dto.service, true) as any[], this.clock.now());
       if (!chosen) throw new ProblemException('fila_sin_espera', 409, 'No hay números en espera en este servicio.');
       const next = chosen.ticket as QueueRow;

@@ -17,7 +17,7 @@ export class QueueController {
   @Post() @RequirePermission('fila.emitir') @ApiOperation({ summary: 'Emitir un número para el paciente actual o indicado' }) @ApiCreatedResponse({ type: QueueIssuedResponse })
   issue(@Req() r: ActorRequest, @Body() dto: QueueIssueDto, @Headers('idempotency-key') key?: string) { return this.queue.issue(r.actor, dto, key); }
 
-  @Post('llamar-siguiente') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Llamar el siguiente número en espera del servicio (orden de llegada)' }) @ApiCreatedResponse({ type: QueueCallNextResponse })
+  @Post('llamar-siguiente') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Llamar al siguiente según RN-FILA-SIGUIENTE (emergencias, urgentes, citas en su ventana y luego orden de llegada)' }) @ApiCreatedResponse({ type: QueueCallNextResponse })
   callNext(@Req() r: ActorRequest, @Body() dto: QueueCallNextDto, @Headers('idempotency-key') key?: string) { return this.queue.callNext(r.actor, dto, key); }
 
   @Get('siguiente') @RequirePermission('fila.ver') @ApiOperation({ summary: 'Quién pasa después en un servicio (regla RN-FILA-SIGUIENTE)' })
