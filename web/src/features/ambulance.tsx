@@ -7,6 +7,7 @@ import { MaintenancePanel } from './ambulance/maintenance';
 import { RequestsBoard } from './ambulance/requests';
 import { CrewAction,CrewCoverage,missingCrew } from './ambulance/crew';
 import { AdminCloseAction } from './ambulance/admin-close';
+import { useQuickAction } from './personal/accion';
 import { milestoneNames,minutesBetween,priorityNames,roleNames,stateNames,typeNames,type AmbulanceRequest,type AmbulanceStatus,type PrehospitalView } from './ambulance/types';
 import './ambulance/ambulance.css';
 export * from './ambulance/types';
@@ -21,6 +22,9 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  const pendingCount=data.data?.pendingRequests?.length??0,previous=useRef<number|null>(null);
  useEffect(()=>{if(previous.current!==null&&pendingCount>previous.current)beep();if(data.data)previous.current=pendingCount;},[pendingCount,data.data]);
  const saved=()=>{setDispatching(null);setDiscarding(null);setCalling(false);data.refresh();};
+ // S13: the home quick action «Solicitar ambulancia» (#/ambulancia?accion=solicitud) opens the call form directly.
+ const [quick,consumeQuick]=useQuickAction();
+ useEffect(()=>{if(quick==='solicitud'&&phoneDesk)setCalling(true);if(quick)consumeQuick();},[quick,phoneDesk,consumeQuick]);
  return <><CompactHeader breadcrumb="Operaciones / Ambulancia" title="Centro de despacho" actions={phoneDesk?<button type="button" className="secondary-button" onClick={()=>setCalling(true)}>Registrar llamada</button>:undefined}/><RemoteState state={data}>{s=><section className="data-workbench" aria-label="Estado de la unidad">
   <div className="number-strip"><div><strong className="mono-data">{s.unit.plate}</strong><span>Unidad única</span></div><div><strong><Tag value={s.unit.state} label={stateNames[s.unit.state]}/></strong><span>Estado actual</span></div><CrewCoverage status={s}/></div>
   {dispatcher&&s.dispatchBlock&&<section aria-label="Despacho bloqueado"><Notice kind="info"><strong>No se puede despachar ahora.</strong> {s.dispatchBlock.message} {s.dispatchBlock.action}</Notice>{missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}
@@ -31,7 +35,7 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
   {dispatching&&<DispatchForm api={api} unitVersion={s.unit.version} crewPool={s.availableCrew??[]} request={dispatching==='direct'?null:dispatching} onClose={()=>setDispatching(null)} onSaved={saved}/>}
   {discarding&&<DiscardForm api={api} request={discarding} onClose={()=>setDiscarding(null)} onSaved={saved}/>}
  </section>}</RemoteState>
- {calling&&<PhoneRequestForm api={api} onClose={()=>setCalling(false)} onSaved={saved}/>}
+ {calling&&<PhoneRequestForm api={api} profile={profile} onClose={()=>setCalling(false)} onSaved={saved}/>}
  {report&&<PrehospitalDialog api={api} serviceId={report} version={version} onClose={()=>setReport(null)}/>}
  </>;
 }

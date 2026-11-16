@@ -72,7 +72,8 @@ Un paciente que creó su cuenta en la app pide vincularla a su expediente con su
 
 ### Hospitalización
 
-- **Ingresar paciente** abre el asistente de admisión. Luego **Asignar cama** con las camas que sugiere la API (sexo de la habitación, aislamiento).
+- **Ingresar paciente** abre el asistente de admisión: paciente, origen y motivo, fecha y médico, habitación (categoría, requisitos y visitas en un paso), cama y resumen. Sin permiso de cama o con ingreso para más adelante no aparece el paso de cama.
+- **Asignar cama** muestra de una vez las camas que sugiere la API (sexo de la habitación, aislamiento), con la primera ya elegida. Con excepción autorizada se ven las dos categorías, la solicitada primero.
 - Si otra persona toma la misma cama al mismo tiempo, una asignación gana y la otra recibe el aviso de que la cama ya no está libre: elige otra.
 - **Cancelar admisión**, con motivo, mientras espera cama.
 - **Solicitar alta al médico tratante**: el médico firma el alta desde su app.
@@ -85,7 +86,7 @@ Consulta del tablero de camas y del árbol del edificio. El bloqueo y la limpiez
 
 ### Ambulancia
 
-- **Registrar llamada**: crea una solicitud a nombre de quien llama.
+- **Registrar llamada**: crea una solicitud a nombre de quien llama. **Solicitar ambulancia** del inicio la abre directamente. Si la llamada es por un paciente con expediente, elígelo en **Paciente · opcional**: se copian quien llama, el teléfono y la dirección a los campos vacíos, y el aviso dice cuáles.
 - **Confirmar y despachar** o **Descartar** una solicitud. Al despachar eliges paramédico y motorista de turno; la propuesta viene llena. El despacho se rechaza si el paramédico no tiene cuenta en la app o si falta motorista.
 - **Ver reporte prehospital**.
 
