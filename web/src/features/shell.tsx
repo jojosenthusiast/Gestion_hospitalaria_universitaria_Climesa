@@ -1,4 +1,4 @@
-import { lazy,Suspense,useEffect,useLayoutEffect,useRef,useState,type ComponentType,type ReactNode } from 'react';
+import { Component,lazy,Suspense,useEffect,useLayoutEffect,useRef,useState,type ComponentType,type ReactNode } from 'react';
 import { Brand,Icon,StatusView,type IconName } from '../components/ui';
 import { Skeleton } from '../components/system';
 import { can,roleNames,type AccessProfile,type Api } from '../lib/api';
@@ -30,8 +30,10 @@ function page<I extends LoaderId,P extends object>(id:I,pick:(module:Loaded[I])=
  let ready:ComponentType<P>|null=null;
  const load=()=>(loaders[id]() as Promise<Loaded[I]>).then(m=>{ready=pick(m);return ready;});
  const list:(()=>Promise<void>)[]=warmers[id as LoaderId]??=[];list.push(()=>load().then(()=>undefined));
- const Deferred=lazy(()=>load().then(component=>({default:component})));
- return function ModulePage(props:P){const [Loaded]=useState(()=>ready);return Loaded?<Loaded {...props}/>:<Deferred {...props}/>;};
+ // React memoizes a rejected lazy import: after a failed download a new lazy is made, so "Reintentar" downloads again.
+ const deferred=():ComponentType<P>=>lazy(()=>load().then(component=>({default:component})).catch(error=>{Deferred=deferred();throw error;})) as unknown as ComponentType<P>;
+ let Deferred=deferred();
+ return function ModulePage(props:P){const [Loaded]=useState(()=>ready);const [Current]=useState(()=>Deferred);return Loaded?<Loaded {...props}/>:<Current {...props}/>;};
 }
 const PatientsPage=page('patients',m=>m.PatientsPage);
 const PersonnelPage=page('personnel',m=>m.PersonnelPage);
@@ -53,6 +55,20 @@ const NoticesPage=page('notices',m=>m.NoticesPage);
 const MetricsPage=page('metrics',m=>m.MetricsPage);
 /** Descarga el código de los módulos visibles cuando el navegador queda libre. Es una sola vez por sesión, no un sondeo. */
 export function preloadModules(ids:string[]){const wanted=[...new Set(ids.map(id=>moduleCode[id]).filter((id):id is LoaderId=>!!id))];for(const id of wanted)for(const warm of warmers[id]??[])void warm().catch(()=>undefined);}
+/**
+ * A module whose code or render failed (for example a tab left open across a deploy that replaced the files) shows a
+ * notice in the content area; the navigation stays usable. "Reintentar" mounts the module again; "Recargar la página"
+ * brings the current files.
+ */
+class ModuleBoundary extends Component<{label:string;children:ReactNode},{failed:boolean;attempt:number}>{
+ state={failed:false,attempt:0};
+ static getDerivedStateFromError(){return {failed:true};}
+ componentDidCatch(error:unknown){console.error(error);}
+ render(){
+  if(!this.state.failed)return <Suspense key={this.state.attempt} fallback={<ModuleFallback label={this.props.label}/>}>{this.props.children}</Suspense>;
+  return <><CompactHeader title={this.props.label}/><div className="notice notice-error" role="alert"><p><strong>No se pudo abrir este módulo.</strong> Revisa tu conexión. Si el sistema se actualizó, recarga la página.</p><div className="row-actions"><button type="button" className="secondary-button" onClick={()=>this.setState(s=>({failed:false,attempt:s.attempt+1}))}>Reintentar</button><button type="button" className="primary-button" onClick={()=>window.location.reload()}>Recargar la página</button></div></div></>;
+ }
+}
 /** Lo que se ve mientras llega el código de un módulo: la barra y el contenido reservan su lugar. */
 function ModuleFallback({label}:{label:string}){return <><CompactHeader title={label}/><Skeleton rows={6} label={`Cargando ${label.toLowerCase()}…`}/></>;}
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión; `alsoPermissions` abre el mismo módulo a otros permisos. */
@@ -98,6 +114,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  // Una ruta de la sesión anterior (o escrita a mano) que esta cuenta no ve vuelve a Inicio: nunca queda una pantalla «Sin permiso» fuera del menú.
  const menuIds=menu.map(m=>m.id).join('|');
  useLayoutEffect(()=>{const current=readRoute();if(modules.some(m=>m.id===current)&&!menuIds.split('|').includes(current)){history.replaceState(null,'','#/inicio');setRoute('inicio');}},[menuIds]);
+ useEffect(()=>{try{window.scrollTo(0,0);document.getElementById('main-content')?.scrollTo?.(0,0);}catch{/* jsdom has no scrolling */}},[route]);
  useEffect(()=>{const handle=()=>{setRoute(readRoute());setNavOpen(false);};window.addEventListener('hashchange',handle);return()=>window.removeEventListener('hashchange',handle);},[]);
  // S3: con el armazón ya pintado, se descarga en segundo plano el código de los módulos del menú (una vez).
  useEffect(()=>{const ids=menuIds.split('|'),run=()=>preloadModules(ids);if(typeof window.requestIdleCallback==='function'){const handle=window.requestIdleCallback(run,{timeout:2000});return()=>window.cancelIdleCallback(handle);}const timer=window.setTimeout(run,300);return()=>window.clearTimeout(timer);},[menuIds]);
@@ -160,7 +177,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
    <div className="hospital-workspace">
     {connection!=='live'&&<div role="status" className={`connection-band connection-${connection}`}><Icon name="info" size={16}/>{connection==='offline'?'Sin conexión. No se pueden guardar cambios.':'Recuperando la conexión…'}</div>}
     {/* S3: sin `key` por ruta. Cada módulo es su propio componente y se monta solo; la caché de `useData` muestra al instante lo ya leído. */}
-    <main id="main-content" className="hospital-main"><Suspense fallback={<ModuleFallback label={active?.label??'Módulo'}/>}>{content}</Suspense></main>
+    <main id="main-content" className="hospital-main"><ModuleBoundary key={route} label={active?.label??'Módulo'}>{content}</ModuleBoundary></main>
     <footer className="hospital-footer"><Brand/><span>Hospital universitario CLIMESA</span><span><Icon name="lock" size={13}/>Acceso personal</span></footer>
    </div>
   </div>

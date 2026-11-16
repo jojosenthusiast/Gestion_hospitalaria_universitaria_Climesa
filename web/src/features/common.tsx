@@ -12,6 +12,9 @@ export type Remote<T>={data:T|null;loading:boolean;error:ApiError|null;refresh:(
  */
 const caches=new WeakMap<object,Map<string,unknown>>();
 const cacheOf=(api:Api)=>{let cache=caches.get(api);if(!cache){cache=new Map();caches.set(api,cache);}return cache;};
+/** Bounded cache (least recently written out first): patient searches and records are not kept for the whole session. */
+const CACHE_LIMIT=30;
+const remember=(cache:Map<string,unknown>,path:string,value:unknown)=>{cache.delete(path);cache.set(path,value);while(cache.size>CACHE_LIMIT)cache.delete(cache.keys().next().value as string);};
 /**
  * `version` sube al reconectar (todo se vuelve a pedir); `live` sube solo con eventos de las entidades que afectan a `path` (WEB-01).
  * Al montar, si la ruta ya se leyó en esta sesión, el dato guardado se muestra al instante (`loading` sigue en `true`
@@ -23,10 +26,11 @@ export function useData<T>(api:Api,path:string,version=0,enabled=true):Remote<T>
  const scope=useMemo(()=>liveScope(path),[path]),live=scopedVersion(useLiveSignal(),scope);
  useEffect(()=>{
   if(!enabled){setLoading(false);setError(null);setData(null);return;}
-  // Otra ruta en el mismo componente (filtro, página): si ya se leyó, se muestra su dato; si no, queda el anterior hasta que llegue el nuevo.
-  if(cache.has(path))setData(cache.get(path) as T);
+  // Otra ruta en el mismo componente (filtro, página): si ya se leyó, se muestra su dato; si no, se muestra la carga.
+  // Nunca se dejan a la vista filas de otros filtros bajo los filtros nuevos.
+  setData(cache.has(path)?cache.get(path) as T:null);
   const controller=new AbortController();setLoading(true);setError(null);
-  api.request<T>(path,{signal:controller.signal}).then(v=>{if(!controller.signal.aborted){cache.set(path,v);setData(v);}}).catch(e=>{if(!controller.signal.aborted)setError(e instanceof ApiError?e:new ApiError('No se pudo cargar la información.'));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+  api.request<T>(path,{signal:controller.signal}).then(v=>{if(!controller.signal.aborted){remember(cache,path,v);setData(v);}}).catch(e=>{if(!controller.signal.aborted)setError(e instanceof ApiError?e:new ApiError('No se pudo cargar la información.'));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
   return()=>controller.abort();
  },[api,cache,path,version,live,tick,enabled]);
  return {data,loading,error,refresh:()=>setTick(v=>v+1)};
