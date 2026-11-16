@@ -157,14 +157,13 @@ object BusinessErrors {
         "cancelacion_fuera_de_plazo" -> "Ya pasó el plazo para cancelar o reprogramar esta cita."
         "franja_ocupada" -> "Esa franja se acaba de ocupar. Elige otra."
         "vinculacion_resuelta" -> "La vinculación ya fue resuelta por otra persona. Se actualizó la lista."
-        "sin_vinculacion" -> "La solicitud de vinculación ya no existe. Se actualizó la lista."
+        "sin_vinculacion" -> "Tu cuenta todavía no está vinculada a un expediente."
         "expediente_ya_vinculado" -> "Ese expediente ya está vinculado a otra cuenta."
         "cuenta_ya_vinculada" -> "Esta cuenta ya está vinculada a un expediente."
         "vinculacion_pendiente" -> "Ya tienes una solicitud de vinculación en revisión."
         "consulta_firmada" -> "La consulta ya está firmada; no se puede modificar."
         "existencia_insuficiente" -> "No hay existencia suficiente en ese lote o bodega."
-        "trabajo_abierto" -> "Hay trabajo abierto que impide esta acción. Ciérralo primero."
-        "capacidad_excedida" -> "No hay capacidad disponible en esa área."
+        // trabajo_abierto and capacidad_excedida keep the API text: it lists what to reassign / names the full room.
         else -> null
     }
 }

@@ -51,6 +51,8 @@ data class ConsultationState(
     val reschedules: List<ReceptionAppointment> = emptyList(),
     /** S9: after signing, who goes next in the consultation's area (`nextProposal` of the signature). */
     val handoff: NextProposal? = null,
+    /** Ticket this doctor called with "Llamar siguiente"; only that called number may be the main action. */
+    val calledByMe: String? = null,
 )
 
 @HiltViewModel
@@ -202,7 +204,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         viewModelScope.launch {
             try {
                 api.request("/fila/${proposal.id}/llamar", "POST", JSONObject().put("version", proposal.version))
-                mutable.value = mutable.value.copy(saving = false, handoff = null, notice = "Llamaste ${proposal.code}.")
+                mutable.value = mutable.value.copy(saving = false, handoff = null, calledByMe = proposal.id, notice = "Llamaste ${proposal.code}.")
                 load(silent = true)
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }

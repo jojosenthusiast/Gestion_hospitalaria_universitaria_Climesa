@@ -42,7 +42,8 @@ data class QueueConsultation(
 
 /**
  * S13: the single primary action of the doctor's day. `/fila` is not scoped to the doctor: a ticket in attention is the
- * reader's own only when it carries `consultationId`, and numbers of other services belong to other areas.
+ * reader's own only when it carries `consultationId`, and numbers of other services belong to other areas. `/fila` also lists
+ * the called numbers of every office, so a called number is this doctor's only when this doctor called it (`calledByMe`).
  */
 sealed interface ConsultationPrimary {
     data object CallNext : ConsultationPrimary
@@ -53,12 +54,12 @@ sealed interface ConsultationPrimary {
     companion object {
         private fun QueueConsultation.general() = service == null || service == "consulta_general"
 
-        fun pick(queue: List<QueueConsultation>, unsigned: List<String>, canCallNext: Boolean): ConsultationPrimary? {
+        fun pick(queue: List<QueueConsultation>, unsigned: List<String>, canCallNext: Boolean, calledByMe: String? = null): ConsultationPrimary? {
             if (canCallNext) return CallNext
             queue.filter { it.general() && it.state == "en_atencion" && it.consultationId != null && it.consultationState != "firmada" }
                 .minByOrNull { it.number }?.let { return ResumeTicket(it.ticketId) }
             unsigned.firstOrNull()?.let { return ResumeUnsigned(it) }
-            return queue.filter { it.general() && it.state == "llamado" && it.consultationId == null }.minByOrNull { it.number }?.let { StartTicket(it.ticketId) }
+            return queue.firstOrNull { it.ticketId == calledByMe && it.general() && it.state == "llamado" && it.consultationId == null }?.let { StartTicket(it.ticketId) }
         }
     }
 }
@@ -102,7 +103,7 @@ object ConsultationResume {
     fun parseQueue(value: Any): List<QueueConsultation> {
         val rows = value as? org.json.JSONArray ?: return emptyList()
         return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
-            QueueConsultation(row.optString("id"), row.optInt("numero"), row.optString("patientName").takeIf { it.isNotBlank() && it != "null" } ?: "Paciente no identificado", row.optString("state"), row.text("consultationId"), row.text("consultationState"), row.text("servicio"))
+            QueueConsultation(row.optString("id"), row.optInt("numero"), row.optString("patientName").takeIf { it.isNotBlank() && it != "null" } ?: "Paciente no identificado", row.optString("state"), row.text("consultationId"), row.text("consultationState"), row.text("service"))
         } }
     }
 

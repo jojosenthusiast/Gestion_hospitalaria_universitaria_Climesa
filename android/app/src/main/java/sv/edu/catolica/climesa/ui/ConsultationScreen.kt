@@ -70,7 +70,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     selectedItem?.let { item -> ConsultationDialog(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, onClose = { selected = null; model.closeResumed() }) }
     val retry = { model.clearMessages(); model.load() }
     // S13: one primary action for the whole screen (call next, resume own patient, resume unsigned, or start a called number).
-    val primary = ConsultationPrimary.pick(state.queue, state.unsigned.map { it.id }, canCallNext = state.handoff?.proposal != null && "fila.llamar" in permissions)
+    val primary = ConsultationPrimary.pick(state.queue, state.unsigned.map { it.id }, canCallNext = state.handoff?.proposal != null && "fila.llamar" in permissions, calledByMe = state.calledByMe)
     PageList(modifier) {
         item { SectionIntro("", stringResource(R.string.consulta_mi_consultorio)) }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
