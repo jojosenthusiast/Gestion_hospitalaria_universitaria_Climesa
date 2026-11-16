@@ -121,6 +121,28 @@ describe('Turnos · el generador llena la cobertura mínima por área (Fase 2, f
   expect(again.body).toEqual(first.body);
  });
 
+ test('con un inicio que no es hora completa no repite personas en la misma franja y explica la hora suelta',async()=>{
+  const group=[await person('Media'),await person('Media'),await person('Media'),await person('Media')];
+  const half=await call('JOP','POST','/turnos/generar',{areaId:receptionId,staffIds:group,pattern:'personalizado',startTime:'07:30',hours:12,workDays:1,restDays:3,from:'2027-08-02',to:'2027-08-02'});
+  expect(half.status).toBe(200);
+  // The pattern shift 07:30-19:30 already covers every whole hour of its band: nothing to fill.
+  expect((half.body.items as any[]).map(i=>[i.origen,i.start])).toEqual([['patron',local('2027-08-02','07:30')]]);
+  // 07:00-08:00 is not fully covered and no pattern shift can cover that whole hour.
+  expect(half.body.huecos.map((g:any)=>[g.start,g.end,g.motivo])).toEqual([[local('2027-08-02','07:00'),local('2027-08-02','08:00'),'fuera_del_patron']]);
+  // Control: starting on the hour leaves no gap and no fill.
+  const whole=await call('JOP','POST','/turnos/generar',{areaId:receptionId,staffIds:group,pattern:'personalizado',startTime:'07:00',hours:12,workDays:1,restDays:3,from:'2027-08-09',to:'2027-08-09'});
+  expect((whole.body.items as any[]).map(i=>i.origen)).toEqual(['patron']);
+  expect(whole.body.huecos).toEqual([]);
+ });
+
+ test('un hueco de hoy cuyo turno del patrón ya empezó lo explica así, no como fuera del patrón',async()=>{
+  const p=await person('Hoy');
+  // It is 08:00 on the 16th: the 07:00-19:00 band already started, so 08:00-19:00 stays open.
+  const today=await sparse([p],'2026-11-16','2026-11-16',2);
+  expect(today.status).toBe(200);
+  expect(today.body.huecos.map((g:any)=>[g.start,g.end,g.motivo])).toEqual([[local('2026-11-16','08:00'),local('2026-11-16','19:00'),'franja_ya_iniciada']]);
+ });
+
  test('a escala real (60 personas, 31 días) responde en tiempo acotado, aunque casi todo choque, con un límite de pruebas por solicitud',async()=>{
   const group:string[]=[];
   for(let k=0;k<60;k++)group.push(await person('Escala'));

@@ -67,6 +67,8 @@ const REJECTION_PHRASE:Record<string,string>={
   conflicto:'con otro turno en ese horario',
 };
 type GroupPerson={id:string;name:string;tipo:string};
+/** Whole hours `[ceil(a), floor(b))` inside `[a, b)` (ms): the hours a shift fully covers. */
+const interior=(a:number,b:number):[number,number]=>[Math.ceil(a/HOUR)*HOUR,Math.floor(b/HOUR)*HOUR];
 type TemplateRow={dia:number;inicio:string;horas:number;tipo:string;staffId:string};
 @Injectable()
 export class PersonnelService implements OnModuleInit,OnModuleDestroy {
@@ -539,14 +541,20 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       const rows=(await c.query(`SELECT t.persona_id AS id,sum(extract(epoch FROM upper(t.periodo)-lower(t.periodo)))/3600 AS hours FROM personal.turno t WHERE ${WORKING} AND t.persona_id=ANY($1::uuid[]) AND lower(t.periodo)>=$2 AND lower(t.periodo)<$3 GROUP BY t.persona_id`,[people.map(p=>p.id),businessDayRange(dto.from).start,to])).rows;
       for(const r of rows)load.set(r.id,Number(r.hours));
     }
-    const windows=daysBetween(dto.from,dto.to).flatMap(date=>rotationShapes(options).map(shape=>({...slotRange(date,shape.startTime,shape.hours),type:shape.type})))
-      .filter(w=>Date.parse(w.start)>this.clock.now().valueOf())
+    const now=this.clock.now().valueOf();
+    const all=daysBetween(dto.from,dto.to).flatMap(date=>rotationShapes(options).map(shape=>({...slotRange(date,shape.startTime,shape.hours),type:shape.type})))
       .sort((a,b)=>a.start.localeCompare(b.start)||a.end.localeCompare(b.end));
+    const windows=all.filter(w=>Date.parse(w.start)>now);
+    // Bands of the pattern that already started: their hours can no longer be planned.
+    const started=all.filter(w=>Date.parse(w.start)<=now).map(w=>interior(...range(w))).filter(([a,b])=>a<b);
     // What was tried in each band without success: it explains the gap that remains.
     const failures:{role:string;start:number;end:number;rejected:Record<string,number>;exhausted:boolean}[]=[];
     for(const window of windows)for(const role of fillable){
       const [a,b]=range(window);
-      while(gaps.some(g=>g.role===role&&range(g)[0]<b&&range(g)[1]>a)){
+      // `gaps` counts a shift for an hour only when it covers the whole hour: only the whole hours inside the band
+      // can be filled by it. A partial hour at the edge stays open and reads as outside the pattern.
+      const [ha,hb]=interior(a,b);
+      while(ha<hb&&gaps.some(g=>g.role===role&&range(g)[0]<hb&&range(g)[1]>ha)){
         const order=people.filter(p=>p.tipo===COVERAGE_ROLES[role]).map((p,k)=>({p,k})).sort((x,y)=>load.get(x.p.id)!-load.get(y.p.id)!||x.k-y.k).map(x=>x.p);
         const rejected:Record<string,number>={};
         let placed=false,exhausted=false;
@@ -561,17 +569,21 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
           load.set(candidate.id,load.get(candidate.id)!+(b-a)/HOUR);
           placed=true;break;
         }
-        if(!placed){failures.push({role,start:a,end:b,rejected,exhausted});break;}
+        if(!placed){failures.push({role,start:ha,end:hb,rejected,exhausted});break;}
+        const before=JSON.stringify(gaps);
         gaps=await this.gaps(c,from,to,dto.areaId,true);
+        // A placement that changes no gap would repeat forever: stop on this band.
+        if(JSON.stringify(gaps)===before)break;
       }
     }
-    return gaps.map(gap=>({...gap,...this.gapReason(gap,fillable,failures)}));
+    return gaps.map(gap=>({...gap,...this.gapReason(gap,fillable,failures,started)}));
   }
   /** Reason of a gap the generator did not fill: nobody of that function, outside the pattern, attempt limit, or what rejected each person. */
-  private gapReason(gap:CoverageGap,fillable:string[],failures:{role:string;start:number;end:number;rejected:Record<string,number>;exhausted:boolean}[]):{motivo:string;mensaje:string} {
+  private gapReason(gap:CoverageGap,fillable:string[],failures:{role:string;start:number;end:number;rejected:Record<string,number>;exhausted:boolean}[],started:[number,number][]):{motivo:string;mensaje:string} {
     if(!fillable.includes(gap.role))return {motivo:'sin_personal_elegible',mensaje:'El grupo no tiene personal de esa función para cubrir el mínimo.'};
     const [a,b]=[Date.parse(gap.start),Date.parse(gap.end)];
     const mine=failures.filter(f=>f.role===gap.role&&f.start<b&&f.end>a);
+    if(!mine.length&&started.some(([s,e])=>s<b&&e>a))return {motivo:'franja_ya_iniciada',mensaje:'El turno del patrón que cubre este horario ya empezó; cúbrelo a mano.'};
     if(!mine.length)return {motivo:'fuera_del_patron',mensaje:'Ningún turno del patrón cae en este horario; agrégalo a mano.'};
     const rejected:Record<string,number>={};
     for(const f of mine)for(const [code,n] of Object.entries(f.rejected))rejected[code]=(rejected[code]??0)+n;

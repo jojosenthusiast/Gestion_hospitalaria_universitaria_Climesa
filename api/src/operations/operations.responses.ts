@@ -255,7 +255,7 @@ export class RotationItemResponse {
 }
 /** Hueco que queda después del relleno de cobertura del generador, con el motivo por el que no se llenó. */
 export class RotationGapResponse extends CoverageGapResponse {
-  @StrProp({ description: 'sin_personal_elegible, fuera_del_patron, limite_de_intentos o el código que rechazó a más personas probadas (personal_en_descanso, carga_semanal_excedida...)' }) motivo!: string;
+  @StrProp({ description: 'sin_personal_elegible, fuera_del_patron, franja_ya_iniciada, limite_de_intentos o el código que rechazó a más personas probadas (personal_en_descanso, carga_semanal_excedida...)' }) motivo!: string;
   @StrProp() mensaje!: string;
 }
 export class RotationPreviewResponse {

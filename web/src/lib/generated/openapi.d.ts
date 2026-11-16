@@ -3289,7 +3289,7 @@ export interface components {
             end: string;
             required: number;
             actual: number;
-            /** @description sin_personal_elegible, fuera_del_patron, limite_de_intentos o el código que rechazó a más personas probadas (personal_en_descanso, carga_semanal_excedida...) */
+            /** @description sin_personal_elegible, fuera_del_patron, franja_ya_iniciada, limite_de_intentos o el código que rechazó a más personas probadas (personal_en_descanso, carga_semanal_excedida...) */
             motivo: string;
             mensaje: string;
         };
