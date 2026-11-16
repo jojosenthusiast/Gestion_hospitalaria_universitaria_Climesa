@@ -4158,6 +4158,215 @@
           }
         }
       }
+    },
+    "queue.next.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quién pasa después"
+          }
+        }
+      }
+    },
+    "queue.next.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nadie espera en consulta general."
+          }
+        }
+      }
+    },
+    "queue.next.rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regla: %@"
+          }
+        }
+      }
+    },
+    "queue.called.undoable": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Llamaste %@."
+          }
+        }
+      }
+    },
+    "queue.undo": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deshacer"
+          }
+        }
+      }
+    },
+    "queue.undone": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ volvió a la espera."
+          }
+        }
+      }
+    },
+    "queue.menu": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover o cambiar prioridad"
+          }
+        }
+      }
+    },
+    "queue.menu.for": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover o cambiar prioridad de %@"
+          }
+        }
+      }
+    },
+    "queue.move.to": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover a %@ (%@)"
+          }
+        }
+      }
+    },
+    "queue.priority.to": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prioridad: %@"
+          }
+        }
+      }
+    },
+    "consultation.steps": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consulta → procedimientos → receta o exámenes → cerrar"
+          }
+        }
+      }
+    },
+    "consultation.step.1": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Consulta"
+          }
+        }
+      }
+    },
+    "consultation.step.2": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Procedimientos y plan"
+          }
+        }
+      }
+    },
+    "consultation.step.3": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Receta y exámenes"
+          }
+        }
+      }
+    },
+    "consultation.step.4": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4. Cerrar consulta"
+          }
+        }
+      }
+    },
+    "consultation.step.4.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Firmar cierra la consulta y el número de fila; luego te proponemos quién pasa después."
+          }
+        }
+      }
+    },
+    "consultation.next.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consulta cerrada · quién pasa después"
+          }
+        }
+      }
+    },
+    "consultation.next.call": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Llamar a %@"
+          }
+        }
+      }
+    },
+    "consultation.next.dismiss": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

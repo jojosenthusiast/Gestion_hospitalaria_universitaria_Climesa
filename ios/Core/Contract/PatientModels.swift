@@ -24,9 +24,18 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     public var blockedActions: [BlockedAction<QueueAction>]? = nil
     public var maxCalls: Int? = nil
     public var callsForAbsence: Int? = nil
+    /// Fase 2 (S9): area code ("CON"), clinical priority, today's appointment time (nil = walk-in), consultorio code,
+    /// and the reversible moves the server accepts now (`deshacer_llamado`).
+    public var area: String? = nil
+    public var priority: String? = nil
+    public var appointmentAt: String? = nil
+    public var walkIn: Bool? = nil
+    public var officeCode: String? = nil
+    public var undoActions: [String]? = nil
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
         case consultationId, consultationState, allowedActions, blockedActions, maxCalls, callsForAbsence
+        case area, priority, appointmentAt, walkIn, officeCode, undoActions
     }
 }
 
