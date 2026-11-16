@@ -1,6 +1,20 @@
 package sv.edu.catolica.climesa.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.remember
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import sv.edu.catolica.climesa.domain.NextProposal
+import sv.edu.catolica.climesa.domain.QueueMove
+import sv.edu.catolica.climesa.domain.QueueMoves
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,6 +70,8 @@ fun QueueScreen(
     var service by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { model.load() }
+    // The chosen area also selects whose "who goes next" proposal is shown on top (RN-FILA-SIGUIENTE).
+    LaunchedEffect(service) { model.chooseArea(service) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     // A dashboard asked to "issue a number" or "call next": open the matching dialog once the day's queue is loaded.
     LaunchedEffect(quickAction, state.loading, state.tickets) {
@@ -68,14 +84,17 @@ fun QueueScreen(
     if (callNextOpen) QueueServiceDialog(
         title = stringResource(R.string.fila_llamar_siguiente), confirmLabel = "Llamar", initial = QueueRules.callNextService(state.tickets, service), busy = state.busy,
         message = { stringResource(R.string.fila_llamar_siguiente_mensaje, QueueLabels.service(it)) },
-        onClose = { callNextOpen = false }, onSubmit = { chosen -> callNextOpen = false; model.callNext(chosen) },
+        onClose = { callNextOpen = false }, onSubmit = { chosen, _ -> callNextOpen = false; model.callNext(chosen) },
     )
-    if (issueOpen) QueueServiceDialog(title = "Emitir número", confirmLabel = "Emitir", initial = QueueLabels.services.first().first, busy = state.busy, message = { "Selecciona el servicio de llegada." }, onClose = { issueOpen = false }, onSubmit = { service -> issueOpen = false; model.issue(service) })
+    if (issueOpen) QueueServiceDialog(title = "Emitir número", confirmLabel = "Emitir", initial = QueueLabels.services.first().first, busy = state.busy, message = { stringResource(R.string.fila_emitir_mensaje) }, withPriority = true,
+        onClose = { issueOpen = false }, onSubmit = { service, priority -> issueOpen = false; model.issue(service, priority) })
     PageList(modifier) {
         item { SectionIntro("Atención / Llegada", "Fila del día", "El número se emite al llegar y avanza sin alterar la hora de la cita.") }
         if (canIssue) item { PrimaryButton("Emitir número", { issueOpen = true }, icon = Icons.Default.Add, enabled = !state.busy) }
-        if (canCall) item { SecondaryButton(stringResource(R.string.fila_llamar_siguiente), { model.clearMessages(); callNextOpen = true }, icon = Icons.Default.Phone, enabled = !state.busy) }
+        if (canCall && service == null) item { SecondaryButton(stringResource(R.string.fila_llamar_siguiente), { model.clearMessages(); callNextOpen = true }, icon = Icons.Default.Phone, enabled = !state.busy) }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        state.undo?.let { undo -> item { UndoRow(undo.label, state.busy) { model.undoLastCall() } } }
+        if (service != null && !state.loading) item { NextCard(state.next, service!!, canCall, state.busy, state.tickets.any { it.service == service && it.state == "en_espera" }) { model.callNext(service!!) } }
         if (state.error != null && state.tickets.isNotEmpty()) item { NoticeBanner(NoticeKind.ERROR, state.error!!) }
         when {
             state.loading -> item { LoadingState() }
@@ -107,7 +126,7 @@ fun QueueScreen(
                     val inColumn = QueueBoard.sorted(visible.filter { QueueBoard.column(it) == column })
                     if (inColumn.isNotEmpty()) {
                         item(key = "h-${column.name}") { Text("${column.label} (${inColumn.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                        items(inColumn, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, state.busy, model, now) }
+                        items(inColumn, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, canManage, state.busy, model, now) }
                     }
                 }
             }
@@ -115,11 +134,51 @@ fun QueueScreen(
     }
 }
 
+/** Who goes next in the chosen area by the server rule, and "Llamar siguiente" right under it. */
 @Composable
-private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, busy: Boolean, model: QueueViewModel, now: Long) {
-    SectionCard("N.º ${ticket.number}", eyebrow = QueueLabels.service(ticket.service), action = { OperacionStatusTag(ticket.state, label = QueueLabels.state(ticket.state)) }) {
+private fun NextCard(next: NextProposal?, service: String, canCall: Boolean, busy: Boolean, waiting: Boolean, onCallNext: () -> Unit) {
+    val proposal = next?.proposal
+    Column(Modifier.fillMaxWidth().areaSurface(next?.area ?: QueueLabels.areaOf(service)).padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(stringResource(R.string.fila_quien_sigue), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (proposal != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                AreaTag(proposal.area)
+                Text(proposal.number.toString(), style = MaterialTheme.typography.displaySmall, modifier = Modifier.semantics { contentDescription = proposal.code })
+                if (proposal.priority != "rutina") PriorityBadge(Priority.of(proposal.priority))
+            }
+            Text(proposal.patientName, style = MaterialTheme.typography.bodyLarge)
+            Text(proposal.reasonText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else Text(stringResource(R.string.fila_nadie_espera), style = MaterialTheme.typography.bodyMedium)
+        next?.rule?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.fila_regla, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (canCall) PrimaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, icon = Icons.Default.Phone, enabled = !busy && waiting)
+    }
+}
+
+/** "Llamaste CON 7." with its undo, where the call happened (S4: undo for what is reversible). */
+@Composable
+private fun UndoRow(label: String, busy: Boolean, onUndo: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        TextButton(onClick = onUndo, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.fila_deshacer)) }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, busy: Boolean, model: QueueViewModel, now: Long) {
+    Column(Modifier.fillMaxWidth().areaSurface(ticket.area).padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            AreaTag(ticket.area)
+            // The number is large next to the area code, as the patient hears it called ("CON 7").
+            Text(ticket.number.toString(), style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f).semantics { contentDescription = QueueLabels.code(ticket) })
+            OperacionStatusTag(ticket.state, label = QueueLabels.state(ticket.state))
+        }
         Text(ticket.patientName, style = MaterialTheme.typography.bodyLarge)
-        Text(QueueLabels.progress(ticket, canCall), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            if (ticket.priority != "rutina") PriorityBadge(Priority.of(ticket.priority))
+            Text(QueueLabels.arrival(ticket), style = MaterialTheme.typography.labelLarge, color = if (ticket.appointmentAt != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("${QueueLabels.service(ticket.service)} · ${QueueLabels.progress(ticket, canCall)}${ticket.officeCode?.let { " · $it" } ?: ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         QueueBoard.waitMinutes(ticket, now)?.takeIf { QueueBoard.waitLevel(ticket, now) != SlaLevel.NONE }?.let { minutes ->
             Text(stringResource(R.string.fila_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(QueueBoard.waitLevel(ticket, now)))
         }
@@ -128,6 +187,30 @@ private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, busy: Boolean
         QueueActionButton(ticket, QueueAction.ATTEND, "Atender", busy, primary = true) { model.attend(ticket) }
         QueueActionButton(ticket, QueueAction.COMPLETE, "Completar", busy, primary = true) { model.complete(ticket) }
         QueueActionButton(ticket, QueueAction.ABSENT, "No se presentó", busy, primary = false) { model.absent(ticket) }
+        CardMenu(ticket, canCall, canManage, busy, model)
+    }
+}
+
+/** Board moves without dragging (touch and keyboard): only the moves the server accepts now, plus the priority. */
+@Composable
+private fun CardMenu(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, busy: Boolean, model: QueueViewModel) {
+    val moves = remember(ticket) { QueueMoves.destinations(ticket) }
+    val removeCall = canCall && QueueMoves.canRemoveCall(ticket)
+    val priorities = if (canManage && ticket.state in listOf("en_espera", "llamado")) listOf("emergencia", "urgente", "rutina").filter { it != ticket.priority } else emptyList()
+    if (moves.isEmpty() && priorities.isEmpty() && !removeCall) return
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.fila_mover)) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (removeCall) DropdownMenuItem(text = { Text(stringResource(R.string.fila_quitar_llamado, ticket.calls)) }, onClick = { open = false; model.move(ticket, QueueMove.REMOVE_CALL) })
+            moves.forEach { (column, move) ->
+                DropdownMenuItem(text = { Text(stringResource(R.string.fila_mover_a, column.label, move.label.lowercase())) }, onClick = { open = false; model.move(ticket, move) })
+            }
+            if (moves.isNotEmpty() && priorities.isNotEmpty()) HorizontalDivider()
+            priorities.forEach { p ->
+                DropdownMenuItem(text = { Text(stringResource(R.string.fila_prioridad_a, QueueLabels.priority(p))) }, onClick = { open = false; model.changePriority(ticket, p) })
+            }
+        }
     }
 }
 
@@ -142,12 +225,13 @@ private fun QueueActionButton(ticket: QueueTicket, action: QueueAction, label: S
 
 /** Service picker dialog shared by "Emitir número" and "Llamar siguiente". */
 @Composable
-private fun QueueServiceDialog(title: String, confirmLabel: String, initial: String, busy: Boolean, message: @Composable (String) -> String, onClose: () -> Unit, onSubmit: (String) -> Unit) {
+private fun QueueServiceDialog(title: String, confirmLabel: String, initial: String, busy: Boolean, message: @Composable (String) -> String, onClose: () -> Unit, withPriority: Boolean = false, onSubmit: (String, String) -> Unit) {
     var service by rememberSaveable { mutableStateOf(initial) }
+    var priority by rememberSaveable { mutableStateOf("rutina") }
     ConfirmDialog(
         title = title,
         confirmLabel = confirmLabel,
-        onConfirm = { onSubmit(service) },
+        onConfirm = { onSubmit(service, priority) },
         onDismiss = onClose,
         busy = busy,
         message = message(service),
@@ -158,6 +242,16 @@ private fun QueueServiceDialog(title: String, confirmLabel: String, initial: Str
                         RadioButton(selected = service == value, onClick = null)
                         Text(label, Modifier.padding(start = Spacing.sm))
                     }
+                }
+                if (withPriority) {
+                    Text(stringResource(R.string.fila_prioridad), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
+                    listOf("rutina", "urgente", "emergencia").forEach { value ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = Spacing.touch).selectable(selected = priority == value, role = Role.RadioButton, onClick = { priority = value }), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = priority == value, onClick = null)
+                            Text(QueueLabels.priority(value), Modifier.padding(start = Spacing.sm))
+                        }
+                    }
+                    Text(stringResource(R.string.fila_prioridad_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },

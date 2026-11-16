@@ -6,6 +6,8 @@ import SwiftUI
 struct DoctorDay: Sendable {
     var agenda: [AgendaEntry]?
     var tickets: Part<[QueueTicket]>?
+    /// S9: who goes next in consulta general by the server rule (`GET /fila/siguiente`); nil when unreadable.
+    var next: QueueNextProposal?
     var pendingResults: Part<Int>?
     /// RN-25: órdenes con valor crítico que este médico puede revisar.
     var criticalResults = 0
@@ -29,6 +31,8 @@ struct DoctorDayView: View {
     @State private var loader = Loader<DoctorDay>()
     @State private var calling = Submission()
     @State private var deciding = Submission()
+    /// Last call made here, undoable while it is still "llamado" (S9): ticket id, returned version and "CON 7".
+    @State private var undo: (id: String, version: Int, code: String)?
     @State private var rejecting: Appointment?
 
     var body: some View {
@@ -47,7 +51,7 @@ struct DoctorDayView: View {
                 }
                 if let open = day.unsigned?.value, !open.isEmpty { unsignedSection(open) }
                 if let pending = day.reschedules?.value, !pending.isEmpty { rescheduleSection(pending) }
-                if let tickets = day.tickets?.value { queueSection(tickets) }
+                if let tickets = day.tickets?.value { queueSection(tickets, next: day.next) }
                 if let agenda = day.agenda { agendaSection(agenda) }
                 moreSection(day)
             }
@@ -116,21 +120,38 @@ struct DoctorDayView: View {
         }
     }
 
-    @ViewBuilder private func queueSection(_ tickets: [QueueTicket]) -> some View {
+    @ViewBuilder private func queueSection(_ tickets: [QueueTicket], next: QueueNextProposal?) -> some View {
         let waiting = tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count
         SectionCard(title: L.text("day.queue")) {
             Text(verbatim: String(format: L.text("day.queue.waiting"), waiting)).font(Typo.body).foregroundStyle(Theme.ink)
-            // FILA-02: el servidor elige el siguiente número en espera del servicio.
+            // S9 / RN-FILA-SIGUIENTE: the server proposes who goes next and says why; "Llamar siguiente" calls that number.
+            if let next { nextCard(next) }
             if account.can("fila.llamar"), QueueRules.nextToCall(tickets) != nil {
                 ClimesaButton(title: L.text("day.queue.callNext"), loading: calling.busy) { Task { await callNext() } }
+            }
+            if let undo {
+                HStack(spacing: Spacing.m) {
+                    Text(verbatim: String(format: L.text("queue.called.undoable"), undo.code)).font(Typo.body).foregroundStyle(Theme.ink)
+                    Spacer()
+                    Button(L.text("queue.undo")) { Task { await undoCall() } }.disabled(calling.busy)
+                }
             }
             WriteNotice(submission: calling, reload: load)
         }
         let called = tickets.filter { $0.state == .llamado || $0.state == .enAtencion }.sorted { $0.number < $1.number }
         ForEach(called) { ticket in
             SectionCard {
-                ListRow(title: ticket.patientName ?? ticket.service.label, subtitle: String(format: L.text("consultation.ticket"), ticket.number)) {
+                HStack(spacing: Spacing.s) {
+                    AreaTag(QueueBoardRules.area(ticket))
+                    // The per-area number, large, as it is called out ("CON 7").
+                    Text(verbatim: "\(ticket.number)").font(.title2.bold()).foregroundStyle(Theme.ink).accessibilityLabel(QueueBoardRules.code(ticket))
+                    Spacer()
                     MedicoTag(ticket.state.rawValue, label: ticket.state.label)
+                }
+                Text(verbatim: ticket.patientName ?? ticket.service.label).font(Typo.body).foregroundStyle(Theme.ink)
+                HStack(spacing: Spacing.s) {
+                    if QueueBoardRules.priority(ticket) != "rutina" { PriorityBadge(ticket.priority) }
+                    Text(verbatim: QueueBoardRules.arrival(ticket)).font(Typo.small).foregroundStyle(ticket.appointmentAt == nil ? Theme.muted : Theme.ink)
                 }
                 // FILA-01: volver a llamar o "No se presentó" solo cuando el servidor lo permite; si no, su motivo.
                 let allowed = ticket.allowedActions ?? []
@@ -143,12 +164,57 @@ struct DoctorDayView: View {
                 ForEach(ticket.blockedActions ?? [], id: \.action) { item in
                     Text(verbatim: "\(item.action.label): \(item.reason)").font(Typo.small).foregroundStyle(Theme.muted)
                 }
+                cardMenu(ticket)
                 if account.can("consulta.iniciar") {
                     // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
                     NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
                         .buttonStyle(ClimesaButtonStyle())
                 }
             }
+        }
+    }
+
+    @ViewBuilder private func nextCard(_ next: QueueNextProposal) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            Text("queue.next.title").font(Typo.label).foregroundStyle(Theme.muted)
+            if let proposal = next.proposal {
+                HStack(spacing: Spacing.s) {
+                    AreaTag(proposal.area)
+                    Text(verbatim: "\(proposal.number)").font(.title.bold()).foregroundStyle(Theme.ink).accessibilityLabel(proposal.code)
+                    if proposal.priority != "rutina" { PriorityBadge(proposal.priority) }
+                }
+                Text(verbatim: proposal.patientName ?? "").font(Typo.body).foregroundStyle(Theme.ink)
+                Text(verbatim: proposal.reasonText).font(Typo.small).foregroundStyle(Theme.muted)
+            } else {
+                Text("queue.next.none").font(Typo.body).foregroundStyle(Theme.ink)
+            }
+            Text(verbatim: String(format: L.text("queue.next.rule"), next.rule)).font(Typo.small).foregroundStyle(Theme.muted)
+        }
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .areaSurface(next.area)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Board moves without dragging: only the moves the server accepts now, plus the priority (S9).
+    @ViewBuilder private func cardMenu(_ ticket: QueueTicket) -> some View {
+        let moves = QueueBoardRules.destinations(ticket)
+        let priorities = account.can("fila.gestionar") ? QueueBoardRules.priorityChoices(ticket) : []
+        let removeCall = account.can("fila.llamar") && QueueBoardRules.canRemoveCall(ticket)
+        if !moves.isEmpty || !priorities.isEmpty || removeCall {
+            Menu {
+                if removeCall {
+                    Button(String(format: L.text("queue.removeCall"), ticket.calls)) { Task { await move(ticket, .quitarLlamado) } }
+                }
+                ForEach(moves, id: \.column) { item in
+                    Button(String(format: L.text("queue.move.to"), item.column.label, item.move.label.lowercased())) { Task { await move(ticket, item.move) } }
+                }
+                ForEach(priorities, id: \.self) { value in
+                    Button(String(format: L.text("queue.priority.to"), QueueBoardRules.priorityLabel(value))) { Task { await setPriority(ticket, value) } }
+                }
+            } label: { Text("queue.menu") }
+            .disabled(calling.busy)
+            .accessibilityLabel(String(format: L.text("queue.menu.for"), QueueBoardRules.code(ticket)))
         }
     }
 
@@ -222,7 +288,11 @@ struct DoctorDayView: View {
                     try await api.get("/citas", as: [Appointment].self).filter { $0.allowedActions?.contains(.aceptarReprogramacion) ?? false }
                 }
             }
-            if profile.hasPermission("fila.ver") { day.tickets = try await Part<[QueueTicket]>.load { try await api.get("/fila", as: [QueueTicket].self) } }
+            if profile.hasPermission("fila.ver") {
+                day.tickets = try await Part<[QueueTicket]>.load { try await api.get("/fila", as: [QueueTicket].self) }
+                // Optional: a doctor who only sees their own queue gets 403 and simply no proposal.
+                day.next = try? await api.get("/fila/siguiente?service=consulta_general", as: QueueNextProposal.self)
+            }
             if profile.hasPermission("resultados.ver") {
                 let orders = try await Part<[LabOrder]>.load { try await api.get("/laboratorio/ordenes", as: [LabOrder].self) }
                 switch orders {
@@ -252,7 +322,38 @@ struct DoctorDayView: View {
         await calling.run("siguiente", body: body) { key in
             called = try await account.client().send("POST", "/fila/llamar-siguiente", body: body, key: key, as: QueueCallNextResult.self)
         }
-        if let called { calling.notice = String(format: L.text("day.queue.called"), called.number) }
+        if let called {
+            calling.notice = String(format: L.text("day.queue.called"), called.number)
+            undo = (called.id, called.version, "\(QueueBoardRules.area(of: .consultaGeneral)) \(called.number)")
+        }
+        await load()
+    }
+
+    private func undoCall() async {
+        guard let last = undo else { return }
+        let body = VersionBody(version: last.version)
+        let ok = await calling.run(last.id, body: body, success: String(format: L.text("queue.undone"), last.code)) { key in
+            _ = try await account.client().send("POST", "/fila/\(last.id)/deshacer-llamado", body: body, key: key, as: QueueTransitionResult.self)
+        }
+        if ok { undo = nil }
+        await load()
+    }
+
+    private func move(_ ticket: QueueTicket, _ move: QueueMove) async {
+        let body = VersionBody(version: ticket.version)
+        var result: QueueTransitionResult?
+        await calling.run(ticket.id, body: body, success: "\(QueueBoardRules.code(ticket)): \(move.label)") { key in
+            result = try await account.client().send("POST", QueueBoardRules.path(ticket, move), body: body, key: key, as: QueueTransitionResult.self)
+        }
+        if move == .llamar, let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)) } else if result != nil { undo = nil }
+        await load()
+    }
+
+    private func setPriority(_ ticket: QueueTicket, _ priority: String) async {
+        let body = QueuePriorityBody(version: ticket.version, priority: priority)
+        await calling.run(ticket.id, body: body, success: "\(QueueBoardRules.code(ticket)): \(QueueBoardRules.priorityLabel(priority))") { key in
+            _ = try await account.client().send("POST", "/fila/\(ticket.id)/prioridad", body: body, key: key, as: QueueTransitionResult.self)
+        }
         await load()
     }
 
@@ -266,9 +367,11 @@ struct DoctorDayView: View {
 
     private func call(_ ticket: QueueTicket) async {
         let body = VersionBody(version: ticket.version)
+        var result: QueueCallResult?
         await calling.run(ticket.id, body: body, success: String(format: L.text("day.queue.called"), ticket.number)) { key in
-            _ = try await account.client().send("POST", "/fila/\(ticket.id)/llamar", body: body, key: key, as: QueueCallResult.self)
+            result = try await account.client().send("POST", "/fila/\(ticket.id)/llamar", body: body, key: key, as: QueueCallResult.self)
         }
+        if let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)) }
         await load()
     }
 }

@@ -31,6 +31,7 @@ begin;
 
 create or replace function pg_temp.paciente_en_uso(p uuid) returns boolean language sql stable as $$
   select exists (select 1 from atencion.cita where paciente_id = p)
+      or exists (select 1 from atencion.solicitud_cita where paciente_id = p)
       or exists (select 1 from atencion.ticket_fila where paciente_id = p)
       or exists (select 1 from atencion.consulta where paciente_id = p)
       or exists (select 1 from atencion.signos_vitales where paciente_id = p)
@@ -49,6 +50,7 @@ create or replace function pg_temp.persona_en_uso(p uuid) returns boolean langua
   select exists (select 1 from personal.turno where persona_id = p)
       or exists (select 1 from personal.inscripcion where persona_id = p and id::text not like 'de300000-%')
       or exists (select 1 from atencion.cita where medico_id = p)
+      or exists (select 1 from atencion.solicitud_cita where medico_preferido_id = p)
       or exists (select 1 from atencion.consulta where medico_id = p)
       or exists (select 1 from atencion.relacion_atencion where profesional_id = p)
       or exists (select 1 from laboratorio.orden where medico_id = p)
@@ -145,10 +147,12 @@ alter table atencion.signos_vitales enable trigger signos_consulta_abierta;
 delete from atencion.addendum where id::text like 'de300000-%' or consulta_id::text like 'de300000-%';
 delete from atencion.relacion_atencion where id::text like 'de300000-%' or origen_id::text like 'de300000-%';
 delete from atencion.consulta where id::text like 'de300000-%';
--- Cita o número usados por una consulta real se conservan (la consulta real los referencia).
+-- Cita o número usados por una consulta real se conservan (la consulta real los referencia); igual una cita que asignó una
+-- solicitud por motivo (atencion.solicitud_cita.cita_id).
 delete from atencion.ticket_fila t where t.id::text like 'de300000-%' and not exists (select 1 from atencion.consulta c where c.ticket_id = t.id);
 -- Una cita demo enlazada a una propuesta de seguimiento real (orden real) también se conserva: la propuesta confirmada la exige.
 delete from atencion.cita c where c.id::text like 'de300000-%' and not exists (select 1 from atencion.consulta k where k.cita_id = c.id)
+  and not exists (select 1 from atencion.solicitud_cita s where s.cita_id = c.id)
   and not exists (select 1 from laboratorio.propuesta_cita p where p.cita_id = c.id);
 
 -- ---------------------------------------------------------------------------------------------------------

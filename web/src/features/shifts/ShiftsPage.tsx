@@ -13,14 +13,20 @@ import { CrewCoverageAlert } from './CrewCoverageAlert';
 import { AreaCoverageAlert, type CoverageWeek } from './AreaCoverageAlert';
 import { AttendanceDialog } from './AttendanceDialog';
 import { SpecialistsWeek } from './SpecialistsWeek';
-import { ShiftWeek, StateLegend, timeRange } from './ShiftWeek';
+import { DAY_VIEW_LANES, ShiftWeek, StateLegend, timeRange, type CalendarPlanning } from './ShiftWeek';
+import { BatchPreview, BulkDialog, MoveDialog, PublishWeekDialog, RotationDialog, TemplatesDialog, moveBody } from './PlanningDialogs';
+import { copyWeek, type BatchGap, type BatchResult, type PreviewItem } from './plan';
 import { ShiftDayList, ShiftDetail, dayTitle, type RowActions } from './ShiftDayList';
-import { KIND_LABEL, attendanceLabel, localDay, type CatalogArea, type CatalogRole, type CatalogStaff, type ShiftCatalog, type ShiftRow } from './rules';
-import { addWeeks, displayState, mondayOf, stateName, weekDays, weekLabel } from './week';
+import { KIND_LABEL, attendanceLabel, can as canShift, localDay, localMs, suggestKind, type CatalogArea, type CatalogRole, type CatalogStaff, type ShiftCatalog, type ShiftRow } from './rules';
+import { addWeeks, dayHeading, displayState, mondayOf, stateName, weekDays, weekLabel } from './week';
 import './shifts.css';
 
 type View = 'semana' | 'lista' | 'especialistas';
 type Sort = 'inicio' | 'persona';
+type Scale = 'semana' | 'dia';
+type Batch = { items: PreviewItem[]; initial?: { resultados: BatchResult[]; huecos: BatchGap[] } };
+type Undo = { shift: ShiftRow; start: string; end: string; version: number };
+const DRAFT_REASON = 'Ajuste de borrador en el calendario', UNDO_REASON = 'Deshacer el cambio anterior en el calendario';
 const STATES: [string, string][] = [['borrador', 'Borradores'], ['publicado', 'Publicados por iniciar'], ['en_curso', 'En curso'], ['completado', 'Completados'], ['ausente', 'Ausencias'], ['cancelado', 'Cancelados']];
 const EMPTY_CATALOG: ShiftCatalog = { roles: [], areas: [], staff: [] };
 /** La semana con bloques por hora necesita ancho; en un teléfono se abre la lista por día (la semana sigue disponible). */
@@ -55,6 +61,13 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const [now, setNow] = useState(() => new Date());
   const [monday, setMonday] = useState(() => mondayOf(Date.now()));
   const [quick, consumeQuick] = useQuickAction();
+  // Planificación (S12): vista Día, turno recién creado resaltado, mover con motivo, deshacer y lotes como borrador.
+  const [scale, setScale] = useState<Scale>('semana'), [dayDate, setDayDate] = useState<string | null>(null);
+  const [highlight, setHighlight] = useState<string | null>(null), [announce, setAnnounce] = useState('');
+  const [moving, setMoving] = useState<{ shift: ShiftRow; start: string; end: string } | null>(null), [undo, setUndo] = useState<Undo | null>(null);
+  const [batch, setBatch] = useState<Batch | null>(null), [tool, setTool] = useState<'rotacion' | 'masiva' | 'plantillas' | 'publicar' | null>(null);
+  const move = useAction(api);
+  const publish = can(profile, 'turnos.publicar');
   // Reloj local para pasar de "publicado" a "en curso" en pantalla sin pedir datos; no consulta la red.
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 30_000); return () => clearInterval(timer); }, []);
   useEffect(() => { if (!quick) return; if (quick === 'planificar' && plan) { setEditing(null); setOpen(true); } consumeQuick(); }, [quick, plan, consumeQuick]);
@@ -120,6 +133,52 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   };
   const isThisWeek = monday === mondayOf(at);
 
+  const reload = () => { data.refresh(); if (!covered) weekData.refresh(); };
+  const shownDay = days.find(d => d.date === dayDate) ?? days.find(d => d.date === today) ?? days[0];
+  const visibleDays = scale === 'dia' ? [shownDay] : days;
+  const dayName = (date: string) => { const h = dayHeading(date, today); return `${h.relative ? `${h.relative}, ` : ''}${h.label}`; };
+  const drafts = inWeek.filter(t => t.state === 'borrador' && Date.parse(t.start) >= weekStart && (area === 'todos' || t.areaId === area)).length;
+  const areaId = area === 'todos' ? undefined : area;
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const openCreate = (date: string, start?: number, end?: number) => {
+    const from = start ?? localMs(date, '07:00'), to = end ?? from + 8 * 3600_000;
+    setEditing(null); setDraft({ areaId: areaId ?? '', start: iso(from), end: iso(to), type: suggestKind(from, to), staffId: '' }); setOpen(true);
+  };
+  // Un borrador se ajusta sin motivo (nadie lo ve todavía); un turno publicado pide el motivo en un diálogo.
+  const moved = (shift: ShiftRow, start: string, end: string, version: number) => {
+    setUndo({ shift: { ...shift, start, end, version }, start: shift.start, end: shift.end, version });
+    setHighlight(shift.id); setAnnounce(`Turno de ${shift.person} movido a ${timeRange(start, end)}.`); reload();
+  };
+  const planning: CalendarPlanning | undefined = plan ? {
+    canMove: t => canShift(t, 'editar') && Date.parse(t.start) > at,
+    onCreate: openCreate,
+    onMove: async (shift, start, end) => {
+      if (shift.state !== 'borrador') { setMoving({ shift, start, end }); return; }
+      const saved = await move.run<{ version: number }>(`/turnos/${shift.id}`, moveBody(shift, start, end, DRAFT_REASON), 'PATCH');
+      if (saved) moved(shift, start, end, saved.version);
+    },
+  } : undefined;
+  const undoMove = async () => {
+    if (!undo) return;
+    const saved = await move.run<{ version: number }>(`/turnos/${undo.shift.id}`, moveBody(undo.shift, undo.start, undo.end, UNDO_REASON), 'PATCH');
+    if (saved) { setUndo(null); setHighlight(undo.shift.id); setAnnounce(`Se deshizo el cambio del turno de ${undo.shift.person}.`); reload(); }
+  };
+  // Copiar la semana anterior: desde los turnos ya cargados, o pidiendo esa semana si queda fuera de la ventana.
+  const copyPrevious = async () => {
+    const previous = weekDays(addWeeks(monday, -1));
+    let source = all;
+    if (previous[0].start < Date.now() - WINDOW_PAST) {
+      try { source = await api.request<ShiftRow[]>(`/turnos?from=${previous[0].date}&to=${previous[6].date}`); }
+      catch { setAnnounce('No pudimos leer la semana anterior. Vuelve a intentar.'); return; }
+    }
+    const items = copyWeek(source, previous, areaId);
+    if (!items.length) { setAnnounce('La semana anterior no tiene turnos para copiar con estos filtros.'); return; }
+    setBatch({ items });
+  };
+  const created = (count: number) => { setBatch(null); setAnnounce(`${count === 1 ? '1 borrador creado' : `${count} borradores creados`}. Revísalos en el calendario y publica la semana cuando esté lista.`); reload(); };
+  // El turno recién creado o movido se trae a la vista sin cambiar de semana.
+  useEffect(() => { if (highlight) document.querySelector('.shift-block.is-new')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' }); }, [highlight, shown]);
+
   return <>
     <CompactHeader breadcrumb="Operaciones / Jornada" title="Turnos"
       actions={<>
@@ -164,21 +223,51 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
           {active.map(a => <button key={a.key} type="button" className="shift-active-chip" aria-label={`Quitar filtro ${a.label}`} onClick={a.clear}>{a.label}<Icon name="close" size={14} /></button>)}
           <button type="button" className="secondary-button" onClick={clearAll}>Quitar filtros</button>
         </div>}
+        {plan && view === 'semana' && <div className="shift-plan-tools" role="group" aria-label="Planificar la semana">
+          <button type="button" className="secondary-button" onClick={() => setTool('rotacion')}>Generar rotación</button>
+          <button type="button" className="secondary-button" onClick={() => void copyPrevious()}>Copiar semana anterior</button>
+          <button type="button" className="secondary-button" onClick={() => setTool('masiva')}>Asignación masiva</button>
+          <button type="button" className="secondary-button" onClick={() => setTool('plantillas')}>Plantillas</button>
+          {publish && drafts > 0 && <button type="button" className="primary-button" onClick={() => setTool('publicar')}>{`Publicar semana (${drafts === 1 ? '1 borrador' : `${drafts} borradores`})`}</button>}
+        </div>}
+        {view === 'semana' && <div className="shift-scale">
+          <div className="shift-views" role="group" aria-label="Escala del calendario">
+            <button type="button" className="shift-pill" aria-pressed={scale === 'semana'} onClick={() => setScale('semana')}>Toda la semana</button>
+            <button type="button" className="shift-pill" aria-pressed={scale === 'dia'} onClick={() => setScale('dia')}>Día</button>
+          </div>
+          {scale === 'dia' && <div className="shift-day-picker" role="group" aria-label="Día que se muestra">
+            {days.map(d => { const h = dayHeading(d.date, today); return <button key={d.date} type="button" className="shift-pill" aria-pressed={d.date === shownDay.date} onClick={() => setDayDate(d.date)}>{`${h.weekday} ${h.dayNumber}`}</button>; })}
+          </div>}
+        </div>}
+        <div className="shift-announce" role="status" aria-live="polite">
+          {(undo || move.error) ? <div className="shift-undo">
+            {move.error ? <WriteError error={move.error} /> : <span>{announce}</span>}
+            {undo && <button type="button" className="secondary-button" onClick={() => void undoMove()} disabled={move.busy}>Deshacer</button>}
+          </div> : announce && <Notice kind="info">{announce}</Notice>}
+        </div>
         <div className="shift-toolbar-foot">
           <p className="shift-count" role="status">{rows.length} de {assigned} turnos de la semana</p>
           {view === 'semana' && <StateLegend />}
         </div>
       </div>
-      <RemoteState state={source}>{() => view === 'semana' ? <section className="shift-week-wrap" aria-label={`Semana del ${weekLabel(monday)}`}>
+      <RemoteState state={source}>{() => view === 'semana' ? <section className="shift-week-wrap" aria-label={scale === 'dia' ? dayName(shownDay.date) : `Semana del ${weekLabel(monday)}`}>
         {coverage.error && coverage.error.status !== 403 && <Notice kind="error">No pudimos dibujar los huecos de cobertura de esta semana: {coverage.error.message} <button type="button" className="secondary-button" onClick={coverage.refresh}>Volver a intentar</button></Notice>}
-        <ShiftWeek days={days} today={today} now={at} shifts={drawn} gaps={gaps} onOpen={setDetail} onShowDay={date => { setFocusDay(date); setView('lista'); }} />
-        {!drawn.length && <Empty title="Sin turnos en esta semana" description={active.length ? 'Ajusta los filtros o la búsqueda para consultar otros horarios.' : 'Cambia de semana o asigna un turno.'} />}
+        <ShiftWeek days={visibleDays} today={today} now={at} shifts={drawn} gaps={gaps} onOpen={setDetail} onShowDay={date => { setFocusDay(date); setView('lista'); }}
+          planning={planning} highlight={highlight} maxLanes={scale === 'dia' ? DAY_VIEW_LANES : undefined} />
+        {!drawn.length && <Empty title="Sin turnos en esta semana" description={active.length ? 'Ajusta los filtros o la búsqueda para consultar otros horarios.' : plan ? 'Haz clic en una hora del calendario, usa el botón + de cada día, genera una rotación o copia la semana anterior.' : 'Cambia de semana.'} />}
       </section> : drawn.length ? <ShiftDayList days={days} today={today} now={at} rows={drawn} plan={plan} byPerson={sort === 'persona'} typeOf={typeOf} actions={actions} />
         : <Empty title="Sin turnos en esta vista" description="Ajusta los filtros, la búsqueda o la semana para consultar otros horarios." />}</RemoteState>
     </section>
     </>}
     {detail && <ShiftDetail shift={detail} now={at} plan={plan} typeOf={typeOf} actions={actions} onClose={() => setDetail(null)} />}
-    {open && <ShiftForm api={api} shift={editing} draft={editing ? undefined : draft} catalog={catalog} shifts={covered ? all : [...all, ...shown.filter(t => !all.some(a => a.id === t.id))]} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); data.refresh(); if (!covered) weekData.refresh(); }} />}
+    {open && <ShiftForm api={api} shift={editing} draft={editing ? undefined : draft} catalog={catalog} shifts={covered ? all : [...all, ...shown.filter(t => !all.some(a => a.id === t.id))]} onClose={() => setOpen(false)} onSaved={id => { setOpen(false); if (id) { setHighlight(id); setAnnounce(editing ? 'Turno guardado; está resaltado en el calendario.' : 'Turno asignado; está resaltado en el calendario.'); } reload(); }} />}
+    {moving && <MoveDialog api={api} shift={moving.shift} start={moving.start} end={moving.end} onClose={() => setMoving(null)} onSaved={version => { moved(moving.shift, moving.start, moving.end, version); setMoving(null); }} />}
+    {tool === 'rotacion' && <RotationDialog api={api} catalog={catalog} areaId={areaId} defaultFrom={addWeeks(monday, 1)} defaultTo={localDay(weekDays(addWeeks(monday, 1))[6].start)} onClose={() => setTool(null)} onPreview={(items, initial) => { setTool(null); setBatch({ items, initial }); }} />}
+    {tool === 'masiva' && <BulkDialog catalog={catalog} areaId={areaId} defaultDate={days.find(d => d.date >= today)?.date ?? monday} onClose={() => setTool(null)} onPreview={items => { setTool(null); setBatch({ items }); }} />}
+    {tool === 'plantillas' && <TemplatesDialog api={api} catalog={catalog} days={days} rows={inWeek} version={version} areaId={areaId} onClose={() => setTool(null)} onApply={items => { setTool(null); setBatch({ items }); }} />}
+    {tool === 'publicar' && <PublishWeekDialog api={api} drafts={drafts} label={weekLabel(monday)} from={monday} to={sunday} areaId={areaId} areaName={catalog.areas.find(a => a.id === areaId)?.name} onClose={() => setTool(null)}
+      onPublished={result => { setTool(null); setAnnounce(`${result.published === 1 ? 'Se publicó 1 turno' : `Se publicaron ${result.published} turnos`}. El personal ya los ve en Mis turnos.${result.warnings?.length ? ` Quedan ${result.warnings.length === 1 ? '1 hueco' : `${result.warnings.length} huecos`} de cobertura.` : ''}`); reload(); }} />}
+    {batch && <BatchPreview api={api} catalog={catalog} items={batch.items} initial={batch.initial} onClose={() => setBatch(null)} onCreated={created} />}
     {marking && <AttendanceDialog api={api} shift={marking} onClose={() => setMarking(null)} onSaved={() => { setMarking(null); data.refresh(); if (!covered) weekData.refresh(); }} onAssignSubstitute={plan ? id => assignSubstitute(marking, id) : undefined} />}
     {cancelling && <CancelShiftForm api={api} shift={cancelling} onClose={() => { setCancelling(null); source.refresh(); }} onSaved={() => { setCancelling(null); source.refresh(); }} />}
 

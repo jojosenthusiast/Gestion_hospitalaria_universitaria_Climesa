@@ -635,3 +635,39 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .status-legend > div { display: grid; gap: var(--space-2); }
 .status-legend ul { margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; }
 .legend-title { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
+
+/* Fase 2, flujo B (S9): fila arriba (quién pasa después), tablero abajo con tarjetas por área que se arrastran. */
+.qb-next { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); margin: 0 0 var(--space-4); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.qb-next-main { display: grid; gap: var(--space-2); min-width: 0; }
+.qb-next-label { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
+.qb-next-ticket { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.qb-next-who { display: grid; gap: 2px; min-width: 0; }
+.qb-next-who span { font-weight: 700; overflow-wrap: anywhere; }
+.qb-next-who small, .qb-rule { color: var(--muted); }
+.qb-next-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
+.qb-number-lg { font-size: var(--text-2xl); line-height: 1; }
+.qb-code { display: inline-flex; align-items: center; gap: var(--space-2); }
+.qb-ticket.area-surface { border: 1px solid color-mix(in srgb, var(--area) 35%, transparent); border-radius: var(--radius-card); background: var(--area-soft); box-shadow: inset 0 3px 0 var(--area); padding-top: calc(var(--space-3) + 3px); transition: opacity var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out); }
+.qb-ticket[draggable="true"] { cursor: grab; }
+.qb-ticket[draggable="true"]:active { cursor: grabbing; }
+.qb-ticket.is-pending { opacity: 0.6; }
+.qb-marks { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.qb-cita, .qb-walkin { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-chip); font-size: var(--text-xs); font-weight: 700; font-variant-numeric: tabular-nums; }
+.qb-cita { border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.qb-walkin { border: 1px dashed var(--line); color: var(--muted); }
+.qb-column { transition: box-shadow var(--motion-fast) var(--ease-out); }
+.qb-column.is-drop-target { box-shadow: inset 0 0 0 2px var(--primary); }
+.qb-menu { min-height: 40px; max-width: 100%; padding: 0 var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font: inherit; font-size: var(--text-sm); }
+.qb-undo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); }
+.qb-hint { margin: 0 0 var(--space-3); }
+.qb-priority-choice { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.qb-next-proposal { margin: 0 0 var(--space-4); }
+@media (pointer: coarse) { .qb-menu { min-height: 44px; } }
+/* Consulta en cuatro pasos (S9): consulta → procedimientos → receta y exámenes → cerrar. */
+.consult-steps { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); padding: 0; list-style: none; counter-reset: none; }
+.consult-step-item { display: inline-flex; }
+.consult-step-item > a, .consult-step-item > span { display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-chip); color: var(--muted); font-size: var(--text-sm); font-weight: 700; text-decoration: none; font-variant-numeric: tabular-nums; }
+.consult-step-item.is-actual > a, .consult-step-item.is-actual > span { border-color: var(--primary); color: var(--primary-text); }
+.consult-step-item.is-hecho > a, .consult-step-item.is-hecho > span { border-style: dashed; }
+.consult-step { margin: var(--space-4) 0 0; font-size: var(--text-base); scroll-margin-top: var(--space-4); }
+.consult-handoff { margin-bottom: var(--space-4); }

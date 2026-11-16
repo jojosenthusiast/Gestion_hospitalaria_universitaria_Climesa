@@ -15,6 +15,9 @@ import { businessDate } from '../platform/clock';
 type AppointmentRow = Record<string, any>;
 const SLOT_MS = 20 * 60_000;
 
+/** RN-20a: days a pending category request counts toward the CITA-07 limit (it has no slot that expires it). */
+export const CATEGORY_REQUEST_COUNT_DAYS = 14;
+
 @Injectable()
 export class AttentionService {
   constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock, private readonly policies: PolicyRegistry, private readonly sweeper: AttentionSweepService) {}
@@ -288,18 +291,48 @@ export class AttentionService {
       await this.doctor(c, dto.doctorId);
       await this.doctorHasShift(c, dto.doctorId, start, end, true);
       await this.patientHasConflict(c, patientId, start, end);
-      if (patientRequest) {
-        // CITA-07: a patient cannot pile up simultaneous requests; they reschedule the one they already have.
-        const { maximo } = await this.policies.value<{ maximo: number }>(c, 'citas.solicitudes_pendientes_max', this.clock.now());
-        const pending = Number((await c.query(`SELECT count(*) AS n FROM atencion.cita WHERE paciente_id=$1 AND estado='solicitada' AND lower(horario)>$2::timestamptz`, [patientId, this.clock.now()])).rows[0].n);
-        if (pending >= maximo) throw new ProblemException('solicitudes_pendientes_max', 409, `Ya tienes ${pending} solicitudes pendientes; reprograma o cancela una antes de pedir otra.`);
-      }
+      if (patientRequest) await this.assertPendingLimit(c, patientId);
       const row = (await c.query(`INSERT INTO atencion.cita(paciente_id,medico_id,horario,motivo,estado,origen,creado_por)
         VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,$7,$8) RETURNING id,version`, [patientId, dto.doctorId, start, end, dto.reason?.trim() || null, state, patientRequest ? 'paciente' : 'recepcion', actor.id])).rows[0];
       await this.commands.audit(c, actor, { action: patientRequest ? 'citas.solicitar' : 'citas.agendar', entity: 'cita', entityId: row.id, permission, detail: { patientId, doctorId: dto.doctorId, start: start.toISOString(), end: end.toISOString() } });
       await this.commands.event(c, 'cita.actualizada', 'cita', row.id, row.version, await this.channels(c, patientId));
       return { id: row.id, version: row.version, state };
     });
+  }
+
+  /**
+   * CITA-07: a patient cannot pile up simultaneous requests; they reschedule or cancel the one they already have.
+   * Counts both kinds of request still waiting for reception: with a doctor (future `solicitada`) and by category
+   * (`pendiente`, Fase 2 flow A). A category request has no slot to expire with, so it only counts during
+   * `CATEGORY_REQUEST_COUNT_DAYS` after it was created (RN-20a); it stays in reception's inbox until resolved.
+   */
+  async assertPendingLimit(c: PoolClient, patientId: string) {
+    const { maximo } = await this.policies.value<{ maximo: number }>(c, 'citas.solicitudes_pendientes_max', this.clock.now());
+    const pending = Number((await c.query(`SELECT
+        (SELECT count(*) FROM atencion.cita WHERE paciente_id=$1 AND estado='solicitada' AND lower(horario)>$2::timestamptz)
+        + (SELECT count(*) FROM atencion.solicitud_cita WHERE paciente_id=$1 AND estado='pendiente'
+            AND creado_en > $2::timestamptz - make_interval(days => $3)) AS n`, [patientId, this.clock.now(), CATEGORY_REQUEST_COUNT_DAYS])).rows[0].n);
+    if (pending >= maximo) throw new ProblemException('solicitudes_pendientes_max', 409, `Ya tienes ${pending} solicitudes pendientes; reprograma o cancela una antes de pedir otra.`);
+  }
+
+  /** Throws when the doctor is not an active doctor (shared with the category request's preferred doctor). */
+  async assertDoctor(c: PoolClient, doctorId: string) { await this.doctor(c, doctorId); }
+
+  /**
+   * Fase 2 flow A: reception assigns a category request. The appointment is created confirmed with exactly the checks
+   * of `POST /citas` (20-minute slot aligned to the doctor's shift, future, no overlap for doctor or patient), so every
+   * existing appointment rule applies to it afterwards. Runs inside the caller's command transaction.
+   */
+  async insertConfirmed(c: PoolClient, actor: Actor, input: { patientId: string; doctorId: string; start: string; end: string; reason: string | null }) {
+    const { start, end } = this.range(input.start, input.end);
+    await this.patient(c, input.patientId);
+    await this.doctor(c, input.doctorId);
+    await this.doctorHasShift(c, input.doctorId, start, end, true);
+    await this.patientHasConflict(c, input.patientId, start, end);
+    const row = (await c.query(`INSERT INTO atencion.cita(paciente_id,medico_id,horario,motivo,estado,origen,creado_por)
+      VALUES($1,$2,tstzrange($3,$4,'[)'),$5,'confirmada','paciente',$6) RETURNING id,version`, [input.patientId, input.doctorId, start, end, input.reason, actor.id])).rows[0];
+    await this.commands.event(c, 'cita.actualizada', 'cita', row.id, row.version, await this.channels(c, input.patientId));
+    return { id: row.id as string, version: row.version as number, start, end };
   }
 
   /** API-09: confirming or rejecting only applies to a pending request; the database trigger `atencion.validar_cita` backs it. */

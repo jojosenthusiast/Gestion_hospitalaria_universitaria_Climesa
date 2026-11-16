@@ -38,6 +38,15 @@ Un paciente que creó su cuenta en la app pide vincularla a su expediente con su
 
 ### Citas
 
+- **Solicitudes por asignar** (arriba de la agenda): los pacientes piden cita por motivo (por ejemplo "Piel" o
+  "Corazón y presión"), con su franja preferida (mañana, tarde o cualquier hora) y una nota. No eligen médico. La
+  bandeja muestra primero las más antiguas, con el expediente, la nota y, si lo dijo, el médico que prefiere.
+  - **Asignar** abre la asignación en la misma fila, ya prellenada: el médico que prefiere el paciente o el primero con
+    turno de las especialidades sugeridas, y la primera franja libre de 20 minutos dentro de la franja pedida. Puedes
+    cambiar fecha, médico o franja (**Ver todo el día**) y luego **Confirmar cita**. Se crea una cita confirmada con las
+    reglas de siempre (franja de la jornada del médico, sin traslapes) y el paciente la ve en su app.
+  - **Rechazar** pide un motivo de 10 caracteres o más; el paciente lo ve.
+  - Bandeja vacía: "Al día: no hay solicitudes por asignar". El inicio también las muestra en **Requiere tu atención**.
 - **Agendar cita** crea una cita de 20 minutos, ya confirmada, en una franja libre del médico.
 - Las solicitudes de los pacientes llegan en vivo. Para cada cita, la fila muestra solo las acciones permitidas:
   - **Confirmar** o **Rechazar** una solicitud.
@@ -49,8 +58,13 @@ Un paciente que creó su cuenta en la app pide vincularla a su expediente con su
 
 ### Fila del día
 
-- **Emitir número** para un paciente y un servicio.
-- Elige el servicio y usa **Llamar siguiente**: llama al primer número en espera de ese servicio. Un número en espera se llama antes de atenderlo. En cada número: **Llamar** o **Llamar de nuevo**, **Iniciar atención** y **Completar**.
+- **Emitir número** para un paciente y un servicio, con su **prioridad** (Rutina, Urgente o Emergencia; por omisión Rutina). El número cuenta desde 1 en cada área y se muestra grande junto al código del área: **CON 7** (consulta general), **EMG** (emergencia), **LAB** (laboratorio), **REC** (admisiones).
+- Cada tarjeta dice si el paciente tiene cita hoy (**Cita 10:30**) o llegó sin cita (**Sin cita**), y muestra la prioridad cuando no es rutina.
+- Arriba está la fila y abajo el tablero por estado: **En espera**, **Llamados**, **En atención** y **Terminados**.
+- Elige un área: el recuadro **Quién pasa después** muestra el número propuesto, el paciente y el motivo. **Llamar siguiente** llama exactamente a ese número; si eliges un **Consultorio**, el número queda llamado hacia ese consultorio. La regla es fija y la decide el servidor: *emergencias primero; luego urgentes; luego citas dentro de su ventana (de 15 min antes a 15 min después de la hora, por hora de cita); luego el resto en orden de llegada (número del área).*
+- Mueve una tarjeta arrastrándola a otra columna o, sin arrastrar, con su menú **Mover o cambiar prioridad** (sirve con teclado y en el celular). Solo aparecen los cambios que el servidor acepta ahora; si sueltas una tarjeta donde no se puede, el tablero explica por qué y no cambia nada. El menú también cambia la prioridad mientras el número espera o está llamado.
+- Después de llamar aparece **Llamaste CON 7.** con **Deshacer**: el número vuelve a la espera (si ya tenía otros llamados, solo se resta uno). Un número llamado una sola vez también vuelve a **En espera** arrastrándolo o desde su menú; con 2 o más llamados el menú ofrece **Quitar un llamado**, que resta uno y lo deja en **Llamados**. Lo demás no se deshace: iniciar la atención, completar y "no se presentó" son definitivos.
+- Un número en espera se llama antes de atenderlo. En cada número: **Llamar** o **Llamar de nuevo**, **Iniciar atención** y **Completar**.
 - **No se presentó** aparece solo después de los llamados exigidos (3 por omisión).
 - Al día siguiente, el sistema cierra solo los números que quedaron abiertos.
 
@@ -87,7 +101,7 @@ Inicio, Emitir número, Pacientes, Citas, Vinculaciones, Admisión y cama, Table
 |---|---|
 | Emitir número | **Emitir número** → eliges el servicio → **Emitir** |
 | Pacientes | **Buscar paciente** y registrar después de buscar |
-| Citas | **Agendar cita** → **Confirmar cita**. En cada cita: **Confirmar**, **Rechazar**, **Reprogramar**, **Cancelar cita**, **No asistió**, **Aceptar nuevo horario**, **Rechazar nuevo horario**, según lo que permita el servidor |
+| Citas | **Solicitudes por asignar**: **Asignar** (médico y franja ya prellenados; **Ver todo el día** si no hay libres en la franja pedida) → **Confirmar cita**, o **Rechazar** con motivo. **Agendar cita** → **Confirmar cita**. En cada cita: **Confirmar**, **Rechazar**, **Reprogramar**, **Cancelar cita**, **No asistió**, **Aceptar nuevo horario**, **Rechazar nuevo horario**, según lo que permita el servidor |
 | Vinculaciones | **Aprobar**, **Rechazar con motivo** |
 | Admisión y cama | **Ingresar paciente**, **Asignar cama** → **Confirmar cama**, **Cancelar admisión** |
 | Tablero de camas | Estado de las camas |

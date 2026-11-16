@@ -102,7 +102,8 @@ describe('turnos · vista semanal', () => {
     const semana = await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre de 2026/ });
     expect(screen.getByRole('button', { name: 'Semana' }).getAttribute('aria-pressed')).toBe('true');
     const hoy = within(semana).getByRole('group', { name: /Hoy, martes, 10 de noviembre/ });
-    const bloques = within(hoy).getAllByRole('button').map(b => b.getAttribute('aria-label'));
+    // Cada día tiene además su botón "Asignar turno el …" (S12); los bloques son los turnos.
+    const bloques = within(hoy).getAllByRole('button').filter(b => b.classList.contains('shift-block')).map(b => b.getAttribute('aria-label'));
     expect(bloques).toEqual([
       'Ana Ficticia Prueba, Emergencia, 07:00 a 07:00 del día siguiente, Guardia / 24 h, En curso',
       'Rosa Enfermera Prueba, Emergencia, 08:00 a 14:00, Diurno, En curso',
@@ -135,10 +136,12 @@ describe('turnos · vista semanal', () => {
     montar(false);
     expect(screen.getByRole('button', { name: 'Lista por día' }).getAttribute('aria-pressed')).toBe('true');
     const dias = await screen.findAllByRole('heading', { level: 3 });
-    // Todos los días tienen su ancla; la guardia del martes también aparece el miércoles, al que llega.
+    // Todos los días tienen su ancla; la guardia del martes también aparece el miércoles, al que llega. Hoy va primero y
+    // los días pasados quedan plegados al final (S12).
     expect(dias.map(h => h.textContent)).toEqual([
-      'Ayer · lunes, 9 de noviembreSin turnos', 'Hoy · martes, 10 de noviembre2 turnos', 'Mañana · miércoles, 11 de noviembre1 turno',
+      'Hoy · martes, 10 de noviembre2 turnos', 'Mañana · miércoles, 11 de noviembre1 turno',
       'Jueves, 12 de noviembre1 turno', 'Viernes, 13 de noviembreSin turnos', 'Sábado, 14 de noviembreSin turnos', 'Domingo, 15 de noviembreSin turnos',
+      'Ayer · lunes, 9 de noviembreSin turnos',
     ]);
     expect(within(screen.getByRole('region', { name: /Mañana · miércoles/ })).getByText('Viene del día anterior')).toBeTruthy();
     const hoy = screen.getByRole('region', { name: /Hoy · martes, 10 de noviembre/ });

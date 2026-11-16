@@ -4,6 +4,7 @@ import { Dialog, Tag, formatDateTime } from '../common';
 import { KIND_LABEL, attendanceLabel, canNow, localTime, type ShiftRow } from './rules';
 import { timeRange } from './ShiftWeek';
 import { dayHeading, displayState, stateName, type WeekDay } from './week';
+import { splitDays } from './plan';
 
 const ATTENDANCE_ACTIONS = ['marcar_presente', 'marcar_ausente', 'deshacer_asistencia'] as const;
 export const hasAttendanceAction = (t: ShiftRow, now: number) => ATTENDANCE_ACTIONS.some(a => canNow(t, a, now));
@@ -18,10 +19,11 @@ export function dayTitle(date: string, today: string) {
 export type RowActions = { onEdit: (t: ShiftRow) => void; onCancel: (t: ShiftRow) => void; onAttendance: (t: ShiftRow) => void };
 
 /**
- * Lista de la semana por día, de lunes a domingo, con los turnos de cada día por hora de inicio (o por persona). Un turno
- * de noche o una guardia de 24 h que viene del día anterior también aparece en el día al que llega, marcado "viene del
- * día anterior" (así coincide con "N turnos más" de la semana; el lunes incluye los del domingo anterior). Todos los
- * días se dibujan, con o sin turnos, para que "N turnos más" y "Hoy" siempre tengan dónde llegar.
+ * Lista para REVISAR la semana: hoy primero y los días que vienen; los días pasados de la semana quedan plegados abajo
+ * ("Días anteriores", el más reciente primero), nunca arriba. Cada día ordena sus turnos por hora de inicio (o por
+ * persona). Un turno de noche o una guardia de 24 h que viene del día anterior también aparece en el día al que llega,
+ * marcado "viene del día anterior" (así coincide con "N turnos más" de la semana; el lunes incluye los del domingo
+ * anterior). Todos los días se dibujan, con o sin turnos, para que "N turnos más" y "Hoy" siempre tengan dónde llegar.
  */
 export function ShiftDayList({ days, today, now, rows, plan, byPerson, typeOf, actions }: {
   days: WeekDay[]; today: string; now: number; rows: ShiftRow[]; plan: boolean; byPerson: boolean;
@@ -35,7 +37,10 @@ export function ShiftDayList({ days, today, now, rows, plan, byPerson, typeOf, a
     const carried = rows.filter(t => Date.parse(t.start) < day.start && Date.parse(t.end) > day.start).sort(order);
     return { day, items: [...carried, ...starts], carried: new Set(carried.map(t => t.id)) };
   });
-  return <div className="shift-days">{groups.map(({ day, items, carried }) => {
+  const { upcoming, past } = splitDays(days, today);
+  const byDate = new Map(groups.map(g => [g.day.date, g]));
+  const pastCount = past.reduce((sum, d) => sum + (byDate.get(d.date)?.items.length ?? 0), 0);
+  const section = ({ day, items, carried }: typeof groups[number]) => {
     const id = `turnos-dia-${day.date}`;
     return <section key={day.date} id={`dia-${day.date}`} className={`shift-day${day.date === today ? ' is-today' : ''}`} aria-labelledby={id}>
       <h3 id={id} className="shift-day-title"><span>{dayTitle(day.date, today)}</span><span className="shift-day-count">{items.length === 0 ? 'Sin turnos' : items.length === 1 ? '1 turno' : `${items.length} turnos`}</span></h3>
@@ -58,7 +63,14 @@ export function ShiftDayList({ days, today, now, rows, plan, byPerson, typeOf, a
         })}</tbody>
       </table>}
     </section>;
-  })}</div>;
+  };
+  return <div className="shift-days">
+    {upcoming.map(d => section(byDate.get(d.date)!))}
+    {past.length > 0 && <details className="shift-past" open={upcoming.length === 0}>
+      <summary><span>{upcoming.length === 0 ? 'Días de esta semana' : 'Días anteriores de esta semana'}</span><span className="shift-day-count">{pastCount === 1 ? '1 turno' : `${pastCount} turnos`}</span></summary>
+      {past.map(d => section(byDate.get(d.date)!))}
+    </details>}
+  </div>;
 }
 
 /** Qué pasó con la entrada, en palabras: automática a la hora de inicio, corregida por JOP o ausencia. */

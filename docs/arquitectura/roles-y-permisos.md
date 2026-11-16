@@ -183,6 +183,12 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/turnos/especialistas` | `turnos.ver` | Médicos de turno por día y especialidad durante 7 días; sin datos de contacto (RN-17, CARGA-04) | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/turnos/{id}/entrada` | `turnos.ver` | Propio; obsoleto, una versión para apps instaladas: no cambia nada, devuelve el estado del turno ya empezado o 409 entrada_automatica antes del inicio | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/turnos/{id}/asistencia` | `turnos.planificar` | La entrada es automática al inicio; ausencia con tipo y motivo, corregir la hora real de entrada o deshacer una ausencia; versión y motivo (ASIS-01 a ASIS-03) | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/turnos/lote/validar` | `turnos.planificar` | No guarda; un resultado por turno con las reglas de un turno suelto (descanso, tope de 7 días, traslape, inscripción) y huecos de cobertura | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/turnos/lote` | `turnos.planificar` | Todo o nada, como borradores; 409 lote_con_conflictos con el resultado de cada turno | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/turnos/generar` | `turnos.planificar` | Vista previa sin guardar: rotativo, 12x36, 24x72 o personalizado; máximo 31 días | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/turnos/plantillas` | `turnos.planificar` |  | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/turnos/plantillas` | `turnos.planificar` | Nombre único por área | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| PATCH | `/api/v1/turnos/plantillas/{id}` | `turnos.planificar` | Versión optimista | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 
 ### Spec 104
 
@@ -220,7 +226,16 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/citas/reprogramaciones/{id}/aceptar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/citas/reprogramaciones/{id}/rechazar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita, motivo | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/citas/{id}/no-asistio` | `citas.agendar` | Hora alcanzada y sin consulta | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
-| POST | `/api/v1/fila/llamar-siguiente` | `fila.llamar` | Primer número en espera del servicio | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/llamar-siguiente` | `fila.llamar` | Número que propone la regla RN-FILA-SIGUIENTE | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| GET | `/api/v1/fila/siguiente` | `fila.ver` | Solo con fila completa; emergencias, urgentes, citas en ventana y llegada | R | 4 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
+| POST | `/api/v1/fila/{id}/deshacer-llamado` | `fila.llamar` | Solo un número llamado | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/{id}/prioridad` | `fila.gestionar` | Solo antes de la atención | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| GET | `/api/v1/citas/categorias` | `citas.solicitar` o `citas.agendar` |  | R | 5 | · | · | ✔ | · | · | · | · | · | · | propio |
+| GET | `/api/v1/citas/solicitudes-categoria` | `citas.ver` | REC todas las pendientes y las resueltas en 30 días; PAC solo propias | R | 5 | · | ✔ | ✔ | ✔ | · | propio | · | · | · | propio |
+| POST | `/api/v1/citas/solicitudes-categoria` | `citas.solicitar` | PAC propio; una a tres categorías, franja y nota; sin médico | R | 5 | · | · | · | · | · | · | · | · | · | propio |
+| POST | `/api/v1/citas/solicitudes-categoria/{id}/asignar` | `citas.agendar` | Crea cita confirmada con las reglas de siempre; auditado | R | 5 | · | · | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/citas/solicitudes-categoria/{id}/rechazar` | `citas.agendar` | Motivo | R | 5 | · | · | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/citas/solicitudes-categoria/{id}/cancelar` | `citas.cancelar` | PAC solo propias y pendientes | R | 5 | · | · | ✔ | · | · | · | · | · | · | propio |
 
 ### Spec 106
 

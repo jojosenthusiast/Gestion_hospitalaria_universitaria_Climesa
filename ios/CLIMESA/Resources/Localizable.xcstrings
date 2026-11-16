@@ -4345,6 +4345,512 @@
           }
         }
       }
+    },
+    "appointments.franja.manana": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mañana"
+          }
+        }
+      }
+    },
+    "appointments.franja.tarde": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarde"
+          }
+        }
+      }
+    },
+    "appointments.franja.cualquiera": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cualquier hora"
+          }
+        }
+      }
+    },
+    "appointments.category.mine": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mis solicitudes"
+          }
+        }
+      }
+    },
+    "appointments.category.state.pendiente": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Por asignar"
+          }
+        }
+      }
+    },
+    "appointments.category.state.asignada": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asignada"
+          }
+        }
+      }
+    },
+    "appointments.category.state.rechazada": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechazada"
+          }
+        }
+      }
+    },
+    "appointments.category.state.cancelada": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirada"
+          }
+        }
+      }
+    },
+    "appointments.category.assigned": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cita con %1$@ el %2$@"
+          }
+        }
+      }
+    },
+    "appointments.category.withdraw": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirar solicitud"
+          }
+        }
+      }
+    },
+    "appointments.category.withdraw.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recepción ya no verá esta solicitud."
+          }
+        }
+      }
+    },
+    "appointments.category.withdrawn": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solicitud retirada."
+          }
+        }
+      }
+    },
+    "appointments.category.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige el motivo; recepción te asigna médico y hora."
+          }
+        }
+      }
+    },
+    "appointments.category.reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Por qué quieres la cita?"
+          }
+        }
+      }
+    },
+    "appointments.category.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige de una a tres opciones (%d de 3)."
+          }
+        }
+      }
+    },
+    "appointments.category.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar motivo"
+          }
+        }
+      }
+    },
+    "appointments.category.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ningún motivo coincide. Prueba otra palabra o elige Consulta general."
+          }
+        }
+      }
+    },
+    "appointments.category.franja": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Franja preferida"
+          }
+        }
+      }
+    },
+    "appointments.category.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nota para recepción · opcional"
+          }
+        }
+      }
+    },
+    "appointments.category.note.long": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La nota admite hasta 280 caracteres."
+          }
+        }
+      }
+    },
+    "appointments.category.general": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medicina general"
+          }
+        }
+      }
+    },
+    "appointments.category.doctor": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya tengo médico (opcional)"
+          }
+        }
+      }
+    },
+    "appointments.category.doctor.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Médico preferido · opcional"
+          }
+        }
+      }
+    },
+    "appointments.category.doctor.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar"
+          }
+        }
+      }
+    },
+    "appointments.category.sent": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solicitud enviada. Recepción te asignará médico y hora."
+          }
+        }
+      }
+    },
+    "appointments.category.submit": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar solicitud"
+          }
+        }
+      }
+    },
+    "queue.next.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quién pasa después"
+          }
+        }
+      }
+    },
+    "queue.next.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nadie espera en consulta general."
+          }
+        }
+      }
+    },
+    "queue.next.rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regla: %@"
+          }
+        }
+      }
+    },
+    "queue.called.undoable": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Llamaste %@."
+          }
+        }
+      }
+    },
+    "queue.undo": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deshacer"
+          }
+        }
+      }
+    },
+    "queue.undone": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ volvió a la espera."
+          }
+        }
+      }
+    },
+    "queue.menu": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover o cambiar prioridad"
+          }
+        }
+      }
+    },
+    "queue.menu.for": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover o cambiar prioridad de %@"
+          }
+        }
+      }
+    },
+    "queue.move.to": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover a %@ (%@)"
+          }
+        }
+      }
+    },
+    "queue.priority.to": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prioridad: %@"
+          }
+        }
+      }
+    },
+    "consultation.steps": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consulta → procedimientos → receta o exámenes → cerrar"
+          }
+        }
+      }
+    },
+    "consultation.step.1": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Consulta"
+          }
+        }
+      }
+    },
+    "consultation.step.2": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2. Procedimientos y plan"
+          }
+        }
+      }
+    },
+    "consultation.step.3": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3. Receta y exámenes"
+          }
+        }
+      }
+    },
+    "consultation.step.4": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4. Cerrar consulta"
+          }
+        }
+      }
+    },
+    "consultation.step.4.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Firmar cierra la consulta y el número de fila; luego te proponemos quién pasa después."
+          }
+        }
+      }
+    },
+    "consultation.next.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consulta cerrada · quién pasa después"
+          }
+        }
+      }
+    },
+    "consultation.next.call": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Llamar a %@"
+          }
+        }
+      }
+    },
+    "consultation.next.dismiss": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no"
+          }
+        }
+      }
+    },
+    "queue.removeCall": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar un llamado (van %lld)"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

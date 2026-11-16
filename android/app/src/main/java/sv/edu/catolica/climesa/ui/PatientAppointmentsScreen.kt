@@ -14,11 +14,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
@@ -40,8 +37,6 @@ import androidx.compose.ui.res.stringResource
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AppointmentAction
 import sv.edu.catolica.climesa.domain.AppointmentActions
-import sv.edu.catolica.climesa.domain.AppointmentDoctor
-import sv.edu.catolica.climesa.domain.AppointmentSlot
 import sv.edu.catolica.climesa.domain.PatientAppointment
 import sv.edu.catolica.climesa.domain.QuickAction
 
@@ -57,28 +52,29 @@ fun PatientAppointmentsScreen(
     quickAction: QuickAction? = null,
     onQuickActionHandled: () -> Unit = {},
     model: PatientAppointmentsViewModel = viewModel(),
+    requests: CategoryRequestsViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
-    var requestOpen by rememberSaveable { mutableStateOf(false) }
+    val requestState by requests.state.collectAsStateWithLifecycle()
     var cancelTarget by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) { model.load(); model.startLive(channels) }
+    val canRequest = "citas.solicitar" in permissions
+    LaunchedEffect(Unit) { model.load(); model.startLive(channels); requests.load(withCategories = canRequest); requests.startLive(channels) }
     LaunchedEffect(quickAction) {
         if (quickAction == null) return@LaunchedEffect
-        if (quickAction == QuickAction.REQUEST_APPOINTMENT && "citas.solicitar" in permissions) requestOpen = true
+        if (quickAction == QuickAction.REQUEST_APPOINTMENT && canRequest) requests.openForm()
         onQuickActionHandled()
     }
+    // Fase 2, flow A: the patient asks by reason instead of picking one of every doctor; reception assigns doctor and time.
+    if (requestState.formOpen) { CategoryRequestForm(requestState, requests, state.doctors, modifier); return }
     val cancelAppointment = state.appointments.firstOrNull { it.id == cancelTarget }
 
-    if (requestOpen) {
-        AppointmentRequestDialog(state, model, onClose = { requestOpen = false })
-    }
     if (cancelAppointment != null) {
         CancelAppointmentDialog(cancelAppointment, state.saving, model, onClose = { cancelTarget = null })
     }
     state.rescheduleTarget?.let { RescheduleRequestDialog(it, state, model) }
 
     PageList(modifier) {
-        item { SectionIntro("Paciente / Atención", "Mis citas", "Consulta tus citas y solicita una nueva franja con un médico disponible.") }
+        item { SectionIntro("Paciente / Atención", "Mis citas", "Consulta tus citas y pide una nueva por motivo; recepción te asigna médico y hora.") }
         state.error?.let { error ->
             item {
                 ClimesaActionGroup {
@@ -88,9 +84,12 @@ fun PatientAppointmentsScreen(
             }
         }
         state.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.Send) } }
-        if ("citas.solicitar" in permissions) {
-            item { PrimaryButton("Solicitar cita", { model.clearMessages(); requestOpen = true }, icon = Icons.Default.CalendarMonth) }
+        requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+        requestState.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.Send) } }
+        if (canRequest) {
+            item { PrimaryButton(stringResource(R.string.cat_pedir_cita), { model.clearMessages(); requests.openForm() }, icon = Icons.Default.CalendarMonth) }
         }
+        if (requestState.requests.isNotEmpty()) item { MyCategoryRequests(requestState.requests, requestState.saving, requests::withdraw) }
         if (state.loading) {
             item { LoadingState() }
         } else if (state.appointments.isEmpty()) {
@@ -166,57 +165,6 @@ private fun RescheduleRequestDialog(appointment: PatientAppointment, state: Pati
 }
 
 @Composable
-private fun AppointmentRequestDialog(state: PatientAppointmentsState, model: PatientAppointmentsViewModel, onClose: () -> Unit) {
-    var doctorMenu by rememberSaveable { mutableStateOf(false) }
-    var reason by rememberSaveable { mutableStateOf("") }
-    var datePickerOpen by rememberSaveable { mutableStateOf(false) }
-    val selectedDoctor = state.doctors.firstOrNull { it.id == state.selectedDoctorId }
-    ConfirmDialog(
-        title = "Solicitar cita",
-        confirmLabel = "Enviar solicitud",
-        onConfirm = { model.request(reason); onClose() },
-        onDismiss = onClose,
-        message = "Selecciona un médico, una fecha y una franja publicada. Recepción confirmará la solicitud.",
-        busy = state.saving,
-        confirmEnabled = state.selectedSlot != null,
-        body = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                androidx.compose.material3.ExposedDropdownMenuBox(expanded = doctorMenu, onExpandedChange = { doctorMenu = !doctorMenu }) {
-                    OutlinedTextField(value = selectedDoctor?.name ?: "Selecciona un médico", onValueChange = {}, readOnly = true, label = { Text("Médico") }, modifier = Modifier.menuAnchor().fillMaxWidth())
-                    DropdownMenu(expanded = doctorMenu, onDismissRequest = { doctorMenu = false }) {
-                        state.doctors.forEach { doctor -> DropdownMenuItem(enabled = doctor.hasShift, text = { Text(doctorLabel(doctor) + if (doctor.hasShift) "" else " · " + (doctor.reason ?: "Sin turno")) }, onClick = { model.selectDoctor(doctor.id); doctorMenu = false }) }
-                    }
-                }
-                OutlinedButton(onClick = { datePickerOpen = true }, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(Icons.Default.CalendarMonth, contentDescription = null); Spacer(Modifier.padding(4.dp)); Text("Fecha: ${state.selectedDate.format(appointmentDateFormatter)}") }
-                if (state.selectedDoctorId.isNotBlank()) {
-                    if (state.workPeriods.isNotEmpty()) Text("Jornada publicada: ${state.workPeriods.joinToString(" · ") { "${formatTime(it.start)}–${formatTime(it.end)}" }}", style = MaterialTheme.typography.bodySmall)
-                    if (state.daySlots.isEmpty()) Text("No hay franjas publicadas para esta fecha.", style = MaterialTheme.typography.bodySmall)
-                    else {
-                        Text("Toca una franja libre de 20 minutos. Las apagadas no están disponibles y dicen por qué.", style = MaterialTheme.typography.bodySmall)
-                        DaySlotGrid(state.daySlots, state.daySlots.firstOrNull { it.start == state.selectedSlot?.start }, { model.selectSlot(AppointmentSlot(it.start, it.end)) })
-                    }
-                }
-                FormField("Motivo · opcional", reason, { reason = it.take(500) }, singleLine = false)
-            }
-        },
-    )
-    if (datePickerOpen) {
-        val picker = rememberDatePickerState(initialSelectedDateMillis = state.selectedDate.atStartOfDay(sanSalvador).toInstant().toEpochMilli())
-        DatePickerDialog(onDismissRequest = { datePickerOpen = false }, confirmButton = { TextButton(onClick = { picker.selectedDateMillis?.let { model.selectDate(Instant.ofEpochMilli(it).atZone(sanSalvador).toLocalDate()) }; datePickerOpen = false }) { Text("Aceptar") } }, dismissButton = { TextButton(onClick = { datePickerOpen = false }) { Text("Cancelar") } }) { DatePicker(state = picker) }
-    }
-}
-
-@Composable
-private fun SlotPicker(slots: List<AppointmentSlot>, selected: AppointmentSlot?, onSelected: (AppointmentSlot) -> Unit) {
-    var open by rememberSaveable { mutableStateOf(false) }
-    val text = selected?.let { "${formatTime(it.start)} – ${formatTime(it.end)}" } ?: "Selecciona un horario"
-    androidx.compose.material3.ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = !open }) {
-        OutlinedTextField(text, {}, readOnly = true, label = { Text("Horario disponible") }, modifier = Modifier.menuAnchor().fillMaxWidth())
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) { slots.forEach { slot -> DropdownMenuItem(text = { Text("${formatTime(slot.start)} – ${formatTime(slot.end)}") }, onClick = { onSelected(slot); open = false }) } }
-    }
-}
-
-@Composable
 private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boolean, model: PatientAppointmentsViewModel, onClose: () -> Unit) {
     var reason by rememberSaveable(appointment.id) { mutableStateOf("") }
     ConfirmDialog(
@@ -232,6 +180,5 @@ private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boole
     )
 }
 
-private fun doctorLabel(doctor: AppointmentDoctor) = doctor.specialty?.let { "${doctor.name} · $it" } ?: doctor.name
 private fun formatAppointmentDateTime(value: String) = runCatching { appointmentTimeFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
 private fun formatTime(value: String) = runCatching { java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)

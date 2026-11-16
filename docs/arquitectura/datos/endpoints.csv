@@ -39,6 +39,12 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 103,GET,/api/v1/turnos/especialistas,turnos.ver,"Médicos de turno por día y especialidad durante 7 días; sin datos de contacto (RN-17, CARGA-04)",R,3,Especialistas de la semana
 103,POST,/api/v1/turnos/{id}/entrada,turnos.ver,"Propio; obsoleto, una versión para apps instaladas: no cambia nada, devuelve el estado del turno ya empezado o 409 entrada_automatica antes del inicio",R,3,Marcar mi entrada al turno (obsoleto)
 103,POST,/api/v1/turnos/{id}/asistencia,turnos.planificar,"La entrada es automática al inicio; ausencia con tipo y motivo, corregir la hora real de entrada o deshacer una ausencia; versión y motivo (ASIS-01 a ASIS-03)",R,3,Registrar la asistencia de un turno
+103,POST,/api/v1/turnos/lote/validar,turnos.planificar,"No guarda; un resultado por turno con las reglas de un turno suelto (descanso, tope de 7 días, traslape, inscripción) y huecos de cobertura",R,4,Validar un lote de turnos
+103,POST,/api/v1/turnos/lote,turnos.planificar,"Todo o nada, como borradores; 409 lote_con_conflictos con el resultado de cada turno",R,4,Crear turnos en lote como borrador
+103,POST,/api/v1/turnos/generar,turnos.planificar,"Vista previa sin guardar: rotativo, 12x36, 24x72 o personalizado; máximo 31 días",R,4,Generar una rotación de turnos
+103,GET,/api/v1/turnos/plantillas,turnos.planificar,,R,4,Plantillas de semana por área
+103,POST,/api/v1/turnos/plantillas,turnos.planificar,Nombre único por área,R,4,Guardar una semana como plantilla
+103,PATCH,/api/v1/turnos/plantillas/{id},turnos.planificar,Versión optimista,R,4,Retirar una plantilla de semana
 104,GET,/api/v1/espacios,espacios.ver,,R,2,Árbol del edificio con disponibilidad agregada (CTE recursiva)
 104,POST,/api/v1/espacios,espacios.configurar,,R,2,Crear espacio
 104,PATCH,/api/v1/espacios/{id},espacios.configurar,No reduce capacidad bajo ocupación,R,2,Editar espacio
@@ -163,5 +169,14 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/citas/reprogramaciones/{id}/aceptar,citas.agendar OR consulta.iniciar,REC o el médico de la cita,R,4,Aceptar solicitud de reprogramación
 105,POST,/api/v1/citas/reprogramaciones/{id}/rechazar,citas.agendar OR consulta.iniciar,"REC o el médico de la cita, motivo",R,4,Rechazar solicitud de reprogramación
 105,POST,/api/v1/citas/{id}/no-asistio,citas.agendar,Hora alcanzada y sin consulta,R,4,Marcar que el paciente no asistió
-105,POST,/api/v1/fila/llamar-siguiente,fila.llamar,Primer número en espera del servicio,R,4,Llamar el siguiente número
+105,POST,/api/v1/fila/llamar-siguiente,fila.llamar,Número que propone la regla RN-FILA-SIGUIENTE,R,4,Llamar el siguiente número
+105,GET,/api/v1/fila/siguiente,fila.ver,"Solo con fila completa; emergencias, urgentes, citas en ventana y llegada",R,4,Quién pasa después en un servicio (RN-FILA-SIGUIENTE)
+105,POST,/api/v1/fila/{id}/deshacer-llamado,fila.llamar,Solo un número llamado,R,4,Deshacer el último llamado
+105,POST,/api/v1/fila/{id}/prioridad,fila.gestionar,Solo antes de la atención,R,4,Cambiar la prioridad del número
 106,GET,/api/v1/consultas/sin-firmar,consulta.iniciar,Solo propias,R,4,Consultas abiertas de cualquier día para reanudar
+105,GET,/api/v1/citas/categorias,citas.solicitar OR citas.agendar,,R,5,"Catálogo de motivos de cita (categoría, ícono, palabras de búsqueda y especialidades sugeridas)"
+105,GET,/api/v1/citas/solicitudes-categoria,citas.ver,"REC todas las pendientes y las resueltas en 30 días; PAC solo propias",R,5,Bandeja de solicitudes de cita por categoría con allowedActions
+105,POST,/api/v1/citas/solicitudes-categoria,citas.solicitar,"PAC propio; una a tres categorías, franja y nota; sin médico",R,5,Paciente pide cita por motivo sin elegir médico
+105,POST,/api/v1/citas/solicitudes-categoria/{id}/asignar,citas.agendar,"Crea cita confirmada con las reglas de siempre; auditado",R,5,Recepción asigna médico y hora a una solicitud por categoría
+105,POST,/api/v1/citas/solicitudes-categoria/{id}/rechazar,citas.agendar,Motivo,R,5,Recepción rechaza una solicitud por categoría
+105,POST,/api/v1/citas/solicitudes-categoria/{id}/cancelar,citas.cancelar,PAC solo propias y pendientes,R,5,Paciente retira su solicitud por categoría
