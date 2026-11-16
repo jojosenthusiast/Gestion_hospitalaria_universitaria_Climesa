@@ -44,7 +44,7 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
     val step = state.step
     val problem = AdmissionIntake.stepError(step, draft, canAssignBed, state.feasibility?.feasible == true)
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.ing_eyebrow), stringResource(R.string.ing_titulo), stringResource(R.string.ing_paso, step + 1, AdmissionIntake.STEP_TITLES.size, AdmissionIntake.STEP_TITLES[step])) }
+        item { CompactHeader(stringResource(R.string.ing_titulo), breadcrumb = stringResource(R.string.ing_paso, step + 1, AdmissionIntake.STEP_TITLES.size, AdmissionIntake.STEP_TITLES[step])) }
         item { LinearProgressIndicator(progress = { (step + 1f) / AdmissionIntake.STEP_TITLES.size }, modifier = Modifier.fillMaxWidth()) }
         state.error?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
         if (state.loading) item { LoadingState() }

@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -16,7 +20,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -61,10 +64,9 @@ internal fun NoticeBanner(kind: NoticeKind, text: String, modifier: Modifier = M
 }
 
 @Composable
-private fun StateSymbol(icon: ImageVector?, tint: Color = MaterialTheme.climesa.primaryText, background: Color = MaterialTheme.climesa.soft) {
+private fun StateSymbol(icon: ImageVector, tint: Color = MaterialTheme.climesa.primaryText, background: Color = MaterialTheme.climesa.soft) {
     Box(Modifier.size(64.dp).background(background, CircleShape), contentAlignment = Alignment.Center) {
-        if (icon == null) CircularProgressIndicator(Modifier.size(30.dp), strokeWidth = 3.dp, color = tint)
-        else Icon(icon, null, Modifier.size(30.dp), tint = tint)
+        Icon(icon, null, Modifier.size(30.dp), tint = tint)
     }
 }
 
@@ -93,16 +95,45 @@ private fun StateLayout(
 internal fun EmptyState(title: String, modifier: Modifier = Modifier, detail: String? = null, icon: ImageVector = Icons.Default.Search, action: (@Composable () -> Unit)? = null) =
     StateLayout({ StateSymbol(icon) }, title, detail, modifier, action)
 
-/** Spinner with the common copy. Announced to screen readers as a polite live region. */
+/**
+ * S3: static placeholder that reserves a section's place while it loads (web `Skeleton`). No spinner and no shimmer;
+ * [label] is read by screen readers. Rows default to the height of a [DataRow] so nothing jumps when the data arrives.
+ */
+@Composable
+internal fun Skeleton(
+    modifier: Modifier = Modifier,
+    rows: Int = 3,
+    rowHeight: Dp = Spacing.touch + Spacing.sm,
+    label: String = stringResource(R.string.ui_cargando_titulo),
+) {
+    val fill = MaterialTheme.climesa.line.copy(alpha = .7f)
+    val widths = listOf(.88f, 1f, .72f)
+    Column(
+        modifier.fillMaxWidth().padding(vertical = Space2).semantics {
+            contentDescription = label
+            liveRegion = LiveRegionMode.Polite
+        },
+        verticalArrangement = Arrangement.spacedBy(Space3),
+    ) {
+        repeat(rows) { i -> Box(Modifier.fillMaxWidth(widths[i % widths.size]).height(rowHeight).background(fill, RoundedCornerShape(RadiusControl))) }
+    }
+}
+
+/**
+ * Loading a section after sign-in: a [Skeleton] in place of the content, never a full-screen spinner (S3). `title` is the
+ * screen-reader label; `detail` is kept for callers but not drawn. After a few seconds the first load still explains that
+ * the server may be waking up (MA-OPS-01).
+ */
 @Composable
 internal fun LoadingState(
     modifier: Modifier = Modifier,
     title: String = stringResource(R.string.ui_cargando_titulo),
-    detail: String? = stringResource(R.string.ui_cargando_detalle),
+    @Suppress("UNUSED_PARAMETER") detail: String? = null,
 ) {
-    // MA-OPS-01: after a few seconds the first load explains that the server may be waking up.
-    val shown = if (rememberSlowServer(true)) stringResource(R.string.servidor_activando) else detail
-    StateLayout({ StateSymbol(null) }, title, shown, modifier.semantics { liveRegion = LiveRegionMode.Polite })
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(Space2)) {
+        Skeleton(rows = 4, label = title)
+        SlowServerHint(active = true, modifier = Modifier.fillMaxWidth())
+    }
 }
 
 /** Thin bar shown above stale content while a silent refresh runs (web `.refresh-hint`). */

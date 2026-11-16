@@ -65,7 +65,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     }
 }
 @Composable private fun AccessPending(error:String?,retry:()->Unit,logout:()->Unit){
-    Surface { Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){SectionIntro("Acceso / CLIMESA","No pudimos verificar tu acceso",error?:"Revisa tu conexión e intenta de nuevo.");Spacer(Modifier.height(24.dp));ClimesaButton("Volver a intentar",Icons.Default.Refresh,retry);Spacer(Modifier.height(10.dp));TextButton(onClick=logout){Text("Cerrar sesión")}} }
+    Surface { Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){CompactHeader("No pudimos verificar tu acceso");Text(error?:"Revisa tu conexión e intenta de nuevo.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Spacer(Modifier.height(24.dp));ClimesaButton("Volver a intentar",Icons.Default.Refresh,retry);Spacer(Modifier.height(10.dp));TextButton(onClick=logout){Text("Cerrar sesión")}} }
 }
 @Composable private fun AuthorizedWorkspace(account:AuthenticatedAccount,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit){
     val destination=account.profile.androidDestination()
