@@ -38,4 +38,11 @@ class RoleNoticesTest {
     @Test fun noticeEventsMatchTheAvisoEntity() {
         assertTrue(NoticeEvents.matches(EventoDominio(type = "aviso.publicado", entity = "aviso", id = "x", version = 1)))
     }
+
+    /** MA-AVI-02: editar o retirar un aviso llega como `aviso.actualizado`; Información del hospital también se actualiza. */
+    @Test fun editedOrWithdrawnNoticesRefreshTheHospitalInfo() {
+        val edited = EventoDominio(type = "aviso.actualizado", entity = "aviso", id = "x", version = 2)
+        assertTrue(NoticeEvents.matches(edited))
+        assertTrue(HospitalInfoEvents.matches(edited))
+    }
 }

@@ -129,6 +129,8 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 112,POST,/api/v1/avisos,avisos.publicar,Vigencia,R,3,Publicar aviso con audiencia (público y/o roles) y prioridad
 112,GET,/api/v1/avisos,avisos.publicar,,R,3,Avisos recientes con audiencia prioridad y estado para quien los redacta
 112,GET,/api/v1/me/avisos,sesion.perfil,Propio,R,3,Avisos vigentes para mis roles incluidos los públicos
+112,PUT,/api/v1/avisos/{id},avisos.publicar,Vigente o programado; exige versión,R,3,Editar aviso: texto prioridad audiencia y vigencia (adelantar el fin lo vence antes); auditado
+112,POST,/api/v1/avisos/{id}/retirar,avisos.publicar,Motivo de 10 caracteres o más (D-13),R,3,Retirar aviso antes de tiempo; deja de verse en todas partes
 113,GET,/api/v1/metricas/tablero,metricas.ver,Agregados sin datos personales,R,2,Tablero inicial
 113,GET,/api/v1/metricas/{indicador},metricas.ver,,E,5,Serie de un indicador
 111,POST,/api/v1/inventario/articulos,inventario.configurar,,R,4,Crear artículo

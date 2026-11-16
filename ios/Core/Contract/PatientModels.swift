@@ -361,7 +361,21 @@ public struct DoctorsOnDuty: Decodable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey { case updatedAt = "actualizadoEn", doctors = "medicos" }
 }
 
-/// `NoticesResponse` de `GET /publico/avisos`.
+/// Escalera de avisos (D-071), del más urgente al menos. Un valor desconocido se trata como `atencion`.
+public enum NoticePriority: String, Sendable, Equatable, CaseIterable {
+    case critico, urgente, atencion
+
+    public var label: String {
+        switch self {
+        case .critico: return "Crítico"
+        case .urgente: return "Urgente"
+        case .atencion: return "Atención"
+        }
+    }
+}
+
+/// `NoticesResponse` de `GET /publico/avisos` y `MyNoticesResponse` de `GET /me/avisos` (MA-AVI-01): los avisos
+/// públicos y los dirigidos a los roles de la cuenta, con su prioridad. `/publico/avisos` no trae audiencia.
 public struct PublicNotices: Decodable, Sendable, Equatable {
     public struct Notice: Decodable, Sendable, Identifiable, Equatable {
         public let id: String
@@ -369,7 +383,28 @@ public struct PublicNotices: Decodable, Sendable, Equatable {
         public let body: String
         public let from: String?
         public let until: String?
-        enum CodingKeys: String, CodingKey { case id, title = "titulo", body = "cuerpo", from = "desde", until = "hasta" }
+        public let priority: NoticePriority
+        public let isPublic: Bool
+        public let roles: [String]
+        enum CodingKeys: String, CodingKey { case id, title = "titulo", body = "cuerpo", from = "desde", until = "hasta", priority = "prioridad", isPublic = "publico", roles }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            title = try c.decode(String.self, forKey: .title)
+            body = try c.decode(String.self, forKey: .body)
+            from = try c.decodeIfPresent(String.self, forKey: .from)
+            until = try c.decodeIfPresent(String.self, forKey: .until)
+            priority = (try c.decodeIfPresent(String.self, forKey: .priority)).flatMap(NoticePriority.init(rawValue:)) ?? .atencion
+            isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? true
+            roles = try c.decodeIfPresent([String].self, forKey: .roles) ?? []
+        }
+    }
+
+    /// Del más urgente al menos, conservando el orden del servidor dentro de cada prioridad (igual que Android y la web).
+    public var byPriority: [Notice] {
+        let rank = Dictionary(uniqueKeysWithValues: NoticePriority.allCases.enumerated().map { ($1, $0) })
+        return notices.enumerated().sorted { (rank[$0.element.priority] ?? 0, $0.offset) < (rank[$1.element.priority] ?? 0, $1.offset) }.map(\.element)
     }
     public let updatedAt: String
     public let notices: [Notice]

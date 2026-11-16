@@ -12,7 +12,14 @@ export const priorityLabel = (priority: string) => priorities.find(p => p.id ===
 export const audienceRoles = ['ADM', 'JOP', 'REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR', 'DPD'] as const;
 
 export type NoticeAudience = { id: string; titulo: string; cuerpo: string; desde: string | null; hasta: string | null; prioridad: string; publico: boolean; roles: string[] };
-export type NoticeListItem = NoticeAudience & { estado: 'vigente' | 'programado' | 'vencido'; publicadoEn: string | null };
+/** Acciones que el servidor acepta sobre un aviso (MA-AVI-02); vacío si venció o fue retirado. */
+export type NoticeAction = 'editar' | 'retirar';
+export type NoticeListItem = NoticeAudience & {
+  estado: 'vigente' | 'programado' | 'vencido' | 'retirado'; publicadoEn: string | null;
+  version: number; allowedActions: NoticeAction[]; retiradoEn: string | null; motivoRetiro: string | null;
+};
+/** Motivo mínimo para retirar un aviso (D-13); la API lo vuelve a exigir. */
+export const WITHDRAW_MIN = 10;
 export type MyNotices = { actualizadoEn: string; avisos: NoticeAudience[]; proximoCambio: string | null };
 
 /** Dónde se ve un aviso, en palabras: «Pantalla pública y apps sin sesión» o «Medicina y Enfermería». */
@@ -36,3 +43,5 @@ export const localToIso = (value: string) => value ? new Date(`${value.length ==
 /** `yyyy-MM-ddTHH:mm` en hora de El Salvador, sumando horas a `now`. */
 export const localInput = (hoursFromNow: number, now = new Date()) => new Date(now.getTime() - 6 * 3600_000 + hoursFromNow * 3600_000).toISOString().slice(0, 16);
 export const durations: { hours: number; label: string }[] = [{ hours: 24, label: '24 horas' }, { hours: 72, label: '3 días' }, { hours: 168, label: '7 días' }, { hours: 720, label: '30 días' }];
+/** ISO del servidor → `yyyy-MM-ddTHH:mm` en hora de El Salvador (UTC-6), para precargar un `datetime-local` al editar. */
+export const isoToLocalInput = (iso: string) => new Date(Date.parse(iso) - 6 * 3600_000).toISOString().slice(0, 16);

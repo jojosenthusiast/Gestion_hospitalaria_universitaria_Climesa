@@ -91,7 +91,7 @@ export function removeChip(filters: AuditFilters, key: Chip['key']): AuditFilter
 
 const verbs: Record<string, string> = {
   leer: 'lectura', ver_ficha: 'ver ficha', buscar: 'búsqueda', registrar: 'registro', editar: 'edición', estado: 'cambio de estado', roles: 'cambio de roles', invitar: 'invitación',
-  emitir: 'emisión', firmar: 'firma', cancelar: 'cancelación', asignar: 'asignación', trasladar: 'traslado', publicar: 'publicación', consultar: 'consulta', verificar: 'verificación',
+  retirar: 'retiro', emitir: 'emisión', firmar: 'firma', cancelar: 'cancelación', asignar: 'asignación', trasladar: 'traslado', publicar: 'publicación', consultar: 'consulta', verificar: 'verificación',
   exportar: 'exportación', denegado: 'acceso denegado', conflicto: 'conflicto', mis_accesos: 'mis accesos', solicitar: 'solicitud', despachar: 'despacho', llamar: 'llamado',
 };
 const nouns: Record<string, string> = {

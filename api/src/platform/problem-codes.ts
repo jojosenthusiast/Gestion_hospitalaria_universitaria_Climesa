@@ -23,7 +23,7 @@ export const PROBLEM_CODES = [
   'cuenta_no_verificada', 'cuenta_ya_vinculada', 'expediente_ya_vinculado', 'paciente_ya_vinculado', 'sin_vinculacion', 'vinculacion_pendiente', 'vinculacion_resuelta',
   'sin_expediente', 'rol_no_invitable', 'invitacion_no_pendiente', 'jerarquia_administrador', 'trabajo_abierto',
   // Inventory, public information and metrics.
-  'existencia_insuficiente', 'aviso_con_datos_personales', 'indicador_desconocido',
+  'existencia_insuficiente', 'aviso_con_datos_personales', 'aviso_retirado', 'aviso_vencido', 'indicador_desconocido',
   // Laboratory catalog (MA-LAB-06).
   'examen_con_resultados',
   // Ambulance.

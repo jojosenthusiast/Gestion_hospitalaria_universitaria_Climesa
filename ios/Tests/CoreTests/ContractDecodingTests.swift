@@ -92,6 +92,19 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertEqual(link.state.label, "En verificación")
     }
 
+    /// MA-AVI-01: `/me/avisos` trae los avisos dirigidos a los roles de la cuenta con su prioridad; se muestran del más urgente al menos.
+    func testAvisosDeMisRolesConPrioridad() throws {
+        let mine = try decode(PublicNotices.self, #"{"actualizadoEn":"2026-11-20T15:00:00.000Z","avisos":[{"id":"a1","titulo":"Visitas","cuerpo":"De 2 a 5.","desde":null,"hasta":"2026-11-21T00:00:00.000Z","prioridad":"atencion","publico":true,"roles":[]},{"id":"a2","titulo":"Simulacro","cuerpo":"Ala norte.","desde":null,"hasta":null,"prioridad":"critico","publico":false,"roles":["MED"]},{"id":"a3","titulo":"Otro","cuerpo":"Texto.","desde":null,"hasta":null,"prioridad":"desconocida","publico":true,"roles":[]}],"proximoCambio":null}"#)
+        XCTAssertEqual(mine.byPriority.map(\.id), ["a2", "a1", "a3"])
+        XCTAssertEqual(mine.notices[1].roles, ["MED"])
+        XCTAssertFalse(mine.notices[1].isPublic)
+        XCTAssertEqual(mine.notices[2].priority, .atencion)
+        XCTAssertEqual(NoticePriority.critico.label, "Crítico")
+        let anonymous = try decode(PublicNotices.self, #"{"actualizadoEn":"2026-11-20T15:00:00.000Z","avisos":[{"id":"a1","titulo":"Visitas","cuerpo":"De 2 a 5.","desde":null,"hasta":null,"prioridad":"urgente"}],"proximoCambio":null}"#)
+        XCTAssertEqual(anonymous.notices.first?.priority, .urgente)
+        XCTAssertTrue(anonymous.notices.first?.isPublic ?? false)
+    }
+
     func testLosCuerposSeCodificanConLosNombresDelContrato() throws {
         let start = String(decoding: try JSONBody.encode(ConsultationStartBody(appointmentId: "c1")), as: UTF8.self)
         XCTAssertEqual(start, #"{"appointmentId":"c1"}"#)

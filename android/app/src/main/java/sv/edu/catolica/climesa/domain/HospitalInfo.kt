@@ -45,8 +45,8 @@ object HospitalInfoParser {
 
 /**
  * Eventos del canal `publico` (tiempo-real.md): los agregados de cama, fila y turnos llegan con entidad
- * `publico`, y los avisos con `aviso.publicado`.
+ * `publico`, y los avisos con entidad `aviso` (`aviso.publicado`, y `aviso.actualizado` al editarlos o retirarlos, MA-AVI-02).
  */
 object HospitalInfoEvents {
-    fun matches(event: EventoDominio) = event.entity == "publico" || event.type == "aviso.publicado"
+    fun matches(event: EventoDominio) = event.entity == "publico" || NoticeEvents.matches(event)
 }

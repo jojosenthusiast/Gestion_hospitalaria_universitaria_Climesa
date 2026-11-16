@@ -96,10 +96,8 @@ struct HospitalInfoView: View {
         SectionTitle("home.notices")
         if let error = part.error {
             SectionCard { PartError(message: error, retry: load) }
-        } else if let list = part.value?.notices, !list.isEmpty {
-            ForEach(list) { notice in
-                SectionCard(title: notice.title) { Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink) }
-            }
+        } else if let list = part.value?.byPriority, !list.isEmpty {
+            ForEach(list) { notice in NoticeCard(notice: notice) }
         } else {
             EmptyStateView(title: L.text("hospital.notices.none"), symbol: "bell")
         }
@@ -303,5 +301,41 @@ private struct EditMyDataSheet: View {
         }
         await reload()
         if ok { dismiss() }
+    }
+}
+
+/// Un aviso con su prioridad (D-071), igual que en Android y la web: Crítico en rojo, Urgente en amarillo (MA-AVI-01).
+struct NoticeCard: View {
+    let notice: PublicNotices.Notice
+
+    var body: some View {
+        let tone: (Color, Color) = {
+            switch notice.priority {
+            case .critico: return (Theme.danger, Theme.dangerSoft)
+            case .urgente: return (Theme.warning, Theme.warningSoft)
+            case .atencion: return (Theme.primaryText, Theme.surface)
+            }
+        }()
+        HStack(alignment: .top, spacing: Spacing.m) {
+            Image(systemName: notice.priority == .atencion ? "megaphone" : "exclamationmark.triangle.fill")
+                .foregroundStyle(tone.0).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Spacing.s) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(verbatim: notice.title).font(Typo.subheading).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: Spacing.s)
+                    Text(verbatim: notice.priority.label).font(Typo.tag).foregroundStyle(tone.0)
+                }
+                Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink)
+                if let until = notice.until {
+                    Text(verbatim: String(format: L.text("notice.until"), ClimesaDates.display(until))).font(Typo.small).foregroundStyle(Theme.muted)
+                }
+            }
+        }
+        .padding(Spacing.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tone.1, in: RoundedRectangle(cornerRadius: Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(notice.priority == .atencion ? Theme.line : tone.0, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: "\(notice.priority.label): \(notice.title). \(notice.body)"))
     }
 }

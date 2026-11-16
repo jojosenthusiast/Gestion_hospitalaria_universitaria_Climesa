@@ -97,6 +97,7 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `inventario.actualizado` | `articulo` | Movimiento | `inventario.ver` | 111 |
 | `inventario.bajo_minimo` | `articulo` | Movimiento o mínimo que cruza el umbral | `inventario.mover` según tipo de artículo | 111 |
 | `aviso.publicado` | `aviso` | Publicar aviso | `publico` | 112 |
+| `aviso.actualizado` | `aviso` | Editar o retirar un aviso (MA-AVI-02) | `publico` y `rol:<código>` de la audiencia anterior y la nueva | 112 |
 | `metricas.recalculadas` | `metricas` | Derivado en la base cuando cambia un indicador | `metricas.ver` | 113 |
 
 ### Eventos del catálogo anterior que no se emiten
@@ -112,7 +113,7 @@ El catálogo original nombraba eventos finos por transición. La API emite un ev
 | `lab.valor_critico` | `laboratorio.critico` |
 | `turno.cambiado` (con datos) | `turno.actualizado` |
 
-Pendientes (no emitidos; su spec no está implementada): push con la app cerrada (`PUT /me/dispositivos`), y los canales `area:*` y `paciente:*`.
+Pendientes (no emitidos; su spec no está implementada): push con la app cerrada (límite conocido de la entrega, D-09; `PUT /me/dispositivos` se retiró del catálogo, D-091), y los canales `area:*` y `paciente:*`.
 
 ## Límites conocidos
 

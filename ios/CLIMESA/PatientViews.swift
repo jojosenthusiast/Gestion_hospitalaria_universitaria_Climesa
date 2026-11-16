@@ -49,9 +49,7 @@ struct PatientHomeView: View {
                         SectionCard { PartError(message: error, retry: load) }
                     } else if let list = notices.value, !list.isEmpty {
                         SectionTitle("home.notices")
-                        ForEach(list) { notice in
-                            SectionCard(title: notice.title) { Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink) }
-                        }
+                        ForEach(list) { notice in NoticeCard(notice: notice) }
                     }
                 }
             }
@@ -90,7 +88,7 @@ struct PatientHomeView: View {
                 }
             }
             // MA-AVI-01: los avisos dirigidos a los roles de la persona además de los públicos.
-            home.notices = try await Part<[PublicNotices.Notice]>.load { try await api.get("/me/avisos", as: PublicNotices.self).notices }
+            home.notices = try await Part<[PublicNotices.Notice]>.load { try await api.get("/me/avisos", as: PublicNotices.self).byPriority }
             return home
         }
     }
