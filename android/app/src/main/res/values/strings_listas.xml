@@ -26,4 +26,15 @@
     <string name="pac_ficha_cambios">Cambios</string>
     <string name="pac_ficha_faltan">Faltan datos: %1$s.</string>
     <string name="pac_ficha_completa">Ficha completa para los datos que tu rol puede ver.</string>
+    <string name="lab_revisar">Revisar</string>
+    <string name="lab_cancelar_orden">Cancelar orden</string>
+    <string name="lab_cancelar_titulo">Cancelar orden de laboratorio</string>
+    <string name="lab_cancelar_efecto">La orden de %1$s deja de avanzar y el laboratorio ya no la procesa. Queda registrado quién la canceló y por qué.</string>
+    <string name="lab_cancelar_motivo">Motivo (al menos %1$d caracteres)</string>
+    <string name="lab_cancelar_confirmar">Cancelar orden</string>
+    <string name="lab_cancelar_volver">Volver</string>
+    <string name="lab_criticos_por_revisar">%1$d resultado(s) con valor crítico esperan tu revisión.</string>
+    <string name="portal_critico_aviso">Llegó un resultado con valor crítico. Revísalo cuanto antes.</string>
+    <string name="portal_critico_revisar">Revisar</string>
+    <string name="portal_critico_cerrar">Cerrar aviso</string>
 </resources>

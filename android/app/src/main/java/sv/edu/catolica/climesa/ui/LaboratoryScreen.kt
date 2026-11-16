@@ -50,6 +50,9 @@ import sv.edu.catolica.climesa.domain.LabFilter
 import sv.edu.catolica.climesa.domain.LabFlow
 import sv.edu.catolica.climesa.domain.LabStepStatus
 import sv.edu.catolica.climesa.domain.LaboratoryOrder
+import sv.edu.catolica.climesa.domain.LabCritical
+import sv.edu.catolica.climesa.domain.LabOrderAction
+import sv.edu.catolica.climesa.domain.LabOrderRules
 import sv.edu.catolica.climesa.domain.LabStage
 import sv.edu.catolica.climesa.domain.LabWorklist
 import sv.edu.catolica.climesa.domain.elapsedText
@@ -76,6 +79,9 @@ fun LaboratoryScreen(
     PageList(modifier) {
         item { SectionIntro("Atención / Diagnóstico", "Laboratorio", stringResource(if (ownResults) R.string.lab_ayuda_paciente else R.string.lab_ayuda)) }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        // RN-25: critical values waiting for this doctor's review stay visible at the top of the list.
+        val critical = if (ownResults) 0 else LabCritical.pendingReview(state.orders)
+        if (critical > 0) item { NoticeBanner(NoticeKind.ERROR, stringResource(R.string.lab_criticos_por_revisar, critical)) }
         when {
             state.loading && state.orders.isEmpty() -> item { LoadingState() }
             state.error != null && state.orders.isEmpty() -> item { ErrorState(state.error, retry) }
@@ -92,15 +98,40 @@ fun LaboratoryScreen(
                 val now = System.currentTimeMillis()
                 val visible = LabWorklist.sorted(state.orders.filter { filter.matches(it) && (!urgentOnly || LabWorklist.isUrgent(it)) && LabWorklist.matches(it, query) })
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
-                items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, profile, ownResults, state.busy, model, now) }
+                items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, ownResults, state.busy, model, now) }
             }
         }
     }
+    state.cancelOrderId?.let { id -> CancelOrderDialog(state, state.orders.firstOrNull { it.id == id }, model) }
+}
+
+/** Cancel with a reason (D-13: at least 10 characters). The reason and the open dialog live in the ViewModel, so a rotation keeps them. */
+@Composable
+private fun CancelOrderDialog(state: LaboratoryState, order: LaboratoryOrder?, model: LaboratoryViewModel) {
+    // The order left the list or no longer allows cancelling (realtime update): the dialog closes on its own.
+    LaunchedEffect(order?.id, order?.allows(LabOrderAction.CANCEL)) { if (order == null || !order.allows(LabOrderAction.CANCEL)) model.dismissCancel() }
+    if (order == null) return
+    ConfirmDialog(
+        title = stringResource(R.string.lab_cancelar_titulo),
+        message = stringResource(R.string.lab_cancelar_efecto, order.patientName),
+        confirmLabel = stringResource(R.string.lab_cancelar_confirmar),
+        onConfirm = { model.confirmCancel(order) },
+        onDismiss = model::dismissCancel,
+        dismissLabel = stringResource(R.string.lab_cancelar_volver),
+        destructive = true,
+        busy = state.cancelling,
+        body = {
+            state.cancelError?.let { NoticeBanner(NoticeKind.ERROR, it) }
+            FormField(stringResource(R.string.lab_cancelar_motivo, LabOrderRules.MIN_CANCEL_REASON), state.cancelReason, model::setCancelReason)
+        },
+    )
 }
 
 @Composable
-private fun LaboratoryOrderCard(order: LaboratoryOrder, profile: AccessProfile, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, now: Long) {
-    val canReview = "laboratorio.revisar" in profile.permissions
+private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, now: Long) {
+    // Buttons follow `allowedActions` from the API for this reader, never the role or the state.
+    val canReview = !ownView && order.allows(LabOrderAction.REVIEW)
+    val canCancel = !ownView && order.allows(LabOrderAction.CANCEL)
     val inReview = order.state == "completado" && !order.reviewed
     SectionCard(
         title = order.patientName,
@@ -113,11 +144,12 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, profile: AccessProfile, 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("${item.code} · ${item.name}", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 val result = item.result
-                if (result != null) LabMarkTag(result.mark, LaboratoryLabels.valueAndMark(result))
+                if (result != null) LabMarkTag(result.mark, LaboratoryLabels.valueAndMark(result, item.unit))
                 else Text(if (inReview) stringResource(R.string.lab_valor_en_revision) else stringResource(R.string.clin_lab_pendiente), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (canReview && inReview) PrimaryButton("Revisar", { model.review(order) }, enabled = !busy, loading = busy)
+        if (canReview) PrimaryButton(stringResource(R.string.lab_revisar), { model.review(order) }, enabled = !busy, loading = busy)
+        if (canCancel) SecondaryButton(stringResource(R.string.lab_cancelar_orden), { model.openCancel(order.id) }, enabled = !busy)
     }
 }
 

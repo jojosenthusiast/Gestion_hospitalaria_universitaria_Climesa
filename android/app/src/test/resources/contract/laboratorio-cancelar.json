@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/api/v1/laboratorio/ordenes/{id}/cancelar",
+  "body": {
+    "version": 2,
+    "reason": "El paciente no se presentó a la toma"
+  }
+}

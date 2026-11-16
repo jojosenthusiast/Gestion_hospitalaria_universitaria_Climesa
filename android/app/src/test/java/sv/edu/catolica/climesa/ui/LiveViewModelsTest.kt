@@ -47,6 +47,26 @@ class LiveViewModelsTest {
         assertFalse("la recarga en vivo no muestra el indicador de carga", vm.state.value.loading)
     }
 
+    @Test fun unValorCriticoAvisaAlMedicoHastaQueLoCierra() = runTest(dispatcher) {
+        val bus = SignalBus()
+        val vm = RoleViewModel({ org.json.JSONArray() }, bus)
+        vm.start(listOf("usuario:m1"), listOf("laboratorio.revisar")); runCurrent()
+        bus.signals.tryEmit(event("laboratorio.orden_actualizada", "orden_laboratorio")); runCurrent()
+        assertFalse(vm.criticalLab.value)
+        bus.signals.tryEmit(event("laboratorio.critico", "orden_laboratorio")); runCurrent()
+        assertTrue(vm.criticalLab.value)
+        vm.dismissCriticalLab()
+        assertFalse(vm.criticalLab.value)
+    }
+
+    @Test fun unValorCriticoNoAvisaSinPermisoDeRevisar() = runTest(dispatcher) {
+        val bus = SignalBus()
+        val vm = RoleViewModel({ org.json.JSONArray() }, bus)
+        vm.start(listOf("rol:LAB"), listOf("laboratorio.procesar")); runCurrent()
+        bus.signals.tryEmit(event("laboratorio.critico", "orden_laboratorio")); runCurrent()
+        assertFalse(vm.criticalLab.value)
+    }
+
     @Test fun elPortalIgnoraEventosDeOtraSeccion() = runTest(dispatcher) {
         val bus = SignalBus(); val calls = mutableListOf<String>()
         val vm = RoleViewModel({ path -> calls += path; org.json.JSONObject() }, bus)

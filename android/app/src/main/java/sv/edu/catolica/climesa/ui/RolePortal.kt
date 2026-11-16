@@ -83,10 +83,16 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
         }
     }
     fun load(path:String?,silent:Boolean=false){current=path;job?.cancel();job=viewModelScope.launch{if(!silent||path==null)mutable.value=RoleData(loading=path!=null);if(path!=null)try{mutable.value=RoleData(data=source.get(path))}catch(e:Exception){if(e is CancellationException)throw e;if(silent&&mutable.value.data!=null)return@launch;mutable.value=RoleData(error=e.message?:"No se pudo cargar la información.")}}}
+    /** RN-25: llegó un valor crítico y la cuenta puede revisar resultados; sigue visible hasta que se cierra o se abre la revisión. */
+    private val criticalLabMutable=MutableStateFlow(false);val criticalLab=criticalLabMutable.asStateFlow()
+    fun dismissCriticalLab(){criticalLabMutable.value=false}
     /** Idempotente: refresca la sección abierta cuando llega un evento que le importa, sin mostrar el indicador de carga. */
-    fun start(channels:List<String>){live.start(viewModelScope,channels){signal->
+    fun start(channels:List<String>,permissions:Collection<String> = emptyList()){live.start(viewModelScope,channels){signal->
         when(signal){
-            is RealtimeSignal.Event->if(PortalEvents.matches(current,signal.event))load(current,silent=true)
+            is RealtimeSignal.Event->{
+                if(LabCriticalEvents.notifies(signal.event,permissions))criticalLabMutable.value=true
+                if(PortalEvents.matches(current,signal.event))load(current,silent=true)
+            }
             RealtimeSignal.Resync->if(current!=null)load(current,silent=true)
             else->Unit
         }
@@ -119,25 +125,32 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     val handled={inbox.consume(page)}
     val onDashboardAction:(QuickActionRequest)->Unit={request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}}
     LaunchedEffect(role,page){model.load(path)}
-    LaunchedEffect(account.profile.channels){model.start(account.profile.channels)}
+    LaunchedEffect(account.profile.channels,account.profile.permissions){model.start(account.profile.channels,account.profile.permissions)}
+    val criticalLab by model.criticalLab.collectAsStateWithLifecycle()
+    // Opening the review section is reading the notice.
+    LaunchedEffect(page){if(page==AndroidSection.RESULT_REVIEW)model.dismissCriticalLab()}
     PortalScaffold(
         role=role,sections=sections,selected=page,onSelected={selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
-    ) content@{padding->
-        if(page==AndroidSection.HOME){RoleDashboardScreen(account,role,onDashboardAction,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.BEDS||page==AndroidSection.CLEANING){BedsScreen(account.profile,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.MY_APPOINTMENTS){PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
-        if(page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD){HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
-        if(page==AndroidSection.SUPPLIES){InventoryScreen(Modifier.padding(padding),account.profile);return@content}
-        if(page==AndroidSection.MY_ACCESS){MyAccessScreen(Modifier.padding(padding));return@content}
-        if(page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION){QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled);return@content}
-        if(page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW){LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page);return@content}
-        if(page==AndroidSection.LINK_RECORD){LinkRecordScreen(account.profile,Modifier.padding(padding));return@content}
-        if(page==AndroidSection.HISTORY||page==AndroidSection.RECORD){ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding));return@content}
-        if(page==AndroidSection.MEDICAL_DAY){ConsultationScreen(account.profile,Modifier.padding(padding),userId=account.session.userId);return@content}
-        if(page==AndroidSection.HOSPITAL_INFO){HospitalInfoScreen(Modifier.padding(padding));return@content}
-        if(page==AndroidSection.VITAL_SIGNS){VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=role=="MED",userId=account.session.userId);return@content}
-        if(page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)){AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding));return@content}
-        PageList(Modifier.padding(padding)){
+    ) {outer->
+      Column(Modifier.padding(outer).fillMaxSize()){
+        if(criticalLab&&AndroidSection.RESULT_REVIEW in sections)CriticalLabNotice(onReview={model.dismissCriticalLab();selectedName=AndroidSection.RESULT_REVIEW.name},onDismiss=model::dismissCriticalLab)
+        val padding=PaddingValues(0.dp)
+        Box(Modifier.weight(1f).fillMaxWidth()){when{
+        page==AndroidSection.HOME->RoleDashboardScreen(account,role,onDashboardAction,Modifier.padding(padding))
+        page==AndroidSection.BEDS||page==AndroidSection.CLEANING->BedsScreen(account.profile,Modifier.padding(padding))
+        page==AndroidSection.MY_APPOINTMENTS->PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
+        page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD->HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
+        page==AndroidSection.SUPPLIES->InventoryScreen(Modifier.padding(padding),account.profile)
+        page==AndroidSection.MY_ACCESS->MyAccessScreen(Modifier.padding(padding))
+        page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
+        page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW->LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page)
+        page==AndroidSection.LINK_RECORD->LinkRecordScreen(account.profile,Modifier.padding(padding))
+        page==AndroidSection.HISTORY||page==AndroidSection.RECORD->ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding))
+        page==AndroidSection.MEDICAL_DAY->ConsultationScreen(account.profile,Modifier.padding(padding),userId=account.session.userId)
+        page==AndroidSection.HOSPITAL_INFO->HospitalInfoScreen(Modifier.padding(padding))
+        page==AndroidSection.VITAL_SIGNS->VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=role=="MED",userId=account.session.userId)
+        page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)->AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding))
+        else->PageList(Modifier.padding(padding)){
             if(page==AndroidSection.PROFILE){
                 profileItems(account,dark,setDark,{if(!signingOut)logout()},myData=if("pacientes.editar_propios" in account.profile.permissions){{MyDataCard()}}else null)
             }
@@ -164,6 +177,18 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
                 if(shifts.isEmpty())item{EmptyState("No tienes turnos publicados.")}
                 else{item{CheckInError(model)};items(shifts){shift->MyShiftCard(shift,model)}}
             }else item{EmptyState(stringResource(R.string.portal_seccion_no_disponible))}
+        }
+        }}
+      }
+    }
+}
+/** RN-25: app-wide notice of a critical lab value, above the current section, with a shortcut to the review list. */
+@Composable private fun CriticalLabNotice(onReview:()->Unit,onDismiss:()->Unit){
+    Column(Modifier.fillMaxWidth().padding(horizontal=Spacing.page,vertical=Spacing.sm),verticalArrangement=Arrangement.spacedBy(Spacing.xs)){
+        NoticeBanner(NoticeKind.ERROR,stringResource(R.string.portal_critico_aviso))
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+            TextButton(onClick=onDismiss){Text(stringResource(R.string.portal_critico_cerrar))}
+            TextButton(onClick=onReview){Text(stringResource(R.string.portal_critico_revisar))}
         }
     }
 }

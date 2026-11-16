@@ -4,17 +4,61 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class LaboratoryResult(val value: Double?, val text: String?, val mark: String, val version: Int)
-data class LaboratoryItem(val id: String, val code: String, val name: String, val result: LaboratoryResult?)
-/** [age] is already worded for the role ("34 años" or the decade "30-39 años"); null when the role does not see it. */
+data class LaboratoryItem(val id: String, val code: String, val name: String, val result: LaboratoryResult?, val unit: String? = null)
+
+/** Actions the API allows the reader on an order (`allowedActions`, enum `AccionOrdenLaboratorio`). */
+enum class LabOrderAction(val wire: String) {
+    TAKE_SAMPLE("tomar_muestra"), CAPTURE("capturar"), COMPLETE("completar"), REVIEW("revisar"), CANCEL("cancelar"), AMEND("enmendar"),
+}
+
+/**
+ * [age] is already worded for the role ("34 años" or the decade "30-39 años"); null when the role does not see it.
+ * [allowedActions] comes from the server for this reader: buttons follow it, never the role or the state.
+ * [amendedAtMillis] is set when a lab technician amended a result of the completed order (it went back to the doctor's review).
+ */
 data class LaboratoryOrder(
     val id: String, val patientName: String, val priority: String, val state: String, val version: Int, val items: List<LaboratoryItem>, val reviewed: Boolean,
     val record: String? = null, val sex: String? = null, val age: String? = null, val doctorName: String? = null, val createdAtMillis: Long? = null,
-)
+    val allowedActions: Set<String> = emptySet(), val amendedAtMillis: Long? = null,
+) {
+    fun allows(action: LabOrderAction) = action.wire in allowedActions
+}
+
+/** Reads `GET /laboratorio/ordenes` and `GET /me/laboratorio` rows (LabOrderResponse). */
+object LaboratoryParser {
+    fun orders(value: Any?): List<LaboratoryOrder> {
+        val rows = value as? JSONArray ?: return emptyList()
+        return (0 until rows.length()).mapNotNull { index -> rows.optJSONObject(index)?.let(::order) }
+    }
+
+    private fun order(row: JSONObject): LaboratoryOrder {
+        val items = row.optJSONArray("items")?.let { array -> (0 until array.length()).mapNotNull { index -> array.optJSONObject(index)?.let(::item) } } ?: emptyList()
+        val actions = row.optJSONArray("allowedActions")?.let { array -> (0 until array.length()).mapNotNull { array.optString(it).takeIf(String::isNotBlank) }.toSet() } ?: emptySet()
+        return LaboratoryOrder(
+            row.optString("id"), row.optString("patientName").ifBlank { "Paciente" }, row.optString("priority"), row.optString("state"), row.optInt("version", 1), items, !row.isNull("reviewedAt"),
+            record = row.optString("patientRecord").ifBlank { null }, sex = row.optString("patientSex").ifBlank { null },
+            age = if (!row.isNull("patientAge")) "${row.optInt("patientAge")} años" else row.optString("patientAgeRange").takeIf(String::isNotBlank)?.let { "$it años" },
+            doctorName = row.optString("doctorName").ifBlank { null }, createdAtMillis = parseMillis(row.optString("createdAt")),
+            allowedActions = actions, amendedAtMillis = if (row.isNull("amendedAt")) null else parseMillis(row.optString("amendedAt")),
+        )
+    }
+
+    private fun item(item: JSONObject): LaboratoryItem {
+        val result = item.optJSONObject("result")?.let { LaboratoryResult(if (it.isNull("value")) null else it.optDouble("value"), it.optString("text").takeIf(String::isNotBlank), it.optString("mark"), it.optInt("version", 1)) }
+        return LaboratoryItem(item.optString("id"), item.optString("code"), item.optString("name"), result, unit = if (item.isNull("unit")) null else item.optString("unit").ifBlank { null })
+    }
+}
+
+/** RN-25: critical values the doctor still has to review (only orders the API lets this reader review). */
+object LabCritical {
+    fun pendingReview(orders: List<LaboratoryOrder>) = orders.count { it.allows(LabOrderAction.REVIEW) && LabWorklist.isCritical(it) }
+}
 
 object LaboratoryLabels {
     fun state(value: String) = mapOf("pendiente" to "Pendiente", "en_proceso" to "En proceso", "completado" to "Completado", "cancelado" to "Cancelado")[value] ?: value
     /** Value (or text) followed by its mark, for the result rows. */
-    fun valueAndMark(result: LaboratoryResult) = listOfNotNull(result.text ?: result.value?.toString(), mark(result.mark)).joinToString(" · ")
+    fun valueAndMark(result: LaboratoryResult, unit: String? = null) =
+        listOfNotNull((result.text ?: result.value?.toString())?.let { value -> if (result.text == null && unit != null) "$value $unit" else value }, mark(result.mark)).joinToString(" · ")
     fun mark(value: String) = mapOf("normal" to "Normal", "alto" to "Alto", "bajo" to "Bajo", "critico_alto" to "Crítico alto", "critico_bajo" to "Crítico bajo", "sin_rango" to "Sin rango")[value] ?: value
 }
 
@@ -41,4 +85,19 @@ object LabOrderRules {
 
     fun body(consultationId: String, exams: Collection<String>, urgent: Boolean): JSONObject =
         JSONObject().put("consultationId", consultationId).put("exams", JSONArray(exams.distinct())).put("priority", if (urgent) "urgente" else "rutina")
+
+    /** Cancel reason bounds, the same as the web (D-13); the API is the guarantee. */
+    const val MIN_CANCEL_REASON = 10
+    const val MAX_CANCEL_REASON = 500
+
+    fun cancelPath(orderId: String) = "/laboratorio/ordenes/$orderId/cancelar"
+
+    fun cancelReasonError(reason: String): String? = when {
+        reason.trim().length < MIN_CANCEL_REASON -> "Indica el motivo, de al menos $MIN_CANCEL_REASON caracteres."
+        reason.trim().length > MAX_CANCEL_REASON -> "El motivo no puede pasar de $MAX_CANCEL_REASON caracteres."
+        else -> null
+    }
+
+    /** `POST /laboratorio/ordenes/{id}/cancelar` body: the order version and the trimmed reason. */
+    fun cancelBody(version: Int, reason: String): JSONObject = JSONObject().put("version", version).put("reason", reason.trim())
 }
