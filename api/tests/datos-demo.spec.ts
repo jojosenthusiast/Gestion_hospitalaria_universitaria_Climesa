@@ -40,6 +40,8 @@ const TABLAS: Record<string, string> = {
   'atencion.signos_vitales': `id::text LIKE ${DEMO}`,
   'atencion.addendum': `id::text LIKE ${DEMO}`,
   'atencion.relacion_atencion': `id::text LIKE ${DEMO}`,
+  // Fase 2, S6: solicitudes de cita por categoría en todos los estados, para la bandeja de recepción.
+  'atencion.solicitud_cita': `id::text LIKE ${DEMO}`,
   'laboratorio.orden': `id::text LIKE ${DEMO}`,
   'laboratorio.orden_item': `id::text LIKE ${DEMO}`,
   'laboratorio.resultado': `orden_item_id::text LIKE ${DEMO}`,
@@ -72,19 +74,18 @@ const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acc
   'hospitalizacion.cambio_tratante',
   // Fase 2, flujo C (S10): pendientes del médico, propuestas de cita y adjuntos externos nacen del uso real.
   'laboratorio.pendiente_medico', 'laboratorio.propuesta_cita', 'laboratorio.adjunto',
-  // Fase 2 flujo A: las solicitudes de cita por categoría nacen solo del uso real del paciente.
-  'atencion.solicitud_cita',
   // Fase 2, flujo F: las plantillas de semana nacen de Jefatura; la demo no las siembra.
   'personal.plantilla_semana',
   // Fase 2, flujo D (S11): el «Enterado» y los recordatorios nacen solo de cada cuenta.
   'publico.aviso_enterado'];
 
 const MINIMOS: Record<string, number> = {
-  'pacientes.paciente': 120, 'pacientes.identificador': 100, 'atencion.cita': 130, 'atencion.ticket_fila': 30, 'atencion.consulta': 70,
+  'pacientes.paciente': 300, 'pacientes.identificador': 280, 'atencion.cita': 400, 'atencion.ticket_fila': 60, 'personal.persona': 100,
+  'atencion.solicitud_cita': 25, 'atencion.consulta': 70,
   'atencion.diagnostico': 100, 'atencion.receta': 60, 'atencion.signos_vitales': 150, 'laboratorio.orden': 30, 'laboratorio.resultado': 80,
   'hospitalizacion.admision': 20, 'hospitalizacion.ocupacion_cama': 18, 'hospitalizacion.nota_enfermeria': 30, 'ambulancia.solicitud': 15,
   'ambulancia.servicio': 12, 'ambulancia.hito': 45, 'ambulancia.reporte_prehospital': 10, 'inventario.articulo': 40, 'inventario.lote': 40,
-  'inventario.movimiento': 90, 'publico.aviso': 14, 'personal.turno': 350, 'acceso.vinculacion_paciente': 10, 'acceso.invitacion': 8,
+  'inventario.movimiento': 90, 'publico.aviso': 14, 'personal.turno': 1000, 'acceso.vinculacion_paciente': 10, 'acceso.invitacion': 8,
 };
 const verificarUmbrales = (conteo: Record<string, number>) => {
   for (const [tabla, minimo] of Object.entries(MINIMOS)) expect({ tabla, ok: conteo[tabla] >= minimo }).toEqual({ tabla, ok: true });
@@ -163,11 +164,42 @@ describe('Datos de demostración (tools/demo)', () => {
     expect(vinculaciones).toEqual(['aprobada', 'pendiente', 'rechazada']);
   });
 
-  test('volumen: unos 120 pacientes y cada módulo supera su umbral', async () => {
+  test('volumen: unos 300 pacientes y cada módulo supera su umbral', async () => {
     await t.pg.exec(limpieza);
     await t.pg.exec(semilla);
     const conteo = await demo();
     verificarUmbrales(conteo);
+  });
+
+  test('S6: escala de hospital real: 45+ médicos, cientos de pacientes, decenas de turnos hoy, fila llena y solicitudes por categoría', async () => {
+    await t.pg.exec(semilla);
+    const n = async (sql: string) => Number((await t.one<{ n: string }>(sql)).n);
+    const HOY = `(now() AT TIME ZONE 'America/El_Salvador')::date`;
+    const localDia = `(lower(u.periodo) AT TIME ZONE 'America/El_Salvador')::date`;
+    expect(await n(`SELECT count(*) AS n FROM personal.persona WHERE id::text LIKE ${DEMO} AND tipo = 'medico'`)).toBeGreaterThanOrEqual(45);
+    expect(await n(`SELECT count(*) AS n FROM pacientes.paciente WHERE id::text LIKE ${DEMO}`)).toBeGreaterThanOrEqual(300);
+    // Dozens of published shifts start today across areas, and most doctors work today.
+    expect(await n(`SELECT count(*) AS n FROM personal.turno u WHERE u.id::text LIKE ${DEMO} AND u.estado NOT IN ('cancelado', 'borrador') AND ${localDia} = ${HOY}`)).toBeGreaterThanOrEqual(60);
+    expect(await n(`SELECT count(DISTINCT u.persona_id) AS n FROM personal.turno u JOIN personal.persona p ON p.id = u.persona_id
+      WHERE u.id::text LIKE ${DEMO} AND p.tipo = 'medico' AND u.estado NOT IN ('cancelado', 'borrador') AND ${localDia} = ${HOY}`)).toBeGreaterThanOrEqual(20);
+    expect(await n(`SELECT count(DISTINCT e.codigo) AS n FROM personal.turno u JOIN infra.espacio e ON e.id = u.area_id
+      WHERE u.id::text LIKE ${DEMO} AND u.estado NOT IN ('cancelado', 'borrador') AND ${localDia} = ${HOY}`)).toBeGreaterThanOrEqual(6);
+    // Appointments are spread across many doctors, each one inside a shift of that doctor (API rule CITA-04).
+    expect(await n(`SELECT count(DISTINCT medico_id) AS n FROM atencion.cita WHERE id::text LIKE ${DEMO}`)).toBeGreaterThanOrEqual(30);
+    expect(await n(`SELECT count(*) AS n FROM atencion.cita c WHERE c.id::text LIKE ${DEMO} AND c.estado IN ('solicitada', 'confirmada')
+      AND c.medico_id IN (SELECT id FROM personal.persona WHERE id::text LIKE ${DEMO} AND id::text >= 'de300000-0002-4000-8000-000000000100')
+      AND NOT EXISTS (SELECT 1 FROM personal.turno u WHERE u.persona_id = c.medico_id AND u.estado NOT IN ('cancelado', 'borrador') AND u.periodo @> c.horario)`)).toBe(0);
+    // Category requests in several states; an assigned one points to a confirmed appointment of the same patient.
+    const solicitudes = (await t.pg.query<{ estado: string }>(`SELECT DISTINCT estado FROM atencion.solicitud_cita WHERE id::text LIKE ${DEMO}`)).rows.map(r => r.estado).sort();
+    expect(solicitudes).toEqual(['asignada', 'cancelada', 'pendiente', 'rechazada']);
+    expect(await n(`SELECT count(*) AS n FROM atencion.solicitud_cita s LEFT JOIN atencion.cita c ON c.id = s.cita_id
+      WHERE s.id::text LIKE ${DEMO} AND s.estado = 'asignada' AND (c.id IS NULL OR c.paciente_id <> s.paciente_id OR c.estado <> 'confirmada')`)).toBe(0);
+    expect(await n(`SELECT count(*) AS n FROM atencion.solicitud_cita s WHERE s.id::text LIKE ${DEMO}
+      AND EXISTS (SELECT unnest(s.categorias) EXCEPT SELECT codigo FROM atencion.categoria_cita)`)).toBe(0);
+    // A busy queue today with every priority.
+    expect(await n(`SELECT count(*) AS n FROM atencion.ticket_fila WHERE id::text LIKE ${DEMO} AND fecha = ${HOY}`)).toBeGreaterThanOrEqual(60);
+    const prioridades = (await t.pg.query<{ p: string }>(`SELECT DISTINCT prioridad AS p FROM atencion.ticket_fila WHERE id::text LIKE ${DEMO}`)).rows.map(r => r.p).sort();
+    expect(prioridades).toEqual(['emergencia', 'rutina', 'urgente']);
   });
 
   test('cada enumeración de estado aparece al menos una vez', async () => {
