@@ -17,7 +17,7 @@ const jop = perfil([['pacientes.buscar', 'x'], ['pacientes.ver_ficha', 'x'], ['a
 const enfermeria = perfil([['pacientes.buscar', 'x'], ['admision.ver', 'area'], ['turnos.ver', 'x']]);
 
 const paciente: Patient = { id: 'p1', record: 'EXP-000001', fullName: 'Rosa Ficticia', givenNames: 'Rosa', surnames: 'Ficticia', state: 'activo', active: true, sex: 'femenino', birth: '1990-05-01', version: 1, matchReason: '' };
-const catalogo = { roles: [], areas: [{ id: 'area-1', parentId: null, type: 'area', code: 'P2', name: 'Hospitalización planta 2' }], staff: [{ id: 'med-1', name: 'Médica Ficticia', type: 'medico', specialty: null, areaId: null, area: null, registrations: [] }] };
+const catalogo = { roles: [], areas: [{ id: '00000000-0000-4000-8000-0000000000a1', parentId: null, type: 'area', code: 'P2', name: 'Hospitalización planta 2' }], staff: [{ id: '00000000-0000-4000-8000-0000000000d1', name: 'Médica Ficticia', type: 'medico', specialty: null, areaId: null, area: null, registrations: [] }] };
 
 function pacientes(profile: AccessProfile, lista: (path: string) => Patient[] = () => [paciente]) {
   const api = { request: vi.fn(async (path: string) => path === '/turnos/catalogo' ? catalogo : lista(path)), write: vi.fn() };
@@ -43,9 +43,9 @@ describe('Pacientes · filtros del servidor', () => {
     const api = pacientes(jop);
     await screen.findByText('Rosa Ficticia');
     await screen.findByRole('option', { name: 'Hospitalización planta 2' });
-    await userEvent.selectOptions(screen.getByLabelText('Área de la cama'), 'area-1');
-    await userEvent.selectOptions(screen.getByLabelText('Médico tratante'), 'med-1');
-    await waitFor(() => expect(listCalls(api).at(-1)).toBe('/pacientes?limit=50&estado=vigente&areaId=area-1&medicoId=med-1'));
+    await userEvent.selectOptions(screen.getByLabelText('Área de la cama'), '00000000-0000-4000-8000-0000000000a1');
+    await userEvent.selectOptions(screen.getByLabelText('Médico tratante'), '00000000-0000-4000-8000-0000000000d1');
+    await waitFor(() => expect(listCalls(api).at(-1)).toBe('/pacientes?limit=50&estado=vigente&areaId=00000000-0000-4000-8000-0000000000a1&medicoId=00000000-0000-4000-8000-0000000000d1'));
     const chips = screen.getByLabelText('Filtros activos');
     expect(within(chips).getByText('Área: Hospitalización planta 2')).toBeTruthy();
     expect(within(chips).getByText('Médico: Médica Ficticia')).toBeTruthy();
@@ -59,6 +59,22 @@ describe('Pacientes · filtros del servidor', () => {
     expect(await screen.findByText('Sin pacientes en esta situación')).toBeTruthy();
     expect(screen.getByText(/Nadie está en la fila de hoy con estos filtros/)).toBeTruthy();
     expect(listCalls(api)[0]).toBe('/pacientes?limit=50&situacion=en_fila');
+  });
+
+  it('un enlace con filtros que la cuenta no puede usar se limpia antes de pedir la lista (sin 403)', async () => {
+    location.hash = '#/pacientes?situacion=cita_hoy&area=00000000-0000-4000-8000-0000000000a1&medico=00000000-0000-4000-8000-0000000000d1';
+    const api = pacientes(enfermeria);
+    await screen.findByText('Rosa Ficticia');
+    expect(listCalls(api)).toEqual(['/pacientes?limit=50&estado=vigente']);
+    expect(location.hash).toBe('#/pacientes');
+  });
+
+  it('un estado inventado en la dirección vuelve a «Vigentes» (sin 400)', async () => {
+    location.hash = '#/pacientes?estado=foo&situacion=urgente';
+    const api = pacientes(jop);
+    await screen.findByText('Rosa Ficticia');
+    expect(listCalls(api)).toEqual(['/pacientes?limit=50&estado=vigente']);
+    expect(location.hash).toBe('#/pacientes');
   });
 
   it('sin alcance global de admisiones no ofrece filtros de atención (el servidor los rechazaría)', async () => {

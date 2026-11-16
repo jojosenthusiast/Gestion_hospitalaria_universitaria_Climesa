@@ -6,7 +6,7 @@ import { ageFrom,profileGaps,validatePatientDraft } from './listas/patient-rules
 import type { ClinicalHistory } from './clinical-history';
 import { dayKey,dayLabel,timeRange } from './listas/schedule';
 import './listas/lists.css';
-import { matchesPatientState,canFilterAdmissions,patientEmptyState,patientFilterDefaults,patientListPath,patientStateOptions,situationChip,situationOptions,stateChip,type PatientFilters } from './listas/patient-filters';
+import { matchesPatientState,sanitizePatientFilters,canFilterAdmissions,patientEmptyState,patientFilterDefaults,patientListPath,patientStateOptions,situationChip,situationOptions,stateChip,type PatientFilters } from './listas/patient-filters';
 import type { ShiftCatalog } from './shifts/rules';
 import { useHashFilters } from '../lib/hash-params';
 import { useQuickAction } from './personal/accion';
@@ -41,7 +41,11 @@ export function prefillFromQuery(query:string):Partial<PatientInput>{
 export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfile;version:number}){
  // Filtros en la dirección (#/pacientes?situacion=hospitalizado&area=…): se comparten, sobreviven a recargar y el servidor los aplica.
  // El texto buscado (nombre, DUI) no va a la dirección: quedaría en el historial del navegador de un equipo compartido.
- const [filters,setFilters]=useHashFilters<keyof PatientFilters>(patientFilterDefaults);
+ const [rawFilters,setFilters]=useHashFilters<keyof PatientFilters>(patientFilterDefaults);
+ // Un enlace compartido o editado puede traer filtros que esta cuenta no puede usar: se limpian antes de pedir la lista y en la dirección.
+ const filters=sanitizePatientFilters(rawFilters,profile);
+ const dirty=(Object.keys(filters) as (keyof PatientFilters)[]).filter(k=>filters[k]!==rawFilters[k]).join(',');
+ useEffect(()=>{if(dirty)setFilters(filters);},[dirty]);
  const [query,setQuery]=useState(''),[typed,setTyped]=useState('');
  // Búsqueda mientras se escribe: la lista se pide con una pequeña espera; el botón «Buscar» sigue registrando la constancia que exige el alta.
  useEffect(()=>{const t=setTimeout(()=>setTyped(query.trim().length>=2?query.trim():''),300);return()=>clearTimeout(t);},[query]);

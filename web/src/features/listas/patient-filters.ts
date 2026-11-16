@@ -28,6 +28,21 @@ export const canFilterAdmissions = (profile: AccessProfile) => canGlobally(profi
 export const matchesPatientState = (state: string, filter: string) =>
   filter === 'todos' || !filter ? true : filter === 'vigente' ? state === 'provisional' || state === 'activo' : state === filter;
 
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * Lo que trae la dirección puede venir de un enlace compartido o editado a mano: se descarta lo que esta cuenta no puede
+ * filtrar (el servidor respondería 403) o lo que no es un valor válido (400), antes de pedir la lista.
+ */
+export function sanitizePatientFilters(filters: PatientFilters, profile: AccessProfile): PatientFilters {
+  const admissions = canFilterAdmissions(profile);
+  return {
+    estado: patientStateOptions.some(o => o.value === filters.estado) ? filters.estado : patientFilterDefaults.estado,
+    situacion: situationOptions(profile).some(s => s.value === filters.situacion) ? filters.situacion : '',
+    area: admissions && uuid.test(filters.area) ? filters.area : '',
+    medico: admissions && uuid.test(filters.medico) ? filters.medico : '',
+  };
+}
+
 export function patientListPath(filters: PatientFilters, typed: string) {
   const params = new URLSearchParams({ limit: '50' });
   if (typed) params.set('query', typed);

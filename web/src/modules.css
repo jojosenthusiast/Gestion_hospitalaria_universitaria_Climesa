@@ -56,12 +56,12 @@
 .hospital-footer > span:last-child { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 
 /* Cabeceras y acciones */
-/* Cabecera discreta: migas, título y una línea de descripción; la acción principal a la derecha. El contenido empieza enseguida. */
+/* Cabecera discreta: migas, título y una descripción breve (dos líneas como máximo); la acción principal a la derecha. El contenido empieza enseguida. */
 .module-heading { margin-bottom: 20px; padding-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--line); }
 .module-heading-text { min-width: 0; }
 .module-heading .eyebrow { font-size: 11px; color: var(--muted); }
 .module-heading h1 { margin: 2px 0 0; font-size: clamp(24px, 2.1vw, 28px); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; overflow-wrap: anywhere; }
-.module-heading p { margin: 4px 0 0; max-width: 760px; color: var(--muted); font-size: 14px; line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.module-heading p { margin: 4px 0 0; max-width: 760px; color: var(--muted); font-size: 14px; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; flex-shrink: 0; }
 .heading-actions > button { white-space: nowrap; }
 .row-action { min-height: 42px; padding: 8px 4px; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--primary-text); font-size: 14px; font-weight: 700; line-height: 1.4; text-decoration: none; cursor: pointer; transition: background var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-instant) ease; }
@@ -315,7 +315,7 @@
   .hospital-footer > span:nth-child(2) { display: none; }
   .module-heading { display: block; margin-bottom: 16px; padding-bottom: 14px; }
   .module-heading h1 { font-size: 24px; }
-  .module-heading p { white-space: normal; }
+  .module-heading p { -webkit-line-clamp: unset; line-clamp: unset; display: block; }
   .heading-actions { margin-top: 14px; justify-content: stretch; }
   .heading-actions > button, .heading-actions > .primary-button, .heading-actions > .secondary-button { flex: 1 1 100%; width: 100%; white-space: normal; }
   .table-toolbar { padding: 18px; align-items: stretch; }
