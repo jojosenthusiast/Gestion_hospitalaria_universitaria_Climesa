@@ -38,4 +38,4 @@ Elige al paciente (o **Cambiar paciente**), registra los signos y pulsa **Guarda
 
 ## Mis turnos
 
-Tus turnos publicados, agrupados por día y por hora. La entrada se confirma sola a la hora de inicio.
+Tus turnos publicados, agrupados por día y por hora. La entrada se confirma sola a la hora de inicio. La lista abre en Hoy, seguida de los próximos días; los días ya pasados quedan debajo, en "Turnos anteriores".

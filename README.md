@@ -43,7 +43,7 @@ Cada componente tiene su propio workflow y solo se ejecuta cuando cambian sus ru
 | Plataforma | Stack real |
 |---|---|
 | API | Node.js 22, TypeScript 5.7, NestJS 11, Fastify, node-postgres |
-| Datos e identidad | PostgreSQL 17 / Supabase Auth y Realtime; 28 migraciones SQL, 11 esquemas de dominio (más `metricas`, solo vistas), 66 tablas con RLS, 10 roles, 79 permisos y 112 operaciones HTTP en el contrato |
+| Datos e identidad | PostgreSQL 17 / Supabase Auth y Realtime; 54 migraciones SQL, 11 esquemas de dominio (más `metricas`, solo vistas), 66 tablas con RLS, 10 roles, 76 permisos y 160 operaciones HTTP en el contrato |
 | Web | React 19, TypeScript, Vite 6, CSS responsive, tipos de API generados desde OpenAPI |
 | Android | Kotlin 2.1.20, Jetpack Compose (BOM 2025.04.01) Material 3, MVVM con `StateFlow` y corrutinas, Hilt 2.57.1, OkHttp 4.12 (HTTP y Realtime), Android Keystore; API 26+, SDK 35 |
 | iOS | SwiftUI, MVVM, URLSession con async/await y Keychain; proyecto Xcode, iOS 17+; núcleo como Swift Package. Pantallas de MED y PAC; compila y corre `swift test` en CI (macOS 15), **sin probar** en simulador o dispositivo |
@@ -104,9 +104,9 @@ Detalles en [android/README.md](android/README.md) e [ios/README.md](ios/README.
 
 ## Base de datos y semilla
 
-El esquema vive en `supabase/migrations/*.sql` (hoy 28 archivos) y los datos ficticios en `supabase/seed.sql`. Hay tres caminos; elige el que corresponda.
+El esquema vive en `supabase/migrations/*.sql` (hoy 54 archivos) y los datos ficticios en `supabase/seed.sql`. Hay tres caminos; elige el que corresponda.
 
-**1. Entorno demo en la nube (el que usa el equipo).** El proyecto Supabase "Gestion hospitalaria universitaria (Climesa)" tiene la semilla y las migraciones aplicadas a mano. Producción tiene aplicadas todas las migraciones hasta `20261116002000`; `20261114000300` se aplica pasada la medianoche local del 14-nov (camino 2). Fuera de eso, solo apunta tus `.env` a ese proyecto.
+**1. Entorno demo en la nube (el que usa el equipo).** El proyecto Supabase "Gestion hospitalaria universitaria (Climesa)" tiene la semilla y las migraciones aplicadas a mano. En producción ya están aplicadas, entre otras, `20261121001000` a `20261121003200` y `20261122001000` (16-nov-2026); la lista y el procedimiento están en el [runbook del operador](docs/operacion/runbook-operador.md), sección 3. Fuera de eso, solo apunta tus `.env` a ese proyecto.
 
 **2. Cambiar la base de la nube.** **No uses `supabase db push`**: el remoto registró las migraciones con otras marcas de versión y `db push` las vería todas pendientes e intentaría recrear tablas existentes. Aplica solo la migración que falte, a mano, en el SQL Editor de Supabase y en orden de fecha. El procedimiento y los pendientes del remoto están en [docs/desarrollo/ges-15-supabase-remoto.md](docs/desarrollo/ges-15-supabase-remoto.md). No ejecutes la semilla sobre datos reales.
 
@@ -205,7 +205,7 @@ python tools/progreso.py --verificar
 python tools/backlog.py --verificar
 ```
 
-Hay 66 archivos de prueba de API (`api/tests/`), 57 de web (`web/src`), 71 de Android (`android/app/src/test`) y 19 de iOS (`ios/Tests`). Las pruebas de API ejecutan el pipeline HTTP y todas las migraciones sobre PostgreSQL WASM (PGlite); el verificador de identidad y el proveedor de invitaciones están simulados solo en tests. No sustituyen las pruebas de login, correo y concurrencia multisesión en Supabase. Se incluyen workflows de CI para API, web, PostgreSQL nativo, Android, iOS y documentación (`.github/workflows/`). El despliegue en Render no depende de que CI pase.
+Hay 67 archivos de prueba de API (`api/tests/`), 59 de web (`web/src`), 72 de Android (`android/app/src/test`) y 19 de iOS (`ios/Tests`). Las pruebas de API ejecutan el pipeline HTTP y todas las migraciones sobre PostgreSQL WASM (PGlite); el verificador de identidad y el proveedor de invitaciones están simulados solo en tests. No sustituyen las pruebas de login, correo y concurrencia multisesión en Supabase. Se incluyen workflows de CI para API, web, PostgreSQL nativo, Android, iOS y documentación (`.github/workflows/`). El despliegue en Render no depende de que CI pase.
 
 [API](api/README.md) · [Web](web/README.md) · [Android](android/README.md) · [iOS](ios/README.md) · [Despliegue y migraciones](deployment/README.md) · [Arquitectura](docs/arquitectura/arquitectura.md) · [Modelo ER](docs/arquitectura/modelo-datos.md) · [RBAC](docs/arquitectura/roles-y-permisos.md) · [Privacidad](docs/arquitectura/privacidad.md) · [Resumen de arquitectura para el avance](docs/arquitectura/avance-31-octubre.md) · [Pruebas manuales por pantalla](docs/pruebas/pruebas-manuales.md).
 

@@ -76,7 +76,7 @@ Una migración ya aplicada no se edita nunca. Un cambio de base es siempre un ar
 5. Vuelve a correr la comprobación previa o la consulta de verificación de la cabecera.
 6. En **Advisors → Security Advisor** no debe aparecer ningún hallazgo nuevo.
 
-### Migraciones de las fases 0 y 1
+### Migraciones de las fases 0 y 1 y de los turnos por reloj
 
 | # | Archivo | Qué hace |
 |---|---|---|
@@ -95,6 +95,9 @@ Una migración ya aplicada no se edita nunca. Un cambio de base es siempre un ar
 | 13 | `20261121003000_aviso_editar_retirar.sql` | Versión y retiro de avisos |
 | 14 | `20261121003100_recursos_inventario_adm.sql` | Generada: ADM recibe `inventario.ver`; se retiran `recursos.*` |
 | 15 | `20261121003200_retiro_vista_avisos_vigentes.sql` | Elimina `publico.v_avisos_vigentes`, que exponía avisos internos y retirados |
+| 16 | `20261122001000_turnos_estado_por_reloj.sql` | El estado del turno sigue al reloj: política `turnos.entrada_automatica` (corte = hora de aplicación), columna `version_previa_reloj` con su disparador e índice del barrido. No cambia filas de turnos |
+
+Estado en producción: están aplicadas `20261121001000`, `20261121002000`, `20261121003000`, `20261121003100`, `20261121003200` y `20261122001000` (esta última el 16-nov-2026, que fija el corte de la entrada automática).
 
 Para saber cuáles ya están aplicadas, corre la comprobación previa de cada una: una migración aplicada deja la base en el estado que su verificación espera. Las migraciones "generadas" salen de `tools/generar_docs.py` desde `permisos.csv`; `python tools/generar_docs.py --verificar` confirma que el repositorio está al día.
 
@@ -103,6 +106,8 @@ Después de aplicar las migraciones, despliega la API (sección 2) si el PR lo p
 ## 4. Cuentas demo: rotar contraseñas y apagar el inicio de sesión de prueba
 
 Hay una cuenta demo por rol. Sus credenciales viven solo en `demo-credenciales.json` en la raíz (ignorado por git; formato en `demo-credenciales.example.json`) y se entregan por un canal privado del equipo. No hay un script que rote contraseñas: se hace a mano.
+
+**Estado al 16-nov-2026:** el selector de cuentas de prueba está **encendido** en Render `sghu-web` (`VITE_DEMO_LOGIN=true` y `VITE_DEMO_CREDENTIALS` cargada por la dueña del proyecto) para probar el sistema. Antes de la entrega hay que apagarlo y rotar las contraseñas con los pasos de abajo.
 
 ### Antes de la entrega o después de compartir credenciales
 

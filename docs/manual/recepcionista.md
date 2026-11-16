@@ -18,6 +18,7 @@ Accesos rápidos: **Registrar paciente**, **Agendar cita**, **Emitir número** y
 ### Pacientes
 
 - Busca siempre antes de registrar: por nombre (también por sonido), DUI o expediente.
+- Filtros de la lista: **Expediente** (Vigentes, Provisionales, Inactivos o Todos), **Hoy** (Hospitalizados, Esperan cama, Con alta firmada, En la fila de hoy o Con cita hoy), **Área de la cama** y **Médico tratante**. Quedan en la dirección de la página; lo que escribes en la búsqueda no.
 - **Registrar paciente** crea el expediente. Si el sistema detecta un posible duplicado, lo avisa. Solo si es otra persona, regístrala con el botón que lo confirma.
 - **Editar datos** corrige los datos personales con motivo; el historial guarda la versión anterior.
 - Ves datos personales y de contacto, nunca diagnósticos ni resultados.
@@ -85,5 +86,5 @@ Inicio, Emitir número, Pacientes, Citas, Vinculaciones, Admisión y cama, Table
 | Admisión y cama | **Ingresar paciente**, **Asignar cama** → **Confirmar cama**, **Cancelar admisión** |
 | Tablero de camas | Estado de las camas |
 | Despacho | **Confirmar y despachar** o **Descartar** (con motivo). En el despacho eliges tipo (emergencia a domicilio o traslado interhospitalario), prioridad (roja, naranja, amarilla o verde), destino y **Tripulación**. Un paramédico sin cuenta aparece marcado "sin cuenta en la app" y no se puede elegir como único paramédico |
-| Mis turnos | Tus turnos publicados por día y hora; la entrada se confirma sola al iniciar |
+| Mis turnos | Tus turnos publicados por día y hora, desde hoy (los días pasados quedan debajo, en "Turnos anteriores"); la entrada se confirma sola al iniciar |
 | Hospital | Información pública del hospital |

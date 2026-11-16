@@ -1,6 +1,6 @@
 # Guion de la defensa · CLIMESA
 
-Demostración en vivo del 21 de noviembre de 2026. Usa solo datos ficticios y las cuentas de demostración de cada rol (las credenciales se entregan por un canal privado del equipo; no están en el repositorio). El guion cubre lo que existe en `main` (`1a124e7`, hasta el PR #119): flujo clínico, cierre de hospitalización, camas, turnos con asistencia y carga, ambulancia de punta a punta, vinculación de cuentas, auditoría, página pública, métricas y la app iOS. Lo que sigue pendiente se dice al final.
+Demostración en vivo del 21 de noviembre de 2026. Usa solo datos ficticios y las cuentas de demostración de cada rol (las credenciales se entregan por un canal privado del equipo; no están en el repositorio). El guion cubre lo que existe en `main` (`c7f31a6`, hasta el PR #122): flujo clínico, cierre de hospitalización, camas, turnos con asistencia y carga, ambulancia de punta a punta, vinculación de cuentas, auditoría, página pública, métricas y la app iOS. Lo que sigue pendiente se dice al final.
 
 Regla de plataformas (`docs/arquitectura/datos/roles.csv`): ADM, JOP, LAB y DPD trabajan en la web; MED trabaja en Android o iOS (la web le muestra "Tu rol no usa esta aplicación"); AST, ENF y PAR, en Android; REC, en web y Android; PAC, en Android e iOS.
 
@@ -12,7 +12,7 @@ Regla de plataformas (`docs/arquitectura/datos/roles.csv`): ADM, JOP, LAB y DPD 
 | 2 | Confirmar que las migraciones hasta `20261121003200` están aplicadas en Supabase (runbook, sección 3) | La comprobación previa de cada archivo ya no encuentra nada que aplicar; `GET /api/v1/publico/ocupacion` responde 200 |
 | 3 | Confirmar que producción no conserva la planta 4 de una semilla anterior (BL-01) | La pantalla `/publico` muestra solo las plantas 2 y 3 en hospitalización |
 | 4 | Despertar la API 5 minutos antes (plan gratuito) | Abrir https://sghu-web.onrender.com e ingresar con cualquier cuenta; el aviso "El servidor se está activando" desaparece |
-| 5 | Con JOP, asignar hoy un turno al médico de prueba en su consultorio y turnos de paramédico, motorista y enfermería de Emergencia | En **Turnos** aparecen `En curso` o `Pendiente de iniciar` |
+| 5 | Con JOP, asignar hoy un turno al médico de prueba en su consultorio y turnos de paramédico, motorista y enfermería de Emergencia | En **Turnos** aparecen `En curso` o `Publicado` (por iniciar) |
 | 6 | Preparar un paciente ficticio con cuenta PAC vinculada y una cita solicitada | En **Citas** (REC) aparece `Solicitada` |
 | 7 | Instalar el APK en el teléfono, apuntando a la API de producción (`ENTREGA_2026-11-21.md`, sección 7) | La app abre y el ingreso con PAC muestra **Mis citas** |
 | 8 | Abrir dos navegadores (o una ventana normal y una privada) para la demostración de concurrencia | Ambas sesiones en la web de producción |
@@ -81,11 +81,12 @@ Punto para explicar: la doble asignación la impide PostgreSQL con `EXCLUDE USIN
 
 | # | Plataforma y rol | Acción | Resultado esperado |
 |---|---|---|---|
-| 1 | Web · JOP | **Turnos**: filtrar por área y rol | Se ven las asignaciones del día |
+| 1 | Web · JOP | **Turnos**, vista **Semana**: filtrar por área y rol | Se ven los turnos de la semana por día y hora, con el color de su estado; los huecos de cobertura aparecen rayados |
 | 2 | Web · JOP | Asignar un turno nocturno 18:00–07:00 a una persona y luego intentar asignarla el día en que termina | La API rechaza el turno por descanso insuficiente e indica desde cuándo está disponible |
 | 3 | Web · JOP | Asignar un turno que deje a la persona sobre 72 horas en 7 días | El formulario muestra la carga; la API lo rechaza salvo con "Motivo de la emergencia", que queda auditado |
 | 4 | Android · MED | **Mis turnos** | Los turnos aparecen por día (Hoy, Mañana…); el turno en curso ya tiene la entrada confirmada sola |
 | 5 | Web · JOP | **Asistencia** de otro turno: marcar ausencia injustificada | La persona deja de contar como de turno; aparecen "Suplentes disponibles" con **Asignar turno** |
+| 6 | Web · JOP | **Personal → Turno de hoy: Ausentes** | Si la ausencia del paso 5 es de hoy, aparece esa persona; el filtro queda en la dirección y el enlace se puede compartir |
 
 ## Bloque 6 · Ambulancia (6 minutos)
 
@@ -115,6 +116,7 @@ Punto para explicar: PAR también puede **Terminar sin llegar al hospital** con 
 | 6 | Web · DPD | **Auditoría**: buscar por expediente y fecha y **Verificar integridad** | Ve el intento denegado (sin contenido clínico); la cadena de hash resulta íntegra |
 | 7 | Android · PAC | **Quién vio mi expediente** | El paciente ve fecha, rol y motivo del acceso, sin el nombre del personal |
 | 8 | Documento | Mostrar la matriz RBAC (Anexo B) y `permisos.csv` | Explicar que el código pregunta permisos, no roles (`sin-roles-en-codigo.spec.ts`) |
+| 9 | Web · LAB | **Pacientes**: abrir un enlace con `?situacion=hospitalizado` | La web quita el filtro: LAB no tiene `admision.ver` con alcance global y la API respondería 403 |
 
 ## Bloque 8 · Información pública y métricas (3 minutos)
 

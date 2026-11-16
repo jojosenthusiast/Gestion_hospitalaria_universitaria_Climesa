@@ -1,4 +1,4 @@
-# iOS CLIMESA · 0.4.0
+# iOS CLIMESA · 1.0.0 (build 4)
 
 Proyecto SwiftUI/MVVM para Médico y Paciente, iOS 17+. Abre `CLIMESA.xcodeproj`, esquema `CLIMESA`, en una Mac con Xcode 15 o posterior. El paquete `Package.swift` compila `Core/` (Swift puro) y corre sus pruebas sin SwiftUI.
 

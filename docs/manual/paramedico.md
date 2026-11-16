@@ -59,4 +59,4 @@ Tus servicios, con **Buscar en la bitácora**, **Filtros** y **Quitar filtros**.
 
 ## Mis turnos
 
-Tus turnos publicados, agrupados por día y por hora. La entrada se confirma sola a la hora de inicio.
+Tus turnos publicados, agrupados por día y por hora. La entrada se confirma sola a la hora de inicio. La lista abre en Hoy, seguida de los próximos días; los días ya pasados quedan debajo, en "Turnos anteriores".
