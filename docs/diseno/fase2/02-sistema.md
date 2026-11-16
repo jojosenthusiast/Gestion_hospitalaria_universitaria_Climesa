@@ -32,7 +32,7 @@ El estado lleva siempre **ícono + etiqueta + patrón**. El color acompaña, nun
 | En espera | rayado diagonal | reloj | `en_espera`, `solicitada`, `pendiente`, `pendiente_cama`, `borrador`, `publicado`, `reservada`, `provisional` |
 | Llamado o en proceso | punteado | megáfono | `llamado`, `confirmada`, `en_proceso`, `limpieza`, `reprogramada` |
 | En atención o en uso | sólido | pulso | `en_atencion`, `en_curso`, `ocupada`, `hospitalizado`, `en_servicio`, `abierta` |
-| Terminado o disponible | contorno | check | `atendida`, `completado`, `firmada`, `alta_firmada`, `egresado`, `libre`, `disponible`, `activo`, `exito`, `normal`, `aprobada` |
+| Terminado o disponible | contorno | check | `atendida`, `atendido`, `completado`, `firmada`, `alta_firmada`, `egresado`, `libre`, `disponible`, `activo`, `exito`, `normal`, `aprobada` |
 | Cancelado o fuera de servicio | contorno discontinuo | cruz | `cancelado(a)`, `no_asistio`, `no_se_presento`, `cerrado`, `rechazada`, `vencida`, `vencido`, `bloqueada`, `inactivo`, `desactivado`, `denegado`, `fallido`, `en_mantenimiento` |
 | Crítico | borde doble | alerta | `critico_alto`, `critico_bajo` |
 

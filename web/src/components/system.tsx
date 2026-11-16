@@ -48,8 +48,14 @@ export const AREAS: { code: AreaCode; name: string; token: string }[] = [
 const AREA_ALIASES: Record<string, AreaCode> = { ESP: 'REC', VIP: 'HOS', BOD: 'GEN' };
 /** Área de un código de espacio o de área (`P1-EMG` → `EMG`); lo desconocido cae en el neutro. */
 export function areaOf(code: string | null | undefined): AreaCode {
-  const key = (code ?? '').toUpperCase().split('-').map(p => p.trim()).find(p => AREAS.some(a => a.code === p) || p in AREA_ALIASES) ?? '';
-  return (AREA_ALIASES[key] ?? AREAS.find(a => a.code === key)?.code ?? 'GEN') as AreaCode;
+  const parts = (code ?? '').toUpperCase().split('-').map(p => p.trim());
+  // A real area code wins over an alias (02-sistema §1): `BOD-LAB` is LAB, `BOD-CEN` falls back to the BOD alias (GEN).
+  const area = parts.find(p => AREAS.some(a => a.code === p));
+  if (area) return area as AreaCode;
+  // Consulting rooms are coded `C-101`: 02-sistema section 1 lists them under CON.
+  if (parts[0] === 'C' && parts.length > 1) return 'CON';
+  const alias = parts.find(p => p in AREA_ALIASES);
+  return (alias ? AREA_ALIASES[alias] : 'GEN') as AreaCode;
 }
 export function AreaTag({ code, showName = false }: { code: string; showName?: boolean }) {
   const area = AREAS.find(a => a.code === areaOf(code))!;
@@ -73,12 +79,12 @@ const familyOfValue: Record<string, StatusFamilyId> = {
   en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera',
   llamado: 'llamado', confirmada: 'llamado', en_proceso: 'llamado', limpieza: 'llamado', reprogramada: 'llamado',
   en_atencion: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion',
-  atendida: 'listo', completado: 'listo', firmada: 'listo', alta_firmada: 'listo', egresado: 'listo', libre: 'listo', disponible: 'listo', activo: 'listo', exito: 'listo', normal: 'listo', aprobada: 'listo',
+  atendida: 'listo', atendido: 'listo', completado: 'listo', firmada: 'listo', alta_firmada: 'listo', egresado: 'listo', libre: 'listo', disponible: 'listo', activo: 'listo', exito: 'listo', normal: 'listo', aprobada: 'listo',
   cancelado: 'cerrado', cancelada: 'cerrado', no_asistio: 'cerrado', no_se_presento: 'cerrado', cerrado: 'cerrado', rechazada: 'cerrado', vencida: 'cerrado', vencido: 'cerrado', bloqueada: 'cerrado', inactivo: 'cerrado', desactivado: 'cerrado', denegado: 'cerrado', fallido: 'cerrado', en_mantenimiento: 'cerrado',
   critico_alto: 'critico', critico_bajo: 'critico',
 };
 export const statusFamily = (value: string): StatusFamilyId | null => familyOfValue[value] ?? null;
-export const statusNames: Record<string, string> = { activo: 'Activo', inactivo: 'Inactivo', provisional: 'Provisional', libre: 'Libre', ocupada: 'Ocupada', reservada: 'Reservada', limpieza: 'En limpieza', bloqueada: 'Bloqueada', borrador: 'Borrador', publicado: 'Pendiente de iniciar', pendiente: 'Pendiente de iniciar', en_curso: 'En curso', completado: 'Completado', cancelado: 'Cancelado', cancelada: 'Cancelada', solicitada: 'Solicitada', confirmada: 'Confirmada', atendida: 'Atendida', firmada: 'Firmada', rechazada: 'Rechazada', no_asistio: 'No asistió', vencida: 'Vencida', reprogramada: 'Reprogramada', cerrado: 'Cerrado sin atender', desactivado: 'Desactivado', pendiente_cama: 'Pendiente de cama', hospitalizado: 'Hospitalizado', alta_firmada: 'Alta firmada', egresado: 'Egresado', exito: 'Correcto', denegado: 'Denegado', fallido: 'Fallido', en_espera: 'En espera', llamado: 'Llamado', en_atencion: 'En atención', no_se_presento: 'No se presentó', en_proceso: 'En proceso', abierta: 'Abierta', bajo_minimo: 'Bajo mínimo', vencido: 'Vencido', normal: 'Normal', alto: 'Alto', bajo: 'Bajo', critico_alto: 'Crítico alto', critico_bajo: 'Crítico bajo', sin_rango: 'Sin rango', disponible: 'Disponible', en_servicio: 'En servicio', en_mantenimiento: 'En mantenimiento' };
+export const statusNames: Record<string, string> = { activo: 'Activo', inactivo: 'Inactivo', provisional: 'Provisional', libre: 'Libre', ocupada: 'Ocupada', reservada: 'Reservada', limpieza: 'En limpieza', bloqueada: 'Bloqueada', borrador: 'Borrador', publicado: 'Pendiente de iniciar', pendiente: 'Pendiente de iniciar', en_curso: 'En curso', completado: 'Completado', cancelado: 'Cancelado', cancelada: 'Cancelada', solicitada: 'Solicitada', confirmada: 'Confirmada', atendida: 'Atendida', atendido: 'Atendido', firmada: 'Firmada', rechazada: 'Rechazada', no_asistio: 'No asistió', vencida: 'Vencida', reprogramada: 'Reprogramada', cerrado: 'Cerrado sin atender', desactivado: 'Desactivado', pendiente_cama: 'Pendiente de cama', hospitalizado: 'Hospitalizado', alta_firmada: 'Alta firmada', egresado: 'Egresado', exito: 'Correcto', denegado: 'Denegado', fallido: 'Fallido', en_espera: 'En espera', llamado: 'Llamado', en_atencion: 'En atención', no_se_presento: 'No se presentó', en_proceso: 'En proceso', abierta: 'Abierta', bajo_minimo: 'Bajo mínimo', vencido: 'Vencido', normal: 'Normal', alto: 'Alto', bajo: 'Bajo', critico_alto: 'Crítico alto', critico_bajo: 'Crítico bajo', sin_rango: 'Sin rango', disponible: 'Disponible', en_servicio: 'En servicio', en_mantenimiento: 'En mantenimiento' };
 
 /**
  * Estado con ícono + etiqueta + patrón. Conserva las clases `status-tag status-<valor>` para las vistas que ya las usan.
