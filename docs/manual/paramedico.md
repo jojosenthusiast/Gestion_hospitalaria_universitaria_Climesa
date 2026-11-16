@@ -9,7 +9,7 @@ Para que te puedan despachar necesitas un turno publicado y tu cuenta activa en 
 
 ## Secciones
 
-Inicio, Servicio, Bitácora, Mis turnos, Hospital y Perfil. La barra inferior muestra Inicio, Servicio y Bitácora.
+Inicio, Avisos, Servicio, Bitácora, Mis turnos, Hospital y Perfil. La barra inferior muestra Inicio, Servicio y Bitácora.
 
 ## Servicio
 

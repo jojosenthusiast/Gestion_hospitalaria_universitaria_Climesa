@@ -23,6 +23,8 @@ object AppModule {
     @Provides @Singleton fun sessionExpiry()=SessionExpiry()
     @Provides @Singleton fun api(auth:SupabaseAuthRepository,expiry:SessionExpiry)=ApiClient(BuildConfig.API_BASE_URL,auth,expiry)
     @Provides @Singleton fun gateway(api:ApiClient):ApiGateway=api
+    /** Reads the document picked for a lab attachment upload (T07c). */
+    @Provides @Singleton fun documents(@ApplicationContext context:Context):sv.edu.catolica.climesa.data.DocumentReader=sv.edu.catolica.climesa.data.ContentDocumentReader(context)
     /** Local drafts of long forms, per user (see [DraftStore]). */
     @Provides @Singleton fun drafts(@ApplicationContext context:Context):DraftStore=FileDraftStore.of(context)
     @Provides @Singleton fun patients(api:ApiClient):PatientRepository=RemotePatientRepository(api)

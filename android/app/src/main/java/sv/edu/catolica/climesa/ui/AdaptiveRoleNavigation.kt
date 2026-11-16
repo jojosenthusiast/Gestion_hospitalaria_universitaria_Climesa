@@ -86,6 +86,7 @@ private fun compactLabel(section: AndroidSection): String = when (section) {
 /** E-04/E-07: every section has its own icon, so the bar and the "Más" sheet never repeat one. */
 internal fun iconFor(section: AndroidSection): ImageVector = when (section) {
     AndroidSection.HOME -> Icons.Default.Home
+    AndroidSection.NOTICES -> Icons.Default.Notifications
     AndroidSection.PROFILE -> Icons.Default.AccountCircle
     AndroidSection.SHIFTS -> Icons.Default.Schedule
     AndroidSection.APPOINTMENTS -> Icons.Default.DateRange

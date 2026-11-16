@@ -9,7 +9,7 @@ Lo que ves de un paciente depende de tu turno: necesitas un turno en curso en su
 
 ## Secciones
 
-AST y ENF comparten un catálogo de estación de cuidado; cada cuenta ve solo las secciones que permiten sus permisos. Para ENF: Inicio, Signos vitales, Mi planta, Limpieza de camas, Consumo de insumos, Recepción de ambulancia, Mis turnos, Hospital y Perfil.
+AST y ENF comparten un catálogo de estación de cuidado; cada cuenta ve solo las secciones que permiten sus permisos. Para ENF: Inicio, Avisos, Signos vitales, Mi planta, Limpieza de camas, Consumo de insumos, Recepción de ambulancia, Mis turnos, Hospital y Perfil.
 
 ## Mi planta
 

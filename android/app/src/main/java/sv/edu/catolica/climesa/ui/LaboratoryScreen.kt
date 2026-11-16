@@ -1,7 +1,17 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import android.content.Intent
 import android.net.Uri
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.text.style.TextOverflow
+import sv.edu.catolica.climesa.domain.LabAttachmentRules
+import sv.edu.catolica.climesa.domain.NoticeInboxRules
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -98,6 +108,8 @@ fun LaboratoryScreen(
     var openGroups by rememberSaveable { mutableStateOf(listOf<String>()) }
     LaunchedEffect(ownResults, reviewer) {
         model.path = if (ownResults) "/me/laboratorio" else "/laboratorio/ordenes"; model.followUpsEnabled = reviewer
+        // T07c: whoever loads or reviews results may upload the file of a reference-only attachment (as the web).
+        model.canAttach = !ownResults && ("laboratorio.procesar" in profile.permissions || "laboratorio.revisar" in profile.permissions)
         model.load(); if (reviewer) model.loadFollowUps()
     }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
@@ -145,6 +157,30 @@ fun LaboratoryScreen(
     state.cancelOrderId?.let { id -> CancelOrderDialog(state, state.orders.firstOrNull { it.id == id }, model) }
     state.external?.let { draft -> SendExternalDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
     state.externalLoad?.let { draft -> ExternalResultDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
+    state.uploadFailure?.let { message -> UploadFailureDialog(message, model::dismissUploadFailure) }
+    OpenSignedLink(state.openUrl, model)
+}
+
+/** T07c: the values are already saved; only the file is missing, and it can be uploaded later from the order. */
+@Composable
+private fun UploadFailureDialog(message: String, onClose: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(stringResource(R.string.lab_cargar_externo)) },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) { NoticeBanner(NoticeKind.ERROR, message); Text(stringResource(R.string.lab_subida_fallida_ayuda)) } },
+        confirmButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.lab_entendido)) } },
+    )
+}
+
+/** Hands a fresh signed http(s) link to the system once (ACTION_VIEW) and forgets it; the link is never stored or shown. */
+@Composable
+private fun OpenSignedLink(url: String?, model: LaboratoryViewModel) {
+    val context = LocalContext.current
+    LaunchedEffect(url) {
+        val link = url ?: return@LaunchedEffect
+        val opened = runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
+        if (opened) model.urlOpened() else model.openFailed()
+    }
 }
 
 /** Group title with its count; [open] is null when the group cannot fold (it shows its orders). */
@@ -200,8 +236,8 @@ private fun SendExternalDialog(draft: ExternalDraft, order: LaboratoryOrder?, mo
 }
 
 /**
- * External report: a PDF or photo picked on the phone plus one key value per exam. Only the file's metadata and fingerprint
- * travel (there is no clinical file storage yet); the dialog says so.
+ * External report: a PDF or photo picked on the phone plus one key value per exam. The values go first with the file reference,
+ * then the file itself uploads to the API, which keeps it in the private clinical storage (T07c, as the web does).
  */
 @Composable
 private fun ExternalResultDialog(draft: ExternalLoadDraft, order: LaboratoryOrder?, model: LaboratoryViewModel) {
@@ -223,7 +259,7 @@ private fun ExternalResultDialog(draft: ExternalLoadDraft, order: LaboratoryOrde
         body = {
             draft.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
             SecondaryButton(stringResource(if (draft.attachment == null) R.string.lab_cargar_externo_elegir else R.string.lab_cargar_externo_cambiar), { picker.launch(LabExternalRules.ATTACHMENT_TYPES.toTypedArray()) }, enabled = !draft.busy)
-            draft.attachment?.let { Text("${it.fileName} · ${it.sizeBytes / 1024} KB", style = MaterialTheme.typography.bodySmall) }
+            draft.attachment?.let { Text("${it.fileName} · ${LabAttachmentRules.sizeText(it.sizeBytes)}", style = MaterialTheme.typography.bodySmall) }
             order.items.forEach { item ->
                 FormField(if (item.numeric && item.unit != null) "${item.name} (${item.unit})" else item.name, draft.values[item.id].orEmpty(), { model.setExternalValue(item.id, it) },
                     keyboardOptions = if (item.numeric) KeyboardOptions(keyboardType = KeyboardType.Decimal) else KeyboardOptions.Default)
@@ -234,7 +270,7 @@ private fun ExternalResultDialog(draft: ExternalLoadDraft, order: LaboratoryOrde
     )
 }
 
-/** Name, type, size and SHA-256 of the picked document; the bytes are read once here and never leave the phone. */
+/** Name, type, size and SHA-256 of the picked document; its bytes are read again when the file is uploaded (T07c). */
 private fun describe(context: android.content.Context, uri: Uri): LabAttachment? = runCatching {
     val resolver = context.contentResolver
     var name = "informe"; var size = -1L
@@ -245,14 +281,14 @@ private fun describe(context: android.content.Context, uri: Uri): LabAttachment?
         }
     }
     val type = resolver.getType(uri) ?: "application/octet-stream"
-    if (size > LabExternalRules.MAX_ATTACHMENT_BYTES) return@runCatching LabAttachment(name, type, size)
+    if (size > LabExternalRules.MAX_ATTACHMENT_BYTES) return@runCatching LabAttachment(name, type, size, uri = uri.toString())
     val digest = MessageDigest.getInstance("SHA-256")
     var read = 0L
     resolver.openInputStream(uri)?.use { input ->
         val buffer = ByteArray(64 * 1024)
         while (true) { val n = input.read(buffer); if (n < 0) break; digest.update(buffer, 0, n); read += n }
     }
-    LabAttachment(name, type, if (size >= 0) size else read, digest.digest().joinToString("") { "%02x".format(it) })
+    LabAttachment(name, type, if (size >= 0) size else read, digest.digest().joinToString("") { "%02x".format(it) }, uri.toString())
 }.getOrNull()
 
 /** Cancel with a reason (D-13: at least 10 characters). The reason and the open dialog live in the ViewModel, so a rotation keeps them. */
@@ -309,11 +345,65 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
             }
             item.result?.let { result -> LabFollowUpRules.labNote(result, ownView)?.let { ObservationLine(it, result.relevant) } }
         }
+        // T07c: the report file of a completed external order. Never in the patient's own view.
+        if (!ownView && order.external && order.state == "completado") ExternalReport(order, model)
         if (canLoadExternal) PrimaryButton(stringResource(R.string.lab_cargar_externo), { model.openExternalLoad(order.id) }, enabled = !busy)
         if (canReview) PrimaryButton(stringResource(R.string.lab_revisar), { model.review(order) }, enabled = !busy, loading = busy)
         if (canSendExternal) SecondaryButton(stringResource(R.string.lab_externo_titulo), { model.openExternal(order.id) }, enabled = !busy)
         if (canCancel) SecondaryButton(stringResource(R.string.lab_cancelar_orden), { model.openCancel(order.id) }, enabled = !busy)
         if (!ownView && !(canReview || canLoadExternal || canSendExternal)) TextButton(onClick = { expanded = false }) { Text(stringResource(R.string.lab_ocultar_detalle)) }
+    }
+}
+
+/**
+ * T07c · "Informe externo" (web `ExternalReport`): each file with its kind, size, date and who loaded it. A stored file opens
+ * through a fresh signed link on every tap; a reference-only file says so, and whoever may load results can upload it here.
+ */
+@Composable
+private fun ExternalReport(order: LaboratoryOrder, model: LaboratoryViewModel) {
+    val state by model.state.collectAsStateWithLifecycle()
+    LaunchedEffect(order.id, order.version) { model.loadAttachments(order.id, order.version) }
+    val report = state.attachments[order.id]
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var target by rememberSaveable(order.id) { mutableStateOf<String?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        val id = target
+        if (uri != null && id != null) scope.launch { model.uploadAttachment(order.id, order.version, id, withContext(Dispatchers.IO) { describe(context, uri) }) }
+    }
+    val canAttach = model.canAttach
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        HorizontalDivider(color = MaterialTheme.climesa.line)
+        Text(stringResource(R.string.lab_informe_externo), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
+        when {
+            report == null || (report.loading && report.files.isEmpty()) -> Text(stringResource(R.string.lab_adjunto_cargando), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            report.files.isEmpty() && report.error == null -> Text(stringResource(R.string.lab_adjunto_sin), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        report?.files?.forEach { file ->
+            val busy = state.attachmentBusy == file.id
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Icon(if (file.mimeType == "application/pdf") Icons.Default.PictureAsPdf else Icons.Default.Image, null, Modifier.size(20.dp), tint = MaterialTheme.climesa.primaryText)
+                    Text(file.fileName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                Text(
+                    listOfNotNull(LabAttachmentRules.kindLabel(file.mimeType), LabAttachmentRules.sizeText(file.sizeBytes), NoticeInboxRules.dateText(file.uploadedAt).takeIf { it.isNotBlank() }, file.uploadedByName).joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                file.note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                if (file.stored) {
+                    val description = stringResource(R.string.lab_adjunto_abrir_desc, file.fileName)
+                    SecondaryButton(stringResource(R.string.lab_adjunto_abrir), { model.openAttachment(order.id, file.id) }, Modifier.semantics { contentDescription = description }, icon = Icons.AutoMirrored.Filled.OpenInNew, enabled = state.attachmentBusy == null, loading = busy)
+                } else {
+                    Text(stringResource(R.string.lab_adjunto_solo_referencia), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (canAttach) SecondaryButton(stringResource(R.string.lab_adjunto_subir), { target = file.id; picker.launch(LabExternalRules.ATTACHMENT_TYPES.toTypedArray()) }, icon = Icons.Default.UploadFile, enabled = state.attachmentBusy == null, loading = busy)
+                }
+            }
+        }
+        report?.error?.let { error ->
+            NoticeBanner(NoticeKind.ERROR, error)
+            if (report.files.isEmpty()) TextButton(onClick = { model.loadAttachments(order.id, order.version, force = true) }) { Text(stringResource(R.string.lab_adjunto_reintentar)) }
+        }
     }
 }
 

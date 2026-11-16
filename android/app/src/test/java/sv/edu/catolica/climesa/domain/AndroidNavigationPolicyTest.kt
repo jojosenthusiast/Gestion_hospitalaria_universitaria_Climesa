@@ -40,7 +40,7 @@ class AndroidNavigationPolicyTest {
         val nav = AndroidNavigationPolicy.compact("PAC", AndroidSections.visible("PAC", everything))
         assertEquals(listOf(MoreGroup.TASKS, MoreGroup.HOSPITAL, MoreGroup.ACCOUNT), nav.more.map { it.group })
         assertEquals(listOf(AndroidSection.LINK_RECORD, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST), nav.more[0].sections)
-        assertEquals(listOf(AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS), nav.more[1].sections)
+        assertEquals(listOf(AndroidSection.NOTICES, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS), nav.more[1].sections)
         assertEquals(listOf(AndroidSection.PROFILE), nav.more[2].sections)
     }
 
@@ -48,7 +48,7 @@ class AndroidNavigationPolicyTest {
         val perms = listOf("sesion.perfil", "turnos.ver", "fila.llamar")
         val nav = AndroidNavigationPolicy.compact("AST", AndroidSections.visible("AST", perms))
         assertEquals(listOf(AndroidSection.HOME, AndroidSection.ASSISTANT_STATION, AndroidSection.SHIFTS), nav.primary)
-        assertEquals(listOf(AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE), nav.overflow)
+        assertEquals(listOf(AndroidSection.NOTICES, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE), nav.overflow)
     }
 
     @Test fun sinInicioCabenCuatroTareas() {

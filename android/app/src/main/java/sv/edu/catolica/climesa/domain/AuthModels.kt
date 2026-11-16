@@ -56,6 +56,8 @@ object RoleAccess {
  */
 enum class AndroidSection(val screenId: String, val label: String, val permission: String, val ready: Boolean) {
     HOME("A04", "Inicio", "sesion.perfil", true),
+    /** S11: notices in their own area for every account with a session (web W25, iOS «Avisos»). */
+    NOTICES("A14", "Avisos", "sesion.perfil", true),
     LINK_RECORD("A03", "Vincular expediente", "cuenta.vincular", true),
     PATIENT_QUEUE("A05", "Mi turno", "fila.ver", true),
     MY_APPOINTMENTS("A06", "Mis citas", "citas.ver", true),
@@ -99,18 +101,18 @@ object AndroidSections {
      * permissions of each account. "Paciente hospitalizado" opens the same screen as "Mi planta", so it is not a second entry.
      */
     private val careStation = listOf(
-        AndroidSection.HOME, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.CLEANING,
+        AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.CLEANING,
         AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE,
     )
 
     /** Jefe de Operaciones and Laboratorio use the web only (D-090): they have no Android catalog and see "Tu rol no usa esta aplicación". */
     private val roleCatalog = mapOf(
-        "REC" to listOf(AndroidSection.HOME, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "REC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "AST" to careStation,
         "ENF" to careStation,
-        "MED" to listOf(AndroidSection.HOME, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.UNIT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "PAR" to listOf(AndroidSection.HOME, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "PAC" to listOf(AndroidSection.HOME, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.LINK_RECORD, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
+        "MED" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.UNIT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "PAR" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "PAC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.LINK_RECORD, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
     )
 
     /** The role's core tasks, in bar order (they are what its dashboard leads to). The bar takes the first visible ones after "Inicio". */
@@ -136,9 +138,9 @@ object AndroidSections {
     fun visible(role: String, permissions: Collection<String>): List<AndroidSection> =
         roleCatalog[role].orEmpty().filter { it.permission in permissions }
 
-    /** Without a destination beyond Home, Hospital and Profile, the role has no operational Android flow. */
+    /** Without a destination beyond Home, Avisos, Hospital and Profile, the role has no operational Android flow. */
     fun hasAppScreens(role: String, permissions: Collection<String>) =
-        visible(role, permissions).any { it != AndroidSection.HOME && it != AndroidSection.HOSPITAL_INFO && it != AndroidSection.PROFILE }
+        visible(role, permissions).any { it != AndroidSection.HOME && it != AndroidSection.NOTICES && it != AndroidSection.HOSPITAL_INFO && it != AndroidSection.PROFILE }
 }
 
 enum class AndroidNavigationMode { BOTTOM_BAR, RAIL, DRAWER }
@@ -172,7 +174,7 @@ object AndroidNavigationPolicy {
 
     private fun group(section: AndroidSection) = when (section) {
         AndroidSection.PROFILE -> MoreGroup.ACCOUNT
-        AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS -> MoreGroup.HOSPITAL
+        AndroidSection.NOTICES, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS -> MoreGroup.HOSPITAL
         else -> MoreGroup.TASKS
     }
 
