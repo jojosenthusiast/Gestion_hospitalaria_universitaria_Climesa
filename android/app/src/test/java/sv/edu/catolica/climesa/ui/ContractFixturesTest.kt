@@ -122,6 +122,26 @@ class ContractFixturesTest {
             sv.edu.catolica.climesa.domain.LabOrderRules.cancelBody(2, "  El paciente no se presentó a la toma "), order)
     }
 
+    @Test fun laboratorySendExternal() {
+        val order = "99999999-9999-4999-8999-999999999999"
+        assertContract("laboratorio-externa", "POST", sv.edu.catolica.climesa.domain.LabExternalRules.sendPath(order),
+            sv.edu.catolica.climesa.domain.LabExternalRules.sendBody(2, " Clínica Ficticia de Imágenes ", "Sin ayuno. Presente su DUI y esta orden."), order)
+    }
+
+    @Test fun laboratoryExternalResult() {
+        val order = "99999999-9999-4999-8999-999999999999"
+        val item = sv.edu.catolica.climesa.domain.LaboratoryItem("88888888-8888-4888-8888-888888888888", "HB", "Hemoglobina", null, "g/dL", "numerico")
+        val attachment = sv.edu.catolica.climesa.domain.LabAttachment("informe.pdf", "application/pdf", 2048, "a".repeat(64))
+        assertContract("laboratorio-resultado-externo", "POST", sv.edu.catolica.climesa.domain.LabExternalRules.resultPath(order),
+            sv.edu.catolica.climesa.domain.LabExternalRules.resultBody(2, attachment, listOf(item), mapOf(item.id to "12.9"), "Informe de laboratorio externo"), order)
+    }
+
+    @Test fun laboratoryFollowUpReviewed() {
+        val followUp = "99999999-9999-4999-8999-999999999999"
+        assertContract("laboratorio-pendiente-revisar", "POST", sv.edu.catolica.climesa.domain.LabFollowUpRules.reviewPath(followUp),
+            sv.edu.catolica.climesa.domain.LabFollowUpRules.reviewBody(1), followUp)
+    }
+
     @Test fun queueCallNext() {
         assertContract("fila-llamar-siguiente", "POST", "/fila/llamar-siguiente", sv.edu.catolica.climesa.domain.QueueRules.callNextBody("consulta_general"))
     }

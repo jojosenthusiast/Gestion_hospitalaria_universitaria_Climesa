@@ -14,6 +14,11 @@ import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.data.AuthRequestException
+import sv.edu.catolica.climesa.domain.LabAttachment
+import sv.edu.catolica.climesa.domain.LabExternalAction
+import sv.edu.catolica.climesa.domain.LabExternalRules
+import sv.edu.catolica.climesa.domain.LabFollowUp
+import sv.edu.catolica.climesa.domain.LabFollowUpRules
 import sv.edu.catolica.climesa.domain.LabOrderAction
 import sv.edu.catolica.climesa.domain.LabOrderRules
 import sv.edu.catolica.climesa.domain.LaboratoryEvents
@@ -25,7 +30,14 @@ import sv.edu.catolica.climesa.domain.RealtimeSignal
 data class LaboratoryState(
     val loading: Boolean = true, val orders: List<LaboratoryOrder> = emptyList(), val busy: Boolean = false, val error: String? = null, val notice: String? = null,
     val cancelOrderId: String? = null, val cancelReason: String = "", val cancelError: String? = null, val cancelling: Boolean = false,
+    /** S10: the doctor's "Resultados por revisar" (`GET /laboratorio/pendientes`). */
+    val followUps: List<LabFollowUp> = emptyList(), val followUpBusy: String? = null,
+    /** S10: dialogs of the external path; their drafts live here so a rotation keeps them. */
+    val external: ExternalDraft? = null, val externalLoad: ExternalLoadDraft? = null,
 )
+
+data class ExternalDraft(val orderId: String, val place: String = "", val instructions: String = LabExternalRules.INSTRUCTIONS_TEMPLATE, val error: String? = null, val busy: Boolean = false)
+data class ExternalLoadDraft(val orderId: String, val attachment: LabAttachment? = null, val values: Map<String, String> = emptyMap(), val note: String = "", val error: String? = null, val busy: Boolean = false)
 
 @HiltViewModel
 class LaboratoryViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
@@ -35,6 +47,8 @@ class LaboratoryViewModel @Inject constructor(private val api: ApiGateway, realt
     private var loadJob: Job? = null
     /** Source of the list: the lab queue, or `/me/laboratorio` for the patient (A07: state always, values only reviewed). */
     var path: String = "/laboratorio/ordenes"
+    /** True for readers with `laboratorio.revisar`: they also get the "Resultados por revisar" inbox. */
+    var followUpsEnabled: Boolean = false
 
     /** A [silent] reload (realtime invalidation) keeps the shown orders and messages, even if it fails. */
     fun load(silent: Boolean = false) {
@@ -50,7 +64,75 @@ class LaboratoryViewModel @Inject constructor(private val api: ApiGateway, realt
     /** Idempotent per channel list: reloads when a laboratory event arrives or after a reconnection gap. */
     fun startLive(channels: List<String>) {
         live.start(viewModelScope, channels) { signal ->
-            if (signal is RealtimeSignal.Event && LaboratoryEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load(silent = true)
+            if (signal is RealtimeSignal.Event && LaboratoryEvents.matches(signal.event) || signal is RealtimeSignal.Resync) { load(silent = true); if (followUpsEnabled) loadFollowUps() }
+        }
+    }
+
+    /** Loads the doctor's inbox; only called for readers with `laboratorio.revisar` (the API answers 403 otherwise). */
+    fun loadFollowUps() {
+        viewModelScope.launch {
+            try { mutable.value = mutable.value.copy(followUps = LabFollowUpRules.parse(api.request("/laboratorio/pendientes"))) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { /* The list below still works; the inbox reloads on the next event. */ }
+        }
+    }
+
+    fun reviewFollowUp(item: LabFollowUp) {
+        if (mutable.value.followUpBusy != null) return
+        mutable.value = mutable.value.copy(followUpBusy = item.id, error = null, notice = null)
+        viewModelScope.launch {
+            try {
+                api.request(LabFollowUpRules.reviewPath(item.id), "POST", LabFollowUpRules.reviewBody(item.version))
+                mutable.value = mutable.value.copy(followUpBusy = null, followUps = mutable.value.followUps.filterNot { it.id == item.id }, notice = "Marcado como revisado.")
+                loadFollowUps()
+            }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.value = mutable.value.copy(followUpBusy = null, error = businessMessage(e, "No se pudo marcar como revisado.")); loadFollowUps() }
+        }
+    }
+
+    fun openExternal(orderId: String) { mutable.value = mutable.value.copy(external = ExternalDraft(orderId), notice = null) }
+    fun editExternal(place: String = mutable.value.external?.place.orEmpty(), instructions: String = mutable.value.external?.instructions.orEmpty()) {
+        mutable.value.external?.let { mutable.value = mutable.value.copy(external = it.copy(place = place.take(LabExternalRules.MAX_PLACE), instructions = instructions.take(LabExternalRules.MAX_INSTRUCTIONS), error = null)) }
+    }
+    fun dismissExternal() { if (mutable.value.external?.busy != true) mutable.value = mutable.value.copy(external = null) }
+
+    fun confirmExternal(order: LaboratoryOrder) {
+        val draft = mutable.value.external ?: return
+        if (draft.busy || !order.allowsExternal(LabExternalAction.SEND)) return
+        LabExternalRules.sendError(draft.place, draft.instructions)?.let { mutable.value = mutable.value.copy(external = draft.copy(error = it)); return }
+        mutable.value = mutable.value.copy(external = draft.copy(busy = true, error = null))
+        viewModelScope.launch {
+            try {
+                api.request(LabExternalRules.sendPath(order.id), "POST", LabExternalRules.sendBody(order.version, draft.place, draft.instructions))
+                mutable.value = mutable.value.copy(external = null, notice = "La orden quedó como externa; el paciente ya ve dónde ir.")
+                load(silent = true)
+            }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.value = mutable.value.copy(external = draft.copy(busy = false, error = businessMessage(e, "No se pudo enviar a externo."))) }
+        }
+    }
+
+    fun openExternalLoad(orderId: String) { mutable.value = mutable.value.copy(externalLoad = ExternalLoadDraft(orderId), notice = null) }
+    fun setAttachment(file: LabAttachment?) { mutable.value.externalLoad?.let { mutable.value = mutable.value.copy(externalLoad = it.copy(attachment = file, error = LabExternalRules.attachmentError(file))) } }
+    fun setExternalValue(itemId: String, value: String) { mutable.value.externalLoad?.let { mutable.value = mutable.value.copy(externalLoad = it.copy(values = it.values + (itemId to value), error = null)) } }
+    fun setExternalNote(note: String) { mutable.value.externalLoad?.let { mutable.value = mutable.value.copy(externalLoad = it.copy(note = note.take(LabExternalRules.MAX_NOTE))) } }
+    fun dismissExternalLoad() { if (mutable.value.externalLoad?.busy != true) mutable.value = mutable.value.copy(externalLoad = null) }
+
+    fun confirmExternalLoad(order: LaboratoryOrder) {
+        val draft = mutable.value.externalLoad ?: return
+        if (draft.busy || !order.allowsExternal(LabExternalAction.LOAD_RESULT)) return
+        val problem = LabExternalRules.attachmentError(draft.attachment) ?: LabExternalRules.valuesError(order.items, draft.values)
+        if (problem != null) { mutable.value = mutable.value.copy(externalLoad = draft.copy(error = problem)); return }
+        mutable.value = mutable.value.copy(externalLoad = draft.copy(busy = true, error = null))
+        viewModelScope.launch {
+            try {
+                api.request(LabExternalRules.resultPath(order.id), "POST", LabExternalRules.resultBody(order.version, draft.attachment!!, order.items, draft.values, draft.note))
+                mutable.value = mutable.value.copy(externalLoad = null, notice = "Resultado externo guardado; la orden espera la revisión médica.")
+                load(silent = true)
+            }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.value = mutable.value.copy(externalLoad = draft.copy(busy = false, error = businessMessage(e, "No se pudo guardar el resultado externo."))) }
         }
     }
 

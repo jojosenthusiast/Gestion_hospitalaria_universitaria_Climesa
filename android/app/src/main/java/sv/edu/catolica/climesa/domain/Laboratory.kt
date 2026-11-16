@@ -3,13 +3,20 @@ package sv.edu.catolica.climesa.domain
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class LaboratoryResult(val value: Double?, val text: String?, val mark: String, val version: Int)
-data class LaboratoryItem(val id: String, val code: String, val name: String, val result: LaboratoryResult?, val unit: String? = null)
+/** [observation] is the lab note on the value; [relevant] means it opened an item in the doctor's "Resultados por revisar" (S10). */
+data class LaboratoryResult(val value: Double?, val text: String?, val mark: String, val version: Int, val observation: String? = null, val relevant: Boolean = false)
+/** [resultType] is `numerico` or `texto` (null on older API rows: then a unit means numeric). */
+data class LaboratoryItem(val id: String, val code: String, val name: String, val result: LaboratoryResult?, val unit: String? = null, val resultType: String? = null) {
+    val numeric get() = resultType?.let { it == "numerico" } ?: (unit != null)
+}
 
 /** Actions the API allows the reader on an order (`allowedActions`, enum `AccionOrdenLaboratorio`). */
 enum class LabOrderAction(val wire: String) {
     TAKE_SAMPLE("tomar_muestra"), CAPTURE("capturar"), COMPLETE("completar"), REVIEW("revisar"), CANCEL("cancelar"), AMEND("enmendar"),
 }
+
+/** S10: the external path (`externalActions`, enum `AccionExternaLaboratorio`), apart so `allowedActions` stays as older clients read it. */
+enum class LabExternalAction(val wire: String) { SEND("enviar_externo"), LOAD_RESULT("cargar_externo") }
 
 /**
  * [age] is already worded for the role ("34 años" or the decade "30-39 años"); null when the role does not see it.
@@ -20,8 +27,10 @@ data class LaboratoryOrder(
     val id: String, val patientName: String, val priority: String, val state: String, val version: Int, val items: List<LaboratoryItem>, val reviewed: Boolean,
     val record: String? = null, val sex: String? = null, val age: String? = null, val doctorName: String? = null, val createdAtMillis: Long? = null,
     val allowedActions: Set<String> = emptySet(), val amendedAtMillis: Long? = null,
+    val external: Boolean = false, val externalPlace: String? = null, val externalInstructions: String? = null, val externalActions: Set<String> = emptySet(),
 ) {
     fun allows(action: LabOrderAction) = action.wire in allowedActions
+    fun allowsExternal(action: LabExternalAction) = action.wire in externalActions
 }
 
 /** Reads `GET /laboratorio/ordenes` and `GET /me/laboratorio` rows (LabOrderResponse). */
@@ -33,19 +42,26 @@ object LaboratoryParser {
 
     private fun order(row: JSONObject): LaboratoryOrder {
         val items = row.optJSONArray("items")?.let { array -> (0 until array.length()).mapNotNull { index -> array.optJSONObject(index)?.let(::item) } } ?: emptyList()
-        val actions = row.optJSONArray("allowedActions")?.let { array -> (0 until array.length()).mapNotNull { array.optString(it).takeIf(String::isNotBlank) }.toSet() } ?: emptySet()
+        val actions = strings(row.optJSONArray("allowedActions"))
         return LaboratoryOrder(
             row.optString("id"), row.optString("patientName").ifBlank { "Paciente" }, row.optString("priority"), row.optString("state"), row.optInt("version", 1), items, !row.isNull("reviewedAt"),
             record = row.optString("patientRecord").ifBlank { null }, sex = row.optString("patientSex").ifBlank { null },
             age = if (!row.isNull("patientAge")) "${row.optInt("patientAge")} años" else row.optString("patientAgeRange").takeIf(String::isNotBlank)?.let { "$it años" },
             doctorName = row.optString("doctorName").ifBlank { null }, createdAtMillis = parseMillis(row.optString("createdAt")),
             allowedActions = actions, amendedAtMillis = if (row.isNull("amendedAt")) null else parseMillis(row.optString("amendedAt")),
+            external = row.optBoolean("external"), externalPlace = text(row, "externalPlace"), externalInstructions = text(row, "externalInstructions"),
+            externalActions = strings(row.optJSONArray("externalActions")),
         )
     }
 
+    private fun strings(array: JSONArray?) = array?.let { (0 until it.length()).mapNotNull { index -> it.optString(index).takeIf(String::isNotBlank) }.toSet() } ?: emptySet()
+    private fun text(row: JSONObject, key: String) = if (row.isNull(key)) null else row.optString(key).ifBlank { null }
+
     private fun item(item: JSONObject): LaboratoryItem {
-        val result = item.optJSONObject("result")?.let { LaboratoryResult(if (it.isNull("value")) null else it.optDouble("value"), it.optString("text").takeIf(String::isNotBlank), it.optString("mark"), it.optInt("version", 1)) }
-        return LaboratoryItem(item.optString("id"), item.optString("code"), item.optString("name"), result, unit = if (item.isNull("unit")) null else item.optString("unit").ifBlank { null })
+        val result = item.optJSONObject("result")?.let {
+            LaboratoryResult(if (it.isNull("value")) null else it.optDouble("value"), text(it, "text"), it.optString("mark"), it.optInt("version", 1), text(it, "observation"), it.optBoolean("relevant"))
+        }
+        return LaboratoryItem(item.optString("id"), item.optString("code"), item.optString("name"), result, unit = text(item, "unit"), resultType = text(item, "resultType"))
     }
 }
 

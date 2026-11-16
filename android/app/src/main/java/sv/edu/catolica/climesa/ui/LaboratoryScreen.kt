@@ -1,6 +1,10 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +42,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import java.security.MessageDigest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.rememberCoroutineScope
+import sv.edu.catolica.climesa.domain.LabAttachment
+import sv.edu.catolica.climesa.domain.LabExternalAction
+import sv.edu.catolica.climesa.domain.LabExternalRules
+import sv.edu.catolica.climesa.domain.LabFollowUp
+import sv.edu.catolica.climesa.domain.LabGroups
+import sv.edu.catolica.climesa.domain.LaboratoryResult
 import androidx.compose.ui.res.stringResource
 import sv.edu.catolica.climesa.R
 import androidx.compose.ui.unit.dp
@@ -73,7 +93,13 @@ fun LaboratoryScreen(
     val filter = LabFilter.entries.firstOrNull { it.name == filterName } ?: LabFilter.ALL
     var query by rememberSaveable { mutableStateOf("") }
     var urgentOnly by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(ownResults) { model.path = if (ownResults) "/me/laboratorio" else "/laboratorio/ordenes"; model.load() }
+    // S10: the reviewing doctor also gets "Resultados por revisar" (critical values and relevant lab observations).
+    val reviewer = !ownResults && "laboratorio.revisar" in profile.permissions
+    var openGroups by rememberSaveable { mutableStateOf(listOf<String>()) }
+    LaunchedEffect(ownResults, reviewer) {
+        model.path = if (ownResults) "/me/laboratorio" else "/laboratorio/ordenes"; model.followUpsEnabled = reviewer
+        model.load(); if (reviewer) model.loadFollowUps()
+    }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     val retry = { model.clearMessages(); model.load() }
     PageList(modifier) {
@@ -82,6 +108,7 @@ fun LaboratoryScreen(
         // RN-25: critical values waiting for this doctor's review stay visible at the top of the list.
         val critical = if (ownResults) 0 else LabCritical.pendingReview(state.orders)
         if (critical > 0) item { NoticeBanner(NoticeKind.ERROR, stringResource(R.string.lab_criticos_por_revisar, critical)) }
+        if (reviewer) item { FollowUpInbox(state.followUps, state.followUpBusy, model) }
         when {
             state.loading && state.orders.isEmpty() -> item { LoadingState() }
             state.error != null && state.orders.isEmpty() -> item { ErrorState(state.error, retry) }
@@ -98,12 +125,135 @@ fun LaboratoryScreen(
                 val now = System.currentTimeMillis()
                 val visible = LabWorklist.sorted(state.orders.filter { filter.matches(it) && (!urgentOnly || LabWorklist.isUrgent(it)) && LabWorklist.matches(it, query) })
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
-                items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, ownResults, state.busy, model, now) }
+                if (ownResults) items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, true, state.busy, model, now) }
+                else {
+                    // S10: grouped by what comes next; closed groups start folded unless the person filters or searches.
+                    val foldable = filter == LabFilter.ALL && query.isBlank()
+                    LabGroups.group(visible).forEach { (group, orders) ->
+                        val open = !group.folded || !foldable || group.name in openGroups
+                        item(key = "g-${group.name}") {
+                            LabGroupHeader(group.label, orders.size, if (group.folded && foldable) open else null) {
+                                openGroups = if (group.name in openGroups) openGroups - group.name else openGroups + group.name
+                            }
+                        }
+                        if (open) items(orders, key = { it.id }) { order -> LaboratoryOrderCard(order, false, state.busy, model, now) }
+                    }
+                }
             }
         }
     }
     state.cancelOrderId?.let { id -> CancelOrderDialog(state, state.orders.firstOrNull { it.id == id }, model) }
+    state.external?.let { draft -> SendExternalDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
+    state.externalLoad?.let { draft -> ExternalResultDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
 }
+
+/** Group title with its count; [open] is null when the group cannot fold (it shows its orders). */
+@Composable
+private fun LabGroupHeader(label: String, count: Int, open: Boolean?, onToggle: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = Spacing.sm), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(label, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
+        Text("$count", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (open != null) {
+            Box(Modifier.weight(1f))
+            TextButton(onClick = onToggle) { Text(stringResource(if (open) R.string.lab_grupo_ocultar else R.string.lab_grupo_mostrar, label.lowercase())) }
+        }
+    }
+}
+
+/** S10: "Resultados por revisar". Critical values first; the doctor marks each one reviewed after reading it. */
+@Composable
+private fun FollowUpInbox(items: List<LabFollowUp>, busy: String?, model: LaboratoryViewModel) {
+    SectionCard(title = stringResource(R.string.lab_pendientes_titulo), eyebrow = stringResource(R.string.lab_pendientes_cuenta, items.size)) {
+        if (items.isEmpty()) Text(stringResource(R.string.lab_pendientes_vacio), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        items.forEach { item ->
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text(item.patientName, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                    if (item.critical) CriticalPill(stringResource(R.string.lab_critico)) else StatusPill(stringResource(R.string.lab_pendiente_observacion), StatusTone.PROCESS)
+                }
+                item.record?.let { Text(stringResource(R.string.lab_expediente, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Text(item.detail, style = MaterialTheme.typography.bodyMedium)
+                SecondaryButton(stringResource(R.string.lab_pendiente_revisado), { model.reviewFollowUp(item) }, enabled = busy == null)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SendExternalDialog(draft: ExternalDraft, order: LaboratoryOrder?, model: LaboratoryViewModel) {
+    LaunchedEffect(order?.id, order?.allowsExternal(LabExternalAction.SEND)) { if (order == null || !order.allowsExternal(LabExternalAction.SEND)) model.dismissExternal() }
+    if (order == null) return
+    ConfirmDialog(
+        title = stringResource(R.string.lab_externo_titulo),
+        message = stringResource(R.string.lab_externo_efecto, order.patientName),
+        confirmLabel = stringResource(R.string.lab_externo_confirmar),
+        onConfirm = { model.confirmExternal(order) },
+        onDismiss = model::dismissExternal,
+        dismissLabel = stringResource(R.string.lab_cancelar_volver),
+        busy = draft.busy,
+        body = {
+            draft.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+            FormField(stringResource(R.string.lab_externo_lugar), draft.place, { model.editExternal(place = it) })
+            FormField(stringResource(R.string.lab_externo_instrucciones), draft.instructions, { model.editExternal(instructions = it) }, singleLine = false)
+        },
+    )
+}
+
+/**
+ * External report: a PDF or photo picked on the phone plus one key value per exam. Only the file's metadata and fingerprint
+ * travel (there is no clinical file storage yet); the dialog says so.
+ */
+@Composable
+private fun ExternalResultDialog(draft: ExternalLoadDraft, order: LaboratoryOrder?, model: LaboratoryViewModel) {
+    LaunchedEffect(order?.id, order?.allowsExternal(LabExternalAction.LOAD_RESULT)) { if (order == null || !order.allowsExternal(LabExternalAction.LOAD_RESULT)) model.dismissExternalLoad() }
+    if (order == null) return
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) scope.launch { model.setAttachment(withContext(Dispatchers.IO) { describe(context, uri) }) }
+    }
+    ConfirmDialog(
+        title = stringResource(R.string.lab_cargar_externo),
+        message = stringResource(R.string.lab_cargar_externo_efecto),
+        confirmLabel = stringResource(R.string.lab_cargar_externo_guardar),
+        onConfirm = { model.confirmExternalLoad(order) },
+        onDismiss = model::dismissExternalLoad,
+        dismissLabel = stringResource(R.string.lab_cancelar_volver),
+        busy = draft.busy,
+        body = {
+            draft.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+            SecondaryButton(stringResource(if (draft.attachment == null) R.string.lab_cargar_externo_elegir else R.string.lab_cargar_externo_cambiar), { picker.launch(LabExternalRules.ATTACHMENT_TYPES.toTypedArray()) }, enabled = !draft.busy)
+            draft.attachment?.let { Text("${it.fileName} · ${it.sizeBytes / 1024} KB", style = MaterialTheme.typography.bodySmall) }
+            order.items.forEach { item ->
+                FormField(if (item.numeric && item.unit != null) "${item.name} (${item.unit})" else item.name, draft.values[item.id].orEmpty(), { model.setExternalValue(item.id, it) },
+                    keyboardOptions = if (item.numeric) KeyboardOptions(keyboardType = KeyboardType.Decimal) else KeyboardOptions.Default)
+            }
+            FormField(stringResource(R.string.lab_cargar_externo_nota), draft.note, model::setExternalNote, singleLine = false)
+            Text(stringResource(R.string.lab_cargar_externo_almacen), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+    )
+}
+
+/** Name, type, size and SHA-256 of the picked document; the bytes are read once here and never leave the phone. */
+private fun describe(context: android.content.Context, uri: Uri): LabAttachment? = runCatching {
+    val resolver = context.contentResolver
+    var name = "informe"; var size = -1L
+    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            cursor.getString(0)?.let { name = it }
+            if (!cursor.isNull(1)) size = cursor.getLong(1)
+        }
+    }
+    val type = resolver.getType(uri) ?: "application/octet-stream"
+    if (size > LabExternalRules.MAX_ATTACHMENT_BYTES) return@runCatching LabAttachment(name, type, size)
+    val digest = MessageDigest.getInstance("SHA-256")
+    var read = 0L
+    resolver.openInputStream(uri)?.use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) { val n = input.read(buffer); if (n < 0) break; digest.update(buffer, 0, n); read += n }
+    }
+    LabAttachment(name, type, if (size >= 0) size else read, digest.digest().joinToString("") { "%02x".format(it) })
+}.getOrNull()
 
 /** Cancel with a reason (D-13: at least 10 characters). The reason and the open dialog live in the ViewModel, so a rotation keeps them. */
 @Composable
@@ -133,12 +283,22 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
     val canReview = !ownView && order.allows(LabOrderAction.REVIEW)
     val canCancel = !ownView && order.allows(LabOrderAction.CANCEL)
     val inReview = order.state == "completado" && !order.reviewed
+    val canSendExternal = !ownView && order.allowsExternal(LabExternalAction.SEND)
+    val canLoadExternal = !ownView && order.allowsExternal(LabExternalAction.LOAD_RESULT)
+    // Progressive detail: the patient and orders with something to do open expanded; the rest show the summary only.
+    var expanded by rememberSaveable(order.id) { mutableStateOf(ownView || canReview || canLoadExternal || canSendExternal) }
     SectionCard(
         title = order.patientName,
         eyebrow = stringResource(if (order.priority == "urgente") R.string.lab_prioridad_urgente else R.string.lab_prioridad_rutina),
         action = { LabStagePill(LabWorklist.stage(order)) },
     ) {
         if (!ownView) LabWorkSummary(order, now)
+        if (order.external) ExternalNote(order)
+        if (!expanded) {
+            Text(LabFlow.nextStep(order, ownView), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { expanded = true }) { Text(stringResource(R.string.lab_ver_detalle, order.items.size)) }
+            return@SectionCard
+        }
         LabStepper(order, ownView)
         order.items.forEach { item ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -147,10 +307,34 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
                 if (result != null) LabMarkTag(result.mark, LaboratoryLabels.valueAndMark(result, item.unit))
                 else Text(if (inReview) stringResource(R.string.lab_valor_en_revision) else stringResource(R.string.clin_lab_pendiente), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            item.result?.let { ObservationLine(it) }
         }
+        if (canLoadExternal) PrimaryButton(stringResource(R.string.lab_cargar_externo), { model.openExternalLoad(order.id) }, enabled = !busy)
         if (canReview) PrimaryButton(stringResource(R.string.lab_revisar), { model.review(order) }, enabled = !busy, loading = busy)
+        if (canSendExternal) SecondaryButton(stringResource(R.string.lab_externo_titulo), { model.openExternal(order.id) }, enabled = !busy)
         if (canCancel) SecondaryButton(stringResource(R.string.lab_cancelar_orden), { model.openCancel(order.id) }, enabled = !busy)
+        if (!ownView && !(canReview || canLoadExternal || canSendExternal)) TextButton(onClick = { expanded = false }) { Text(stringResource(R.string.lab_ocultar_detalle)) }
     }
+}
+
+/** Where the exam is done and what the patient was told; the patient reads exactly this text. */
+@Composable
+private fun ExternalNote(order: LaboratoryOrder) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(stringResource(R.string.lab_externo_lugar_valor, order.externalPlace ?: stringResource(R.string.lab_externo_sin_lugar)), style = MaterialTheme.typography.labelLarge)
+        order.externalInstructions?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    }
+}
+
+@Composable
+private fun ObservationLine(result: LaboratoryResult) {
+    val note = result.observation ?: return
+    Text(
+        stringResource(if (result.relevant) R.string.lab_observacion_relevante else R.string.lab_observacion, note),
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = if (result.relevant) FontWeight.Bold else FontWeight.Normal,
+        color = if (result.relevant) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /**
@@ -201,7 +385,8 @@ private fun LabWorkSummary(order: LaboratoryOrder, now: Long) {
         Text(LabWorklist.identityLine(order).ifBlank { stringResource(R.string.lab_sin_datos_expediente) }, style = MaterialTheme.typography.bodyMedium)
         order.doctorName?.let { Text(stringResource(R.string.lab_pidio, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            if (LabWorklist.isUrgent(order)) { Icon(Icons.Default.Warning, null, Modifier.size(18.dp), tint = MaterialTheme.climesa.danger); Text(stringResource(R.string.lab_prioridad_urgente), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.danger) }
+            // S7: urgent is amber; red is only for critical values.
+            if (LabWorklist.isUrgent(order)) { Icon(Icons.Default.Warning, null, Modifier.size(18.dp), tint = MaterialTheme.climesa.warning); Text(stringResource(R.string.lab_prioridad_urgente), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.warning) }
             LabWorklist.elapsedMinutes(order, now)?.let { minutes ->
                 Text(stringResource(R.string.lab_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(LabWorklist.sla(order, now)))
             }

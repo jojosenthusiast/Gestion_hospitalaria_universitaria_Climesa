@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/api/v1/laboratorio/ordenes/{id}/externa",
+  "body": {
+    "version": 2,
+    "place": "Clínica Ficticia de Imágenes",
+    "instructions": "Sin ayuno. Presente su DUI y esta orden."
+  }
+}
