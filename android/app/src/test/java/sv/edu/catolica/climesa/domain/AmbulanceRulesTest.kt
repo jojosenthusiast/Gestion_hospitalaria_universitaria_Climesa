@@ -94,4 +94,25 @@ class AmbulanceRulesTest {
         assertFalse(AmbulanceParser.status(JSONObject(base.toString()).put("driverOnDuty", false))!!.driverOnDuty)
         assertTrue(AmbulanceParser.status(JSONObject(base.toString()).put("driverOnDuty", true))!!.driverOnDuty)
     }
+
+    /** MA-AMB-03: the same rule as the API; from "trasladando" the service ends without a fake arrival. */
+    @Test fun losEstadosFinalesSiguenLosHitosYNuncaOfrecenCompletadoSinLlegada() {
+        assertEquals(listOf("en_hospital", "finalizado"), AmbulanceRules.nextMilestones(listOf("salida", "en_escena", "trasladando")))
+        assertEquals(listOf("fallecido", "desviado", "cancelado"), AmbulanceRules.allowedFinalStates(listOf("salida", "en_escena", "trasladando")))
+        assertEquals(listOf("sin_traslado", "rechaza_traslado", "fallecido", "cancelado"), AmbulanceRules.allowedFinalStates(listOf("salida")))
+        assertEquals(listOf("completado"), AmbulanceRules.allowedFinalStates(listOf("salida", "en_escena", "trasladando", "en_hospital")))
+        assertEquals(listOf("desviado" to "Desviado a otro centro", "cancelado" to "Cancelado"), AmbulanceLabels.finishChoices(listOf("completado", "desviado", "cancelado")))
+        assertEquals("Paciente fallecido", AmbulanceLabels.finalState("fallecido"))
+    }
+
+    /** MA-AMB-04 / MA-AMB-05: handover and own requests are read from the server, with the actions it allows. */
+    @Test fun laEntregaYLasSolicitudesPropiasSeLeenConSusAcciones() {
+        val view = AmbulanceParser.prehospital(JSONObject().put("serviceId", "s1").put("version", 4).put("active", false).put("arrived", true).put("clinical", true)
+            .put("reports", org.json.JSONArray()).put("handover", JSONObject().put("receivedAt", "2026-11-15T14:40:00Z").put("receivedByName", "Ana Ficticia")).put("allowedActions", org.json.JSONArray()))!!
+        assertEquals(Handover("2026-11-15T14:40:00Z", "Ana Ficticia"), view.handover)
+        assertFalse(view.canReceive)
+        val own = AmbulanceParser.ownRequests(org.json.JSONArray().put(JSONObject().put("id", "r1").put("state", "descartada").put("address", "A").put("reason", "B").put("createdAt", "x").put("version", 2).put("service", JSONObject.NULL).put("allowedActions", org.json.JSONArray())))
+        assertNull(AmbulanceRules.activeRequest(own))
+        assertEquals("No se pudo atender", AmbulanceLabels.requestState("descartada"))
+    }
 }

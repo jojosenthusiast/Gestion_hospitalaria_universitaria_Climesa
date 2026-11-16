@@ -10,9 +10,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.AuthRequestException
+import sv.edu.catolica.climesa.data.RequestIntent
 import sv.edu.catolica.climesa.data.SubmissionIntent
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
@@ -23,16 +26,17 @@ import sv.edu.catolica.climesa.domain.AmbulanceRequestRow
 import sv.edu.catolica.climesa.domain.AmbulanceRules
 import sv.edu.catolica.climesa.domain.AmbulanceService
 import sv.edu.catolica.climesa.domain.AmbulanceStatus
+import sv.edu.catolica.climesa.domain.FormDrafts
 import sv.edu.catolica.climesa.domain.LogFilters
+import sv.edu.catolica.climesa.domain.OwnAmbulanceRequest
+import sv.edu.catolica.climesa.domain.QueuedMilestone
 import sv.edu.catolica.climesa.domain.PrehospitalForm
 import sv.edu.catolica.climesa.domain.PrehospitalView
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 
-/** Solicitud propia del paciente (A09). No hay lectura de la solicitud para el paciente: se sigue con los eventos de su canal. */
-data class OwnAmbulanceRequest(val id: String, val state: String, val updates: List<String> = emptyList())
 data class ProvisionalPatient(val id: String, val record: String)
-/** Reporte prehospital en cola: el mismo cuerpo se reenvía para conservar la clave de idempotencia (RN-34). */
-data class QueuedPrehospital(val serviceId: String, val body: String)
+/** Reporte prehospital en cola: el mismo cuerpo y la misma clave se reenvían, aunque la app se cierre (RN-34). */
+data class QueuedPrehospital(val serviceId: String, val body: String, val key: String = java.util.UUID.randomUUID().toString())
 
 data class AmbulanceUiState(
     val loading: Boolean = false,
@@ -41,9 +45,12 @@ data class AmbulanceUiState(
     val logFilters: LogFilters = LogFilters(),
     val arrival: PrehospitalView? = null,
     val arrivalServiceId: String? = null,
-    val ownRequest: OwnAmbulanceRequest? = null,
+    /** MA-AMB-05: the patient's requests as the server keeps them; null until the first read answers. */
+    val ownRequests: List<OwnAmbulanceRequest>? = null,
     val prehospital: PrehospitalForm = PrehospitalForm(),
     val queued: QueuedPrehospital? = null,
+    /** MA-AMB-06: milestones recorded without signal, sent in order with their phone time. */
+    val queuedMilestones: List<QueuedMilestone> = emptyList(),
     val provisional: ProvisionalPatient? = null,
     val busy: Boolean = false,
     val error: String? = null,
@@ -64,9 +71,14 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     fun bindUser(id: String) {
         if (userId == id) return
         userId = id; drafts.retainOnly(id)
-        val queued = drafts.load(id, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_QUEUE)?.let { runCatching { QueuedPrehospital(it.getString("serviceId"), it.getString("body")) }.getOrNull() }
+        val queued = drafts.load(id, FormDrafts.PREHOSPITAL_QUEUE)?.let { runCatching { QueuedPrehospital(it.getString("serviceId"), it.getString("body"), it.optString("key").ifBlank { java.util.UUID.randomUUID().toString() }) }.getOrNull() }
         if (queued != null && mutable.value.queued == null) mutable.value = mutable.value.copy(queued = queued, notice = "Hay un reporte prehospital en cola: se enviará al reintentar.")
-        restoredForm = drafts.load(id, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_FORM)
+        restoredForm = drafts.load(id, FormDrafts.PREHOSPITAL_FORM)
+        // MA-AMB-06: the provisional patient and the queued milestones survive a killed app too.
+        val provisional = drafts.load(id, FormDrafts.PROVISIONAL_PATIENT)?.let { runCatching { ProvisionalPatient(it.getString("id"), it.optString("record")) }.getOrNull() }
+        if (provisional != null && mutable.value.provisional == null) mutable.value = mutable.value.copy(provisional = provisional)
+        val milestones = drafts.load(id, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.let { items -> (0 until items.length()).mapNotNull { items.optJSONObject(it)?.let(QueuedMilestone::fromJson) } }.orEmpty()
+        if (milestones.isNotEmpty() && mutable.value.queuedMilestones.isEmpty()) mutable.value = mutable.value.copy(queuedMilestones = milestones, notice = "Hay hitos en cola: se enviarán al volver la señal.")
     }
     private var restoredForm: JSONObject? = null
 
@@ -84,7 +96,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     private var mode: AmbulanceMode? = null
     private var readsStatus = false
 
-    /** Abre una sección: STATUS (A36, A70, A71, A72), LOG (A74), ARRIVAL (A25, A54) o REQUEST (A09, sin lectura). */
+    /** Abre una sección: STATUS (A36, A70, A71, A72), LOG (A74), ARRIVAL (A25, A54) o REQUEST (A09, `GET /ambulancia/solicitudes/mias`). */
     fun open(mode: AmbulanceMode, canReadStatus: Boolean = true) {
         this.mode = mode; readsStatus = canReadStatus
         load(silent = false)
@@ -92,7 +104,6 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
 
     fun load(silent: Boolean = true) {
         val current = mode ?: return
-        if (current == AmbulanceMode.REQUEST) return
         if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -102,7 +113,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
                     AmbulanceMode.LOG -> mutable.value = mutable.value.copy(loading = false, log = AmbulanceParser.log(api.request(AmbulanceRules.logPath(mutable.value.logFilters))))
                     AmbulanceMode.ARRIVAL -> loadArrival()
                     AmbulanceMode.PARAMEDIC -> loadParamedic()
-                    AmbulanceMode.REQUEST -> Unit
+                    AmbulanceMode.REQUEST -> mutable.value = mutable.value.copy(loading = false, ownRequests = AmbulanceParser.ownRequests(api.request("/ambulancia/solicitudes/mias")))
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) else mutable.value = mutable.value.copy(loading = false) }
@@ -134,20 +145,12 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             when (signal) {
                 is RealtimeSignal.Event -> if (AmbulanceEvents.matches(signal.event)) {
                     if (AmbulanceEvents.isPrehospital(signal.event)) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
-                    mutable.value.ownRequest?.let { own -> mutable.value = mutable.value.copy(ownRequest = own.copy(updates = (own.updates + ownUpdate(signal.event.type, signal.event.entity)).takeLast(10))) }
                     load()
                 }
-                RealtimeSignal.Resync -> { load(); retryQueued() }
+                RealtimeSignal.Resync -> { load(); retryQueued(); flushMilestones() }
                 else -> Unit
             }
         }
-    }
-
-    private fun ownUpdate(type: String, entity: String) = when {
-        type == "ambulancia.estado_cambiado" && entity == "unidad" -> "Despacho confirmó tu solicitud: la ambulancia va en camino."
-        type == "ambulancia.estado_cambiado" && entity == "solicitud" -> "Despacho revisó tu solicitud. Si necesitas ayuda, llama al 911."
-        type == "ambulancia.hito" -> "La ambulancia registró un avance en su servicio."
-        else -> "Hay novedades de tu solicitud."
     }
 
     /** A09 / FR-109-02: queda "por confirmar" y muestra el aviso del 911. */
@@ -156,10 +159,20 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
 
     fun submitRequest(address: String, municipality: String, reason: String, contactPhone: String) {
         AmbulanceRules.requestError(address, reason, contactPhone)?.let { mutable.value = mutable.value.copy(formError = it); return }
-        write {
-            val created = requestIntent.send { api.request("/ambulancia/solicitudes", "POST", AmbulanceRules.requestBody(address, municipality, reason, contactPhone)) } as? JSONObject
-            mutable.value = mutable.value.copy(ownRequest = OwnAmbulanceRequest(created?.optString("id").orEmpty(), created?.optString("state")?.ifBlank { null } ?: "por_confirmar"), notice = AmbulanceRules.NOTICE_911)
-        }
+        write(notice = AmbulanceRules.NOTICE_911) { requestIntent.send { api.request("/ambulancia/solicitudes", "POST", AmbulanceRules.requestBody(address, municipality, reason, contactPhone)) } }
+    }
+
+    /** MA-AMB-05: the patient cancels a request still waiting for confirmation; the server says when it is allowed. */
+    fun cancelRequest(request: OwnAmbulanceRequest, reason: String) {
+        if (!request.canCancel) return
+        write(notice = "Solicitud cancelada.") { api.request("/ambulancia/solicitudes/${request.id}/cancelar", "POST", AmbulanceRules.cancelBody(request.version, reason)) }
+    }
+
+    /** MA-AMB-04 (A25, A54): clinical staff mark the patient received after the ambulance arrived. */
+    fun receivePatient() {
+        val view = mutable.value.arrival ?: return
+        if (!view.canReceive) return
+        write(notice = "Paciente recibido en el hospital.") { api.request("/ambulancia/servicios/${view.serviceId}/recepcion", "POST", AmbulanceRules.handoverBody(view)) }
     }
 
     /** A36 / FR-109-04: confirma por teléfono y despacha con la versión de la unidad que se vio Disponible. */
@@ -174,12 +187,63 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         write(notice = "Solicitud descartada.") { api.request("/ambulancia/solicitudes/${request.id}/descartar", "POST", JSONObject().put("version", request.version).put("reason", reason.trim())) }
     }
 
-    /** A71 / FR-109-07: el hito siguiente; finalizar antes del hospital exige estado final y motivo. */
-    fun advance(service: AmbulanceService, type: String, finalState: String? = null, reason: String = "", notice: String = "Hito registrado.") {
-        if (type == "finalizado" && AmbulanceRules.finishNeedsReason(service) && (finalState == null || reason.trim().length < 5)) {
-            mutable.value = mutable.value.copy(formError = "Para terminar sin traslado elige el estado final y escribe el motivo."); return
+    /** The active service as the API will see it once the queued milestones arrive (MA-AMB-06). */
+    fun projected(service: AmbulanceService) = AmbulanceRules.withQueued(service, mutable.value.queuedMilestones)
+
+    /**
+     * A71 / FR-109-07: el hito siguiente con la hora del teléfono; finalizar antes del hospital exige estado final y motivo.
+     * MA-AMB-06: every milestone goes through the ordered queue: without signal it stays on the phone (with its key and
+     * time) and is resent on reconnect or with "Reintentar", so the paramedic keeps working offline.
+     */
+    fun advance(service: AmbulanceService, type: String, finalState: String? = null, reason: String = "", notice: String = "Hito registrado.", at: Instant = Instant.now()) {
+        val current = projected(service)
+        if (type == "finalizado" && AmbulanceRules.finishNeedsReason(current) && (finalState == null || reason.trim().length < 5)) {
+            mutable.value = mutable.value.copy(formError = "Para terminar sin llegar al hospital elige cómo terminó y escribe el motivo."); return
         }
-        write(notice = notice) { api.request("/ambulancia/servicios/${service.id}/hitos", "POST", AmbulanceRules.milestoneBody(type, finalState, reason)) }
+        val item = QueuedMilestone(service.id, type, AmbulanceRules.milestoneBody(type, finalState, reason, at).toString(), java.util.UUID.randomUUID().toString())
+        saveMilestones(mutable.value.queuedMilestones + item)
+        flushMilestones(notice)
+    }
+
+    fun retryMilestones() = flushMilestones()
+
+    private var flushing = false
+
+    private fun saveMilestones(items: List<QueuedMilestone>) {
+        mutable.value = mutable.value.copy(queuedMilestones = items)
+        val user = userId ?: return
+        if (items.isEmpty()) drafts.clear(user, FormDrafts.MILESTONE_QUEUE)
+        else drafts.save(user, FormDrafts.MILESTONE_QUEUE, JSONObject().put("items", JSONArray().apply { items.forEach { put(it.toJson()) } }))
+    }
+
+    /** Sends the queued milestones in order; stops at the first one without signal and keeps it (and the rest) for the next try. */
+    private fun flushMilestones(notice: String? = null) {
+        if (flushing || mutable.value.queuedMilestones.isEmpty()) return
+        flushing = true
+        mutable.value = mutable.value.copy(busy = true, formError = null, notice = null)
+        viewModelScope.launch {
+            var outcome: String? = notice
+            var failure: String? = null
+            try {
+                while (true) {
+                    val next = mutable.value.queuedMilestones.firstOrNull() ?: break
+                    try {
+                        withContext(RequestIntent(next.key)) { api.request("/ambulancia/servicios/${next.serviceId}/hitos", "POST", JSONObject(next.body)) }
+                        saveMilestones(mutable.value.queuedMilestones.drop(1))
+                    } catch (e: CancellationException) { throw e }
+                    catch (e: Exception) {
+                        if (isOffline(e)) { outcome = "Sin señal: el hito quedó en cola con su hora y se enviará al volver la conexión."; break }
+                        // A definitive answer (service closed, already recorded by a crewmate): drop that one and go on.
+                        saveMilestones(mutable.value.queuedMilestones.drop(1))
+                        failure = message(e); outcome = null
+                    }
+                }
+            } finally {
+                flushing = false
+                mutable.value = mutable.value.copy(busy = false, notice = outcome, formError = failure)
+                load()
+            }
+        }
     }
 
     /** A74: búsqueda y filtros de la bitácora; cada cambio vuelve a pedir con la consulta nueva. */
@@ -215,13 +279,13 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         mutable.value = mutable.value.copy(busy = true, formError = null, notice = null)
         viewModelScope.launch {
             try {
-                api.request("/ambulancia/servicios/${item.serviceId}/prehospital", "POST", JSONObject(item.body))
-                userId?.let { drafts.clear(it, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_QUEUE); drafts.clear(it, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_FORM) }
+                withContext(RequestIntent(item.key)) { api.request("/ambulancia/servicios/${item.serviceId}/prehospital", "POST", JSONObject(item.body)) }
+                userId?.let { drafts.clear(it, FormDrafts.PREHOSPITAL_QUEUE); drafts.clear(it, FormDrafts.PREHOSPITAL_FORM); drafts.clear(it, FormDrafts.PROVISIONAL_PATIENT) }
                 mutable.value = mutable.value.copy(busy = false, queued = null, prehospital = PrehospitalForm(), provisional = null, notice = "Reporte enviado a emergencia.")
                 load()
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
-                if (isOffline(e)) userId?.let { drafts.save(it, sv.edu.catolica.climesa.domain.FormDrafts.PREHOSPITAL_QUEUE, JSONObject().put("serviceId", item.serviceId).put("body", item.body)) }
+                if (isOffline(e)) userId?.let { drafts.save(it, FormDrafts.PREHOSPITAL_QUEUE, JSONObject().put("serviceId", item.serviceId).put("body", item.body).put("key", item.key)) }
                 mutable.value = if (isOffline(e)) mutable.value.copy(busy = false, queued = item, notice = "Sin señal: el reporte quedó en cola y se enviará al volver la conexión.")
                 else mutable.value.copy(busy = false, queued = null, formError = message(e))
             }
@@ -238,7 +302,9 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
                 .put("searchToken", search.getString("token")).put("searchQuery", query)
                 .apply { estimatedAge.toIntOrNull()?.let { put("estimatedAge", it) } }
             val created = api.request("/pacientes/provisionales", "POST", body) as JSONObject
-            mutable.value = mutable.value.copy(provisional = ProvisionalPatient(created.getString("id"), created.optString("record")))
+            val provisional = ProvisionalPatient(created.getString("id"), created.optString("record"))
+            mutable.value = mutable.value.copy(provisional = provisional)
+            userId?.let { drafts.save(it, FormDrafts.PROVISIONAL_PATIENT, JSONObject().put("id", provisional.id).put("record", provisional.record)) }
         }
     }
 
@@ -266,6 +332,12 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             "cuenta_no_verificada" -> "Tu cuenta aún no está vinculada a tu expediente; recepción debe verificarla."
             "hito_fuera_de_orden" -> "Ese hito no sigue al último registrado. Se actualizó el servicio."
             "version_conflicto" -> "La unidad o la solicitud cambió. Revisa el estado actual e intenta de nuevo."
+            "estado_final_invalido" -> "Ese estado final no corresponde a los hitos registrados. Se actualizó el servicio."
+            "servicio_finalizado" -> "El servicio ya terminó; los hitos pendientes se descartaron."
+            "solicitud_resuelta" -> "Despacho ya atendió la solicitud; ya no se puede cancelar. Si necesitas ayuda, llama al 911."
+            "sin_llegada_hospital" -> "La entrega se marca cuando la ambulancia registra la llegada al hospital."
+            "entrega_registrada" -> "Otra persona ya marcó recibido al paciente."
+            "servicio_cerrado" -> "Pasaron más de 24 horas desde que terminó el servicio."
             else -> error.message ?: "No se pudo completar la operación."
         }
     }

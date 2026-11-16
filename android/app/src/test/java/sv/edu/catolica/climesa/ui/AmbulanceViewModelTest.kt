@@ -133,18 +133,105 @@ class AmbulanceViewModelTest {
         assertNull(vm.state.value.provisional)
     }
 
-    @Test fun laSolicitudDelPacienteMuestraElAvisoYSigueLosEventos() = runTest(dispatcher) {
-        val api = FakeGateway(); api.responses["/ambulancia/solicitudes"] = JSONObject().put("id", "r7").put("state", "por_confirmar")
+    private fun ownRequest(state: String, actions: JSONArray = JSONArray(), service: Any = JSONObject.NULL) = JSONObject().put("id", "r7").put("state", state).put("channel", "app_paciente")
+        .put("address", "Colonia Ficticia 12").put("reason", "Caída en casa").put("createdAt", "2026-11-15T14:00:00Z").put("version", 1)
+        .put("service", service).put("allowedActions", actions).put("notice", "Si hay riesgo de vida, llama al 911.")
+
+    @Test fun laSolicitudDelPacienteSaleDelServidorYSeVuelveAPedirConCadaEvento() = runTest(dispatcher) {
+        val api = FakeGateway(); api.responses["/ambulancia/solicitudes/mias"] = JSONArray()
         val bus = AmbulanceBus()
         val vm = AmbulanceViewModel(api, bus)
         vm.startLive(listOf("usuario:pac")); vm.open(AmbulanceMode.REQUEST); runCurrent()
+        assertEquals(emptyList<Any>(), vm.state.value.ownRequests)
         vm.submitRequest("Co", "", "Caída", "7000"); runCurrent()
-        assertTrue(api.calls.isEmpty())
+        assertTrue(api.calls.none { it.second == "POST" })
+        api.responses["/ambulancia/solicitudes/mias"] = JSONArray().put(ownRequest("por_confirmar", JSONArray().put("cancelar")))
         vm.submitRequest("Colonia Ficticia 12", "San Salvador", "Caída en casa", "7000-0001"); runCurrent()
         assertEquals("Si hay riesgo de vida, llama al 911.", vm.state.value.notice)
-        bus.signals.tryEmit(RealtimeSignal.Event(EventoDominio("ambulancia.estado_cambiado", "unidad", "u1", 6))); runCurrent()
-        assertEquals(listOf("Despacho confirmó tu solicitud: la ambulancia va en camino."), vm.state.value.ownRequest!!.updates)
+        val active = sv.edu.catolica.climesa.domain.AmbulanceRules.activeRequest(vm.state.value.ownRequests!!)!!
+        assertTrue(active.canCancel)
+        // A dispatch event: the screen asks the server again instead of guessing the new state.
+        api.responses["/ambulancia/solicitudes/mias"] = JSONArray().put(ownRequest("confirmada", service = JSONObject().put("dispatchedAt", "2026-11-15T14:05:00Z").put("finalState", JSONObject.NULL)
+            .put("milestones", JSONArray().put(JSONObject().put("type", "salida").put("occurredAt", "2026-11-15T14:07:00Z")))))
+        bus.signals.tryEmit(RealtimeSignal.Event(EventoDominio("ambulancia.hito", "servicio", "s1", 3))); runCurrent()
+        val following = vm.state.value.ownRequests!!.single()
+        assertEquals("La ambulancia va en camino.", sv.edu.catolica.climesa.domain.AmbulanceRules.requestProgress(following))
+        assertTrue(!following.canCancel && following.active)
         assertTrue("el paciente no lee el tablero de despacho", api.calls.none { it.first == "/ambulancia" })
+    }
+
+    @Test fun elPacienteCancelaSoloLoQueLaApiPermiteConLaVersionDeLaSolicitud() = runTest(dispatcher) {
+        val api = FakeGateway(); api.responses["/ambulancia/solicitudes/mias"] = JSONArray().put(ownRequest("por_confirmar", JSONArray().put("cancelar")))
+        val vm = AmbulanceViewModel(api, AmbulanceBus())
+        vm.open(AmbulanceMode.REQUEST); runCurrent()
+        val request = vm.state.value.ownRequests!!.single()
+        vm.cancelRequest(request, " Me llevó un familiar "); runCurrent()
+        val body = api.calls.single { it.first == "/ambulancia/solicitudes/r7/cancelar" }.third!!
+        assertEquals(1, body.getInt("version")); assertEquals("Me llevó un familiar", body.getString("reason"))
+        assertEquals("Solicitud cancelada.", vm.state.value.notice)
+        vm.cancelRequest(request.copy(allowedActions = emptyList()), ""); runCurrent()
+        assertEquals(1, api.calls.count { it.first.endsWith("/cancelar") })
+    }
+
+    @Test fun elPersonalClinicoMarcaRecibidoSoloCuandoLaApiLoOfrece() = runTest(dispatcher) {
+        val api = FakeGateway()
+        val view = JSONObject().put("serviceId", "s1").put("version", 7).put("active", true).put("arrived", true).put("clinical", true).put("reports", JSONArray()).put("handover", JSONObject.NULL).put("allowedActions", JSONArray().put("recibir"))
+        api.responses["/ambulancia/servicios/s1/prehospital"] = view
+        val bus = AmbulanceBus()
+        val vm = AmbulanceViewModel(api, bus)
+        vm.startLive(listOf("rol:ENF")); vm.open(AmbulanceMode.ARRIVAL, canReadStatus = false); runCurrent()
+        bus.signals.tryEmit(RealtimeSignal.Event(EventoDominio("ambulancia.prehospital", "servicio", "s1", 3))); runCurrent()
+        assertTrue(vm.state.value.arrival!!.canReceive)
+        api.responses["/ambulancia/servicios/s1/prehospital"] = JSONObject(view.toString()).put("allowedActions", JSONArray()).put("handover", JSONObject().put("receivedAt", "2026-11-15T14:40:00Z").put("receivedByName", "Ana Ficticia"))
+        vm.receivePatient(); runCurrent()
+        assertEquals(7, api.calls.single { it.first == "/ambulancia/servicios/s1/recepcion" }.third!!.getInt("version"))
+        assertEquals("Ana Ficticia", vm.state.value.arrival!!.handover!!.receivedByName)
+        vm.receivePatient(); runCurrent()
+        assertEquals("sin la acción de la API no se vuelve a enviar", 1, api.calls.count { it.first.endsWith("/recepcion") })
+    }
+
+    @Test fun sinSenalLosHitosQuedanEnColaConSuHoraSobrevivenALaAppYSeEnvianEnOrden() = runTest(dispatcher) {
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile())
+        val api = FakeGateway(); api.responses["/ambulancia"] = status(withService = true)
+        api.failures["/ambulancia/servicios/s1/hitos"] = AuthRequestException("Sin conexión.")
+        val first = AmbulanceViewModel(api, AmbulanceBus(), store)
+        first.bindUser("par-1"); first.open(AmbulanceMode.PARAMEDIC); runCurrent()
+        val service = first.state.value.status!!.activeService!!
+        first.advance(service, "en_escena", at = Instant.parse("2026-11-15T14:12:00Z")); runCurrent()
+        // The paramedic keeps going without signal: the projected service already offers the next step.
+        val projected = first.projected(service)
+        assertEquals(listOf("trasladando", "finalizado"), projected.nextMilestones)
+        first.advance(projected, "trasladando", at = Instant.parse("2026-11-15T14:30:00Z")); runCurrent()
+        assertEquals(listOf("en_escena", "trasladando"), first.state.value.queuedMilestones.map { it.type })
+        assertEquals(listOf("fallecido", "desviado", "cancelado"), first.projected(service).finalStates)
+
+        val again = AmbulanceViewModel(api, AmbulanceBus(), store)
+        again.bindUser("par-1"); again.open(AmbulanceMode.PARAMEDIC); runCurrent()
+        assertEquals(first.state.value.queuedMilestones, again.state.value.queuedMilestones)
+        api.failures.clear()
+        again.retryMilestones(); runCurrent()
+        val sent = api.calls.filter { it.first == "/ambulancia/servicios/s1/hitos" }.map { it.third!! }.takeLast(2)
+        assertEquals(listOf("en_escena", "trasladando"), sent.map { it.getString("type") })
+        assertEquals(listOf("2026-11-15T14:12:00Z", "2026-11-15T14:30:00Z"), sent.map { it.getString("occurredAt") })
+        assertTrue(again.state.value.queuedMilestones.isEmpty())
+        assertNull(store.load("par-1", sv.edu.catolica.climesa.domain.FormDrafts.MILESTONE_QUEUE))
+    }
+
+    @Test fun elPacienteProvisionalSobreviveAQueSeCierreLaApp() = runTest(dispatcher) {
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("provisional").toFile())
+        val api = FakeGateway(); api.responses["/ambulancia"] = status(withService = true)
+        api.responses["/pacientes/busquedas"] = JSONObject().put("token", "t1")
+        api.responses["/pacientes/provisionales"] = JSONObject().put("id", "p9").put("record", "EXP-9")
+        val first = AmbulanceViewModel(api, AmbulanceBus(), store)
+        first.bindUser("par-1"); first.open(AmbulanceMode.PARAMEDIC); runCurrent()
+        first.registerUnidentified("masculino", "40", "Camisa azul"); runCurrent()
+        val again = AmbulanceViewModel(api, AmbulanceBus(), store)
+        again.bindUser("par-1")
+        assertEquals("p9", again.state.value.provisional!!.id)
+        again.updatePrehospital(PrehospitalForm(reason = "Politraumatismo", priority = "roja"))
+        again.sendPrehospital("s1", Instant.parse("2026-11-15T14:10:00Z")); runCurrent()
+        assertEquals("p9", api.calls.single { it.first == "/ambulancia/servicios/s1/prehospital" }.third!!.getString("patientId"))
+        assertNull(store.load("par-1", sv.edu.catolica.climesa.domain.FormDrafts.PROVISIONAL_PATIENT))
     }
 
     @Test fun laBitacoraVuelveAPedirConLaBusquedaYLosFiltros() = runTest(dispatcher) {

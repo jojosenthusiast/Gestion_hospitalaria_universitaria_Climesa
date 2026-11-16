@@ -19,6 +19,8 @@ data class AmbulanceService(
     val milestones: List<AmbulanceMilestone>,
     val nextMilestones: List<String>,
     val lastLocation: AmbulanceLocation? = null,
+    /** MA-AMB-03: final states the API accepts with the milestones already recorded (server-driven finish choices). */
+    val finalStates: List<String> = emptyList(),
 )
 /** Último punto GPS que la tripulación envió a `POST /ambulancia/ubicacion`. */
 data class AmbulanceLocation(val latitude: Double, val longitude: Double, val capturedAt: String)
@@ -44,7 +46,36 @@ data class LogFilters(val query: String = "", val priority: String = "", val fin
     val any get() = query.isNotBlank() || activeCount > 0
 }
 data class PrehospitalEntry(val id: String, val priority: String, val estimatedArrival: String?, val capturedAt: String, val reason: String?, val vitalSigns: Map<String, String>)
-data class PrehospitalView(val serviceId: String, val active: Boolean, val clinical: Boolean, val reports: List<PrehospitalEntry>)
+/** MA-AMB-04: who received the patient at the hospital and when. */
+data class Handover(val receivedAt: String, val receivedByName: String)
+data class PrehospitalView(
+    val serviceId: String, val active: Boolean, val clinical: Boolean, val reports: List<PrehospitalEntry>,
+    val version: Int = 1, val arrived: Boolean = false, val handover: Handover? = null, val allowedActions: List<String> = emptyList(),
+) {
+    val canReceive get() = "recibir" in allowedActions
+}
+
+/** MA-AMB-05: progress of the service dispatched for the patient's own request (no crew, no location). */
+data class OwnRequestService(val dispatchedAt: String, val milestones: List<AmbulanceMilestone>, val finalState: String?)
+/** MA-AMB-05: the patient's own request as the server keeps it (`GET /ambulancia/solicitudes/mias`). */
+data class OwnAmbulanceRequest(
+    val id: String, val state: String, val address: String, val reason: String, val createdAt: String, val version: Int,
+    val service: OwnRequestService? = null, val allowedActions: List<String> = emptyList(), val notice: String = "",
+) {
+    val canCancel get() = "cancelar" in allowedActions
+    /** Still waiting or on its way: the screen follows it instead of offering a new request. */
+    val active get() = state == "por_confirmar" || (state == "confirmada" && service != null && service.finalState == null)
+}
+
+/** MA-AMB-06: a milestone recorded without signal; the same key and phone time are resent until the API answers. */
+data class QueuedMilestone(val serviceId: String, val type: String, val body: String, val key: String) {
+    /** Phone time of the milestone, as it will reach the API. */
+    val occurredAt: String get() = runCatching { JSONObject(body).optString("occurredAt") }.getOrDefault("")
+    fun toJson(): JSONObject = JSONObject().put("serviceId", serviceId).put("type", type).put("body", body).put("key", key)
+    companion object {
+        fun fromJson(json: JSONObject): QueuedMilestone? = runCatching { QueuedMilestone(json.getString("serviceId"), json.getString("type"), json.getString("body"), json.getString("key")) }.getOrNull()
+    }
+}
 
 /** Formulario del reporte prehospital (A72). Los signos vacíos no se envían. */
 data class PrehospitalForm(
@@ -63,10 +94,14 @@ object AmbulanceLabels {
     const val ADMINISTRATIVE_CLOSE = "Cierre administrativo"
     val priorities = listOf("roja" to "Roja", "naranja" to "Naranja", "amarilla" to "Amarilla", "verde" to "Verde")
     val types = listOf("emergencia_domicilio" to "Emergencia a domicilio", "traslado_interhospitalario" to "Traslado interhospitalario")
-    /** Estados finales permitidos antes de llegar al hospital (RN-32): siempre con motivo. */
-    val earlyFinalStates = listOf("sin_traslado" to "Sin traslado", "rechaza_traslado" to "Paciente rechaza traslado", "cancelado" to "Cancelado")
+    /** Estados finales sin llegar al hospital (RN-32, MA-AMB-03): siempre con motivo. La API dice cuáles admite cada servicio. */
+    val earlyFinalStates = listOf("sin_traslado" to "Sin traslado", "rechaza_traslado" to "Paciente rechaza traslado", "fallecido" to "Paciente fallecido", "desviado" to "Desviado a otro centro", "cancelado" to "Cancelado")
+    /** Opciones de finalizar que la API admite para [codes], con su texto; nunca se ofrece un estado que la API rechazaría. */
+    fun finishChoices(codes: List<String>) = codes.filter { it != "completado" }.map { it to finalState(it) }
     private val milestones = mapOf("salida" to "Salida", "en_escena" to "En escena", "trasladando" to "Trasladando", "en_hospital" to "En hospital", "finalizado" to "Finalizado")
-    private val finals = mapOf("completado" to "Completado", "cancelado" to "Cancelado", "sin_traslado" to "Sin traslado", "rechaza_traslado" to "Paciente rechaza traslado")
+    private val finals = mapOf("completado" to "Completado", "cancelado" to "Cancelado", "sin_traslado" to "Sin traslado", "rechaza_traslado" to "Paciente rechaza traslado", "fallecido" to "Paciente fallecido", "desviado" to "Desviado a otro centro")
+    private val requestStates = mapOf("por_confirmar" to "Por confirmar", "confirmada" to "Confirmada", "descartada" to "No se pudo atender", "cancelada" to "Cancelada")
+    fun requestState(code: String) = requestStates[code] ?: "Sin estado"
     private val states = mapOf("disponible" to "Disponible", "en_servicio" to "En servicio", "en_mantenimiento" to "En mantenimiento")
     private val signs = mapOf("heartRate" to "Frecuencia cardiaca", "systolic" to "Presión sistólica", "diastolic" to "Presión diastólica", "respiratoryRate" to "Frecuencia respiratoria", "oxygenSaturation" to "Saturación", "temperature" to "Temperatura", "glasgow" to "Glasgow")
     fun milestone(code: String) = milestones[code] ?: code
@@ -101,12 +136,69 @@ object AmbulanceRules {
     fun dispatchBody(unitVersion: Int, requestId: String, type: String, priority: String, destination: String): JSONObject =
         JSONObject().put("version", unitVersion).put("requestId", requestId).put("type", type).put("priority", priority).put("destination", destination.trim())
 
-    /** Finalizar antes de llegar al hospital exige estado final y motivo; desde el hospital es "completado". */
-    fun milestoneBody(type: String, finalState: String? = null, reason: String = ""): JSONObject =
+    /**
+     * Finalizar antes de llegar al hospital exige estado final y motivo; desde el hospital es "completado".
+     * `occurredAt` es la hora del teléfono al tocar el botón (MA-AMB-06): un hito enviado tarde conserva su hora real.
+     */
+    fun milestoneBody(type: String, finalState: String? = null, reason: String = "", occurredAt: java.time.Instant? = null): JSONObject =
         JSONObject().put("type", type).apply {
+            occurredAt?.let { put("occurredAt", it.toString()) }
             if (type == "finalizado" && finalState != null) put("finalState", finalState)
             if (reason.isNotBlank()) put("reason", reason.trim())
         }
+
+    /** Hitos que pueden seguir a los registrados; la misma regla que la API (RN-32, MA-AMB-03). */
+    fun nextMilestones(done: List<String>): List<String> = when {
+        "finalizado" in done -> emptyList()
+        "salida" !in done -> listOf("salida")
+        "en_hospital" in done -> listOf("finalizado")
+        "trasladando" in done -> listOf("en_hospital", "finalizado")
+        "en_escena" in done -> listOf("trasladando", "finalizado")
+        else -> listOf("en_escena", "finalizado")
+    }
+
+    /** Estados finales que admite la API con esos hitos (misma regla que `allowedFinalStates` del servidor). */
+    fun allowedFinalStates(done: List<String>): List<String> = when {
+        "finalizado" in done || "salida" !in done -> emptyList()
+        "en_hospital" in done -> listOf("completado")
+        "trasladando" in done -> listOf("fallecido", "desviado", "cancelado")
+        else -> listOf("sin_traslado", "rechaza_traslado", "fallecido", "cancelado")
+    }
+
+    /** El servicio como lo verá la API cuando lleguen los hitos en cola: el paramédico sigue avanzando sin señal. */
+    fun withQueued(service: AmbulanceService, queued: List<QueuedMilestone>): AmbulanceService {
+        val mine = queued.filter { it.serviceId == service.id && service.milestones.none { m -> m.type == it.type } }
+        if (mine.isEmpty()) return service
+        val milestones = service.milestones + mine.map { AmbulanceMilestone(it.type, it.occurredAt) }
+        val done = milestones.map { it.type }
+        return service.copy(milestones = milestones, nextMilestones = nextMilestones(done), finalStates = allowedFinalStates(done))
+    }
+
+    /** MA-AMB-05: cuerpo de `POST /ambulancia/solicitudes/{id}/cancelar`; el motivo es opcional. */
+    fun cancelBody(version: Int, reason: String): JSONObject = JSONObject().put("version", version).apply { if (reason.isNotBlank()) put("reason", reason.trim().take(300)) }
+
+    /** MA-AMB-04: cuerpo de `POST /ambulancia/servicios/{id}/recepcion` con la versión del servicio que se vio. */
+    fun handoverBody(view: PrehospitalView): JSONObject = JSONObject().put("version", view.version)
+
+    /** La solicitud que sigue la pantalla del paciente: la activa más reciente (por confirmar o en camino). */
+    fun activeRequest(requests: List<OwnAmbulanceRequest>) = requests.firstOrNull { it.active }
+
+    /** Qué pasa con la solicitud, en una frase para el paciente. */
+    fun requestProgress(request: OwnAmbulanceRequest): String {
+        val service = request.service
+        return when {
+            request.state == "por_confirmar" -> "Despacho te llamará para confirmar antes de mover la ambulancia."
+            request.state == "cancelada" -> "Cancelaste esta solicitud."
+            request.state == "descartada" -> "Despacho no pudo atender esta solicitud. Si hay riesgo de vida, llama al 911."
+            service == null -> "Despacho confirmó tu solicitud."
+            service.finalState != null -> "El servicio terminó: ${AmbulanceLabels.finalState(service.finalState).lowercase()}."
+            service.milestones.any { it.type == "en_hospital" } -> "La ambulancia llegó al hospital."
+            service.milestones.any { it.type == "trasladando" } -> "La ambulancia va hacia el hospital."
+            service.milestones.any { it.type == "en_escena" } -> "La ambulancia llegó al lugar."
+            service.milestones.any { it.type == "salida" } -> "La ambulancia va en camino."
+            else -> "Despacho confirmó tu solicitud: la ambulancia saldrá en breve."
+        }
+    }
 
     /** Cuerpo de `POST /ambulancia/ubicacion`; solo la API decide si hay servicio activo. */
     fun locationBody(latitude: Double, longitude: Double, capturedAt: java.time.Instant): JSONObject =
@@ -195,6 +287,7 @@ object AmbulanceParser {
                 objects(s.optJSONArray("milestones")).map { AmbulanceMilestone(it.text("type"), it.text("occurredAt")) },
                 strings(s.optJSONArray("nextMilestones")),
                 s.optJSONObject("lastLocation")?.let { AmbulanceLocation(it.optDouble("latitude"), it.optDouble("longitude"), it.text("capturedAt")) },
+                strings(s.optJSONArray("finalStates")),
             )
         }
         val pending = objects(root.optJSONArray("pendingRequests")).map {
@@ -222,7 +315,13 @@ object AmbulanceParser {
                 signs?.keys()?.asSequence()?.associateWith { signs.optString(it) }.orEmpty(),
             )
         }
-        return PrehospitalView(root.text("serviceId"), root.optBoolean("active"), root.optBoolean("clinical"), reports)
+        val handover = root.optJSONObject("handover")?.let { Handover(it.text("receivedAt"), it.text("receivedByName")) }
+        return PrehospitalView(root.text("serviceId"), root.optBoolean("active"), root.optBoolean("clinical"), reports, root.optInt("version", 1), root.optBoolean("arrived"), handover, strings(root.optJSONArray("allowedActions")))
+    }
+
+    fun ownRequests(value: Any?): List<OwnAmbulanceRequest> = objects(value as? JSONArray).map {
+        val service = it.optJSONObject("service")?.let { s -> OwnRequestService(s.text("dispatchedAt"), objects(s.optJSONArray("milestones")).map { m -> AmbulanceMilestone(m.text("type"), m.text("occurredAt")) }, s.text("finalState").ifBlank { null }) }
+        OwnAmbulanceRequest(it.text("id"), it.text("state"), it.text("address"), it.text("reason"), it.text("createdAt"), it.optInt("version", 1), service, strings(it.optJSONArray("allowedActions")), it.text("notice"))
     }
 }
 

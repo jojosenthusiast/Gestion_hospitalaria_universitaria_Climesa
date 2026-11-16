@@ -154,7 +154,7 @@
     <string name="amb_prioridad">Prioridad</string>
     <string name="amb_pendiente">Pendiente</string>
     <string name="amb_abrir_mapa">Abrir mapa</string>
-    <string name="amb_terminar_sin_traslado">Terminar sin traslado</string>
+    <string name="amb_terminar_sin_traslado">Terminar sin llegar al hospital</string>
     <string name="amb_finalizar">Finalizar servicio</string>
     <string name="amb_en_cola">Reporte en cola: se enviará una sola vez al volver la señal.</string>
     <string name="amb_provisional_vinculara">Paciente provisional %1$s: se vinculará al servicio con el próximo reporte prehospital.</string>
@@ -172,6 +172,21 @@
     <string name="amb_respuesta_min">Respuesta: %1$d min</string>
     <string name="amb_sin_llegada">Sin llegada a escena</string>
     <string name="amb_sin_reporte">Aún no llega un reporte prehospital. Aparecerá aquí en vivo.</string>
+    <string name="amb_entrega_titulo">Entrega del paciente</string>
+    <string name="amb_recibido">Recibido</string>
+    <string name="amb_recibido_por">Recibido por %1$s · %2$s</string>
+    <string name="amb_personal_clinico">personal clínico</string>
+    <string name="amb_marcar_recibido">Marcar recibido</string>
+    <string name="amb_marcar_recibido_detalle">Confirmas que recibiste al paciente de la ambulancia. Queda registrado con tu nombre y la hora de ahora.</string>
+    <string name="amb_entrega_espera">Podrás marcar recibido al paciente cuando la ambulancia registre su llegada al hospital.</string>
+    <string name="amb_entrega_sin_permiso">La ambulancia llegó. La entrega la marca el personal clínico que recibe al paciente.</string>
+    <string name="amb_cancelar_solicitud">Cancelar solicitud</string>
+    <string name="amb_cancelar_detalle">Despacho dejará de ver tu solicitud. Si la emergencia sigue, llama al 911.</string>
+    <string name="amb_motivo_opcional">Motivo (opcional)</string>
+    <plurals name="par_hitos_en_cola">
+        <item quantity="one">%d hito en cola: se enviará con su hora al volver la señal.</item>
+        <item quantity="other">%d hitos en cola: se enviarán con su hora al volver la señal.</item>
+    </plurals>
     <string name="amb_sin_relacion">Los datos clínicos solo los ve quien recibe al paciente.</string>
     <string name="amb_llegada_estimada">Llegada estimada</string>
     <string name="amb_sin_estimar">Sin estimar</string>

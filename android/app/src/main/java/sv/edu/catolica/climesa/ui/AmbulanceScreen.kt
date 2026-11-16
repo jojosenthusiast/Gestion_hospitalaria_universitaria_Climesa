@@ -95,7 +95,7 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
             AndroidSection.AMBULANCE_REQUEST -> requestContent(state, model)
             AndroidSection.DISPATCH -> dispatchContent(state, model)
             AndroidSection.LOG -> logContent(state, model)
-            else -> arrivalContent(state)
+            else -> arrivalContent(state, model)
         }
     }
 }
@@ -107,18 +107,42 @@ private fun modeOf(section: AndroidSection) = when (section) {
     else -> AmbulanceMode.STATUS
 }
 
-/** A09: aviso del 911, solicitud y seguimiento en vivo por el canal propio del paciente. */
+/**
+ * A09: aviso del 911, solicitud y seguimiento. MA-AMB-05: el estado sale de `GET /ambulancia/solicitudes/mias` (sobrevive a
+ * cerrar la app), se vuelve a pedir con cada evento del canal propio y la cancelación solo se ofrece si la API la permite.
+ */
 private fun LazyListScope.requestContent(state: AmbulanceUiState, model: AmbulanceViewModel) {
     item { NoticeBanner(NoticeKind.WARNING, AmbulanceRules.NOTICE_911) }
-    val own = state.ownRequest
-    if (own == null) item { RequestForm(state.busy, model) }
-    else {
-        item {
-            SectionCard(stringResource(R.string.amb_solicitud_enviada), action = { StatusPill(stringResource(R.string.amb_por_confirmar), StatusTone.RESERVED) }) {
-                Text(stringResource(R.string.amb_por_confirmar_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val requests = state.ownRequests ?: return
+    val active = AmbulanceRules.activeRequest(requests)
+    if (active == null) item { RequestForm(state.busy, model) }
+    else item { OwnRequestCard(active, state.busy, model) }
+}
+
+@Composable
+private fun OwnRequestCard(request: sv.edu.catolica.climesa.domain.OwnAmbulanceRequest, busy: Boolean, model: AmbulanceViewModel) {
+    var cancelling by rememberSaveable(request.id) { mutableStateOf(false) }
+    val tone = if (request.state == "por_confirmar") StatusTone.RESERVED else StatusTone.PROCESS
+    SectionCard(stringResource(R.string.amb_solicitud_enviada), eyebrow = localTime(request.createdAt), action = { StatusPill(AmbulanceLabels.requestState(request.state), tone) }) {
+        Text(AmbulanceRules.requestProgress(request), style = MaterialTheme.typography.bodyMedium)
+        LabeledValue(stringResource(R.string.amb_donde), request.address)
+        request.service?.let { service ->
+            HorizontalDivider()
+            listOf("salida", "en_escena", "trasladando", "en_hospital").forEach { type ->
+                val done = service.milestones.firstOrNull { it.type == type }
+                Text("${AmbulanceLabels.milestone(type)}: ${done?.occurredAt?.let(::localTime) ?: stringResource(R.string.amb_pendiente)}", style = MaterialTheme.typography.bodySmall, color = if (done != null) MaterialTheme.climesa.success else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        items(own.updates.reversed()) { DataRow(it) }
+        if (request.canCancel) SecondaryButton(stringResource(R.string.amb_cancelar_solicitud), { cancelling = true }, enabled = !busy)
+    }
+    if (cancelling) {
+        var reason by rememberSaveable { mutableStateOf("") }
+        ConfirmDialog(
+            title = stringResource(R.string.amb_cancelar_solicitud), confirmLabel = stringResource(R.string.amb_cancelar_solicitud), destructive = true, busy = busy,
+            message = stringResource(R.string.amb_cancelar_detalle),
+            onConfirm = { cancelling = false; model.cancelRequest(request, reason) }, onDismiss = { cancelling = false },
+            body = { FormField(stringResource(R.string.amb_motivo_opcional), reason, { reason = it.take(300) }, singleLine = false) },
+        )
     }
 }
 
@@ -286,10 +310,12 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
     }
 }
 
-/** A54 y A25: reporte prehospital en vivo; el contenido clínico solo si la API lo entrega. */
-private fun LazyListScope.arrivalContent(state: AmbulanceUiState) {
+/** A54 y A25: reporte prehospital en vivo; el contenido clínico solo si la API lo entrega. MA-AMB-04: marcar recibido. */
+private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: AmbulanceViewModel) {
     val view = state.arrival
-    if (view == null || view.reports.isEmpty()) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
+    if (view == null) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
+    item { HandoverCard(view, state.busy, model) }
+    if (view.reports.isEmpty()) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
     if (!view.clinical) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_sin_relacion)) }
     items(view.reports, key = { it.id }) { report ->
         SectionCard("${stringResource(R.string.amb_prioridad)} ${AmbulanceLabels.priority(report.priority)}", eyebrow = "${stringResource(R.string.amb_capturado)}: ${localTime(report.capturedAt)}") {
@@ -301,6 +327,26 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState) {
             }
         }
     }
+}
+
+/** MA-AMB-04: who received the patient, or the single "Marcar recibido" action when the API allows it. */
+@Composable
+private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, busy: Boolean, model: AmbulanceViewModel) {
+    var confirming by rememberSaveable(view.serviceId) { mutableStateOf(false) }
+    val handover = view.handover
+    SectionCard(stringResource(R.string.amb_entrega_titulo), action = { if (handover != null) StatusPill(stringResource(R.string.amb_recibido), StatusTone.SUCCESS) }) {
+        when {
+            handover != null -> Text(stringResource(R.string.amb_recibido_por, handover.receivedByName.ifBlank { stringResource(R.string.amb_personal_clinico) }, localTime(handover.receivedAt)), style = MaterialTheme.typography.bodyMedium)
+            view.canReceive -> PrimaryButton(stringResource(R.string.amb_marcar_recibido), { confirming = true }, icon = Icons.Default.Check, enabled = !busy, loading = busy)
+            !view.arrived -> Text(stringResource(R.string.amb_entrega_espera), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> Text(stringResource(R.string.amb_entrega_sin_permiso), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    if (confirming) ConfirmDialog(
+        title = stringResource(R.string.amb_marcar_recibido), confirmLabel = stringResource(R.string.amb_marcar_recibido), busy = busy,
+        message = stringResource(R.string.amb_marcar_recibido_detalle),
+        onConfirm = { confirming = false; model.receivePatient() }, onDismiss = { confirming = false },
+    )
 }
 
 private val timeFormat = java.time.format.DateTimeFormatter.ofPattern("d MMM HH:mm", java.util.Locale("es", "SV")).withZone(java.time.ZoneId.of("America/El_Salvador"))

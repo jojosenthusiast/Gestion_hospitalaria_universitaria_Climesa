@@ -1,0 +1,10 @@
+{
+  "method": "POST",
+  "path": "/api/v1/ambulancia/servicios/{id}/hitos",
+  "body": {
+    "type": "finalizado",
+    "occurredAt": "2026-11-15T14:30:00Z",
+    "finalState": "desviado",
+    "reason": "Desviado a otro centro por saturación"
+  }
+}
