@@ -77,11 +77,11 @@ public enum ShiftAttendanceRules {
             else { groups.append((dayTitle(at, today: today), [item], at)) }
         }
         let startOfToday = calendar.startOfDay(for: today)
-        let isPast = { (group: (title: String, items: [T], day: Date)) in
+        let past = groups.map { group in
             group.day < startOfToday && group.items.allSatisfy { item in end(item).map { $0 <= today } ?? false }
         }
-        var result = groups.filter { !isPast($0) }.map { (title: $0.title, items: $0.items, past: false) }
-        result += groups.filter(isPast).reversed().map { (title: $0.title, items: $0.items, past: true) }
+        var result = groups.indices.filter { !past[$0] }.map { (title: groups[$0].title, items: groups[$0].items, past: false) }
+        result += groups.indices.filter { past[$0] }.reversed().map { (title: groups[$0].title, items: groups[$0].items, past: true) }
         let undated = items.filter { start($0) == nil }
         if !undated.isEmpty { result.append((title: "Sin fecha", items: undated, past: false)) }
         return result
