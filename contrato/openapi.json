@@ -6550,6 +6550,321 @@
         "x-permiso": "fila.llamar"
       }
     },
+    "/api/v1/fila/siguiente": {
+      "get": {
+        "operationId": "QueueController_next",
+        "parameters": [
+          {
+            "name": "service",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueNextProposalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quién pasa después en un servicio (regla RN-FILA-SIGUIENTE)",
+        "tags": [
+          "queue"
+        ],
+        "x-permiso": "fila.ver"
+      }
+    },
+    "/api/v1/fila/{id}/deshacer-llamado": {
+      "post": {
+        "operationId": "QueueController_undoCall",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueUndoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueCallResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deshacer el último llamado de un número",
+        "tags": [
+          "queue"
+        ],
+        "x-permiso": "fila.llamar"
+      }
+    },
+    "/api/v1/fila/{id}/prioridad": {
+      "post": {
+        "operationId": "QueueController_priority",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueuePriorityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuePriorityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambiar la prioridad de un número antes de la atención",
+        "tags": [
+          "queue"
+        ],
+        "x-permiso": "fila.gestionar"
+      }
+    },
     "/api/v1/fila/{id}/llamar": {
       "post": {
         "operationId": "QueueController_call",
@@ -19780,6 +20095,146 @@
           "version"
         ]
       },
+      "ServicioFila": {
+        "type": "string",
+        "enum": [
+          "consulta_general",
+          "emergencia",
+          "laboratorio",
+          "admisiones"
+        ]
+      },
+      "AreaFila": {
+        "type": "string",
+        "enum": [
+          "CON",
+          "EMG",
+          "LAB",
+          "REC",
+          "GEN"
+        ]
+      },
+      "PrioridadFila": {
+        "type": "string",
+        "enum": [
+          "emergencia",
+          "urgente",
+          "rutina"
+        ]
+      },
+      "MotivoSiguiente": {
+        "type": "string",
+        "enum": [
+          "emergencia",
+          "urgente",
+          "cita",
+          "llegada"
+        ]
+      },
+      "QueueProposalResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "numero": {
+            "type": "integer"
+          },
+          "area": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AreaFila"
+              }
+            ]
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "patientName": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioridadFila"
+              }
+            ]
+          },
+          "appointmentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer"
+          },
+          "reason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MotivoSiguiente"
+              }
+            ]
+          },
+          "reasonText": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "numero",
+          "area",
+          "patientId",
+          "patientName",
+          "priority",
+          "appointmentAt",
+          "version",
+          "reason",
+          "reasonText"
+        ]
+      },
+      "QueueNextProposalResponse": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ServicioFila"
+              }
+            ]
+          },
+          "area": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AreaFila"
+              }
+            ]
+          },
+          "rule": {
+            "type": "string",
+            "description": "Regla documentada RN-FILA-SIGUIENTE"
+          },
+          "proposal": {
+            "nullable": true,
+            "description": "null cuando nadie espera",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QueueProposalResponse"
+              }
+            ]
+          }
+        },
+        "required": [
+          "service",
+          "area",
+          "rule",
+          "proposal"
+        ]
+      },
       "ConsultationSignResponse": {
         "type": "object",
         "properties": {
@@ -19800,22 +20255,24 @@
           "signedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "nextProposal": {
+            "nullable": true,
+            "description": "Quién pasa después en el área de la consulta; null sin permiso de ver la fila completa",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QueueNextProposalResponse"
+              }
+            ]
           }
         },
         "required": [
           "id",
           "version",
           "state",
-          "signedAt"
-        ]
-      },
-      "ServicioFila": {
-        "type": "string",
-        "enum": [
-          "consulta_general",
-          "emergencia",
-          "laboratorio",
-          "admisiones"
+          "signedAt",
+          "nextProposal"
         ]
       },
       "EstadoFila": {
@@ -19828,6 +20285,13 @@
           "no_se_presento",
           "cerrado"
         ]
+      },
+      "DeshacerFila": {
+        "type": "string",
+        "enum": [
+          "deshacer_llamado"
+        ],
+        "description": "Acciones reversibles que el servidor acepta ahora"
       },
       "AccionFila": {
         "type": "string",
@@ -19901,6 +20365,11 @@
             "format": "uuid",
             "nullable": true
           },
+          "officeCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Código del consultorio asignado (C-101)"
+          },
           "llamados": {
             "type": "integer"
           },
@@ -19910,6 +20379,38 @@
           "issuedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "area": {
+            "description": "Código del área del servicio; el número cuenta desde 1 por área y día",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AreaFila"
+              }
+            ]
+          },
+          "priority": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioridadFila"
+              }
+            ]
+          },
+          "appointmentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hora de la cita de hoy del paciente (solo consulta general); null si llegó sin cita"
+          },
+          "walkIn": {
+            "type": "boolean",
+            "description": "Llegó sin cita"
+          },
+          "undoActions": {
+            "type": "array",
+            "description": "Acciones reversibles que el servidor acepta ahora",
+            "items": {
+              "$ref": "#/components/schemas/DeshacerFila"
+            }
           },
           "consultationId": {
             "type": "string",
@@ -19957,9 +20458,15 @@
           "patientName",
           "state",
           "officeId",
+          "officeCode",
           "llamados",
           "version",
           "issuedAt",
+          "area",
+          "priority",
+          "appointmentAt",
+          "walkIn",
+          "undoActions",
           "consultationId",
           "consultationState",
           "maxCalls",
@@ -19983,6 +20490,15 @@
           "patientId": {
             "type": "string",
             "format": "uuid"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "emergencia",
+              "urgente",
+              "rutina"
+            ],
+            "description": "Prioridad clínica; por omisión rutina"
           }
         },
         "required": [
@@ -20024,6 +20540,20 @@
           "serviceName": {
             "type": "string"
           },
+          "area": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AreaFila"
+              }
+            ]
+          },
+          "priority": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioridadFila"
+              }
+            ]
+          },
           "patientId": {
             "type": "string",
             "format": "uuid"
@@ -20037,6 +20567,8 @@
           "state",
           "version",
           "serviceName",
+          "area",
+          "priority",
           "patientId"
         ]
       },
@@ -20087,6 +20619,24 @@
           "patientName": {
             "type": "string",
             "nullable": true
+          },
+          "area": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AreaFila"
+              }
+            ]
+          },
+          "reason": {
+            "description": "Por qué la regla eligió este número",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MotivoSiguiente"
+              }
+            ]
+          },
+          "reasonText": {
+            "type": "string"
           }
         },
         "required": [
@@ -20095,24 +20645,18 @@
           "state",
           "llamados",
           "numero",
-          "patientName"
+          "patientName",
+          "area",
+          "reason",
+          "reasonText"
         ]
       },
-      "QueueTransitionDto": {
+      "QueueUndoDto": {
         "type": "object",
         "properties": {
           "version": {
             "type": "number",
             "minimum": 1
-          },
-          "officeId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 0,
-            "maxLength": 500
           }
         },
         "required": [
@@ -20145,6 +20689,85 @@
           "version",
           "state",
           "llamados"
+        ]
+      },
+      "QueuePriorityDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "emergencia",
+              "urgente",
+              "rutina"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "priority"
+        ]
+      },
+      "QueuePriorityResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoFila"
+              }
+            ]
+          },
+          "priority": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioridadFila"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "state",
+          "priority"
+        ]
+      },
+      "QueueTransitionDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "officeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version"
         ]
       },
       "QueueTransitionResponse": {

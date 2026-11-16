@@ -9,12 +9,13 @@ import { appointmentActions } from './attention.rules';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { requireCurrentEnrollment } from '../platform/enrollment';
 import { ConsultationSignDto, ConsultationStartDto, ConsultationUpdateDto } from './consultation.dto';
+import { QueueService } from './queue.service';
 
 type Row = Record<string, any>;
 
 @Injectable()
 export class ConsultationService {
-  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
+  constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock, private readonly queue: QueueService) {}
 
   private requireDoctor(actor: Actor) {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a un médico.');
@@ -163,7 +164,10 @@ export class ConsultationService {
       if (appointment) await this.commands.event(c, 'cita.actualizada', 'cita', appointment.id, appointment.version, await channelsFor(c, ['citas.ver'], { users: [await patientAccount(c, old.paciente_id)] }));
       await this.commands.audit(c, actor, { action: 'consulta.firmar', entity: 'consulta', entityId: id, patientId: old.paciente_id, permission: 'consulta.registrar' });
       await this.commands.event(c, 'consulta.actualizada', 'consulta', id, row.version, await this.channels(c, old.paciente_id, true));
-      return { id: row.id, version: row.version, state: row.estado, signedAt: row.signedAt };
+      // S9: on closing, propose who goes next in the consultation's area (RN-FILA-SIGUIENTE); only to whom sees the whole queue.
+      const service = (await c.query(`SELECT t.servicio FROM atencion.consulta k JOIN atencion.ticket_fila t ON t.id=k.ticket_id WHERE k.id=$1`, [id])).rows[0]?.servicio ?? 'consulta_general';
+      const nextProposal = contextsOf(actor, 'fila.ver').some(context => context !== 'propio') ? await this.queue.auditedProposal(c, actor, service) : null;
+      return { id: row.id, version: row.version, state: row.estado, signedAt: row.signedAt, nextProposal };
     });
   }
 }
