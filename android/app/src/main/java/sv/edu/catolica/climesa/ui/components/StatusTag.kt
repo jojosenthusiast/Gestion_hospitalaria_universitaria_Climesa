@@ -46,3 +46,7 @@ internal fun StatusTag(value: String, modifier: Modifier = Modifier, label: Stri
 @Composable
 internal fun StatusPill(text: String, tone: StatusTone, modifier: Modifier = Modifier) =
     FamilyBadge(text, StatusFamily.fromTone(tone), modifier)
+
+/** Badge for a critical clinical value (critical lab result, critical vital sign): the only free-text badge in red. */
+@Composable
+internal fun CriticalPill(text: String, modifier: Modifier = Modifier) = FamilyBadge(text, StatusFamily.CRITICO, modifier)

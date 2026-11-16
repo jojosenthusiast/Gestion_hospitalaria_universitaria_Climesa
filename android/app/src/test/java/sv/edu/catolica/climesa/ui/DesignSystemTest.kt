@@ -44,6 +44,7 @@ class DesignSystemTest {
         assertEquals(Area.EMG, Area.of("P1-EMG"))
         assertEquals(Area.CON, Area.of("con"))
         assertEquals(Area.LAB, Area.of("BOD-LAB"))
+        assertEquals(Area.CON, Area.of("C-101"))
         assertEquals(Area.HOS, Area.of("P3-VIP"))
         assertEquals(Area.REC, Area.of("P1-ESP"))
         assertEquals(Area.AMB, Area.of("P1-AMB"))
@@ -100,7 +101,8 @@ class DesignSystemTest {
         assertNull(StatusFamily.resolve("estado_raro", null))
         assertNull(StatusFamily.resolve("bajo_minimo", StatusTone.NEUTRAL))
         assertEquals(StatusFamily.LISTO, StatusFamily.resolve("atendido", StatusTone.SUCCESS))
-        assertEquals(StatusFamily.LLAMADO, StatusFamily.resolve("sin_traslado", StatusTone.WARNING))
+        // A warning tone is not the queue "Llamado" family: the badge stays neutral with its own text.
+        assertNull(StatusFamily.resolve("sin_traslado", StatusTone.WARNING))
         // The API value wins over a legacy tone so every platform shows the same family.
         assertEquals(StatusFamily.CERRADO, StatusFamily.resolve("cancelada", StatusTone.DANGER))
     }
@@ -109,10 +111,17 @@ class DesignSystemTest {
         assertEquals(StatusFamily.LISTO, StatusFamily.fromTone(StatusTone.SUCCESS))
         assertEquals(StatusFamily.ATENCION, StatusFamily.fromTone(StatusTone.PROCESS))
         assertEquals(StatusFamily.ESPERA, StatusFamily.fromTone(StatusTone.RESERVED))
-        assertEquals(StatusFamily.LLAMADO, StatusFamily.fromTone(StatusTone.WARNING))
         assertEquals(StatusFamily.CERRADO, StatusFamily.fromTone(StatusTone.BLOCKED))
-        assertEquals(StatusFamily.CRITICO, StatusFamily.fromTone(StatusTone.DANGER))
         assertNull(StatusFamily.fromTone(StatusTone.NEUTRAL))
+    }
+
+    @Test fun `a free-text warning or danger pill never becomes called or critical`() {
+        // 02-sistema sections 2-3: red and the critical family are for critical values only (stock below minimum,
+        // out of stock or isolation are not); "Llamado" is a queue state, not a generic warning.
+        assertNull(StatusFamily.fromTone(StatusTone.DANGER))
+        assertNull(StatusFamily.fromTone(StatusTone.WARNING))
+        assertNull(StatusFamily.resolve("bajo_minimo", StatusTone.DANGER))
+        assertEquals(StatusFamily.CRITICO, StatusFamily.resolve("critico_alto", StatusTone.DANGER))
     }
 
     @Test fun `priorities keep red for emergencies only`() {

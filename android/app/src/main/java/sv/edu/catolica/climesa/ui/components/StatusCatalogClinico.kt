@@ -53,7 +53,7 @@ internal fun ClinicalStatusTag(code: String, modifier: Modifier = Modifier) {
     when (code) {
         StatusCatalogClinico.URGENT -> PriorityBadge(Priority.URGENTE, modifier, label)
         StatusCatalogClinico.ROUTINE -> PriorityBadge(Priority.RUTINA, modifier, label)
-        else -> FamilyBadge(label, StatusFamily.fromTone(tone), modifier)
+        else -> FamilyBadge(label, StatusFamily.of(code) ?: StatusFamily.fromTone(tone), modifier)
     }
 }
 

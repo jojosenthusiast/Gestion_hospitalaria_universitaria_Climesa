@@ -26,6 +26,8 @@ internal enum class Area(val code: String, val label: String) {
         fun of(code: String?): Area {
             val parts = (code ?: "").uppercase().split('-').map { it.trim() }
             parts.firstNotNullOfOrNull { part -> entries.firstOrNull { it.code == part } }?.let { return it }
+            // Consulting rooms are coded `C-101`: 02-sistema section 1 lists them under CON.
+            if (parts.firstOrNull() == "C" && parts.size > 1) return CON
             return parts.firstNotNullOfOrNull { aliases[it] } ?: GEN
         }
     }
@@ -61,15 +63,17 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
         /** Family of an API state value, or null when the value has none (`alto`, `bajo`, `sin_rango`, `bajo_minimo`). */
         fun of(value: String): StatusFamily? = byValue[value]
 
-        /** Family a legacy [StatusTone] stands for; [StatusTone.NEUTRAL] has none. */
+        /**
+         * Family a legacy [StatusTone] stands for. [StatusTone.WARNING] and [StatusTone.DANGER] have none: a free-text
+         * warning (stock below minimum, isolation, abnormal vitals) is neither a called queue number nor a critical value.
+         * Critical values use [StatusFamily.CRITICO] explicitly (`critico_alto`, `CriticalPill`).
+         */
         fun fromTone(tone: StatusTone): StatusFamily? = when (tone) {
             StatusTone.SUCCESS -> LISTO
             StatusTone.PROCESS -> ATENCION
             StatusTone.RESERVED -> ESPERA
-            StatusTone.WARNING -> LLAMADO
             StatusTone.BLOCKED -> CERRADO
-            StatusTone.DANGER -> CRITICO
-            StatusTone.NEUTRAL -> null
+            StatusTone.WARNING, StatusTone.DANGER, StatusTone.NEUTRAL -> null
         }
 
         /**
