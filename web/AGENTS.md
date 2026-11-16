@@ -17,7 +17,7 @@ web/
 
 ## Reglas
 
-- TypeScript estricto. Datos del servidor con TanStack Query; nada de `fetch` suelto en componentes.
+- TypeScript estricto. Datos del servidor con `useData` (`features/common.tsx`): caché en memoria por ruta con revalidación en segundo plano y tiempo real; nada de `fetch` suelto en componentes ni dependencias nuevas de caché (Fase 2, `docs/diseno/fase2/02-sistema.md`).
 - Tiempo real: un evento de Realtime llama `queryClient.invalidateQueries` con la clave que corresponde. Prohibido `setInterval` para refrescar.
 - El menú y las acciones se muestran según los permisos de `/api/v1/me`, nunca según el nombre del rol.
 - Toda pantalla tiene sus 8 estados (cargando, vacío, error, sin permiso, sin conexión, en vivo, conflicto, sesión por vencer): `docs/diseno/claude-design/04-estados-y-avisos.html`.
