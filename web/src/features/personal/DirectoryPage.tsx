@@ -76,7 +76,7 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
 
   return <>
     <CompactHeader breadcrumb={accountsOnly ? 'Protección de datos / Cuentas' : 'Administración / Equipo'} title="Personal"
-      actions={<>{manage && <button className="primary-button" onClick={() => { setEdit(null); setStaffOpen(true); }}><Icon name="plus" size={18} />Registrar personal</button>}{canInvite && <button className={manage ? 'secondary-button' : 'primary-button'} onClick={() => setInvite({ person: null })}><Icon name="mail" size={18} />Invitar persona</button>}</>} />
+      actions={manage ? <button className="primary-button" onClick={() => { setEdit(null); setStaffOpen(true); }}><Icon name="plus" size={18} />Registrar personal</button> : canInvite && <button className="primary-button" onClick={() => setInvite({ person: null })}><Icon name="mail" size={18} />Invitar persona</button>} />
     {canStaff && canAccounts && <div className="number-strip"><div><strong>{rows.filter(r => r.staff && r.staff.active).length}</strong><span>Personal activo</span></div><div><strong>{withAccount}</strong><span>Con cuenta de acceso</span></div><div><strong>{withoutAccount}</strong><span>Sin cuenta todavía</span></div></div>}
     <section className="data-workbench">
       <div className="table-toolbar">
@@ -88,6 +88,8 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
         {canAccounts && <Select label="Rol" value={rol} onChange={value => setFilters({ rol: value })}><option value="">Todos los roles</option>{roleOptions.map(r => <option key={r} value={r}>{roleNames[r] ?? r}</option>)}</Select>}
       </div>
       {canStaff && <div className="cl-filter-row"><span className="cl-filter-label">Turno de hoy</span><ChipGroup label="Turno de hoy" value={turno} onChange={value => setFilters({ turno: value })} options={[{ value: '', label: 'Cualquiera' }, ...shiftOptions.map(o => ({ value: o.value, label: o.label, count: shiftCount(o.value), tone: o.tone }))]} /></div>}
+      {/* S13: one header action. Registered staff are invited from their row; this link covers accounts without a record (ADM, DPD). */}
+      {manage && canInvite && <p className="dir-invite-note">¿Alguien sin ficha en el directorio? <button type="button" className="cl-link-button" onClick={() => setInvite({ person: null })}>Invitar persona</button></p>}
       <ActiveFilters filters={chips} onClear={() => { setQuery(''); setFilters(staffFilterDefaults); }} />
       <RemoteState state={primary}>{() => filtered.length
         ? <table className="record-table"><caption className="sr-only">Directorio de personal y cuentas</caption>

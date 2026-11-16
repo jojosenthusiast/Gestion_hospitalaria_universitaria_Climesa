@@ -1,12 +1,9 @@
 /* Inventario: maestro-detalle. Cada categoría tiene su color; los estados siguen la paleta común. */
 .inv { --inv-insumo: var(--primary-text); --inv-reactivo: var(--state-reserved); --inv-equipo_menor: var(--success); }
 .inv-summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
-.inv-summary button { display: inline-flex; align-items: baseline; gap: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.inv-summary button { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
 .inv-summary button strong { font-size: 22px; }
 .inv-summary button[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 2px var(--soft); }
-.inv-summary .tone-agotado strong, .inv-summary .tone-bajo_minimo strong { color: var(--danger); }
-.inv-summary .tone-por_vencer strong { color: var(--warning); }
-.inv-summary .tone-ok strong { color: var(--success); }
 .inv-layout { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); gap: 16px; align-items: start; }
 .inv-pane { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
 .inv-toolbar { display: grid; gap: 10px; padding: 14px; border-bottom: 1px solid var(--line); }
@@ -34,12 +31,6 @@
 .inv-gauge[data-status="bajo_minimo"] > span, .inv-gauge[data-status="agotado"] > span { background: var(--danger); }
 .inv-gauge[data-status="por_vencer"] > span { background: var(--warning); }
 .inv-gauge > i { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); }
-.inv-tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
-.inv-tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.inv-tag-ok { background: var(--success-soft); color: var(--success); }
-.inv-tag-bajo_minimo, .inv-tag-agotado { background: var(--danger-soft); color: var(--danger); }
-.inv-tag-por_vencer { background: var(--warning-soft); color: var(--warning); }
-.inv-tag-inactivo { background: var(--state-blocked-soft); color: var(--state-blocked); }
 .inv-detail { display: grid; gap: 18px; padding: 18px; }
 .inv-detail-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between; }
 .inv-detail-head h2 { margin: 0; font-size: 22px; }

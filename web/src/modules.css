@@ -77,6 +77,7 @@
 .search-form { min-width: 0; display: flex; align-items: flex-end; gap: 12px; flex: 1 1 560px; }
 .search-form > .field { min-width: 180px; flex: 1; }
 .search-form > button { min-height: 52px; }
+.pt-register-search { flex: none; padding-bottom: var(--space-4); border-bottom: 1px solid var(--line); }
 .table-caption { padding: 18px 24px 8px; font-size: 14px; font-weight: 700; line-height: 1.5; }
 .table-caption > span { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; font-weight: 400; }
 .data-workbench > .notice { margin: 18px 24px; }
@@ -556,7 +557,6 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .metric-summary strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 .metric-figure { border-left: 4px solid currentColor !important; grid-column: span 2; }
 .metric-figure strong { color: var(--ink); }
-.metric-figure em { font-weight: 700; color: inherit; }
 .metric-figure.tone-neutral { color: var(--control-line); }
 .export-menu { position: relative; display: inline-block; }
 .export-trigger { min-height: 42px; padding-block: 8px; }
@@ -671,3 +671,4 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .consult-step-item.is-hecho > a, .consult-step-item.is-hecho > span { border-style: dashed; }
 .consult-step { margin: var(--space-4) 0 0; font-size: var(--text-base); scroll-margin-top: var(--space-4); }
 .consult-handoff { margin-bottom: var(--space-4); }
+.dir-invite-note { margin: 0 0 var(--space-3); color: var(--muted); font-size: var(--text-sm, 14px); }

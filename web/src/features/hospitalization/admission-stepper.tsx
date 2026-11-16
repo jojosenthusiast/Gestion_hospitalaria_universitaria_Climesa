@@ -5,8 +5,8 @@ import { can, type AccessProfile, type Api } from '../../lib/api';
 import { patientPicker } from '../appointments';
 import { Dialog, Empty, RemoteState, WriteError, formatDateTime, useAction, useData } from '../common';
 import {
-  LAST_STEP, MOTIVE_MAX, VISITOR_LIMIT, admissionBody, categoryNames, feasibilityQuery, groupBeds, initialForm, isImmediate, isolationNames, originNames, salvadorInstant, salvadorNow, stepError, stepTitles, visitorError,
-  type AdmissionForm, type BedPick, type Category, type CategoryCount, type Check, type DoctorPick, type IsolationType, type OriginKind, type OriginRecord,
+  MOTIVE_MAX, VISITOR_LIMIT, admissionBody, categoryNames, feasibilityQuery, groupBeds, initialForm, isImmediate, isolationNames, originNames, salvadorInstant, salvadorNow, stepError, stepTitles, stepsFor, visitorError,
+  type AdmissionForm, type StepId, type BedPick, type Category, type CategoryCount, type Check, type DoctorPick, type IsolationType, type OriginKind, type OriginRecord,
 } from './admission-rules';
 import './admission-stepper.css';
 
@@ -14,31 +14,34 @@ type BedMap = { categories: CategoryCount[]; beds: BedPick[] };
 type DoctorRow = { id: string; name: string; specialty: string | null; available: boolean; reason: string | null };
 const originKinds: OriginKind[] = ['cita', 'emergencia', 'ambulancia', 'consulta'];
 
-/** W14 · ingreso guiado: ocho pasos, cada uno se valida antes de avanzar y la API vuelve a comprobar todo al confirmar. */
+/**
+ * W14 · ingreso guiado: seis pasos (cinco sin cama), cada uno se valida antes de avanzar y la API vuelve a comprobar todo al confirmar.
+ * S13: category, requirements and visitors share the «Habitación» step; the bed step only appears when a bed is assigned now.
+ */
 export function AdmissionStepper({ api, profile, onClose, onSaved }: { api: Api; profile: AccessProfile; onClose: () => void; onSaved: () => void }) {
-  const [step, setStep] = useState(0), [form, setForm] = useState<AdmissionForm>(() => initialForm(salvadorNow()));
+  const [index, setIndex] = useState(0), [form, setForm] = useState<AdmissionForm>(() => initialForm(salvadorNow()));
   const canAssignBed = can(profile, 'camas.asignar'), action = useAction(api);
   const update = (patch: Partial<AdmissionForm>) => setForm(current => ({ ...current, ...patch }));
-  const error = stepError(step, form, canAssignBed), last = step === LAST_STEP;
+  // The list can shrink when the date moves to later (no bed step): keep the position inside it.
+  const steps = stepsFor(form, canAssignBed), step: StepId = steps[Math.min(index, steps.length - 1)], position = steps.indexOf(step);
+  const error = stepError(step, form, canAssignBed), last = step === 'resumen';
   async function confirm() {
     if (await action.run('/admisiones', admissionBody(form, canAssignBed))) onSaved();
   }
   return <Dialog title="Ingresar paciente" onClose={onClose} busy={action.busy}><div className="module-form admission-stepper">
-    <ol className="stepper-track" aria-label="Pasos del ingreso">{stepTitles.map((title, index) => <li key={title} className={index === step ? 'is-current' : index < step ? 'is-done' : ''} aria-current={index === step ? 'step' : undefined}><span>{index < step ? <Icon name="check" size={14} /> : index + 1}</span><small>{title}</small></li>)}</ol>
-    <h3 className="stepper-title">Paso {step + 1} de {stepTitles.length} · {stepTitles[step]}</h3>
+    <ol className="stepper-track" aria-label="Pasos del ingreso">{steps.map((id, i) => <li key={id} className={i === position ? 'is-current' : i < position ? 'is-done' : ''} aria-current={i === position ? 'step' : undefined}><span>{i < position ? <Icon name="check" size={14} /> : i + 1}</span><small>{stepTitles[id]}</small></li>)}</ol>
+    <h3 className="stepper-title">Paso {position + 1} de {steps.length} · {stepTitles[step]}</h3>
     <WriteError error={action.error} onReload={onSaved} />
-    {step === 0 && <PatientStep api={api} form={form} update={update} />}
-    {step === 1 && <OriginStep api={api} form={form} update={update} />}
-    {step === 2 && <DoctorStep api={api} form={form} update={update} />}
-    {step === 3 && <CategoryStep api={api} form={form} update={update} />}
-    {step === 4 && <RequirementsStep form={form} update={update} />}
-    {step === 5 && <BedStep api={api} form={form} update={update} canAssignBed={canAssignBed} />}
-    {step === 6 && <VisitorsStep form={form} update={update} />}
-    {step === 7 && <SummaryStep api={api} form={form} update={update} canAssignBed={canAssignBed} />}
+    {step === 'paciente' && <PatientStep api={api} form={form} update={update} />}
+    {step === 'origen' && <OriginStep api={api} form={form} update={update} />}
+    {step === 'medico' && <DoctorStep api={api} form={form} update={update} />}
+    {step === 'habitacion' && <><CategoryStep api={api} form={form} update={update} /><RequirementsStep form={form} update={update} /><VisitorsStep form={form} update={update} /></>}
+    {step === 'cama' && <BedStep api={api} form={form} update={update} canAssignBed={canAssignBed} />}
+    {step === 'resumen' && <SummaryStep api={api} form={form} update={update} canAssignBed={canAssignBed} />}
     {error && <p className="step-error" role="alert">{error}</p>}
     <div className="dialog-actions">
-      <button type="button" className="secondary-button" onClick={step === 0 ? onClose : () => setStep(step - 1)} disabled={action.busy}>{step === 0 ? 'Cancelar' : 'Atrás'}</button>
-      {last ? <SaveButtonLike busy={action.busy} disabled={!!error} onClick={() => void confirm()} /> : <button type="button" className="primary-button" onClick={() => setStep(step + 1)} disabled={!!error}>Siguiente <Icon name="arrow" size={16} /></button>}
+      <button type="button" className="secondary-button" onClick={position === 0 ? onClose : () => setIndex(position - 1)} disabled={action.busy}>{position === 0 ? 'Cancelar' : 'Atrás'}</button>
+      {last ? <SaveButtonLike busy={action.busy} disabled={!!error} onClick={() => void confirm()} /> : <button type="button" className="primary-button" onClick={() => setIndex(position + 1)} disabled={!!error}>Siguiente <Icon name="arrow" size={16} /></button>}
     </div>
   </div></Dialog>;
 }
@@ -100,7 +103,7 @@ function DoctorStep({ api, form, update }: StepProps & { api: Api }) {
 function CategoryStep({ api, form, update }: StepProps & { api: Api }) {
   const map = useData<BedMap>(api, `/admisiones/mapa-camas?patientId=${encodeURIComponent(form.patient!.id)}`);
   return <>
-    <p className="form-intro">Camas disponibles por categoría para este paciente. Una categoría sin camas libres no se puede elegir.</p>
+    <h4 className="stepper-subtitle">Categoría</h4><p className="muted">Camas libres por categoría para este paciente. Una categoría sin camas libres no se puede elegir.</p>
     <RemoteState state={map}>{({ categories }) => <div className="category-grid" role="radiogroup" aria-label="Categoría">{categories.map(item => {
       const unavailable = item.free === 0;
       return <label key={item.category} className={`category-card${form.category === item.category ? ' is-selected' : ''}${unavailable ? ' is-disabled' : ''}`}>
@@ -115,7 +118,7 @@ function CategoryStep({ api, form, update }: StepProps & { api: Api }) {
 
 function RequirementsStep({ form, update }: StepProps) {
   return <>
-    <p className="form-intro">Requisitos clínicos que condicionan la habitación. El aislamiento exige una habitación sin otros ocupantes.</p>
+    <h4 className="stepper-subtitle">Requisitos clínicos</h4><p className="muted">El aislamiento exige una habitación sin otros ocupantes.</p>
     <label className="check-field"><input type="checkbox" checked={form.isolation} onChange={event => update({ isolation: event.target.checked, isolationType: event.target.checked ? form.isolationType : '', bed: null })} /> Requiere aislamiento</label>
     {form.isolation && <fieldset className="choice-list"><legend>Tipo de aislamiento (opcional)</legend><div className="chip-row">{(Object.keys(isolationNames) as IsolationType[]).map(type => <label key={type} className={`choice-chip${form.isolationType === type ? ' is-selected' : ''}`}><input type="radio" name="isolation-type" checked={form.isolationType === type} onChange={() => update({ isolationType: type })} /><strong>{isolationNames[type]}</strong></label>)}</div></fieldset>}
     <label className="check-field"><input type="checkbox" checked={form.unstable} onChange={event => update({ unstable: event.target.checked })} /> Paciente inestable</label>
@@ -155,7 +158,7 @@ function BedStep({ api, form, update, canAssignBed }: StepProps & { api: Api; ca
 function VisitorsStep({ form, update }: StepProps) {
   const limit = form.category ? VISITOR_LIMIT[form.category] : 4, invalid = visitorError(form.visitorsAllowed, form.visitorsMax, form.category);
   return <>
-    <p className="form-intro">El edificio no modela asientos para acompañantes: el máximo por paciente depende de la categoría ({form.category ? `${categoryNames[form.category]}: hasta ${limit}` : ''}).</p>
+    <h4 className="stepper-subtitle">Visitas</h4><p className="muted">El máximo de acompañantes depende de la categoría ({form.category ? `${categoryNames[form.category]}: hasta ${limit}` : ''}).</p>
     <label className="check-field"><input type="checkbox" checked={form.visitorsAllowed} onChange={event => update({ visitorsAllowed: event.target.checked, visitorsMax: event.target.checked ? 1 : 0 })} /> Se permiten visitas y acompañantes</label>
     {form.visitorsAllowed && <Field label="Acompañantes permitidos" type="number" min={1} max={limit} value={String(form.visitorsMax)} onChange={value => update({ visitorsMax: value === '' ? 0 : Number(value) })} required aria-invalid={invalid ? true : undefined} />}
   </>;

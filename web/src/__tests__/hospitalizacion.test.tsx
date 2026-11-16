@@ -182,12 +182,39 @@ describe('W13 · admisiones con acciones según allowedActions (D-02)', () => {
     expect(api.write).toHaveBeenCalledWith('/admisiones/a-1/cama', { bedId: 'b-1', version: 5, reason: 'Cercanía a estación de enfermería.' }, 'POST');
   });
 
-  it('con excepción autorizada, la categoría elegida viaja a las sugerencias de cama (MA-HOS-06)', async () => {
-    const api = mount(['admision.ver'], { '/admisiones/a-9/sugerencias-cama': [] }, undefined, jopRow(['asignar_cama'], { state: 'pendiente_cama', bed: '', bedCategory: null, occupationId: null, authorized: true }));
+  // S13 (T10w): the category select is gone; both categories' suggested beds show at once and the first one comes chosen.
+  it('con excepción autorizada muestra las camas sugeridas de ambas categorías, sin pedir la categoría antes (MA-HOS-06)', async () => {
+    const api = mount(['admision.ver'], {
+      '/admisiones/a-9/sugerencias-cama?category=semiprivada': [{ id: 'b-2', version: 3, code: 'C-205', room: 'H-205', category: 'semiprivada', reason: 'habitación vacía' }],
+      '/admisiones/a-9/sugerencias-cama?category=vip': [{ id: 'b-7', version: 2, code: 'V-301', room: 'H-301', category: 'vip', reason: 'única libre' }],
+    }, undefined, jopRow(['asignar_cama'], { state: 'pendiente_cama', bed: '', bedCategory: null, occupationId: null, authorized: true }));
     await userEvent.click(within(await rowOf('Paciente Ficticio Nueve')).getByRole('button', { name: /Asignar cama/ }));
     const dialog = screen.getByRole('dialog');
-    await userEvent.selectOptions(within(dialog).getByLabelText('Categoría de cama'), 'vip');
+    expect(within(dialog).queryByLabelText('Categoría de cama')).toBeNull();
+    expect(await within(dialog).findByLabelText(/V-301/)).toBeTruthy();
+    expect(within(dialog).getByLabelText(/C-205/)).toHaveProperty('checked', true);
     expect(api.request).toHaveBeenCalledWith('/admisiones/a-9/sugerencias-cama?category=vip', expect.anything());
+    await userEvent.click(within(dialog).getByLabelText(/V-301/));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar cama' }));
+    expect(api.write).toHaveBeenCalledWith('/admisiones/a-9/cama', { bedId: 'b-7', version: 2 }, 'POST');
+  });
+
+  // S13 review (A1): the first bed is chosen only on the first load; if the chosen bed leaves the list the choice empties.
+  it('si la cama elegida sale de la lista, la elección queda vacía y no se elige otra en silencio', async () => {
+    let beds = [{ id: 'b-1', version: 5, code: 'C-202', room: 'H-202', category: 'semiprivada', reason: 'habitación vacía' }, { id: 'b-2', version: 1, code: 'C-203', room: 'H-203', category: 'semiprivada', reason: 'cerca de enfermería' }];
+    const api = {
+      request: vi.fn(async (path: string) => path === '/admisiones' ? admissionsFixture() : beds),
+      write: vi.fn(async () => ({})),
+    };
+    const view = render(<HospitalizationPage api={api as unknown as Api} profile={profile(['admision.ver'])} version={0} />);
+    await userEvent.click(within(await rowOf('Paciente Ficticio Uno')).getByRole('button', { name: /Asignar cama/ }));
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByLabelText(/C-202/)).toHaveProperty('checked', true);
+    beds = beds.slice(1);
+    view.rerender(<HospitalizationPage api={api as unknown as Api} profile={profile(['admision.ver'])} version={1} />);
+    await vi.waitFor(() => expect(within(dialog).queryByLabelText(/C-202/)).toBeNull());
+    expect(within(dialog).getByLabelText(/C-203/)).toHaveProperty('checked', false);
+    expect((within(dialog).getByRole('button', { name: 'Confirmar cama' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('traslada solo a camas libres de la misma categoría, sin la cama actual (MA-HOS-01)', async () => {

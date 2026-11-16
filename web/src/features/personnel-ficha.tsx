@@ -10,7 +10,7 @@ const boards:Record<string,string>={JVPM:'JVPM · Medicina',JVPE:'JVPE · Enferm
 const shiftTypes:Record<string,string>={diurno:'Diurno',nocturno:'Nocturno',guardia:'Guardia'};
 export type RegistrationState='vigente'|'por_vencer'|'vencida'|'proxima';
 const registrationLabels:Record<RegistrationState,string>={vigente:'Vigente',por_vencer:'Por vencer',vencida:'Vencida',proxima:'Aún no vigente'};
-const registrationTone:Record<RegistrationState,string>={vigente:'activo',por_vencer:'borrador',vencida:'cancelado',proxima:'provisional'};
+const registrationTone:Record<RegistrationState,string>={vigente:'activo',por_vencer:'por_vencer',vencida:'vencida',proxima:'provisional'};
 /** Fecha civil de El Salvador (yyyy-MM-dd) del instante dado. */
 export const businessToday=(at=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/El_Salvador'}).format(at);
 /** La vigencia viene con ambos extremos incluidos (FR-103-03). */
@@ -40,7 +40,7 @@ export function StaffFicha({api,profile,person,version,onClose,onEdit,onChanged}
     </dl>
    </section>
    <section aria-labelledby="ficha-inscripciones"><h3 id="ficha-inscripciones">Inscripciones profesionales</h3>
-    {registrations.length?<table className="record-table"><caption className="sr-only">Inscripciones profesionales</caption><thead><tr><th>Junta</th><th>Número</th><th>Vigencia</th><th>Estado</th></tr></thead><tbody>{registrations.map(r=>{const s=registrationState(r,today);return <tr key={r.id}><td data-label="Junta">{boards[r.board]??r.board}</td><td data-label="Número">{r.number}</td><td data-label="Vigencia">{formatDate(r.validFrom)} al {formatDate(r.validTo)}</td><td data-label="Estado"><span className={`status-tag status-${registrationTone[s]}`}>{registrationLabels[s]}</span></td></tr>;})}</tbody></table>
+    {registrations.length?<table className="record-table"><caption className="sr-only">Inscripciones profesionales</caption><thead><tr><th>Junta</th><th>Número</th><th>Vigencia</th><th>Estado</th></tr></thead><tbody>{registrations.map(r=>{const s=registrationState(r,today);return <tr key={r.id}><td data-label="Junta">{boards[r.board]??r.board}</td><td data-label="Número">{r.number}</td><td data-label="Vigencia">{formatDate(r.validFrom)} al {formatDate(r.validTo)}</td><td data-label="Estado"><Tag value={registrationTone[s]} label={registrationLabels[s]}/></td></tr>;})}</tbody></table>
      :<Empty title="Sin inscripciones registradas" description="Sin una inscripción vigente no se programan turnos de medicina ni de enfermería."/>}
     {manage&&!adding&&<button type="button" className="secondary-button" onClick={()=>setAdding(true)}><Icon name="plus" size={18}/>Registrar inscripción</button>}
     {manage&&adding&&<RegistrationForm api={api} person={person} onCancel={()=>setAdding(false)} onSaved={()=>{setAdding(false);onChanged();}} onStale={()=>{setAdding(false);onChanged();}}/>}
@@ -49,7 +49,7 @@ export function StaffFicha({api,profile,person,version,onClose,onEdit,onChanged}
     <RemoteState state={shifts}>{()=>upcoming.length?<table className="record-table"><caption className="sr-only">Turnos próximos publicados</caption><thead><tr><th>Inicio</th><th>Fin</th><th>Área</th><th>Tipo</th></tr></thead><tbody>{upcoming.map(s=><tr key={s.id}><td data-label="Inicio">{formatDateTime(s.start)}</td><td data-label="Fin">{formatDateTime(s.end)}</td><td data-label="Área">{s.area}</td><td data-label="Tipo">{shiftTypes[s.type]??s.type}</td></tr>)}</tbody></table>
      :<Empty title="Sin turnos próximos" description="Esta persona no tiene turnos publicados por venir."/>}</RemoteState>
    </section>}
-   <div className="dialog-actions">{manage&&<button type="button" className="secondary-button" onClick={onEdit}>Editar datos</button>}<button type="button" className="primary-button" onClick={onClose}>Cerrar</button></div>
+   <div className="dialog-actions"><button type="button" className={manage?'secondary-button':'primary-button'} onClick={onClose}>Cerrar</button>{manage&&<button type="button" className="primary-button" onClick={onEdit}>Editar datos</button>}</div>
   </div>
  </Dialog>;
 }

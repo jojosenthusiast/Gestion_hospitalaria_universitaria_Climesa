@@ -40,3 +40,5 @@
 .feasibility-list li.is-ok { border-color: var(--success); background: var(--success-soft); }
 .feasibility-list li.is-fail { border-color: var(--state-blocked); background: var(--state-blocked-soft); }
 @media (max-width: 640px) { .stepper-track small { display: none; } .summary-list > div { grid-template-columns: 1fr; gap: 2px; } }
+.stepper-subtitle { margin: var(--space-4) 0 0; font-size: var(--text-base, 15px); font-weight: 700; }
+.stepper-subtitle + .muted { margin: 0; }

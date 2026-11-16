@@ -42,7 +42,7 @@ function Master({ rows, selected, setSelected, filters, setFilters, panel, setPa
   const suggestions = filters.query.trim().length >= 2 ? shown.slice(0, 5) : [];
   return <>
     <div className="inv-summary" role="group" aria-label="Resumen por estado">
-      {(['agotado', 'bajo_minimo', 'por_vencer', 'ok'] as StockStatus[]).map(s => <button key={s} type="button" className={`tone-${s}`} aria-pressed={filters.statuses.includes(s)} onClick={() => setFilters({ ...filters, statuses: toggle(filters.statuses, s) })}><strong>{counts[s]}</strong><span>{statusLabels[s]}</span></button>)}
+      {(['agotado', 'bajo_minimo', 'por_vencer', 'ok'] as StockStatus[]).map(s => <button key={s} type="button" aria-pressed={filters.statuses.includes(s)} onClick={() => setFilters({ ...filters, statuses: toggle(filters.statuses, s) })}><strong>{counts[s]}</strong><StatusChip status={s} /></button>)}
     </div>
     <div className="inv-layout" data-selected={selected ? 'true' : 'false'}>
       <section className="inv-pane inv-pane-list" aria-label="Artículos">

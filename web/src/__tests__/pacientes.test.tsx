@@ -70,16 +70,17 @@ describe('búsqueda antes de registrar', () => {
     expect(screen.getByText(/Posibles coincidencias/)).toBeTruthy();
   });
 
-  it('"Registrar paciente" siempre abre el formulario y pide buscar primero si no hay búsqueda vigente', async () => {
+  // S13 (T10w): the search and the data share one form; the search no longer hides the fields.
+  it('"Registrar paciente" siempre abre el formulario con la búsqueda arriba si no hay búsqueda vigente', async () => {
     const api = montar();
     expect((registrar() as HTMLButtonElement).disabled).toBe(false);
     await userEvent.click(registrar());
     const dialogo = await screen.findByRole('dialog', { name: 'Registrar paciente' });
-    expect(within(dialogo).getByText(/Antes de crear un expediente nuevo, busca/)).toBeTruthy();
-    expect(within(dialogo).queryByLabelText('Nombres')).toBeNull();
+    expect(within(dialogo).getByText(/Busca primero si la persona ya existe/)).toBeTruthy();
+    expect(within(dialogo).getByLabelText('Nombres')).toHaveProperty('value', '');
     await userEvent.type(within(dialogo).getByLabelText(/Nombre, DUI o expediente/), 'Pedro Gomez');
     await userEvent.click(within(dialogo).getByRole('button', { name: /Buscar/ }));
-    expect(await within(dialogo).findByLabelText('Nombres')).toHaveProperty('value', 'Pedro');
+    expect(await within(dialogo).findByDisplayValue('Pedro')).toBe(within(dialogo).getByLabelText('Nombres'));
     expect(within(dialogo).getByLabelText('Apellidos')).toHaveProperty('value', 'Gomez');
     expect(api.write).toHaveBeenCalledWith('/pacientes/busquedas', { query: 'Pedro Gomez' }, 'POST');
   });
@@ -90,7 +91,7 @@ describe('búsqueda antes de registrar', () => {
     await screen.findByText(/Puedes registrar/);
     await userEvent.click(registrar());
     const dialogo = await screen.findByRole('dialog', { name: 'Registrar paciente' });
-    expect(within(dialogo).getByLabelText(/DUI/)).toHaveProperty('value', '00000001-8');
+    expect(within(dialogo).getByLabelText(/DUI · opcional/)).toHaveProperty('value', '00000001-8');
     expect(within(dialogo).getByText(/si la persona no está, completa los datos/)).toBeTruthy();
   });
 
@@ -129,7 +130,7 @@ describe('búsqueda antes de registrar', () => {
     expect(within(dialogo).queryByText(/Conservamos lo que escribiste/)).toBeNull();
   });
 
-  it('con el recibo vencido con el diálogo abierto no llama a la API y bloquea el envío', async () => {
+  it('con el recibo vencido con el diálogo abierto vuelve a buscar antes de registrar y no registra', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     const api = montar({ busqueda: recibo(Date.now() + 60_000) });
     const vaciar = () => act(async () => { await vi.advanceTimersByTimeAsync(0); });
@@ -144,8 +145,10 @@ describe('búsqueda antes de registrar', () => {
     fireEvent.change(within(dialogo).getByLabelText('Apellidos'), { target: { value: 'Prueba' } });
     await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
     expect(within(dialogo).getByText('La búsqueda venció; vuelve a buscar.')).toBeTruthy();
-    expect(within(dialogo).queryByRole('button', { name: /Registrar paciente/ })).toBeNull();
+    // S13 (T10w): registering with an expired search searches again first; with candidates it stops for review and never registers.
+    fireEvent.click(within(dialogo).getByRole('button', { name: /Registrar paciente/ }));
     await vaciar();
+    expect(api.write.mock.calls.filter(([path]) => path === '/pacientes/busquedas')).toHaveLength(2);
     expect(api.write.mock.calls.some(([path]) => path === '/pacientes')).toBe(false);
   });
 });

@@ -2,9 +2,10 @@ import { useEffect,useId,useState } from 'react';
 import { Field,Icon } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
 import { exportName,type ExportTable } from '../lib/export';
-import { Empty,CompactHeader,RemoteState,Select,formatDateTime,useData } from './common';
+import { Empty,CompactHeader,RemoteState,Select,Tag,formatDateTime,useData } from './common';
+import { PriorityBadge } from '../components/system';
 import { type Api } from '../lib/api';
-import { finalStateNames,priorityNames,roleNames,typeNames } from './ambulance/types';
+import { finalStateNames,priorityLevel,priorityNames,roleNames,typeNames } from './ambulance/types';
 import { activeFilters,emptyFilters,logPath,narrate,timeline,type AmbulanceLogRow,type LogFilters } from './ambulance/narrative';
 import './ambulance/ambulance.css';
 export { logPath };
@@ -47,7 +48,7 @@ export function AmbulanceLogPage({api,version}:{api:Api;version:number}){
    {chips.map(c=><span className="amb-chip" key={c.key}>{c.label}: {c.value}<button type="button" aria-label={`Quitar filtro ${c.label}`} onClick={()=>setFilters(f=>({...f,[c.key]:''}))}>×</button></span>)}
    <button type="button" className="row-action" onClick={clear}>Quitar filtros</button></div>}
   <RemoteState state={data}>{rows=>rows.length?<><p className="amb-count" role="status">{rows.length} {rows.length===1?'servicio':'servicios'}{rows.length>=500?' (se muestran los 500 más recientes)':''}</p>{view==='cards'?<ol className="amb-service-list" aria-label="Servicios de ambulancia">{rows.map(r=><li key={r.id} className={`amb-service amb-prio-${r.priority}`}>
-    <header><span className="amb-prio-chip">{priorityNames[r.priority]??r.priority}</span><strong>{typeNames[r.type]??r.type}</strong><time dateTime={r.dispatchedAt}>{formatDateTime(r.dispatchedAt)}</time><span className={`status-tag status-${r.finalState??'en_curso'}`}>{finalLabel(r)}</span></header>
+    <header><PriorityBadge value={priorityLevel(r.priority)} label={priorityNames[r.priority]??r.priority}/><strong>{typeNames[r.type]??r.type}</strong><time dateTime={r.dispatchedAt}>{formatDateTime(r.dispatchedAt)}</time><Tag value={r.administrativeClose?'cerrado':r.finalState??'en_curso'} label={finalLabel(r)}/></header>
     <p className="amb-narrative">{narrate(r)}</p>
     {timeline(r).length>0&&<ol className="amb-timeline" aria-label="Hitos del servicio">{timeline(r).map(m=><li key={m.type}><span>{m.label}</span><time>{m.time}</time></li>)}</ol>}
     <p className="muted amb-response">{r.responseMinutes===null?'Sin llegada a escena':`Llegó a la escena en ${r.responseMinutes} min`}</p></li>)}</ol>

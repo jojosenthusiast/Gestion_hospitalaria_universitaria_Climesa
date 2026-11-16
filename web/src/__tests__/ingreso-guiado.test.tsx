@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api } from '../lib/api';
 import { HospitalizationPage } from '../features/hospitalization';
-import { admissionBody, groupBeds, initialForm, isImmediate, salvadorInstant, stepError, visitorError, type AdmissionForm, type BedPick } from '../features/hospitalization/admission-rules';
+import { admissionBody, groupBeds, initialForm, isImmediate, salvadorInstant, stepError, stepsFor, visitorError, type AdmissionForm, type BedPick } from '../features/hospitalization/admission-rules';
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
@@ -20,25 +20,35 @@ const complete = (over: Partial<AdmissionForm> = {}): AdmissionForm => ({
 
 describe('ingreso guiado · reglas de cada paso', () => {
   it('paso 1 y 2: paciente, origen enlazado y motivo obligatorio', () => {
-    expect(stepError(0, initialForm('2026-11-20T08:30'), true)).toMatch(/paciente/);
+    expect(stepError('paciente', initialForm('2026-11-20T08:30'), true)).toMatch(/paciente/);
     const f = complete();
-    expect(stepError(1, { ...f, origin: null, originRecord: null }, true)).toMatch(/origen/);
-    expect(stepError(1, { ...f, originRecord: null }, true)).toMatch(/registro de origen/);
-    expect(stepError(1, { ...f, motive: 'corto' }, true)).toMatch(/motivo/);
-    expect(stepError(1, f, true)).toBeNull();
+    expect(stepError('origen', { ...f, origin: null, originRecord: null }, true)).toMatch(/origen/);
+    expect(stepError('origen', { ...f, originRecord: null }, true)).toMatch(/registro de origen/);
+    expect(stepError('origen', { ...f, motive: 'corto' }, true)).toMatch(/motivo/);
+    expect(stepError('origen', f, true)).toBeNull();
   });
   it('paso 3: el médico apagado no deja avanzar y explica por qué', () => {
     const f = complete({ doctor: { id: 'd2', label: 'Dr. Sin Turno', available: false, reason: 'Sin turno en ese horario' } });
-    expect(stepError(2, f, true)).toMatch(/Sin turno en ese horario/);
-    expect(stepError(2, { ...f, doctor: null }, true)).toMatch(/médico/);
+    expect(stepError('medico', f, true)).toMatch(/Sin turno en ese horario/);
+    expect(stepError('medico', { ...f, doctor: null }, true)).toMatch(/médico/);
   });
-  it('paso 6: la cama es obligatoria solo para ingreso inmediato y con permiso de cama', () => {
+  // S13 (T10w): category, clinical requirements and visitors share one step, and the bed step only appears when a bed is
+  // assigned now (immediate admission and permission). Eight steps become six, or five without a bed.
+  it('el paso de cama solo existe si se asigna cama ahora; la cama es obligatoria en ese paso', () => {
     const now = new Date('2026-11-20T14:30:00Z');
     const f = complete({ at: '2026-11-20T08:30', bed: null });
     expect(isImmediate(f.at, now)).toBe(true);
-    expect(stepError(5, f, true, now)).toMatch(/cama/);
-    expect(stepError(5, f, false, now)).toBeNull();
-    expect(stepError(5, { ...f, at: '2026-11-22T08:30' }, true, now)).toBeNull();
+    expect(stepsFor(f, true, now)).toEqual(['paciente', 'origen', 'medico', 'habitacion', 'cama', 'resumen']);
+    expect(stepsFor(f, false, now)).toEqual(['paciente', 'origen', 'medico', 'habitacion', 'resumen']);
+    expect(stepsFor({ ...f, at: '2026-11-22T08:30' }, true, now)).not.toContain('cama');
+    expect(stepError('cama', f, true, now)).toMatch(/cama/);
+  });
+  it('el paso de habitación pide la categoría y valida aislamiento y visitas', () => {
+    const f = complete();
+    expect(stepError('habitacion', { ...f, category: null }, true)).toMatch(/categoría/);
+    expect(stepError('habitacion', { ...f, isolation: false, isolationType: 'contacto' }, true)).toMatch(/aislamiento/);
+    expect(stepError('habitacion', { ...f, visitorsAllowed: true, visitorsMax: 0 }, true)).toMatch(/al menos 1/);
+    expect(stepError('habitacion', f, true)).toBeNull();
   });
   it('paso 7: visitas según categoría', () => {
     expect(visitorError(false, 0, 'vip')).toBeNull();
@@ -89,7 +99,7 @@ function mount(permissions: string[], write?: (path: string, body: unknown) => P
 }
 const next = async () => userEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
 
-describe('ingreso guiado · recorrido de ocho pasos', { timeout: 30000 }, () => {
+describe('ingreso guiado · recorrido de seis pasos', { timeout: 30000 }, () => {
   it('recorre los pasos validando cada uno y confirma con cama sugerida preseleccionada', async () => {
     const api = mount(['admision.ver', 'admision.crear', 'camas.asignar', 'pacientes.buscar']);
     await userEvent.click(await screen.findByRole('button', { name: /Ingresar paciente/ }));
@@ -113,23 +123,20 @@ describe('ingreso guiado · recorrido de ocho pasos', { timeout: 30000 }, () => 
     expect(off.textContent).toContain('Sin turno en ese horario');
     await userEvent.click(within(dialog).getByRole('option', { name: /Dra\. Ficticia/ }));
     await next();
-    // 4. categoría: VIP apagada por no tener camas libres
+    // 4. habitación: categoría (VIP apagada por no tener camas libres), requisitos y visitas en un solo paso
+    expect(within(dialog).getByText(/Paso 4 de 6/)).toBeTruthy();
     expect((await within(dialog).findByLabelText(/VIP/) as HTMLInputElement).disabled).toBe(true);
     await userEvent.click(within(dialog).getByLabelText(/Semiprivada/));
-    await next();
-    // 5. requisitos
     await userEvent.click(within(dialog).getByLabelText('Paciente inestable'));
+    await userEvent.click(within(dialog).getByLabelText(/Se permiten visitas/));
     await next();
-    // 6. cama: la sugerida viene elegida y las incompatibles están apagadas con su motivo
+    // 5. cama: la sugerida viene elegida y las incompatibles están apagadas con su motivo
     const suggested = await within(dialog).findByRole('button', { name: /C-201, sugerida/ });
     expect(suggested.getAttribute('aria-pressed')).toBe('true');
     expect((within(dialog).getByRole('button', { name: /C-202, no disponible: Ocupada/ }) as HTMLButtonElement).disabled).toBe(true);
     expect((within(dialog).getByRole('button', { name: /C-203, no disponible: Habitación ocupada por un paciente de otro sexo/ }) as HTMLButtonElement).disabled).toBe(true);
     await next();
-    // 7. visitas
-    await userEvent.click(within(dialog).getByLabelText(/Se permiten visitas/));
-    await next();
-    // 8. resumen y factibilidad
+    // 6. resumen y factibilidad
     expect(await within(dialog).findByText('El médico tiene turno en ese horario.')).toBeTruthy();
     expect(within(dialog).getByText(/C-201 · H-201 · planta 2/)).toBeTruthy();
     await userEvent.click(within(dialog).getByRole('button', { name: /Confirmar ingreso/ }));
@@ -139,7 +146,7 @@ describe('ingreso guiado · recorrido de ocho pasos', { timeout: 30000 }, () => 
     }), 'POST');
   });
 
-  it('sin permiso de cama el paso de cama avisa y el ingreso queda pendiente de cama', async () => {
+  it('sin permiso de cama no hay paso de cama y el ingreso queda pendiente de cama', async () => {
     mount(['admision.ver', 'admision.crear', 'pacientes.buscar']);
     await userEvent.click(await screen.findByRole('button', { name: /Ingresar paciente/ }));
     const dialog = screen.getByRole('dialog');
@@ -154,10 +161,11 @@ describe('ingreso guiado · recorrido de ocho pasos', { timeout: 30000 }, () => 
     await userEvent.click(await within(dialog).findByRole('option', { name: /Dra\. Ficticia/ }));
     await next();
     await userEvent.click(await within(dialog).findByLabelText(/Semiprivada/));
-    await next(); await next();
-    expect(within(dialog).getByText(/no puede asignar cama/)).toBeTruthy();
-    await next(); await next();
+    expect(within(dialog).getByText(/Paso 4 de 5/)).toBeTruthy();
+    await next();
+    // S13: without permission there is no bed step; the summary says the admission waits for a bed.
     expect(await within(dialog).findByText('Pendiente de cama (sin permiso para asignar)')).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: /Confirmar ingreso/ })).toBeTruthy();
   });
 
   it('abre el ingreso guiado con ?accion=admision si el rol puede crear admisiones', async () => {

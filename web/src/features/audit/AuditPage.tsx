@@ -3,6 +3,7 @@ import { Field, Icon } from '../../components/ui';
 import { SearchPicker, type PickerItem } from '../../components/search-picker';
 import { roleNames, type Api } from '../../lib/api';
 import { Empty, CompactHeader, RemoteState, Select, Tag, formatDateTime, useData } from '../common';
+import { ActiveFilters } from '../listas/chips';
 import { AuditDrawer } from './AuditDrawer';
 import { AuditExport } from './AuditExport';
 import { ChainPanel } from './ChainPanel';
@@ -75,10 +76,7 @@ export function AuditPage({ api, version }: { api: Api; version: number }) {
         <Field label="Desde" type="date" value={filters.from} onChange={from => change({ from })} />
         <Field label="Hasta" type="date" value={filters.to} onChange={to => change({ to })} />
       </div>}
-      {filterChips.length > 0 && <div className="audit-chips" aria-label="Filtros activos">
-        {filterChips.map(chip => <span className="audit-chip" key={chip.key}>{chip.label}<button type="button" aria-label={`Quitar filtro ${chip.label}`} onClick={() => { setFilters(removeChip(filters, chip.key)); setPage(1); }}><Icon name="close" size={14} /></button></span>)}
-        <button type="button" className="row-action" onClick={clear}>Quitar filtros</button>
-      </div>}
+      <div className="audit-active-filters"><ActiveFilters filters={filterChips.map(chip => ({ key: chip.key, label: chip.label, remove: () => { setFilters(removeChip(filters, chip.key)); setPage(1); } }))} onClear={clear} /></div>
       <RemoteState state={data}>{result => result.filas.length
         ? <>
           <table className="record-table audit-table"><caption className="sr-only">Operaciones auditadas, ordenadas por {sort.key} {sort.dir === 'asc' ? 'de menor a mayor' : 'de mayor a menor'}</caption>

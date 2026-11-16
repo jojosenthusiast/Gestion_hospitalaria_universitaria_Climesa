@@ -1,7 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Field, Icon } from '../components/ui';
 import { can, type AccessProfile, type Api, type Bed } from '../lib/api';
-import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, Tag, WriteError, useAction, useData } from './common';
+import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, useAction, useData } from './common';
 import { AdmissionStepper } from './hospitalization/admission-stepper';
 import { ExitDialog, ReasonDialog, ReassignDoctorDialog, RequestDischargeDialog, categoryNames, relativeTime, type Admission } from './hospitalization/admission-actions';
 import { spanishProblem } from './problems';
@@ -78,16 +78,29 @@ function categoryOptions(admission: Admission) {
   return admission.authorized || admission.requestedCategory === 'vip' ? [admission.requestedCategory, other] : [admission.requestedCategory];
 }
 
+/**
+ * S13: the suggested beds show at once. With an authorized exception (or a VIP request) both categories are listed, the
+ * requested one first, so nobody picks a category before seeing beds. The first suggestion comes chosen until the person picks.
+ */
 function BedSuggestionDialog({ api, admission, version, onClose, onSaved }: { api: Api; admission: Admission; version: number; onClose: () => void; onSaved: () => void }) {
-  const options = categoryOptions(admission), [category, setCategory] = useState(admission.requestedCategory);
-  const data = useData<Suggestion[]>(api, `/admisiones/${admission.id}/sugerencias-cama${options.length > 1 ? `?category=${encodeURIComponent(category)}` : ''}`, version), [bedId, setBedId] = useState(''), [reason, setReason] = useState(''), action = useAction(api);
-  const selected = data.data?.find(x => x.id === bedId), reasonInvalid = reason.trim().length > 0 && reason.trim().length < 10;
+  const options = categoryOptions(admission), both = options.length > 1;
+  const path = (category: string) => `/admisiones/${admission.id}/sugerencias-cama${both ? `?category=${encodeURIComponent(category)}` : ''}`;
+  const requested = useData<Suggestion[]>(api, path(options[0]), version), other = useData<Suggestion[]>(api, path(options[1] ?? options[0]), version, both);
+  const [bedId, setBedId] = useState(''), [reason, setReason] = useState(''), action = useAction(api);
+  const all = [...(requested.data ?? []), ...(both ? other.data ?? [] : [])];
+  const selected = all.find(x => x.id === bedId), reasonInvalid = reason.trim().length > 0 && reason.trim().length < 10;
+  const first = requested.data?.[0]?.id ?? (both ? other.data?.[0]?.id : undefined);
+  // The first suggestion is chosen once, on the first load. A bed that later leaves the list (real time) leaves the choice
+  // empty and «Confirmar cama» disabled: another bed is never chosen silently.
+  const prefilled = useRef(false);
+  useEffect(() => { if (!prefilled.current && first) { prefilled.current = true; setBedId(first); } }, [first]);
   // WEB-08: el motivo lo escribe la persona; si queda vacío no se envía uno inventado.
   async function assign() { if (selected && await action.run(`/admisiones/${admission.id}/cama`, { bedId: selected.id, version: selected.version, ...(reason.trim() ? { reason: reason.trim() } : {}) })) onSaved(); }
+  const group = (category: string, rows: Suggestion[]) => <fieldset className="choice-list" key={category}><legend>{both ? `Camas sugeridas · ${categoryNames[category] ?? category}${category !== admission.requestedCategory ? ' (excepción)' : ''}` : 'Camas sugeridas'}</legend>
+    {rows.length ? rows.map(row => <label className="check-field" key={row.id}><input type="radio" name="bed" value={row.id} checked={bedId === row.id} onChange={() => setBedId(row.id)} /><span><strong>{row.code}</strong> <small>{row.room} · {categoryNames[row.category] ?? row.category} · {row.reason}</small></span></label>) : <p className="muted">Sin camas libres de esta categoría.</p>}</fieldset>;
   return <Dialog title="Asignar cama" onClose={onClose} busy={action.busy}>
     <p className="form-intro">Paciente: <strong>{admission.patientName}</strong> · categoría solicitada {categoryNames[admission.requestedCategory] ?? admission.requestedCategory} · médico tratante {admission.attendingDoctorName || 'sin asignar'}.</p>
-    {options.length > 1 && <Select label="Categoría de cama" value={category} onChange={value => { setCategory(value); setBedId(''); }}>{options.map(c => <option key={c} value={c}>{categoryNames[c] ?? c}</option>)}</Select>}
-    <RemoteState state={data}>{rows => rows.length ? <div className="module-form"><WriteError error={spanishProblem(action.error)} onReload={onSaved} /><p className="form-intro">Selecciona una cama libre. La API vuelve a comprobar el conflicto al confirmar.</p><fieldset className="choice-list"><legend>Camas sugeridas</legend>{rows.map(row => <label className="check-field" key={row.id}><input type="radio" name="bed" value={row.id} checked={bedId === row.id} onChange={() => setBedId(row.id)} /><span><strong>{row.code}</strong> <small>{row.room} · {categoryNames[row.category] ?? row.category} · {row.reason}</small></span></label>)}</fieldset><Field label="Motivo de la asignación (opcional)" value={reason} onChange={setReason} maxLength={500} hint="Si lo escribes, al menos 10 caracteres." aria-invalid={reasonInvalid || undefined} /><div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose}>Cancelar</button><button className="primary-button" type="button" onClick={() => void assign()} disabled={action.busy || !selected || reasonInvalid}>Confirmar cama</button></div></div> : <Empty title="Sin camas sugeridas" description={options.length > 1 ? 'Prueba con la otra categoría o revisa el aislamiento y la disponibilidad del edificio.' : 'Revisa la categoría, aislamiento o disponibilidad del edificio. Jefatura puede autorizar una excepción de categoría.'} />}</RemoteState>
+    <RemoteState state={requested}>{rows => rows.length || (both && other.data?.length) ? <div className="module-form"><WriteError error={spanishProblem(action.error)} onReload={onSaved} /><p className="form-intro">Te proponemos la primera cama libre; cambia si prefieres otra. Se vuelve a comprobar al confirmar.</p>{group(options[0], rows)}{both && (other.data ? group(options[1], other.data) : other.error ? <p className="muted">No pudimos cargar las camas de la otra categoría.</p> : null)}<Field label="Motivo de la asignación (opcional)" value={reason} onChange={setReason} maxLength={500} hint="Si lo escribes, al menos 10 caracteres." aria-invalid={reasonInvalid || undefined} /><div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose}>Cancelar</button><button className="primary-button" type="button" onClick={() => void assign()} disabled={action.busy || !selected || reasonInvalid}>Confirmar cama</button></div></div> : both && !other.data && !other.error ? <p className="muted" role="status">Buscando camas…</p> : <Empty title="Sin camas sugeridas" description={both ? 'No hay camas libres en ninguna de las dos categorías. Revisa el aislamiento y la disponibilidad del edificio.' : 'Revisa la categoría, aislamiento o disponibilidad del edificio. Jefatura puede autorizar una excepción de categoría.'} />}</RemoteState>
   </Dialog>;
 }
 

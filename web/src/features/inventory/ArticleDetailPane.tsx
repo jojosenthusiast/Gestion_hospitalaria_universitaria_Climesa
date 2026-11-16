@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ExportMenu } from '../../components/export-menu';
 import { Icon } from '../../components/ui';
 import type { Api } from '../../lib/api';
-import { Empty, RemoteState, WriteError, formatDate, formatDateTime, useAction, useData } from '../common';
+import { Empty, RemoteState, Tag, WriteError, formatDate, formatDateTime, useAction, useData } from '../common';
 import { CategoryIcon, StatusChip, StockGauge } from './parts';
 import { categories, expiryText, movementLabels, movementsExport, quantityText, todayIso, type ArticleDetail, type Lot, type MovementType } from './model';
 
@@ -24,13 +24,13 @@ function Body({ api, article, canMove, canConfigure, onBack, onMove, onEdit, onL
     <header className="inv-detail-head">
       <div className="inv-detail-title"><CategoryIcon type={article.type} size={26} /><div><h2>{article.name}</h2><span className="inv-muted">{article.code} · {categories[article.type].label} · {article.unit}</span></div></div>
       <div className="inv-detail-actions">
-        {canMove && article.active && <button type="button" className="primary-button" onClick={() => onMove(article.id)}><Icon name="plus" size={18} />Registrar movimiento</button>}
+        {canMove && article.active && <button type="button" className="secondary-button" onClick={() => onMove(article.id)}><Icon name="plus" size={18} />Registrar movimiento</button>}
         {canConfigure && <button type="button" className="secondary-button" onClick={() => onEdit(article)}>Editar artículo</button>}
         {canConfigure && <button type="button" className="secondary-button" onClick={() => onLot(article, null)}>Nuevo lote</button>}
         {canConfigure && (removable ? <button type="button" className="secondary-button" onClick={() => setConfirming(true)}>Eliminar</button> : article.active && <button type="button" className="secondary-button" onClick={() => onEdit(article)} title="Con lotes o historial no se elimina; se desactiva al editarlo">Desactivar</button>)}
       </div>
     </header>
-    {confirming && <div className="conflict-notice" role="alertdialog" aria-label="Confirmar eliminación"><p>¿Eliminar «{article.name}»? Solo se puede porque no tiene lotes ni historial. No se puede deshacer.</p><div className="inv-detail-actions"><button type="button" className="secondary-button" onClick={() => setConfirming(false)}>Conservar</button><button type="button" className="primary-button" disabled={action.busy} onClick={() => void remove()}>Sí, eliminar</button></div></div>}
+    {confirming && <div className="conflict-notice" role="alertdialog" aria-label="Confirmar eliminación"><p>¿Eliminar «{article.name}»? Solo se puede porque no tiene lotes ni historial. No se puede deshacer.</p><div className="inv-detail-actions"><button type="button" className="secondary-button" onClick={() => setConfirming(false)}>Conservar</button><button type="button" className="secondary-button" disabled={action.busy} onClick={() => void remove()}>Sí, eliminar</button></div></div>}
     <WriteError error={action.error} />
     <div className="inv-stats">
       <div><span className="inv-muted">Existencia usable</span><strong>{quantityText(article.available, article.unit)}</strong><StockGauge article={article} /></div>
@@ -46,7 +46,7 @@ function Body({ api, article, canMove, canConfigure, onBack, onMove, onEdit, onL
     <section className="inv-section" aria-label="Lotes"><header><h3>Lotes y vencimientos</h3></header>
       {lotsInUse.length || retired.length ? <div className="inv-table-wrap"><table className="inv-table"><caption className="sr-only">Lotes del artículo</caption><thead><tr><th>Lote</th><th>Vencimiento</th><th>Existencia</th><th>Bodegas</th>{canConfigure && <th><span className="sr-only">Acción</span></th>}</tr></thead>
         <tbody>{[...lotsInUse, ...retired].map(lot => <tr key={lot.id}>
-          <td><strong>{lot.number}</strong>{!lot.active && <> <span className="inv-tag inv-tag-inactivo">Dado de baja</span></>}</td>
+          <td><strong>{lot.number}</strong>{!lot.active && <> <Tag value="inactivo" label="Dado de baja" /></>}</td>
           <td>{lot.expiresAt ? formatDate(lot.expiresAt) : 'No vence'}<br /><span className={lot.expired ? 'inv-expired' : expiryText(lot.expiresAt, today).startsWith('Vence') ? 'inv-soon' : 'inv-muted'}>{expiryText(lot.expiresAt, today)}</span></td>
           <td>{quantityText(lot.total, article.unit)}</td>
           <td>{lot.warehouses.length ? lot.warehouses.map(w => `${w.warehouseCode}: ${w.quantity}`).join(' · ') : '—'}</td>

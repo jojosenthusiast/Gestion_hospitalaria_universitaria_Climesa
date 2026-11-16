@@ -40,8 +40,9 @@ export type AdmissionForm = {
 
 export const initialForm = (at: string): AdmissionForm => ({ patient: null, origin: null, originRecord: null, motive: '', at, doctor: null, category: null, isolation: false, isolationType: '', unstable: false, postSurgical: false, bed: null, visitorsAllowed: true, visitorsMax: 1, feasible: false });
 
-export const stepTitles = ['Paciente', 'Origen y motivo', 'Fecha y médico', 'Categoría', 'Requisitos clínicos', 'Cama', 'Visitas', 'Resumen'] as const;
-export const LAST_STEP = stepTitles.length - 1;
+/** S13: category, clinical requirements and visitors share one step; the bed step exists only when a bed is assigned now. */
+export type StepId = 'paciente' | 'origen' | 'medico' | 'habitacion' | 'cama' | 'resumen';
+export const stepTitles: Record<StepId, string> = { paciente: 'Paciente', origen: 'Origen y motivo', medico: 'Fecha y médico', habitacion: 'Habitación', cama: 'Cama', resumen: 'Resumen' };
 
 /** Instante local de El Salvador (UTC-6, sin horario de verano) desde un `datetime-local`. */
 export const salvadorInstant = (local: string) => `${local.length === 16 ? `${local}:00` : local}-06:00`;
@@ -59,25 +60,31 @@ export function visitorError(allowed: boolean, max: number, category: Category |
 }
 
 /** Mensaje de lo que falta para salir del paso `step`, o `null` si puede avanzar. `canAssignBed`: tiene `camas.asignar`. */
-export function stepError(step: number, form: AdmissionForm, canAssignBed: boolean, now = new Date()): string | null {
+/** Steps for this admission: no bed step when the account cannot assign beds or the admission is for later. */
+export function stepsFor(form: AdmissionForm, canAssignBed: boolean, now = new Date()): StepId[] {
+  return ['paciente', 'origen', 'medico', 'habitacion', ...(canAssignBed && isImmediate(form.at, now) ? ['cama' as const] : []), 'resumen'];
+}
+
+export function stepError(step: StepId, form: AdmissionForm, canAssignBed: boolean, now = new Date()): string | null {
   switch (step) {
-    case 0: return form.patient ? null : 'Elige al paciente.';
-    case 1:
+    case 'paciente': return form.patient ? null : 'Elige al paciente.';
+    case 'origen':
       if (!form.origin) return 'Elige el origen del ingreso.';
       if (!form.originRecord) return 'Elige el registro de origen del paciente.';
       if (form.motive.trim().length < MOTIVE_MIN) return `Escribe el motivo del ingreso, de al menos ${MOTIVE_MIN} caracteres.`;
       return null;
-    case 2:
+    case 'medico':
       if (!form.at || Number.isNaN(new Date(salvadorInstant(form.at)).getTime())) return 'Indica la fecha y la hora del ingreso.';
       if (!form.doctor) return 'Elige al médico tratante.';
       return form.doctor.available ? null : `El médico elegido no está disponible: ${form.doctor.reason ?? 'sin turno'}.`;
-    case 3: return form.category ? null : 'Elige la categoría de habitación.';
-    case 4: return form.isolationType && !form.isolation ? 'El tipo de aislamiento necesita que el aislamiento esté marcado.' : null;
-    case 5:
+    case 'habitacion':
+      if (!form.category) return 'Elige la categoría de habitación.';
+      if (form.isolationType && !form.isolation) return 'El tipo de aislamiento necesita que el aislamiento esté marcado.';
+      return visitorError(form.visitorsAllowed, form.visitorsMax, form.category);
+    case 'cama':
       if (!canAssignBed || !isImmediate(form.at, now)) return null;
       return form.bed ? null : 'Elige una cama compatible.';
-    case 6: return visitorError(form.visitorsAllowed, form.visitorsMax, form.category);
-    case 7: return form.feasible ? null : 'Hay condiciones que impiden confirmar el ingreso.';
+    case 'resumen': return form.feasible ? null : 'Hay condiciones que impiden confirmar el ingreso.';
     default: return null;
   }
 }
