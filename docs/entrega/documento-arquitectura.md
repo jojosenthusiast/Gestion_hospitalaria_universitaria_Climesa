@@ -612,6 +612,8 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 | GET | `/publico/avisos` | sin sesión | Avisos vigentes |
 | GET | `/publico/fila/{servicio}` | sin sesión | Números llamados hoy con su consultorio, sin nombres |
 | POST | `/avisos` | `avisos.publicar` | Publicar un aviso general con vigencia; advierte si parece llevar datos personales |
+| PUT | `/avisos/{id}` | `avisos.publicar` | Editar un aviso vigente o programado (texto, audiencia, prioridad y vigencia), con versión y auditoría |
+| POST | `/avisos/{id}/retirar` | `avisos.publicar` | Retirar un aviso antes de tiempo con motivo (D-13) |
 | GET | `/metricas/tablero` | `metricas.ver` | Tablero inicial: agregados sin datos personales |
 | GET | `/metricas/{indicador}` | `metricas.ver` | Serie diaria de un indicador (ocupacion_diaria, estancia_promedio, tiempo_laboratorio, tiempo_ambulancia, cobertura_turnos) |
 | GET | `/ambulancia` | `ambulancia.ver_estado` | Estado de la unidad, servicio activo con hitos y, para despacho, solicitudes por confirmar |
@@ -629,7 +631,7 @@ Generado desde `contrato/openapi.json` (campo `x-permiso` de cada operación): 1
 
 Copia de `docs/arquitectura/datos/permisos.csv` (78 permisos, 10 roles). `✔` = permitido sin restricción adicional; `·` = no permitido; una palabra indica el contexto que la API exige además del permiso: `propio` (solo lo del propio usuario o paciente), `propio_revisado` (lo propio, solo después de la revisión o firma del médico), `relacion` (relación de atención con el paciente), `area` (turno en curso en el área del paciente), `orden` (paciente con orden de laboratorio), `rango` (solo para calcular rangos de referencia), `autor` (solo lo que creó la misma persona), `consumo` y `reactivos` (solo esos movimientos de inventario).
 
-Ocho permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo y filtran campos dentro de otros endpoints (`pacientes.ver_nacimiento`, `pacientes.ver_contacto`, `personal.ver_datos_personales`, `turnos.ver_borradores`, `camas.ver_ocupante`); los otros tres no tienen endpoint (`recursos.gestionar`, `recursos.configurar`, `consulta.corregir`).
+Seis permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo y filtran campos dentro de otros endpoints (`pacientes.ver_nacimiento`, `pacientes.ver_contacto`, `personal.ver_datos_personales`, `turnos.ver_borradores`, `camas.ver_ocupante`); `consulta.corregir` espera el addendum clínico (MA-CIT-04). Los permisos `recursos.*` se retiraron (D-091): el control de recursos del Administrador es inventario + edificio.
 
 | Permiso | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -665,8 +667,6 @@ Ocho permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo
 | `camas.bloquear` | · | ✔ | · | · | · | · | · | · | · | · |
 | `camas.registrar_limpieza` | · | · | · | · | ✔ | · | · | · | · | · |
 | `camas.verificar_limpieza` | · | ✔ | · | · | ✔ | · | · | · | · | · |
-| `recursos.gestionar` | · | ✔ | · | · | · | · | · | · | · | · |
-| `recursos.configurar` | ✔ | · | · | · | · | · | · | · | · | · |
 | `fila.emitir` | · | · | ✔ | · | · | · | · | · | · | · |
 | `fila.ver` | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
 | `fila.llamar` | · | · | · | ✔ | · | ✔ | · | · | · | · |
@@ -705,7 +705,7 @@ Ocho permisos no son el `x-permiso` de ninguna operación. Cinco son de atributo
 | `ambulancia.ver_bitacora` | · | ✔ | ✔ | · | · | · | · | propio | ✔ | · |
 | `auditoria.ver` | · | · | · | · | · | · | · | · | ✔ | · |
 | `auditoria.mis_accesos` | · | · | · | · | · | · | · | · | · | propio |
-| `inventario.ver` | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| `inventario.ver` | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · | · |
 | `inventario.mover` | · | ✔ | · | · | consumo | · | reactivos | · | · | · |
 | `inventario.configurar` | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | `avisos.publicar` | · | ✔ | · | · | · | · | · | · | · | · |

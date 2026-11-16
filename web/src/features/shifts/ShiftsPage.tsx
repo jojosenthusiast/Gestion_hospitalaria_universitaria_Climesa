@@ -10,6 +10,7 @@ import { useQuickAction } from '../personal/accion';
 import { Field } from '../../components/ui';
 import { ShiftForm, type ShiftDraft } from './ShiftForm';
 import { CrewCoverageAlert } from './CrewCoverageAlert';
+import { AreaCoverageAlert } from './AreaCoverageAlert';
 import { AttendanceDialog } from './AttendanceDialog';
 import { SpecialistsWeek } from './SpecialistsWeek';
 import { KIND_LABEL, attendanceLabel, can as allows, type CatalogArea, type CatalogRole, type CatalogStaff, type ShiftCatalog, type ShiftRow } from './rules';
@@ -100,6 +101,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
     {unconfirmed.length > 0 && <Notice kind="info">{unconfirmed.length === 1 ? 'Un turno en curso no tiene' : `${unconfirmed.length} turnos en curso no tienen`} la entrada marcada. Confirma la asistencia o registra la ausencia para que no cuenten como de turno.{' '}
       <button type="button" className="secondary-button" onClick={() => { setState('sin_confirmar'); setPanel(false); }}>Ver turnos sin entrada</button></Notice>}
     {data.data && remote.data && <CrewCoverageAlert shifts={all} typeOf={typeOf} now={now} onPlan={plan ? () => { setEditing(null); setOpen(true); } : undefined} />}
+    <AreaCoverageAlert api={api} version={version} now={now} onPlan={plan ? () => { setEditing(null); setDraft(undefined); setOpen(true); } : undefined} />
     <section className="data-workbench">
       <div className="shift-toolbar">
         <div className="shift-toolbar-row">

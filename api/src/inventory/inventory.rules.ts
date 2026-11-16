@@ -22,12 +22,16 @@ export const alertExcludedContexts = (articleType: string) => articleType === 'r
 
 /** What each context of `inventario.mover` may see and do: `x` everything, `reactivos` only reagents, `consumo` only consumption of non-reagents. */
 export type InventoryScope = { articleTypes: string[] | null; movementTypes: string[] };
+/**
+ * `canConfigure` (inventario.configurar) widens what the actor sees to every article, never what it may move: an
+ * Administrator who configures but has no `inventario.mover` gets no movement types (MA-REQ-01; the API rejects them).
+ */
 export function scopeOf(contexts: string[], canConfigure = false): InventoryScope {
-  if (canConfigure || contexts.includes('x')) return { articleTypes: null, movementTypes: [...MOVEMENT_TYPES] };
+  if (contexts.includes('x')) return { articleTypes: null, movementTypes: [...MOVEMENT_TYPES] };
   const types = new Set<string>(), movements = new Set<string>();
   if (contexts.includes('reactivos')) { types.add('reactivo'); MOVEMENT_TYPES.forEach(m => movements.add(m)); }
   if (contexts.includes('consumo')) { types.add('insumo'); types.add('equipo_menor'); movements.add('consumo'); }
-  if (!contexts.length) return { articleTypes: null, movementTypes: [] };
+  if (canConfigure || !contexts.length) return { articleTypes: null, movementTypes: [...movements] };
   return { articleTypes: [...types], movementTypes: [...movements] };
 }
 export const canTouchArticle = (scope: InventoryScope, articleType: string) => scope.articleTypes === null || scope.articleTypes.includes(articleType);

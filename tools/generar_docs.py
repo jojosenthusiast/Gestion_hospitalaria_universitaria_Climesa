@@ -23,6 +23,7 @@ SALIDA_ATRIBUTOS = RAIZ / "supabase" / "migrations" / "20261030000100_permisos_a
 SALIDA_RONDA3 = RAIZ / "supabase" / "migrations" / "20261118007000_permisos_ronda3.sql"
 SALIDA_PLATAFORMAS = RAIZ / "supabase" / "migrations" / "20261118008000_plataformas_sin_android.sql"
 SALIDA_FASE01 = RAIZ / "supabase" / "migrations" / "20261120001200_permisos_fase01_hospitalizacion.sql"
+SALIDA_RECURSOS = RAIZ / "supabase" / "migrations" / "20261121003100_recursos_inventario_adm.sql"
 
 # Permisos que se agregaron al catálogo después de aplicada la semilla (regla 10 de AGENTS.md: la semilla no se edita). La semilla
 # no los emite; la migración de SALIDA_ATRIBUTOS los inserta. Son permisos de atributo: deciden qué campos o filas ve quien ya
@@ -43,6 +44,11 @@ ADICIONES_ROL = [("MED", "ambulancia.ver_bitacora")]
 # semilla y la ronda 3. Ninguna migración aplicada las emite; las inserta la migración de SALIDA_FASE01.
 ADICIONES_ROL_FASE01 = [("JOP", "camas.registrar_limpieza")]
 
+# Fase 1 de la auditoría final, D-05 y D-091 (MA-REQ-01): "control de recursos" del Administrador = inventario + edificio. El
+# Administrador ya configura el inventario (inventario.configurar) y ahora también lo ve (inventario.ver), así que abre Inventario.
+# Lo inserta la migración de SALIDA_RECURSOS, que además borra los permisos recursos.* (PERMISOS_RETIRADOS).
+ADICIONES_ROL_RECURSOS = [("ADM", "inventario.ver")]
+
 # Permisos que se retiraron del catálogo (observación 12: módulo de acceso excepcional) después de aplicada la semilla. Ya no están en
 # permisos.csv ni en los documentos RBAC, pero la semilla (aplicada, regla 10 de AGENTS.md) los sigue emitiendo tal como estaban, en su
 # posición original (`despues_de`), y la migración 20261117002000 los borra. Ningún endpoint los declara y `--verificar` no los trata
@@ -52,6 +58,12 @@ PERMISOS_RETIRADOS = [
      "roles": {"ADM": "x", "JOP": "x", "MED": "x"}},
     {"permiso": "privacidad.aprobar_acceso", "descripcion": "Aprobar o negar accesos excepcionales", "despues_de": "ambulancia.ver_bitacora",
      "roles": {"DPD": "x"}},
+    # D-05 y D-091 (MA-REQ-01, MA-REQ-02): el control de recursos es inventario + edificio; el módulo de equipo médico
+    # (`/recursos/*`) nunca tuvo endpoint ni pantalla. La migración de SALIDA_RECURSOS los borra.
+    {"permiso": "recursos.gestionar", "descripcion": "Equipo médico por espacio y su estado", "despues_de": "camas.verificar_limpieza",
+     "roles": {"JOP": "x"}},
+    {"permiso": "recursos.configurar", "descripcion": "Tipos de equipo y catálogos de recursos", "despues_de": "camas.verificar_limpieza",
+     "roles": {"ADM": "x"}},
 ]
 
 # Descripción de rol con que la semilla (aplicada) los insertó, cuando roles.csv ya la cambió. La semilla conserva el histórico.
@@ -326,7 +338,7 @@ def generar_sql(roles, permisos):
     filas = []
     for p in permisos:
         for c in codigos:
-            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL and (c, p["permiso"]) not in ADICIONES_ROL_FASE01:
+            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL + ADICIONES_ROL_FASE01 + ADICIONES_ROL_RECURSOS:
                 filas.append(f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(historico.get((c, p['permiso']), p[c]))})")
     l.append(",\n".join(filas) + ";")
     return "\n".join(l) + "\n"
@@ -418,6 +430,42 @@ def generar_sql_fase01(permisos):
     return "\n".join(l) + "\n"
 
 
+def generar_sql_recursos(permisos):
+    por_nombre = {p["permiso"]: p for p in permisos}
+    retirados = [r["permiso"] for r in PERMISOS_RETIRADOS if r["permiso"].startswith("recursos.")]
+    lista = ", ".join(sql_txt(r) for r in retirados)
+    adiciones = " or ".join(f"(rol_codigo = {sql_txt(r)} and permiso_codigo = {sql_txt(p)})" for r, p in ADICIONES_ROL_RECURSOS)
+    l = [
+        "-- Generado por tools/generar_docs.py desde ADICIONES_ROL_RECURSOS, PERMISOS_RETIRADOS y permisos.csv. No editar a mano.",
+        "-- Auditoría final, D-05 y D-091 (MA-REQ-01, MA-REQ-02): el \"control de recursos\" del Administrador es inventario + edificio.",
+        "-- El Administrador ve el inventario que ya configura; se retiran los permisos del módulo de equipo médico, que nunca tuvo",
+        "-- endpoint ni pantalla. Las tablas infra.equipo e infra.tipo_equipo se conservan sin uso (no se borra estructura en la entrega).",
+        "-- Idempotente: no duplica asignaciones y borrar lo que ya no existe no falla.",
+        "--",
+        "-- Pre-comprobación en producción (la primera no debe devolver filas; la segunda lista lo que se borra):",
+        f"--   select rol_codigo, permiso_codigo from acceso.rol_permiso where {adiciones};",
+        f"--   select rol_codigo, permiso_codigo from acceso.rol_permiso where permiso_codigo in ({lista});",
+        "--",
+        "-- Reversa:",
+        f"--   delete from acceso.rol_permiso where {adiciones};",
+    ]
+    for r in PERMISOS_RETIRADOS:
+        if r["permiso"].startswith("recursos."):
+            l.append(f"--   insert into acceso.permiso (codigo, descripcion) values ({sql_txt(r['permiso'])}, {sql_txt(r['descripcion'])}) on conflict do nothing;")
+            for rol, ctx in r["roles"].items():
+                l.append(f"--   insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values ({sql_txt(rol)}, {sql_txt(r['permiso'])}, {sql_txt(ctx)}) on conflict do nothing;")
+    l += [
+        "",
+        "insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values",
+        ",\n".join(f"  ({sql_txt(r)}, {sql_txt(perm)}, {sql_txt(por_nombre[perm][r])})" for r, perm in ADICIONES_ROL_RECURSOS),
+        "on conflict (rol_codigo, permiso_codigo) do nothing;",
+        "",
+        f"delete from acceso.rol_permiso where permiso_codigo in ({lista});",
+        f"delete from acceso.permiso where codigo in ({lista});",
+    ]
+    return "\n".join(l) + "\n"
+
+
 def generar_sql_plataformas(roles):
     por_codigo = {r["codigo"]: r for r in roles}
     l = [
@@ -477,6 +525,9 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
     for r, perm in ADICIONES_ROL_FASE01:
         if not por_permiso.get(perm, {}).get(r):
             errores.append(f"ADICIONES_ROL_FASE01 dice {r} {perm} y permisos.csv no se lo asigna")
+    for r, perm in ADICIONES_ROL_RECURSOS:
+        if not por_permiso.get(perm, {}).get(r):
+            errores.append(f"ADICIONES_ROL_RECURSOS dice {r} {perm} y permisos.csv no se lo asigna")
     usados = {parte for e in endpoints for parte in partes_permiso(e["permiso"])}
     for p in permisos:
         if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante" and p["permiso"] not in PERMISOS_POSTERIORES:
@@ -585,6 +636,7 @@ def main():
         SALIDA_RONDA3: generar_sql_ronda3(roles, permisos),
         SALIDA_PLATAFORMAS: generar_sql_plataformas(roles),
         SALIDA_FASE01: generar_sql_fase01(permisos),
+        SALIDA_RECURSOS: generar_sql_recursos(permisos),
     }
     if "--verificar" in sys.argv:
         for ruta, contenido in salidas.items():

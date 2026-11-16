@@ -3,7 +3,6 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 101,GET,/api/v1/inicio,sesion.perfil,,R,2,Resumen de inicio según rol y permisos
 110,POST,/api/v1/exportaciones,sesion.perfil,Solo registra la exportación; el archivo se arma en la web,R,2,Auditar una exportación de lista con datos personales (MA-SEG-05)
 101,GET,/api/v1/eventos,sesion.perfil,Solo eventos de canales permitidos al usuario,R,2,Consulta de recuperación de eventos desde un cursor (?after=) tras reconectar
-101,PUT,/api/v1/me/dispositivos,sesion.perfil,,E,5,Registrar token de push FCM o APNs
 101,POST,/api/v1/cuentas/vinculacion,cuenta.vincular,Solo su cuenta,R,2,Paciente pide vincular su cuenta con DUI y fecha de nacimiento
 101,GET,/api/v1/cuentas/vinculaciones,cuentas.verificar,,R,3,Vinculaciones pendientes
 101,POST,/api/v1/cuentas/vinculaciones/{id}/aprobar,cuentas.verificar,,R,3,Aprobar vinculación tras verificar identidad
@@ -49,10 +48,6 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 104,POST,/api/v1/camas/{id}/limpieza,camas.registrar_limpieza,Versión y motivo obligatorios,R,4,Iniciar una limpieza después de la salida física
 104,POST,/api/v1/camas/{id}/limpieza/completar,camas.registrar_limpieza,Versión y motivo obligatorios,R,4,Registrar que se realizó la limpieza
 104,POST,/api/v1/camas/{id}/limpieza/verificar,camas.verificar_limpieza,Distinta persona; versión y motivo obligatorios,R,4,Verificar la limpieza y liberar la cama
-104,GET,/api/v1/recursos/equipos,recursos.gestionar,,E,4,Equipo médico por espacio
-104,POST,/api/v1/recursos/equipos/{id}/estado,recursos.gestionar,,E,4,Operativo o en mantenimiento
-104,PUT,/api/v1/recursos/tipos/{id},recursos.configurar,,E,4,Tipos de equipo médico
-105,GET,/api/v1/me/fila,fila.ver,Propio,R,3,Mi número y cuántos faltan
 105,GET,/api/v1/citas,citas.ver,MED y PAC solo propias,R,3,"Citas por fecha, médico o paciente"
 105,GET,/api/v1/citas/disponibilidad,citas.agendar OR citas.solicitar,PAC y REC según permisos,R,3,"Franjas del día por médico con su estado (libre, ocupado, sin_turno, pasado)"
 105,POST,/api/v1/citas,citas.agendar,Sin traslape por médico,R,3,Agendar cita

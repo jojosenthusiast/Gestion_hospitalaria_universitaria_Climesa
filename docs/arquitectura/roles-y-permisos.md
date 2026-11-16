@@ -70,8 +70,6 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `camas.bloquear` | Bloquear o desbloquear una cama | · | ✔ | · | · | · | · | · | · | · | · |
 | `camas.registrar_limpieza` | Registrar limpieza de cama | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | `camas.verificar_limpieza` | Verificar limpieza (otra persona) | · | ✔ | · | · | ✔ | · | · | · | · | · |
-| `recursos.gestionar` | Equipo médico por espacio y su estado | · | ✔ | · | · | · | · | · | · | · | · |
-| `recursos.configurar` | Tipos de equipo y catálogos de recursos | ✔ | · | · | · | · | · | · | · | · | · |
 | `fila.emitir` | Emitir número de fila | · | · | ✔ | · | · | · | · | · | · | · |
 | `fila.ver` | Ver la fila del día | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
 | `fila.llamar` | Llamar un número | · | · | · | ✔ | · | ✔ | · | · | · | · |
@@ -110,7 +108,7 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `ambulancia.ver_bitacora` | Ver bitácora filtrable | · | ✔ | ✔ | · | · | ✔ | · | propio | ✔ | · |
 | `auditoria.ver` | Consultar y verificar auditoría | · | · | · | · | · | · | · | · | ✔ | · |
 | `auditoria.mis_accesos` | Ver quién consultó mi expediente | · | · | · | · | · | · | · | · | · | propio |
-| `inventario.ver` | Ver existencias | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| `inventario.ver` | Ver existencias | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · | · |
 | `inventario.mover` | Registrar entradas, salidas, ajustes y traslados | · | ✔ | · | · | consumo | · | reactivos | · | · | · |
 | `inventario.configurar` | Artículos, bodegas y mínimos | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | `avisos.publicar` | Publicar avisos generales | · | ✔ | · | · | · | · | · | · | · | · |
@@ -127,7 +125,6 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/auth/me` | `sesion.perfil` |  | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | GET | `/api/v1/inicio` | `sesion.perfil` |  | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | GET | `/api/v1/eventos` | `sesion.perfil` | Solo eventos de canales permitidos al usuario | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
-| PUT | `/api/v1/me/dispositivos` | `sesion.perfil` |  | E | 5 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | POST | `/api/v1/cuentas/vinculacion` | `cuenta.vincular` | Solo su cuenta | R | 2 | · | · | · | · | · | · | · | · | · | propio |
 | GET | `/api/v1/cuentas/vinculaciones` | `cuentas.verificar` |  | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/cuentas/vinculaciones/{id}/aprobar` | `cuentas.verificar` |  | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
@@ -200,15 +197,11 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/camas/{id}/limpieza` | `camas.registrar_limpieza` | Versión y motivo obligatorios | R | 4 | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | POST | `/api/v1/camas/{id}/limpieza/completar` | `camas.registrar_limpieza` | Versión y motivo obligatorios | R | 4 | · | ✔ | · | · | ✔ | · | · | · | · | · |
 | POST | `/api/v1/camas/{id}/limpieza/verificar` | `camas.verificar_limpieza` | Distinta persona; versión y motivo obligatorios | R | 4 | · | ✔ | · | · | ✔ | · | · | · | · | · |
-| GET | `/api/v1/recursos/equipos` | `recursos.gestionar` |  | E | 4 | · | ✔ | · | · | · | · | · | · | · | · |
-| POST | `/api/v1/recursos/equipos/{id}/estado` | `recursos.gestionar` |  | E | 4 | · | ✔ | · | · | · | · | · | · | · | · |
-| PUT | `/api/v1/recursos/tipos/{id}` | `recursos.configurar` |  | E | 4 | ✔ | · | · | · | · | · | · | · | · | · |
 
 ### Spec 105
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/me/fila` | `fila.ver` | Propio | R | 3 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
 | GET | `/api/v1/citas` | `citas.ver` | MED y PAC solo propias | R | 3 | · | ✔ | ✔ | ✔ | · | propio | · | · | · | propio |
 | GET | `/api/v1/citas/disponibilidad` | `citas.agendar` o `citas.solicitar` | PAC y REC según permisos | R | 3 | · | · | ✔ | · | · | · | · | · | · | propio |
 | POST | `/api/v1/citas` | `citas.agendar` | Sin traslape por médico | R | 3 | · | · | ✔ | · | · | · | · | · | · | · |
@@ -314,18 +307,18 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/inventario/existencias` | `inventario.ver` |  | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
-| GET | `/api/v1/inventario/movimientos` | `inventario.ver` |  | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| GET | `/api/v1/inventario/existencias` | `inventario.ver` |  | R | 4 | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| GET | `/api/v1/inventario/movimientos` | `inventario.ver` |  | R | 4 | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · | · |
 | POST | `/api/v1/inventario/movimientos` | `inventario.mover` | Sin existencia negativa | R | 4 | · | ✔ | · | · | consumo | · | reactivos | · | · | · |
 | PUT | `/api/v1/inventario/articulos/{id}` | `inventario.configurar` |  | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/inventario/articulos` | `inventario.configurar` |  | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
-| GET | `/api/v1/inventario/articulos` | `inventario.ver` | Según el contexto del rol | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
-| GET | `/api/v1/inventario/articulos/{id}` | `inventario.ver` | Según el contexto del rol | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| GET | `/api/v1/inventario/articulos` | `inventario.ver` | Según el contexto del rol | R | 4 | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| GET | `/api/v1/inventario/articulos/{id}` | `inventario.ver` | Según el contexto del rol | R | 4 | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · | · |
 | DELETE | `/api/v1/inventario/articulos/{id}` | `inventario.configurar` | Solo sin lotes ni historial | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/inventario/articulos/{id}/lotes` | `inventario.configurar` |  | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
 | PUT | `/api/v1/inventario/lotes/{id}` | `inventario.configurar` | Sin existencia para dar de baja | R | 4 | ✔ | ✔ | · | · | · | · | · | · | · | · |
-| GET | `/api/v1/inventario/lotes` | `inventario.ver` | Según el contexto del rol | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
-| GET | `/api/v1/inventario/bodegas` | `inventario.ver` | Según el contexto del rol | R | 4 | · | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| GET | `/api/v1/inventario/lotes` | `inventario.ver` | Según el contexto del rol | R | 4 | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · | · |
+| GET | `/api/v1/inventario/bodegas` | `inventario.ver` | Según el contexto del rol | R | 4 | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · | · |
 
 ### Spec 112
 
@@ -339,6 +332,8 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/avisos` | `avisos.publicar` | Vigencia | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/avisos` | `avisos.publicar` |  | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/me/avisos` | `sesion.perfil` | Propio | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| PUT | `/api/v1/avisos/{id}` | `avisos.publicar` | Vigente o programado; exige versión | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/avisos/{id}/retirar` | `avisos.publicar` | Motivo de 10 caracteres o más (D-13) | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 
 ### Spec 113
 
