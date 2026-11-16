@@ -12,7 +12,9 @@ import { PatientVitalsService } from './patient-vitals.service';
 import { ClinicalHistoryController } from './clinical-history.controller';
 import { ClinicalHistoryService } from './clinical-history.service';
 import { AttentionSweepService } from './attention-sweep.service';
+import { AppointmentRequestController } from './appointment-request.controller';
+import { AppointmentRequestService } from './appointment-request.service';
 
-@Module({ controllers: [AttentionController, ConsultationController, QueueController, ClinicalRecordController, ClinicalHistoryController, PatientVitalsController], providers: [AttentionSweepService, PatientVitalsService, AttentionService, ConsultationService, QueueService, ClinicalRecordService, ClinicalHistoryService] })
+@Module({ controllers: [AttentionController, ConsultationController, QueueController, ClinicalRecordController, ClinicalHistoryController, PatientVitalsController, AppointmentRequestController], providers: [AttentionSweepService, AppointmentRequestService, PatientVitalsService, AttentionService, ConsultationService, QueueService, ClinicalRecordService, ClinicalHistoryService] })
 export class AttentionModule {}
 

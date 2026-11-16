@@ -19,6 +19,12 @@ final class ContractFixtureTests: XCTestCase {
         try assertMatches(body, fixture: "appointment-request")
     }
 
+    func testSolicitudDeCitaPorMotivoYRetiro() throws {
+        let body = CategoryRequestRules.body(picked: ["piel", "alergias"], franja: .tarde, note: " Mancha en el brazo desde hace un mes ", preferredDoctorId: doctor)
+        try assertMatches(body, fixture: "appointment-category-request")
+        try assertMatches(VersionBody(version: 2), fixture: "appointment-category-withdraw")
+    }
+
     func testCancelacionDeCita() throws {
         try assertMatches(AppointmentCancelBody(version: 2, reason: "No podré asistir por un compromiso de trabajo."), fixture: "appointment-cancel")
     }
@@ -53,6 +59,11 @@ final class ContractFixtureTests: XCTestCase {
     func testContactoDelPropioPaciente() throws {
         let body = PatientProfileRules.body(version: 4, phone: " 7777-7777 ", email: "paciente.demo@example.com", address: "Colonia Escalón, San Salvador\n")
         try assertMatches(body, fixture: "me-paciente")
+    }
+
+    func testPrioridadYDeshacerLlamadoDeLaFila() throws {
+        try assertMatches(QueuePriorityBody(version: 2, priority: "emergencia"), fixture: "queue-priority")
+        try assertMatches(VersionBody(version: 3), fixture: "queue-undo-call")
     }
 
     private func assertMatches<Body: Encodable>(_ body: Body, fixture name: String, file: StaticString = #filePath, line: UInt = #line) throws {

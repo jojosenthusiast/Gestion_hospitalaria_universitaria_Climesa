@@ -230,3 +230,72 @@ public enum PatientLabRules {
         return result.text ?? "—"
     }
 }
+
+/// Fase 2, flujo A (S8): el paciente pide cita por motivo (una a tres categorías), franja preferida y nota; el médico es
+/// opcional y recepción asigna médico y hora. iOS no tiene rol de recepción: solo cubre el lado del paciente.
+public enum CategoryRequestRules {
+    public static let path = "/citas/solicitudes-categoria"
+    public static let categoriesPath = "/citas/categorias"
+    public static let maxCategories = 3
+    public static let noteMax = 280
+
+    public static func cancelPath(_ id: String) -> String { "\(path)/\(id)/cancelar" }
+
+    private static func fold(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "es")).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Búsqueda sin tildes en nombre, descripción, palabras clave y especialidades; las elegidas siempre quedan a la vista.
+    public static func filter(_ categories: [AppointmentCategory], query: String, picked: [String] = []) -> [AppointmentCategory] {
+        let needle = fold(query)
+        guard !needle.isEmpty else { return categories }
+        return categories.filter { c in
+            picked.contains(c.code) || fold([c.name, c.description, c.keywords, c.specialties.joined(separator: " ")].joined(separator: " ")).contains(needle)
+        }
+    }
+
+    /// De una a tres: una cuarta se ignora y tocar una elegida la quita.
+    public static func toggle(_ picked: [String], _ code: String) -> [String] {
+        if picked.contains(code) { return picked.filter { $0 != code } }
+        return picked.count >= maxCategories ? picked : picked + [code]
+    }
+
+    public static func canSend(picked: [String], note: String) -> Bool { !picked.isEmpty && note.count <= noteMax }
+
+    public static func body(picked: [String], franja: RequestFranja, note: String, preferredDoctorId: String?) -> CategoryRequestBody {
+        let text = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let doctor = preferredDoctorId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return CategoryRequestBody(categories: picked, franja: franja, note: text.isEmpty ? nil : text, preferredDoctorId: (doctor?.isEmpty ?? true) ? nil : doctor)
+    }
+
+    /// Médicos que coinciden con lo escrito (nombre o especialidad), para la opción secundaria "Ya tengo médico".
+    public static func doctors(_ doctors: [AppointmentCatalogs.Doctor], query: String, limit: Int = 6) -> [AppointmentCatalogs.Doctor] {
+        let needle = fold(query)
+        guard !needle.isEmpty else { return [] }
+        return Array(doctors.filter { $0.active && fold("\($0.fullName) \($0.specialty ?? "")").contains(needle) }.prefix(limit))
+    }
+
+    /// Clave estable del ícono de la categoría a SF Symbol; una clave desconocida usa un ícono genérico.
+    public static func symbol(_ icon: String) -> String {
+        switch icon {
+        case "general": return "stethoscope"
+        case "nino": return "figure.and.child.holdinghands"
+        case "mujer": return "figure.dress.line.vertical.figure"
+        case "corazon": return "heart"
+        case "hueso": return "figure.walk"
+        case "piel": return "hand.raised"
+        case "ojo": return "eye"
+        case "oido": return "ear"
+        case "mente": return "brain.head.profile"
+        case "neuro": return "brain"
+        case "digestivo": return "fork.knife"
+        case "rinon": return "drop"
+        case "alergia": return "allergens"
+        case "cirugia": return "bandage"
+        default: return "cross.case"
+        }
+    }
+
+    /// Clave de Localizable.xcstrings con el estado de la solicitud.
+    public static func stateKey(_ state: String) -> String { "appointments.category.state.\(state)" }
+}

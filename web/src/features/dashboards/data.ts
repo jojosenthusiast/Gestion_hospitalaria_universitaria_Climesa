@@ -9,6 +9,8 @@ import type { MetricsBoard } from '../tablero';
 export type QueueTicket = { id: string; service: string; numero: number; patientName?: string | null; state: string; issuedAt: string; officeId?: string | null };
 export type LabOrderRow = { id: string; patientName?: string; priority: string; state: string; createdAt: string; sampleTakenAt?: string | null; completedAt?: string | null; reviewedAt?: string | null; items: { id: string; name: string }[] };
 export type StockRow = { articulo_id: string; codigo: string; nombre: string; tipo: string; unidad: string; minimo: number; disponible: number; vencido: number; bajo_minimo: boolean };
+/** Fase 2, flujo A: solicitud de cita por motivo, sin médico, que Recepción asigna. */
+export type AppointmentRequestRow = { id: string; patientName: string | null; categories: { code: string; name: string }[]; franja: string; note: string | null; state: string; createdAt: string };
 export type AdmissionRow = { id: string; patientName: string; state: string; requestedCategory: string; isolation: boolean; bed: string };
 
 /** Cada fuente es un listado o agregado existente de la API; la cuenta la pide solo si tiene alguno de sus permisos. */
@@ -17,6 +19,7 @@ export const sources = {
   board: { path: '/metricas/tablero', any: ['metricas.ver'] },
   queue: { path: '/fila', any: ['fila.ver'] },
   appts: { path: '/citas', any: ['citas.ver'] },
+  apptRequests: { path: '/citas/solicitudes-categoria', any: ['citas.agendar'] },
   lab: { path: '/laboratorio/ordenes', any: ['laboratorio.ver_cola', 'resultados.ver'] },
   myLab: { path: '/me/laboratorio', any: ['resultados.ver'] },
   beds: { path: '/camas', any: ['camas.ver_tablero'] },
@@ -34,7 +37,7 @@ export const sources = {
 export type Source = keyof typeof sources;
 
 export type DashboardData = {
-  summary: Remote<Summary>; board: Remote<MetricsBoard>; queue: Remote<QueueTicket[]>; appts: Remote<Appointment[]>;
+  summary: Remote<Summary>; board: Remote<MetricsBoard>; queue: Remote<QueueTicket[]>; appts: Remote<Appointment[]>; apptRequests: Remote<AppointmentRequestRow[]>;
   lab: Remote<LabOrderRow[]>; myLab: Remote<LabOrderRow[]>; beds: Remote<Bed[]>; admissions: Remote<AdmissionRow[]>; stock: Remote<StockRow[]>;
   ambulance: Remote<AmbulanceStatus>; shifts: Remote<Shift[]>; myShifts: Remote<Shift[]>; agenda: Remote<Consultation[]>;
   links: Remote<LinkRequest[]>; users: Remote<UserAccount[]>; staff: Remote<Staff[]>; audit: Remote<AuditRow[]>;
@@ -50,7 +53,7 @@ function useSource<T>(api: Api, profile: AccessProfile, version: number, needed:
  */
 export function useDashboardData(api: Api, profile: AccessProfile, version: number, needed: ReadonlySet<Source>): DashboardData {
   return {
-    summary: useSource<Summary>(api, profile, version, needed, 'summary'), board: useSource<MetricsBoard>(api, profile, version, needed, 'board'), queue: useSource<QueueTicket[]>(api, profile, version, needed, 'queue'), appts: useSource<Appointment[]>(api, profile, version, needed, 'appts'),
+    summary: useSource<Summary>(api, profile, version, needed, 'summary'), board: useSource<MetricsBoard>(api, profile, version, needed, 'board'), queue: useSource<QueueTicket[]>(api, profile, version, needed, 'queue'), appts: useSource<Appointment[]>(api, profile, version, needed, 'appts'), apptRequests: useSource<AppointmentRequestRow[]>(api, profile, version, needed, 'apptRequests'),
     lab: useSource<LabOrderRow[]>(api, profile, version, needed, 'lab'), myLab: useSource<LabOrderRow[]>(api, profile, version, needed, 'myLab'), beds: useSource<Bed[]>(api, profile, version, needed, 'beds'), admissions: useSource<AdmissionRow[]>(api, profile, version, needed, 'admissions'), stock: useSource<StockRow[]>(api, profile, version, needed, 'stock'),
     ambulance: useSource<AmbulanceStatus>(api, profile, version, needed, 'ambulance'), shifts: useSource<Shift[]>(api, profile, version, needed, 'shifts'), myShifts: useSource<Shift[]>(api, profile, version, needed, 'myShifts'), agenda: useSource<Consultation[]>(api, profile, version, needed, 'agenda'),
     links: useSource<LinkRequest[]>(api, profile, version, needed, 'links'), users: useSource<UserAccount[]>(api, profile, version, needed, 'users'), staff: useSource<Staff[]>(api, profile, version, needed, 'staff'), audit: useSource<AuditRow[]>(api, profile, version, needed, 'audit'),

@@ -63,6 +63,9 @@ struct ConsultationView: View {
     @State private var prescribing = Submission()
     @State private var ordering = Submission()
     @State private var signing = Submission()
+    /// S9: after signing, who goes next in the consultation's area (`nextProposal`), with the call one tap away.
+    @State private var handoff: QueueNextProposal?
+    @State private var handoffCall = Submission()
     @State private var prefilledVersion: Int?
     @State private var reason = ""
     @State private var exam = ""
@@ -165,15 +168,24 @@ struct ConsultationView: View {
     @ViewBuilder private func editor(_ value: ConsultationDetail) -> some View {
         let editable = ConsultationRules.isEditable(value.consultation.state) && profile.hasPermission("consulta.registrar")
         MedicoTag(value.consultation.state.rawValue, label: value.consultation.state.label)
+        if let handoff { nextPatient(handoff) }
+        if editable {
+            // S9: consultation → procedures → prescription and/or exams → close, in that order.
+            Text("consultation.steps").font(Typo.small).foregroundStyle(Theme.muted)
+            Text("consultation.step.1").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
+        }
         vitalSigns(value.vitalSigns)
         draftSection(value, editable: editable)
         diagnosesSection(value, editable: editable)
+        if editable { Text("consultation.step.3").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader) }
         prescriptionSection(value, editable: editable && profile.hasPermission("recetas.emitir"))
         if editable && profile.hasPermission("laboratorio.ordenar") { labSection(value) }
         if editable && profile.hasPermission("admision.solicitar") && profile.staffId != nil {
             AdmissionIndicationCard(consultationId: value.consultation.id, patientId: value.consultation.patientId)
         }
         if editable {
+            Text("consultation.step.4").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
+            Text("consultation.step.4.hint").font(Typo.small).foregroundStyle(Theme.muted)
             WriteNotice(submission: signing, reload: loadDetail)
             ClimesaButton(title: L.text("consultation.sign"), loading: signing.busy) { Task { await sign(value) } }
         }
@@ -206,6 +218,7 @@ struct ConsultationView: View {
             if editable {
                 MedicoTextArea(label: L.text("consultation.reason"), text: $reason, error: draftErrors["reason"], lines: 2...5)
                 MedicoTextArea(label: L.text("consultation.exam"), text: $exam, error: draftErrors["physicalExam"])
+                Text("consultation.step.2").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
                 MedicoTextArea(label: L.text("consultation.plan"), text: $plan, error: draftErrors["plan"], lines: 2...6)
                 draftStatus
                 WriteNotice(submission: saving, reload: loadDetail)
@@ -399,13 +412,51 @@ struct ConsultationView: View {
     private func sign(_ value: ConsultationDetail) async {
         guard let id = consultationId else { return }
         let body = VersionBody(version: value.consultation.version)
+        var signed: ConsultationCommandResult?
         let ok = await signing.run(id, body: body, success: L.text("consultation.signed")) { key in
-            _ = try await account.client().send("POST", "/consultas/\(id)/firmar", body: body, key: key, as: ConsultationCommandResult.self)
+            signed = try await account.client().send("POST", "/consultas/\(id)/firmar", body: body, key: key, as: ConsultationCommandResult.self)
         }
+        handoff = signed?.nextProposal
         if ok, let key = draftKey {
             DraftStore.shared.clear(user: profile.id, key: key)
             draftSaved = false; draftFailed = false; draftRecovered = false
         }
         await loadDetail()
+    }
+
+    // MARK: - Quién pasa después (S9)
+
+    @ViewBuilder private func nextPatient(_ next: QueueNextProposal) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            Text("consultation.next.title").font(Typo.label).foregroundStyle(Theme.muted)
+            if let proposal = next.proposal {
+                HStack(spacing: Spacing.s) {
+                    AreaTag(proposal.area)
+                    Text(verbatim: "\(proposal.number)").font(.title.bold()).foregroundStyle(Theme.ink).accessibilityLabel(proposal.code)
+                    if proposal.priority != "rutina" { PriorityBadge(proposal.priority) }
+                }
+                Text(verbatim: proposal.patientName ?? "").font(Typo.body).foregroundStyle(Theme.ink)
+                Text(verbatim: proposal.reasonText).font(Typo.small).foregroundStyle(Theme.muted)
+            } else {
+                Text("queue.next.none").font(Typo.body).foregroundStyle(Theme.ink)
+            }
+            Text(verbatim: String(format: L.text("queue.next.rule"), next.rule)).font(Typo.small).foregroundStyle(Theme.muted)
+            WriteNotice(submission: handoffCall, reload: loadDetail)
+            if let proposal = next.proposal, profile.hasPermission("fila.llamar") {
+                ClimesaButton(title: String(format: L.text("consultation.next.call"), proposal.code), loading: handoffCall.busy) { Task { await callProposed(proposal) } }
+            }
+            ClimesaButton(title: L.text("consultation.next.dismiss"), kind: .secondary) { handoff = nil }
+        }
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .areaSurface(next.area)
+    }
+
+    private func callProposed(_ proposal: QueueProposedTicket) async {
+        let body = VersionBody(version: proposal.version)
+        let ok = await handoffCall.run(proposal.id, body: body, success: String(format: L.text("queue.called.undoable"), proposal.code)) { key in
+            _ = try await account.client().send("POST", "/fila/\(proposal.id)/llamar", body: body, key: key, as: QueueCallResult.self)
+        }
+        if ok { handoff = nil }
     }
 }

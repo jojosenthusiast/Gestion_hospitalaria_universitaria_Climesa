@@ -226,7 +226,16 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/citas/reprogramaciones/{id}/aceptar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/citas/reprogramaciones/{id}/rechazar` | `citas.agendar` o `consulta.iniciar` | REC o el médico de la cita, motivo | R | 4 | · | · | ✔ | · | · | ✔ | · | · | · | · |
 | POST | `/api/v1/citas/{id}/no-asistio` | `citas.agendar` | Hora alcanzada y sin consulta | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
-| POST | `/api/v1/fila/llamar-siguiente` | `fila.llamar` | Primer número en espera del servicio | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/llamar-siguiente` | `fila.llamar` | Número que propone la regla RN-FILA-SIGUIENTE | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| GET | `/api/v1/fila/siguiente` | `fila.ver` | Solo con fila completa; emergencias, urgentes, citas en ventana y llegada | R | 4 | · | ✔ | ✔ | ✔ | · | ✔ | · | · | · | propio |
+| POST | `/api/v1/fila/{id}/deshacer-llamado` | `fila.llamar` | Solo un número llamado | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| POST | `/api/v1/fila/{id}/prioridad` | `fila.gestionar` | Solo antes de la atención | R | 4 | · | · | ✔ | ✔ | · | ✔ | · | · | · | · |
+| GET | `/api/v1/citas/categorias` | `citas.solicitar` o `citas.agendar` |  | R | 5 | · | · | ✔ | · | · | · | · | · | · | propio |
+| GET | `/api/v1/citas/solicitudes-categoria` | `citas.ver` | REC todas las pendientes y las resueltas en 30 días; PAC solo propias | R | 5 | · | ✔ | ✔ | ✔ | · | propio | · | · | · | propio |
+| POST | `/api/v1/citas/solicitudes-categoria` | `citas.solicitar` | PAC propio; una a tres categorías, franja y nota; sin médico | R | 5 | · | · | · | · | · | · | · | · | · | propio |
+| POST | `/api/v1/citas/solicitudes-categoria/{id}/asignar` | `citas.agendar` | Crea cita confirmada con las reglas de siempre; auditado | R | 5 | · | · | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/citas/solicitudes-categoria/{id}/rechazar` | `citas.agendar` | Motivo | R | 5 | · | · | ✔ | · | · | · | · | · | · | · |
+| POST | `/api/v1/citas/solicitudes-categoria/{id}/cancelar` | `citas.cancelar` | PAC solo propias y pendientes | R | 5 | · | · | ✔ | · | · | · | · | · | · | propio |
 
 ### Spec 106
 

@@ -47,6 +47,8 @@ public struct ConsultationCommandResult: Decodable, Sendable, Equatable {
     public let id: String
     public let version: Int
     public let state: ConsultationState
+    /// Only on signing (S9): who goes next in the consultation's area; nil when the reader does not see the whole queue.
+    public var nextProposal: QueueNextProposal? = nil
 }
 
 /// `ConsultationDetailResponse` de `GET /consultas/{id}/detalle`.

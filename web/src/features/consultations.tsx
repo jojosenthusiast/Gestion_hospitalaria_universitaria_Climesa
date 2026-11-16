@@ -5,6 +5,8 @@ import { loadDraft, useLocalDraft } from '../lib/drafts';
 import { ClinicalHistoryDialog } from './clinical-history';
 import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import { newIntentKey, withIntentKey } from './intent';
+import { AreaTag, PriorityBadge } from '../components/system';
+import type { NextProposal } from './queue';
 
 export type Consultation = {
   appointmentId: string;
@@ -58,6 +60,8 @@ export function ConsultationsPage({ api, profile, version }: { api: Api; profile
   // `#/consultas?consulta=<id>` (from the queue board) reopens that consultation.
   const [resuming, setResuming] = useState<{ id: string; ticket?: QueueConsultationTicket } | null>(() => { const id = consultationFromHash(); return id ? { id } : null; });
   const [startError, setStartError] = useState<ApiError | null>(null), [starting, setStarting] = useState<string | null>(null);
+  // S9: after signing, who goes next in the consultation's area (RN-FILA-SIGUIENTE), until the doctor acts or dismisses it.
+  const [handoff, setHandoff] = useState<NextProposal | null>(null);
   const intents = useRef(new Map<string, string>());
   /** Starts the consultation of a called number, or resumes the doctor's own one (listed id or 409 with `consultaId`). */
   async function attend(ticket: QueueConsultationTicket) {
@@ -78,6 +82,7 @@ export function ConsultationsPage({ api, profile, version }: { api: Api; profile
   const closeResumed = () => { setResuming(null); if (consultationFromHash()) window.history.replaceState(null, '', '#/consultas'); };
   return <>
     <CompactHeader breadcrumb="Atención / Medicina" title="Mi consultorio"/>
+    {handoff && <NextPatientHandoff api={api} profile={profile} handoff={handoff} onDone={() => { setHandoff(null); queue.refresh(); }} />}
     <section className="data-workbench">
       <RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Agenda del médico</caption><thead><tr><th>Horario</th><th>Paciente</th><th>Cita</th><th>Consulta</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.appointmentId}><td data-label="Horario"><strong>{formatDateTime(row.start)}</strong><small>{formatDateTime(row.end)}</small></td><td data-label="Paciente">{row.patientName}</td><td data-label="Cita"><Tag value={row.appointmentState} /></td><td data-label="Consulta"><Tag value={row.consultationState ?? 'pendiente'} /></td><td data-label="Acción"><div className="row-actions">{!row.consultationId && row.allowedActions && !row.allowedActions.includes('iniciar_consulta') ? <small className="form-hint">{row.blockedActions?.find(item => item.action === 'iniciar_consulta')?.reason ?? 'Esta cita no admite iniciar consulta.'}</small> : <button className="row-action" onClick={() => setSelected(row)}>{row.consultationState === 'firmada' ? 'Ver consulta' : row.consultationId ? 'Continuar' : 'Iniciar consulta'} <Icon name="arrow" size={16} /></button>}{historyAllowed && <button className="row-action" aria-label={`Historial clínico de ${row.patientName}`} onClick={() => setHistory(row)}>Historial</button>}</div></td></tr>)}</tbody></table> : <Empty title="No hay citas en tu agenda" description="Las citas confirmadas aparecerán aquí para iniciar su atención." />}</RemoteState>
     </section>
@@ -89,14 +94,14 @@ export function ConsultationsPage({ api, profile, version }: { api: Api; profile
       <RemoteState state={unsigned}>{rows => rows.length ? <ul className="record-list">{rows.map(row => <li key={row.id}><strong>{row.patientName ?? 'Paciente'}</strong> <small>Iniciada {formatDateTime(row.startedAt)}{row.reason ? ` · ${row.reason}` : ''}</small> <button className="row-action" onClick={() => setResuming({ id: row.id })}>Reanudar <Icon name="arrow" size={16} /></button></li>)}</ul>
         : <Empty title="No tienes consultas abiertas" description="Las consultas que inicies y no firmes, de cualquier día, aparecerán aquí para reanudarlas." />}</RemoteState>
     </section>}
-    {resuming && <ResumedConsultation api={api} profile={profile} id={resuming.id} ticket={resuming.ticket} onClose={closeResumed} onSaved={() => { closeResumed(); queue.refresh(); data.refresh(); unsigned.refresh(); }} />}
+    {resuming && <ResumedConsultation api={api} profile={profile} id={resuming.id} ticket={resuming.ticket} onClose={closeResumed} onSaved={next => { closeResumed(); setHandoff(next ?? null); queue.refresh(); data.refresh(); unsigned.refresh(); }} />}
     {history && <ClinicalHistoryDialog api={api} patientId={history.patientId} patientName={history.patientName} version={version} onClose={() => setHistory(null)} />}
-    {selected && <ConsultationDialog api={api} profile={profile} item={selected} onClose={() => setSelected(null)} onSaved={() => { setSelected(null); data.refresh(); }} />}
+    {selected && <ConsultationDialog api={api} profile={profile} item={selected} onClose={() => setSelected(null)} onSaved={next => { setSelected(null); setHandoff(next ?? null); data.refresh(); queue.refresh(); }} />}
   </>;
 }
 
 /** Loads an existing consultation by id (started from the queue or reopened by link) and shows the same editor. */
-function ResumedConsultation({ api, profile, id, ticket, onClose, onSaved }: { api: Api; profile: AccessProfile; id: string; ticket?: QueueConsultationTicket; onClose: () => void; onSaved: () => void }) {
+function ResumedConsultation({ api, profile, id, ticket, onClose, onSaved }: { api: Api; profile: AccessProfile; id: string; ticket?: QueueConsultationTicket; onClose: () => void; onSaved: (next?: NextProposal | null) => void }) {
   const detail = useData<ConsultationDetail>(api, `/consultas/${id}/detalle`, 0);
   const value = detail.data?.consultation;
   if (!value) return <Dialog title="Retomar consulta" onClose={onClose}><RemoteState state={detail}>{() => null}</RemoteState></Dialog>;
@@ -113,7 +118,7 @@ function TextArea({ label, value, onChange, required = false, disabled = false }
   return <label className="field"><span>{label}</span><textarea value={value} onChange={event => onChange(event.target.value)} required={required} disabled={disabled} rows={4} maxLength={10000} /></label>;
 }
 
-function ConsultationDialog({ api, profile, item, onClose, onSaved }: { api: Api; profile: AccessProfile; item: Consultation; onClose: () => void; onSaved: () => void }) {
+function ConsultationDialog({ api, profile, item, onClose, onSaved }: { api: Api; profile: AccessProfile; item: Consultation; onClose: () => void; onSaved: (next?: NextProposal | null) => void }) {
   const signed = item.consultationState === 'firmada';
   // Unsaved fields of an open consultation are kept as a local draft of this user, so leaving or closing the tab loses nothing.
   const userId = profile.user?.id ?? profile.id, draftName = item.consultationId && !signed ? `consulta:${item.consultationId}` : null;
@@ -141,8 +146,8 @@ function ConsultationDialog({ api, profile, item, onClose, onSaved }: { api: Api
   async function sign() {
     const draft = await action.run(`/consultas/${item.consultationId}`, { version, reason, physicalExam, plan }, 'PATCH');
     if (!draft) return;
-    const signedResult = await action.run(`/consultas/${item.consultationId}/firmar`, { version: (draft as { version: number }).version });
-    if (signedResult) { localDraft.clear(); onSaved(); }
+    const signedResult = await action.run<{ nextProposal?: NextProposal | null }>(`/consultas/${item.consultationId}/firmar`, { version: (draft as { version: number }).version });
+    if (signedResult) { localDraft.clear(); onSaved(signedResult.nextProposal ?? null); }
   }
   async function saveVitals() {
     if (!item.consultationId) return;
@@ -165,7 +170,7 @@ function ConsultationDialog({ api, profile, item, onClose, onSaved }: { api: Api
     if (saved) { setMedication(''); setDose(''); setRoute(''); setFrequency(''); setDuration(''); setInstructions(''); setNotice('Receta emitida.'); }
   }
   const existing = !!item.consultationId;
-  return <Dialog title={signed ? 'Consulta firmada' : existing ? 'Continuar consulta' : 'Iniciar consulta'} onClose={close} busy={action.busy}><form className="module-form" onSubmit={existing ? saveDraft : start}><p>Paciente: <strong>{item.patientName}</strong><br />{item.ticketNumber != null ? `Número de fila N.º ${item.ticketNumber}` : item.appointmentId ? `Cita: ${formatDateTime(item.start)} · 20 minutos` : 'Consulta abierta'}</p><WriteError error={action.error} />{stored && !signed && <Notice kind="info">Recuperamos lo que escribiste y aún no habías guardado.</Notice>}{notice && !action.error && <Notice kind="success">{notice}</Notice>}{signed && <Notice kind="info">Esta consulta está firmada. Los cambios posteriores deben registrarse como addendum.</Notice>}<Field label="Motivo de consulta" value={reason} onChange={setReason} maxLength={2000} required disabled={signed} autoFocus={!signed} /><TextArea label="Examen físico" value={physicalExam} onChange={setPhysicalExam} disabled={signed} /><TextArea label="Plan" value={plan} onChange={setPlan} required={!signed} disabled={signed} />{existing && !signed && can(profile, 'consulta.registrar') && <section className="inline-form-section"><h3>Diagnóstico CIE-10</h3><div className="form-grid"><Field label="Código" value={diagnosisCode} onChange={setDiagnosisCode} maxLength={20} /><Field label="Nota" value={diagnosisNote} onChange={setDiagnosisNote} maxLength={2000} /></div><label className="check-field"><input type="checkbox" checked={diagnosisPrincipal} onChange={event => setDiagnosisPrincipal(event.target.checked)} /> Diagnóstico principal</label><button type="button" className="secondary-button" onClick={() => void saveDiagnosis()} disabled={action.busy || !diagnosisCode.trim()}>Registrar diagnóstico</button></section>}{existing && can(profile, 'signos.registrar') && <section className="inline-form-section"><h3>Signos vitales</h3><div className="form-grid"><Field label="PA sistólica" type="number" value={systolic} onChange={setSystolic} min={40} max={300} /><Field label="PA diastólica" type="number" value={diastolic} onChange={setDiastolic} min={20} max={200} /><Field label="Frecuencia cardiaca" type="number" value={heartRate} onChange={setHeartRate} min={20} max={250} /><Field label="Temperatura °C" type="number" value={temperature} onChange={setTemperature} min={30} max={45} step="0.1" /><Field label="Sat. O₂" type="number" value={oxygenSaturation} onChange={setOxygenSaturation} min={40} max={100} /></div><button type="button" className="secondary-button" onClick={() => void saveVitals()} disabled={action.busy || ![systolic, diastolic, heartRate, temperature, oxygenSaturation].some(Boolean)}>Registrar signos</button></section>}{existing && !signed && can(profile, 'recetas.emitir') && <section className="inline-form-section"><h3>Emitir receta</h3><div className="form-grid"><Field label="Medicamento" value={medication} onChange={setMedication} maxLength={200} /><Field label="Dosis" value={dose} onChange={setDose} maxLength={200} /><Field label="Vía" value={route} onChange={setRoute} maxLength={100} /><Field label="Frecuencia" value={frequency} onChange={setFrequency} maxLength={200} /><Field label="Duración" value={duration} onChange={setDuration} maxLength={100} /></div><TextArea label="Indicaciones" value={instructions} onChange={setInstructions} /><button type="button" className="secondary-button" onClick={() => void savePrescription()} disabled={action.busy || ![medication, dose, route, frequency, duration].every(value => value.trim())}>Emitir receta</button></section>}{existing && item.consultationId && can(profile, 'laboratorio.ordenar') && <LabOrderSection api={api} consultationId={item.consultationId} />}{localDraft.status === 'guardado' && <p className="muted" role="status">Borrador guardado en este equipo.</p>}{localDraft.status === 'sin_guardar' && <Notice kind="error">Tienes cambios sin guardar: este navegador no permitió guardar el borrador.</Notice>}{!signed && <div className="dialog-actions"><button type="button" className="secondary-button" onClick={close} disabled={action.busy}>Cancelar</button>{existing && <button type="button" className="secondary-button" onClick={() => void sign()} disabled={action.busy || !reason.trim() || !plan.trim()}>Firmar consulta</button>}<SaveButton busy={action.busy} label={existing ? 'Guardar borrador' : 'Iniciar consulta'} /></div>}{signed && <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose}>Cerrar</button></div>}</form></Dialog>;
+  return <Dialog title={signed ? 'Consulta firmada' : existing ? 'Continuar consulta' : 'Iniciar consulta'} onClose={close} busy={action.busy}><form className="module-form" onSubmit={existing ? saveDraft : start}><p>Paciente: <strong>{item.patientName}</strong><br />{item.ticketNumber != null ? `Número de fila N.º ${item.ticketNumber}` : item.appointmentId ? `Cita: ${formatDateTime(item.start)} · 20 minutos` : 'Consulta abierta'}</p><ConsultSteps signed={signed} existing={existing} /><WriteError error={action.error} />{stored && !signed && <Notice kind="info">Recuperamos lo que escribiste y aún no habías guardado.</Notice>}{notice && !action.error && <Notice kind="success">{notice}</Notice>}{signed && <Notice kind="info">Esta consulta está firmada. Los cambios posteriores deben registrarse como addendum.</Notice>}<h3 className="consult-step" id="paso-consulta">1. Consulta</h3><Field label="Motivo de consulta" value={reason} onChange={setReason} maxLength={2000} required disabled={signed} autoFocus={!signed} /><TextArea label="Examen físico" value={physicalExam} onChange={setPhysicalExam} disabled={signed} />{existing && !signed && can(profile, 'consulta.registrar') && <section className="inline-form-section"><h3>Diagnóstico CIE-10</h3><div className="form-grid"><Field label="Código" value={diagnosisCode} onChange={setDiagnosisCode} maxLength={20} /><Field label="Nota" value={diagnosisNote} onChange={setDiagnosisNote} maxLength={2000} /></div><label className="check-field"><input type="checkbox" checked={diagnosisPrincipal} onChange={event => setDiagnosisPrincipal(event.target.checked)} /> Diagnóstico principal</label><button type="button" className="secondary-button" onClick={() => void saveDiagnosis()} disabled={action.busy || !diagnosisCode.trim()}>Registrar diagnóstico</button></section>}{existing && can(profile, 'signos.registrar') && <section className="inline-form-section"><h3>Signos vitales</h3><div className="form-grid"><Field label="PA sistólica" type="number" value={systolic} onChange={setSystolic} min={40} max={300} /><Field label="PA diastólica" type="number" value={diastolic} onChange={setDiastolic} min={20} max={200} /><Field label="Frecuencia cardiaca" type="number" value={heartRate} onChange={setHeartRate} min={20} max={250} /><Field label="Temperatura °C" type="number" value={temperature} onChange={setTemperature} min={30} max={45} step="0.1" /><Field label="Sat. O₂" type="number" value={oxygenSaturation} onChange={setOxygenSaturation} min={40} max={100} /></div><button type="button" className="secondary-button" onClick={() => void saveVitals()} disabled={action.busy || ![systolic, diastolic, heartRate, temperature, oxygenSaturation].some(Boolean)}>Registrar signos</button></section>}<h3 className="consult-step" id="paso-procedimientos">2. Procedimientos y plan</h3><p className="form-hint">Anota en el plan los procedimientos que hiciste y lo que sigue.</p><TextArea label="Plan" value={plan} onChange={setPlan} required={!signed} disabled={signed} />{existing && <h3 className="consult-step" id="paso-receta">3. Receta y exámenes</h3>}{existing && !signed && can(profile, 'recetas.emitir') && <section className="inline-form-section"><h3>Emitir receta</h3><div className="form-grid"><Field label="Medicamento" value={medication} onChange={setMedication} maxLength={200} /><Field label="Dosis" value={dose} onChange={setDose} maxLength={200} /><Field label="Vía" value={route} onChange={setRoute} maxLength={100} /><Field label="Frecuencia" value={frequency} onChange={setFrequency} maxLength={200} /><Field label="Duración" value={duration} onChange={setDuration} maxLength={100} /></div><TextArea label="Indicaciones" value={instructions} onChange={setInstructions} /><button type="button" className="secondary-button" onClick={() => void savePrescription()} disabled={action.busy || ![medication, dose, route, frequency, duration].every(value => value.trim())}>Emitir receta</button></section>}{existing && item.consultationId && can(profile, 'laboratorio.ordenar') && <LabOrderSection api={api} consultationId={item.consultationId} />}{localDraft.status === 'guardado' && <p className="muted" role="status">Borrador guardado en este equipo.</p>}{localDraft.status === 'sin_guardar' && <Notice kind="error">Tienes cambios sin guardar: este navegador no permitió guardar el borrador.</Notice>}{existing && !signed && <><h3 className="consult-step" id="paso-cierre">4. Cerrar consulta</h3><p className="form-hint">Firmar cierra la consulta y el número de fila; luego te proponemos quién pasa después.</p></>}{!signed && <div className="dialog-actions"><button type="button" className="secondary-button" onClick={close} disabled={action.busy}>Cancelar</button>{existing && <button type="button" className="secondary-button" onClick={() => void sign()} disabled={action.busy || !reason.trim() || !plan.trim()}>Firmar consulta</button>}<SaveButton busy={action.busy} label={existing ? 'Guardar borrador' : 'Iniciar consulta'} /></div>}{signed && <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose}>Cerrar</button></div>}</form></Dialog>;
 }
 
 /** Examen o panel activo de `GET /laboratorio/catalogo`. */
@@ -195,3 +200,42 @@ function LabOrderSection({ api, consultationId }: { api: Api; consultationId: st
 }
 
 function numberOrUndefined(value: string) { const parsed = Number(value); return value.trim() && Number.isFinite(parsed) ? parsed : undefined; }
+
+const STEPS = [{ id: 'paso-consulta', label: 'Consulta' }, { id: 'paso-procedimientos', label: 'Procedimientos' }, { id: 'paso-receta', label: 'Receta y exámenes' }, { id: 'paso-cierre', label: 'Cerrar consulta' }];
+/** S9: consultation → procedures → prescription and/or exams → close. Links jump to each part of the same form. */
+function ConsultSteps({ signed, existing }: { signed: boolean; existing: boolean }) {
+  const current = signed ? STEPS.length : existing ? 1 : 0;
+  return <ol className="consult-steps" aria-label="Pasos de la consulta">{STEPS.map((step, index) => {
+    const reachable = signed ? false : existing || index === 0;
+    const state = signed || index < current ? 'hecho' : index === current ? 'actual' : 'pendiente';
+    return <li key={step.id} className={`consult-step-item is-${state}`} aria-current={state === 'actual' ? 'step' : undefined}>
+      {reachable ? <a href={`#${step.id}`} onClick={event => { event.preventDefault(); document.getElementById(step.id)?.scrollIntoView({ block: 'start' }); }}>{index + 1}. {step.label}</a> : <span>{index + 1}. {step.label}</span>}
+    </li>;
+  })}</ol>;
+}
+
+/** After closing a consultation: the server's proposal of who goes next, with the call one click away (or dismissed). */
+function NextPatientHandoff({ api, profile, handoff, onDone }: { api: Api; profile: AccessProfile; handoff: NextProposal; onDone: () => void }) {
+  const action = useAction(api);
+  const next = handoff.proposal;
+  async function callIt() {
+    if (!next) return;
+    if (await action.run(`/fila/${next.id}/llamar`, { version: next.version })) onDone();
+  }
+  return <section className="data-workbench qb-next consult-handoff" aria-label="Quién pasa después">
+    <div className="qb-next-main">
+      <span className="qb-next-label">Consulta cerrada · quién pasa después</span>
+      {next
+        ? <div className="qb-next-ticket"><AreaTag code={next.area} /><strong className="qb-number qb-number-lg mono-data">{next.numero}</strong>
+            <div className="qb-next-who"><span>{next.patientName || 'Paciente no identificado'}</span><small>{next.reasonText}</small></div>
+            {next.priority !== 'rutina' && <PriorityBadge value={next.priority} />}</div>
+        : <p className="muted">Nadie espera en {handoff.area}. Puedes descansar o revisar tu agenda.</p>}
+      <small className="qb-rule">Regla: {handoff.rule}</small>
+      <WriteError error={action.error} />
+    </div>
+    <div className="qb-next-actions">
+      {next && can(profile, 'fila.llamar') && <button className="primary-button" disabled={action.busy} onClick={() => void callIt()}><Icon name="megaphone" size={18} />{action.busy ? 'Llamando…' : `Llamar a ${next.area} ${next.numero}`}</button>}
+      <button className="secondary-button" disabled={action.busy} onClick={onDone}>{next ? 'Ahora no' : 'Entendido'}</button>
+    </div>
+  </section>;
+}

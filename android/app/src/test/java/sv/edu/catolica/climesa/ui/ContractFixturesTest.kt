@@ -20,6 +20,8 @@ import sv.edu.catolica.climesa.domain.AdmissionIndication
 import sv.edu.catolica.climesa.domain.AppointmentAction
 import sv.edu.catolica.climesa.domain.AppointmentActions
 import sv.edu.catolica.climesa.domain.AppointmentSlot
+import sv.edu.catolica.climesa.domain.CategoryRequestRules
+import sv.edu.catolica.climesa.domain.RequestFranja
 import sv.edu.catolica.climesa.domain.DaySlot
 import sv.edu.catolica.climesa.domain.DischargePending
 import sv.edu.catolica.climesa.domain.DischargeType
@@ -101,6 +103,15 @@ class ContractFixturesTest {
         assertContract("cita-solicitar", "POST", "/citas/solicitudes", PatientAppointmentRules.requestBody(DOCTOR, AppointmentSlot(START, END), "Control de presión arterial"))
     }
 
+    @Test fun appointmentRequestedByReasonAndResolvedByReception() {
+        assertContract("cita-solicitar-categoria", "POST", CategoryRequestRules.PATH,
+            CategoryRequestRules.createBody(listOf("piel", "alergias"), RequestFranja.AFTERNOON, " Mancha en el brazo desde hace un mes ", DOCTOR))
+        val request = CategoryRequestRules.requests(JSONArray().put(JSONObject().put("id", APPOINTMENT).put("version", 1).put("state", "pendiente").put("franja", "tarde"))).single()
+        assertContract("cita-asignar-categoria", "POST", CategoryRequestRules.assignPath(request), CategoryRequestRules.assignBody(request, DOCTOR, DaySlot(START, END, SlotStatus.FREE, null)), APPOINTMENT)
+        assertContract("cita-rechazar-categoria", "POST", CategoryRequestRules.rejectPath(request), CategoryRequestRules.rejectBody(request, " No hay dermatología este mes "), APPOINTMENT)
+        assertContract("cita-retirar-categoria", "POST", CategoryRequestRules.cancelPath(request), CategoryRequestRules.cancelBody(request.copy(version = 2)), APPOINTMENT)
+    }
+
     @Test fun appointmentConfirmRejectAndCancel() {
         assertContract("cita-confirmar", "POST", AppointmentActions.path(AppointmentAction.CONFIRM, APPOINTMENT), AppointmentActions.body(AppointmentAction.CONFIRM, 2, ""), APPOINTMENT)
         assertContract("cita-rechazar", "POST", AppointmentActions.path(AppointmentAction.REJECT, APPOINTMENT), AppointmentActions.body(AppointmentAction.REJECT, 2, " El médico no atiende ese día "), APPOINTMENT)
@@ -124,6 +135,15 @@ class ContractFixturesTest {
 
     @Test fun queueCallNext() {
         assertContract("fila-llamar-siguiente", "POST", "/fila/llamar-siguiente", sv.edu.catolica.climesa.domain.QueueRules.callNextBody("consulta_general"))
+    }
+
+    @Test fun queueFase2Bodies() {
+        val ticket = "77777777-7777-4777-8777-777777777777"
+        val rules = sv.edu.catolica.climesa.domain.QueueRules
+        assertContract("fila-emitir-prioridad", "POST", "/fila", rules.issueBody("emergencia", "urgente"))
+        assertContract("fila-deshacer-llamado", "POST", "/fila/$ticket/deshacer-llamado", rules.undoBody(3), ticket)
+        assertContract("fila-prioridad", "POST", "/fila/$ticket/prioridad", rules.priorityBody(2, "emergencia"), ticket)
+        assertContract("fila-llamar-siguiente-consultorio", "POST", "/fila/llamar-siguiente", rules.callNextBody("consulta_general", "99999999-9999-4999-8999-999999999999"))
     }
 
     private fun agenda() = JSONArray().put(JSONObject()

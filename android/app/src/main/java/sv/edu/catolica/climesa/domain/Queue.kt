@@ -22,6 +22,14 @@ data class QueueTicket(
     /** Calls the API makes before the number closes (`maxCalls`), and calls needed to mark an absence (`callsForAbsence`). */
     val maxCalls: Int? = null,
     val callsForAbsence: Int? = null,
+    /** Fase 2 (S9): area code next to the number (counts from 1 per area and day), clinical priority, today's appointment. */
+    val area: String = QueueLabels.areaOf(service),
+    val priority: String = "rutina",
+    val appointmentAt: String? = null,
+    val walkIn: Boolean = true,
+    /** Reversible actions the server accepts now (`undoActions`), apart from `allowedActions`. */
+    val undoActions: List<String> = emptyList(),
+    val officeCode: String? = null,
 ) {
     fun allows(action: QueueAction) = action in allowedActions
     /** The action is shown: allowed, or blocked with a reason from the server. */
@@ -29,6 +37,13 @@ data class QueueTicket(
 }
 
 object QueueLabels {
+    private val areas = mapOf("consulta_general" to "CON", "emergencia" to "EMG", "laboratorio" to "LAB", "admisiones" to "REC")
+    fun areaOf(service: String) = areas[service] ?: "GEN"
+    /** "CON 7": the area code and the number, as the patient hears it called. */
+    fun code(ticket: QueueTicket) = "${ticket.area} ${ticket.number}"
+    fun priority(value: String) = mapOf("emergencia" to "Emergencia", "urgente" to "Urgente", "rutina" to "Rutina")[value] ?: value
+    /** Cited (with the appointment time) or walk-in. */
+    fun arrival(ticket: QueueTicket) = ticket.appointmentAt?.let { "Cita ${AppointmentAgenda.time(it)}" } ?: "Sin cita"
     val services = listOf("consulta_general" to "Consulta general", "emergencia" to "Emergencia", "laboratorio" to "Laboratorio", "admisiones" to "Admisiones")
     fun service(value: String) = services.firstOrNull { it.first == value }?.second ?: value
     fun state(value: String) = mapOf("en_espera" to "En espera", "llamado" to "Llamado", "en_atencion" to "En atención", "atendido" to "Atendido", "no_se_presento" to "No se presentó", "cerrado" to "Cerrado sin atender")[value] ?: value
@@ -56,6 +71,12 @@ object QueueRules {
                 blockedActions = ServerActions.blocked(row).mapNotNull { (k, v) -> QueueAction.of(k)?.let { it to v } }.toMap(),
                 maxCalls = if (row.has("maxCalls") && !row.isNull("maxCalls")) row.optInt("maxCalls") else null,
                 callsForAbsence = if (row.has("callsForAbsence") && !row.isNull("callsForAbsence")) row.optInt("callsForAbsence") else null,
+                area = ServerActions.text(row, "area") ?: QueueLabels.areaOf(row.optString("service")),
+                priority = ServerActions.text(row, "priority") ?: "rutina",
+                appointmentAt = ServerActions.text(row, "appointmentAt"),
+                walkIn = if (row.has("walkIn")) row.optBoolean("walkIn", true) else ServerActions.text(row, "appointmentAt") == null,
+                undoActions = row.optJSONArray("undoActions")?.let { list -> (0 until list.length()).map { list.optString(it) } } ?: emptyList(),
+                officeCode = ServerActions.text(row, "officeCode"),
             )
         } }
     }
@@ -64,5 +85,56 @@ object QueueRules {
     fun callNextService(tickets: List<QueueTicket>, filter: String?): String =
         filter ?: tickets.firstOrNull { it.state == "en_espera" }?.service ?: QueueLabels.services.first().first
 
-    fun callNextBody(service: String) = org.json.JSONObject().put("service", service)
+    fun callNextBody(service: String, officeId: String? = null) = org.json.JSONObject().put("service", service).apply { officeId?.let { put("officeId", it) } }
+
+    /** `rutina` is the server default: a routine number keeps the body it always had. */
+    fun issueBody(service: String, priority: String) = org.json.JSONObject().put("service", service).apply { if (priority != "rutina") put("priority", priority) }
+    fun undoBody(version: Int) = org.json.JSONObject().put("version", version)
+    fun priorityBody(version: Int, priority: String) = org.json.JSONObject().put("version", version).put("priority", priority)
+
+    /** `GET /fila/siguiente` and `nextProposal` of a signed consultation; null when the answer is not that object. */
+    fun parseNext(value: Any?): NextProposal? {
+        val json = value as? org.json.JSONObject ?: return null
+        val p = json.optJSONObject("proposal")
+        val proposal = p?.let {
+            ProposedTicket(it.optString("id"), it.optInt("numero"), ServerActions.text(it, "area") ?: json.optString("area"), ServerActions.text(it, "patientName") ?: "Paciente",
+                ServerActions.text(it, "priority") ?: "rutina", it.optInt("version", 1), it.optString("reason"), it.optString("reasonText"))
+        }
+        return NextProposal(json.optString("service"), json.optString("area"), json.optString("rule"), proposal)
+    }
+}
+
+data class ProposedTicket(val id: String, val number: Int, val area: String, val patientName: String, val priority: String, val version: Int, val reason: String, val reasonText: String) {
+    val code get() = "$area $number"
+}
+/** Who goes next in one area, by the server's documented rule (RN-FILA-SIGUIENTE). */
+data class NextProposal(val service: String, val area: String, val rule: String, val proposal: ProposedTicket?)
+
+/** A board move is a request for one server action (drag is not used on mobile: the card menu offers the moves). */
+enum class QueueMove(val wire: String, val path: String, val label: String) {
+    CALL("llamar", "llamar", "Llamar"), ATTEND("atender", "atender", "Iniciar atención"), COMPLETE("completar", "completar", "Completar"),
+    ABSENT("no_se_presento", "no-se-presento", "No se presentó"), UNDO_CALL("deshacer_llamado", "deshacer-llamado", "Devolver a espera"),
+    /** Same server action as [UNDO_CALL] with 2+ calls: one call less, the number stays called. Not a column move. */
+    REMOVE_CALL("deshacer_llamado", "deshacer-llamado", "Quitar un llamado"),
+}
+
+object QueueMoves {
+    private val moves = mapOf(
+        QueueColumn.WAITING to mapOf(QueueColumn.CALLED to QueueMove.CALL),
+        QueueColumn.CALLED to mapOf(QueueColumn.WAITING to QueueMove.UNDO_CALL, QueueColumn.IN_ATTENTION to QueueMove.ATTEND, QueueColumn.CLOSED to QueueMove.ABSENT),
+        QueueColumn.IN_ATTENTION to mapOf(QueueColumn.CLOSED to QueueMove.COMPLETE),
+    )
+    /** The server action that moves [ticket] to [to], only when the server accepts it now; else null. */
+    fun moveFor(ticket: QueueTicket, to: QueueColumn): QueueMove? {
+        val move = moves[QueueBoard.column(ticket)]?.get(to) ?: return null
+        // Undo removes one call; only the last one sends the number back to waiting. With more calls the card would
+        // land in "En espera" and jump back, so that is not a column move (see [canRemoveCall]).
+        if (move == QueueMove.UNDO_CALL && ticket.calls > 1) return null
+        val server = if (move == QueueMove.UNDO_CALL) ticket.undoActions else ticket.allowedActions.map { it.wire }
+        return move.takeIf { it.wire in server }
+    }
+    /** "Quitar un llamado": the number keeps being called (2+ calls) and the server accepts removing one. */
+    fun canRemoveCall(ticket: QueueTicket) = ticket.state == "llamado" && ticket.calls > 1 && "deshacer_llamado" in ticket.undoActions
+    fun destinations(ticket: QueueTicket): List<Pair<QueueColumn, QueueMove>> = QueueColumn.entries.mapNotNull { c -> moveFor(ticket, c)?.let { c to it } }
+    fun path(ticket: QueueTicket, move: QueueMove) = "/fila/${ticket.id}/${move.path}"
 }

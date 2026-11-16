@@ -24,9 +24,18 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     public var blockedActions: [BlockedAction<QueueAction>]? = nil
     public var maxCalls: Int? = nil
     public var callsForAbsence: Int? = nil
+    /// Fase 2 (S9): area code ("CON"), clinical priority, today's appointment time (nil = walk-in), consultorio code,
+    /// and the reversible moves the server accepts now (`deshacer_llamado`).
+    public var area: String? = nil
+    public var priority: String? = nil
+    public var appointmentAt: String? = nil
+    public var walkIn: Bool? = nil
+    public var officeCode: String? = nil
+    public var undoActions: [String]? = nil
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
         case consultationId, consultationState, allowedActions, blockedActions, maxCalls, callsForAbsence
+        case area, priority, appointmentAt, walkIn, officeCode, undoActions
     }
 }
 
@@ -462,4 +471,90 @@ public struct AmbulanceRequestCreated: Decodable, Sendable, Equatable {
     public let version: Int
     public let createdAt: String
     public let notice: String
+}
+
+// MARK: - Fase 2, flujo A: cita por motivo (S8)
+
+/// `AppointmentCategoryResponse` de `GET /citas/categorias`: el motivo que el paciente elige en lugar del médico.
+public struct AppointmentCategory: Decodable, Sendable, Identifiable, Equatable {
+    public let code: String
+    public let name: String
+    public let description: String
+    /// Clave estable del ícono (`piel`, `corazon`...); la app la traduce a un SF Symbol (`CategoryRequestRules.symbol`).
+    public let icon: String
+    public let specialties: [String]
+    public let keywords: String
+    public var id: String { code }
+    public init(code: String, name: String, description: String, icon: String, specialties: [String], keywords: String) {
+        self.code = code; self.name = name; self.description = description; self.icon = icon; self.specialties = specialties; self.keywords = keywords
+    }
+}
+
+/// `CategoryRefResponse`
+public struct AppointmentCategoryRef: Decodable, Sendable, Equatable {
+    public let code: String
+    public let name: String
+    public let icon: String
+}
+
+/// `AssignedAppointmentResponse`: la cita que recepción creó al asignar la solicitud.
+public struct AssignedAppointment: Decodable, Sendable, Equatable {
+    public let id: String
+    public let doctorName: String
+    public let start: String
+    public let end: String
+}
+
+/// Franja preferida de una solicitud por motivo (`FranjaSolicitudCita`).
+public enum RequestFranja: String, Codable, CaseIterable, Sendable, Hashable {
+    case manana, tarde, cualquiera
+    /// Clave de Localizable.xcstrings con el nombre de la franja.
+    public var titleKey: String { "appointments.franja.\(rawValue)" }
+}
+
+/// `CategoryRequestResponse` de `GET /citas/solicitudes-categoria`; las acciones salen del servidor (`allowedActions`).
+public struct CategoryRequest: Decodable, Sendable, Identifiable, Equatable {
+    public let id: String
+    public let categories: [AppointmentCategoryRef]
+    public let franja: RequestFranja
+    public let note: String?
+    public let preferredDoctorName: String?
+    /// `pendiente`, `asignada`, `rechazada` o `cancelada` (`EstadoSolicitudCita`).
+    public let state: String
+    public let rejectionReason: String?
+    public let appointment: AssignedAppointment?
+    public let createdAt: String
+    public let version: Int
+    public let allowedActions: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case id, categories, franja, note, preferredDoctorName, state, rejectionReason, appointment, createdAt, version, allowedActions
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        categories = (try? c.decodeIfPresent([AppointmentCategoryRef].self, forKey: .categories)) ?? []
+        franja = (try? c.decodeIfPresent(RequestFranja.self, forKey: .franja)) ?? .cualquiera
+        note = try c.decodeIfPresent(String.self, forKey: .note)
+        preferredDoctorName = try c.decodeIfPresent(String.self, forKey: .preferredDoctorName)
+        state = try c.decode(String.self, forKey: .state)
+        rejectionReason = try c.decodeIfPresent(String.self, forKey: .rejectionReason)
+        appointment = try c.decodeIfPresent(AssignedAppointment.self, forKey: .appointment)
+        createdAt = try c.decode(String.self, forKey: .createdAt)
+        version = try c.decode(Int.self, forKey: .version)
+        allowedActions = ((try? c.decodeIfPresent([String].self, forKey: .allowedActions)) ?? nil) ?? []
+    }
+
+    public var categoryNames: String { categories.map(\.name).joined(separator: ", ") }
+    public var canWithdraw: Bool { allowedActions.contains("cancelar") }
+    public var isPending: Bool { state == "pendiente" }
+}
+
+/// `CategoryRequestCommandResponse` de crear, asignar, rechazar o retirar una solicitud por motivo.
+public struct CategoryRequestCommandResult: Decodable, Sendable, Equatable {
+    public let id: String
+    public let version: Int
+    public let state: String
+    public let appointmentId: String?
 }

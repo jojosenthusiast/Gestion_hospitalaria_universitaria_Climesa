@@ -69,6 +69,8 @@ const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acc
   'atencion.reprogramacion',
   // Historial de cambios de médico tratante (BL-03): nace de una acción de Jefatura, la demo no lo siembra.
   'hospitalizacion.cambio_tratante',
+  // Fase 2 flujo A: las solicitudes de cita por categoría nacen solo del uso real del paciente.
+  'atencion.solicitud_cita',
   // Fase 2, flujo F: las plantillas de semana nacen de Jefatura; la demo no las siembra.
   'personal.plantilla_semana'];
 
@@ -110,7 +112,7 @@ describe('Datos de demostración (tools/demo)', () => {
     const todas = (await t.pg.query<{ t: string }>(`SELECT schemaname || '.' || tablename AS t FROM pg_tables
       WHERE schemaname IN ('plataforma','acceso','pacientes','infra','personal','atencion','laboratorio','hospitalizacion','ambulancia','inventario','publico')`)).rows.map(r => r.t);
     const catalogos = ['pacientes.tipo_identificador', 'infra.tipo_equipo', 'acceso.rol', 'acceso.permiso', 'acceso.rol_permiso', 'atencion.cie10',
-      'laboratorio.examen', 'laboratorio.examen_componente', 'laboratorio.rango_referencia', 'plataforma.politica', 'ambulancia.unidad', 'personal.especialidad_catalogo'];
+      'laboratorio.examen', 'laboratorio.examen_componente', 'laboratorio.rango_referencia', 'plataforma.politica', 'ambulancia.unidad', 'personal.especialidad_catalogo', 'atencion.categoria_cita'];
     expect(todas.filter(x => !(x in TABLAS) && !SIN_SEMBRAR.includes(x) && !catalogos.includes(x))).toEqual([]);
   });
 
@@ -402,6 +404,24 @@ describe('Datos de demostración (tools/demo)', () => {
     expect(await contar('pacientes.paciente', `id = 'de300000-0001-4000-8000-000000000001'`)).toBe(1);
     expect(await contar('pacientes.paciente', `id::text LIKE ${DEMO} AND id <> 'de300000-0001-4000-8000-000000000001'`)).toBe(0);
     await t.pg.query('DELETE FROM atencion.cita WHERE id = $1', [real.id]);
+    await t.pg.exec(limpieza);
+    expect(await estadoGeneral()).toEqual(antes);
+  });
+
+  test('una solicitud por motivo real que prefiere a un médico demo, o de un paciente demo, conserva ambos y la limpieza no falla', async () => {
+    await t.pg.exec(semilla);
+    const medico = await t.one<{ id: string }>(`SELECT id FROM personal.persona WHERE id::text LIKE ${DEMO} AND tipo = 'medico' ORDER BY id LIMIT 1`);
+    const realPaciente = await t.patient();
+    const prefiere = await t.one<{ id: string }>(`INSERT INTO atencion.solicitud_cita(paciente_id, categorias, franja, medico_preferido_id)
+      VALUES ($1, '{piel}', 'tarde', $2) RETURNING id`, [realPaciente, medico.id]);
+    const delDemo = await t.one<{ id: string }>(`INSERT INTO atencion.solicitud_cita(paciente_id, categorias, franja)
+      VALUES ('de300000-0001-4000-8000-000000000002', '{consulta_general}', 'manana') RETURNING id`);
+    await t.pg.exec(limpieza);
+    expect(await contar('personal.persona', `id = '${medico.id}'`)).toBe(1);
+    expect(await contar('pacientes.paciente', `id = 'de300000-0001-4000-8000-000000000002'`)).toBe(1);
+    expect(await contar('atencion.solicitud_cita', `id IN ('${prefiere.id}', '${delDemo.id}')`)).toBe(2);
+    await t.pg.query('DELETE FROM atencion.solicitud_cita WHERE id = ANY($1::uuid[])', [[prefiere.id, delDemo.id]]);
+    await t.pg.query('DELETE FROM pacientes.paciente WHERE id = $1', [realPaciente]);
     await t.pg.exec(limpieza);
     expect(await estadoGeneral()).toEqual(antes);
   });

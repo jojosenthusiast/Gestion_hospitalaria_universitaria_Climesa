@@ -184,7 +184,7 @@ const dpd: RoleDashboard = {
 // ───────────────────────────── REC · recepción
 const rec: RoleDashboard = {
   title: 'Recepción', description: 'Pacientes, fila, citas y camas: lo que llega a la puerta y lo que espera una respuesta tuya',
-  needs: ['summary', 'queue', 'appts', 'links', 'admissions', 'ambulance'],
+  needs: ['summary', 'queue', 'appts', 'apptRequests', 'links', 'admissions', 'ambulance'],
   actions: [
     { id: 'registrar', label: 'Registrar paciente', hint: 'Busca primero y registra si no existe', icon: 'userPlus', href: '#/pacientes?accion=registrar', permission: 'pacientes.registrar' },
     { id: 'agendar', label: 'Agendar cita', hint: 'Paciente, médico y horario disponible', icon: 'calendar', href: '#/citas?accion=agendar', permission: 'citas.agendar' },
@@ -195,7 +195,7 @@ const rec: RoleDashboard = {
   render: ({ d }) => <>
     <KpiRow>
       <Kpi icon="queue" label="En espera en la fila" value={num(d.queue, r => tickets(r, 'en_espera').length)} sub={d.queue.data ? `${tickets(d.queue.data, 'llamado').length} llamados` : undefined} tone={d.queue.data ? toneFor(tickets(d.queue.data, 'en_espera').length, 8, 15) : 'neutral'} href="#/fila" />
-      <Kpi icon="calendar" label="Citas de hoy" value={num(d.appts, r => todays(r).length)} sub={d.appts.data ? `${d.appts.data.filter(a => a.state === 'solicitada').length} por confirmar` : undefined} tone="info" href="#/citas" />
+      <Kpi icon="calendar" label="Citas de hoy" value={num(d.appts, r => todays(r).length)} sub={d.appts.data ? `${d.appts.data.filter(a => a.state === 'solicitada').length + (d.apptRequests.data ?? []).filter(r => r.state === 'pendiente').length} por confirmar o asignar` : undefined} tone="info" href="#/citas" />
       <Kpi icon="bed" label="Camas libres" value={num(d.summary, s => s.beds ? s.beds.free : '—')} sub={d.summary.data?.beds ? `de ${d.summary.data.beds.total} camas` : undefined} tone={d.summary.data?.beds?.free === 0 ? 'danger' : 'ok'} href="#/camas" />
       <Kpi icon="users" label="Pacientes activos" value={num(d.summary, s => s.patients ? s.patients.active : '—')} sub="Expedientes vigentes" tone="neutral" href="#/pacientes" />
     </KpiRow>
@@ -204,6 +204,7 @@ const rec: RoleDashboard = {
         <AttentionList empty="No hay vinculaciones, solicitudes ni admisiones esperando." items={[
           ...(d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name, detail: `Pide vincular su cuenta${l.candidate ? ` con el expediente ${l.candidate.record}` : ''}`, tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar', tag: 'Vinculación' })),
           ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `Solicita cita el ${new Intl.DateTimeFormat('es-SV', { day: 'numeric', month: 'short', timeZone: 'America/El_Salvador' }).format(new Date(a.start))} a las ${timeLabel(a.start)}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Cita solicitada' })),
+          ...(d.apptRequests.data ?? []).filter(r => r.state === 'pendiente').map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: `Pide cita por ${r.categories.map(c => c.name.toLowerCase()).join(', ')}${r.note ? `: ${r.note}` : ''}`, tone: 'warn' as Tone, href: '#/citas', action: 'Asignar', tag: 'Por asignar' })),
           ...(d.admissions.data ?? []).filter(a => a.state === 'pendiente_cama').map(a => ({ id: `a-${a.id}`, title: a.patientName, detail: 'Admisión sin cama asignada', tone: 'warn' as Tone, href: '#/hospitalizacion', action: 'Asignar cama', tag: 'Sin cama' })),
           ...(d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: r.address, tone: 'danger' as Tone, href: '#/ambulancia', action: 'Despachar', tag: 'Ambulancia' })),
         ]} />
@@ -369,7 +370,7 @@ const par: RoleDashboard = {
 const pac: RoleDashboard = {
   title: 'Mi atención', description: 'Tu próxima cita, tu número en la fila y el estado de tus exámenes',
   needs: ['appts', 'queue', 'myLab'],
-  actions: [{ id: 'cita', label: 'Pedir una cita', hint: 'Elige médico y horario', icon: 'calendar', href: '#/citas?accion=solicitar', permission: 'citas.solicitar' }],
+  actions: [{ id: 'cita', label: 'Pedir una cita', hint: 'Elige el motivo; recepción te asigna médico y hora', icon: 'calendar', href: '#/citas?accion=solicitar', permission: 'citas.solicitar' }],
   render: ({ d }) => {
     const upcoming = (rows: Appointment[]) => rows.filter(a => open(a.state) && new Date(a.end).getTime() > Date.now()).sort((a, b) => a.start.localeCompare(b.start));
     const mine = (d.queue.data ?? []).filter(t => ['en_espera', 'llamado', 'en_atencion'].includes(t.state))[0];
