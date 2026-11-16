@@ -26,15 +26,21 @@ export const FOLLOW_UP_REASON = 'Seguimiento de resultados de laboratorio';
 export function LabFollowUpPanel({ api, version }: { api: Api; version: number }) {
   const data = useData<LabProposal[]>(api, '/laboratorio/seguimientos', version);
   const rows = data.data ?? [];
+  // Appointment already created for a proposal whose link failed. It lives here, not in the form, so "Volver" never loses it
+  // and a retry links the same appointment instead of posting /citas again.
+  const [scheduled, setScheduled] = useState<Record<string, string>>({});
+  const remember = (proposalId: string, appointmentId: string) => setScheduled(current => ({ ...current, [proposalId]: appointmentId }));
   return <section className="work-inbox lab-follow-up" aria-labelledby="lab-follow-up-title">
     <div><h2 id="lab-follow-up-title">Citas de seguimiento por confirmar</h2><p className="muted">Resultados de laboratorio que ya llegaron: agenda la cita con el médico que los pidió.</p></div>
     <RemoteState state={data} skeletonRows={2}>{() => rows.length
-      ? <ul className="lab-follow-up-list">{rows.map(row => <ProposalRow key={row.id} api={api} proposal={row} onDone={data.refresh} />)}</ul>
+      ? <ul className="lab-follow-up-list">{rows.map(row => <ProposalRow key={row.id} api={api} proposal={row} scheduled={scheduled[row.id] ?? null} onScheduled={id => remember(row.id, id)} onDone={data.refresh} />)}</ul>
       : <p className="muted lab-follow-up-empty"><Icon name="check" size={18} />Al día: no hay citas de seguimiento por confirmar.</p>}</RemoteState>
   </section>;
 }
 
-function ProposalRow({ api, proposal, onDone }: { api: Api; proposal: LabProposal; onDone: () => void }) {
+type Scheduled = { scheduled: string | null; onScheduled: (appointmentId: string) => void };
+
+function ProposalRow({ api, proposal, scheduled, onScheduled, onDone }: { api: Api; proposal: LabProposal; onDone: () => void } & Scheduled) {
   const [mode, setMode] = useState<'idle' | 'schedule' | 'discard'>('idle');
   return <li className="lab-follow-up-row">
     <div className="lab-follow-up-who">
@@ -46,7 +52,7 @@ function ProposalRow({ api, proposal, onDone }: { api: Api; proposal: LabProposa
       <button type="button" className="primary-button" onClick={() => setMode('schedule')}>Agendar cita</button>
       <button type="button" className="secondary-button" onClick={() => setMode('discard')}>Descartar</button>
     </div>}
-    {mode === 'schedule' && <ScheduleForm api={api} proposal={proposal} onCancel={() => setMode('idle')} onDone={onDone} />}
+    {mode === 'schedule' && <ScheduleForm api={api} proposal={proposal} scheduled={scheduled} onScheduled={onScheduled} onCancel={() => setMode('idle')} onDone={onDone} />}
     {mode === 'discard' && <DiscardForm api={api} proposal={proposal} onCancel={() => setMode('idle')} onDone={onDone} />}
   </li>;
 }
@@ -55,9 +61,9 @@ function ProposalRow({ api, proposal, onDone }: { api: Api; proposal: LabProposa
  * Two steps with the existing commands: schedule (POST /citas, a confirmed appointment) and link it to the proposal.
  * If the link fails after the appointment exists, the appointment is kept and the link can be retried with it.
  */
-function ScheduleForm({ api, proposal, onCancel, onDone }: { api: Api; proposal: LabProposal; onCancel: () => void; onDone: () => void }) {
+function ScheduleForm({ api, proposal, scheduled, onScheduled, onCancel, onDone }: { api: Api; proposal: LabProposal; onCancel: () => void; onDone: () => void } & Scheduled) {
   const [day, setDay] = useState(() => localDay(new Date(), 7)), [slot, setSlot] = useState<Slot | null>(null);
-  const [busy, setBusy] = useState(false), [error, setError] = useState<ApiError | null>(null), [scheduled, setScheduled] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false), [error, setError] = useState<ApiError | null>(null);
   const availability = useData<Availability>(api, `/citas/disponibilidad?doctorId=${proposal.doctorId}&date=${day}`, 0);
   const slots = availability.data?.slots ?? [];
   async function confirm() {
@@ -65,7 +71,7 @@ function ScheduleForm({ api, proposal, onCancel, onDone }: { api: Api; proposal:
     setBusy(true); setError(null);
     try {
       const appointmentId = scheduled ?? (await withIntentKey(newIntentKey(), () => api.write<{ id: string }>('/citas', { patientId: proposal.patientId, doctorId: proposal.doctorId, start: slot!.start, end: slot!.end, reason: FOLLOW_UP_REASON }, 'POST'))).id;
-      setScheduled(appointmentId);
+      onScheduled(appointmentId);
       await withIntentKey(newIntentKey(), () => api.write(`/laboratorio/seguimientos/${proposal.id}/confirmar`, { version: proposal.version, appointmentId }, 'POST'));
       onDone();
     } catch (e) { setError(e instanceof ApiError ? e : new ApiError('No se pudo agendar la cita.')); }

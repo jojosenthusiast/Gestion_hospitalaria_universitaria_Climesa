@@ -56,6 +56,26 @@ describe('Citas de seguimiento por confirmar', () => {
     expect(api.write).toHaveBeenLastCalledWith('/laboratorio/seguimientos/p-1/confirmar', { version: 2, appointmentId: 'cita-9' }, 'POST');
   });
 
+  it('si enlazar falla y se vuelve atrás, al agendar de nuevo enlaza la misma cita: un solo POST /citas', async () => {
+    let links = 0;
+    const api = montar([proposal], async path => {
+      if (path === '/citas') return { id: 'cita-9', version: 1, state: 'confirmada' };
+      if (links++ === 0) throw new ApiError('Sin conexión.', 503, 'no_disponible');
+      return { state: 'confirmada' };
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Agendar cita' }));
+    const form = await screen.findByRole('form', { name: /Agendar seguimiento/ });
+    await userEvent.click(await within(form).findByRole('radio'));
+    await userEvent.click(within(form).getByRole('button', { name: 'Confirmar cita' }));
+    await userEvent.click(await within(form).findByRole('button', { name: 'Volver' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Agendar cita' }));
+    const again = await screen.findByRole('form', { name: /Agendar seguimiento/ });
+    await userEvent.click(within(again).getByRole('button', { name: 'Enlazar la cita' }));
+    await vi.waitFor(() => expect(api.write).toHaveBeenCalledTimes(3));
+    expect(api.write.mock.calls.filter(([path]) => path === '/citas')).toHaveLength(1);
+    expect(api.write).toHaveBeenLastCalledWith('/laboratorio/seguimientos/p-1/confirmar', { version: 2, appointmentId: 'cita-9' }, 'POST');
+  });
+
   it('descarta con un motivo de al menos 10 caracteres', async () => {
     const api = montar([proposal]);
     await userEvent.click(await screen.findByRole('button', { name: 'Descartar' }));

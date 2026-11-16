@@ -4020,10 +4020,10 @@ export interface components {
             text: string | null;
             mark: components["schemas"]["MarcaResultado"];
             version: number;
-            /** @description S10: observación del laboratorio */
-            observation: string | null;
-            /** @description S10: la observación es relevante (abrió un pendiente para el médico) */
-            relevant: boolean;
+            /** @description S10: observación del laboratorio; solo para el personal, nunca en lecturas del paciente */
+            observation?: string | null;
+            /** @description S10: la observación es relevante (abrió un pendiente para el médico); solo para el personal */
+            relevant?: boolean;
         };
         LabOrderItemResponse: {
             /** Format: uuid */
