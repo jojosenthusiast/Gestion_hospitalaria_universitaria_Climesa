@@ -2454,6 +2454,193 @@
         }
       }
     },
+    "results.followUp.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultados por revisar"
+          }
+        }
+      }
+    },
+    "results.followUp.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d pendiente(s)"
+          }
+        }
+      }
+    },
+    "results.followUp.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Al día: no tienes resultados por revisar."
+          }
+        }
+      }
+    },
+    "results.followUp.patient": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paciente"
+          }
+        }
+      }
+    },
+    "results.followUp.observation": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observación"
+          }
+        }
+      }
+    },
+    "results.followUp.review": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marcar como revisado"
+          }
+        }
+      }
+    },
+    "results.followUp.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marcado como revisado."
+          }
+        }
+      }
+    },
+    "results.external.send": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se realiza en otro sitio"
+          }
+        }
+      }
+    },
+    "results.external.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La orden queda como externa: ya no se toma muestra aquí. El paciente ve el lugar y estas instrucciones en sus exámenes."
+          }
+        }
+      }
+    },
+    "results.external.place": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dónde se realiza"
+          }
+        }
+      }
+    },
+    "results.external.instructions": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instrucciones para el paciente"
+          }
+        }
+      }
+    },
+    "results.external.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar a externo"
+          }
+        }
+      }
+    },
+    "results.external.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La orden quedó como externa; el paciente ya ve dónde ir."
+          }
+        }
+      }
+    },
+    "exams.external.place": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se realiza en otro sitio: %@"
+          }
+        }
+      }
+    },
+    "exams.external.noPlace": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lugar por confirmar"
+          }
+        }
+      }
+    },
+    "exams.observation": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observación: %@"
+          }
+        }
+      }
+    },
+    "exams.observation.relevant": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observación relevante (enviada al médico): %@"
+          }
+        }
+      }
+    },
     "results.markReviewed": {
       "extractionState": "manual",
       "localizations": {

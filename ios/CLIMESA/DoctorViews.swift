@@ -321,9 +321,13 @@ struct ResultsReviewView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<[LabOrder]>()
+    @State private var followUps: [LabFollowUp] = []
+    @State private var followUpSubmission = Submission()
 
     var body: some View {
         LoadState(loader: loader, retry: load) { orders in
+            // S10: valores críticos y observaciones relevantes del laboratorio, hasta que el médico los marca revisados.
+            if account.can("laboratorio.revisar") { LabFollowUpInbox(items: followUps, submission: followUpSubmission, review: review) }
             let pending = ReviewRules.pending(orders)
             let critical = ReviewRules.criticalToReview(orders)
             let inProgress = ReviewRules.cancellable(orders)
@@ -347,7 +351,49 @@ struct ResultsReviewView: View {
         .task(id: live.snapshot.version(.laboratory)) { await load() }
     }
 
-    private func load() async { await loader.load { try await account.client().get("/laboratorio/ordenes", as: [LabOrder].self) } }
+    private func load() async {
+        await loader.load { try await account.client().get("/laboratorio/ordenes", as: [LabOrder].self) }
+        await loadFollowUps()
+    }
+
+    private func loadFollowUps() async {
+        guard account.can("laboratorio.revisar") else { return }
+        if let rows = try? await account.client().get("/laboratorio/pendientes", as: [LabFollowUp].self) { followUps = LabFollowUpRules.sorted(rows) }
+    }
+
+    private func review(_ item: LabFollowUp) async {
+        let body = LabFollowUpRules.reviewBody(version: item.version)
+        _ = await followUpSubmission.run(item.id, body: body, success: L.text("results.followUp.done")) { key in
+            _ = try await account.client().send("POST", LabFollowUpRules.reviewPath(item.id), body: body, key: key, as: LabFollowUpState.self)
+        }
+        await loadFollowUps()
+    }
+}
+
+/// S10 · «Resultados por revisar»: críticos primero (rojo solo para el valor crítico); cada uno se marca revisado.
+private struct LabFollowUpInbox: View {
+    let items: [LabFollowUp]
+    let submission: Submission
+    let review: (LabFollowUp) async -> Void
+
+    var body: some View {
+        SectionCard(title: L.text("results.followUp.title"), eyebrow: String(format: L.text("results.followUp.count"), items.count)) {
+            if items.isEmpty { Text("results.followUp.none").font(Typo.small).foregroundStyle(Theme.muted) }
+            ForEach(items) { item in
+                VStack(alignment: .leading, spacing: Spacing.s) {
+                    HStack(spacing: Spacing.s) {
+                        Text(verbatim: item.patientName ?? L.text("results.followUp.patient")).font(Typo.label).foregroundStyle(Theme.ink)
+                        Spacer()
+                        PatientTag(item.critical ? "critico_alto" : "en_proceso", label: L.text(item.critical ? "results.critical" : "results.followUp.observation"))
+                    }
+                    if let record = item.patientRecord { Text(verbatim: "Exp. \(record)").font(Typo.small).foregroundStyle(Theme.muted) }
+                    Text(verbatim: item.detail).font(Typo.small).foregroundStyle(Theme.ink)
+                    ClimesaButton(title: L.text("results.followUp.review"), kind: .secondary, loading: submission.busy) { Task { await review(item) } }
+                }
+            }
+            WriteNotice(submission: submission, reload: {})
+        }
+    }
 }
 
 private struct ReviewDetailView: View {
@@ -359,6 +405,8 @@ private struct ReviewDetailView: View {
     @State private var cancelSubmission = Submission()
     @State private var cancelling = false
     @State private var cancelled = false
+    @State private var sendingExternal = false
+    @State private var externalSubmission = Submission()
 
     var body: some View {
         ScreenFrame(title: "results.detail") {
@@ -373,6 +421,9 @@ private struct ReviewDetailView: View {
             if order.allows(.revisar) {
                 ClimesaButton(title: L.text("results.markReviewed"), loading: submission.busy) { Task { await review() } }
             }
+            if order.allowsExternal(.enviarExterno) {
+                ClimesaButton(title: L.text("results.external.send"), kind: .secondary) { sendingExternal = true }
+            }
             if order.allows(.cancelar) {
                 ClimesaButton(title: L.text("results.cancel"), kind: .secondary) { cancelling = true }
             }
@@ -386,12 +437,51 @@ private struct ReviewDetailView: View {
         .sheet(isPresented: $cancelling, onDismiss: { if cancelled { dismiss() } }) {
             CancelLabOrderSheet(order: order, submission: cancelSubmission, reload: reload) { cancelled = true }
         }
+        .sheet(isPresented: $sendingExternal) {
+            SendExternalSheet(order: order, submission: externalSubmission, reload: reload)
+        }
     }
 
     private func review() async {
         let body = VersionBody(version: order.version)
         let ok = await submission.run(order.id, body: body) { key in
             _ = try await account.client().send("POST", "/laboratorio/ordenes/\(order.id)/revisar", body: body, key: key, as: LabReviewResult.self)
+        }
+        await reload()
+        if ok { dismiss() }
+    }
+}
+
+/// S10 · La orden se hace en otro lugar: el paciente ve el lugar y las instrucciones en «Mis exámenes».
+private struct SendExternalSheet: View {
+    let order: LabOrder
+    let submission: Submission
+    let reload: () async -> Void
+    @EnvironmentObject private var account: AccountModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var place = ""
+    @State private var instructions = LabExternalRules.instructionsTemplate
+    @State private var problem: String?
+
+    var body: some View {
+        NavigationStack {
+            ScreenFrame(title: "results.external.send") {
+                Text("results.external.intro").font(Typo.small).foregroundStyle(Theme.muted)
+                MedicoTextArea(label: L.text("results.external.place"), text: $place, error: problem ?? submission.fieldErrors["place"], lines: 1...2)
+                MedicoTextArea(label: L.text("results.external.instructions"), text: $instructions, error: submission.fieldErrors["instructions"], lines: 3...6)
+                WriteNotice(submission: submission, reload: reload)
+                ClimesaButton(title: L.text("results.external.confirm"), loading: submission.busy) { Task { await send() } }
+                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
+            }
+        }
+    }
+
+    private func send() async {
+        problem = LabExternalRules.sendError(place: place, instructions: instructions)
+        guard problem == nil else { return }
+        let body = LabExternalRules.sendBody(version: order.version, place: place, instructions: instructions)
+        let ok = await submission.run(order.id, body: body, success: L.text("results.external.done")) { key in
+            _ = try await account.client().send("POST", LabExternalRules.sendPath(order.id), body: body, key: key, as: LabExternalSent.self)
         }
         await reload()
         if ok { dismiss() }

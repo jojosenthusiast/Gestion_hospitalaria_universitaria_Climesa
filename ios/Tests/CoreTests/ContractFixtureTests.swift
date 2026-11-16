@@ -28,6 +28,15 @@ final class ContractFixtureTests: XCTestCase {
         try assertMatches(LabCancelRules.body(version: 2, reason: "  El paciente no se presentó a la toma "), fixture: "lab-order-cancel")
     }
 
+    func testOrdenDeLaboratorioEnviadaAExterno() throws {
+        try assertMatches(LabExternalRules.sendBody(version: 2, place: " Clínica Ficticia de Imágenes ", instructions: "Sin ayuno. Presente su DUI y esta orden.\n"), fixture: "lab-send-external")
+    }
+
+    func testPendienteDeLaboratorioRevisado() throws {
+        XCTAssertEqual(LabFollowUpRules.reviewPath("f1"), "/laboratorio/pendientes/f1/revisar")
+        try assertMatches(LabFollowUpRules.reviewBody(version: 1), fixture: "lab-follow-up-review")
+    }
+
     func testInicioDeConsultaDesdeUnaCita() throws {
         try assertMatches(ConsultationStartBody(appointmentId: "44444444-4444-4444-8444-444444444444"), fixture: "consultation-start")
     }
