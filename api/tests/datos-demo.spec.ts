@@ -405,4 +405,22 @@ describe('Datos de demostración (tools/demo)', () => {
     await t.pg.exec(limpieza);
     expect(await estadoGeneral()).toEqual(antes);
   });
+
+  test('una solicitud por motivo real que prefiere a un médico demo, o de un paciente demo, conserva ambos y la limpieza no falla', async () => {
+    await t.pg.exec(semilla);
+    const medico = await t.one<{ id: string }>(`SELECT id FROM personal.persona WHERE id::text LIKE ${DEMO} AND tipo = 'medico' ORDER BY id LIMIT 1`);
+    const realPaciente = await t.patient();
+    const prefiere = await t.one<{ id: string }>(`INSERT INTO atencion.solicitud_cita(paciente_id, categorias, franja, medico_preferido_id)
+      VALUES ($1, '{piel}', 'tarde', $2) RETURNING id`, [realPaciente, medico.id]);
+    const delDemo = await t.one<{ id: string }>(`INSERT INTO atencion.solicitud_cita(paciente_id, categorias, franja)
+      VALUES ('de300000-0001-4000-8000-000000000002', '{consulta_general}', 'manana') RETURNING id`);
+    await t.pg.exec(limpieza);
+    expect(await contar('personal.persona', `id = '${medico.id}'`)).toBe(1);
+    expect(await contar('pacientes.paciente', `id = 'de300000-0001-4000-8000-000000000002'`)).toBe(1);
+    expect(await contar('atencion.solicitud_cita', `id IN ('${prefiere.id}', '${delDemo.id}')`)).toBe(2);
+    await t.pg.query('DELETE FROM atencion.solicitud_cita WHERE id = ANY($1::uuid[])', [[prefiere.id, delDemo.id]]);
+    await t.pg.query('DELETE FROM pacientes.paciente WHERE id = $1', [realPaciente]);
+    await t.pg.exec(limpieza);
+    expect(await estadoGeneral()).toEqual(antes);
+  });
 });
