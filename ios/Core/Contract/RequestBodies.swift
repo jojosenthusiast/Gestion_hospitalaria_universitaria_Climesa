@@ -203,3 +203,14 @@ public struct QueueCallNextBody: Encodable, Sendable, Equatable {
     public let service: String
     public init(service: String) { self.service = service }
 }
+
+/// `CategoryRequestCreateDto` de `POST /citas/solicitudes-categoria` (Fase 2, flujo A): motivo sin médico.
+public struct CategoryRequestBody: Encodable, Sendable, Equatable {
+    public let categories: [String]
+    public let franja: RequestFranja
+    public let note: String?
+    public let preferredDoctorId: String?
+    public init(categories: [String], franja: RequestFranja, note: String?, preferredDoctorId: String?) {
+        self.categories = categories; self.franja = franja; self.note = note; self.preferredDoctorId = preferredDoctorId
+    }
+}

@@ -216,11 +216,14 @@ struct PatientAppointmentsView: View {
     @State private var cancelling: Appointment?
     @State private var rescheduling: Appointment?
     @State private var requesting = false
+    @State private var requests = Loader<[CategoryRequest]>()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // Fase 2, flujo A: se pide por motivo, no eligiendo entre todos los médicos; recepción asigna médico y hora.
             if account.can("citas.solicitar") { ClimesaButton(title: L.text("appointments.request")) { requesting = true } }
             PatientSubmissionNotice(submission: submission)
+            if let mine = requests.value, !mine.isEmpty { MyCategoryRequests(requests: mine, submission: submission, reload: load) }
             if submission.lastFailure?.code == "version_conflicto" { ConflictBanner { Task { submission.error = nil; await load() } } }
             LoadState(loader: loader, retry: load) { list in
                 // CITA-04: el reloj de interfaz (cada minuto) solo recalcula qué acciones siguen válidas; no pide datos.
@@ -244,10 +247,13 @@ struct PatientAppointmentsView: View {
             CancelAppointmentSheet(appointment: item, submission: submission, reload: load)
         }
         .sheet(item: $rescheduling) { item in RescheduleAppointmentSheet(appointment: item, reload: load) }
-        .sheet(isPresented: $requesting) { RequestAppointmentSheet(reload: load) }
+        .sheet(isPresented: $requesting) { CategoryRequestSheet(reload: load) }
     }
 
-    private func load() async { await loader.load { try await account.client().get("/citas", as: [Appointment].self) } }
+    private func load() async {
+        await loader.load { try await account.client().get("/citas", as: [Appointment].self) }
+        await requests.load { try await account.client().get(CategoryRequestRules.path, as: [CategoryRequest].self) }
+    }
 
     private func cancelOption(_ item: Appointment, now: Date) -> AppointmentRules.CancelOption {
         account.can("citas.cancelar") ? AppointmentRules.cancelOption(item, now: now) : .hidden
@@ -392,76 +398,150 @@ private struct RescheduleAppointmentSheet: View {
     }
 }
 
-private struct RequestAppointmentSheet: View {
+/// Solicitudes por motivo del paciente con su estado; "Retirar solicitud" solo si el servidor lo permite (`allowedActions`).
+private struct MyCategoryRequests: View {
+    let requests: [CategoryRequest]
+    let submission: Submission
+    let reload: () async -> Void
+    @EnvironmentObject private var account: AccountModel
+    @State private var withdrawing: CategoryRequest?
+
+    var body: some View {
+        SectionTitle("appointments.category.mine")
+        ForEach(requests) { item in
+            SectionCard {
+                ListRow(title: item.categoryNames, subtitle: L.text(item.franja.titleKey), meta: item.note) {
+                    PatientTag(item.state, label: L.text(CategoryRequestRules.stateKey(item.state)))
+                }
+                if let appointment = item.appointment {
+                    Text(verbatim: String(format: L.text("appointments.category.assigned"), appointment.doctorName, ClimesaDates.display(appointment.start)))
+                        .font(Typo.small).foregroundStyle(Theme.primary)
+                }
+                if let reason = item.rejectionReason, !reason.isEmpty { Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted) }
+                if item.canWithdraw { ClimesaButton(title: L.text("appointments.category.withdraw"), kind: .secondary) { withdrawing = item } }
+            }
+        }
+        .confirmationDialog(L.text("appointments.category.withdraw"), isPresented: Binding(get: { withdrawing != nil }, set: { if !$0 { withdrawing = nil } }), titleVisibility: .visible) {
+            Button(L.text("appointments.category.withdraw"), role: .destructive) { if let item = withdrawing { Task { await withdraw(item) } } }
+        } message: { Text("appointments.category.withdraw.message") }
+    }
+
+    private func withdraw(_ item: CategoryRequest) async {
+        let body = VersionBody(version: item.version)
+        let ok = await submission.run("withdraw-\(item.id)", body: body, success: L.text("appointments.category.withdrawn")) { key in
+            _ = try await account.client().send("POST", CategoryRequestRules.cancelPath(item.id), body: body, key: key, as: CategoryRequestCommandResult.self)
+        }
+        withdrawing = nil
+        if ok { await reload() }
+    }
+}
+
+/// A06 iOS: pedir cita por motivo (una a tres categorías con ícono y búsqueda), franja preferida y nota. El médico es
+/// solo una opción secundaria; recepción asigna médico y hora.
+private struct CategoryRequestSheet: View {
     let reload: () async -> Void
     @EnvironmentObject private var account: AccountModel
     @Environment(\.dismiss) private var dismiss
+    @State private var categories = Loader<[AppointmentCategory]>()
     @State private var catalog = Loader<AppointmentCatalogs>()
-    @State private var availability = Loader<Availability>()
     @State private var submission = Submission()
-    @State private var doctorId = ""
-    @State private var day = Date()
-    @State private var slot: Period?
-    @State private var reason = ""
+    @State private var query = ""
+    @State private var picked: [String] = []
+    @State private var franja: RequestFranja = .cualquiera
+    @State private var note = ""
+    @State private var doctorOpen = false
+    @State private var doctorQuery = ""
+    @State private var doctor: AppointmentCatalogs.Doctor?
 
     var body: some View {
         NavigationStack {
             ScreenFrame(title: "appointments.request.title") {
-                LoadState(loader: catalog, retry: loadCatalog) { value in
-                    Picker("appointments.doctor", selection: $doctorId) {
-                        Text("appointments.doctor.choose").tag("")
-                        ForEach(value.doctors.filter(\.active)) { doctor in
-                            Text(verbatim: doctor.specialty.map { "\(doctor.fullName) · \($0)" } ?? doctor.fullName).tag(doctor.id)
-                        }
-                    }.pickerStyle(.menu)
-                }
-                // El día de la cita es el de El Salvador, no el de la zona horaria del teléfono.
-                DatePicker("appointments.date", selection: $day, in: Date()..., displayedComponents: .date)
-                    .environment(\.timeZone, ClimesaDates.zone).environment(\.calendar, ClimesaDates.calendar)
-                if !doctorId.isEmpty {
-                    SectionTitle("appointments.slots")
-                    LoadState(loader: availability, retry: loadSlots) { value in
-                        if value.slots.isEmpty { EmptyStateView(title: L.text("appointments.slots.none"), symbol: "calendar.badge.exclamationmark") }
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 8) {
-                            ForEach(value.slots, id: \.self) { period in
-                                Button { slot = period } label: {
-                                    Text(verbatim: ClimesaDates.display(period.start, .time)).font(Typo.label).frame(maxWidth: .infinity, minHeight: Spacing.control)
-                                        .background(slot == period ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
-                                        .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(slot == period ? Theme.primary : Theme.controlLine, lineWidth: 1))
-                                        .foregroundStyle(slot == period ? Theme.onPrimary : Theme.ink)
-                                }
-                            }
-                        }
+                Group {
+                Text("appointments.category.intro").font(Typo.small).foregroundStyle(Theme.muted)
+                SectionTitle("appointments.category.reason")
+                Text(verbatim: String(format: L.text("appointments.category.count"), picked.count)).font(Typo.caption).foregroundStyle(Theme.muted)
+                searchField(L.text("appointments.category.search"), text: $query)
+                LoadState(loader: categories, retry: loadCategories) { list in
+                    let visible = CategoryRequestRules.filter(list, query: query, picked: picked)
+                    if visible.isEmpty { EmptyStateView(title: L.text("appointments.category.none"), symbol: "magnifyingglass") }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Spacing.s)], spacing: Spacing.s) {
+                        ForEach(visible) { category in categoryButton(category) }
                     }
                 }
-                PatientTextArea(label: L.text("appointments.reason"), text: $reason, lines: 2...4, error: AppointmentRules.requestReasonError(reason) ?? submission.fieldErrors["reason"])
+                }
+                SectionTitle("appointments.category.franja")
+                Picker("appointments.category.franja", selection: $franja) {
+                    ForEach(RequestFranja.allCases, id: \.self) { Text(LocalizedStringKey($0.titleKey)).tag($0) }
+                }.pickerStyle(.segmented)
+                PatientTextArea(label: L.text("appointments.category.note"), text: $note, lines: 2...4,
+                                error: note.count > CategoryRequestRules.noteMax ? L.text("appointments.category.note.long") : submission.fieldErrors["note"])
+                doctorSection
                 PatientSubmissionNotice(submission: submission)
-                ClimesaButton(title: L.text("appointments.submit"), loading: submission.busy) { Task { await send() } }
-                    .disabled(slot == nil || AppointmentRules.requestReasonError(reason) != nil)
+                ClimesaButton(title: L.text("appointments.category.submit"), loading: submission.busy) { Task { await send() } }
+                    .disabled(!CategoryRequestRules.canSend(picked: picked, note: note))
                 ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
-            .task { await loadCatalog() }
-            .task(id: "\(doctorId)|\(ClimesaDates.localDay(day))") { slot = nil; await loadSlots() }
+            .task { await loadCategories() }
+            .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await catalog.load { try await account.client().get("/citas/catalogos", as: AppointmentCatalogs.self) } } }
         }
     }
 
-    private func loadCatalog() async { await catalog.load { try await account.client().get("/citas/catalogos", as: AppointmentCatalogs.self) } }
-
-    private func loadSlots() async {
-        guard !doctorId.isEmpty else { availability.clear(); return }
-        let path = "/citas/disponibilidad?doctorId=\(Query.encode(doctorId))&date=\(ClimesaDates.localDay(day))"
-        await availability.load { try await account.client().get(path, as: Availability.self) }
+    private func categoryButton(_ category: AppointmentCategory) -> some View {
+        let selected = picked.contains(category.code)
+        let full = !selected && picked.count >= CategoryRequestRules.maxCategories
+        return Button { picked = CategoryRequestRules.toggle(picked, category.code) } label: {
+            HStack(spacing: Spacing.s) {
+                Image(systemName: selected ? "checkmark.circle.fill" : CategoryRequestRules.symbol(category.icon)).frame(width: 22)
+                Text(verbatim: category.name).font(Typo.label).multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Spacing.m).frame(maxWidth: .infinity, minHeight: Spacing.control)
+            .background(selected ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+            .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(selected ? Theme.primary : Theme.controlLine, lineWidth: 1))
+            .foregroundStyle(selected ? Theme.onPrimary : Theme.ink)
+        }
+        .disabled(full).opacity(full ? 0.5 : 1)
+        .accessibilityLabel(Text(verbatim: "\(category.name): \(category.description)"))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
+
+    @ViewBuilder private var doctorSection: some View {
+        if let doctor {
+            SectionCard {
+                ListRow(title: doctor.fullName, subtitle: doctor.specialty ?? L.text("appointments.category.general"), meta: nil) {
+                    Button(L.text("appointments.category.doctor.remove")) { self.doctor = nil }.font(Typo.label)
+                }
+            }
+        } else if !doctorOpen {
+            Button(L.text("appointments.category.doctor")) { doctorOpen = true }.font(Typo.label).foregroundStyle(Theme.primary)
+        } else {
+            searchField(L.text("appointments.category.doctor.search"), text: $doctorQuery)
+            ForEach(CategoryRequestRules.doctors(catalog.value?.doctors ?? [], query: doctorQuery)) { d in
+                Button { doctor = d; doctorQuery = "" } label: {
+                    ListRow(title: d.fullName, subtitle: d.specialty ?? L.text("appointments.category.general"), meta: nil) { EmptyView() }
+                }.buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func searchField(_ label: String, text: Binding<String>) -> some View {
+        HStack(spacing: Spacing.s) {
+            Image(systemName: "magnifyingglass").foregroundStyle(Theme.muted)
+            TextField(label, text: text).font(Typo.body).foregroundStyle(Theme.ink).textInputAutocapitalization(.never).autocorrectionDisabled()
+        }
+        .padding(.horizontal, Spacing.m).frame(minHeight: Spacing.control)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+        .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(Theme.controlLine, lineWidth: 1))
+    }
+
+    private func loadCategories() async { await categories.load { try await account.client().get(CategoryRequestRules.categoriesPath, as: [AppointmentCategory].self) } }
 
     private func send() async {
-        guard let slot else { return }
-        let text = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        let body = AppointmentRequestBody(doctorId: doctorId, start: slot.start, end: slot.end, reason: text.isEmpty ? nil : text)
-        let ok = await submission.run(body: body, success: L.text("appointments.requested")) { key in
-            _ = try await account.client().send("POST", "/citas/solicitudes", body: body, key: key, as: AppointmentCommandResult.self)
+        let body = CategoryRequestRules.body(picked: picked, franja: franja, note: note, preferredDoctorId: doctor?.id)
+        let ok = await submission.run(body: body, success: L.text("appointments.category.sent")) { key in
+            _ = try await account.client().send("POST", CategoryRequestRules.path, body: body, key: key, as: CategoryRequestCommandResult.self)
         }
         if ok { await reload(); dismiss() }
-        else if submission.lastFailure?.code == "franja_ocupada" { self.slot = nil; await loadSlots() }
     }
 }
 
