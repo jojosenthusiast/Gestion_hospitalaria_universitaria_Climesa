@@ -200,7 +200,7 @@ describe('Fase 0 · cierre administrativo de la ambulancia', () => {
   });
   afterAll(async () => { await t?.close(); });
   const unit = () => t.one<{ version: number; estado: string }>('SELECT version,estado FROM ambulancia.unidad');
-  const dispatch = async () => t.call('REC', 'POST', '/ambulancia/servicios', { version: (await unit()).version, type: 'emergencia_domicilio', priority: 'roja', origin: 'Colonia Escalón, calle 5', destination: 'Hospital CLIMESA' });
+  const dispatch = async () => t.call('REC', 'POST', '/ambulancia/servicios', { version: (await unit()).version, type: 'emergencia_domicilio', priority: 'roja', origin: 'Colonia Escalón, calle 5', destination: 'Hospital CLIMESA', crew: await t.crewOnDuty() });
 
   test('dispatchBlock nombra al paramédico con cuenta cuando solo hay paramédicos sin cuenta', () => {
     expect(dispatchBlock('disponible', true, true, false)).toMatchObject({ code: 'sin_paramedico_de_turno', message: expect.stringMatching(/con cuenta/) });

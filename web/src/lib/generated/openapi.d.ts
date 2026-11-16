@@ -2207,6 +2207,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ambulancia/solicitudes/mias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mis solicitudes de ambulancia (últimos 7 días) con su estado y el avance del servicio */
+        get: operations["AmbulanceController_ownRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/solicitudes/{id}/cancelar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancelar mi solicitud mientras está por confirmar */
+        post: operations["AmbulanceController_cancelRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ambulancia/solicitudes/{id}/descartar": {
         parameters: {
             query?: never;
@@ -2287,6 +2321,40 @@ export interface paths {
         put?: never;
         /** Reporte prehospital; el reenvío con la misma Idempotency-Key no duplica */
         post: operations["AmbulanceController_prehospital"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/llegada": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Servicio que llega o llegó sin entrega registrada (para abrir el reporte y marcar recibido) */
+        get: operations["AmbulanceController_arrival"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ambulancia/servicios/{id}/recepcion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marcar recibido al paciente en el hospital (personal clínico, después de la llegada; una sola vez) */
+        post: operations["AmbulanceController_handover"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5100,6 +5168,11 @@ export interface components {
          * @enum {string}
          */
         AccionServicioAmbulancia: "cerrar";
+        /**
+         * @description Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03)
+         * @enum {string}
+         */
+        EstadoFinalServicio: "completado" | "cancelado" | "sin_traslado" | "rechaza_traslado" | "fallecido" | "desviado";
         ActiveServiceResponse: {
             /** Format: uuid */
             id: string;
@@ -5120,6 +5193,8 @@ export interface components {
             lastLocation: components["schemas"]["LocationPointResponse"] | null;
             /** @description Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo) */
             allowedActions: components["schemas"]["AccionServicioAmbulancia"][];
+            /** @description Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03) */
+            finalStates: components["schemas"]["EstadoFinalServicio"][];
         };
         /** @enum {string} */
         MotivoBloqueoDespacho: "en_servicio" | "en_mantenimiento" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno";
@@ -5164,6 +5239,8 @@ export interface components {
             dispatchBlock: components["schemas"]["DispatchBlockResponse"] | null;
             /** @description Solo con ambulancia.despachar */
             pendingRequests?: components["schemas"]["PendingAmbulanceRequestResponse"][];
+            /** @description Solo con ambulancia.despachar: paramédicos y motoristas de turno entre los que se elige la tripulación (MA-AMB-02) */
+            availableCrew?: components["schemas"]["CrewMemberResponse"][];
         };
         MaintenanceDto: {
             version: number;
@@ -5204,15 +5281,48 @@ export interface components {
             createdAt: string;
             notice: string;
         };
-        DiscardRequestDto: {
-            version: number;
+        OwnRequestServiceResponse: {
+            /** Format: date-time */
+            dispatchedAt: string;
+            milestones: components["schemas"]["MilestoneEntryResponse"][];
+            finalState: components["schemas"]["EstadoFinalServicio"] | null;
+            /** Format: date-time */
+            finishedAt: string | null;
+        };
+        /**
+         * @description cancelar: quien pidió puede cancelarla (solo por confirmar)
+         * @enum {string}
+         */
+        AccionSolicitudAmbulancia: "cancelar";
+        OwnAmbulanceRequestResponse: {
+            /** Format: uuid */
+            id: string;
+            state: components["schemas"]["EstadoSolicitudAmbulancia"];
+            channel: components["schemas"]["CanalSolicitudAmbulancia"];
+            address: string;
             reason: string;
+            /** Format: date-time */
+            createdAt: string;
+            version: number;
+            /** @description Servicio despachado para la solicitud; null si aún no se confirma */
+            service: components["schemas"]["OwnRequestServiceResponse"] | null;
+            /** @description cancelar: quien pidió puede cancelarla (solo por confirmar) */
+            allowedActions: components["schemas"]["AccionSolicitudAmbulancia"][];
+            notice: string;
+        };
+        CancelRequestDto: {
+            version: number;
+            reason?: string;
         };
         AmbulanceRequestStateResponse: {
             /** Format: uuid */
             id: string;
             state: components["schemas"]["EstadoSolicitudAmbulancia"];
             version: number;
+        };
+        DiscardRequestDto: {
+            version: number;
+            reason: string;
         };
         DispatchDto: {
             version: number;
@@ -5225,6 +5335,8 @@ export interface components {
             origin?: string;
             destination: string;
             municipality?: string;
+            /** @description Personal de turno elegido para el servicio (`availableCrew`); RN-30 exige un paramédico con cuenta y un motorista. Si falta (clientes anteriores, solo esta versión) se usa el paramédico con cuenta y el motorista que la app propone */
+            crew?: string[];
         };
         DispatchedCrewResponse: {
             /** Format: uuid */
@@ -5249,11 +5361,9 @@ export interface components {
              */
             occurredAt?: string;
             /** @enum {string} */
-            finalState?: "completado" | "cancelado" | "sin_traslado" | "rechaza_traslado";
+            finalState?: "completado" | "cancelado" | "sin_traslado" | "rechaza_traslado" | "fallecido" | "desviado";
             reason?: string;
         };
-        /** @enum {string} */
-        EstadoFinalServicio: "completado" | "cancelado" | "sin_traslado" | "rechaza_traslado";
         MilestoneResponse: {
             /** Format: uuid */
             id: string;
@@ -5306,6 +5416,24 @@ export interface components {
             version: number;
             patientLinked: boolean;
         };
+        ArrivalCandidateResponse: {
+            /** Format: uuid */
+            serviceId: string;
+            /** Format: date-time */
+            dispatchedAt: string;
+            /** @description Sin finalizar */
+            active: boolean;
+            /** @description Con el hito en_hospital */
+            arrived: boolean;
+        };
+        ArrivalServiceResponse: {
+            /**
+             * Format: uuid
+             * @description El primero de `services`
+             */
+            serviceId: string | null;
+            services: components["schemas"]["ArrivalCandidateResponse"][];
+        };
         PrehospitalReportResponse: {
             /** Format: uuid */
             id: string;
@@ -5323,14 +5451,41 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        HandoverInfoResponse: {
+            /** Format: date-time */
+            receivedAt: string;
+            /** @description Nombre de quien recibió (personal clínico) */
+            receivedByName: string | null;
+        };
+        /**
+         * @description recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada)
+         * @enum {string}
+         */
+        AccionPrehospital: "recibir";
         PrehospitalViewResponse: {
             /** Format: uuid */
             serviceId: string;
+            /** @description Versión del servicio; la entrega al hospital la envía */
+            version: number;
             active: boolean;
+            /** @description La ambulancia registró la llegada al hospital */
+            arrived: boolean;
             priority: components["schemas"]["PrioridadAmbulancia"];
             patientLinked: boolean;
             clinical: boolean;
             reports: components["schemas"]["PrehospitalReportResponse"][];
+            /** @description Entrega del paciente al hospital; null si aún no se registra */
+            handover: components["schemas"]["HandoverInfoResponse"] | null;
+            /** @description recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada) */
+            allowedActions: components["schemas"]["AccionPrehospital"][];
+        };
+        HandoverResponse: {
+            /** Format: uuid */
+            serviceId: string;
+            version: number;
+            /** Format: date-time */
+            receivedAt: string;
+            receivedByName: string | null;
         };
         LocationDto: {
             latitude: number;
@@ -5375,7 +5530,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "asistencia_ya_marcada" | "sin_asistencia_marcada" | "sin_ficha_personal" | "turno_ajeno" | "fuera_de_horario" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "indicador_desconocido" | "examen_con_resultados" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "asistencia_ya_marcada" | "sin_asistencia_marcada" | "sin_ficha_personal" | "turno_ajeno" | "fuera_de_horario" | "medico_ausente" | "tripulante_ausente" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "indicador_desconocido" | "examen_con_resultados" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -15547,6 +15702,143 @@ export interface operations {
             };
         };
     };
+    AmbulanceController_ownRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnAmbulanceRequestResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AmbulanceController_cancelRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AmbulanceRequestStateResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     AmbulanceController_discard: {
         parameters: {
             query?: never;
@@ -15954,6 +16246,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PrehospitalCreatedResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AmbulanceController_arrival: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArrivalServiceResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AmbulanceController_handover: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoverResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */

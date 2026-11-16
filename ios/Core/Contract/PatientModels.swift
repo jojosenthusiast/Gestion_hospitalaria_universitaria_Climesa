@@ -376,6 +376,39 @@ public struct PublicNotices: Decodable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey { case updatedAt = "actualizadoEn", notices = "avisos" }
 }
 
+/// MA-AMB-05: `OwnAmbulanceRequestResponse` de `GET /ambulancia/solicitudes/mias`: la solicitud propia como la guarda el servidor.
+public struct OwnAmbulanceRequest: Decodable, Sendable, Equatable, Identifiable {
+    public struct Milestone: Decodable, Sendable, Equatable {
+        public let type: String
+        public let occurredAt: String
+    }
+    public struct Service: Decodable, Sendable, Equatable {
+        public let dispatchedAt: String
+        public let milestones: [Milestone]
+        public let finalState: String?
+        public let finishedAt: String?
+    }
+    public let id: String
+    public let state: AmbulanceRequestState
+    public let address: String
+    public let reason: String
+    public let createdAt: String
+    public let version: Int
+    public let service: Service?
+    public let allowedActions: [String]
+    public let notice: String
+    public var canCancel: Bool { allowedActions.contains("cancelar") }
+    /// Sigue esperando o va en camino: la pantalla la sigue en lugar de ofrecer otra solicitud.
+    public var isActive: Bool { state == .porConfirmar || (state == .confirmada && service != nil && service?.finalState == nil) }
+}
+
+/// `AmbulanceRequestStateResponse` de `POST /ambulancia/solicitudes/{id}/cancelar`.
+public struct AmbulanceRequestStateResult: Decodable, Sendable, Equatable {
+    public let id: String
+    public let state: AmbulanceRequestState
+    public let version: Int
+}
+
 /// `AmbulanceRequestCreatedResponse` de `POST /ambulancia/solicitudes`.
 public struct AmbulanceRequestCreated: Decodable, Sendable, Equatable {
     public let id: String

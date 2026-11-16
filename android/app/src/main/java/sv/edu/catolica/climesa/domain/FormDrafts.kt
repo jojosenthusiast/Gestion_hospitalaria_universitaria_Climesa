@@ -7,6 +7,10 @@ object FormDrafts {
     fun vitalsKey(patientId: String) = "signos:$patientId"
     const val PREHOSPITAL_FORM = "prehospital:formulario"
     const val PREHOSPITAL_QUEUE = "prehospital:cola"
+    /** MA-AMB-06: milestones recorded without signal, in order (`{"items":[...]}`). */
+    const val MILESTONE_QUEUE = "hitos:cola"
+    /** MA-AMB-06: provisional patient created on this phone, linked with the next prehospital report. */
+    const val PROVISIONAL_PATIENT = "prehospital:provisional"
 
     fun vitals(form: VitalsForm) = JSONObject().apply { form.values.forEach { (measure, text) -> if (text.isNotBlank()) put(measure.key, text) }; if (form.note.isNotBlank()) put("note", form.note) }
 

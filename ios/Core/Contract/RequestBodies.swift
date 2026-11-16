@@ -39,6 +39,22 @@ public struct AmbulanceRequestBody: Encodable, Sendable, Equatable {
     }
 }
 
+/// MA-AMB-05: `CancelRequestDto`; el motivo es opcional y no se envía vacío.
+public struct AmbulanceCancelBody: Encodable, Sendable, Equatable {
+    public let version: Int
+    public let reason: String?
+    public init(version: Int, reason: String) {
+        let text = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.version = version; self.reason = text.isEmpty ? nil : String(text.prefix(300))
+    }
+}
+
+/// Cuerpo vacío (`{}`) de una escritura sin campos, como la entrega al hospital (MA-AMB-04): no lleva la versión del
+/// servicio porque cada hito o reporte la cambia mientras se recibe al paciente.
+public struct EmptyBody: Encodable, Sendable, Equatable {
+    public init() {}
+}
+
 /// `QueueTransitionDto`, `ConsultationSignDto` y `LabVersionDto`: solo la versión vigente.
 public struct VersionBody: Encodable, Sendable, Equatable {
     public let version: Int

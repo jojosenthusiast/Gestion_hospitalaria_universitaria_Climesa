@@ -211,13 +211,15 @@ public enum RecordAccess {
 
 /// Estado final de un servicio de ambulancia (`EstadoFinalServicio`).
 public enum AmbulanceFinalState: String, CaseIterable, Sendable, Hashable {
-    case completado, cancelado, sinTraslado = "sin_traslado", rechazaTraslado = "rechaza_traslado"
+    case completado, cancelado, sinTraslado = "sin_traslado", rechazaTraslado = "rechaza_traslado", fallecido, desviado
     public var label: String {
         switch self {
         case .completado: return "Completado"
         case .cancelado: return "Cancelado"
         case .sinTraslado: return "Sin traslado"
         case .rechazaTraslado: return "Rechaza traslado"
+        case .fallecido: return "Paciente fallecido"
+        case .desviado: return "Desviado a otro centro"
         }
     }
 }

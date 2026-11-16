@@ -2,7 +2,7 @@
 export type UnitState = 'disponible' | 'en_servicio' | 'en_mantenimiento';
 export const milestoneTypes = ['salida', 'en_escena', 'trasladando', 'en_hospital', 'finalizado'] as const;
 export type MilestoneType = typeof milestoneTypes[number];
-export const finalStates = ['completado', 'cancelado', 'sin_traslado', 'rechaza_traslado'] as const;
+export const finalStates = ['completado', 'cancelado', 'sin_traslado', 'rechaza_traslado', 'fallecido', 'desviado'] as const;
 export type FinalState = typeof finalStates[number];
 export const serviceTypes = ['emergencia_domicilio', 'traslado_interhospitalario'] as const;
 export const priorities = ['roja', 'naranja', 'amarilla', 'verde'] as const;
@@ -46,23 +46,37 @@ export function nextMilestones(done: readonly string[]): MilestoneType[] {
   const following: Record<string, MilestoneType[]> = {
     salida: ['en_escena', 'finalizado'],
     en_escena: ['trasladando', 'finalizado'],
-    trasladando: ['en_hospital'],
+    // MA-AMB-03: durante el traslado el servicio puede terminar sin llegar (fallecimiento, desvío, cancelación).
+    trasladando: ['en_hospital', 'finalizado'],
     en_hospital: ['finalizado'],
   };
   return following[last] ?? [];
 }
 
 /**
- * Estado final permitido al finalizar: `completado` solo después de llegar al hospital; antes, el servicio termina
- * cancelado, sin traslado o con rechazo del paciente, y siempre con motivo. Devuelve el mensaje de error o null.
+ * Estados finales que admite el servicio según sus hitos (RN-32, MA-AMB-03): `completado` solo después de llegar al
+ * hospital; antes de salir con el paciente, sin traslado, rechazo, fallecimiento o cancelación; durante el traslado,
+ * fallecimiento, desvío a otro centro o cancelación. La base repite la regla (`ambulancia.validar_cierre_servicio`).
  */
+export function allowedFinalStates(done: readonly string[]): FinalState[] {
+  if (done.includes('finalizado') || !done.includes('salida')) return [];
+  if (done.includes('en_hospital')) return ['completado'];
+  if (done.includes('trasladando')) return ['fallecido', 'desviado', 'cancelado'];
+  return ['sin_traslado', 'rechaza_traslado', 'fallecido', 'cancelado'];
+}
+const finalStateNames: Record<string, string> = { completado: 'completado', cancelado: 'cancelado', sin_traslado: 'sin traslado', rechaza_traslado: 'rechazo del traslado', fallecido: 'fallecimiento', desviado: 'desvío a otro centro' };
+
+/** Valida el estado final y su motivo al finalizar; `completado` se asume al llegar al hospital. Devuelve el error o null. */
 export function finalStateError(done: readonly string[], finalState: string | undefined, reason: string | undefined): string | null {
+  const allowed = allowedFinalStates(done);
   const arrived = done.includes('en_hospital');
   const state = finalState ?? (arrived ? 'completado' : undefined);
-  if (!state) return 'Indica cómo terminó el servicio: cancelado, sin traslado o rechazo del traslado.';
+  const options = allowed.map(code => finalStateNames[code]).join(', ');
+  if (!state) return `Indica cómo terminó el servicio: ${options}.`;
   if (state === 'completado' && !arrived) return 'Solo se completa un servicio que llegó al hospital; indica otro estado final con su motivo.';
   if (state !== 'completado' && arrived) return 'El servicio ya llegó al hospital; finalízalo como completado.';
-  if (state !== 'completado' && (reason ?? '').trim().length < 5) return 'Indica el motivo de terminar sin traslado (al menos 5 caracteres).';
+  if (!allowed.includes(state as FinalState)) return `Con los hitos registrados el servicio solo puede terminar como: ${options}.`;
+  if (state !== 'completado' && (reason ?? '').trim().length < 5) return 'Indica el motivo de terminar sin llegar al hospital (al menos 5 caracteres).';
   return null;
 }
 
@@ -72,6 +86,31 @@ export const responseMinutes = (dispatchedAt: Date, onScene: Date | null) =>
 
 /** El reporte prehospital se puede enviar durante el servicio y hasta 24 h después de finalizar (privacidad "(servicio)"). */
 export const PREHOSPITAL_GRACE_MS = 24 * 3600_000;
+/**
+ * Área que recibe a los pacientes de la ambulancia (código de `infra.espacio`, la "Emergencia" de la planta 1). Ver el contenido
+ * clínico del prehospital y marcar recibido exige un turno en curso en ella (o en un espacio dentro de ella) o relación de atención.
+ */
+export const RECEIVING_AREA = 'P1-EMG';
+/**
+ * MA-AMB-02 (respaldo de una versión): la tripulación que la app propone por defecto, sobre candidatos ya ordenados como
+ * `availableCrew`: el primer paramédico con cuenta y el primer motorista.
+ */
+export function defaultCrew<T extends { tipo: string; hasAccount: boolean }>(candidates: T[]): T[] {
+  const paramedic = candidates.find(p => p.tipo === 'paramedico' && p.hasAccount), driver = candidates.find(p => p.tipo === 'motorista');
+  return [paramedic, driver].filter((p): p is T => !!p);
+}
+/** Orden de `availableCrew`: por función, primero quien tiene cuenta y luego por nombre. */
+export const crewOrder = (a: { tipo: string; hasAccount: boolean; name: string }, b: { tipo: string; hasAccount: boolean; name: string }) =>
+  a.tipo.localeCompare(b.tipo) || Number(b.hasAccount) - Number(a.hasAccount) || a.name.localeCompare(b.name);
+/**
+ * Hora de un hito (MA-AMB-06): no antes del último hito registrado (o del despacho) ni con más de 24 h; null si es válida.
+ * Un hito encolado sin señal llega tarde, pero en orden y el mismo día.
+ */
+export function milestoneTimeError(occurredAt: Date, lastRecorded: Date, now: Date): string | null {
+  if (occurredAt.getTime() < now.getTime() - PREHOSPITAL_GRACE_MS) return 'La hora del hito tiene más de 24 horas; ya no se registra.';
+  if (occurredAt.getTime() < lastRecorded.getTime()) return 'La hora del hito es anterior al último hito registrado del servicio.';
+  return null;
+}
 export const canReportAfter = (finishedAt: Date | null, now: Date) => !finishedAt || now.getTime() - finishedAt.getTime() <= PREHOSPITAL_GRACE_MS;
 
 /**
@@ -79,5 +118,8 @@ export const canReportAfter = (finishedAt: Date | null, now: Date) => !finishedA
  * No usa `personal.v_turno_en_curso` porque esa vista lee `now()` de la base y aquí el reloj es sustituible.
  */
 export const CREW_ROLES_ON_DUTY_SQL = "SELECT bool_or(p.tipo='paramedico') AS paramedic, bool_or(p.tipo='motorista') AS driver, bool_or(p.tipo='paramedico' AND EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo')) AS \"paramedicWithAccount\" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";
-/** Tripulación asignada al despachar: paramédicos y motoristas activos con turno en curso; `hasAccount` si puede operar en la app. */
-export const CREW_ON_DUTY_SQL = "SELECT DISTINCT p.id,p.tipo,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS \"hasAccount\" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";
+/**
+ * Candidatos a tripulación (MA-AMB-02): paramédicos y motoristas activos con turno en curso (no ausente); `hasAccount` si
+ * puede operar en la app. El despachador elige de esta lista; estar de turno no da por sí solo relación de atención.
+ */
+export const CREW_ON_DUTY_SQL = "SELECT DISTINCT p.id,p.tipo,p.nombres||' '||p.apellidos AS name,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS \"hasAccount\" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";

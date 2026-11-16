@@ -131,4 +131,40 @@ final class DatesAndLiveTopicTests: XCTestCase {
         XCTAssertTrue(LiveTopic.allCases.allSatisfy { next.version($0) == 1 })
         XCTAssertEqual(next.version([.queue, .appointments]), 2)
     }
+
+    /// MA-AMB-05: la solicitud propia sale del servidor; la pantalla sigue la activa y solo ofrece cancelar si la API lo permite.
+    func testSolicitudPropiaDeAmbulancia() throws {
+        let json = """
+        [{"id":"r2","state":"confirmada","channel":"app_paciente","address":"Colonia Ficticia","reason":"Caída","createdAt":"2026-11-15T14:00:00Z","version":2,
+          "service":{"dispatchedAt":"2026-11-15T14:05:00Z","milestones":[{"type":"salida","occurredAt":"2026-11-15T14:07:00Z"}],"finalState":null,"finishedAt":null},
+          "allowedActions":[],"notice":"Si hay riesgo de vida, llama al 911."},
+         {"id":"r1","state":"por_confirmar","channel":"app_paciente","address":"A","reason":"B","createdAt":"2026-11-14T10:00:00Z","version":1,"service":null,"allowedActions":["cancelar"],"notice":"x"}]
+        """
+        let requests = try JSONDecoder().decode([OwnAmbulanceRequest].self, from: Data(json.utf8))
+        let active = try XCTUnwrap(AmbulanceRules.active(requests))
+        XCTAssertEqual(active.id, "r2")
+        XCTAssertFalse(active.canCancel)
+        XCTAssertTrue(requests[1].canCancel)
+        XCTAssertEqual(AmbulanceRules.progress(active), "La ambulancia va en camino.")
+        XCTAssertEqual(AmbulanceFinalState(rawValue: "desviado")?.label, "Desviado a otro centro")
+    }
+
+    /// MA-AMB-04: "Marcar recibido" depende de `allowedActions`.
+    func testEntregaDelPacienteSegunLaApi() throws {
+        let json = """
+        {"serviceId":"s1","active":true,"priority":"roja","clinical":true,"reports":[],"version":7,"arrived":true,"handover":null,"allowedActions":["recibir"]}
+        """
+        let view = try JSONDecoder().decode(PrehospitalView.self, from: Data(json.utf8))
+        XCTAssertTrue(view.canReceive)
+        XCTAssertEqual(view.version, 7)
+        // La entrega no lleva cuerpo ni versión; la llegada se encuentra aunque no haya evento ni reporte.
+        XCTAssertEqual(String(decoding: try JSONBody.encode(EmptyBody()), as: UTF8.self), "{}")
+        let none = try JSONDecoder().decode(ArrivalService.self, from: Data(#"{"serviceId":null,"services":[]}"#.utf8))
+        XCTAssertNil(none.pick(nil))
+        // Re-revisión #117: el que llegó sin entrega va primero aunque la unidad ya salió a otro; la elección se respeta mientras siga listada.
+        let two = try JSONDecoder().decode(ArrivalService.self, from: Data(#"{"serviceId":"a1","services":[{"serviceId":"a1","dispatchedAt":"2026-11-15T14:00:00Z","active":false,"arrived":true},{"serviceId":"s1","dispatchedAt":"2026-11-15T15:00:00Z","active":true,"arrived":false}]}"#.utf8))
+        XCTAssertEqual(two.pick(nil), "a1")
+        XCTAssertEqual(two.pick("s1"), "s1")
+        XCTAssertEqual(two.pick("gone"), "a1")
+    }
 }

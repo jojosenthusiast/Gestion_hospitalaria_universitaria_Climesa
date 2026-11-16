@@ -49,7 +49,7 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
         auth.clearLocalSession();pending=null;draft.password=""
         mutableState.value=AuthUiState(checkingSession=false,error=message)
     }
-    init { retryAccess() }
+    init { sessionDrafts.appStarted(); retryAccess() }
     /**
      * Verifies the session against `/auth/me`. `silent` is for returning from the background or a lost live channel: it never swaps the
      * screen for the loading one, ignores a call while another is in flight, and keeps the current account when the answer is only a
@@ -97,6 +97,8 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
     fun confirmedSignIn(email:String){draft.email=email.trim();draft.password="";clearRegistration()}
     fun clearRegistration(){mutableState.update{it.copy(confirmationEmail=null,unconfirmedEmail=null,emailNotice=null,fieldErrors=emptyMap(),error=null)}}
     /** Manual sign-out and the 5-minute inactivity sign-out (`MainActivity.onStart`) both end here. */
+    /** The signed-in paramedic still has milestones or a prehospital report waiting for signal (kept across sign-out). */
+    fun hasPendingWrites():Boolean=mutableState.value.account?.session?.userId?.let(sessionDrafts::hasPendingWrites)==true
     fun signOut(){
         val session=mutableState.value.account?.session?:pending
         liveProfile.stop()

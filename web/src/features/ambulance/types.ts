@@ -11,13 +11,24 @@ export type AmbulanceStatus={
  driverOnDuty?:boolean;
  dispatchBlock?:DispatchBlock|null;
  pendingRequests?:AmbulanceRequest[];
+ /** MA-AMB-02: solo con `ambulancia.despachar`; personal de turno entre el que se elige la tripulación. */
+ availableCrew?:CrewCandidate[];
 };
-export type PrehospitalView={serviceId:string;active:boolean;priority:string;patientLinked:boolean;clinical:boolean;reports:{id:string;priority:string;estimatedArrival?:string|null;capturedAt:string;receivedAt:string;reason?:string;vitalSigns?:Record<string,number>}[]};
+export type CrewCandidate={staffId:string;role:string;name:string;hasAccount:boolean};
+/** Tripulación propuesta: el primer paramédico con cuenta (registra los hitos) y el primer motorista. */
+export function defaultCrew(pool:CrewCandidate[]){const paramedic=pool.find(p=>p.role==='paramedico'&&p.hasAccount);const driver=pool.find(p=>p.role==='motorista');return [paramedic,driver].filter((p):p is CrewCandidate=>!!p).map(p=>p.staffId);}
+/** Qué falta en la tripulación elegida (RN-30, BL-05); null si se puede despachar con ella. */
+export function crewProblem(pool:CrewCandidate[],chosen:string[]){const picked=pool.filter(p=>chosen.includes(p.staffId));
+ if(!picked.some(p=>p.role==='paramedico'&&p.hasAccount))return 'Elige un paramédico con cuenta en la app: registra los hitos del servicio.';
+ if(!picked.some(p=>p.role==='motorista'))return 'Elige un motorista de turno para el servicio.';
+ return null;}
+/** MA-AMB-04: `handover` dice quién recibió al paciente; marcar recibido es del personal clínico en las apps (`allowedActions`). */
+export type PrehospitalView={serviceId:string;version:number;active:boolean;arrived:boolean;priority:string;patientLinked:boolean;clinical:boolean;handover:{receivedAt:string;receivedByName:string|null}|null;allowedActions:string[];reports:{id:string;priority:string;estimatedArrival?:string|null;capturedAt:string;receivedAt:string;reason?:string;vitalSigns?:Record<string,number>}[]};
 export const stateNames:Record<string,string>={disponible:'Disponible',en_servicio:'En servicio',en_mantenimiento:'En mantenimiento'};
 export const priorityNames:Record<string,string>={roja:'Roja',naranja:'Naranja',amarilla:'Amarilla',verde:'Verde'};
 export const typeNames:Record<string,string>={emergencia_domicilio:'Emergencia a domicilio',traslado_interhospitalario:'Traslado interhospitalario'};
 export const milestoneNames:Record<string,string>={salida:'Salida',en_escena:'En escena',trasladando:'Trasladando',en_hospital:'En hospital',finalizado:'Finalizado'};
-export const finalStateNames:Record<string,string>={completado:'Completado',cancelado:'Cancelado',sin_traslado:'Sin traslado',rechaza_traslado:'Paciente rechaza traslado'};
+export const finalStateNames:Record<string,string>={completado:'Completado',cancelado:'Cancelado',sin_traslado:'Sin traslado',rechaza_traslado:'Paciente rechaza traslado',fallecido:'Paciente fallecido',desviado:'Desviado a otro centro'};
 export const roleNames:Record<string,string>={paramedico:'Paramédico',motorista:'Motorista',medico:'Médico',enfermero:'Enfermería'};
 export const channelNames:Record<string,string>={app_paciente:'App del paciente',telefono:'Llamada telefónica'};
 export const minutesBetween=(fromIso:string,now=Date.now())=>Math.max(0,Math.round((now-new Date(fromIso).getTime())/60000));

@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -81,7 +82,8 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
     // Solo repinta el «hace X min»; no consulta nada a la red.
     val now by produceState(Instant.now()) { while (true) { delay(30_000); value = Instant.now() } }
     val status = state.status
-    val service = status?.activeService
+    // MA-AMB-06: the service as the API will see it once the queued milestones arrive.
+    val service = status?.activeService?.let(model::projected)
     val canPlan = "turnos.planificar" in profile.permissions
     PageList(modifier) {
         item {
@@ -94,6 +96,12 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         state.queued?.let { item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_en_cola)) } }
+        if (state.queuedMilestones.isNotEmpty()) item {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                NoticeBanner(NoticeKind.WARNING, pluralStringResource(R.plurals.par_hitos_en_cola, state.queuedMilestones.size, state.queuedMilestones.size))
+                SecondaryButton(stringResource(R.string.camas_reintentar), { model.retryMilestones() }, enabled = !state.busy)
+            }
+        }
         when {
             state.loading && status == null -> item { LoadingState() }
             state.error != null && status == null -> item { ErrorState(state.error, onRetry = { model.open(AmbulanceMode.PARAMEDIC) }) }
@@ -192,14 +200,16 @@ private fun NextStepButton(service: AmbulanceService, busy: Boolean, model: Ambu
         )
     }
     if (finishing) {
-        var finalState by rememberSaveable { mutableStateOf(AmbulanceLabels.earlyFinalStates.first().first) }
+        // MA-AMB-03: only the final states the API accepts for the milestones recorded so far.
+        val choices = AmbulanceRules.finishOptions(service)
+        var finalState by rememberSaveable(service.id, choices.size) { mutableStateOf(choices.first().first) }
         var reason by rememberSaveable { mutableStateOf("") }
         ConfirmDialog(
             title = stringResource(R.string.amb_terminar_sin_traslado), confirmLabel = stringResource(R.string.amb_finalizar), destructive = true, busy = busy,
             onConfirm = { finishing = false; model.advance(service, "finalizado", finalState, reason) }, onDismiss = { finishing = false },
             body = {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Choices(AmbulanceLabels.earlyFinalStates, finalState) { finalState = it }
+                    Choices(choices, finalState) { finalState = it }
                     FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, singleLine = false)
                 }
             },

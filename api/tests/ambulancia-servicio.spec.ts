@@ -14,13 +14,15 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
   let driverId: string;
   const unit = () => t.one<{ id: string; estado: string; version: number }>('SELECT id,estado,version FROM ambulancia.unidad');
   const request = (role: string, body: Record<string, unknown> = {}, key?: string) => t.call(role, 'POST', '/ambulancia/solicitudes', { address: 'Colonia Ficticia, pasaje 3, casa 12', municipality: 'San Salvador', reason: 'Caída en casa con dolor de cadera', contactPhone: '7000-0001', ...body }, key);
-  const dispatch = (body: Record<string, unknown>, role = 'REC', key?: string) => t.call(role, 'POST', '/ambulancia/servicios', { type: 'emergencia_domicilio', priority: 'naranja', destination: 'Hospital CLIMESA, emergencia', ...body }, key);
+  const dispatch = async (body: Record<string, unknown>, role = 'REC', key?: string) => t.call(role, 'POST', '/ambulancia/servicios', { type: 'emergencia_domicilio', priority: 'naranja', destination: 'Hospital CLIMESA, emergencia', crew: await t.crewOnDuty(), ...body }, key);
   const milestone = (id: string, body: Record<string, unknown>, role = 'PAR', key?: string) => t.call(role, 'POST', `/ambulancia/servicios/${id}/hitos`, body, key);
 
   beforeAll(async () => {
     t = await createTestApp(at('08:00'));
     await t.shift('PAR', at('06:00'), at('14:00'));
     driverId = await t.driverShift(at('06:00'), at('14:00'));
+    // Emergencia recibe: Enfermería con turno en el área que recibe ve el contenido clínico del prehospital.
+    await t.shift('ENF', at('06:00'), at('23:00'), 'P1-EMG');
     const current = await unit();
     const ready = await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: current.version, inMaintenance: false, reason: 'Inicio de turno con paramédico' });
     expect(ready.status).toBe(201);

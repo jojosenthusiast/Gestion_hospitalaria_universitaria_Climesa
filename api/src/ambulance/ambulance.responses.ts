@@ -48,6 +48,7 @@ export class ActiveServiceResponse {
   @EnumArrayProp(HITO_SERVICIO, 'HitoServicio') nextMilestones!: string[];
   @ClassProp(LocationPointResponse, { nullable: true }) lastLocation!: LocationPointResponse | null;
   @EnumArrayProp(['cerrar'], 'AccionServicioAmbulancia', { description: 'Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)' }) allowedActions!: string[];
+  @EnumArrayProp(ESTADO_FINAL_SERVICIO, 'EstadoFinalServicio', { description: 'Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03)' }) finalStates!: string[];
 }
 
 export class PendingAmbulanceRequestResponse {
@@ -81,6 +82,21 @@ export class AmbulanceStatusResponse {
   @BoolProp({ description: 'Hay un paramédico con cuenta activa y turno en curso (BL-05: sin él no se despacha)' }) paramedicWithAccountOnDuty!: boolean;
   @ClassProp(DispatchBlockResponse, { nullable: true, description: 'Por qué no se puede despachar ahora; null si se puede' }) dispatchBlock!: DispatchBlockResponse | null;
   @ClassArrayProp(PendingAmbulanceRequestResponse, { optional: true, description: 'Solo con ambulancia.despachar' }) pendingRequests?: PendingAmbulanceRequestResponse[];
+  @ClassArrayProp(CrewMemberResponse, { optional: true, description: 'Solo con ambulancia.despachar: paramédicos y motoristas de turno entre los que se elige la tripulación (MA-AMB-02)' }) availableCrew?: CrewMemberResponse[];
+}
+
+/** MA-AMB-04: un servicio que el hospital recibe o espera, sin datos clínicos. */
+export class ArrivalCandidateResponse {
+  @UuidProp() serviceId!: string;
+  @DateTimeProp() dispatchedAt!: string;
+  @BoolProp({ description: 'Sin finalizar' }) active!: boolean;
+  @BoolProp({ description: 'Con el hito en_hospital' }) arrived!: boolean;
+}
+
+/** MA-AMB-04: servicios por recibir: primero los que llegaron sin entrega (hasta 24 h después de finalizar), después el activo. */
+export class ArrivalServiceResponse {
+  @UuidProp({ nullable: true, description: 'El primero de `services`' }) serviceId!: string | null;
+  @ClassArrayProp(ArrivalCandidateResponse) services!: ArrivalCandidateResponse[];
 }
 
 export class AmbulanceUnitStateResponse {
@@ -154,13 +170,52 @@ export class PrehospitalReportResponse {
   @JsonProp({ optional: true, description: 'Solo con contenido clínico' }) vitalSigns?: Record<string, unknown>;
 }
 
+/** MA-AMB-04: quién recibió al paciente en el hospital y cuándo. */
+export class HandoverInfoResponse {
+  @DateTimeProp() receivedAt!: string;
+  @StrProp({ nullable: true, description: 'Nombre de quien recibió (personal clínico)' }) receivedByName!: string | null;
+}
+
 export class PrehospitalViewResponse {
   @UuidProp() serviceId!: string;
+  @IntProp({ description: 'Versión del servicio; la entrega al hospital la envía' }) version!: number;
   @BoolProp() active!: boolean;
+  @BoolProp({ description: 'La ambulancia registró la llegada al hospital' }) arrived!: boolean;
   @EnumProp(PRIORIDAD_AMBULANCIA, 'PrioridadAmbulancia') priority!: string;
   @BoolProp() patientLinked!: boolean;
   @BoolProp() clinical!: boolean;
   @ClassArrayProp(PrehospitalReportResponse) reports!: PrehospitalReportResponse[];
+  @ClassProp(HandoverInfoResponse, { nullable: true, description: 'Entrega del paciente al hospital; null si aún no se registra' }) handover!: HandoverInfoResponse | null;
+  @EnumArrayProp(['recibir'], 'AccionPrehospital', { description: 'recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada)' }) allowedActions!: string[];
+}
+
+export class HandoverResponse {
+  @UuidProp() serviceId!: string;
+  @IntProp() version!: number;
+  @DateTimeProp() receivedAt!: string;
+  @StrProp({ nullable: true }) receivedByName!: string | null;
+}
+
+/** MA-AMB-05: avance del servicio que atiende la solicitud, sin tripulación ni ubicación. */
+export class OwnRequestServiceResponse {
+  @DateTimeProp() dispatchedAt!: string;
+  @ClassArrayProp(MilestoneEntryResponse) milestones!: MilestoneEntryResponse[];
+  @EnumProp(ESTADO_FINAL_SERVICIO, 'EstadoFinalServicio', { nullable: true }) finalState!: string | null;
+  @DateTimeProp({ nullable: true }) finishedAt!: string | null;
+}
+
+/** MA-AMB-05: solicitud de ambulancia de la propia cuenta (o del propio expediente) con su estado en el servidor. */
+export class OwnAmbulanceRequestResponse {
+  @UuidProp() id!: string;
+  @EnumProp(ESTADO_SOLICITUD_AMBULANCIA, 'EstadoSolicitudAmbulancia') state!: string;
+  @EnumProp(CANAL_SOLICITUD, 'CanalSolicitudAmbulancia') channel!: string;
+  @StrProp() address!: string;
+  @StrProp() reason!: string;
+  @DateTimeProp() createdAt!: string;
+  @IntProp() version!: number;
+  @ClassProp(OwnRequestServiceResponse, { nullable: true, description: 'Servicio despachado para la solicitud; null si aún no se confirma' }) service!: OwnRequestServiceResponse | null;
+  @EnumArrayProp(['cancelar'], 'AccionSolicitudAmbulancia', { description: 'cancelar: quien pidió puede cancelarla (solo por confirmar)' }) allowedActions!: string[];
+  @StrProp() notice!: string;
 }
 
 export class LocationRecordedResponse {

@@ -88,10 +88,10 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `laboratorio.actualizado` | `orden_laboratorio` | Ordenar, muestra, resultado, enmienda, completar, cancelar | `laboratorio.ver_cola`, `resultados.ver` (el paciente solo al revisar o si se enmienda un resultado ya liberado; la enmienda también va a `usuario:<médico que pidió>`) | 107 |
 | `laboratorio.critico` | `orden_laboratorio` | Resultado o enmienda con marca crítica | `laboratorio.ver_cola`, `usuario:<médico que pidió>` y `usuario:<tratante de la admisión activa>` (RN-25; ni los demás médicos ni el paciente; los canales de `resultados.ver` reciben a la vez `laboratorio.actualizado`) | 107 |
 | `admision.creada` / `admision.actualizada` / `admision.cama_asignada` | `admision` | Admisión, indicación, cama, autorizar, notas, alta, salida, traslado | `admision.ver`, `camas.asignar` o `camas.ver_tablero` | 108 |
-| `ambulancia.estado_cambiado` | `unidad` o `solicitud` | Mantenimiento, despacho, descarte, cierre | `ambulancia`, `ambulancia.despachar`, `usuario:<solicitante>` | 109 |
+| `ambulancia.estado_cambiado` | `unidad` o `solicitud` | Mantenimiento, despacho, descarte, cierre, cancelación por el solicitante (MA-AMB-05) | `ambulancia`, `ambulancia.despachar`, `usuario:<solicitante>` | 109 |
 | `ambulancia.solicitud_creada` | `solicitud` | Solicitud de paciente o recepción | `ambulancia`, `ambulancia.despachar`, `usuario:<paciente>` | 109 |
-| `ambulancia.hito` | `servicio` | Hito del servicio | `ambulancia`, `usuario:<paciente solicitante>` | 109 |
-| `ambulancia.prehospital` | `servicio` | Reporte prehospitalario | `ambulancia`, `ambulancia.recibir_prehospital` | 109 |
+| `ambulancia.hito` | `servicio` | Hito del servicio | `ambulancia`, `usuario:<paciente solicitante>`; `trasladando`, `en_hospital` y `finalizado` también a `ambulancia.recibir_prehospital` (MA-AMB-04) | 109 |
+| `ambulancia.prehospital` | `servicio` | Reporte prehospitalario; entrega al hospital (MA-AMB-04) | `ambulancia`, `ambulancia.recibir_prehospital` | 109 |
 | `ambulancia.ubicacion` | `servicio` | Ubicación en vivo | `ambulancia` | 109 |
 | `vinculacion.solicitada` / `vinculacion.resuelta` | `vinculacion_paciente` | Solicitud, aprobación o rechazo | `cuentas.verificar`, `usuario:<solicitante>` | 101 |
 | `inventario.actualizado` | `articulo` | Movimiento | `inventario.ver` | 111 |

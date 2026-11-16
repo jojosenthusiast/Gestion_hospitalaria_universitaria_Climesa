@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsUUID, Matches, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsUUID, Matches, Max, Min, ValidateNested } from 'class-validator';
 import { Text } from '../platform/dto';
 import { finalStates, milestoneTypes, priorities, serviceTypes } from './ambulance.rules';
 
@@ -33,6 +33,13 @@ export class DispatchDto {
   @Text(5,300,true) origin?:string;
   @Text(3,300) destination!:string;
   @Text(0,80,true) municipality?:string;
+  /**
+   * MA-AMB-02: el despachador elige la tripulación entre `availableCrew` de `GET /ambulancia` (paramédico con cuenta y motorista).
+   * TODO(MA-AMB-02): opcional solo durante una versión para no romper clientes anteriores en plena emergencia; sin ella se usan los
+   * valores que la app propone (`defaultCrew`) y la auditoría lo marca con `crewFallback`. Quitar el respaldo en la siguiente versión.
+   */
+  @ApiPropertyOptional({type:[String],format:'uuid',maxItems:6,uniqueItems:true,description:'Personal de turno elegido para el servicio (`availableCrew`); RN-30 exige un paramédico con cuenta y un motorista. Si falta (clientes anteriores, solo esta versión) se usa el paramédico con cuenta y el motorista que la app propone'})
+  @IsOptional() @IsArray() @ArrayMaxSize(6) @ArrayUnique() @IsUUID('all',{each:true}) crew?:string[];
 }
 /** FR-109-07: hito del servicio; `finalState` y `reason` solo al finalizar. */
 export class MilestoneDto {
@@ -64,6 +71,11 @@ export class CloseServiceDto {
   @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
   /** Trimmed before validation: the stored reason is the trimmed text, so padding cannot pass the minimum length. */
   @Transform(({value}:{value:unknown})=>typeof value==='string'?value.trim():value) @Text(10,500) reason!:string;
+}
+/** MA-AMB-05: quien pidió cancela su solicitud por confirmar; `version` es la de la solicitud. */
+export class CancelRequestDto {
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+  @Text(0,300,true) reason?:string;
 }
 export class LocationDto {
   @ApiProperty({minimum:-90,maximum:90}) @IsNumber() @Min(-90) @Max(90) latitude!:number;
