@@ -97,6 +97,8 @@ delete from inventario.movimiento where id::text like 'de300000-%' or lote_id::t
 delete from inventario.existencia where lote_id::text like 'de300000-%';
 delete from inventario.lote where id::text like 'de300000-%';
 delete from inventario.articulo a where a.id::text like 'de300000-%' and not exists (select 1 from inventario.lote l where l.articulo_id = a.id);
+-- "Enterado" y recordatorios (Fase 2, S11) sobre avisos demo, de cualquier cuenta: van antes que el aviso (llave foránea).
+delete from publico.aviso_enterado where aviso_id::text like 'de300000-%';
 delete from publico.aviso where id::text like 'de300000-%';
 
 -- ---------------------------------------------------------------------------------------------------------
@@ -191,6 +193,7 @@ end $$;
 -- ---------------------------------------------------------------------------------------------------------
 delete from acceso.invitacion where id::text like 'de300000-%' or usuario_id::text like 'de300000-%';
 delete from acceso.vinculacion_paciente where id::text like 'de300000-%' or usuario_id::text like 'de300000-%';
+delete from publico.aviso_enterado where usuario_id::text like 'de300000-%';
 delete from acceso.asignacion_rol where usuario_id::text like 'de300000-%';
 delete from acceso.usuario where id::text like 'de300000-%';
 

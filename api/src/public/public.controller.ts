@@ -5,7 +5,7 @@ import { ActorRequest } from '../platform/actor';
 import { NoticeDto, NoticeEditDto, NoticeWithdrawDto } from './public.dto';
 import { PublicRateLimitGuard } from './rate-limit.guard';
 import { PublicService } from './public.service';
-import { DoctorsOnDutyResponse, HospitalLocationResponse, MyNoticesResponse, NoticeListItemResponse, NoticePublishedResponse, NoticesResponse, PublicOccupancyResponse, PublicQueueResponse } from './public.responses';
+import { DoctorsOnDutyResponse, HospitalLocationResponse, MyInboxResponse, MyNoticesResponse, NoticeAckResponse, NoticeStatsResponse, NoticeListItemResponse, NoticePublishedResponse, NoticesResponse, PublicOccupancyResponse, PublicQueueResponse } from './public.responses';
 
 /** Spec 112 sin sesión: sin guardas de identidad, con límite por IP. Solo agregados y campos públicos. */
 @ApiTags('publico') @ApiExtension('x-permiso', 'publico') @UseGuards(PublicRateLimitGuard) @Controller('publico')
@@ -28,6 +28,8 @@ export class NoticesController {
   constructor(private readonly service: PublicService) {}
   @Get() @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Avisos recientes con su audiencia, prioridad y estado, para quien los redacta' }) @ApiOkResponse({ type: [NoticeListItemResponse] })
   list() { return this.service.listNotices(); }
+  @Get('estadisticas') @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Por aviso: cuántas cuentas dieron "Enterado" y a cuántas va dirigido (solo conteos, sin nombres)' }) @ApiOkResponse({ type: [NoticeStatsResponse] })
+  stats() { return this.service.noticeStats(); }
   @Post() @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Publicar un aviso general con vigencia; advierte si parece llevar datos personales' }) @ApiCreatedResponse({ type: NoticePublishedResponse })
   publish(@Req() r: ActorRequest, @Body() d: NoticeDto, @Headers('idempotency-key') k?: string) { return this.service.publish(r.actor, d, k); }
   @Put(':id') @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Editar un aviso vigente o programado: texto, prioridad, audiencia y vigencia (adelantar el fin lo vence antes); auditado' }) @ApiOkResponse({ type: NoticeListItemResponse })
@@ -42,4 +44,10 @@ export class MyNoticesController {
   constructor(private readonly service: PublicService) {}
   @Get() @RequirePermission('sesion.perfil') @ApiOperation({ summary: 'Avisos vigentes para mis roles, incluidos los públicos' }) @ApiOkResponse({ type: MyNoticesResponse })
   mine(@Req() r: ActorRequest) { return this.service.myNotices(r.actor); }
+  @Get('bandeja') @RequirePermission('sesion.perfil') @ApiOperation({ summary: 'Bandeja de avisos: nivel, "Enterado", recordatorio, cuáles se destacan en el inicio y conteos de sin leer y críticos' }) @ApiOkResponse({ type: MyInboxResponse })
+  inbox(@Req() r: ActorRequest) { return this.service.myInbox(r.actor); }
+  @Post(':id/enterado') @RequirePermission('sesion.perfil') @ApiOperation({ summary: 'Dar "Enterado" a un aviso dirigido a mi cuenta; idempotente y auditado' }) @ApiCreatedResponse({ type: NoticeAckResponse })
+  acknowledge(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Headers('idempotency-key') k?: string) { return this.service.acknowledge(r.actor, id, k); }
+  @Post(':id/posponer') @RequirePermission('sesion.perfil') @ApiOperation({ summary: 'Recordarme después: el aviso crítico deja de destacarse por avisos.recordatorio_horas (4 h) y luego vuelve' }) @ApiCreatedResponse({ type: NoticeAckResponse })
+  snooze(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Headers('idempotency-key') k?: string) { return this.service.snooze(r.actor, id, k); }
 }

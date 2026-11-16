@@ -16291,6 +16291,77 @@
         "x-permiso": "avisos.publicar"
       }
     },
+    "/api/v1/avisos/estadisticas": {
+      "get": {
+        "operationId": "NoticesController_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoticeStatsResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Por aviso: cuántas cuentas dieron \"Enterado\" y a cuántas va dirigido (solo conteos, sin nombres)",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "avisos.publicar"
+      }
+    },
     "/api/v1/avisos/{id}": {
       "put": {
         "operationId": "NoticesController_edit",
@@ -16591,6 +16662,292 @@
           }
         ],
         "summary": "Avisos vigentes para mis roles, incluidos los públicos",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "sesion.perfil"
+      }
+    },
+    "/api/v1/me/avisos/bandeja": {
+      "get": {
+        "operationId": "MyNoticesController_inbox",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyInboxResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bandeja de avisos: nivel, \"Enterado\", recordatorio, cuáles se destacan en el inicio y conteos de sin leer y críticos",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "sesion.perfil"
+      }
+    },
+    "/api/v1/me/avisos/{id}/enterado": {
+      "post": {
+        "operationId": "MyNoticesController_acknowledge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeAckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dar \"Enterado\" a un aviso dirigido a mi cuenta; idempotente y auditado",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "sesion.perfil"
+      }
+    },
+    "/api/v1/me/avisos/{id}/posponer": {
+      "post": {
+        "operationId": "MyNoticesController_snooze",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeAckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Recordarme después: el aviso crítico deja de destacarse por avisos.recordatorio_horas (4 h) y luego vuelve",
         "tags": [
           "publico"
         ],
@@ -29128,6 +29485,15 @@
           "llamados"
         ]
       },
+      "NivelAviso": {
+        "type": "string",
+        "enum": [
+          "informativo",
+          "importante",
+          "critico"
+        ],
+        "description": "Criticidad para el personal (Fase 2): solo critico se destaca en el inicio"
+      },
       "AccionAviso": {
         "type": "string",
         "enum": [
@@ -29167,6 +29533,21 @@
             "type": "boolean"
           },
           "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nivel": {
+            "description": "Criticidad para el personal (Fase 2): solo critico se destaca en el inicio",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NivelAviso"
+              }
+            ]
+          },
+          "areas": {
+            "description": "Códigos de espacio (área o bahía) a cuyo personal va dirigido",
             "type": "array",
             "items": {
               "type": "string"
@@ -29212,12 +29593,36 @@
           "prioridad",
           "publico",
           "roles",
+          "nivel",
+          "areas",
           "estado",
           "publicadoEn",
           "version",
           "allowedActions",
           "retiradoEn",
           "motivoRetiro"
+        ]
+      },
+      "NoticeStatsResponse": {
+        "type": "object",
+        "properties": {
+          "avisoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enterados": {
+            "type": "integer",
+            "description": "Cuentas que dieron \"Enterado\""
+          },
+          "destinatarios": {
+            "type": "integer",
+            "description": "Cuentas activas del personal a las que va dirigido por rol o por el área de su ficha; 0 si solo es público"
+          }
+        },
+        "required": [
+          "avisoId",
+          "enterados",
+          "destinatarios"
         ]
       },
       "NoticeDto": {
@@ -29260,6 +29665,22 @@
           },
           "roles": {
             "description": "Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "informativo",
+              "importante",
+              "critico"
+            ],
+            "description": "Criticidad para el personal (Fase 2): informativo (por omisión al publicar), importante o critico. Solo critico se destaca en el inicio de su audiencia hasta el \"Enterado\". Al editar, sin nivel se conserva el del aviso. Sin prioridad, la prioridad sale del nivel (informativo → atencion, importante → urgente, critico → critico)"
+          },
+          "areas": {
+            "description": "Códigos de espacio (área o bahía, por ejemplo P1-EMG) a cuyo personal va dirigido: su área de ficha o la de su turno en curso. Al editar, sin áreas se conservan las del aviso",
             "type": "array",
             "items": {
               "type": "string"
@@ -29312,6 +29733,21 @@
               "type": "string"
             }
           },
+          "nivel": {
+            "description": "Criticidad para el personal (Fase 2): solo critico se destaca en el inicio",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NivelAviso"
+              }
+            ]
+          },
+          "areas": {
+            "description": "Códigos de espacio (área o bahía) a cuyo personal va dirigido",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "publicadoEn": {
             "type": "string",
             "format": "date-time",
@@ -29327,6 +29763,8 @@
           "prioridad",
           "publico",
           "roles",
+          "nivel",
+          "areas",
           "publicadoEn"
         ]
       },
@@ -29370,6 +29808,22 @@
           },
           "roles": {
             "description": "Códigos de rol que ven el aviso en su tablero de inicio; deben existir en acceso.rol",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "informativo",
+              "importante",
+              "critico"
+            ],
+            "description": "Criticidad para el personal (Fase 2): informativo (por omisión al publicar), importante o critico. Solo critico se destaca en el inicio de su audiencia hasta el \"Enterado\". Al editar, sin nivel se conserva el del aviso. Sin prioridad, la prioridad sale del nivel (informativo → atencion, importante → urgente, critico → critico)"
+          },
+          "areas": {
+            "description": "Códigos de espacio (área o bahía, por ejemplo P1-EMG) a cuyo personal va dirigido: su área de ficha o la de su turno en curso. Al editar, sin áreas se conservan las del aviso",
             "type": "array",
             "items": {
               "type": "string"
@@ -29445,6 +29899,21 @@
             "items": {
               "type": "string"
             }
+          },
+          "nivel": {
+            "description": "Criticidad para el personal (Fase 2): solo critico se destaca en el inicio",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NivelAviso"
+              }
+            ]
+          },
+          "areas": {
+            "description": "Códigos de espacio (área o bahía) a cuyo personal va dirigido",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -29455,7 +29924,9 @@
           "hasta",
           "prioridad",
           "publico",
-          "roles"
+          "roles",
+          "nivel",
+          "areas"
         ]
       },
       "MyNoticesResponse": {
@@ -29481,6 +29952,166 @@
           "actualizadoEn",
           "avisos",
           "proximoCambio"
+        ]
+      },
+      "MyInboxNoticeResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "cuerpo": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "prioridad": {
+            "type": "string",
+            "description": "atencion, urgente o critico (D-071)"
+          },
+          "publico": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nivel": {
+            "description": "Criticidad para el personal (Fase 2): solo critico se destaca en el inicio",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NivelAviso"
+              }
+            ]
+          },
+          "areas": {
+            "description": "Códigos de espacio (área o bahía) a cuyo personal va dirigido",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "publicadoEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dirigido": {
+            "type": "boolean",
+            "description": "Dirigido al rol o al área de la cuenta (no solo público)"
+          },
+          "enteradoEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Cuándo la cuenta dio \"Enterado\"; null si no lo ha hecho"
+          },
+          "recordarEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hasta cuándo pospuso el recordatorio"
+          },
+          "destacado": {
+            "type": "boolean",
+            "description": "Se destaca en el inicio: crítico, dirigido, sin \"Enterado\" y sin posponer"
+          }
+        },
+        "required": [
+          "id",
+          "titulo",
+          "cuerpo",
+          "desde",
+          "hasta",
+          "prioridad",
+          "publico",
+          "roles",
+          "nivel",
+          "areas",
+          "publicadoEn",
+          "dirigido",
+          "enteradoEn",
+          "recordarEn",
+          "destacado"
+        ]
+      },
+      "MyInboxResponse": {
+        "type": "object",
+        "properties": {
+          "actualizadoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "avisos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyInboxNoticeResponse"
+            }
+          },
+          "noLeidos": {
+            "type": "integer",
+            "description": "Avisos sin \"Enterado\""
+          },
+          "criticos": {
+            "type": "integer",
+            "description": "Avisos críticos dirigidos a la cuenta sin \"Enterado\""
+          },
+          "recordatorioHoras": {
+            "type": "number",
+            "description": "Horas que tarda en volver un crítico pospuesto (política avisos.recordatorio_horas)"
+          },
+          "proximoCambio": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Siguiente instante en que la bandeja cambia sola: vence o empieza un aviso, o vuelve un recordatorio"
+          }
+        },
+        "required": [
+          "actualizadoEn",
+          "avisos",
+          "noLeidos",
+          "criticos",
+          "recordatorioHoras",
+          "proximoCambio"
+        ]
+      },
+      "NoticeAckResponse": {
+        "type": "object",
+        "properties": {
+          "avisoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enteradoEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "recordarEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "avisoId",
+          "enteradoEn",
+          "recordarEn"
         ]
       },
       "BedTotalsResponse": {
