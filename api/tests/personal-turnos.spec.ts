@@ -51,6 +51,8 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   app=module.createNestApplication<NestFastifyApplication>(new FastifyAdapter(),{logger:false});configureApplication(app);await app.init();await app.getHttpAdapter().getInstance().ready();
   const tree=(await call('JOP','GET','/espacios')).body;
   areaId=tree.find((n:any)=>n.code==='P1-CON').id;emergencyId=tree.find((n:any)=>n.code==='P1-EMG').id;
+  // Las pruebas viajan en el tiempo: la entrada automática aplica desde antes de todas sus fechas (la migración la fija a su hora de aplicación).
+  await fixture.pg.query("UPDATE plataforma.politica SET valor=jsonb_build_object('desde','2026-10-01T00:00:00Z') WHERE clave='turnos.entrada_automatica'");
  });
  afterAll(async()=>{await app?.close();await fixture?.pg.close();});
 

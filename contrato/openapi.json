@@ -2478,7 +2478,26 @@
     "/api/v1/turnos": {
       "get": {
         "operationId": "OperationsController_shifts",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Primer día local, yyyy-MM-dd (con `to`, máximo 31 días); sin rango, las últimas semanas y la planificación próxima",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Último día local, yyyy-MM-dd",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2952,6 +2971,116 @@
           }
         ],
         "summary": "Médicos de turno por día y especialidad durante 7 días (CARGA-04)",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.ver"
+      }
+    },
+    "/api/v1/turnos/{id}/entrada": {
+      "post": {
+        "deprecated": true,
+        "operationId": "OperationsController_checkIn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftAttendanceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obsoleto: la entrada se registra sola al iniciar el turno. No cambia nada: devuelve el estado del turno propio ya empezado; antes del inicio responde 409 entrada_automatica",
         "tags": [
           "operations"
         ],
@@ -17547,7 +17676,8 @@
         "enum": [
           "pendiente",
           "presente",
-          "ausente"
+          "ausente",
+          "sin_registro"
         ],
         "description": "Null en turnos cancelados o en borrador"
       },
@@ -17983,44 +18113,6 @@
           "items"
         ]
       },
-      "AttendanceDto": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "type": "string",
-            "enum": [
-              "presente",
-              "ausente",
-              "pendiente"
-            ]
-          },
-          "absenceType": {
-            "type": "string",
-            "enum": [
-              "justificada",
-              "injustificada"
-            ]
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Hora real de entrada al corregirla; por omisión, ahora. Obligatoria si el turno ya terminó"
-          },
-          "version": {
-            "type": "number",
-            "minimum": 1
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 10,
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "state",
-          "version"
-        ]
-      },
       "AffectedAppointmentResponse": {
         "type": "object",
         "properties": {
@@ -18132,6 +18224,44 @@
           "late",
           "affectedAppointments",
           "substitutes"
+        ]
+      },
+      "AttendanceDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "presente",
+              "ausente",
+              "pendiente"
+            ]
+          },
+          "absenceType": {
+            "type": "string",
+            "enum": [
+              "justificada",
+              "injustificada"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hora real de entrada al corregirla; por omisión, ahora. Obligatoria si el turno ya terminó"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "state",
+          "version"
         ]
       },
       "PublishDto": {
@@ -27109,11 +27239,8 @@
           "carga_semanal_excedida",
           "dias_seguidos_excedidos",
           "tripulante_en_servicio",
-          "asistencia_ya_marcada",
           "sin_asistencia_marcada",
-          "sin_ficha_personal",
-          "turno_ajeno",
-          "fuera_de_horario",
+          "entrada_automatica",
           "medico_ausente",
           "tripulante_ausente",
           "franja_desalineada",

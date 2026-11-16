@@ -15,13 +15,18 @@ export type ShiftLike = { state: string; start: number; end: number; presentSinc
 /**
  * Asistencia derivada: `null` en turnos que no se trabajan (cancelado, borrador). La entrada se confirma sola a la hora
  * de inicio (el barrido del reloj guarda `presente_desde`); solo una ausencia marcada por JOP la quita. Nunca queda un
- * turno "sin confirmar".
+ * turno "sin confirmar". `autoFrom` es la política `turnos.entrada_automatica`: un turno que empezó antes, sin entrada
+ * registrada, es `sin_registro` (nada se confirma hacia atrás).
  */
-export function attendanceOf(shift: ShiftLike, now: number): 'pendiente' | 'presente' | 'ausente' | null {
+export type Attendance = 'pendiente' | 'presente' | 'ausente' | 'sin_registro';
+export function attendanceOf(shift: ShiftLike, now: number, autoFrom: number | null): Attendance | null {
   if (shift.state === 'cancelado' || shift.state === 'borrador') return null;
   if (shift.state === 'ausente') return 'ausente';
-  return shift.presentSince !== null || now >= shift.start ? 'presente' : 'pendiente';
+  if (shift.presentSince !== null) return 'presente';
+  if (now < shift.start) return 'pendiente';
+  return autoFrom !== null && shift.start >= autoFrom ? 'presente' : 'sin_registro';
 }
+
 
 /** Llegó después del margen de la política. */
 export const isLate = (shift: ShiftLike, policy: AttendancePolicy) =>

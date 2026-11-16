@@ -66,8 +66,11 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       if(!(await c.query('SELECT pg_try_advisory_xact_lock(671021) AS ok')).rows[0].ok)return 0;
       await c.query("SET LOCAL lock_timeout = '2s'");
       await c.query("SET LOCAL statement_timeout = '10s'");
+      // El trigger turno_version_previa_reloj guarda la versión anterior: una marca cargada antes del inicio sigue valiendo.
+      await c.query("SELECT set_config('sghu.barrido_turnos','on',true)");
+      // Sin entrada retroactiva: solo se confirma la de turnos que empiezan desde turnos.entrada_automatica.
       const rows=(await c.query(`UPDATE personal.turno SET estado=CASE WHEN upper(periodo)<=$1::timestamptz THEN 'completado' ELSE 'en_curso' END,
-          presente_desde=coalesce(presente_desde,lower(periodo)),version=version+1
+          presente_desde=CASE WHEN presente_desde IS NULL AND lower(periodo)>=(SELECT (valor->>'desde')::timestamptz FROM plataforma.politica WHERE clave='turnos.entrada_automatica' AND vigencia @> $1::timestamptz) THEN lower(periodo) ELSE presente_desde END,version=version+1
         WHERE (estado='publicado' AND lower(periodo)<=$1::timestamptz) OR (estado='en_curso' AND upper(periodo)<=$1::timestamptz)
         RETURNING id,persona_id,version,estado`,[now])).rows;
       if(!rows.length)return 0;
@@ -82,6 +85,11 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     try{return await this.advanceStates();}catch(e){new Logger(PersonnelService.name).warn(`No se pudo avanzar el estado de los turnos antes de la operación: ${e}`);return 0;}
   }
 
+  /** Desde cuándo la entrada se confirma sola (política turnos.entrada_automatica); null si no hay política vigente. */
+  private async autoEntryFrom(c:PoolClient,at:Date):Promise<number|null>{
+    const row=(await c.query("SELECT (valor->>'desde')::timestamptz AS desde FROM plataforma.politica WHERE clave='turnos.entrada_automatica' AND vigencia @> $1::timestamptz",[at])).rows[0];
+    return row?.desde?new Date(row.desde).valueOf():null;
+  }
   private async announce(c:PoolClient,type:string,rows:{id:string;persona_id:string;version:number}[]) {
     if(!rows.length)return;
     const accounts=(await c.query('SELECT id,persona_personal_id FROM acceso.usuario WHERE persona_personal_id=ANY($1::uuid[])',[rows.map(r=>r.persona_id)])).rows;
@@ -215,27 +223,29 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       return {id:row.id,version};
     });
   }
-  async shifts(actor:Actor,mine=false) {
+  async shifts(actor:Actor,mine=false,from?:string,to?:string) {
     if(mine&&!actor.staffId)return [];
+    // Con from/to (la semana que se ve) trae ese rango, de máximo 31 días; sin ellos, la ventana alrededor de hoy.
+    const asked=from||to?this.range(from??'',to??''):null;
     await this.advanceSafely();
     // Ventana alrededor de hoy, no "los 300 más lejanos": con la planificación a dos semanas, un tope fijo ordenado
     // del más futuro al más antiguo dejaba fuera los turnos de hoy (el recién asignado no aparecía y el formulario
     // no veía los conflictos de la jornada).
     const at=this.clock.now(),now=at.valueOf(),canPlan=hasPermission(actor,'turnos.planificar');
     return this.db.transaction(async c=>{
-      const policy=await this.policies.value<AttendancePolicy>(c,'turnos.asistencia',at);
+      const policy=await this.policies.value<AttendancePolicy>(c,'turnos.asistencia',at),autoFrom=await this.autoEntryFrom(c,at);
       const rows=(await c.query(`SELECT t.id,t.persona_id AS "staffId",p.nombres||' '||p.apellidos AS person,p.tipo AS "staffType",t.area_id AS "areaId",e.nombre AS area,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.tipo AS type,t.estado AS state,t.justificacion AS justification,t.version,
           t.presente_desde AS "presentSince",t.ausencia_tipo AS "absenceType",t.asistencia_motivo AS "attendanceReason",t.excepcion_carga AS "emergencyReason"
         FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id JOIN infra.espacio e ON e.id=t.area_id
         WHERE ($1::uuid IS NULL OR t.persona_id=$1) AND ((NOT $2 AND $3) OR t.estado IN ('publicado','en_curso','completado','ausente'))
-          AND t.periodo && tstzrange($4::timestamptz,$5::timestamptz,'[)') ORDER BY lower(t.periodo) DESC LIMIT 3000`,[mine?actor.staffId:null,mine,hasPermission(actor,'turnos.ver_borradores'),new Date(now-SHIFT_WINDOW.pastDays*DAY),new Date(now+SHIFT_WINDOW.futureDays*DAY)])).rows;
-      return rows.map(({attendanceReason,emergencyReason,...row})=>this.present(row,now,policy,canPlan,{attendanceReason,emergencyReason}));
+          AND t.periodo && tstzrange($4::timestamptz,$5::timestamptz,'[)') ORDER BY lower(t.periodo) DESC LIMIT 3000`,[mine?actor.staffId:null,mine,hasPermission(actor,'turnos.ver_borradores'),asked?asked.start:new Date(now-SHIFT_WINDOW.pastDays*DAY),asked?asked.end:new Date(now+SHIFT_WINDOW.futureDays*DAY)])).rows;
+      return rows.map(({attendanceReason,emergencyReason,...row})=>this.present(row,now,policy,autoFrom,canPlan,{attendanceReason,emergencyReason}));
     });
   }
   /** Asistencia derivada y acciones permitidas del turno para quien consulta (ASIS-01, MA-TUR-03). */
-  private present(row:any,now:number,policy:AttendancePolicy,canPlan:boolean,planner:Record<string,unknown>){
+  private present(row:any,now:number,policy:AttendancePolicy,autoFrom:number|null,canPlan:boolean,planner:Record<string,unknown>){
     const shift={state:row.state as string,start:new Date(row.start).valueOf(),end:new Date(row.end).valueOf(),presentSince:row.presentSince?new Date(row.presentSince).valueOf():null};
-    return {...row,attendance:attendanceOf(shift,now),late:isLate(shift,policy),...(canPlan?planner:{}),allowedActions:allowedActions(shift,now,canPlan)};
+    return {...row,attendance:attendanceOf(shift,now,autoFrom),late:isLate(shift,policy),...(canPlan?planner:{}),allowedActions:allowedActions(shift,now,canPlan)};
   }
   /** Obs. 2/9: opciones reales para filtrar y asignar turnos; no depende de los turnos cargados ni de `personal.ver`/`espacios.ver`. Sin DUI, teléfono ni números de junta. */
   async shiftCatalog() {
@@ -349,7 +359,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   }
   /** Turno con bloqueo para marcar asistencia. */
   private async lockedShift(c:PoolClient,id:string) {
-    const row=(await c.query('SELECT t.id,t.version,t.estado,t.persona_id,t.area_id,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.presente_desde,p.tipo AS staff_type,p.especialidad FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE t.id=$1 FOR UPDATE OF t',[id])).rows[0];
+    const row=(await c.query('SELECT t.id,t.version,t.version_previa_reloj,t.estado,t.persona_id,t.area_id,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.presente_desde,p.tipo AS staff_type,p.especialidad FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE t.id=$1 FOR UPDATE OF t',[id])).rows[0];
     if(!row)throw new NotFoundException('No se encontró el turno.');
     return {...row,start:new Date(row.start),end:new Date(row.end)};
   }
@@ -366,7 +376,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   private async attendanceResult(c:PoolClient,row:{id:string;version:number;estado:string;presente_desde:Date|null},shift:{start:Date;end:Date},extra:{affectedAppointments?:unknown[];substitutes?:unknown[]}={}) {
     const now=this.clock.now(),policy=await this.policies.value<AttendancePolicy>(c,'turnos.asistencia',now);
     const view={state:row.estado,start:shift.start.valueOf(),end:shift.end.valueOf(),presentSince:row.presente_desde?new Date(row.presente_desde).valueOf():null};
-    return {id:row.id,version:row.version,state:row.estado,attendance:attendanceOf(view,now.valueOf()),late:isLate(view,policy),affectedAppointments:extra.affectedAppointments??[],substitutes:extra.substitutes??[]};
+    return {id:row.id,version:row.version,state:row.estado,attendance:attendanceOf(view,now.valueOf(),await this.autoEntryFrom(c,now)),late:isLate(view,policy),affectedAppointments:extra.affectedAppointments??[],substitutes:extra.substitutes??[]};
   }
   /**
    * ASIS-01 a ASIS-03: la entrada se confirma sola a la hora de inicio; JOP marca la ausencia (tipo y motivo), corrige la
@@ -381,7 +391,8 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     await this.advanceSafely();
     return this.commands.run(actor,`turnos.planificar:${id}:asistencia`,key,dto,async c=>{
       const now=this.clock.now(),shift=await this.lockedShift(c,id);
-      if(shift.version!==dto.version)throw new VersionConflictException(shift.version,'El turno cambió; actualiza la planificación.');
+      // Una versión que solo quedó vieja por el barrido del reloj (cargada antes del inicio) sigue valiendo.
+      if(shift.version!==dto.version&&shift.version_previa_reloj!==dto.version)throw new VersionConflictException(shift.version,'El turno cambió; actualiza la planificación.');
       const policy=await this.policies.value<AttendancePolicy>(c,'turnos.asistencia',now);
       const early=new Date(shift.start.valueOf()-policy.entrada_anticipada_minutos*60_000);
       const byClock=stateByClock(shift.start.valueOf(),shift.end.valueOf(),now.valueOf());
@@ -402,7 +413,8 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
         extra={affectedAppointments:shift.staff_type==='medico'&&from<shift.end?await this.appointmentsIn(c,shift.persona_id,from,shift.end):[],substitutes:now<shift.end?await this.substitutes(c,shift):[]};
       }else{
         if(shift.estado!=='ausente')throw new ProblemException('sin_asistencia_marcada',409,'Este turno no tiene una ausencia que deshacer.');
-        const entry=byClock==='publicado'?null:shift.start;
+        const autoFrom=await this.autoEntryFrom(c,now);
+        const entry=byClock==='publicado'||autoFrom===null||shift.start.valueOf()<autoFrom?null:shift.start;
         row=(await dbRule(c.query('UPDATE personal.turno SET estado=$2,presente_desde=$3,ausencia_tipo=NULL,asistencia_motivo=$4,asistencia_por=$5,asistencia_en=$6,version=version+1 WHERE id=$1 RETURNING id,version,estado,presente_desde',[id,byClock,entry,reason,actor.id,now]))).rows[0];
       }
       await this.commands.audit(c,actor,{action:'turnos.asistencia',entity:'turno',entityId:id,permission:'turnos.planificar',reason:reason??undefined,detail:{asistencia:dto.state,tipoAusencia:dto.absenceType??null,presenteDesde:row.presente_desde?new Date(row.presente_desde).toISOString():null}});
@@ -410,21 +422,39 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       return this.attendanceResult(c,row,shift,extra);
     });
   }
-  /** CARGA-04: médicos de turno por día y especialidad durante 7 días desde `from` (información pública, RN-17: sin contacto). */
+  /**
+   * Compatibilidad por una versión con apps instaladas que todavía marcan la entrada (TODO: retirar junto con
+   * `POST /turnos/{id}/entrada`). No cambia nada: con el turno propio ya empezado responde su estado actual; antes del
+   * inicio (o en un turno que no está en curso ni completado) explica que la entrada ahora es automática.
+   */
+  async legacyCheckIn(actor:Actor,id:string) {
+    await this.advanceSafely();
+    return this.db.transaction(async c=>{
+      const now=this.clock.now();
+      const row=(await c.query('SELECT id,version,estado,presente_desde,lower(periodo) AS start,upper(periodo) AS "end" FROM personal.turno WHERE id=$1 AND persona_id=$2',[id,actor.staffId??null])).rows[0];
+      if(!row)throw new NotFoundException('No se encontró el turno.');
+      if(now<new Date(row.start)||!['en_curso','completado'].includes(row.estado))throw new ProblemException('entrada_automatica',409,'La entrada ahora se registra sola al iniciar el turno.');
+      return this.attendanceResult(c,row,{start:new Date(row.start),end:new Date(row.end)});
+    });
+  }
+
+  /** CARGA-04: médicos de turno
+ por día y especialidad durante 7 días desde `from` (información pública, RN-17: sin contacto). */
   async specialists(from:string) {
     let start:Date;
     try{if(!/^\d{4}-\d{2}-\d{2}$/.test(from))throw new RangeError();start=businessDayRange(from).start;}catch{throw new BadRequestException('Indica el primer día con formato AAAA-MM-DD.');}
     const end=new Date(start.valueOf()+7*DAY),to=businessDate(new Date(end.valueOf()-1));
     await this.advanceSafely();
     return this.db.transaction(async c=>{
-      const now=this.clock.now();
+      const now=this.clock.now(),autoFrom=await this.autoEntryFrom(c,now);
       const rows=(await c.query(`SELECT coalesce(p.especialidad,'Medicina general') AS specialty,p.nombres||' '||p.apellidos AS name,e.nombre AS area,lower(t.periodo) AS start,upper(t.periodo) AS "end",t.estado AS state,t.presente_desde AS "presentSince"
         FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id JOIN infra.espacio e ON e.id=t.area_id
         WHERE p.tipo='medico' AND p.activo AND t.estado IN ('publicado','en_curso','completado','ausente') AND t.periodo && tstzrange($1::timestamptz,$2::timestamptz,'[)')
         ORDER BY lower(t.periodo),1,2`,[start,end])).rows;
       const items=rows.map(r=>{
         const s=new Date(r.start),shift={state:r.state,start:s.valueOf(),end:new Date(r.end).valueOf(),presentSince:r.presentSince?new Date(r.presentSince).valueOf():null};
-        return {date:businessDate(s<start?start:s),specialty:r.specialty,name:r.name,area:r.area,start:s.toISOString(),end:new Date(r.end).toISOString(),attendance:attendanceOf(shift,now.valueOf())};
+        return {date:businessDate(s<start?start:s),specialty:r.specialty,name:r.name,area:r.area,start:s.toISOString(),end:new Date(r.end).toISOString(),attendance:attendanceOf(shift,now.valueOf(),autoFrom)};
+
       });
       return {from,to,items};
     });

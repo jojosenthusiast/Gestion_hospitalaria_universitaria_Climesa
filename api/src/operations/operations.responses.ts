@@ -7,7 +7,7 @@ export const TIPO_TURNO = ['diurno', 'nocturno', 'guardia'] as const;
 /** Estados de `personal.turno.estado`, con `ausente` de 20261120003000_turnos_asistencia_carga.sql (ASIS-01). */
 export const ESTADO_TURNO_ASISTENCIA = [...ESTADO_TURNO, 'ausente'] as const;
 /** Asistencia derivada: `pendiente` antes del inicio; desde el inicio, `presente` (automática) salvo que JOP marque `ausente`. */
-export const ASISTENCIA_TURNO = ['pendiente', 'presente', 'ausente'] as const;
+export const ASISTENCIA_TURNO = ['pendiente', 'presente', 'ausente', 'sin_registro'] as const;
 export const TIPO_AUSENCIA = ['justificada', 'injustificada'] as const;
 /** Situación de la persona en el día local, para filtrar el directorio de personal. */
 export const TURNO_HOY = ['de_turno', 'ausente', 'mas_tarde', 'libre'] as const;
