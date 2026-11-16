@@ -21,7 +21,7 @@ export function NoticesPage({ api, profile, version }: { api: Api; profile: Acce
   const [message, setMessage] = useState<string | null>(null);
   const edit = (notice: NoticeListItem) => { setMessage(null); setEditing(notice); document.querySelector('.notice-composer')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); };
   return <>
-    <Heading eyebrow="Operaciones / Comunicación" title="Avisos generales" description="Redacta un aviso, elige quién lo ve y por cuánto tiempo. Cada rol lo recibe en su tablero de inicio; el público lo ve en la pantalla pública." />
+    <Heading eyebrow="Operaciones / Comunicación" title="Avisos generales" description="Redacta un aviso y elige quién lo ve y por cuánto tiempo" />
     {can(profile, 'avisos.publicar') && <NoticeComposer key={editing ? `${editing.id}-${editing.version}` : 'nuevo'} api={api} editing={editing} onDone={() => { if (editing) setMessage(`Cambios guardados en «${editing.titulo}». Ya se ven donde se publica.`); setEditing(null); list.refresh(); }} onCancel={() => setEditing(null)} onReload={() => { setEditing(null); list.refresh(); }} />}
     {message && <Notice kind="success">{message}</Notice>}
     <section className="data-workbench notice-history" aria-label="Avisos publicados">

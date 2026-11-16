@@ -4,7 +4,7 @@ import { SupabaseAuthGuard } from '../auth';
 import { PermissionGuard } from '../auth';
 import { RequirePermission } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { PatientPickerQueryDto, PatientSearchDto, PatientSearchQueryDto } from './patient.dto';
+import { PatientListQueryDto, PatientPickerQueryDto, PatientSearchDto, PatientSearchQueryDto } from './patient.dto';
 import { PatientCreateDto, PatientUpdateDto, PatientStateDto } from './patient-write.dto';
 import { PatientsService } from './patients.service';
 import { DuplicateCaseResponse, PatientCandidateResponse, PatientCreatedResponse, PatientDetailResponse, PatientPickerResponse, PatientSearchRecordResponse, PatientStateResponse } from './patients.responses';
@@ -15,8 +15,8 @@ import { IdVersionResponse } from '../platform/responses';
 @Controller('pacientes')
 export class PatientsController {
   constructor(private readonly patients: PatientsService) {}
-  @Get() @RequirePermission('pacientes.buscar') @ApiOperation({summary:'Buscar por nombre, fonética, DUI o expediente; devuelve campos mínimos'}) @ApiOkResponse({ type: [PatientCandidateResponse] })
-  search(@Req() req:ActorRequest,@Query() q:PatientSearchQueryDto) { return this.patients.search(req.actor,q.query,q.limit,undefined,q.offset); }
+  @Get() @RequirePermission('pacientes.buscar') @ApiOperation({summary:'Buscar por nombre, fonética, DUI o expediente, con filtros de estado y de atención de hoy; devuelve campos mínimos'}) @ApiOkResponse({ type: [PatientCandidateResponse] })
+  search(@Req() req:ActorRequest,@Query() q:PatientListQueryDto) { return this.patients.search(req.actor,q.query,q.limit,undefined,q.offset,{estado:q.estado,situacion:q.situacion,areaId:q.areaId,medicoId:q.medicoId}); }
   @Get('selector') @RequirePermission('pacientes.buscar') @ApiOperation({summary:'Selector de pacientes: id, expediente, nombre y edad, paginado y sin tildes'}) @ApiOkResponse({ type: PatientPickerResponse })
   picker(@Req() req:ActorRequest,@Query() q:PatientPickerQueryDto) { return this.patients.picker(req.actor,q.query,q.limit,q.offset); }
   @Post('busquedas') @RequirePermission('pacientes.buscar') @ApiOperation({summary:'Buscar y obtener constancia de diez minutos, ligada a la cuenta y criterios'}) @ApiCreatedResponse({ type: PatientSearchRecordResponse })

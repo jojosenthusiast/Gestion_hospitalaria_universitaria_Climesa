@@ -9,7 +9,8 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(cleanup);
+// Los filtros viven en la dirección: cada prueba empieza sin filtros.
+afterEach(() => { cleanup(); location.hash = ''; });
 
 describe('reglas de la ficha', () => {
   const ok = { givenNames: 'Ana', surnames: 'Ficticia' };

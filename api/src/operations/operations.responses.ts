@@ -9,6 +9,8 @@ export const ESTADO_TURNO_ASISTENCIA = [...ESTADO_TURNO, 'ausente'] as const;
 /** Asistencia derivada: `sin_confirmar` = pasó el margen de la política `turnos.asistencia` sin marcar entrada. */
 export const ASISTENCIA_TURNO = ['pendiente', 'presente', 'sin_confirmar', 'ausente'] as const;
 export const TIPO_AUSENCIA = ['justificada', 'injustificada'] as const;
+/** Situación de la persona en el día local, para filtrar el directorio de personal. */
+export const TURNO_HOY = ['de_turno', 'ausente', 'mas_tarde', 'libre'] as const;
 /** Acciones que el servidor permite a quien consulta, según su permiso, el estado y la hora (la UI no ofrece otras). */
 export const ACCION_TURNO = ['editar', 'cancelar', 'marcar_entrada', 'marcar_presente', 'marcar_ausente', 'deshacer_asistencia'] as const;
 export const TIPO_ESPACIO = ['hospital', 'planta', 'area', 'habitacion', 'cama', 'consultorio', 'cubiculo', 'bodega', 'bahia'] as const;
@@ -70,6 +72,7 @@ export class StaffResponse {
   @StrProp({ optional: true, nullable: true, description: 'Solo con personal.ver_datos_personales' }) phone?: string | null;
   @StrProp({ optional: true, nullable: true, description: 'Solo con personal.ver_datos_personales' }) dui?: string | null;
   @ClassArrayProp(StaffRegistrationResponse) registrations!: StaffRegistrationResponse[];
+  @EnumProp(TURNO_HOY, 'TurnoHoy', { description: 'Turno de hoy: de turno ahora, ausente marcado hoy, con turno más tarde o libre' }) shiftToday!: string;
 }
 
 // ---- Turnos ----

@@ -176,7 +176,9 @@ describe('Spec 113 · tablero y métricas agregadas', () => {
   test('FR-113-05: tiempo de laboratorio por día con el valor esperado', async () => {
     const patientId = await t.patient();
     const doctor = await t.staffOf('REC');
-    const day = new Date(now.valueOf() - 2 * 86400_000);
+    // 10:00 en El Salvador de hace dos días: la orden se crea y se completa el mismo día local a cualquier hora del reloj real
+    // (antes, después de las 22:30 locales, completarla 90 minutos después caía al día siguiente).
+    const day = new Date(`${new Date(now.valueOf() - 2 * 86400_000 - 6 * hour).toISOString().slice(0, 10)}T16:00:00Z`);
     const created = new Date(day.valueOf()), completed = new Date(day.valueOf() + 90 * 60_000);
     await t.pg.query("INSERT INTO laboratorio.orden(admision_id,paciente_id,medico_id,estado,creada_en,completada_en) VALUES($1,$2,$3,'en_proceso',$4,NULL)", [randomUUID(), patientId, doctor, created]);
     const order = await t.one<{ id: string }>('SELECT id FROM laboratorio.orden WHERE paciente_id=$1', [patientId]);

@@ -9,7 +9,8 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+// Los filtros viven en la dirección: cada prueba empieza sin filtros.
+afterEach(() => { cleanup(); vi.useRealTimers(); location.hash = ''; });
 
 const perfil: AccessProfile = {
   id: 'u-1', user: { id: 'u-1' }, email: 'rec@example.test', name: 'Recepción de prueba', roles: ['REC'], platforms: ['web'],

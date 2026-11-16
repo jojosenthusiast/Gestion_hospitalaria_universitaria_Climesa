@@ -10,7 +10,8 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(cleanup);
+// Los filtros viven en la dirección: cada prueba empieza sin filtros.
+afterEach(() => { cleanup(); location.hash = ''; });
 
 const perfil = (permisos: string[]): AccessProfile => ({
   id: 'u-1', user: { id: 'u-1' }, email: 'adm@example.test', name: 'Administración de prueba', roles: ['ADM'], platforms: ['web'],

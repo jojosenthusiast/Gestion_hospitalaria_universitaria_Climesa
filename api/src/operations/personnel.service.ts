@@ -132,7 +132,13 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     });
   }
   async list(actor:Actor) {
-    const rows=await this.db.query(`SELECT p.id,p.nombres AS "givenNames",p.apellidos AS surnames,p.tipo AS type,p.especialidad AS specialty,p.area_id AS "areaId",e.nombre AS area,p.activo AS active,p.version,p.telefono AS phone,p.dui,COALESCE((SELECT json_agg(json_build_object('id',i.id,'board',i.junta,'number',i.numero,'validFrom',lower(i.vigencia)::text,'validTo',(upper(i.vigencia)-1)::text) ORDER BY lower(i.vigencia) DESC,i.numero) FROM personal.inscripcion i WHERE i.persona_id=p.id),'[]'::json) AS registrations FROM personal.persona p LEFT JOIN infra.espacio e ON e.id=p.area_id ORDER BY p.activo DESC,p.apellidos,p.nombres`);
+    const rows=await this.db.query(`SELECT p.id,p.nombres AS "givenNames",p.apellidos AS surnames,p.tipo AS type,p.especialidad AS specialty,p.area_id AS "areaId",e.nombre AS area,p.activo AS active,p.version,p.telefono AS phone,p.dui,COALESCE((SELECT json_agg(json_build_object('id',i.id,'board',i.junta,'number',i.numero,'validFrom',lower(i.vigencia)::text,'validTo',(upper(i.vigencia)-1)::text) ORDER BY lower(i.vigencia) DESC,i.numero) FROM personal.inscripcion i WHERE i.persona_id=p.id),'[]'::json) AS registrations,
+      -- Turno de hoy (día local): de turno ahora, ausente marcado hoy, con turno más tarde o libre. Solo turnos publicados o en curso cuentan.
+      CASE WHEN EXISTS(SELECT 1 FROM personal.turno t WHERE t.persona_id=p.id AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz) THEN 'de_turno'
+        WHEN EXISTS(SELECT 1 FROM personal.turno t WHERE t.persona_id=p.id AND t.estado='ausente' AND t.periodo && tstzrange(($2::date)::timestamp AT TIME ZONE 'America/El_Salvador',($2::date+1)::timestamp AT TIME ZONE 'America/El_Salvador','[)')) THEN 'ausente'
+        WHEN EXISTS(SELECT 1 FROM personal.turno t WHERE t.persona_id=p.id AND t.estado='publicado' AND lower(t.periodo)>$1::timestamptz AND lower(t.periodo)<($2::date+1)::timestamp AT TIME ZONE 'America/El_Salvador') THEN 'mas_tarde'
+        ELSE 'libre' END AS "shiftToday"
+      FROM personal.persona p LEFT JOIN infra.espacio e ON e.id=p.area_id ORDER BY p.activo DESC,p.apellidos,p.nombres`,[this.clock.now(),businessDate(this.clock.now())]);
     return hasPermission(actor,'personal.ver_datos_personales')?rows:rows.map(({dui,phone,...row})=>row);
   }
   /** Obs. 9: catálogo de especialidades por categoría (tipo de personal). Solo hay catálogo para `medico` y `enfermero`. */

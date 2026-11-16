@@ -229,7 +229,7 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
         TextButton(onClick=back,enabled=!state.signingIn){Text("← Volver al ingreso",color=Color.White)}
         Surface(color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
             Text("CUENTA DE PACIENTE",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
-            Text("Creá tu cuenta.",style=MaterialTheme.typography.headlineMedium)
+            Text("Crea tu cuenta",style=MaterialTheme.typography.headlineMedium)
             run{
                 state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
                 OutlinedTextField(name,{name=it.take(120)},label={Text("Nombre completo")},modifier=Modifier.fillMaxWidth(),singleLine=true,isError=state.fieldErrors.containsKey("name"),supportingText={state.fieldErrors["name"]?.let{Text(it)}},enabled=!state.signingIn)

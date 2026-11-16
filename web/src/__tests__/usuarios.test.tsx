@@ -9,7 +9,8 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(cleanup);
+// Los filtros viven en la dirección: cada prueba empieza sin filtros.
+afterEach(() => { cleanup(); location.hash = ''; });
 
 const perfil = (permissions: string[]): AccessProfile => ({ id: 'adm-1', user: { id: 'adm-1' }, email: 'adm@example.test', name: 'Administración Ficticia', roles: ['ADM'], platforms: ['web'], permissions: permissions.map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId: null });
 const cuentas: UserAccount[] = [

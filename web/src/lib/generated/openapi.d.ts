@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Buscar por nombre, fonética, DUI o expediente; devuelve campos mínimos */
+        /** Buscar por nombre, fonética, DUI o expediente, con filtros de estado y de atención de hoy; devuelve campos mínimos */
         get: operations["PatientsController_search"];
         put?: never;
         /** Registrar después de buscar; expediente y DUI exclusivos */
@@ -2434,6 +2434,10 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
+        EstadoExpediente: "vigente" | "provisional" | "activo" | "inactivo";
+        /** @enum {string} */
+        SituacionPaciente: "hospitalizado" | "pendiente_cama" | "alta_firmada" | "en_fila" | "cita_hoy";
+        /** @enum {string} */
         EstadoPaciente: "provisional" | "activo" | "inactivo" | "ingresado_por_error";
         /** @enum {string} */
         SexoPaciente: "femenino" | "masculino" | "indeterminado" | "no_registrado";
@@ -2785,6 +2789,11 @@ export interface components {
              */
             validTo: string;
         };
+        /**
+         * @description Turno de hoy: de turno ahora, ausente marcado hoy, con turno más tarde o libre
+         * @enum {string}
+         */
+        TurnoHoy: "de_turno" | "ausente" | "mas_tarde" | "libre";
         StaffResponse: {
             /** Format: uuid */
             id: string;
@@ -2802,6 +2811,8 @@ export interface components {
             /** @description Solo con personal.ver_datos_personales */
             dui?: string | null;
             registrations: components["schemas"]["StaffRegistrationResponse"][];
+            /** @description Turno de hoy: de turno ahora, ausente marcado hoy, con turno más tarde o libre */
+            shiftToday: components["schemas"]["TurnoHoy"];
         };
         /** @enum {string} */
         CategoriaEspecialidad: "medico" | "enfermero";
@@ -5691,6 +5702,14 @@ export interface operations {
                 query?: string;
                 limit?: number;
                 offset?: number;
+                /** @description Estado del expediente; vigente = provisional o activo */
+                estado?: components["schemas"]["EstadoExpediente"];
+                /** @description Situación de atención hoy. Hospitalización exige admision.ver global; fila, fila.ver; citas, citas.ver */
+                situacion?: components["schemas"]["SituacionPaciente"];
+                /** @description Área (o planta) donde está su cama hoy. Exige admision.ver global */
+                areaId?: string;
+                /** @description Médico tratante de su admisión activa. Exige admision.ver global */
+                medicoId?: string;
             };
             header?: never;
             path?: never;

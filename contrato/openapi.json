@@ -35,6 +35,44 @@
               "default": 0,
               "type": "number"
             }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "description": "Estado del expediente; vigente = provisional o activo",
+            "schema": {
+              "$ref": "#/components/schemas/EstadoExpediente"
+            }
+          },
+          {
+            "name": "situacion",
+            "required": false,
+            "in": "query",
+            "description": "Situación de atención hoy. Hospitalización exige admision.ver global; fila, fila.ver; citas, citas.ver",
+            "schema": {
+              "$ref": "#/components/schemas/SituacionPaciente"
+            }
+          },
+          {
+            "name": "areaId",
+            "required": false,
+            "in": "query",
+            "description": "Área (o planta) donde está su cama hoy. Exige admision.ver global",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "medicoId",
+            "required": false,
+            "in": "query",
+            "description": "Médico tratante de su admisión activa. Exige admision.ver global",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -97,7 +135,7 @@
             "bearer": []
           }
         ],
-        "summary": "Buscar por nombre, fonética, DUI o expediente; devuelve campos mínimos",
+        "summary": "Buscar por nombre, fonética, DUI o expediente, con filtros de estado y de atención de hoy; devuelve campos mínimos",
         "tags": [
           "patients"
         ],
@@ -16045,6 +16083,25 @@
       }
     },
     "schemas": {
+      "EstadoExpediente": {
+        "type": "string",
+        "enum": [
+          "vigente",
+          "provisional",
+          "activo",
+          "inactivo"
+        ]
+      },
+      "SituacionPaciente": {
+        "type": "string",
+        "enum": [
+          "hospitalizado",
+          "pendiente_cama",
+          "alta_firmada",
+          "en_fila",
+          "cita_hoy"
+        ]
+      },
       "EstadoPaciente": {
         "type": "string",
         "enum": [
@@ -17355,6 +17412,16 @@
           "validTo"
         ]
       },
+      "TurnoHoy": {
+        "type": "string",
+        "enum": [
+          "de_turno",
+          "ausente",
+          "mas_tarde",
+          "libre"
+        ],
+        "description": "Turno de hoy: de turno ahora, ausente marcado hoy, con turno más tarde o libre"
+      },
       "StaffResponse": {
         "type": "object",
         "properties": {
@@ -17409,6 +17476,14 @@
             "items": {
               "$ref": "#/components/schemas/StaffRegistrationResponse"
             }
+          },
+          "shiftToday": {
+            "description": "Turno de hoy: de turno ahora, ausente marcado hoy, con turno más tarde o libre",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TurnoHoy"
+              }
+            ]
           }
         },
         "required": [
@@ -17421,7 +17496,8 @@
           "area",
           "active",
           "version",
-          "registrations"
+          "registrations",
+          "shiftToday"
         ]
       },
       "CategoriaEspecialidad": {

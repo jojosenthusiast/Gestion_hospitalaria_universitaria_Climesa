@@ -10,6 +10,10 @@
 .cl-sort select { min-height: 44px; padding: 0 10px; border: 1px solid var(--control-line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; }
 .cl-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 8px; }
 .cl-filter-label { color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+/* Filtros con muchas opciones (área, médico, función, rol): selects en fila que bajan a una columna en el teléfono. */
+.cl-filter-selects { align-items: flex-end; }
+.cl-filter-selects > .select-field { flex: 1 1 200px; max-width: 280px; margin: 0; }
+@media (max-width: 640px) { .cl-filter-selects > .select-field { max-width: none; } }
 .cl-chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
 .cl-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .cl-chip small { padding: 0 6px; min-width: 20px; border-radius: 999px; background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 800; text-align: center; }
@@ -118,3 +122,5 @@
 .pt-name strong { display: block; }
 .pt-name small, .pt-meta { color: var(--muted); font-size: 13px; }
 @media (max-width: 720px) { .pt-row { grid-template-columns: 1fr auto; } }
+/* Turno de hoy bajo el estado en el directorio de personal. */
+.shift-today { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }

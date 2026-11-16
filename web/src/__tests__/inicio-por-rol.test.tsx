@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api } from '../lib/api';
 import { Dashboard } from '../features/dashboards';
+import { modules } from '../features/shell';
 import permisosCsv from '../../../docs/arquitectura/datos/permisos.csv?raw';
 
 afterEach(cleanup);
@@ -121,5 +122,12 @@ describe('inicio por rol', () => {
   it('sin rol conocido no inventa un tablero', () => {
     montar({ ...perfil('REC'), roles: ['XYZ'], permissions: [{ code: 'sesion.perfil', context: 'x' }] });
     expect(screen.getByText('Tu función no tiene un tablero en la web')).toBeTruthy();
+  });
+  it('ADM: cada enlace del tablero abre un módulo que existe (antes «#/usuarios» daba «Página no encontrada»)', async () => {
+    montar(perfil('ADM'));
+    await screen.findAllByText('Cuentas por estado');
+    const routes = hrefs().filter((h): h is string => !!h && h.startsWith('#/')).map(h => h.slice(2).split('?')[0]);
+    expect(routes.length).toBeGreaterThan(0);
+    expect(routes.filter(r => !modules.some(m => m.id === r))).toEqual([]);
   });
 });

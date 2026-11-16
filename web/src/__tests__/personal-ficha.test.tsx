@@ -12,7 +12,8 @@ beforeEach(() => {
   // Hoy es 29-oct-2026 (mediodía en El Salvador); solo se falsea Date para no frenar a userEvent.
   vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-29T18:00:00Z') });
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+// Los filtros viven en la dirección: cada prueba empieza sin filtros.
+afterEach(() => { cleanup(); vi.useRealTimers(); location.hash = ''; });
 
 const perfil = (permisos: string[]): AccessProfile => ({
   id: 'u-1', user: { id: 'u-1' }, email: 'adm@example.test', name: 'Administración de prueba', roles: ['ADM'], platforms: ['web'],

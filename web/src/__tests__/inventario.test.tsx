@@ -126,7 +126,7 @@ describe('inventario · maestro-detalle', () => {
   it('el Administrador ve y configura todo el inventario, sin ofrecer movimientos (MA-REQ-01, D-091)', async () => {
     mount(profile([['inventario.ver', 'x'], ['inventario.configurar', 'x']]));
     await screen.findByText('Suero oral');
-    expect(screen.getByText(/^Todas las categorías, solo consulta y configuración\./)).toBeTruthy();
+    expect(screen.getByText(/^Todas las categorías, solo consulta y configuración ·/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Nuevo artículo' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Registrar movimiento' })).toBeNull();
   });

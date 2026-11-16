@@ -53,7 +53,7 @@ export function AuditPage({ api, version }: { api: Api; version: number }) {
   const subtitle = filterChips.length ? `Filtros: ${filterChips.map(c => c.label).join('; ')}` : 'Sin filtros';
 
   return <>
-    <Heading eyebrow="Protección de datos / Trazabilidad" title="Auditoría" description="Registro de solo inserción encadenado por hash (D-009). Quién hizo cada operación, cuándo y con qué resultado. No incluye valores clínicos."
+    <Heading eyebrow="Protección de datos / Trazabilidad" title="Auditoría" description="Quién hizo cada operación, cuándo y con qué resultado, sin valores clínicos"
       actions={<AuditExport api={api} total={total} subtitle={subtitle} queryFor={(p, s) => pageQuery(applied, sort, p, s, { exportar: 'true' })} />} />
     <ChainPanel api={api} onOpen={setDetail} />
     <section className="data-workbench audit-workbench">
