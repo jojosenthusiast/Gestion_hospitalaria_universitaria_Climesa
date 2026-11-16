@@ -34,7 +34,8 @@ Accesos rápidos: **Nueva admisión**, **Planificar turno**, **Publicar aviso** 
 Hay tres vistas: **Semana**, **Lista por día** y **Especialistas de la semana**.
 
 - **Semana** (la vista inicial en computadora) muestra de lunes a domingo un bloque por turno, ubicado por su hora y con el color de su estado: borrador, publicado, en curso, completado, ausente o cancelado (la leyenda está sobre la semana). Una guardia de 24 h se ve en los dos días que toca. Los huecos de cobertura aparecen como bandas rayadas en su día y hora. Toca un bloque para ver el turno y sus acciones.
-- **Lista por día** (la vista inicial en el teléfono) agrupa los turnos por el día asignado (Hoy, Mañana, día y fecha) y los ordena por hora de inicio.
+- **Lista por día** (la vista inicial en el teléfono) sirve para revisar: empieza por **Hoy** y los días que vienen, con los turnos ordenados por hora de inicio. Los días pasados de la semana quedan plegados al final en **Días anteriores de esta semana**, el más reciente primero.
+- En **Semana**, **Toda la semana** y **Día** cambian la escala: **Día** muestra un solo día más ancho y los botones con el día de la semana eligen cuál.
 - Las flechas cambian de semana; **Esta semana** vuelve a la actual.
 
 ### Planificar
@@ -46,6 +47,39 @@ Hay tres vistas: **Semana**, **Lista por día** y **Especialistas de la semana**
   - supera 72 horas en 7 días o 6 días seguidos.
 - En una emergencia, escribe el **Motivo de la emergencia**: el turno se acepta por encima del límite y queda auditado.
 - **Cancelar turno** pide un motivo. Un turno ya iniciado o con citas no se cancela.
+
+### Planificar en el calendario
+
+- **Crear:** haz clic en una hora de un día (propone 8 horas desde ahí) o arrastra sobre las horas para marcar el tramo. Sin ratón, usa el botón **+** de cada día ("Asignar turno el …"). Se abre **Asignar turno** con la fecha y la hora puestas.
+- **Mover y estirar:** arrastra un bloque a otra hora u otro día; el borde inferior lo alarga o acorta. Con el teclado, sobre el bloque: **Alt + ↑/↓** lo mueve 30 minutos, **Alt + ←/→** lo cambia de día y **Alt + Mayús + ↑/↓** mueve la hora de fin. También puedes abrir el turno y usar **Editar**.
+- Cada cambio lo valida la API con las mismas reglas de un turno suelto (descanso, tope de 7 días, ausencias). Si lo rechaza, el bloque se queda donde estaba y el motivo aparece arriba del calendario.
+- Un **borrador** se mueve sin pedir motivo. Un turno **publicado** abre **Mover turno** con el horario de antes y el de después, y pide el **Motivo del cambio**.
+- **Deshacer** devuelve el último movimiento a su horario anterior.
+- Al crear o mover, la semana se queda donde estaba y el turno queda resaltado.
+- Los huecos de cobertura se ven como bandas rayadas en su día y hora.
+
+### Planificar la semana en lote
+
+Todo lote termina en **Vista previa de los borradores**. Ahí cada turno muestra **Sin conflictos** o el mismo motivo que daría un turno suelto. Puedes **Quitar** un turno o cambiar la persona y luego **Validar de nuevo**. **Crear N borradores** se activa solo cuando ningún turno tiene conflicto. Se crean todos o ninguno.
+
+- **Generar rotación:** elige el área, las personas (o una función para usar a todo su grupo del área), el patrón y las fechas (hasta 31 días). Los patrones son:
+  - **Mañana, tarde y noche rotativo:** 8 horas; 5 días de trabajo y 2 de descanso.
+  - **12 h de trabajo y 36 h de descanso.**
+  - **Guardia 24 h con 72 h de descanso.**
+  - **Personalizado:** horas por turno, días de trabajo y de descanso.
+
+  El sistema reparte las vueltas respetando el descanso mínimo, el tope de 7 días y la cobertura. Si alguien no puede un día, propone a otra persona del grupo y lo indica con "Reemplaza a …".
+- **Copiar semana anterior:** repite los turnos de la semana pasada siete días después, sin los cancelados ni las ausencias. Si hay un área filtrada, copia solo esa área.
+- **Asignación masiva:** el mismo horario a varias personas en uno o más días. Si la hora de fin es anterior a la de inicio, el turno termina al día siguiente.
+- **Plantillas:** **Guardar esta semana como plantilla** guarda los turnos de un área con un nombre. **Aplicar** lleva una plantilla a la semana que estás viendo. **Retirar** la quita de la lista.
+- Si un turno supera 44 horas diurnas en la semana, la vista previa pide la justificación antes de crear.
+
+### Publicar semana
+
+- Los borradores no los ve el personal: no salen en **Mis turnos** ni en su calendario.
+- **Publicar semana (N borradores)** aparece cuando la semana tiene borradores. Si hay un área filtrada, publica solo esa área.
+- Se publican todos o ninguno. Al publicar, la base vuelve a revisar el descanso y el tope de horas de cada persona.
+- Si quedan huecos de cobertura, el aviso los cuenta.
 
 ### Asistencia
 

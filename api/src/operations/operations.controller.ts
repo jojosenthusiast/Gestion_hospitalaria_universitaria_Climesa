@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../auth';
 import { PermissionGuard } from '../auth';
@@ -7,8 +7,8 @@ import { ActorRequest } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
-import { AttendanceDto, BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, ShiftDto, SpaceDto, StaffDto } from './operations.dto';
-import { BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftAttendanceResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpecialistWeekResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
+import { AttendanceDto, BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, RotationDto, ShiftBatchDto, ShiftDto, SpaceDto, StaffDto, WeekTemplateDto, WeekTemplateRetireDto } from './operations.dto';
+import { BatchCreatedResponse, BatchValidationResponse, RotationPreviewResponse, WeekTemplateResponse, BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftAttendanceResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpecialistWeekResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
 import { IdVersionResponse } from '../platform/responses';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
 export class OperationsController {
@@ -44,6 +44,18 @@ export class OperationsController {
   attendance(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:AttendanceDto,@Headers('idempotency-key') k?:string){return this.people.attendance(r.actor,id,d,k);}
   @Post('turnos/publicar') @RequirePermission('turnos.publicar') @ApiOperation({summary:'Publicar los borradores de un rango; con huecos de cobertura advierte y registra quién publicó'}) @ApiCreatedResponse({ type: PublishShiftsResponse })
   publishShifts(@Req() r:ActorRequest,@Body() d:PublishDto,@Headers('idempotency-key') k?:string){return this.people.publish(r.actor,d,k);}
+  @Post('turnos/lote/validar') @HttpCode(200) @RequirePermission('turnos.planificar') @ApiOperation({summary:'Validar un lote de turnos sin guardarlo: un resultado por turno con las reglas de un turno suelto y los huecos de cobertura'}) @ApiOkResponse({ type: BatchValidationResponse })
+  validateBatch(@Req() r:ActorRequest,@Body() d:ShiftBatchDto){return this.people.validateBatch(r.actor,d);}
+  @Post('turnos/lote') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Crear un lote de turnos como borradores, todo o nada: con un solo conflicto no se crea ninguno (409 lote_con_conflictos con el resultado de cada turno)'}) @ApiCreatedResponse({ type: BatchCreatedResponse })
+  createBatch(@Req() r:ActorRequest,@Body() d:ShiftBatchDto,@Headers('idempotency-key') k?:string){return this.people.createBatch(r.actor,d,k);}
+  @Post('turnos/generar') @HttpCode(200) @RequirePermission('turnos.planificar') @ApiOperation({summary:'Vista previa de una rotación (rotativo, 12x36, 24x72 o personalizado) con descanso, tope de 7 días y cobertura; no guarda nada'}) @ApiOkResponse({ type: RotationPreviewResponse })
+  generate(@Req() r:ActorRequest,@Body() d:RotationDto){return this.people.generate(r.actor,d);}
+  @Get('turnos/plantillas') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Plantillas de semana vigentes por área'}) @ApiOkResponse({ type: [WeekTemplateResponse] })
+  templates(){return this.people.templates();}
+  @Post('turnos/plantillas') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Guardar una semana de un área como plantilla'}) @ApiCreatedResponse({ type: IdVersionResponse })
+  saveTemplate(@Req() r:ActorRequest,@Body() d:WeekTemplateDto,@Headers('idempotency-key') k?:string){return this.people.saveTemplate(r.actor,d,k);}
+  @Patch('turnos/plantillas/:id') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Retirar una plantilla de semana con versión'}) @ApiOkResponse({ type: IdVersionResponse })
+  retireTemplate(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:WeekTemplateRetireDto,@Headers('idempotency-key') k?:string){return this.people.retireTemplate(r.actor,id,d,k);}
   @Post('turnos') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Planificar turno con duración, traslapes y descanso'}) @ApiCreatedResponse({ type: ShiftSavedResponse })
   createShift(@Req() r:ActorRequest,@Body() d:ShiftDto,@Headers('idempotency-key') k?:string){return this.people.saveShift(r.actor,null,d,k);}
   @Patch('turnos/:id') @RequirePermission('turnos.planificar') @ApiOperation({summary:'Mover o cancelar turno con versión y motivo'}) @ApiOkResponse({ type: ShiftSavedResponse })
