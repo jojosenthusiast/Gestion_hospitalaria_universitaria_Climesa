@@ -4,7 +4,8 @@
 -- web ofrecía "Iniciar consulta" en números que llamó un colega. `atencion.ticket_fila.llamado_por` guarda la persona de
 -- personal (`personal.persona`, igual que `atencion.consulta.medico_id`) que hizo el último llamado. La API lo escribe en
 -- cada llamado y lo limpia cuando deshacer el llamado devuelve el número a la espera. La API solo expone si quien lee
--- es quien llamó (`calledByMe`); nunca el id del colega.
+-- es quien llamó (`calledByMe`) y si llamó otro profesional con `consulta.iniciar` (`calledByColleague`); nunca el id
+-- de quien llamó.
 --
 -- Datos reales que cambia: ninguno. Es una columna nueva, nula y sin valor por defecto; no se rellena ninguna fila
 -- existente. Los números ya llamados quedan con llamado_por nulo (ningún médico los ve como propios hasta un nuevo
