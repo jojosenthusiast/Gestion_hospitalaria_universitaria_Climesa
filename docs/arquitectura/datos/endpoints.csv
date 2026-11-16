@@ -106,6 +106,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 109,POST,/api/v1/ambulancia/servicios/{id}/cerrar,ambulancia.mantenimiento,Solo servicio activo; motivo; estado final cancelado; unidad a Disponible,R,6,Cierre administrativo del servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.reportar_prehospital,Funciona sin conexión con reintento,E,4,Reporte prehospital y hora estimada
 109,GET,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.recibir_prehospital,,E,4,Ver reporte prehospital
+109,GET,/api/v1/ambulancia/llegada,ambulancia.recibir_prehospital,Servicio activo o llegado sin entrega (24 h); solo el identificador; MA-AMB-04,R,6,Servicio cuya llegada recibe el hospital
 109,POST,/api/v1/ambulancia/servicios/{id}/recepcion,ambulancia.recibir_prehospital,Personal clínico (expediente.ver); después de en_hospital; una sola vez; MA-AMB-04,E,6,Marcar recibido al paciente en el hospital
 109,POST,/api/v1/ambulancia/ubicacion,ambulancia.operar,Solo con servicio activo,E,5,Ubicación en vivo
 109,POST,/api/v1/ambulancia/mantenimiento,ambulancia.mantenimiento,Solo sin servicio activo,R,4,Entrar o salir de mantenimiento

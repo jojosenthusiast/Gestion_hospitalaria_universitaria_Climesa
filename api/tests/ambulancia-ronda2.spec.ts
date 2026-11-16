@@ -90,7 +90,7 @@ describe('Ambulancia · mantenimiento, solicitante y bitácora narrativa (ronda 
     const patientId = await t.patient({});
     const record = (await t.one<{ expediente: string }>('SELECT expediente FROM pacientes.paciente WHERE id=$1', [patientId])).expediente;
     const req = await t.call('REC', 'POST', '/ambulancia/solicitudes', { address: 'Colonia Ficticia, casa 9', municipality: 'Soyapango', reason: 'Caída de altura', contactPhone: '7000-3333', patientId });
-    const dispatched = await t.call('JOP', 'POST', '/ambulancia/servicios', { version: (await unit()).version, requestId: req.body.id, type: 'emergencia_domicilio', priority: 'roja', destination: 'Hospital CLIMESA, emergencia' });
+    const dispatched = await t.call('JOP', 'POST', '/ambulancia/servicios', { version: (await unit()).version, requestId: req.body.id, type: 'emergencia_domicilio', priority: 'roja', destination: 'Hospital CLIMESA, emergencia', crew: await t.crewOnDuty() });
     expect(dispatched.status).toBe(201);
     t.setNow(at('08:10'));
     expect((await t.call('PAR', 'POST', `/ambulancia/servicios/${dispatched.body.id}/hitos`, { type: 'salida' })).status).toBe(201);

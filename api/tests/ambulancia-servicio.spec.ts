@@ -14,7 +14,7 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
   let driverId: string;
   const unit = () => t.one<{ id: string; estado: string; version: number }>('SELECT id,estado,version FROM ambulancia.unidad');
   const request = (role: string, body: Record<string, unknown> = {}, key?: string) => t.call(role, 'POST', '/ambulancia/solicitudes', { address: 'Colonia Ficticia, pasaje 3, casa 12', municipality: 'San Salvador', reason: 'Caída en casa con dolor de cadera', contactPhone: '7000-0001', ...body }, key);
-  const dispatch = (body: Record<string, unknown>, role = 'REC', key?: string) => t.call(role, 'POST', '/ambulancia/servicios', { type: 'emergencia_domicilio', priority: 'naranja', destination: 'Hospital CLIMESA, emergencia', ...body }, key);
+  const dispatch = async (body: Record<string, unknown>, role = 'REC', key?: string) => t.call(role, 'POST', '/ambulancia/servicios', { type: 'emergencia_domicilio', priority: 'naranja', destination: 'Hospital CLIMESA, emergencia', crew: await t.crewOnDuty(), ...body }, key);
   const milestone = (id: string, body: Record<string, unknown>, role = 'PAR', key?: string) => t.call(role, 'POST', `/ambulancia/servicios/${id}/hitos`, body, key);
 
   beforeAll(async () => {

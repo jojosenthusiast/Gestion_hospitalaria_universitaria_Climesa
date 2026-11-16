@@ -1,7 +1,0 @@
-{
-  "method": "POST",
-  "path": "/api/v1/ambulancia/servicios/{id}/recepcion",
-  "body": {
-    "version": 7
-  }
-}

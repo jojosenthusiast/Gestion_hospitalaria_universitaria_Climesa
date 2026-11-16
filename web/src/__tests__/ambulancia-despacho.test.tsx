@@ -17,7 +17,12 @@ const profile = (permissions: Array<string | [string, string]>, roles = ['REC'])
   permissions: permissions.map(p => Array.isArray(p) ? { code: p[0], context: p[1] } : { code: p, context: 'x' }), channels: ['ambulancia'], patientId: null, staffId: 'staff-1',
 });
 const request = { id: 'req-1', channel: 'app_paciente', address: 'Colonia Ficticia 12', municipality: 'San Salvador', reason: 'Caída en casa', contactPhone: '7000-0001', createdAt: '2026-11-15T14:00:00.000Z', version: 1, registeredPatient: true };
-const board: AmbulanceStatus = { unit: { id: 'unit-1', plate: 'P-000-001', state: 'disponible', version: 5 }, activeService: null, paramedicOnDuty: true, pendingRequests: [request] };
+const availableCrew = [
+  { staffId: 'par-1', role: 'paramedico', name: 'Ana Paramédica', hasAccount: true },
+  { staffId: 'par-2', role: 'paramedico', name: 'Beto Paramédico', hasAccount: false },
+  { staffId: 'mot-1', role: 'motorista', name: 'Carlos Motorista', hasAccount: false },
+];
+const board: AmbulanceStatus = { unit: { id: 'unit-1', plate: 'P-000-001', state: 'disponible', version: 5 }, activeService: null, paramedicOnDuty: true, pendingRequests: [request], availableCrew };
 const serving: AmbulanceStatus = {
   unit: { id: 'unit-1', plate: 'P-000-001', state: 'en_servicio', version: 6 }, paramedicOnDuty: true, pendingRequests: [],
   activeService: { id: 'svc-1', type: 'emergencia_domicilio', priority: 'roja', origin: 'Colonia Ficticia 12', destination: 'Hospital CLIMESA', dispatchedAt: '2026-11-15T14:00:00.000Z', hasPrehospital: true, crew: [], milestones: [{ type: 'salida', occurredAt: '2026-11-15T14:05:00.000Z' }], nextMilestones: ['en_escena', 'finalizado'] },
@@ -38,7 +43,27 @@ describe('W18 centro de despacho', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Confirmar y despachar' });
     await userEvent.selectOptions(within(dialog).getByLabelText('Prioridad'), 'roja');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Despachar' }));
-    expect(api.write).toHaveBeenCalledWith('/ambulancia/servicios', { version: 5, type: 'emergencia_domicilio', priority: 'roja', destination: 'Hospital CLIMESA, emergencia', requestId: 'req-1', municipality: 'San Salvador' }, 'POST');
+    expect(api.write).toHaveBeenCalledWith('/ambulancia/servicios', { version: 5, type: 'emergencia_domicilio', priority: 'roja', destination: 'Hospital CLIMESA, emergencia', requestId: 'req-1', municipality: 'San Salvador', crew: ['par-1', 'mot-1'] }, 'POST');
+  });
+
+  it('MA-AMB-02: el despachador elige la tripulación de turno; viene propuesta y exige paramédico con cuenta y motorista', async () => {
+    const api = apiReturning(board);
+    render(<AmbulancePage api={api} profile={dispatcher} version={0} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirmar y despachar' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Confirmar y despachar' });
+    const crew = within(dialog).getByRole('group', { name: 'Tripulación' });
+    expect((within(crew).getByLabelText(/Ana Paramédica/) as HTMLInputElement).checked).toBe(true);
+    expect((within(crew).getByLabelText(/Beto Paramédico/) as HTMLInputElement).checked).toBe(false);
+    expect(within(crew).getByText(/Sin cuenta en la app/)).toBeTruthy();
+    await userEvent.click(within(crew).getByLabelText(/Carlos Motorista/));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Despachar' }));
+    expect(await within(dialog).findByText('Elige un motorista de turno para el servicio.')).toBeTruthy();
+    await userEvent.click(within(crew).getByLabelText(/Carlos Motorista/));
+    await userEvent.click(within(crew).getByLabelText(/Ana Paramédica/));
+    await userEvent.click(within(crew).getByLabelText(/Beto Paramédico/));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Despachar' }));
+    expect(await within(dialog).findByText('Elige un paramédico con cuenta en la app: registra los hitos del servicio.')).toBeTruthy();
+    expect(api.write).not.toHaveBeenCalled();
   });
 
   it('quien pierde la carrera ve "La ambulancia ya fue despachada."', async () => {

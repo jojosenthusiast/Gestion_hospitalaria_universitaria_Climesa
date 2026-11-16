@@ -28,7 +28,7 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
   {dispatcher&&s.unit.state==='disponible'&&!s.dispatchBlock&&<p><button type="button" className="secondary-button" onClick={()=>setDispatching('direct')}>Despachar traslado sin solicitud</button></p>}
   {manage&&s.unit.state!=='en_servicio'&&<MaintenancePanel status={s} api={api} profile={profile} onSaved={data.refresh}/>}
-  {dispatching&&<DispatchForm api={api} unitVersion={s.unit.version} request={dispatching==='direct'?null:dispatching} onClose={()=>setDispatching(null)} onSaved={saved}/>}
+  {dispatching&&<DispatchForm api={api} unitVersion={s.unit.version} crewPool={s.availableCrew??[]} request={dispatching==='direct'?null:dispatching} onClose={()=>setDispatching(null)} onSaved={saved}/>}
   {discarding&&<DiscardForm api={api} request={discarding} onClose={()=>setDiscarding(null)} onSaved={saved}/>}
  </section>}</RemoteState>
  {calling&&<PhoneRequestForm api={api} onClose={()=>setCalling(false)} onSaved={saved}/>}

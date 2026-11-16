@@ -15364,6 +15364,74 @@
         "x-permiso": "ambulancia.recibir_prehospital"
       }
     },
+    "/api/v1/ambulancia/llegada": {
+      "get": {
+        "operationId": "AmbulanceController_arrival",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArrivalServiceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Servicio que llega o llegó sin entrega registrada (para abrir el reporte y marcar recibido)",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.recibir_prehospital"
+      }
+    },
     "/api/v1/ambulancia/servicios/{id}/recepcion": {
       "post": {
         "operationId": "AmbulanceController_handover",
@@ -15389,16 +15457,6 @@
             "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HandoverDto"
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
             "description": "",
@@ -25684,6 +25742,13 @@
             "items": {
               "$ref": "#/components/schemas/PendingAmbulanceRequestResponse"
             }
+          },
+          "availableCrew": {
+            "description": "Solo con ambulancia.despachar: paramédicos y motoristas de turno entre los que se elige la tripulación (MA-AMB-02)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrewMemberResponse"
+            }
           }
         },
         "required": [
@@ -26050,13 +26115,24 @@
             "type": "string",
             "minLength": 0,
             "maxLength": 80
+          },
+          "crew": {
+            "maxItems": 6,
+            "uniqueItems": true,
+            "description": "Personal de turno elegido para el servicio (`availableCrew`); RN-30 exige un paramédico con cuenta y un motorista",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         },
         "required": [
           "version",
           "type",
           "priority",
-          "destination"
+          "destination",
+          "crew"
         ]
       },
       "DispatchedCrewResponse": {
@@ -26332,6 +26408,19 @@
           "patientLinked"
         ]
       },
+      "ArrivalServiceResponse": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "serviceId"
+        ]
+      },
       "PrehospitalReportResponse": {
         "type": "object",
         "properties": {
@@ -26468,18 +26557,6 @@
           "reports",
           "handover",
           "allowedActions"
-        ]
-      },
-      "HandoverDto": {
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "number",
-            "minimum": 1
-          }
-        },
-        "required": [
-          "version"
         ]
       },
       "HandoverResponse": {
@@ -26744,6 +26821,7 @@
           "sin_paramedico_de_turno",
           "sin_motorista_de_turno",
           "sin_tripulacion_de_turno",
+          "tripulante_sin_turno",
           "sin_servicio_activo",
           "solicitud_resuelta",
           "unidad_en_mantenimiento",

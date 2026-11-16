@@ -56,7 +56,7 @@ describe('Permisos del PDF · edición propia del paciente, bitácora del médic
     const unit = () => t.one<{ version: number }>('SELECT version FROM ambulancia.unidad');
     expect((await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: (await unit()).version, inMaintenance: false, reason: 'Revisión terminada en taller' })).status).toBe(201);
     const req = await t.call('REC', 'POST', '/ambulancia/solicitudes', { address: 'Colonia Ficticia, casa 9', municipality: 'Soyapango', reason: 'Caída de altura', contactPhone: '7000-3333', patientId });
-    expect((await t.call('JOP', 'POST', '/ambulancia/servicios', { version: (await unit()).version, requestId: req.body.id, type: 'emergencia_domicilio', priority: 'roja', destination: 'Hospital CLIMESA, emergencia' })).status).toBe(201);
+    expect((await t.call('JOP', 'POST', '/ambulancia/servicios', { version: (await unit()).version, requestId: req.body.id, type: 'emergencia_domicilio', priority: 'roja', destination: 'Hospital CLIMESA, emergencia', crew: await t.crewOnDuty() })).status).toBe(201);
     const log = await t.call('MED', 'GET', '/ambulancia/bitacora?priority=roja');
     expect(log.status).toBe(200);
     expect(log.body).toHaveLength(1);

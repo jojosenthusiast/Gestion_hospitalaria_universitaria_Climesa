@@ -93,5 +93,8 @@ export const canReportAfter = (finishedAt: Date | null, now: Date) => !finishedA
  * No usa `personal.v_turno_en_curso` porque esa vista lee `now()` de la base y aquí el reloj es sustituible.
  */
 export const CREW_ROLES_ON_DUTY_SQL = "SELECT bool_or(p.tipo='paramedico') AS paramedic, bool_or(p.tipo='motorista') AS driver, bool_or(p.tipo='paramedico' AND EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo')) AS \"paramedicWithAccount\" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";
-/** Tripulación asignada al despachar: paramédicos y motoristas activos con turno en curso; `hasAccount` si puede operar en la app. */
-export const CREW_ON_DUTY_SQL = "SELECT DISTINCT p.id,p.tipo,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS \"hasAccount\" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";
+/**
+ * Candidatos a tripulación (MA-AMB-02): paramédicos y motoristas activos con turno en curso (no ausente); `hasAccount` si
+ * puede operar en la app. El despachador elige de esta lista; estar de turno no da por sí solo relación de atención.
+ */
+export const CREW_ON_DUTY_SQL = "SELECT DISTINCT p.id,p.tipo,p.nombres||' '||p.apellidos AS name,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS \"hasAccount\" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";

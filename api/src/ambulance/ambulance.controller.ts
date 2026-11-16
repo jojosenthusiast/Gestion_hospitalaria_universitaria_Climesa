@@ -3,8 +3,8 @@ import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuer
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { AmbulanceService, LogFilters } from './ambulance.service';
-import { AmbulanceRequestDto, CancelRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, HandoverDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
-import { AmbulanceRequestCreatedResponse, AmbulanceRequestStateResponse, CloseServiceResponse, HandoverResponse, OwnAmbulanceRequestResponse, AmbulanceStatusResponse, AmbulanceUnitStateResponse, DispatchResponse, LocationRecordedResponse, MilestoneResponse, PrehospitalCreatedResponse, PrehospitalViewResponse, ServiceLogEntryResponse } from './ambulance.responses';
+import { AmbulanceRequestDto, CancelRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
+import { AmbulanceRequestCreatedResponse, ArrivalServiceResponse, AmbulanceRequestStateResponse, CloseServiceResponse, HandoverResponse, OwnAmbulanceRequestResponse, AmbulanceStatusResponse, AmbulanceUnitStateResponse, DispatchResponse, LocationRecordedResponse, MilestoneResponse, PrehospitalCreatedResponse, PrehospitalViewResponse, ServiceLogEntryResponse } from './ambulance.responses';
 
 /** Spec 109: rutas de `endpoints.csv`, cada una con su permiso de `permisos.csv`. */
 @ApiTags('ambulancia') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller('ambulancia')
@@ -30,10 +30,13 @@ export class AmbulanceController {
   close(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:CloseServiceDto,@Headers('idempotency-key') k?:string){return this.ambulance.close(r.actor,id,d,k);}
   @Post('servicios/:id/prehospital') @RequirePermission('ambulancia.reportar_prehospital') @ApiOperation({summary:'Reporte prehospital; el reenvío con la misma Idempotency-Key no duplica'}) @ApiCreatedResponse({ type: PrehospitalCreatedResponse })
   prehospital(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:PrehospitalDto,@Headers('idempotency-key') k?:string){return this.ambulance.prehospital(r.actor,id,d,k);}
+  @Get('llegada') @RequirePermission('ambulancia.recibir_prehospital') @ApiOperation({summary:'Servicio que llega o llegó sin entrega registrada (para abrir el reporte y marcar recibido)'}) @ApiOkResponse({ type: ArrivalServiceResponse })
+  arrival(){return this.ambulance.arrival();}
   @Get('servicios/:id/prehospital') @RequirePermission('ambulancia.recibir_prehospital') @ApiOperation({summary:'Ver el reporte prehospital; el contenido clínico solo con relación de atención'}) @ApiOkResponse({ type: PrehospitalViewResponse })
   readPrehospital(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string){return this.ambulance.readPrehospital(r.actor,id);}
   @Post('servicios/:id/recepcion') @RequirePermission('ambulancia.recibir_prehospital') @ApiOperation({summary:'Marcar recibido al paciente en el hospital (personal clínico, después de la llegada; una sola vez)'}) @ApiCreatedResponse({ type: HandoverResponse })
-  handover(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Body() d:HandoverDto,@Headers('idempotency-key') k?:string){return this.ambulance.handover(r.actor,id,d,k);}
+  // Sin cuerpo ni versión (MA-AMB-04): cada hito o reporte cambia la versión del servicio mientras se recibe al paciente.
+  handover(@Req() r:ActorRequest,@Param('id',ParseUUIDPipe) id:string,@Headers('idempotency-key') k?:string){return this.ambulance.handover(r.actor,id,k);}
   @Post('ubicacion') @RequirePermission('ambulancia.operar') @ApiOperation({summary:'Ubicación en vivo de la tripulación; solo con servicio activo'}) @ApiCreatedResponse({ type: LocationRecordedResponse })
   location(@Req() r:ActorRequest,@Body() d:LocationDto,@Headers('idempotency-key') k?:string){return this.ambulance.location(r.actor,d,k);}
   @Get('bitacora') @RequirePermission('ambulancia.ver_bitacora') @ApiOperation({summary:'Bitácora filtrable (D-056); sin datos del paciente (solo el expediente enmascarado)'})

@@ -90,7 +90,7 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `admision.creada` / `admision.actualizada` / `admision.cama_asignada` | `admision` | Admisión, indicación, cama, autorizar, notas, alta, salida, traslado | `admision.ver`, `camas.asignar` o `camas.ver_tablero` | 108 |
 | `ambulancia.estado_cambiado` | `unidad` o `solicitud` | Mantenimiento, despacho, descarte, cierre, cancelación por el solicitante (MA-AMB-05) | `ambulancia`, `ambulancia.despachar`, `usuario:<solicitante>` | 109 |
 | `ambulancia.solicitud_creada` | `solicitud` | Solicitud de paciente o recepción | `ambulancia`, `ambulancia.despachar`, `usuario:<paciente>` | 109 |
-| `ambulancia.hito` | `servicio` | Hito del servicio | `ambulancia`, `usuario:<paciente solicitante>` | 109 |
+| `ambulancia.hito` | `servicio` | Hito del servicio | `ambulancia`, `usuario:<paciente solicitante>`; `trasladando`, `en_hospital` y `finalizado` también a `ambulancia.recibir_prehospital` (MA-AMB-04) | 109 |
 | `ambulancia.prehospital` | `servicio` | Reporte prehospitalario; entrega al hospital (MA-AMB-04) | `ambulancia`, `ambulancia.recibir_prehospital` | 109 |
 | `ambulancia.ubicacion` | `servicio` | Ubicación en vivo | `ambulancia` | 109 |
 | `vinculacion.solicitada` / `vinculacion.resuelta` | `vinculacion_paciente` | Solicitud, aprobación o rechazo | `cuentas.verificar`, `usuario:<solicitante>` | 101 |

@@ -82,6 +82,12 @@ export class AmbulanceStatusResponse {
   @BoolProp({ description: 'Hay un paramédico con cuenta activa y turno en curso (BL-05: sin él no se despacha)' }) paramedicWithAccountOnDuty!: boolean;
   @ClassProp(DispatchBlockResponse, { nullable: true, description: 'Por qué no se puede despachar ahora; null si se puede' }) dispatchBlock!: DispatchBlockResponse | null;
   @ClassArrayProp(PendingAmbulanceRequestResponse, { optional: true, description: 'Solo con ambulancia.despachar' }) pendingRequests?: PendingAmbulanceRequestResponse[];
+  @ClassArrayProp(CrewMemberResponse, { optional: true, description: 'Solo con ambulancia.despachar: paramédicos y motoristas de turno entre los que se elige la tripulación (MA-AMB-02)' }) availableCrew?: CrewMemberResponse[];
+}
+
+/** MA-AMB-04: servicio cuya llegada recibe el hospital (activo, o llegado sin entrega en las últimas 24 h). */
+export class ArrivalServiceResponse {
+  @UuidProp({ nullable: true }) serviceId!: string | null;
 }
 
 export class AmbulanceUnitStateResponse {

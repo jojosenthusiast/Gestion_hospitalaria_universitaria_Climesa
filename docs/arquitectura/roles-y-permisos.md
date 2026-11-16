@@ -304,6 +304,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/ambulancia/servicios/{id}/cerrar` | `ambulancia.mantenimiento` | Solo servicio activo; motivo; estado final cancelado; unidad a Disponible | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.reportar_prehospital` | Funciona sin conexión con reintento | E | 4 | · | · | · | · | · | · | · | ✔ | · | · |
 | GET | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.recibir_prehospital` |  | E | 4 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
+| GET | `/api/v1/ambulancia/llegada` | `ambulancia.recibir_prehospital` | Servicio activo o llegado sin entrega (24 h); solo el identificador; MA-AMB-04 | R | 6 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/recepcion` | `ambulancia.recibir_prehospital` | Personal clínico (expediente.ver); después de en_hospital; una sola vez; MA-AMB-04 | E | 6 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/ambulancia/ubicacion` | `ambulancia.operar` | Solo con servicio activo | E | 5 | · | · | · | · | · | · | · | ✔ | · | · |
 | POST | `/api/v1/ambulancia/mantenimiento` | `ambulancia.mantenimiento` | Solo sin servicio activo | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |

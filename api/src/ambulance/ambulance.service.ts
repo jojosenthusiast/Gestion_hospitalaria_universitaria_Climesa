@@ -6,8 +6,8 @@ import { Clock, businessDayRange } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
-import { AmbulanceRequestDto, CancelRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, HandoverDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
-import { CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, UnitState, allowedFinalStates, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, nextMilestones, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
+import { AmbulanceRequestDto, CancelRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
+import { CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, PREHOSPITAL_GRACE_MS, UnitState, allowedFinalStates, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, nextMilestones, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
 
 type Unit = { id: string; estado: UnitState; version: number };
 type Service = { id: string; unidad_id: string; solicitud_id: string | null; paciente_id: string | null; finalizado_en: Date | null; version: number };
@@ -72,6 +72,10 @@ export class AmbulanceService {
         result.pendingRequests = pending.map(({ patient, patientName, patientAlias, callerName, ...row }) => ({ ...row, registeredPatient: !!patient, requesterName: patientName ?? patientAlias ?? callerName ?? null, callerName }));
         // Dirección y teléfono de contacto son datos personales: la consulta queda auditada (regla 7).
         for (const row of pending.filter(r => r.patient)) await this.commands.audit(c, actor, { action: 'ambulancia.solicitud.ver', entity: 'solicitud', entityId: row.id, patientId: row.patient!, permission: 'ambulancia.despachar' });
+        // MA-AMB-02: candidatos para que el despachador elija la tripulación.
+        const available = (await c.query<{ id: string; tipo: string; name: string; hasAccount: boolean }>(CREW_ON_DUTY_SQL, [this.clock.now()])).rows;
+        result.availableCrew = available.sort((a, b) => a.tipo.localeCompare(b.tipo) || Number(b.hasAccount) - Number(a.hasAccount) || a.name.localeCompare(b.name))
+          .map(p => ({ staffId: p.id, role: p.tipo, name: p.name, hasAccount: p.hasAccount }));
       }
       return result;
     });
@@ -185,9 +189,15 @@ export class AmbulanceService {
       if (unit.estado === 'en_servicio') throw new ProblemException('ambulancia_ya_despachada', 409, 'La ambulancia ya fue despachada.');
       if (unit.estado === 'en_mantenimiento') throw new ProblemException('unidad_en_mantenimiento', 409, 'La ambulancia está en mantenimiento; no se puede despachar.');
       if (unit.version !== dto.version) throw new VersionConflictException(unit.version, 'La unidad cambió; vuelve a consultar su estado.');
-      const crew = (await c.query<{ id: string; tipo: string; hasAccount: boolean }>(CREW_ON_DUTY_SQL, [now])).rows;
+      // MA-AMB-02: la tripulación es la que elige el despachador entre quienes tienen turno en curso; solo ella gana la
+      // relación de atención con el paciente (`patients.service`). RN-30 / BL-05: debe incluir un paramédico con cuenta y un motorista.
+      const onDuty = (await c.query<{ id: string; tipo: string; hasAccount: boolean }>(CREW_ON_DUTY_SQL, [now])).rows;
+      const pool = missingCrew(onDuty.some(p => p.tipo === 'paramedico'), onDuty.some(p => p.tipo === 'motorista'), onDuty.some(p => p.tipo === 'paramedico' && p.hasAccount));
+      if (pool) throw new ProblemException(pool.code, 409, missingCrewDetail(pool.who, 'no se puede despachar el servicio (RN-30).'));
+      if (dto.crew.some(id => !onDuty.some(p => p.id === id))) throw new ProblemException('tripulante_sin_turno', 409, 'Alguien de la tripulación elegida no tiene turno en curso; vuelve a consultar el estado y elige de nuevo.', 'crew');
+      const crew = onDuty.filter(p => dto.crew.includes(p.id));
       const missing = missingCrew(crew.some(p => p.tipo === 'paramedico'), crew.some(p => p.tipo === 'motorista'), crew.some(p => p.tipo === 'paramedico' && p.hasAccount));
-      if (missing) throw new ProblemException(missing.code, 409, missingCrewDetail(missing.who, 'no se puede despachar el servicio (RN-30).'));
+      if (missing) throw new ProblemException(missing.code, 409, `La tripulación elegida no incluye ${missing.who}; elige uno de los que tienen turno en curso (RN-30).`, 'crew');
       let origin = dto.origin?.trim() || null, municipality = dto.municipality?.trim() || null, patientId: string | null = null, account: string | null = null;
       if (dto.requestId) {
         const request = (await c.query<{ estado: string; direccion: string; municipio: string | null; paciente_id: string | null }>('SELECT estado,direccion,municipio,paciente_id FROM ambulancia.solicitud WHERE id=$1 FOR UPDATE', [dto.requestId])).rows[0];
@@ -238,7 +248,9 @@ export class AmbulanceService {
       const version = (await c.query<{ version: number }>(`UPDATE ambulancia.servicio SET version=version+1${finalState ? ',finalizado_en=$2,estado_final=$3,motivo_final=$4' : ''} WHERE id=$1 RETURNING version`, finalState ? [id, occurredAt, finalState, dto.reason?.trim() || null] : [id])).rows[0].version;
       const account = await this.requesterAccount(c, service.solicitud_id);
       await this.commands.audit(c, actor, { action: 'ambulancia.hito', entity: 'servicio', entityId: id, patientId: service.paciente_id ?? undefined, permission: 'ambulancia.operar', reason: dto.reason, detail: { type: dto.type, finalState } });
-      await this.commands.event(c, 'ambulancia.hito', 'servicio', id, version, ['ambulancia', ...(account ? [`usuario:${account}`] : [])]);
+      // MA-AMB-04: quien recibe (Enfermería no lee el tablero) se entera del traslado, la llegada y el final.
+      const receivers = ['trasladando', 'en_hospital', 'finalizado'].includes(dto.type) ? await channelsFor(c, ['ambulancia.recibir_prehospital']) : [];
+      await this.commands.event(c, 'ambulancia.hito', 'servicio', id, version, ['ambulancia', ...receivers, ...(account ? [`usuario:${account}`] : [])]);
       let unitState: UnitState = unit.estado, unitVersion = unit.version;
       if (finalState) {
         unitVersion = await this.setUnit(c, actor, unit, 'disponible', `Servicio finalizado: ${finalState}`);
@@ -305,16 +317,16 @@ export class AmbulanceService {
    * MA-AMB-04: el personal clínico que recibe (con relación de atención, `expediente.ver`) marca recibido al paciente
    * después del hito `en_hospital`, una sola vez y hasta 24 h después de finalizar. Los reportes quedan con `recibido_por`.
    */
-  async handover(actor: Actor, id: string, dto: HandoverDto, key?: string) {
+  async handover(actor: Actor, id: string, key?: string) {
     if (!hasPermission(actor, CLINICAL_PERMISSION)) throw new ForbiddenException('Solo el personal clínico que recibe al paciente registra la entrega.');
-    return this.commands.run(actor, `ambulancia.recibir_prehospital:servicio:${id}:recepcion`, key, dto, async c => {
+    // Sin versión: el bloqueo de la fila, `recibido_por` y el disparador `servicio_cierre` hacen la entrega única.
+    return this.commands.run(actor, `ambulancia.recibir_prehospital:servicio:${id}:recepcion`, key, {}, async c => {
       const now = this.clock.now();
-      const service = (await c.query<{ paciente_id: string | null; finalizado_en: Date | null; recibido_por: string | null; version: number }>('SELECT paciente_id,finalizado_en,recibido_por,version FROM ambulancia.servicio WHERE id=$1 FOR UPDATE', [id])).rows[0];
+      const service = (await c.query<{ paciente_id: string | null; finalizado_en: Date | null; recibido_por: string | null }>('SELECT paciente_id,finalizado_en,recibido_por FROM ambulancia.servicio WHERE id=$1 FOR UPDATE', [id])).rows[0];
       if (!service) throw new NotFoundException('El servicio no existe.');
       if (service.recibido_por) throw new ProblemException('entrega_registrada', 409, 'La entrega del paciente al hospital ya fue registrada.');
       if (!(await this.handoverState(c, id)).arrived) throw new ProblemException('sin_llegada_hospital', 409, 'La entrega se registra cuando la ambulancia llega al hospital.');
       if (!canReportAfter(service.finalizado_en, now)) throw new ProblemException('servicio_cerrado', 409, 'Pasaron más de 24 horas desde que terminó el servicio; ya no se registra la entrega.');
-      if (service.version !== dto.version) throw new VersionConflictException(service.version, 'El servicio cambió; vuelve a abrir el reporte prehospital.');
       const version = (await c.query<{ version: number }>('UPDATE ambulancia.servicio SET recibido_por=$2,recibido_en=$3,version=version+1 WHERE id=$1 RETURNING version', [id, actor.id, now])).rows[0].version;
       await c.query('UPDATE ambulancia.reporte_prehospital SET recibido_por=$2 WHERE servicio_id=$1 AND recibido_por IS NULL', [id, actor.id]);
       await this.commands.audit(c, actor, { action: 'ambulancia.recepcion', entity: 'servicio', entityId: id, patientId: service.paciente_id ?? undefined, permission: 'ambulancia.recibir_prehospital' });
@@ -322,6 +334,18 @@ export class AmbulanceService {
       const { handover } = await this.handoverState(c, id);
       return { serviceId: id, version, receivedAt: now, receivedByName: handover?.receivedByName ?? null };
     });
+  }
+
+  /**
+   * MA-AMB-04: el servicio que el hospital espera o debe recibir: el activo, o el último que llegó al hospital sin entrega
+   * registrada y terminó hace menos de 24 h. Solo el identificador: el reporte se lee (y audita) con `readPrehospital`.
+   */
+  async arrival() {
+    const since = new Date(this.clock.now().getTime() - PREHOSPITAL_GRACE_MS);
+    const [row] = await this.db.query<{ id: string }>(`SELECT s.id FROM ambulancia.servicio s
+      WHERE s.finalizado_en IS NULL OR (s.recibido_por IS NULL AND s.finalizado_en>$1 AND EXISTS(SELECT 1 FROM ambulancia.hito h WHERE h.servicio_id=s.id AND h.tipo='en_hospital'))
+      ORDER BY (s.finalizado_en IS NULL) DESC,s.despachado_en DESC LIMIT 1`, [since]);
+    return { serviceId: row?.id ?? null };
   }
 
   /** FR-109-11: emergencia ve el reporte; el contenido clínico solo con relación de atención (privacidad.md), y la lectura se audita. */

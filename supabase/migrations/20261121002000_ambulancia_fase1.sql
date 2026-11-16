@@ -1,4 +1,8 @@
--- Fase 1, ambulancia (auditoría final MA-AMB-03 a MA-AMB-05).
+-- Fase 1, ambulancia (auditoría final MA-AMB-02 a MA-AMB-05).
+--
+-- MA-AMB-02 (sin cambio de esquema): el despachador elige la tripulación entre el personal de turno; la API solo
+-- inserta en `ambulancia.tripulacion` a quien se eligió y la relación de atención sigue saliendo de esa tabla. Los
+-- disparadores de 20261119002000 (tripulación completa) y de 20261120003000 (tripulante ausente) siguen igual.
 --
 -- 1. MA-AMB-03: estados finales `fallecido` (el paciente falleció antes de llegar al hospital) y `desviado` (el
 --    traslado terminó en otro centro). Desde `trasladando` se puede finalizar sin registrar una llegada falsa.

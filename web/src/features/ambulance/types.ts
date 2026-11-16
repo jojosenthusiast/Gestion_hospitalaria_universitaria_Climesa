@@ -11,7 +11,17 @@ export type AmbulanceStatus={
  driverOnDuty?:boolean;
  dispatchBlock?:DispatchBlock|null;
  pendingRequests?:AmbulanceRequest[];
+ /** MA-AMB-02: solo con `ambulancia.despachar`; personal de turno entre el que se elige la tripulación. */
+ availableCrew?:CrewCandidate[];
 };
+export type CrewCandidate={staffId:string;role:string;name:string;hasAccount:boolean};
+/** Tripulación propuesta: el primer paramédico con cuenta (registra los hitos) y el primer motorista. */
+export function defaultCrew(pool:CrewCandidate[]){const paramedic=pool.find(p=>p.role==='paramedico'&&p.hasAccount);const driver=pool.find(p=>p.role==='motorista');return [paramedic,driver].filter((p):p is CrewCandidate=>!!p).map(p=>p.staffId);}
+/** Qué falta en la tripulación elegida (RN-30, BL-05); null si se puede despachar con ella. */
+export function crewProblem(pool:CrewCandidate[],chosen:string[]){const picked=pool.filter(p=>chosen.includes(p.staffId));
+ if(!picked.some(p=>p.role==='paramedico'&&p.hasAccount))return 'Elige un paramédico con cuenta en la app: registra los hitos del servicio.';
+ if(!picked.some(p=>p.role==='motorista'))return 'Elige un motorista de turno para el servicio.';
+ return null;}
 /** MA-AMB-04: `handover` dice quién recibió al paciente; marcar recibido es del personal clínico en las apps (`allowedActions`). */
 export type PrehospitalView={serviceId:string;version:number;active:boolean;arrived:boolean;priority:string;patientLinked:boolean;clinical:boolean;handover:{receivedAt:string;receivedByName:string|null}|null;allowedActions:string[];reports:{id:string;priority:string;estimatedArrival?:string|null;capturedAt:string;receivedAt:string;reason?:string;vitalSigns?:Record<string,number>}[]};
 export const stateNames:Record<string,string>={disponible:'Disponible',en_servicio:'En servicio',en_mantenimiento:'En mantenimiento'};

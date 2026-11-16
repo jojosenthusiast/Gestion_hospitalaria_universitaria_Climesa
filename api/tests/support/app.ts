@@ -7,6 +7,7 @@ import { DatabaseService } from '../../src/platform/database.service';
 import { SupabaseService } from '../../src/supabase/supabase.service';
 import { Clock, businessDate } from '../../src/platform/clock';
 import { createDatabase, userId } from './database';
+import { CREW_ON_DUTY_SQL } from '../../src/ambulance/ambulance.rules';
 
 const issuer = 'https://gvmvmrusscsfbndnbvbr.supabase.co/auth/v1';
 
@@ -105,8 +106,17 @@ export async function createTestApp(start: Date) {
   const events = async (type: string, entityId: string) => (await pg.query<{ canales: string[] }>('SELECT canales FROM plataforma.outbox WHERE tipo=$1 AND entidad_id=$2 ORDER BY seq', [type, entityId])).rows.map(r => r.canales);
   const audits = async (action: string) => (await pg.query<{ paciente_id: string | null; resultado: string; detalle: any }>('SELECT paciente_id,resultado,detalle FROM plataforma.auditoria WHERE accion=$1 ORDER BY seq', [action])).rows;
 
+  /**
+   * MA-AMB-02: the crew a dispatcher would pick by default (a paramedic with an account, else any paramedic, and a driver)
+   * among the staff on duty now; read straight from the database so no audited board read happens.
+   */
+  const crewOnDuty = async () => {
+    const pool = (await pg.query<{ id: string; tipo: string; hasAccount: boolean }>(CREW_ON_DUTY_SQL, [current])).rows;
+    const paramedic = pool.find(p => p.tipo === 'paramedico' && p.hasAccount) ?? pool.find(p => p.tipo === 'paramedico');
+    return [paramedic, pool.find(p => p.tipo === 'motorista')].filter((p): p is { id: string; tipo: string; hasAccount: boolean } => !!p).map(p => p.id);
+  };
   return {
-    app, pg, call, one, staffOf, patient, enroll, shift, driverShift, appointment, consultation, admissionBody, events, audits,
+    app, pg, call, one, staffOf, patient, enroll, shift, driverShift, appointment, consultation, admissionBody, events, audits, crewOnDuty,
     setNow: (value: Date) => { current = value; },
     close: async () => { await app.close(); await pg.close(); },
   };
