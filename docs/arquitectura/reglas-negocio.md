@@ -67,6 +67,13 @@ Una sola lista de las reglas que el sistema hace cumplir. Cada spec las referenc
 - **RN-36** Ninguna existencia queda negativa; todo cambio de existencia es un movimiento con motivo y autor (D-057).
 - **RN-37** Al bajar del mínimo se avisa en tiempo real. Lotes vencidos no se pueden usar.
 
+## Avisos (spec 112, Fase 2 S11)
+- **RN-AVI-01** Un aviso llega a quien es su audiencia: el público (pantalla pública y apps sin sesión), uno o más roles, o el personal de una o más áreas (`areas`, códigos de espacio de tipo área o bahía). El área de una cuenta es la de su ficha de personal más la de su turno en curso. Debe tener al menos una audiencia.
+- **RN-AVI-02** Nivel: `informativo` (por omisión, y el de todo aviso publicado antes de Fase 2), `importante` o `critico`. Solo un aviso `critico` dirigido al rol o al área de la cuenta (no basta con que sea público) se destaca en su inicio, hasta que la cuenta da «Enterado». La prioridad visual de la pantalla pública (D-071) sigue al nivel si quien publica no la indica (informativo → atencion, importante → urgente, critico → critico); editar sin nivel ni áreas conserva los del aviso.
+- **RN-AVI-03** «Enterado» es por cuenta y una sola vez: repetirlo responde el mismo acuse sin volver a escribir ni auditar. Se guarda en `publico.aviso_enterado` y se audita (`avisos.enterado`). Solo se da sobre un aviso vigente dirigido a la cuenta; uno retirado o vencido responde `aviso_retirado` o `aviso_vencido`.
+- **RN-AVI-04** Recordatorio: «Recordarme después» aparta un crítico sin «Enterado» durante la política `avisos.recordatorio_horas` (4 horas por omisión; el dueño la cambia cerrando la vigencia de la fila e insertando otra en `plataforma.politica`). Al cumplirse vuelve a destacarse: la bandeja lo anuncia en `proximoCambio` y el cliente vuelve a pedir una vez en ese instante, sin sondeo. No hay notificaciones push.
+- **RN-AVI-05** Quien publica ve por aviso cuántas cuentas dieron «Enterado» y a cuántas cuentas activas va dirigido por rol o por el área de su ficha. Nunca nombres.
+
 ## Cuentas y privacidad
 - **RN-38** Nadie se asigna roles a sí mismo.
 - **RN-39** La cuenta de paciente sin verificar no ve nada personal ni clínico (D-032). La verificación compara DUI y fecha de nacimiento con el expediente; si no hay expediente, recepción lo crea siguiendo "buscar antes de crear".

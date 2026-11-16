@@ -16,6 +16,7 @@ Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#
 | Catálogo de laboratorio | Exámenes y rangos de referencia |
 | Inventario | Artículos, lotes y mínimos (sin movimientos) |
 | Métricas | Indicadores del hospital |
+| Avisos | Tus avisos y **Enterado** (ver `README.md`, "Avisos (web)") |
 | Perfil | Tu cuenta |
 
 ## Inicio

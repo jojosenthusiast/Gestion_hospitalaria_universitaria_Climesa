@@ -21,7 +21,7 @@ Antes de leer esta página, revisa [lo que vale para todos los roles](README.md#
 | Hospitalización | Admisiones y cierre del ciclo |
 | Fila del día | Consultar la fila |
 | Citas | Consultar las citas |
-| Avisos | Publicar, editar y retirar avisos |
+| Avisos | Tus avisos con **Enterado**; publicar, editar y retirar avisos |
 | Métricas | Indicadores |
 | Perfil | Tu cuenta |
 
@@ -129,7 +129,12 @@ Vista de **Tarjetas** o **Tabla**, filtros (incluido "Estado final"), **Quitar f
 
 ## Avisos
 
-- **Publicar aviso**, para el público o para roles internos.
+Avisos abre en **Publicados**; **Para mí** es tu propia bandeja, igual que para el resto del personal.
+
+- **Publicar aviso**, para el público, para roles internos o para el personal de un área (por ejemplo Emergencia).
+- **Nivel**: **Informativo** (por omisión) e **Importante** quedan en Avisos. **Crítico** sale además en el Inicio de su rol o área hasta que cada persona pulsa **Enterado**; quien lo pospone lo vuelve a ver a las 4 horas.
+- La columna **Enterado** cuenta cuántas cuentas lo marcaron de cuántas a las que va dirigido ("3 de 8"). No muestra nombres.
+- La pantalla pública sigue mostrando su prioridad (Atención, Urgente o Crítico), que sigue al nivel.
 - **Editar → Guardar cambios**. Si otra persona lo cambió antes, la web te pide volver a cargarlo.
 - **Retirar → Retirar aviso**, con un motivo de 10 caracteres o más. Un aviso retirado desaparece de `/publico` y ya no se puede cambiar.
 
