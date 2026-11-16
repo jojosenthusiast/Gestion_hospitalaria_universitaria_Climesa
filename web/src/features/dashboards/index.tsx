@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { Icon } from '../../components/ui';
-import { roleNames, type AccessProfile, type Api } from '../../lib/api';
+import { can, roleNames, type AccessProfile, type Api } from '../../lib/api';
 import { CompactHeader } from '../common';
 import { NoticesPanel } from '../avisos/NoticesPanel';
 import { WorkInbox } from '../inbox';
 import { useDashboardData, type Source } from './data';
+import { LabFollowUpPanel } from './lab-follow-up';
 import { QuickActions } from './parts';
 import { roleDashboards, roleOrder, type RoleId } from './roles';
 
@@ -32,6 +33,8 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
         {many && <h2 className="role-section-title">{index === 0 ? '' : `${dash.title} · `}{roleNames[role] ?? role}</h2>}
         <QuickActions actions={dash.actions} profile={profile} />
         {index === 0 && <WorkInbox api={api} profile={profile} version={version} />}
+        {/* S10: citas de seguimiento que el sistema propone al llegar resultados; Recepción las confirma. */}
+        {index === 0 && can(profile, 'citas.agendar') && <LabFollowUpPanel api={api} version={version} />}
         {dash.render({ d: data, profile })}
       </div>;
     })}

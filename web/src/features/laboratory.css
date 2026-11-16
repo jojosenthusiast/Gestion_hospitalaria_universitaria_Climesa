@@ -9,3 +9,43 @@
 .lab-cancelled { margin: 0; color: var(--muted); }
 .lab-requirement { margin: 0 0 8px; padding: 8px 12px; border-radius: var(--radius-control); background: var(--warning-soft); color: var(--warning); font-weight: 600; }
 .lab-requirement.is-ready { background: var(--success-soft); color: var(--success); }
+
+/* Fase 2, flujo C (S10): lista agrupada, lote, orden externa y observación relevante. */
+.lab-groups { gap: var(--space-2); }
+.lab-group-head { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-3) 0 var(--space-1); border-bottom: 1px solid var(--line); }
+.lab-group-head:first-child { padding-top: 0; }
+.lab-group-head h3 { margin: 0; font-size: var(--text-sm); font-weight: 700; color: var(--ink); }
+.lab-group-count { color: var(--muted); font-size: var(--text-sm); font-weight: 700; }
+.lab-num { font-variant-numeric: tabular-nums; }
+.lab-fold { margin-left: auto; min-height: 40px; padding: 0 var(--space-2); border: 0; background: none; color: var(--primary-text); font: inherit; font-size: var(--text-sm); font-weight: 700; cursor: pointer; border-radius: var(--radius-control); }
+.lab-fold:focus-visible { outline: 2px solid var(--outline); outline-offset: 2px; }
+.lab-row-item { list-style: none; }
+.lab-row-item.has-batch { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: var(--space-1); }
+.lab-batch-check { width: 20px; height: 20px; justify-self: center; accent-color: var(--primary); }
+/* Sin franja lateral: la etapa la dicen el ícono, el patrón y la etiqueta del estado. */
+.lab-row.lw-row { border-width: 1px; border-left-width: 1px; border-left-color: var(--line); transition: background-color var(--motion-instant, 100ms) ease-out; }
+.lab-row.lw-row[aria-current='true'] { border-color: var(--primary); }
+@media (hover: hover) { .lab-row.lw-row:hover { border-color: var(--primary); } }
+.lab-batch { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.lab-batch > span { margin-right: auto; color: var(--muted); font-size: var(--text-sm); }
+.lab-batch > span strong { color: var(--ink); }
+.lab-batch-result { display: grid; gap: var(--space-2); margin-bottom: var(--space-3); }
+.lab-external-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid var(--line); border-radius: var(--radius-chip); background: var(--bg); color: var(--ink); font-size: var(--text-xs); font-weight: 700; }
+.lab-external { display: grid; gap: var(--space-1); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); }
+.lab-external strong { display: inline-flex; align-items: center; gap: 6px; }
+.lab-external p { margin: 0; max-width: 65ch; }
+.lab-observation { display: flex; align-items: center; gap: 4px; margin-top: 2px; color: var(--muted); font-size: var(--text-sm); }
+.lab-observation.is-relevant { color: var(--ink); font-weight: 700; }
+.lab-relevant { display: flex; align-items: center; gap: var(--space-2); min-height: 40px; font-size: var(--text-sm); }
+.lab-relevant input { width: 18px; height: 18px; accent-color: var(--primary); }
+.lab-more summary { min-height: 40px; display: flex; align-items: center; cursor: pointer; color: var(--primary-text); font-weight: 700; font-size: var(--text-sm); }
+.lab-more summary:focus-visible { outline: 2px solid var(--outline); outline-offset: 2px; border-radius: var(--radius-chip); }
+.lab-more .cl-facts { margin-top: var(--space-2); }
+.lab-report h4 { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
+.lab-report ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }
+.lab-report li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: var(--space-2); align-items: start; }
+.lab-report li small { display: block; }
+.lab-external-values { display: grid; gap: var(--space-2); margin: 0; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-control); }
+.lab-external-values legend { padding: 0 var(--space-1); font-weight: 700; }
+.lab-storage-note { margin: 0; font-size: var(--text-sm); }
+@media (max-width: 720px) { .lab-batch > span { flex-basis: 100%; } }
