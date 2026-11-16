@@ -159,6 +159,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     fun closeResumed() { mutable.value = mutable.value.copy(resumed = null) }
 
     fun save(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, onDone: () -> Unit = {}) {
+        if (mutable.value.saving) return
         if (reason.trim().isBlank()) { mutable.value = mutable.value.copy(error = "Escribe el motivo de consulta."); return }
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
@@ -172,7 +173,9 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         }
     }
 
+    /** Saves the notes, then signs at the version the save returned; `saving` spans both writes so a second tap sends nothing. */
     fun sign(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, onDone: () -> Unit = {}) {
+        if (mutable.value.saving) return
         if (reason.trim().isBlank() || plan.trim().isBlank()) { mutable.value = mutable.value.copy(error = "Completa el motivo y el plan antes de firmar."); return }
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {

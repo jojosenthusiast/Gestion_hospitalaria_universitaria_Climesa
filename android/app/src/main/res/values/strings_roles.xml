@@ -92,4 +92,85 @@
     <string name="app_recuperar_detalle">Escribe el correo de tu cuenta. Te enviaremos un enlace para crear una contraseña nueva.</string>
     <string name="app_enviando">Enviando…</string>
     <string name="app_enviar_enlace">Enviar enlace</string>
+    <!-- Hospitalization and admission guide -->
+    <string name="hosp_titulo">Hospitalización</string>
+    <string name="hosp_cama">Cama</string>
+    <string name="ing_prefill_aviso">Elegimos por ti %1$s porque solo había una opción. Puedes cambiarlo.</string>
+    <string name="ing_campo_origen">el origen</string>
+    <string name="ing_campo_medico">el médico tratante</string>
+    <string name="ing_campo_categoria">la categoría</string>
+    <string name="ing_salir_titulo">¿Salir del ingreso?</string>
+    <string name="ing_salir">Salir</string>
+    <string name="ing_salir_detalle">Se pierde lo elegido en la guía. El paciente no queda ingresado.</string>
+    <string name="ing_medicina_general">Medicina general</string>
+    <string name="ing_elegido">Elegido</string>
+    <string name="ing_req_aislamiento">Aislamiento</string>
+    <string name="ing_req_inestable">Inestable</string>
+    <string name="ing_req_posquirurgico">Posquirúrgico</string>
+
+    <!-- Inventory -->
+    <string name="inv_fila_existencia">%1$s %2$s · mínimo %3$s</string>
+    <string name="inv_vence_el">vence %1$s</string>
+    <string name="inv_lote_n">Lote %1$s</string>
+    <string name="inv_dado_baja">dado de baja</string>
+    <string name="inv_lote_vence">Vence %1$s</string>
+    <string name="inv_lote_vencido">(vencido)</string>
+    <string name="inv_no_vence">No vence</string>
+    <string name="inv_disponible_lote">Disponible en el lote: %1$s</string>
+    <string name="inv_ajuste_ayuda">Negativo resta un faltante; positivo suma un sobrante.</string>
+    <string name="inv_eliminar_titulo">¿Eliminar el artículo?</string>
+    <string name="inv_eliminar_detalle">Se elimina «%1$s» del catálogo. No tiene lotes ni movimientos, y no se puede deshacer.</string>
+
+    <!-- Vital signs (short labels) -->
+    <string name="signos_corto_fc">Frec. cardiaca</string>
+    <string name="signos_corto_fr">Frec. respiratoria</string>
+    <string name="signos_corto_sistolica">Sistólica</string>
+    <string name="signos_corto_diastolica">Diastólica</string>
+    <string name="signos_corto_spo2">SpO2</string>
+    <string name="signos_corto_dolor">Dolor</string>
+
+    <!-- Paramedic -->
+    <string name="par_sexo_femenino">Femenino</string>
+    <string name="par_sexo_masculino">Masculino</string>
+    <string name="par_sexo_indeterminado">Indeterminado</string>
+
+    <!-- Consultation (MED) -->
+    <string name="consulta_mi_consultorio">Mi consultorio</string>
+    <string name="consulta_t_firmada">Consulta firmada</string>
+    <string name="consulta_t_iniciar">Iniciar consulta</string>
+    <string name="consulta_t_continuar">Continuar consulta</string>
+    <string name="consulta_paciente">Paciente</string>
+    <string name="consulta_numero">Número</string>
+    <string name="consulta_cita">Cita</string>
+    <string name="consulta_no_iniciable">La consulta no se puede iniciar ahora.</string>
+    <string name="consulta_paso1">1. Consulta</string>
+    <string name="consulta_paso2">2. Procedimientos y plan</string>
+    <string name="consulta_paso3">3. Receta y exámenes</string>
+    <string name="consulta_paso4">4. Cerrar consulta</string>
+    <string name="consulta_paso4_detalle">Firmar cierra la consulta y el número de fila; luego te proponemos quién pasa después.</string>
+    <string name="consulta_motivo">Motivo de consulta</string>
+    <string name="consulta_examen">Examen físico</string>
+    <string name="consulta_pa_sis">PA sis.</string>
+    <string name="consulta_pa_dia">PA dia.</string>
+    <string name="consulta_fc">FC</string>
+    <string name="consulta_temp">Temp.</string>
+    <string name="consulta_sat">Sat. O₂</string>
+    <string name="consulta_registrar_signos">Registrar signos</string>
+    <string name="consulta_codigo">Código</string>
+    <string name="consulta_nota">Nota</string>
+    <string name="consulta_principal">Principal</string>
+    <string name="consulta_registrar_diagnostico">Registrar diagnóstico</string>
+    <string name="consulta_plan">Plan</string>
+    <string name="consulta_medicamento">Medicamento</string>
+    <string name="consulta_dosis">Dosis</string>
+    <string name="consulta_via">Vía</string>
+    <string name="consulta_frecuencia">Frecuencia</string>
+    <string name="consulta_duracion">Duración</string>
+    <string name="consulta_indicaciones">Indicaciones</string>
+    <string name="consulta_emitir_receta">Emitir receta</string>
+    <string name="consulta_guardar_borrador">Guardar borrador</string>
+    <string name="consulta_cerrar">Cerrar</string>
+    <string name="consulta_firmar">Firmar</string>
+    <string name="consulta_firmar_titulo">¿Firmar la consulta?</string>
+    <string name="consulta_firmar_detalle">Primero se guardan tus notas y después se firma. Una consulta firmada ya no se puede modificar, la cita queda atendida y el número de fila se cierra.</string>
 </resources>

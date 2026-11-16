@@ -69,6 +69,14 @@ internal fun stockFamily(status: StockStatus): StatusFamily = StatusFamily.of(st
     state.movement?.let { MovementDialog(state, kinds, model) }
     state.article?.let { ArticleDialog(it, state.busy, state.dialogError, model) }
     state.lot?.let { LotDialog(it, state.busy, state.dialogError, model) }
+    // Deleting an article cannot be undone: confirm with its name.
+    state.deleting?.let { id -> state.detail?.summary?.takeIf { it.id == id }?.let { article ->
+        ConfirmDialog(
+            title = stringResource(R.string.inv_eliminar_titulo), confirmLabel = stringResource(R.string.inv_eliminar), destructive = true, busy = state.busy,
+            message = stringResource(R.string.inv_eliminar_detalle, article.name),
+            onConfirm = { model.deleteArticle(id) }, onDismiss = { model.cancelDelete() },
+        )
+    } }
     PageList(modifier) {
         item { SectionIntro(stringResource(R.string.inv_eyebrow), stringResource(R.string.inv_titulo), stringResource(R.string.inv_descripcion)) }
         if (state.error != null && state.articles.isNotEmpty()) item { NoticeBanner(NoticeKind.ERROR, state.error!!) }
@@ -124,7 +132,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.listItems(state: Inve
         StockBadge(article.status)
     }) {
         Gauge(article.available, article.minimum, article.status)
-        Text("${trimNumber(article.available)} ${article.unit} · mínimo ${trimNumber(article.minimum)}" + (article.nextExpiry?.let { " · vence $it" } ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.inv_fila_existencia, trimNumber(article.available), article.unit, trimNumber(article.minimum)) + (article.nextExpiry?.let { " · " + stringResource(R.string.inv_vence_el, it) } ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -147,7 +155,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
             if (configure) {
                 SecondaryButton(stringResource(R.string.inv_editar_articulo), { model.openArticle(article) })
                 SecondaryButton(stringResource(R.string.inv_nuevo_lote), { model.openLot(null) })
-                if (detail.lots.isEmpty() && detail.movements.isEmpty()) SecondaryButton(stringResource(R.string.inv_eliminar), { model.deleteArticle(article.id) }, enabled = !state.busy)
+                if (detail.lots.isEmpty() && detail.movements.isEmpty()) SecondaryButton(stringResource(R.string.inv_eliminar), { model.askDelete(article.id) }, enabled = !state.busy)
             }
         }
     }
@@ -162,9 +170,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
             if (detail.lots.isEmpty()) Text(stringResource(R.string.inv_sin_lotes), style = MaterialTheme.typography.bodySmall)
             detail.lots.forEach { lot ->
                 Column(Modifier.fillMaxWidth().clickable(enabled = configure) { model.openLot(lot) }.padding(vertical = Spacing.xs)) {
-                    Text("Lote ${lot.number}" + if (lot.active) "" else " · dado de baja", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.inv_lote_n, lot.number) + if (lot.active) "" else " · " + stringResource(R.string.inv_dado_baja), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        (lot.expiresAt?.let { "Vence $it" + if (lot.expired) " (vencido)" else "" } ?: "No vence") + " · ${trimNumber(lot.total)} ${article.unit}" + (if (lot.warehouses.isEmpty()) "" else " · " + lot.warehouses.joinToString(" · ") { "${it.code}: ${trimNumber(it.quantity)}" }),
+                        (lot.expiresAt?.let { stringResource(R.string.inv_lote_vence, it) + if (lot.expired) " " + stringResource(R.string.inv_lote_vencido) else "" } ?: stringResource(R.string.inv_no_vence)) + " · ${trimNumber(lot.total)} ${article.unit}" + (if (lot.warehouses.isEmpty()) "" else " · " + lot.warehouses.joinToString(" · ") { "${it.code}: ${trimNumber(it.quantity)}" }),
                         style = MaterialTheme.typography.bodySmall, color = if (lot.expired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -216,7 +224,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
                     FormField(stringResource(R.string.inv_vencimiento), draft.expiresAt, { v -> model.editMovement { it.copy(expiresAt = v) } }, error = err("expiresAt"), hint = stringResource(R.string.inv_vacio_no_vence), enabled = !state.busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
                 FormField(stringResource(R.string.inv_cantidad), draft.quantity, { v -> model.editMovement { it.copy(quantity = v) } }, error = err("quantity"), enabled = !state.busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    hint = state.chosenLotQuantity?.let { "Disponible en el lote: ${trimNumber(it)}" } ?: if (draft.kind == MovementKind.ADJUSTMENT) "Negativo resta un faltante; positivo suma un sobrante." else null)
+                    hint = state.chosenLotQuantity?.let { stringResource(R.string.inv_disponible_lote, trimNumber(it)) } ?: if (draft.kind == MovementKind.ADJUSTMENT) stringResource(R.string.inv_ajuste_ayuda) else null)
                 FormField(stringResource(R.string.inv_motivo), draft.reason, { v -> model.editMovement { it.copy(reason = v) } }, error = err("reason"), enabled = !state.busy, singleLine = false)
                 state.dialogError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             }

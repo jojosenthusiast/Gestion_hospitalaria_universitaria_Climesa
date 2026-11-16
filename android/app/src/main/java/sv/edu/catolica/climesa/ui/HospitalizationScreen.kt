@@ -289,7 +289,7 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
     }
 
     /** API errors carry Spanish text (MOV-03); anything else gets the generic [fallback], never a raw exception message. */
-    private fun readable(e: Exception, fallback: String): String = (e as? AuthRequestException)?.message?.takeIf { it.isNotBlank() } ?: fallback
+    private fun readable(e: Exception, fallback: String): String = (e as? AuthRequestException)?.let { userMessage(it, fallback) } ?: fallback
     private fun failure(e: Exception): String = HospitalizationRules.problemMessage((e as? AuthRequestException)?.code, readable(e, "No se pudo completar la operación."))
 
     private data class Quad(val error: String?, val path: String, val body: JSONObject, val notice: String)
@@ -328,9 +328,14 @@ fun HospitalizationScreen(
     state.notes?.let { panel -> byId(panel.admissionId)?.let { NursingNotesDialog(it, panel, state, model) } }
     val retry = { model.clearMessages(); model.load() }
     PageList(modifier) {
-        item { SectionIntro("Hospital / Admisiones", "Hospitalización", "Asigna cama, gestiona el alta y registra la salida física.") }
+        // One primary per screen: the first admission with a main action; "Ingresar paciente" is primary only when none has one.
+        val primaryRow = HospitalizationRules.primaryAdmission(state.admissions)
+        item { SectionIntro("", stringResource(R.string.hosp_titulo)) }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
-        if ("admision.crear" in permissions) item { PrimaryButton(stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, icon = Icons.Default.Add, enabled = !state.busy) }
+        if ("admision.crear" in permissions) item {
+            if (primaryRow == null) PrimaryButton(stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, icon = Icons.Default.Add, enabled = !state.busy)
+            else SecondaryButton(stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, icon = Icons.Default.Add, enabled = !state.busy)
+        }
         when {
             state.loading && state.admissions.isEmpty() -> item { LoadingState() }
             state.error != null && state.admissions.isEmpty() -> item { ErrorState(state.error, retry) }
@@ -338,7 +343,7 @@ fun HospitalizationScreen(
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                items(state.admissions, key = { it.id }) { row -> AdmissionCard(row, state.busy, model) }
+                items(state.admissions, key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow) }
             }
         }
     }
@@ -346,11 +351,16 @@ fun HospitalizationScreen(
 
 /** Every button comes from the server's `allowedActions`; the main action of the state is the only primary button. */
 @Composable
-private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: HospitalizationViewModel) {
+private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: HospitalizationViewModel, primary: Boolean) {
     val actions = row.allowedActions
+    val main = HospitalizationRules.primaryAction(actions)?.takeIf { primary }
+    @Composable fun act(action: AdmissionAction, text: String, onClick: () -> Unit, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
+        if (action !in actions) return
+        if (action == main) PrimaryButton(text, onClick, icon = icon, enabled = !busy) else SecondaryButton(text, onClick, icon = icon, enabled = !busy)
+    }
     SectionCard(title = row.patientName, eyebrow = AdmissionIntake.CATEGORY_LABELS[row.category] ?: row.category, action = { StatusTag(row.state) }) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-            LabeledValue("Cama", if (row.bed.isBlank()) stringResource(R.string.clin_hosp_sin_cama) else row.bed, Modifier.weight(1f))
+            LabeledValue(stringResource(R.string.hosp_cama), if (row.bed.isBlank()) stringResource(R.string.clin_hosp_sin_cama) else row.bed, Modifier.weight(1f))
             if (row.isolation) FamilyBadge(stringResource(R.string.clin_hosp_aislamiento), null)
         }
         row.attendingDoctorName?.let { LabeledValue(stringResource(R.string.hosp_tratante), it) }
@@ -364,9 +374,9 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (AdmissionAction.ASSIGN_BED in actions) PrimaryButton(stringResource(R.string.hosp_asignar_cama), { model.open(row) }, icon = Icons.Default.Bed, enabled = !busy)
-        if (AdmissionAction.SIGN_DISCHARGE in actions) PrimaryButton(stringResource(R.string.hosp_firmar_alta), { model.openDischarge(row) }, enabled = !busy)
-        if (AdmissionAction.REGISTER_EXIT in actions) PrimaryButton(stringResource(R.string.hosp_registrar_salida), { model.openExit(row) }, enabled = !busy)
+        act(AdmissionAction.ASSIGN_BED, stringResource(R.string.hosp_asignar_cama), { model.open(row) }, Icons.Default.Bed)
+        act(AdmissionAction.SIGN_DISCHARGE, stringResource(R.string.hosp_firmar_alta), { model.openDischarge(row) })
+        act(AdmissionAction.REGISTER_EXIT, stringResource(R.string.hosp_registrar_salida), { model.openExit(row) })
         if (AdmissionAction.REQUEST_DISCHARGE in actions) SecondaryButton(stringResource(R.string.hosp_solicitar_alta), { model.openReason(row, AdmissionAction.REQUEST_DISCHARGE) }, enabled = !busy)
         if (AdmissionAction.TRANSFER in actions) SecondaryButton(stringResource(R.string.hosp_trasladar), { model.openTransfer(row) }, icon = Icons.Default.SwapHoriz, enabled = !busy)
         if (AdmissionAction.NURSING_NOTE in actions) SecondaryButton(stringResource(R.string.hosp_notas), { model.openNotes(row) }, icon = Icons.AutoMirrored.Filled.Notes, enabled = !busy)

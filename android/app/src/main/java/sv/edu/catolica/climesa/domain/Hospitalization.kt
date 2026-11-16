@@ -131,6 +131,14 @@ object AdmissionParser {
  * only keep the user from sending clinical text nobody wrote.
  */
 object HospitalizationRules {
+    /** S13: the main action of an admission's state, the only one drawn as primary; the rest stay secondary. */
+    private val mainActions = listOf(AdmissionAction.ASSIGN_BED, AdmissionAction.SIGN_DISCHARGE, AdmissionAction.REGISTER_EXIT)
+
+    fun primaryAction(actions: Set<AdmissionAction>): AdmissionAction? = mainActions.firstOrNull { it in actions }
+
+    /** One primary per screen: the first admission (list order) that has a main action, or null. */
+    fun primaryAdmission(rows: List<HospitalAdmission>): String? = rows.firstOrNull { primaryAction(it.allowedActions) != null }?.id
+
     const val SUMMARY_MIN = 10
     const val SUMMARY_MAX = 2000
     const val NOTE_MAX = 4000

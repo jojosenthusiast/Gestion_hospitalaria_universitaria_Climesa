@@ -44,6 +44,8 @@ data class InventoryState(
     val loading: Boolean = true, val busy: Boolean = false, val articles: List<ArticleSummary> = emptyList(), val filter: InventoryFilter = InventoryFilter(),
     val error: String? = null, val notice: String? = null, val selectedId: String? = null, val detail: ArticleDetail? = null, val detailLoading: Boolean = false,
     val warehouses: List<Warehouse> = emptyList(), val movement: MovementDraft? = null, val movementSubmitted: Boolean = false, val article: ArticleDraft? = null, val lot: LotDraft? = null, val dialogError: String? = null,
+    /** Article waiting for the delete confirmation. */
+    val deleting: String? = null,
 ) {
     val shown: List<ArticleSummary> get() = filterArticles(articles, filter)
     /** One alert per article that is out of stock or below its minimum (FR-111-06). */
@@ -76,7 +78,7 @@ class InventoryViewModel @Inject constructor(private val api: ApiGateway, realti
                 update { it.copy(loading = false, articles = articles) }
                 mutable.value.selectedId?.let { loadDetail(it) }
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (!silent) update { it.copy(loading = false, error = e.message ?: "No se pudo cargar el inventario.") } }
+            catch (e: Exception) { if (!silent) update { it.copy(loading = false, error = userMessage(e, "No se pudo cargar el inventario.")) } }
         }
     }
     /** Idempotent per channel list: reloads when an inventory event arrives or after a reconnection gap. */
@@ -94,7 +96,7 @@ class InventoryViewModel @Inject constructor(private val api: ApiGateway, realti
     private suspend fun loadDetail(id: String) {
         try { val detail = parseDetail(api.request("/inventario/articulos/$id")); if (mutable.value.selectedId == id) update { it.copy(detail = detail, detailLoading = false) } }
         catch (e: CancellationException) { throw e }
-        catch (e: Exception) { if (mutable.value.selectedId == id) update { it.copy(detailLoading = false, error = e.message ?: "No se pudo cargar el artículo.") } }
+        catch (e: Exception) { if (mutable.value.selectedId == id) update { it.copy(detailLoading = false, error = userMessage(e, "No se pudo cargar el artículo.")) } }
     }
 
     // --- Guided movement flow ---------------------------------------------------------------------------------------------------
@@ -126,7 +128,7 @@ class InventoryViewModel @Inject constructor(private val api: ApiGateway, realti
         viewModelScope.launch {
             try { api.request("/inventario/movimientos", "POST", movementBody(article.id, draft)); update { it.copy(busy = false, movement = null, notice = "Movimiento registrado.") }; load(silent = true) }
             catch (e: CancellationException) { update { it.copy(busy = false) }; throw e }
-            catch (e: Exception) { update { it.copy(busy = false, dialogError = e.message ?: "No se pudo registrar el movimiento.") } }
+            catch (e: Exception) { update { it.copy(busy = false, dialogError = userMessage(e, "No se pudo registrar el movimiento.")) } }
         }
     }
 
@@ -144,16 +146,18 @@ class InventoryViewModel @Inject constructor(private val api: ApiGateway, realti
                 api.request(if (draft.id == null) "/inventario/articulos" else "/inventario/articulos/${draft.id}", if (draft.id == null) "POST" else "PUT", body)
                 update { it.copy(busy = false, article = null, notice = "Artículo guardado.") }; load(silent = true)
             } catch (e: CancellationException) { update { it.copy(busy = false) }; throw e }
-            catch (e: Exception) { update { it.copy(busy = false, dialogError = e.message ?: "No se pudo guardar el artículo.") } }
+            catch (e: Exception) { update { it.copy(busy = false, dialogError = userMessage(e, "No se pudo guardar el artículo.")) } }
         }
     }
+    fun askDelete(id: String) = update { it.copy(deleting = id) }
+    fun cancelDelete() { if (!mutable.value.busy) update { it.copy(deleting = null) } }
     fun deleteArticle(id: String) {
         if (mutable.value.busy) return
         update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
-            try { api.request("/inventario/articulos/$id", "DELETE", JSONObject()); update { it.copy(busy = false, selectedId = null, detail = null, notice = "Artículo eliminado.") }; load(silent = true) }
+            try { api.request("/inventario/articulos/$id", "DELETE", JSONObject()); update { it.copy(busy = false, deleting = null, selectedId = null, detail = null, notice = "Artículo eliminado.") }; load(silent = true) }
             catch (e: CancellationException) { update { it.copy(busy = false) }; throw e }
-            catch (e: Exception) { update { it.copy(busy = false, error = e.message ?: "No se pudo eliminar el artículo.") } }
+            catch (e: Exception) { update { it.copy(busy = false, deleting = null, error = userMessage(e, "No se pudo eliminar el artículo.")) } }
         }
     }
     fun openLot(lot: StockLot?) = update { it.copy(lot = lot?.let { l -> LotDraft(l.id, l.version, l.number, l.expiresAt ?: "", l.active) } ?: LotDraft(), dialogError = null) }
@@ -169,7 +173,7 @@ class InventoryViewModel @Inject constructor(private val api: ApiGateway, realti
                 api.request(if (draft.id == null) "/inventario/articulos/${article.id}/lotes" else "/inventario/lotes/${draft.id}", if (draft.id == null) "POST" else "PUT", body)
                 update { it.copy(busy = false, lot = null, notice = "Lote guardado.") }; load(silent = true)
             } catch (e: CancellationException) { update { it.copy(busy = false) }; throw e }
-            catch (e: Exception) { update { it.copy(busy = false, dialogError = e.message ?: "No se pudo guardar el lote.") } }
+            catch (e: Exception) { update { it.copy(busy = false, dialogError = userMessage(e, "No se pudo guardar el lote.")) } }
         }
     }
     fun clearMessages() = update { it.copy(error = null, notice = null) }

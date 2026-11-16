@@ -24,7 +24,7 @@ import sv.edu.catolica.climesa.domain.RealtimeSignal
 import sv.edu.catolica.climesa.domain.RequestDraft
 import sv.edu.catolica.climesa.domain.RequestField
 
-private object SilentBus : RealtimeRepository {
+private object A1Bus : RealtimeRepository {
     override fun observe(channels: List<String>): Flow<RealtimeSignal> = emptyFlow()
 }
 
@@ -69,7 +69,7 @@ class RoleFlowsA1Test {
         val api = FakeGateway()
         api.responses["/ambulancia/solicitudes/mias"] = JSONArray()
         api.responses["/me/paciente"] = JSONObject().put("fullName", "Paciente Demo").put("address", "Colonia Ficticia 12").put("phone", "7000-0001").put("version", 1)
-        val vm = AmbulanceViewModel(api, SilentBus)
+        val vm = AmbulanceViewModel(api, A1Bus)
         vm.open(AmbulanceMode.REQUEST); runCurrent()
         assertEquals(AmbulancePrefill("Colonia Ficticia 12", "7000-0001"), vm.state.value.requestPrefill)
         vm.open(AmbulanceMode.REQUEST); runCurrent()
@@ -78,7 +78,7 @@ class RoleFlowsA1Test {
         val unlinked = FakeGateway()
         unlinked.responses["/ambulancia/solicitudes/mias"] = JSONArray()
         unlinked.failures["/me/paciente"] = AuthRequestException("Sin expediente", 404, "sin_expediente")
-        val vm2 = AmbulanceViewModel(unlinked, SilentBus)
+        val vm2 = AmbulanceViewModel(unlinked, A1Bus)
         vm2.open(AmbulanceMode.REQUEST); runCurrent()
         assertNull(vm2.state.value.requestPrefill)
         assertNull(vm2.state.value.error)

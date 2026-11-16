@@ -59,13 +59,14 @@ import sv.edu.catolica.climesa.domain.VitalsHistory
 import sv.edu.catolica.climesa.domain.VitalsRules
 
 /** Labels short enough for a half-width field. */
+@androidx.compose.runtime.Composable
 private fun compact(m: VitalMeasure) = when (m) {
-    VitalMeasure.HEART_RATE -> "Frec. cardiaca"
-    VitalMeasure.RESPIRATORY_RATE -> "Frec. respiratoria"
-    VitalMeasure.SYSTOLIC -> "Sistólica"
-    VitalMeasure.DIASTOLIC -> "Diastólica"
-    VitalMeasure.OXYGEN -> "SpO2"
-    VitalMeasure.PAIN -> "Dolor"
+    VitalMeasure.HEART_RATE -> stringResource(R.string.signos_corto_fc)
+    VitalMeasure.RESPIRATORY_RATE -> stringResource(R.string.signos_corto_fr)
+    VitalMeasure.SYSTOLIC -> stringResource(R.string.signos_corto_sistolica)
+    VitalMeasure.DIASTOLIC -> stringResource(R.string.signos_corto_diastolica)
+    VitalMeasure.OXYGEN -> stringResource(R.string.signos_corto_spo2)
+    VitalMeasure.PAIN -> stringResource(R.string.signos_corto_dolor)
     else -> m.label
 }
 

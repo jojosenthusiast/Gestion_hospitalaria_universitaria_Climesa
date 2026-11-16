@@ -184,6 +184,8 @@ private fun NextStepButton(service: AmbulanceService, busy: Boolean, model: Ambu
     val next = ParamedicRules.primaryStep(service)
     var confirming by rememberSaveable(service.id, next) { mutableStateOf(false) }
     var finishing by rememberSaveable(service.id) { mutableStateOf(false) }
+    val sent = remember(service.id) { mutableStateOf(false) }
+    CloseWhenDone(busy, sent) { confirming = false; finishing = false }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         if (next != null) {
             val early = next == "finalizado" && AmbulanceRules.finishNeedsReason(service)
@@ -198,7 +200,7 @@ private fun NextStepButton(service: AmbulanceService, busy: Boolean, model: Ambu
         ConfirmDialog(
             title = ParamedicRules.stepLabel(next), confirmLabel = stringResource(R.string.par_confirmar), busy = busy,
             message = ParamedicRules.confirmMessage(next),
-            onConfirm = { confirming = false; model.advance(service, next, notice = "Registrado: ${ParamedicRules.stepLabel(next)}.") },
+            onConfirm = { sent.value = true; model.advance(service, next, notice = "Registrado: ${ParamedicRules.stepLabel(next)}.") },
             onDismiss = { confirming = false },
         )
     }
@@ -209,7 +211,7 @@ private fun NextStepButton(service: AmbulanceService, busy: Boolean, model: Ambu
         var reason by rememberSaveable { mutableStateOf("") }
         ConfirmDialog(
             title = stringResource(R.string.amb_terminar_sin_traslado), confirmLabel = stringResource(R.string.amb_finalizar), destructive = true, busy = busy,
-            onConfirm = { finishing = false; model.advance(service, "finalizado", finalState, reason) }, onDismiss = { finishing = false },
+            onConfirm = { sent.value = true; model.advance(service, "finalizado", finalState, reason) }, onDismiss = { finishing = false },
             body = {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Choices(choices, finalState) { finalState = it }
@@ -310,7 +312,7 @@ private fun UnidentifiedSheet(state: AmbulanceUiState, model: AmbulanceViewModel
         state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
         Text(stringResource(R.string.par_sexo), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            listOf("femenino" to "Femenino", "masculino" to "Masculino", "indeterminado" to "Indeterminado", "no_registrado" to "No registrado").forEach { (value, label) ->
+            listOf("femenino" to stringResource(R.string.par_sexo_femenino), "masculino" to stringResource(R.string.par_sexo_masculino), "indeterminado" to stringResource(R.string.par_sexo_indeterminado), "no_registrado" to stringResource(R.string.rec_no_registrado)).forEach { (value, label) ->
                 FilterChip(selected = sex == value, onClick = { sex = value }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
             }
         }
