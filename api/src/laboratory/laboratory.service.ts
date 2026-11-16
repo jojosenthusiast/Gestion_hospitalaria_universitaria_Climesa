@@ -480,9 +480,10 @@ export class LaboratoryService {
     const sha256 = createHash('sha256').update(content).digest('hex'), sizeBytes = content.length;
     const lab = contextsOf(actor, 'laboratorio.procesar').includes('x');
     const permission = lab ? 'laboratorio.procesar' : 'laboratorio.revisar';
+    const scope = lab ? `laboratorio.procesar:adjunto:${id}:archivo` : `laboratorio.revisar:adjunto:${id}:archivo`;
     let uploaded: string | undefined;
     try {
-      return await this.commands.run(actor, `${permission}:adjunto:${id}:archivo`, key, { sha256, sizeBytes, mimeType }, async c => {
+      return await this.commands.run(actor, scope, key, { sha256, sizeBytes, mimeType }, async c => {
         const found = (await c.query(`SELECT a.orden_id AS "orderId",(a.ruta_almacenamiento IS NOT NULL) AS stored,o.paciente_id AS "patientId",o.medico_id AS "doctorId",o.version
           FROM laboratorio.adjunto a JOIN laboratorio.orden o ON o.id=a.orden_id WHERE a.id=$1 FOR UPDATE OF a`, [id])).rows[0] as Row | undefined;
         if (!found) throw new NotFoundException('No se encontró el adjunto.');
