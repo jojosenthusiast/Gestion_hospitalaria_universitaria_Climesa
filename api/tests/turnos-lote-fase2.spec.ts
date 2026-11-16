@@ -77,7 +77,7 @@ describe('Turnos · planificación en lote, generador y plantillas (Fase 2, fluj
   if(Date.parse(end)<=Date.parse(start))end=new Date(Date.parse(end)+24*HOUR).toISOString();
   return {staffId,areaId:emergencyId,start,end,type:'diurno',...over};
  };
- const shifts=async(staffId:string)=>(await fixture.pg.query<{estado:string;inicio:string}>("SELECT estado,lower(periodo)::text AS inicio FROM personal.turno WHERE persona_id=$1 ORDER BY lower(periodo)",[staffId])).rows;
+ const shifts=async(staffId:string)=>(await fixture.pg.query<{estado:string;inicio:string}>("SELECT estado,to_char(lower(periodo) AT TIME ZONE 'America/El_Salvador','YYYY-MM-DD HH24:MI:SS') AS inicio FROM personal.turno WHERE persona_id=$1 ORDER BY lower(periodo)",[staffId])).rows;
  beforeAll(async()=>{
   fixture=await createDatabase();
   const auth={authClient:{auth:{getUser:async(token:string)=>{
