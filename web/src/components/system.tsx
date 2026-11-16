@@ -48,8 +48,12 @@ export const AREAS: { code: AreaCode; name: string; token: string }[] = [
 const AREA_ALIASES: Record<string, AreaCode> = { ESP: 'REC', VIP: 'HOS', BOD: 'GEN' };
 /** Área de un código de espacio o de área (`P1-EMG` → `EMG`); lo desconocido cae en el neutro. */
 export function areaOf(code: string | null | undefined): AreaCode {
-  const key = (code ?? '').toUpperCase().split('-').map(p => p.trim()).find(p => AREAS.some(a => a.code === p) || p in AREA_ALIASES) ?? '';
-  return (AREA_ALIASES[key] ?? AREAS.find(a => a.code === key)?.code ?? 'GEN') as AreaCode;
+  const parts = (code ?? '').toUpperCase().split('-').map(p => p.trim());
+  // A real area code wins over an alias (02-sistema §1): `BOD-LAB` is LAB, `BOD-CEN` falls back to the BOD alias (GEN).
+  const area = parts.find(p => AREAS.some(a => a.code === p));
+  if (area) return area as AreaCode;
+  const alias = parts.find(p => p in AREA_ALIASES);
+  return (alias ? AREA_ALIASES[alias] : 'GEN') as AreaCode;
 }
 export function AreaTag({ code, showName = false }: { code: string; showName?: boolean }) {
   const area = AREAS.find(a => a.code === areaOf(code))!;

@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AreaTag, CompactHeader, PriorityBadge, StatusBadge, StatusLegend, AREAS, STATUS_FAMILIES, Skeleton } from '../components/system';
+import { areaOf, AreaTag, CompactHeader, PriorityBadge, StatusBadge, StatusLegend, AREAS, STATUS_FAMILIES, Skeleton } from '../components/system';
 
 // Fase 2, S1 y S7: encabezado compacto y color con significado (nunca solo color).
 afterEach(cleanup);
@@ -75,5 +75,15 @@ describe('Skeleton (S3)', () => {
     expect(within(status).getByText('Cargando camas')).toBeTruthy();
     expect(status.querySelectorAll('.skeleton-line').length).toBe(4);
     expect(status.querySelector('.spinner, .status-spinner')).toBeNull();
+  });
+});
+
+describe('área de un código de espacio (02-sistema §1)', () => {
+  it('un código de área real gana al alias: BOD-LAB es LAB, BOD-CEN es GEN', () => {
+    expect(areaOf('BOD-LAB')).toBe('LAB');
+    expect(areaOf('BOD-CEN')).toBe('GEN');
+    expect(areaOf('P3-VIP')).toBe('HOS');
+    expect(areaOf('P1-EMG')).toBe('EMG');
+    expect(areaOf(null)).toBe('GEN');
   });
 });
