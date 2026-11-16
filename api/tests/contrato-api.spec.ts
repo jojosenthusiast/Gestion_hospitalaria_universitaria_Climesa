@@ -69,7 +69,7 @@ describe('contrato OpenAPI', () => {
 
   // CON-04: endpoints.csv matches the real routes; a catalog row without a route is an explicit pending item.
   // MA-REQ-02 (D-091): push devices, `/recursos/*` and `/me/fila` were retired from the catalog. What stays pending has an
-  // open finding of its own: the clinical addendum (MA-CIT-04, D-06) and the laboratory catalog and order detail (MA-LAB-06).
+  // open finding of its own: the clinical addendum (MA-CIT-04, D-06).
   it('keeps endpoints.csv aligned with the contract', () => {
     const pending = [
       'POST /api/v1/consultas/{id}/addendum',
