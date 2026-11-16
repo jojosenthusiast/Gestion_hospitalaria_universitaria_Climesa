@@ -6,6 +6,7 @@ const src=resolve(__dirname,'../src');
 const roleLiteral=/(['"])(ADM|JOP|REC|AST|ENF|MED|LAB|PAR|DPD|PAC)\1/;
 /** archivo (relativo a src) -> por qué se permite. Cada entrada es una lista de códigos del catálogo, no una decisión de autorización. */
 const allowed:Record<string,string>={
+ 'attention/queue-areas.ts':'Códigos de ÁREA de la fila (02-sistema §1): LAB y REC coinciden en letras con roles, pero son áreas y no deciden permisos.',
  'users/invitation.dto.ts':'Enumeración de códigos de rol válidos (roles.csv) para validar el cuerpo y publicar el enum en OpenAPI; qué rol exige qué se toma de la base.',
 };
 const files=(dir:string):string[]=>readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?files(resolve(dir,e.name)):e.name.endsWith('.ts')?[resolve(dir,e.name)]:[]);

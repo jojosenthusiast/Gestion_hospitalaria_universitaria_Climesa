@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/api/v1/fila/{id}/prioridad",
+  "body": {
+    "version": 2,
+    "priority": "emergencia"
+  }
+}

@@ -162,7 +162,10 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/citas/reprogramaciones/{id}/aceptar,citas.agendar OR consulta.iniciar,REC o el médico de la cita,R,4,Aceptar solicitud de reprogramación
 105,POST,/api/v1/citas/reprogramaciones/{id}/rechazar,citas.agendar OR consulta.iniciar,"REC o el médico de la cita, motivo",R,4,Rechazar solicitud de reprogramación
 105,POST,/api/v1/citas/{id}/no-asistio,citas.agendar,Hora alcanzada y sin consulta,R,4,Marcar que el paciente no asistió
-105,POST,/api/v1/fila/llamar-siguiente,fila.llamar,Primer número en espera del servicio,R,4,Llamar el siguiente número
+105,POST,/api/v1/fila/llamar-siguiente,fila.llamar,Número que propone la regla RN-FILA-SIGUIENTE,R,4,Llamar el siguiente número
+105,GET,/api/v1/fila/siguiente,fila.ver,"Solo con fila completa; emergencias, urgentes, citas en ventana y llegada",R,4,Quién pasa después en un servicio (RN-FILA-SIGUIENTE)
+105,POST,/api/v1/fila/{id}/deshacer-llamado,fila.llamar,Solo un número llamado,R,4,Deshacer el último llamado
+105,POST,/api/v1/fila/{id}/prioridad,fila.gestionar,Solo antes de la atención,R,4,Cambiar la prioridad del número
 106,GET,/api/v1/consultas/sin-firmar,consulta.iniciar,Solo propias,R,4,Consultas abiertas de cualquier día para reanudar
 105,GET,/api/v1/citas/categorias,citas.solicitar OR citas.agendar,,R,5,"Catálogo de motivos de cita (categoría, ícono, palabras de búsqueda y especialidades sugeridas)"
 105,GET,/api/v1/citas/solicitudes-categoria,citas.ver,"REC todas las pendientes y las resueltas en 30 días; PAC solo propias",R,5,Bandeja de solicitudes de cita por categoría con allowedActions

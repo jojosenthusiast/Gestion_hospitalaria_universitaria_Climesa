@@ -2,9 +2,9 @@ import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query, Req,
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { QueueCallNextDto, QueueIssueDto, QueueTransitionDto } from './queue.dto';
+import { QueueCallNextDto, QueueIssueDto, QueuePriorityDto, QueueTransitionDto, QueueUndoDto } from './queue.dto';
 import { QueueService } from './queue.service';
-import { QueueCallNextResponse, QueueCallResponse, QueueIssuedResponse, QueueTicketResponse, QueueTransitionResponse } from './attention.responses';
+import { QueueCallNextResponse, QueueCallResponse, QueueIssuedResponse, QueueNextProposalResponse, QueuePriorityResponse, QueueTicketResponse, QueueTransitionResponse } from './attention.responses';
 
 @ApiTags('queue') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('fila')
 export class QueueController {
@@ -17,8 +17,18 @@ export class QueueController {
   @Post() @RequirePermission('fila.emitir') @ApiOperation({ summary: 'Emitir un número para el paciente actual o indicado' }) @ApiCreatedResponse({ type: QueueIssuedResponse })
   issue(@Req() r: ActorRequest, @Body() dto: QueueIssueDto, @Headers('idempotency-key') key?: string) { return this.queue.issue(r.actor, dto, key); }
 
-  @Post('llamar-siguiente') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Llamar el siguiente número en espera del servicio (orden de llegada)' }) @ApiCreatedResponse({ type: QueueCallNextResponse })
+  @Post('llamar-siguiente') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Llamar al siguiente según RN-FILA-SIGUIENTE (emergencias, urgentes, citas en su ventana y luego orden de llegada)' }) @ApiCreatedResponse({ type: QueueCallNextResponse })
   callNext(@Req() r: ActorRequest, @Body() dto: QueueCallNextDto, @Headers('idempotency-key') key?: string) { return this.queue.callNext(r.actor, dto, key); }
+
+  @Get('siguiente') @RequirePermission('fila.ver') @ApiOperation({ summary: 'Quién pasa después en un servicio (regla RN-FILA-SIGUIENTE)' })
+  @ApiQuery({ name: 'service', type: String, required: true }) @ApiOkResponse({ type: QueueNextProposalResponse })
+  next(@Req() r: ActorRequest, @Query('service') service?: string) { return this.queue.proposal(r.actor, service); }
+
+  @Post(':id/deshacer-llamado') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Deshacer el último llamado de un número' }) @ApiCreatedResponse({ type: QueueCallResponse })
+  undoCall(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: QueueUndoDto, @Headers('idempotency-key') key?: string) { return this.queue.undoCall(r.actor, id, dto, key); }
+
+  @Post(':id/prioridad') @RequirePermission('fila.gestionar') @ApiOperation({ summary: 'Cambiar la prioridad de un número antes de la atención' }) @ApiCreatedResponse({ type: QueuePriorityResponse })
+  priority(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: QueuePriorityDto, @Headers('idempotency-key') key?: string) { return this.queue.setPriority(r.actor, id, dto, key); }
 
   @Post(':id/llamar') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Llamar un número de fila' }) @ApiCreatedResponse({ type: QueueCallResponse })
   call(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: QueueTransitionDto, @Headers('idempotency-key') key?: string) { return this.queue.call(r.actor, id, dto, key); }

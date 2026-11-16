@@ -1079,8 +1079,59 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Llamar el siguiente número en espera del servicio (orden de llegada) */
+        /** Llamar al siguiente según RN-FILA-SIGUIENTE (emergencias, urgentes, citas en su ventana y luego orden de llegada) */
         post: operations["QueueController_callNext"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fila/siguiente": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quién pasa después en un servicio (regla RN-FILA-SIGUIENTE) */
+        get: operations["QueueController_next"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fila/{id}/deshacer-llamado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deshacer el último llamado de un número */
+        post: operations["QueueController_undoCall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fila/{id}/prioridad": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cambiar la prioridad de un número antes de la atención */
+        post: operations["QueueController_priority"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3820,6 +3871,37 @@ export interface components {
         ConsultationSignDto: {
             version: number;
         };
+        /** @enum {string} */
+        ServicioFila: "consulta_general" | "emergencia" | "laboratorio" | "admisiones";
+        /** @enum {string} */
+        AreaFila: "CON" | "EMG" | "LAB" | "REC" | "GEN";
+        /** @enum {string} */
+        PrioridadFila: "emergencia" | "urgente" | "rutina";
+        /** @enum {string} */
+        MotivoSiguiente: "emergencia" | "urgente" | "cita" | "llegada";
+        QueueProposalResponse: {
+            /** Format: uuid */
+            id: string;
+            numero: number;
+            area: components["schemas"]["AreaFila"];
+            /** Format: uuid */
+            patientId: string | null;
+            patientName: string | null;
+            priority: components["schemas"]["PrioridadFila"];
+            /** Format: date-time */
+            appointmentAt: string | null;
+            version: number;
+            reason: components["schemas"]["MotivoSiguiente"];
+            reasonText: string;
+        };
+        QueueNextProposalResponse: {
+            service: components["schemas"]["ServicioFila"];
+            area: components["schemas"]["AreaFila"];
+            /** @description Regla documentada RN-FILA-SIGUIENTE */
+            rule: string;
+            /** @description null cuando nadie espera */
+            proposal: components["schemas"]["QueueProposalResponse"] | null;
+        };
         ConsultationSignResponse: {
             /** Format: uuid */
             id: string;
@@ -3827,11 +3909,16 @@ export interface components {
             state: components["schemas"]["EstadoConsulta"];
             /** Format: date-time */
             signedAt: string;
+            /** @description Quién pasa después en el área de la consulta; null sin permiso de ver la fila completa */
+            nextProposal: components["schemas"]["QueueNextProposalResponse"] | null;
         };
         /** @enum {string} */
-        ServicioFila: "consulta_general" | "emergencia" | "laboratorio" | "admisiones";
-        /** @enum {string} */
         EstadoFila: "en_espera" | "llamado" | "en_atencion" | "atendido" | "no_se_presento" | "cerrado";
+        /**
+         * @description Acciones reversibles que el servidor acepta ahora
+         * @enum {string}
+         */
+        DeshacerFila: "deshacer_llamado";
         /**
          * @description Acciones que el servidor acepta ahora para quien lee
          * @enum {string}
@@ -3857,10 +3944,24 @@ export interface components {
             state: components["schemas"]["EstadoFila"];
             /** Format: uuid */
             officeId: string | null;
+            /** @description Código del consultorio asignado (C-101) */
+            officeCode: string | null;
             llamados: number;
             version: number;
             /** Format: date-time */
             issuedAt: string;
+            /** @description Código del área del servicio; el número cuenta desde 1 por área y día */
+            area: components["schemas"]["AreaFila"];
+            priority: components["schemas"]["PrioridadFila"];
+            /**
+             * Format: date-time
+             * @description Hora de la cita de hoy del paciente (solo consulta general); null si llegó sin cita
+             */
+            appointmentAt: string | null;
+            /** @description Llegó sin cita */
+            walkIn: boolean;
+            /** @description Acciones reversibles que el servidor acepta ahora */
+            undoActions: components["schemas"]["DeshacerFila"][];
             /**
              * Format: uuid
              * @description Consulta iniciada desde este número por quien consulta la fila; null si no hay o es de otro profesional
@@ -3881,6 +3982,11 @@ export interface components {
             service: "consulta_general" | "emergencia" | "laboratorio" | "admisiones";
             /** Format: uuid */
             patientId?: string;
+            /**
+             * @description Prioridad clínica; por omisión rutina
+             * @enum {string}
+             */
+            priority?: "emergencia" | "urgente" | "rutina";
         };
         QueueIssuedResponse: {
             /** Format: uuid */
@@ -3895,6 +4001,8 @@ export interface components {
             state: components["schemas"]["EstadoFila"];
             version: number;
             serviceName: string;
+            area: components["schemas"]["AreaFila"];
+            priority: components["schemas"]["PrioridadFila"];
             /** Format: uuid */
             patientId: string;
         };
@@ -3912,12 +4020,13 @@ export interface components {
             llamados: number;
             numero: number;
             patientName: string | null;
+            area: components["schemas"]["AreaFila"];
+            /** @description Por qué la regla eligió este número */
+            reason: components["schemas"]["MotivoSiguiente"];
+            reasonText: string;
         };
-        QueueTransitionDto: {
+        QueueUndoDto: {
             version: number;
-            /** Format: uuid */
-            officeId?: string;
-            reason?: string;
         };
         QueueCallResponse: {
             /** Format: uuid */
@@ -3925,6 +4034,25 @@ export interface components {
             version: number;
             state: components["schemas"]["EstadoFila"];
             llamados: number;
+        };
+        QueuePriorityDto: {
+            version: number;
+            /** @enum {string} */
+            priority: "emergencia" | "urgente" | "rutina";
+            reason?: string;
+        };
+        QueuePriorityResponse: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            state: components["schemas"]["EstadoFila"];
+            priority: components["schemas"]["PrioridadFila"];
+        };
+        QueueTransitionDto: {
+            version: number;
+            /** Format: uuid */
+            officeId?: string;
+            reason?: string;
         };
         QueueTransitionResponse: {
             /** Format: uuid */
@@ -11103,6 +11231,227 @@ export interface operations {
             };
             /** @description Sin permiso (`sin_permiso`) o regla de acceso */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    QueueController_next: {
+        parameters: {
+            query: {
+                service: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueNextProposalResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    QueueController_undoCall: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueUndoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueCallResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    QueueController_priority: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueuePriorityDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueuePriorityResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

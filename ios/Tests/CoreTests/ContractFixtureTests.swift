@@ -61,6 +61,11 @@ final class ContractFixtureTests: XCTestCase {
         try assertMatches(body, fixture: "me-paciente")
     }
 
+    func testPrioridadYDeshacerLlamadoDeLaFila() throws {
+        try assertMatches(QueuePriorityBody(version: 2, priority: "emergencia"), fixture: "queue-priority")
+        try assertMatches(VersionBody(version: 3), fixture: "queue-undo-call")
+    }
+
     private func assertMatches<Body: Encodable>(_ body: Body, fixture name: String, file: StaticString = #filePath, line: UInt = #line) throws {
         let url = try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures/contract"), "Falta Fixtures/contract/\(name).json", file: file, line: line)
         let fixture = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? NSDictionary

@@ -201,7 +201,16 @@ public struct RescheduleDecisionBody: Encodable, Sendable, Equatable {
 /// `QueueCallNextDto` de `POST /fila/llamar-siguiente` (FILA-02).
 public struct QueueCallNextBody: Encodable, Sendable, Equatable {
     public let service: String
-    public init(service: String) { self.service = service }
+    /// Consultorio the called number goes to; omitted when not chosen.
+    public let officeId: String?
+    public init(service: String, officeId: String? = nil) { self.service = service; self.officeId = officeId }
+}
+
+/// `QueuePriorityDto` de `POST /fila/{id}/prioridad` (Fase 2, S9).
+public struct QueuePriorityBody: Encodable, Sendable, Equatable {
+    public let version: Int
+    public let priority: String
+    public init(version: Int, priority: String) { self.version = version; self.priority = priority }
 }
 
 /// `CategoryRequestCreateDto` de `POST /citas/solicitudes-categoria` (Fase 2, flujo A): motivo sin médico.

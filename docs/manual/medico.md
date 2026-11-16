@@ -19,6 +19,9 @@ Inicio, Mi día, Resultados por revisar, Mis hospitalizados, Expediente, Signos 
 - Si dejaste una consulta sin firmar, aparece **Reanudar**.
 - En la consulta: **Registrar signos**, **Registrar diagnóstico** (CIE-10; solo un diagnóstico principal), **Emitir receta** y **Ordenar exámenes**.
 - **Firmar** cierra la consulta: la cita pasa a `Atendida` y la consulta ya no se edita. **Salir sin guardar** descarta los cambios no guardados.
+- La consulta sigue cuatro pasos: **1. Consulta** (motivo y examen), **2. Procedimientos y plan**, **3. Receta y exámenes** y **4. Cerrar consulta** (firmar).
+- Al firmar aparece **Quién pasa después**: el siguiente número de tu área según la regla de la fila (*emergencias primero; luego urgentes; luego citas dentro de su ventana de 15 min antes a 15 min después; luego el resto en orden de llegada*), con el motivo. **Llamar a CON 4** lo llama; **Ahora no** lo cierra. Recepción ve la misma propuesta.
+- En la fila: cada número muestra el código del área junto al número (**CON 7**), la prioridad y si tiene cita (**Cita 10:30**) o no (**Sin cita**). El menú **Mover o cambiar prioridad** ofrece solo lo que el servidor acepta, y después de llamar puedes **Deshacer** el llamado.
 
 ### Resultados por revisar
 
@@ -62,8 +65,8 @@ Mi día, Pacientes, Resultados, Turnos y **Más** (Agenda, Mis hospitalizados, A
 
 | Pantalla | Qué haces |
 |---|---|
-| Mi día | **Llamar siguiente**, **Llamar de nuevo**, **Atender**, **Retomar consulta** o **Reanudar**. En "Solicitudes de reprogramación": **Aceptar nuevo horario** o **Rechazar** |
-| Consulta | **Iniciar consulta**, **Guardar borrador**, **Agregar diagnóstico**, **Emitir receta**, **Ordenar exámenes**, **Firmar consulta**. Al firmar puedes **Indicar hospitalización** o elegir **Ahora no** |
+| Mi día | **Quién pasa después** (número propuesto y su motivo), **Llamar siguiente**, **Deshacer** el llamado, **Mover o cambiar prioridad**, **Llamar de nuevo**, **Atender**, **Retomar consulta** o **Reanudar**. En "Solicitudes de reprogramación": **Aceptar nuevo horario** o **Rechazar** |
+| Consulta | **Iniciar consulta**, **Guardar borrador**, **Agregar diagnóstico**, **Emitir receta**, **Ordenar exámenes**, **Firmar consulta**, en cuatro pasos (consulta, procedimientos y plan, receta y exámenes, cerrar). Al firmar puedes **Indicar hospitalización** o elegir **Ahora no**, y ves **Quién pasa después** con **Llamar a CON 4** |
 | Pacientes | Expediente e historial de tus pacientes |
 | Resultados | **Marcar revisado**, **Cancelar orden**. Un aviso indica cuántos resultados con valor crítico esperan tu revisión |
 | Mis hospitalizados | **Firmar alta**, **Revocar alta** |
