@@ -18,6 +18,7 @@ internal enum class Area(val code: String, val label: String) {
     companion object {
         /** Building spaces that share another area's tone. */
         private val aliases = mapOf("ESP" to REC, "VIP" to HOS, "BOD" to GEN)
+        private val numberedPrefixes = mapOf("C" to CON, "E" to EMG, "HAB" to HOS)
 
         /**
          * Area of a space or area code (`P1-EMG` → [EMG], `P3-VIP` → [HOS]); anything unknown is [GEN]. A real area code
@@ -26,8 +27,10 @@ internal enum class Area(val code: String, val label: String) {
         fun of(code: String?): Area {
             val parts = (code ?: "").uppercase().split('-').map { it.trim() }
             parts.firstNotNullOfOrNull { part -> entries.firstOrNull { it.code == part } }?.let { return it }
-            // Consulting rooms are coded `C-101`: 02-sistema section 1 lists them under CON.
-            if (parts.firstOrNull() == "C" && parts.size > 1) return CON
+            // Numbered building codes take the area of their prefix: consulting rooms `C-101` (CON), emergency cubicles
+            // `E-01` (EMG) and rooms and beds `HAB-201`, `HAB-201-A` (HOS). Only a number after the prefix counts.
+            val numbered = numberedPrefixes[parts.firstOrNull()]
+            if (numbered != null && parts.getOrNull(1)?.let { it.isNotEmpty() && it.all(Char::isDigit) } == true) return numbered
             return parts.firstNotNullOfOrNull { aliases[it] } ?: GEN
         }
     }

@@ -47,13 +47,16 @@ export const AREAS: { code: AreaCode; name: string; token: string }[] = [
 /** Códigos de espacio del edificio (`P1-EMG`, `P3-VIP`, ...) que comparten el tono de otra área. */
 const AREA_ALIASES: Record<string, AreaCode> = { ESP: 'REC', VIP: 'HOS', BOD: 'GEN' };
 /** Área de un código de espacio o de área (`P1-EMG` → `EMG`); lo desconocido cae en el neutro. */
+const NUMBERED_PREFIXES: Record<string, AreaCode> = { C: 'CON', E: 'EMG', HAB: 'HOS' };
 export function areaOf(code: string | null | undefined): AreaCode {
   const parts = (code ?? '').toUpperCase().split('-').map(p => p.trim());
   // A real area code wins over an alias (02-sistema §1): `BOD-LAB` is LAB, `BOD-CEN` falls back to the BOD alias (GEN).
   const area = parts.find(p => AREAS.some(a => a.code === p));
   if (area) return area as AreaCode;
-  // Consulting rooms are coded `C-101`: 02-sistema section 1 lists them under CON.
-  if (parts[0] === 'C' && parts.length > 1) return 'CON';
+  // Numbered building codes take the area of their prefix: consulting rooms `C-101` (CON), emergency cubicles `E-01`
+  // (EMG) and rooms and beds `HAB-201`, `HAB-201-A` (HOS). Only a number after the prefix counts.
+  const numbered = NUMBERED_PREFIXES[parts[0]];
+  if (numbered && /^\d+$/.test(parts[1] ?? '')) return numbered;
   const alias = parts.find(p => p in AREA_ALIASES);
   return (alias ? AREA_ALIASES[alias] : 'GEN') as AreaCode;
 }

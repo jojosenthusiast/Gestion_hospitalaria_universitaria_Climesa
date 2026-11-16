@@ -96,14 +96,16 @@ public enum AreaCode: String, CaseIterable, Sendable {
 
     /// Códigos de espacio del edificio que comparten el tono de otra área.
     private static let aliases: [String: AreaCode] = ["ESP": .rec, "VIP": .hos, "BOD": .gen]
+    private static let numberedPrefixes: [String: AreaCode] = ["C": .con, "E": .emg, "HAB": .hos]
 
     /// Área de un código de espacio o de área (`P1-EMG` → EMG, `P3-VIP` → HOS); lo desconocido cae en el neutro.
     public static func of(_ code: String?) -> AreaCode {
         let parts = (code ?? "").uppercased().split(separator: "-").map { $0.trimmingCharacters(in: .whitespaces) }
         // A real area code wins over an alias: `BOD-LAB` is LAB, `BOD-CEN` falls back to the BOD alias (GEN).
         if let area = parts.lazy.compactMap({ AreaCode(rawValue: $0) }).first { return area }
-        // Consulting rooms are coded `C-101`: 02-sistema section 1 lists them under CON.
-        if parts.first == "C", parts.count > 1, let room = parts.dropFirst().first, !room.isEmpty, room.allSatisfy(\.isNumber) { return .con }
+        // Numbered building codes take the area of their prefix: consulting rooms `C-101` (CON), emergency cubicles `E-01`
+        // (EMG) and rooms and beds `HAB-201`, `HAB-201-A` (HOS). Only a number after the prefix counts.
+        if let first = parts.first, let numbered = numberedPrefixes[first], parts.count > 1, !parts[1].isEmpty, parts[1].allSatisfy(\.isNumber) { return numbered }
         return parts.lazy.compactMap({ aliases[$0] }).first ?? .gen
     }
 }
