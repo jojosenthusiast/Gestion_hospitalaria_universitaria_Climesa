@@ -14512,6 +14512,196 @@
         "x-permiso": "ambulancia.solicitar"
       }
     },
+    "/api/v1/ambulancia/solicitudes/mias": {
+      "get": {
+        "operationId": "AmbulanceController_ownRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OwnAmbulanceRequestResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mis solicitudes de ambulancia (últimos 7 días) con su estado y el avance del servicio",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.solicitar"
+      }
+    },
+    "/api/v1/ambulancia/solicitudes/{id}/cancelar": {
+      "post": {
+        "operationId": "AmbulanceController_cancelRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmbulanceRequestStateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar mi solicitud mientras está por confirmar",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.solicitar"
+      }
+    },
     "/api/v1/ambulancia/solicitudes/{id}/descartar": {
       "post": {
         "operationId": "AmbulanceController_discard",
@@ -15168,6 +15358,125 @@
           }
         ],
         "summary": "Ver el reporte prehospital; el contenido clínico solo con relación de atención",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.recibir_prehospital"
+      }
+    },
+    "/api/v1/ambulancia/servicios/{id}/recepcion": {
+      "post": {
+        "operationId": "AmbulanceController_handover",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoverDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoverResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marcar recibido al paciente en el hospital (personal clínico, después de la llegada; una sola vez)",
         "tags": [
           "ambulancia"
         ],
@@ -25095,6 +25404,18 @@
         ],
         "description": "Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)"
       },
+      "EstadoFinalServicio": {
+        "type": "string",
+        "enum": [
+          "completado",
+          "cancelado",
+          "sin_traslado",
+          "rechaza_traslado",
+          "fallecido",
+          "desviado"
+        ],
+        "description": "Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03)"
+      },
       "ActiveServiceResponse": {
         "type": "object",
         "properties": {
@@ -25174,6 +25495,13 @@
             "items": {
               "$ref": "#/components/schemas/AccionServicioAmbulancia"
             }
+          },
+          "finalStates": {
+            "type": "array",
+            "description": "Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03)",
+            "items": {
+              "$ref": "#/components/schemas/EstadoFinalServicio"
+            }
           }
         },
         "required": [
@@ -25191,7 +25519,8 @@
           "milestones",
           "nextMilestones",
           "lastLocation",
-          "allowedActions"
+          "allowedActions",
+          "finalStates"
         ]
       },
       "MotivoBloqueoDespacho": {
@@ -25512,7 +25841,116 @@
           "notice"
         ]
       },
-      "DiscardRequestDto": {
+      "OwnRequestServiceResponse": {
+        "type": "object",
+        "properties": {
+          "dispatchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "milestones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MilestoneEntryResponse"
+            }
+          },
+          "finalState": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoFinalServicio"
+              }
+            ]
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "dispatchedAt",
+          "milestones",
+          "finalState",
+          "finishedAt"
+        ]
+      },
+      "AccionSolicitudAmbulancia": {
+        "type": "string",
+        "enum": [
+          "cancelar"
+        ],
+        "description": "cancelar: quien pidió puede cancelarla (solo por confirmar)"
+      },
+      "OwnAmbulanceRequestResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoSolicitudAmbulancia"
+              }
+            ]
+          },
+          "channel": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CanalSolicitudAmbulancia"
+              }
+            ]
+          },
+          "address": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "service": {
+            "nullable": true,
+            "description": "Servicio despachado para la solicitud; null si aún no se confirma",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OwnRequestServiceResponse"
+              }
+            ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "cancelar: quien pidió puede cancelarla (solo por confirmar)",
+            "items": {
+              "$ref": "#/components/schemas/AccionSolicitudAmbulancia"
+            }
+          },
+          "notice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "channel",
+          "address",
+          "reason",
+          "createdAt",
+          "version",
+          "service",
+          "allowedActions",
+          "notice"
+        ]
+      },
+      "CancelRequestDto": {
         "type": "object",
         "properties": {
           "version": {
@@ -25521,13 +25959,12 @@
           },
           "reason": {
             "type": "string",
-            "minLength": 5,
-            "maxLength": 500
+            "minLength": 0,
+            "maxLength": 300
           }
         },
         "required": [
-          "version",
-          "reason"
+          "version"
         ]
       },
       "AmbulanceRequestStateResponse": {
@@ -25552,6 +25989,24 @@
           "id",
           "state",
           "version"
+        ]
+      },
+      "DiscardRequestDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "version",
+          "reason"
         ]
       },
       "DispatchDto": {
@@ -25680,7 +26135,9 @@
               "completado",
               "cancelado",
               "sin_traslado",
-              "rechaza_traslado"
+              "rechaza_traslado",
+              "fallecido",
+              "desviado"
             ]
           },
           "reason": {
@@ -25691,15 +26148,6 @@
         },
         "required": [
           "type"
-        ]
-      },
-      "EstadoFinalServicio": {
-        "type": "string",
-        "enum": [
-          "completado",
-          "cancelado",
-          "sin_traslado",
-          "rechaza_traslado"
         ]
       },
       "MilestoneResponse": {
@@ -25929,6 +26377,31 @@
           "receivedAt"
         ]
       },
+      "HandoverInfoResponse": {
+        "type": "object",
+        "properties": {
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receivedByName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre de quien recibió (personal clínico)"
+          }
+        },
+        "required": [
+          "receivedAt",
+          "receivedByName"
+        ]
+      },
+      "AccionPrehospital": {
+        "type": "string",
+        "enum": [
+          "recibir"
+        ],
+        "description": "recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada)"
+      },
       "PrehospitalViewResponse": {
         "type": "object",
         "properties": {
@@ -25936,8 +26409,16 @@
             "type": "string",
             "format": "uuid"
           },
+          "version": {
+            "type": "integer",
+            "description": "Versión del servicio; la entrega al hospital la envía"
+          },
           "active": {
             "type": "boolean"
+          },
+          "arrived": {
+            "type": "boolean",
+            "description": "La ambulancia registró la llegada al hospital"
           },
           "priority": {
             "allOf": [
@@ -25957,15 +26438,74 @@
             "items": {
               "$ref": "#/components/schemas/PrehospitalReportResponse"
             }
+          },
+          "handover": {
+            "nullable": true,
+            "description": "Entrega del paciente al hospital; null si aún no se registra",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HandoverInfoResponse"
+              }
+            ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada)",
+            "items": {
+              "$ref": "#/components/schemas/AccionPrehospital"
+            }
           }
         },
         "required": [
           "serviceId",
+          "version",
           "active",
+          "arrived",
           "priority",
           "patientLinked",
           "clinical",
-          "reports"
+          "reports",
+          "handover",
+          "allowedActions"
+        ]
+      },
+      "HandoverDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "HandoverResponse": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receivedByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "serviceId",
+          "version",
+          "receivedAt",
+          "receivedByName"
         ]
       },
       "LocationDto": {
@@ -26207,7 +26747,9 @@
           "sin_servicio_activo",
           "solicitud_resuelta",
           "unidad_en_mantenimiento",
-          "unidad_en_servicio"
+          "unidad_en_servicio",
+          "sin_llegada_hospital",
+          "entrega_registrada"
         ],
         "description": "Código estable del error (snake_case)."
       },

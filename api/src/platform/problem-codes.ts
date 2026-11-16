@@ -29,5 +29,7 @@ export const PROBLEM_CODES = [
   // Ambulance.
   'ambulancia_ya_despachada', 'estado_final_invalido', 'hito_fuera_de_orden', 'servicio_cerrado', 'servicio_finalizado', 'sin_paramedico_de_turno',
   'sin_motorista_de_turno', 'sin_tripulacion_de_turno', 'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio',
+  // Ambulance phase 1 (20261121002000): hospital handover (MA-AMB-04).
+  'sin_llegada_hospital', 'entrega_registrada',
 ] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];

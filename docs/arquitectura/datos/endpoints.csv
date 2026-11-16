@@ -99,11 +99,14 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 109,GET,/api/v1/ambulancia,ambulancia.ver_estado,,R,3,Estado actual y servicio activo
 109,POST,/api/v1/ambulancia/solicitudes,ambulancia.solicitar,PAC: cuenta verificada; queda por confirmar,R,4,Solicitar ambulancia
 109,POST,/api/v1/ambulancia/solicitudes/{id}/descartar,ambulancia.despachar,Motivo,R,4,Descartar solicitud
+109,GET,/api/v1/ambulancia/solicitudes/mias,ambulancia.solicitar,Solo las propias (cuenta o expediente); últimos 7 días; MA-AMB-05,R,6,Mis solicitudes de ambulancia con su estado
+109,POST,/api/v1/ambulancia/solicitudes/{id}/cancelar,ambulancia.solicitar,Solo quien pidió y solo por confirmar; motivo opcional; MA-AMB-05,R,6,Cancelar mi solicitud de ambulancia
 109,POST,/api/v1/ambulancia/servicios,ambulancia.despachar,Solo si Disponible; bloqueo de fila,R,4,Despachar: pasa a En Servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/hitos,ambulancia.operar,Orden de hitos,R,4,"Salida, en escena, trasladando, en hospital, finalizado"
 109,POST,/api/v1/ambulancia/servicios/{id}/cerrar,ambulancia.mantenimiento,Solo servicio activo; motivo; estado final cancelado; unidad a Disponible,R,6,Cierre administrativo del servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.reportar_prehospital,Funciona sin conexión con reintento,E,4,Reporte prehospital y hora estimada
 109,GET,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.recibir_prehospital,,E,4,Ver reporte prehospital
+109,POST,/api/v1/ambulancia/servicios/{id}/recepcion,ambulancia.recibir_prehospital,Personal clínico (expediente.ver); después de en_hospital; una sola vez; MA-AMB-04,E,6,Marcar recibido al paciente en el hospital
 109,POST,/api/v1/ambulancia/ubicacion,ambulancia.operar,Solo con servicio activo,E,5,Ubicación en vivo
 109,POST,/api/v1/ambulancia/mantenimiento,ambulancia.mantenimiento,Solo sin servicio activo,R,4,Entrar o salir de mantenimiento
 109,GET,/api/v1/ambulancia/bitacora,ambulancia.ver_bitacora,Datos del paciente ocultos sin relación,R,4,Bitácora filtrable (D-056)

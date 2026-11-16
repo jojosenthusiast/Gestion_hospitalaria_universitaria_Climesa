@@ -12,12 +12,13 @@ export type AmbulanceStatus={
  dispatchBlock?:DispatchBlock|null;
  pendingRequests?:AmbulanceRequest[];
 };
-export type PrehospitalView={serviceId:string;active:boolean;priority:string;patientLinked:boolean;clinical:boolean;reports:{id:string;priority:string;estimatedArrival?:string|null;capturedAt:string;receivedAt:string;reason?:string;vitalSigns?:Record<string,number>}[]};
+/** MA-AMB-04: `handover` dice quién recibió al paciente; marcar recibido es del personal clínico en las apps (`allowedActions`). */
+export type PrehospitalView={serviceId:string;version:number;active:boolean;arrived:boolean;priority:string;patientLinked:boolean;clinical:boolean;handover:{receivedAt:string;receivedByName:string|null}|null;allowedActions:string[];reports:{id:string;priority:string;estimatedArrival?:string|null;capturedAt:string;receivedAt:string;reason?:string;vitalSigns?:Record<string,number>}[]};
 export const stateNames:Record<string,string>={disponible:'Disponible',en_servicio:'En servicio',en_mantenimiento:'En mantenimiento'};
 export const priorityNames:Record<string,string>={roja:'Roja',naranja:'Naranja',amarilla:'Amarilla',verde:'Verde'};
 export const typeNames:Record<string,string>={emergencia_domicilio:'Emergencia a domicilio',traslado_interhospitalario:'Traslado interhospitalario'};
 export const milestoneNames:Record<string,string>={salida:'Salida',en_escena:'En escena',trasladando:'Trasladando',en_hospital:'En hospital',finalizado:'Finalizado'};
-export const finalStateNames:Record<string,string>={completado:'Completado',cancelado:'Cancelado',sin_traslado:'Sin traslado',rechaza_traslado:'Paciente rechaza traslado'};
+export const finalStateNames:Record<string,string>={completado:'Completado',cancelado:'Cancelado',sin_traslado:'Sin traslado',rechaza_traslado:'Paciente rechaza traslado',fallecido:'Paciente fallecido',desviado:'Desviado a otro centro'};
 export const roleNames:Record<string,string>={paramedico:'Paramédico',motorista:'Motorista',medico:'Médico',enfermero:'Enfermería'};
 export const channelNames:Record<string,string>={app_paciente:'App del paciente',telefono:'Llamada telefónica'};
 export const minutesBetween=(fromIso:string,now=Date.now())=>Math.max(0,Math.round((now-new Date(fromIso).getTime())/60000));

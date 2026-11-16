@@ -35,8 +35,8 @@ export const ESTADO_CASO_DUPLICADO = ['sospechado', 'en_revision', 'descartado',
 export const ESTADO_AMBULANCIA = ['disponible', 'en_servicio', 'en_mantenimiento'] as const;
 /** ambulancia.solicitud.estado (20261017000900_ambulancia.sql). */
 export const ESTADO_SOLICITUD_AMBULANCIA = ['por_confirmar', 'confirmada', 'descartada', 'cancelada'] as const;
-/** ambulancia.servicio.estado_final (20261017000900_ambulancia.sql). */
-export const ESTADO_FINAL_SERVICIO = ['completado', 'cancelado', 'sin_traslado', 'rechaza_traslado'] as const;
+/** ambulancia.servicio.estado_final (20261121002000_ambulancia_fase1.sql). */
+export const ESTADO_FINAL_SERVICIO = ['completado', 'cancelado', 'sin_traslado', 'rechaza_traslado', 'fallecido', 'desviado'] as const;
 /** ambulancia.hito.tipo (20261017000900_ambulancia.sql). */
 export const HITO_SERVICIO = ['salida', 'en_escena', 'trasladando', 'en_hospital', 'finalizado'] as const;
 /** ambulancia prioridad de triaje (20261017000900_ambulancia.sql). */

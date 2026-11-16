@@ -52,9 +52,14 @@ function ActiveService({api,service,onReport,onSaved}:{api:Api;service:NonNullab
 /** FR-109-11: reporte prehospital; la API omite motivo y signos a quien no tiene relación de atención. */
 function PrehospitalDialog({api,serviceId,version,onClose}:{api:Api;serviceId:string;version:number;onClose:()=>void}){
  const data=useData<PrehospitalView>(api,`/ambulancia/servicios/${serviceId}/prehospital`,version);
- return <Dialog title="Reporte prehospital" onClose={onClose}><RemoteState state={data}>{v=>v.reports.length?<div>{!v.clinical&&<Notice kind="info">Los datos clínicos solo los ve el equipo que recibe al paciente.</Notice>}{v.reports.map(r=><dl key={r.id} className="detail-grid">
+ return <Dialog title="Reporte prehospital" onClose={onClose}><RemoteState state={data}>{v=><div>{handoverNotice(v)}{v.reports.length?<div>{!v.clinical&&<Notice kind="info">Los datos clínicos solo los ve el equipo que recibe al paciente.</Notice>}{v.reports.map(r=><dl key={r.id} className="detail-grid">
   <div><dt>Prioridad</dt><dd>{priorityNames[r.priority]??r.priority}</dd></div><div><dt>Hora estimada de llegada</dt><dd>{r.estimatedArrival?formatDateTime(r.estimatedArrival):'Sin estimar'}</dd></div><div><dt>Capturado</dt><dd>{formatDateTime(r.capturedAt)}</dd></div>
   {r.reason!==undefined&&<div><dt>Motivo</dt><dd>{r.reason}</dd></div>}
   {r.vitalSigns&&Object.entries(r.vitalSigns).map(([k,val])=><div key={k}><dt>{signNames[k]??k}</dt><dd>{val}</dd></div>)}
- </dl>)}</div>:<p className="muted">Aún no llega un reporte.</p>}</RemoteState></Dialog>;
+ </dl>)}</div>:<p className="muted">Aún no llega un reporte.</p>}</div>}</RemoteState></Dialog>;
+}
+/** MA-AMB-04: la entrega al hospital la registra el personal clínico que recibe (apps); aquí solo se muestra. */
+function handoverNotice(v:PrehospitalView){
+ if(v.handover)return <Notice kind="success">Paciente recibido por {v.handover.receivedByName??'personal clínico'} a las {formatDateTime(v.handover.receivedAt)}.</Notice>;
+ return v.arrived?<p className="muted">La ambulancia llegó al hospital; falta que el personal clínico marque recibido al paciente.</p>:null;
 }

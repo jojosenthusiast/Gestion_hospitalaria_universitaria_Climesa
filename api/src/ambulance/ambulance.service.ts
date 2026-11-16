@@ -6,8 +6,8 @@ import { Clock, businessDayRange } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
-import { AmbulanceRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
-import { CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, UnitState, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, nextMilestones, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
+import { AmbulanceRequestDto, CancelRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, HandoverDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto } from './ambulance.dto';
+import { CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, UnitState, allowedFinalStates, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, nextMilestones, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
 
 type Unit = { id: string; estado: UnitState; version: number };
 type Service = { id: string; unidad_id: string; solicitud_id: string | null; paciente_id: string | null; finalizado_en: Date | null; version: number };
@@ -57,7 +57,8 @@ export class AmbulanceService {
         const location = (await c.query('SELECT latitud::float AS latitude,longitud::float AS longitude,capturada_en AS "capturedAt" FROM ambulancia.ubicacion WHERE servicio_id=$1 ORDER BY capturada_en DESC LIMIT 1', [service.id])).rows[0] ?? null;
         // BL-05: Jefatura cierra administrativamente un servicio que la tripulación no puede finalizar.
         const allowedActions = hasPermission(actor, 'ambulancia.mantenimiento') ? ['cerrar'] : [];
-        activeService = { ...service, crew, milestones, nextMilestones: nextMilestones(milestones.map((m: { type: string }) => m.type)), lastLocation: location, allowedActions };
+        const done = milestones.map((m: { type: string }) => m.type);
+        activeService = { ...service, crew, milestones, nextMilestones: nextMilestones(done), lastLocation: location, allowedActions, finalStates: allowedFinalStates(done) };
       }
       const duty = await this.onDuty(c, this.clock.now());
       const change = (await c.query<{ motivo: string | null; en: Date }>('SELECT motivo,en FROM ambulancia.cambio_estado WHERE unidad_id=$1 AND hacia=$2 ORDER BY id DESC LIMIT 1', [unit.id, unit.state])).rows[0];
@@ -115,6 +116,45 @@ export class AmbulanceService {
       const account = general ? (patientId ? await patientAccount(c, patientId) : null) : actor.id;
       await this.commands.event(c, 'ambulancia.solicitud_creada', 'solicitud', row.id, row.version, ['ambulancia', ...await channelsFor(c, ['ambulancia.despachar'], { users: [account] })]);
       return { id: row.id, state: 'por_confirmar', channel, version: row.version, createdAt: row.creada_en, notice: NOTICE_911 };
+    });
+  }
+
+  /**
+   * MA-AMB-05: solicitudes de la propia cuenta o del propio expediente (también las telefónicas), las 10 más recientes de
+   * los últimos 7 días, con el avance del servicio que las atiende. Sin tripulación ni ubicación; la lectura se audita.
+   */
+  async ownRequests(actor: Actor) {
+    return this.db.transaction(async c => {
+      const since = new Date(this.clock.now().getTime() - 7 * 24 * 3600_000);
+      const rows = (await c.query<{ id: string; state: string; channel: string; address: string; reason: string; createdAt: Date; version: number; mine: boolean; patient: string | null; serviceId: string | null; dispatchedAt: Date | null; finalState: string | null; finishedAt: Date | null }>(`SELECT s.id,s.estado AS state,s.canal AS channel,s.direccion AS address,s.motivo AS reason,s.creada_en AS "createdAt",s.version,
+          (s.solicitante_usuario_id=$1) AS mine,s.paciente_id AS patient,v.id AS "serviceId",v.despachado_en AS "dispatchedAt",v.estado_final AS "finalState",v.finalizado_en AS "finishedAt"
+        FROM ambulancia.solicitud s LEFT JOIN ambulancia.servicio v ON v.solicitud_id=s.id
+        WHERE (s.solicitante_usuario_id=$1 OR ($2::uuid IS NOT NULL AND s.paciente_id=$2::uuid)) AND s.creada_en>=$3
+        ORDER BY s.creada_en DESC LIMIT 10`, [actor.id, actor.patientId ?? null, since])).rows;
+      const result = [];
+      for (const row of rows) {
+        const milestones = row.serviceId ? (await c.query('SELECT tipo AS type,ocurrido_en AS "occurredAt" FROM ambulancia.hito WHERE servicio_id=$1 ORDER BY ocurrido_en,registrado_en', [row.serviceId])).rows : [];
+        const service = row.serviceId ? { dispatchedAt: row.dispatchedAt, milestones, finalState: row.finalState, finishedAt: row.finishedAt } : null;
+        if (row.patient) await this.commands.audit(c, actor, { action: 'ambulancia.solicitud.ver_propia', entity: 'solicitud', entityId: row.id, patientId: row.patient, permission: 'ambulancia.solicitar' });
+        result.push({ id: row.id, state: row.state, channel: row.channel, address: row.address, reason: row.reason, createdAt: row.createdAt, version: row.version, service, allowedActions: row.mine && row.state === 'por_confirmar' ? ['cancelar'] : [], notice: NOTICE_911 });
+      }
+      return result;
+    });
+  }
+
+  /** MA-AMB-05: quien pidió desde la app cancela su solicitud mientras sigue por confirmar; despacho la deja de ver. */
+  async cancelRequest(actor: Actor, id: string, dto: CancelRequestDto, key?: string) {
+    return this.commands.run(actor, `ambulancia.solicitar:solicitud:${id}:cancelar`, key, dto, async c => {
+      const row = (await c.query<{ estado: string; version: number; paciente_id: string | null; solicitante_usuario_id: string | null }>('SELECT estado,version,paciente_id,solicitante_usuario_id FROM ambulancia.solicitud WHERE id=$1 FOR UPDATE', [id])).rows[0];
+      if (!row) throw new NotFoundException('La solicitud no existe.');
+      if (row.solicitante_usuario_id !== actor.id) throw new ForbiddenException('Solo quien pidió la ambulancia desde la app puede cancelarla.');
+      if (row.estado !== 'por_confirmar') throw new ProblemException('solicitud_resuelta', 409, 'La solicitud ya fue confirmada, descartada o cancelada; si necesitas ayuda, llama al 911.');
+      if (row.version !== dto.version) throw new VersionConflictException(row.version, 'La solicitud cambió; vuelve a abrirla.');
+      const reason = dto.reason?.trim() || null;
+      const version = (await c.query<{ version: number }>("UPDATE ambulancia.solicitud SET estado='cancelada',motivo_cancelacion=$2,resuelta_por=$3,version=version+1 WHERE id=$1 RETURNING version", [id, reason, actor.id])).rows[0].version;
+      await this.commands.audit(c, actor, { action: 'ambulancia.solicitud.cancelar', entity: 'solicitud', entityId: id, patientId: row.paciente_id ?? undefined, permission: 'ambulancia.solicitar', reason: reason ?? undefined });
+      await this.commands.event(c, 'ambulancia.estado_cambiado', 'solicitud', id, version, ['ambulancia', ...await channelsFor(c, ['ambulancia.despachar'], { users: [actor.id] })]);
+      return { id, state: 'cancelada', version };
     });
   }
 
@@ -253,17 +293,50 @@ export class AmbulanceService {
     });
   }
 
+  /** Llegada al hospital y entrega registrada del servicio (MA-AMB-04). */
+  private async handoverState(c: PoolClient, id: string) {
+    const row = (await c.query<{ arrived: boolean; receivedAt: Date | null; receivedByName: string | null }>(`SELECT EXISTS(SELECT 1 FROM ambulancia.hito h WHERE h.servicio_id=s.id AND h.tipo='en_hospital') AS arrived,s.recibido_en AS "receivedAt",
+        (SELECT nullif(concat_ws(' ',p.nombres,p.apellidos),'') FROM acceso.usuario u JOIN personal.persona p ON p.id=u.persona_personal_id WHERE u.id=s.recibido_por) AS "receivedByName"
+      FROM ambulancia.servicio s WHERE s.id=$1`, [id])).rows[0];
+    return { arrived: row?.arrived === true, handover: row?.receivedAt ? { receivedAt: row.receivedAt, receivedByName: row.receivedByName } : null };
+  }
+
+  /**
+   * MA-AMB-04: el personal clínico que recibe (con relación de atención, `expediente.ver`) marca recibido al paciente
+   * después del hito `en_hospital`, una sola vez y hasta 24 h después de finalizar. Los reportes quedan con `recibido_por`.
+   */
+  async handover(actor: Actor, id: string, dto: HandoverDto, key?: string) {
+    if (!hasPermission(actor, CLINICAL_PERMISSION)) throw new ForbiddenException('Solo el personal clínico que recibe al paciente registra la entrega.');
+    return this.commands.run(actor, `ambulancia.recibir_prehospital:servicio:${id}:recepcion`, key, dto, async c => {
+      const now = this.clock.now();
+      const service = (await c.query<{ paciente_id: string | null; finalizado_en: Date | null; recibido_por: string | null; version: number }>('SELECT paciente_id,finalizado_en,recibido_por,version FROM ambulancia.servicio WHERE id=$1 FOR UPDATE', [id])).rows[0];
+      if (!service) throw new NotFoundException('El servicio no existe.');
+      if (service.recibido_por) throw new ProblemException('entrega_registrada', 409, 'La entrega del paciente al hospital ya fue registrada.');
+      if (!(await this.handoverState(c, id)).arrived) throw new ProblemException('sin_llegada_hospital', 409, 'La entrega se registra cuando la ambulancia llega al hospital.');
+      if (!canReportAfter(service.finalizado_en, now)) throw new ProblemException('servicio_cerrado', 409, 'Pasaron más de 24 horas desde que terminó el servicio; ya no se registra la entrega.');
+      if (service.version !== dto.version) throw new VersionConflictException(service.version, 'El servicio cambió; vuelve a abrir el reporte prehospital.');
+      const version = (await c.query<{ version: number }>('UPDATE ambulancia.servicio SET recibido_por=$2,recibido_en=$3,version=version+1 WHERE id=$1 RETURNING version', [id, actor.id, now])).rows[0].version;
+      await c.query('UPDATE ambulancia.reporte_prehospital SET recibido_por=$2 WHERE servicio_id=$1 AND recibido_por IS NULL', [id, actor.id]);
+      await this.commands.audit(c, actor, { action: 'ambulancia.recepcion', entity: 'servicio', entityId: id, patientId: service.paciente_id ?? undefined, permission: 'ambulancia.recibir_prehospital' });
+      await this.commands.event(c, 'ambulancia.prehospital', 'servicio', id, version, ['ambulancia', ...await channelsFor(c, ['ambulancia.recibir_prehospital'])]);
+      const { handover } = await this.handoverState(c, id);
+      return { serviceId: id, version, receivedAt: now, receivedByName: handover?.receivedByName ?? null };
+    });
+  }
+
   /** FR-109-11: emergencia ve el reporte; el contenido clínico solo con relación de atención (privacidad.md), y la lectura se audita. */
   async readPrehospital(actor: Actor, id: string) {
     return this.db.transaction(async c => {
-      const service = (await c.query<{ id: string; paciente_id: string | null; prioridad: string; finalizado_en: Date | null }>('SELECT id,paciente_id,prioridad,finalizado_en FROM ambulancia.servicio WHERE id=$1', [id])).rows[0];
+      const service = (await c.query<{ id: string; paciente_id: string | null; prioridad: string; finalizado_en: Date | null; version: number }>('SELECT id,paciente_id,prioridad,finalizado_en,version FROM ambulancia.servicio WHERE id=$1', [id])).rows[0];
       if (!service) throw new NotFoundException('El servicio no existe.');
       const clinical = hasPermission(actor, CLINICAL_PERMISSION);
       const rows = (await c.query(`SELECT id,prioridad AS priority,llegada_estimada AS "estimatedArrival",capturado_en AS "capturedAt",recibido_en AS "receivedAt",motivo AS reason,signos AS "vitalSigns"
         FROM ambulancia.reporte_prehospital WHERE servicio_id=$1 ORDER BY capturado_en DESC,recibido_en DESC`, [id])).rows;
       const reports = clinical ? rows : rows.map(({ reason, vitalSigns, ...rest }) => rest);
       await this.commands.audit(c, actor, { action: 'ambulancia.prehospital.ver', entity: 'servicio', entityId: id, patientId: service.paciente_id ?? undefined, permission: 'ambulancia.recibir_prehospital', detail: { clinical, reports: rows.length } });
-      return { serviceId: id, active: !service.finalizado_en, priority: service.prioridad, patientLinked: !!service.paciente_id, clinical, reports };
+      const { arrived, handover } = await this.handoverState(c, id);
+      const allowedActions = clinical && arrived && !handover && canReportAfter(service.finalizado_en, this.clock.now()) ? ['recibir'] : [];
+      return { serviceId: id, version: service.version, active: !service.finalizado_en, arrived, priority: service.prioridad, patientLinked: !!service.paciente_id, clinical, reports, handover, allowedActions };
     });
   }
 

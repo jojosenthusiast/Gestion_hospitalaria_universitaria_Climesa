@@ -2,7 +2,7 @@
 export type UnitState = 'disponible' | 'en_servicio' | 'en_mantenimiento';
 export const milestoneTypes = ['salida', 'en_escena', 'trasladando', 'en_hospital', 'finalizado'] as const;
 export type MilestoneType = typeof milestoneTypes[number];
-export const finalStates = ['completado', 'cancelado', 'sin_traslado', 'rechaza_traslado'] as const;
+export const finalStates = ['completado', 'cancelado', 'sin_traslado', 'rechaza_traslado', 'fallecido', 'desviado'] as const;
 export type FinalState = typeof finalStates[number];
 export const serviceTypes = ['emergencia_domicilio', 'traslado_interhospitalario'] as const;
 export const priorities = ['roja', 'naranja', 'amarilla', 'verde'] as const;
@@ -46,23 +46,37 @@ export function nextMilestones(done: readonly string[]): MilestoneType[] {
   const following: Record<string, MilestoneType[]> = {
     salida: ['en_escena', 'finalizado'],
     en_escena: ['trasladando', 'finalizado'],
-    trasladando: ['en_hospital'],
+    // MA-AMB-03: durante el traslado el servicio puede terminar sin llegar (fallecimiento, desvío, cancelación).
+    trasladando: ['en_hospital', 'finalizado'],
     en_hospital: ['finalizado'],
   };
   return following[last] ?? [];
 }
 
 /**
- * Estado final permitido al finalizar: `completado` solo después de llegar al hospital; antes, el servicio termina
- * cancelado, sin traslado o con rechazo del paciente, y siempre con motivo. Devuelve el mensaje de error o null.
+ * Estados finales que admite el servicio según sus hitos (RN-32, MA-AMB-03): `completado` solo después de llegar al
+ * hospital; antes de salir con el paciente, sin traslado, rechazo, fallecimiento o cancelación; durante el traslado,
+ * fallecimiento, desvío a otro centro o cancelación. La base repite la regla (`ambulancia.validar_cierre_servicio`).
  */
+export function allowedFinalStates(done: readonly string[]): FinalState[] {
+  if (done.includes('finalizado') || !done.includes('salida')) return [];
+  if (done.includes('en_hospital')) return ['completado'];
+  if (done.includes('trasladando')) return ['fallecido', 'desviado', 'cancelado'];
+  return ['sin_traslado', 'rechaza_traslado', 'fallecido', 'cancelado'];
+}
+const finalStateNames: Record<string, string> = { completado: 'completado', cancelado: 'cancelado', sin_traslado: 'sin traslado', rechaza_traslado: 'rechazo del traslado', fallecido: 'fallecimiento', desviado: 'desvío a otro centro' };
+
+/** Valida el estado final y su motivo al finalizar; `completado` se asume al llegar al hospital. Devuelve el error o null. */
 export function finalStateError(done: readonly string[], finalState: string | undefined, reason: string | undefined): string | null {
+  const allowed = allowedFinalStates(done);
   const arrived = done.includes('en_hospital');
   const state = finalState ?? (arrived ? 'completado' : undefined);
-  if (!state) return 'Indica cómo terminó el servicio: cancelado, sin traslado o rechazo del traslado.';
+  const options = allowed.map(code => finalStateNames[code]).join(', ');
+  if (!state) return `Indica cómo terminó el servicio: ${options}.`;
   if (state === 'completado' && !arrived) return 'Solo se completa un servicio que llegó al hospital; indica otro estado final con su motivo.';
   if (state !== 'completado' && arrived) return 'El servicio ya llegó al hospital; finalízalo como completado.';
-  if (state !== 'completado' && (reason ?? '').trim().length < 5) return 'Indica el motivo de terminar sin traslado (al menos 5 caracteres).';
+  if (!allowed.includes(state as FinalState)) return `Con los hitos registrados el servicio solo puede terminar como: ${options}.`;
+  if (state !== 'completado' && (reason ?? '').trim().length < 5) return 'Indica el motivo de terminar sin llegar al hospital (al menos 5 caracteres).';
   return null;
 }
 
