@@ -40,7 +40,7 @@ Requisitos: REQ-PRV-01 a REQ-PRV-05 (documento del curso, sección 1.4 y entrega
 
 Delegado de protección de datos: ve metadatos de auditoría (quién, cuándo, qué tipo de dato, motivo), no el contenido clínico.
 
-"(área)": solo mientras la persona tiene turno en curso en el área donde está el paciente. "(servicio)": solo durante el servicio de ambulancia y 24 h después para completar el reporte.
+"(área)": solo mientras la persona tiene turno en curso en el área donde está el paciente. "(servicio)": solo durante el servicio de ambulancia y 24 h después para completar el reporte. "(emergencia)" y "(receptor)": el contenido clínico del reporte prehospital y marcar recibido solo con turno en curso (publicado o en curso, no ausente) en el área de Emergencia (`P1-EMG` o un espacio dentro de ella) o con relación de atención con el paciente vinculado; Jefatura de operaciones y Recepción ven solo la parte operativa, y `GET /ambulancia/llegada` no lleva datos clínicos.
 
 ## 3. Reglas técnicas
 

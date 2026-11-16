@@ -19,6 +19,8 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
     t = await createTestApp(at('08:00'));
     await t.shift('PAR', at('06:00'), at('18:00'));
     driverId = await t.driverShift(at('06:00'), at('18:00'));
+    // Enfermería recibe con turno en Emergencia; Medicina no tiene turno ni relación con los pacientes de este archivo.
+    await t.shift('ENF', at('06:00'), at('18:00'), 'P1-EMG');
     crew = [await t.staffOf('PAR'), driverId];
     const current = await unit();
     expect((await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: current.version, inMaintenance: false, reason: 'Inicio de turno con tripulación' })).status).toBe(201);
@@ -37,8 +39,7 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
     expect(board.availableCrew.map((m: { staffId: string }) => m.staffId).sort()).toEqual([...crew, other].sort());
     expect(board.availableCrew.find((m: { staffId: string }) => m.staffId === crew[0])).toMatchObject({ role: 'paramedico', hasAccount: true, name: 'PAR Prueba' });
     expect((await t.call('PAR', 'GET', '/ambulancia')).body.availableCrew).toBeUndefined();
-    // Sin tripulación, con alguien sin turno o sin paramédico con cuenta, no se despacha.
-    expect((await t.call('REC', 'POST', '/ambulancia/servicios', { version: (await unit()).version, type: 'emergencia_domicilio', priority: 'roja', origin: 'Residencial Ficticia, casa 1', destination: 'Hospital CLIMESA' })).status).toBe(400);
+    // Con alguien sin turno o sin paramédico con cuenta, no se despacha.
     const notOnDuty = await dispatch(undefined, [crew[0], offDuty]);
     expect(notOnDuty.status).toBe(409);
     expect(notOnDuty.body.codigo).toBe('tripulante_sin_turno');
@@ -96,7 +97,7 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
     expect((await t.call('PAR', 'POST', `/ambulancia/servicios/${service.id}/prehospital`, { reason: 'Dolor torácico opresivo', priority: 'roja', capturedAt: at('10:00').toISOString() })).status).toBe(201);
     let view = (await t.call('MED', 'GET', `/ambulancia/servicios/${service.id}/prehospital`)).body;
     expect(view).toMatchObject({ arrived: false, handover: null, allowedActions: [] });
-    const early = await t.call('MED', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {});
+    const early = await t.call('ENF', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {});
     expect(early.status).toBe(409);
     expect(early.body.codigo).toBe('sin_llegada_hospital');
     await advance(service.id, 'en_hospital');
@@ -105,7 +106,7 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
     expect(arrivalChannels).toEqual(expect.arrayContaining(['rol:ENF', 'rol:MED']));
     // Otro hito cambió la versión del servicio: la entrega no la exige.
     expect((await t.call('PAR', 'POST', `/ambulancia/servicios/${service.id}/prehospital`, { reason: 'Dolor torácico, llegada', priority: 'roja', capturedAt: at('10:00').toISOString() })).status).toBe(201);
-    view = (await t.call('MED', 'GET', `/ambulancia/servicios/${service.id}/prehospital`)).body;
+    view = (await t.call('ENF', 'GET', `/ambulancia/servicios/${service.id}/prehospital`)).body;
     expect(view).toMatchObject({ arrived: true, handover: null, allowedActions: ['recibir'] });
     // Recepción ve el reporte sin contenido clínico y no recibe al paciente.
     expect((await t.call('REC', 'GET', `/ambulancia/servicios/${service.id}/prehospital`)).body.allowedActions).toEqual([]);
@@ -118,7 +119,7 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
     expect((await t.one<{ n: number }>('SELECT count(*)::int AS n FROM ambulancia.reporte_prehospital WHERE servicio_id=$1 AND recibido_por=$2', [service.id, userId('ENF')])).n).toBe(2);
     view = (await t.call('MED', 'GET', `/ambulancia/servicios/${service.id}/prehospital`)).body;
     expect(view).toMatchObject({ handover: { receivedAt: at('10:00').toISOString(), receivedByName: 'ENF Prueba' }, allowedActions: [] });
-    const again = await t.call('MED', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {});
+    const again = await t.call('ENF', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {});
     expect(again.body.codigo).toBe('entrega_registrada');
     expect(await t.events('ambulancia.prehospital', service.id)).toHaveLength(3);
     await expect(t.pg.query('UPDATE ambulancia.servicio SET recibido_por=$2,recibido_en=now() WHERE id=$1', [service.id, userId('MED')])).rejects.toThrow(/entrega_registrada/);
@@ -126,18 +127,90 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
   });
 
   test('MA-AMB-04: Enfermería encuentra la llegada sin reporte prehospital y la recibe después de que la tripulación finalizó', async () => {
-    expect((await t.call('ENF', 'GET', '/ambulancia/llegada')).body).toEqual({ serviceId: null });
+    expect((await t.call('ENF', 'GET', '/ambulancia/llegada')).body).toEqual({ serviceId: null, services: [] });
     const service = (await dispatch()).body;
     t.setNow(at('11:00'));
-    expect((await t.call('ENF', 'GET', '/ambulancia/llegada')).body).toEqual({ serviceId: service.id });
+    expect((await t.call('ENF', 'GET', '/ambulancia/llegada')).body).toMatchObject({ serviceId: service.id, services: [{ serviceId: service.id, active: true, arrived: false }] });
     await advance(service.id, 'salida', 'en_escena', 'trasladando', 'en_hospital');
     expect((await t.call('PAR', 'POST', `/ambulancia/servicios/${service.id}/hitos`, { type: 'finalizado' })).status).toBe(201);
     // Finalizado sin entrega: la llegada sigue visible para recibir al paciente.
-    expect((await t.call('ENF', 'GET', '/ambulancia/llegada')).body).toEqual({ serviceId: service.id });
+    expect((await t.call('ENF', 'GET', '/ambulancia/llegada')).body).toMatchObject({ serviceId: service.id, services: [{ serviceId: service.id, active: false, arrived: true }] });
     expect((await t.call('ENF', 'GET', `/ambulancia/servicios/${service.id}/prehospital`)).body).toMatchObject({ reports: [], arrived: true, allowedActions: ['recibir'] });
     expect((await t.call('ENF', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {})).status).toBe(201);
-    expect((await t.call('ENF', 'GET', '/ambulancia/llegada')).body).toEqual({ serviceId: null });
+    expect((await t.call('ENF', 'GET', '/ambulancia/llegada')).body).toEqual({ serviceId: null, services: [] });
     expect((await t.call('PAC', 'GET', '/ambulancia/llegada')).status).toBe(403);
+  });
+
+  test('re-revisión #117: un servicio finalizado sin recibir sigue en la llegada aunque la unidad salga a otro', async () => {
+    t.setNow(at('11:05'));
+    const first = (await dispatch()).body;
+    await advance(first.id, 'salida', 'en_escena', 'trasladando', 'en_hospital', 'finalizado');
+    const second = (await dispatch()).body;
+    let arrival = (await t.call('ENF', 'GET', '/ambulancia/llegada')).body;
+    expect(arrival.serviceId).toBe(first.id);
+    expect(arrival.services).toMatchObject([{ serviceId: first.id, active: false, arrived: true }, { serviceId: second.id, active: true, arrived: false }]);
+    expect(JSON.stringify(arrival)).not.toMatch(/reason|vitalSigns|patient|paciente/);
+    expect((await t.call('ENF', 'POST', `/ambulancia/servicios/${first.id}/recepcion`, {})).status).toBe(201);
+    arrival = (await t.call('ENF', 'GET', '/ambulancia/llegada')).body;
+    expect(arrival.services.map((s: { serviceId: string }) => s.serviceId)).toEqual([second.id]);
+    const { version } = await t.one<{ version: number }>('SELECT version FROM ambulancia.servicio WHERE id=$1', [second.id]);
+    expect((await t.call('JOP', 'POST', `/ambulancia/servicios/${second.id}/cerrar`, { version, reason: 'Cierre del servicio de prueba' })).status).toBe(201);
+  });
+
+  test('re-revisión #117: el contenido clínico y la entrega son de quien tiene turno en Emergencia o relación con el paciente', async () => {
+    t.setNow(at('11:10'));
+    const stranger = await t.patient();
+    const phone = await t.one<{ id: string }>("INSERT INTO ambulancia.solicitud(canal,paciente_id,direccion,motivo,telefono_contacto,solicitante_nombre,creada_en) VALUES('telefono',$1,'Colonia Ficticia 5','Caída de su altura','7000-0005','Vecina',$2) RETURNING id", [stranger, at('11:10')]);
+    const service = (await dispatch(phone.id)).body;
+    await advance(service.id, 'salida', 'en_escena', 'trasladando');
+    expect((await t.call('PAR', 'POST', `/ambulancia/servicios/${service.id}/prehospital`, { reason: 'Fractura de cadera probable', priority: 'amarilla', capturedAt: at('11:10').toISOString() })).status).toBe(201);
+    await advance(service.id, 'en_hospital');
+    const read = (role: string) => t.call(role, 'GET', `/ambulancia/servicios/${service.id}/prehospital`).then(r => r.body);
+    // Medicina sin turno en Emergencia ni relación con el paciente: vista operativa, sin entrega.
+    let view = await read('MED');
+    expect(view).toMatchObject({ clinical: false, arrived: true, allowedActions: [] });
+    expect(view.reports[0].reason).toBeUndefined();
+    expect((await t.call('MED', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {})).status).toBe(403);
+    // Un turno en otra área tampoco basta.
+    await t.shift('MED', at('06:00'), at('18:00'));
+    expect((await read('MED')).clinical).toBe(false);
+    // Enfermería ausente en su turno de Emergencia no ve lo clínico; de vuelta a publicado, sí.
+    const nurse = await t.staffOf('ENF');
+    const attendance = (sql: string) => t.pg.transaction(async tx => { await tx.exec('SET LOCAL session_replication_role = replica'); await tx.query(sql, [nurse]); });
+    await attendance("UPDATE personal.turno SET estado='ausente',ausencia_tipo='injustificada',asistencia_motivo='No se presentó al turno de prueba' WHERE persona_id=$1");
+    expect(await read('ENF')).toMatchObject({ clinical: false, allowedActions: [] });
+    expect((await t.call('ENF', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {})).status).toBe(403);
+    await attendance("UPDATE personal.turno SET estado='publicado',ausencia_tipo=NULL,asistencia_motivo=NULL WHERE persona_id=$1");
+    expect((await read('ENF')).reports[0].reason).toBe('Fractura de cadera probable');
+    // Jefatura conserva la vista operativa.
+    expect(await read('JOP')).toMatchObject({ clinical: false, priority: 'roja' });
+    // Con relación de atención con el paciente, Medicina ve lo clínico y recibe.
+    await t.pg.query("INSERT INTO atencion.relacion_atencion(paciente_id,profesional_id,origen,origen_id,vigencia) VALUES($1,$2,'consulta',gen_random_uuid(),tstzrange($3::timestamptz,NULL))", [stranger, await t.staffOf('MED'), at('08:00')]);
+    view = await read('MED');
+    expect(view).toMatchObject({ clinical: true, allowedActions: ['recibir'] });
+    expect(view.reports[0].reason).toBe('Fractura de cadera probable');
+    expect((await t.call('MED', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {})).status).toBe(201);
+    await advance(service.id, 'finalizado');
+  });
+
+  test('re-revisión #117: sin `crew` (clientes anteriores) se despacha con la tripulación propuesta y la auditoría lo marca; los hitos no retroceden', async () => {
+    t.setNow(at('11:20'));
+    const legacy = await t.call('REC', 'POST', '/ambulancia/servicios', { version: (await unit()).version, type: 'emergencia_domicilio', priority: 'roja', origin: 'Residencial Ficticia, casa 1', destination: 'Hospital CLIMESA' });
+    expect(legacy.status).toBe(201);
+    expect(legacy.body.crew.map((m: { staffId: string }) => m.staffId).sort()).toEqual([...crew].sort());
+    const dispatches = await t.audits('ambulancia.despachar');
+    expect(dispatches.at(-1)!.detalle).toMatchObject({ crewFallback: true, crew: expect.arrayContaining(crew) });
+    expect(dispatches.at(-2)!.detalle).toMatchObject({ crewFallback: false });
+    t.setNow(at('11:25'));
+    expect((await milestone(legacy.body.id, { type: 'salida', occurredAt: at('11:22').toISOString() })).status).toBe(201);
+    const backwards = await milestone(legacy.body.id, { type: 'en_escena', occurredAt: at('11:21').toISOString() });
+    expect(backwards.status).toBe(409);
+    expect(backwards.body).toMatchObject({ codigo: 'hito_hora_invalida', detail: 'La hora del hito es anterior al último hito registrado del servicio.' });
+    const stale = await milestone(legacy.body.id, { type: 'en_escena', occurredAt: new Date(at('11:25').getTime() - 25 * 3600_000).toISOString() });
+    expect(stale.body).toMatchObject({ codigo: 'hito_hora_invalida', detail: 'La hora del hito tiene más de 24 horas; ya no se registra.' });
+    expect((await milestone(legacy.body.id, { type: 'en_escena', occurredAt: at('11:22').toISOString() })).status).toBe(201);
+    const { version } = await t.one<{ version: number }>('SELECT version FROM ambulancia.servicio WHERE id=$1', [legacy.body.id]);
+    expect((await t.call('JOP', 'POST', `/ambulancia/servicios/${legacy.body.id}/cerrar`, { version, reason: 'Cierre del servicio de prueba' })).status).toBe(201);
   });
 
   test('MA-AMB-05: el paciente consulta su solicitud en el servidor, la cancela mientras está por confirmar y sigue el servicio', async () => {

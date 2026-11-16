@@ -86,6 +86,31 @@ export const responseMinutes = (dispatchedAt: Date, onScene: Date | null) =>
 
 /** El reporte prehospital se puede enviar durante el servicio y hasta 24 h después de finalizar (privacidad "(servicio)"). */
 export const PREHOSPITAL_GRACE_MS = 24 * 3600_000;
+/**
+ * Área que recibe a los pacientes de la ambulancia (código de `infra.espacio`, la "Emergencia" de la planta 1). Ver el contenido
+ * clínico del prehospital y marcar recibido exige un turno en curso en ella (o en un espacio dentro de ella) o relación de atención.
+ */
+export const RECEIVING_AREA = 'P1-EMG';
+/**
+ * MA-AMB-02 (respaldo de una versión): la tripulación que la app propone por defecto, sobre candidatos ya ordenados como
+ * `availableCrew`: el primer paramédico con cuenta y el primer motorista.
+ */
+export function defaultCrew<T extends { tipo: string; hasAccount: boolean }>(candidates: T[]): T[] {
+  const paramedic = candidates.find(p => p.tipo === 'paramedico' && p.hasAccount), driver = candidates.find(p => p.tipo === 'motorista');
+  return [paramedic, driver].filter((p): p is T => !!p);
+}
+/** Orden de `availableCrew`: por función, primero quien tiene cuenta y luego por nombre. */
+export const crewOrder = (a: { tipo: string; hasAccount: boolean; name: string }, b: { tipo: string; hasAccount: boolean; name: string }) =>
+  a.tipo.localeCompare(b.tipo) || Number(b.hasAccount) - Number(a.hasAccount) || a.name.localeCompare(b.name);
+/**
+ * Hora de un hito (MA-AMB-06): no antes del último hito registrado (o del despacho) ni con más de 24 h; null si es válida.
+ * Un hito encolado sin señal llega tarde, pero en orden y el mismo día.
+ */
+export function milestoneTimeError(occurredAt: Date, lastRecorded: Date, now: Date): string | null {
+  if (occurredAt.getTime() < now.getTime() - PREHOSPITAL_GRACE_MS) return 'La hora del hito tiene más de 24 horas; ya no se registra.';
+  if (occurredAt.getTime() < lastRecorded.getTime()) return 'La hora del hito es anterior al último hito registrado del servicio.';
+  return null;
+}
 export const canReportAfter = (finishedAt: Date | null, now: Date) => !finishedAt || now.getTime() - finishedAt.getTime() <= PREHOSPITAL_GRACE_MS;
 
 /**

@@ -21,6 +21,8 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     t = await createTestApp(at('08:00'));
     await t.shift('PAR', at('06:00'), at('14:00'));
     driverId = await t.driverShift(at('06:00'), at('14:00'));
+    // Emergencia recibe: Enfermería con turno en el área que recibe ve el contenido clínico del prehospital.
+    await t.shift('ENF', at('06:00'), at('23:00'), 'P1-EMG');
     const current = await unit();
     const ready = await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: current.version, inMaintenance: false, reason: 'Inicio de turno con paramédico' });
     expect(ready.status).toBe(201);

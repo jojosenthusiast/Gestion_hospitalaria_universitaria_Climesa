@@ -85,9 +85,18 @@ export class AmbulanceStatusResponse {
   @ClassArrayProp(CrewMemberResponse, { optional: true, description: 'Solo con ambulancia.despachar: paramédicos y motoristas de turno entre los que se elige la tripulación (MA-AMB-02)' }) availableCrew?: CrewMemberResponse[];
 }
 
-/** MA-AMB-04: servicio cuya llegada recibe el hospital (activo, o llegado sin entrega en las últimas 24 h). */
+/** MA-AMB-04: un servicio que el hospital recibe o espera, sin datos clínicos. */
+export class ArrivalCandidateResponse {
+  @UuidProp() serviceId!: string;
+  @DateTimeProp() dispatchedAt!: string;
+  @BoolProp({ description: 'Sin finalizar' }) active!: boolean;
+  @BoolProp({ description: 'Con el hito en_hospital' }) arrived!: boolean;
+}
+
+/** MA-AMB-04: servicios por recibir: primero los que llegaron sin entrega (hasta 24 h después de finalizar), después el activo. */
 export class ArrivalServiceResponse {
-  @UuidProp({ nullable: true }) serviceId!: string | null;
+  @UuidProp({ nullable: true, description: 'El primero de `services`' }) serviceId!: string | null;
+  @ClassArrayProp(ArrivalCandidateResponse) services!: ArrivalCandidateResponse[];
 }
 
 export class AmbulanceUnitStateResponse {

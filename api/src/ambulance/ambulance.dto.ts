@@ -33,9 +33,13 @@ export class DispatchDto {
   @Text(5,300,true) origin?:string;
   @Text(3,300) destination!:string;
   @Text(0,80,true) municipality?:string;
-  /** MA-AMB-02: el despachador elige la tripulación entre `availableCrew` de `GET /ambulancia` (paramédico con cuenta y motorista). */
-  @ApiProperty({type:[String],format:'uuid',maxItems:6,uniqueItems:true,description:'Personal de turno elegido para el servicio (`availableCrew`); RN-30 exige un paramédico con cuenta y un motorista'})
-  @IsArray() @ArrayMaxSize(6) @ArrayUnique() @IsUUID('all',{each:true}) crew!:string[];
+  /**
+   * MA-AMB-02: el despachador elige la tripulación entre `availableCrew` de `GET /ambulancia` (paramédico con cuenta y motorista).
+   * TODO(MA-AMB-02): opcional solo durante una versión para no romper clientes anteriores en plena emergencia; sin ella se usan los
+   * valores que la app propone (`defaultCrew`) y la auditoría lo marca con `crewFallback`. Quitar el respaldo en la siguiente versión.
+   */
+  @ApiPropertyOptional({type:[String],format:'uuid',maxItems:6,uniqueItems:true,description:'Personal de turno elegido para el servicio (`availableCrew`); RN-30 exige un paramédico con cuenta y un motorista. Si falta (clientes anteriores, solo esta versión) se usa el paramédico con cuenta y el motorista que la app propone'})
+  @IsOptional() @IsArray() @ArrayMaxSize(6) @ArrayUnique() @IsUUID('all',{each:true}) crew?:string[];
 }
 /** FR-109-07: hito del servicio; `finalState` y `reason` solo al finalizar. */
 export class MilestoneDto {

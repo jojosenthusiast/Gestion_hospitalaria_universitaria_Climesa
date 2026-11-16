@@ -67,8 +67,8 @@ export async function createTestApp(start: Date) {
     await tx.exec('SET LOCAL session_replication_role = replica');
     await tx.query(sql, params);
   });
-  const shift = async (role: string, from: Date, to: Date) => {
-    await coverage(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado' FROM infra.espacio WHERE codigo='P1-CON'`, [await staffOf(role), from, to]);
+  const shift = async (role: string, from: Date, to: Date, area = 'P1-CON') => {
+    await coverage(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado' FROM infra.espacio WHERE codigo=$4`, [await staffOf(role), from, to, area]);
   };
   /** Ambulance driver (motorista) with a published shift: RN-30 needs one on duty to dispatch or leave maintenance. */
   const driverShift = async (from: Date, to: Date) => {

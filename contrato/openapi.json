@@ -26119,7 +26119,7 @@
           "crew": {
             "maxItems": 6,
             "uniqueItems": true,
-            "description": "Personal de turno elegido para el servicio (`availableCrew`); RN-30 exige un paramédico con cuenta y un motorista",
+            "description": "Personal de turno elegido para el servicio (`availableCrew`); RN-30 exige un paramédico con cuenta y un motorista. Si falta (clientes anteriores, solo esta versión) se usa el paramédico con cuenta y el motorista que la app propone",
             "type": "array",
             "items": {
               "type": "string",
@@ -26131,8 +26131,7 @@
           "version",
           "type",
           "priority",
-          "destination",
-          "crew"
+          "destination"
         ]
       },
       "DispatchedCrewResponse": {
@@ -26408,17 +26407,52 @@
           "patientLinked"
         ]
       },
+      "ArrivalCandidateResponse": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dispatchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Sin finalizar"
+          },
+          "arrived": {
+            "type": "boolean",
+            "description": "Con el hito en_hospital"
+          }
+        },
+        "required": [
+          "serviceId",
+          "dispatchedAt",
+          "active",
+          "arrived"
+        ]
+      },
       "ArrivalServiceResponse": {
         "type": "object",
         "properties": {
           "serviceId": {
             "type": "string",
             "format": "uuid",
-            "nullable": true
+            "nullable": true,
+            "description": "El primero de `services`"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArrivalCandidateResponse"
+            }
           }
         },
         "required": [
-          "serviceId"
+          "serviceId",
+          "services"
         ]
       },
       "PrehospitalReportResponse": {
@@ -26822,6 +26856,7 @@
           "sin_motorista_de_turno",
           "sin_tripulacion_de_turno",
           "tripulante_sin_turno",
+          "hito_hora_invalida",
           "sin_servicio_activo",
           "solicitud_resuelta",
           "unidad_en_mantenimiento",
