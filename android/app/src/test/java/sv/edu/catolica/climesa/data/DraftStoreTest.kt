@@ -63,6 +63,28 @@ class DraftStoreTest {
         assertNull(drafts.load("u-2", "signos"))
     }
 
+    /** Review of #117: queued milestones and the prehospital queue are pending writes, not drafts: they survive sign-out. */
+    @Test fun endingTheSessionKeepsThePendingWritesOfEachAccount() {
+        val drafts = store()
+        val session = SessionDrafts(drafts)
+        drafts.save("par-1", "hitos:cola", JSONObject().put("items", org.json.JSONArray().put(JSONObject().put("type", "en_escena"))))
+        drafts.save("par-1", "prehospital:cola", JSONObject().put("serviceId", "s1"))
+        drafts.save("par-1", "prehospital:provisional", JSONObject().put("id", "p9"))
+        drafts.save("par-1", "prehospital:formulario", JSONObject().put("reason", "texto"))
+        assertTrue(session.hasPendingWrites("par-1"))
+        session.ended()
+        assertNull(drafts.load("par-1", "prehospital:formulario"))
+        assertEquals("s1", drafts.load("par-1", "prehospital:cola")?.getString("serviceId"))
+        assertEquals("p9", drafts.load("par-1", "prehospital:provisional")?.getString("id"))
+        assertTrue(session.hasPendingWrites("par-1"))
+        // Another account signing in on the device keeps them for their owner but never sees them.
+        session.signedIn("enf-1")
+        assertTrue(session.hasPendingWrites("par-1"))
+        assertTrue(!session.hasPendingWrites("enf-1"))
+        drafts.clear("par-1", "hitos:cola"); drafts.clear("par-1", "prehospital:cola")
+        assertTrue(!session.hasPendingWrites("par-1"))
+    }
+
     @Test fun signingInKeepsOnlyTheDraftsOfThatAccount() {
         val drafts = store()
         val session = SessionDrafts(drafts)

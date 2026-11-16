@@ -43,16 +43,36 @@ class AmbulanceViewModelTest {
         .put("activeService", if (!withService) JSONObject.NULL else JSONObject().put("id", "s1").put("type", "emergencia_domicilio").put("priority", "roja").put("origin", "Colonia Ficticia").put("destination", "Hospital CLIMESA").put("dispatchedAt", "2026-11-15T14:00:00Z")
             .put("milestones", JSONArray().put(JSONObject().put("type", "salida").put("occurredAt", "2026-11-15T14:05:00Z"))).put("nextMilestones", JSONArray().put("en_escena").put("finalizado")).put("crew", JSONArray()))
         .put("pendingRequests", JSONArray().put(JSONObject().put("id", "r1").put("channel", "telefono").put("address", "Colonia Ficticia 12").put("reason", "Caída").put("contactPhone", "7000-0001").put("createdAt", "2026-11-15T14:00:00Z").put("version", 2)))
+        .put("availableCrew", JSONArray()
+            .put(JSONObject().put("staffId", "par-1").put("role", "paramedico").put("name", "Ana Paramédica").put("hasAccount", true))
+            .put(JSONObject().put("staffId", "par-2").put("role", "paramedico").put("name", "Beto Paramédico").put("hasAccount", false))
+            .put(JSONObject().put("staffId", "mot-1").put("role", "motorista").put("name", "Carlos Motorista").put("hasAccount", false)))
 
     @Test fun despachaConLaVersionDeLaUnidadYLaSolicitud() = runTest(dispatcher) {
         val api = FakeGateway(); api.responses["/ambulancia"] = status()
         val vm = AmbulanceViewModel(api, AmbulanceBus())
         vm.open(AmbulanceMode.STATUS); runCurrent()
         val request = vm.state.value.status!!.pendingRequests.single()
-        vm.dispatch(request, "emergencia_domicilio", "roja", "Hospital CLIMESA"); runCurrent()
+        val pool = vm.state.value.status!!.availableCrew
+        assertEquals(listOf("par-1", "mot-1"), sv.edu.catolica.climesa.domain.AmbulanceRules.defaultCrew(pool))
+        vm.dispatch(request, "emergencia_domicilio", "roja", "Hospital CLIMESA", listOf("par-1", "mot-1")); runCurrent()
         val body = api.calls.single { it.first == "/ambulancia/servicios" }.third!!
         assertEquals(5, body.getInt("version")); assertEquals("r1", body.getString("requestId")); assertEquals("roja", body.getString("priority"))
+        assertEquals(listOf("par-1", "mot-1"), (0 until body.getJSONArray("crew").length()).map { body.getJSONArray("crew").getString(it) })
         assertEquals("Ambulancia despachada.", vm.state.value.notice)
+    }
+
+    /** MA-AMB-02: the dispatcher picks the crew; without a paramedic with an account or a driver nothing is sent. */
+    @Test fun laTripulacionElegidaNecesitaParamedicoConCuentaYMotorista() = runTest(dispatcher) {
+        val api = FakeGateway(); api.responses["/ambulancia"] = status()
+        val vm = AmbulanceViewModel(api, AmbulanceBus())
+        vm.open(AmbulanceMode.STATUS); runCurrent()
+        val request = vm.state.value.status!!.pendingRequests.single()
+        vm.dispatch(request, "emergencia_domicilio", "roja", "Hospital CLIMESA", listOf("par-2", "mot-1")); runCurrent()
+        assertEquals("Elige un paramédico con cuenta en la app: registra los hitos del servicio.", vm.state.value.formError)
+        vm.dispatch(request, "emergencia_domicilio", "roja", "Hospital CLIMESA", listOf("par-1")); runCurrent()
+        assertEquals("Elige un motorista de turno para el servicio.", vm.state.value.formError)
+        assertTrue(api.calls.none { it.first == "/ambulancia/servicios" })
     }
 
     @Test fun quienPierdeLaCarreraVeQueYaFueDespachada() = runTest(dispatcher) {
@@ -60,7 +80,7 @@ class AmbulanceViewModelTest {
         api.failures["/ambulancia/servicios"] = AuthRequestException("x", 409, "ambulancia_ya_despachada")
         val vm = AmbulanceViewModel(api, AmbulanceBus())
         vm.open(AmbulanceMode.STATUS); runCurrent()
-        vm.dispatch(vm.state.value.status!!.pendingRequests.single(), "emergencia_domicilio", "roja", "Hospital CLIMESA"); runCurrent()
+        vm.dispatch(vm.state.value.status!!.pendingRequests.single(), "emergencia_domicilio", "roja", "Hospital CLIMESA", listOf("par-1", "mot-1")); runCurrent()
         assertEquals("La ambulancia ya fue despachada.", vm.state.value.formError)
     }
 
@@ -184,10 +204,64 @@ class AmbulanceViewModelTest {
         assertTrue(vm.state.value.arrival!!.canReceive)
         api.responses["/ambulancia/servicios/s1/prehospital"] = JSONObject(view.toString()).put("allowedActions", JSONArray()).put("handover", JSONObject().put("receivedAt", "2026-11-15T14:40:00Z").put("receivedByName", "Ana Ficticia"))
         vm.receivePatient(); runCurrent()
-        assertEquals(7, api.calls.single { it.first == "/ambulancia/servicios/s1/recepcion" }.third!!.getInt("version"))
+        // MA-AMB-04: no version (milestones keep changing the service's version while the nurse receives the patient).
+        assertEquals(0, api.calls.single { it.first == "/ambulancia/servicios/s1/recepcion" }.third!!.length())
         assertEquals("Ana Ficticia", vm.state.value.arrival!!.handover!!.receivedByName)
         vm.receivePatient(); runCurrent()
         assertEquals("sin la acción de la API no se vuelve a enviar", 1, api.calls.count { it.first.endsWith("/recepcion") })
+    }
+
+    /** MA-AMB-04: Enfermería opens the arrival without an event or a prehospital report: the API says which service it is. */
+    @Test fun laLlegadaSeEncuentraSinEventoNiReporte() = runTest(dispatcher) {
+        val api = FakeGateway()
+        api.responses["/ambulancia/llegada"] = JSONObject().put("serviceId", "s1")
+        api.responses["/ambulancia/servicios/s1/prehospital"] = JSONObject().put("serviceId", "s1").put("active", false).put("arrived", true).put("clinical", true).put("reports", JSONArray()).put("handover", JSONObject.NULL).put("allowedActions", JSONArray().put("recibir"))
+        val vm = AmbulanceViewModel(api, AmbulanceBus())
+        vm.open(AmbulanceMode.ARRIVAL, canReadStatus = false); runCurrent()
+        assertTrue(vm.state.value.arrival!!.canReceive)
+    }
+
+    private fun queuedTwo(store: sv.edu.catolica.climesa.data.DraftStore, api: FakeGateway, failure: Exception): AmbulanceViewModel {
+        api.responses["/ambulancia"] = status(withService = true)
+        api.failures["/ambulancia/servicios/s1/hitos"] = AuthRequestException("Sin conexión.")
+        val vm = AmbulanceViewModel(api, AmbulanceBus(), store)
+        vm.bindUser("par-1"); vm.open(AmbulanceMode.PARAMEDIC)
+        return vm.also { api.failures["/ambulancia/servicios/s1/hitos"] = failure }
+    }
+
+    /** Review of #117: a 503 (cold start), 429 or 401 keeps the queue; it never drops a milestone and sends the next one. */
+    @Test fun unErrorTransitorioNoDescartaElHitoNiEnviaLosSiguientes() = runTest(dispatcher) {
+        for (failure in listOf(AuthRequestException("Despertando.", 503), AuthRequestException("Muchas.", 429), AuthRequestException("Sesión.", 401))) {
+            val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile())
+            val api = FakeGateway()
+            val vm = queuedTwo(store, api, AuthRequestException("Sin conexión.")); runCurrent()
+            val service = vm.state.value.status!!.activeService!!
+            vm.advance(service, "en_escena", at = Instant.parse("2026-11-15T14:12:00Z")); runCurrent()
+            vm.advance(vm.projected(service), "trasladando", at = Instant.parse("2026-11-15T14:30:00Z")); runCurrent()
+            api.failures["/ambulancia/servicios/s1/hitos"] = failure
+            val before = api.calls.count { it.first == "/ambulancia/servicios/s1/hitos" }
+            vm.retryMilestones(); runCurrent()
+            assertEquals("${failure.statusCode}: solo se intenta el primero", before + 1, api.calls.count { it.first == "/ambulancia/servicios/s1/hitos" })
+            assertEquals(listOf("en_escena", "trasladando"), vm.state.value.queuedMilestones.map { it.type })
+            assertNull(vm.state.value.formError)
+        }
+    }
+
+    /** Review of #117: a definitive 4xx drops that milestone and every later one of the same service, and says so. */
+    @Test fun unRechazoDefinitivoDescartaElHitoYLosSiguientesDelServicio() = runTest(dispatcher) {
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile())
+        val api = FakeGateway()
+        val vm = queuedTwo(store, api, AuthRequestException("Sin conexión.")); runCurrent()
+        val service = vm.state.value.status!!.activeService!!
+        vm.advance(service, "en_escena", at = Instant.parse("2026-11-15T14:12:00Z")); runCurrent()
+        vm.advance(vm.projected(service), "trasladando", at = Instant.parse("2026-11-15T14:30:00Z")); runCurrent()
+        api.failures["/ambulancia/servicios/s1/hitos"] = AuthRequestException("Fuera de orden.", 409, "hito_fuera_de_orden")
+        val before = api.calls.count { it.first == "/ambulancia/servicios/s1/hitos" }
+        vm.retryMilestones(); runCurrent()
+        assertEquals(before + 1, api.calls.count { it.first == "/ambulancia/servicios/s1/hitos" })
+        assertTrue(vm.state.value.queuedMilestones.isEmpty())
+        assertNull(store.load("par-1", sv.edu.catolica.climesa.domain.FormDrafts.MILESTONE_QUEUE))
+        assertEquals("No se registró «En escena». Ese hito no sigue al último registrado. Se actualizó el servicio. Los hitos siguientes de este servicio se descartaron; revísalo y regístralos de nuevo.", vm.state.value.formError)
     }
 
     @Test fun sinSenalLosHitosQuedanEnColaConSuHoraSobrevivenALaAppYSeEnvianEnOrden() = runTest(dispatcher) {

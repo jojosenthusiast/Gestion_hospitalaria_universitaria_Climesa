@@ -25,6 +25,7 @@ import sv.edu.catolica.climesa.domain.AmbulanceParser
 import sv.edu.catolica.climesa.domain.AmbulanceRequestRow
 import sv.edu.catolica.climesa.domain.AmbulanceRules
 import sv.edu.catolica.climesa.domain.AmbulanceService
+import sv.edu.catolica.climesa.domain.AmbulanceLabels
 import sv.edu.catolica.climesa.domain.AmbulanceStatus
 import sv.edu.catolica.climesa.domain.FormDrafts
 import sv.edu.catolica.climesa.domain.LogFilters
@@ -70,7 +71,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
      */
     fun bindUser(id: String) {
         if (userId == id) return
-        userId = id; drafts.retainOnly(id)
+        userId = id; drafts.retainOnly(id, sv.edu.catolica.climesa.data.SessionDrafts.PENDING_WRITES)
         val queued = drafts.load(id, FormDrafts.PREHOSPITAL_QUEUE)?.let { runCatching { QueuedPrehospital(it.getString("serviceId"), it.getString("body"), it.optString("key").ifBlank { java.util.UUID.randomUUID().toString() }) }.getOrNull() }
         if (queued != null && mutable.value.queued == null) mutable.value = mutable.value.copy(queued = queued, notice = "Hay un reporte prehospital en cola: se enviará al reintentar.")
         restoredForm = drafts.load(id, FormDrafts.PREHOSPITAL_FORM)
@@ -79,6 +80,9 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         if (provisional != null && mutable.value.provisional == null) mutable.value = mutable.value.copy(provisional = provisional)
         val milestones = drafts.load(id, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.let { items -> (0 until items.length()).mapNotNull { items.optJSONObject(it)?.let(QueuedMilestone::fromJson) } }.orEmpty()
         if (milestones.isNotEmpty() && mutable.value.queuedMilestones.isEmpty()) mutable.value = mutable.value.copy(queuedMilestones = milestones, notice = "Hay hitos en cola: se enviarán al volver la señal.")
+        // Signed in again (after a sign-out or the inactivity timeout): send what waited on the phone.
+        if (milestones.isNotEmpty()) flushMilestones()
+        if (queued != null) retryQueued()
     }
     private var restoredForm: JSONObject? = null
 
@@ -134,7 +138,9 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             status?.activeService?.id?.let { mutable.value = mutable.value.copy(arrivalServiceId = it) }
             mutable.value = mutable.value.copy(status = status)
         }
-        val id = mutable.value.arrivalServiceId
+        // MA-AMB-04: without an event (Enfermería opens the screen) or after the crew finished, the API says which arrival to receive.
+        val id = mutable.value.arrivalServiceId ?: (api.request("/ambulancia/llegada") as? JSONObject)?.takeUnless { it.isNull("serviceId") }?.optString("serviceId")?.ifBlank { null }
+        if (id != null && mutable.value.arrivalServiceId == null) mutable.value = mutable.value.copy(arrivalServiceId = id)
         val view = id?.let { AmbulanceParser.prehospital(api.request("/ambulancia/servicios/$it/prehospital")) }
         mutable.value = mutable.value.copy(loading = false, arrival = view)
     }
@@ -144,7 +150,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         live.start(viewModelScope, channels) { signal ->
             when (signal) {
                 is RealtimeSignal.Event -> if (AmbulanceEvents.matches(signal.event)) {
-                    if (AmbulanceEvents.isPrehospital(signal.event)) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
+                    if (AmbulanceEvents.isPrehospital(signal.event) || (signal.event.type == "ambulancia.hito" && signal.event.entity == "servicio")) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
                     load()
                 }
                 RealtimeSignal.Resync -> { load(); retryQueued(); flushMilestones() }
@@ -176,10 +182,13 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     }
 
     /** A36 / FR-109-04: confirma por teléfono y despacha con la versión de la unidad que se vio Disponible. */
-    fun dispatch(request: AmbulanceRequestRow, type: String, priority: String, destination: String) {
-        val unit = mutable.value.status?.unit ?: return
+    /** MA-AMB-02: with the crew the dispatcher chose among `availableCrew` (only they gain the care relationship). */
+    fun dispatch(request: AmbulanceRequestRow, type: String, priority: String, destination: String, crew: List<String>) {
+        val status = mutable.value.status ?: return
         if (destination.trim().length < 3) { mutable.value = mutable.value.copy(formError = "Indica el destino."); return }
-        write(notice = "Ambulancia despachada.") { api.request("/ambulancia/servicios", "POST", AmbulanceRules.dispatchBody(unit.version, request.id, type, priority, destination)) }
+        AmbulanceRules.crewProblem(status.availableCrew, crew)?.let { mutable.value = mutable.value.copy(formError = it); return }
+        val chosen = status.availableCrew.map { it.staffId }.filter { it in crew }
+        write(notice = "Ambulancia despachada.") { api.request("/ambulancia/servicios", "POST", AmbulanceRules.dispatchBody(status.unit.version, request.id, type, priority, destination, chosen)) }
     }
 
     fun discard(request: AmbulanceRequestRow, reason: String) {
@@ -232,10 +241,13 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
                         saveMilestones(mutable.value.queuedMilestones.drop(1))
                     } catch (e: CancellationException) { throw e }
                     catch (e: Exception) {
-                        if (isOffline(e)) { outcome = "Sin señal: el hito quedó en cola con su hora y se enviará al volver la conexión."; break }
-                        // A definitive answer (service closed, already recorded by a crewmate): drop that one and go on.
-                        saveMilestones(mutable.value.queuedMilestones.drop(1))
-                        failure = message(e); outcome = null
+                        // No signal, server waking up (5xx), too many requests or a session to renew: keep it and stop,
+                        // so a later milestone never lands without this one (review of #117).
+                        if (transient(e)) { outcome = if (isOffline(e)) "Sin señal: el hito quedó en cola con su hora y se enviará al volver la conexión." else "El servidor no respondió: el hito quedó en cola con su hora; toca Reintentar en un momento."; break }
+                        // A definitive rejection: the later milestones of that service cannot apply either; drop them and say so.
+                        saveMilestones(mutable.value.queuedMilestones.drop(1).filter { it.serviceId != next.serviceId })
+                        failure = "No se registró «${AmbulanceLabels.milestone(next.type)}». ${message(e)} Los hitos siguientes de este servicio se descartaron; revísalo y regístralos de nuevo."
+                        outcome = null; break
                     }
                 }
             } finally {
@@ -320,6 +332,8 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     }
 
     private fun isOffline(error: Exception) = error is AuthRequestException && error.statusCode == null
+    /** Worth retrying later with the same key: no signal, 5xx (Render cold start), 429 or 401 (aligned with `ColdStart.retryable`). */
+    private fun transient(error: Exception) = error is AuthRequestException && (error.statusCode == null || error.statusCode >= 500 || error.statusCode == 429 || error.statusCode == 401)
 
     /** El mensaje sale del `codigo` de la API cuando es una regla conocida; si no, del texto que devolvió. */
     private fun message(error: Exception): String {
@@ -336,7 +350,8 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             "servicio_finalizado" -> "El servicio ya terminó; los hitos pendientes se descartaron."
             "solicitud_resuelta" -> "Despacho ya atendió la solicitud; ya no se puede cancelar. Si necesitas ayuda, llama al 911."
             "sin_llegada_hospital" -> "La entrega se marca cuando la ambulancia registra la llegada al hospital."
-            "entrega_registrada" -> "Otra persona ya marcó recibido al paciente."
+            "entrega_registrada" -> "Otra persona ya marcó recibido al paciente; se actualizó la entrega."
+            "tripulante_sin_turno" -> "Alguien de la tripulación elegida ya no tiene turno en curso. Se actualizó la lista; elige de nuevo."
             "servicio_cerrado" -> "Pasaron más de 24 horas desde que terminó el servicio."
             else -> error.message ?: "No se pudo completar la operación."
         }

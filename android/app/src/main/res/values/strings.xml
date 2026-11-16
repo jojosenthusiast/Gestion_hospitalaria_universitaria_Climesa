@@ -180,6 +180,11 @@
     <string name="amb_marcar_recibido_detalle">Confirmas que recibiste al paciente de la ambulancia. Queda registrado con tu nombre y la hora de ahora.</string>
     <string name="amb_entrega_espera">Podrás marcar recibido al paciente cuando la ambulancia registre su llegada al hospital.</string>
     <string name="amb_entrega_sin_permiso">La ambulancia llegó. La entrega la marca el personal clínico que recibe al paciente.</string>
+    <string name="amb_tripulacion">Tripulación</string>
+    <string name="amb_sin_tripulacion_turno">No hay paramédicos ni motoristas con turno en curso.</string>
+    <string name="amb_sin_cuenta">sin cuenta en la app</string>
+    <string name="cerrar_sesion_pendiente_titulo">Hay datos sin enviar</string>
+    <string name="cerrar_sesion_pendiente_detalle">Tienes hitos o un reporte prehospital sin enviar. Quedan guardados en este teléfono y se enviarán cuando vuelvas a iniciar sesión con tu cuenta.</string>
     <string name="amb_cancelar_solicitud">Cancelar solicitud</string>
     <string name="amb_cancelar_detalle">Despacho dejará de ver tu solicitud. Si la emergencia sigue, llama al 911.</string>
     <string name="amb_motivo_opcional">Motivo (opcional)</string>

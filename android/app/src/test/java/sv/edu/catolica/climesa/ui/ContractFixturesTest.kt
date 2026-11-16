@@ -171,12 +171,10 @@ class ContractFixturesTest {
         assertContract("me-paciente", patch.second, patch.first, patch.third)
     }
 
-    /** MA-AMB-03..05: the ambulance bodies of the patient (cancel), clinical staff (handover) and paramedic (milestone). */
-    @Test fun ambulanceCancelHandoverAndMilestone() {
+    /** MA-AMB-03..05: the ambulance bodies of the patient (cancel) and the paramedic (milestone); the handover has no body. */
+    @Test fun ambulanceCancelAndMilestone() {
         val request = sv.edu.catolica.climesa.domain.OwnAmbulanceRequest(APPOINTMENT, "por_confirmar", "Colonia Ficticia", "Caída", START, 1, allowedActions = listOf("cancelar"))
         assertContract("ambulancia-solicitud-cancelar", "POST", "/ambulancia/solicitudes/${request.id}/cancelar", sv.edu.catolica.climesa.domain.AmbulanceRules.cancelBody(request.version, " Me llevó un familiar "), APPOINTMENT)
-        val view = sv.edu.catolica.climesa.domain.PrehospitalView(ADMISSION, true, true, emptyList(), version = 7, arrived = true, allowedActions = listOf("recibir"))
-        assertContract("ambulancia-recepcion", "POST", "/ambulancia/servicios/${view.serviceId}/recepcion", sv.edu.catolica.climesa.domain.AmbulanceRules.handoverBody(view), ADMISSION)
         assertContract("ambulancia-hito", "POST", "/ambulancia/servicios/$ADMISSION/hitos",
             sv.edu.catolica.climesa.domain.AmbulanceRules.milestoneBody("finalizado", "desviado", " Desviado a otro centro por saturación ", java.time.Instant.parse("2026-11-15T14:30:00Z")), ADMISSION)
     }

@@ -201,7 +201,7 @@ private fun NextStepButton(service: AmbulanceService, busy: Boolean, model: Ambu
     }
     if (finishing) {
         // MA-AMB-03: only the final states the API accepts for the milestones recorded so far.
-        val choices = AmbulanceLabels.finishChoices(service.finalStates).ifEmpty { AmbulanceLabels.earlyFinalStates }
+        val choices = AmbulanceRules.finishOptions(service)
         var finalState by rememberSaveable(service.id, choices.size) { mutableStateOf(choices.first().first) }
         var reason by rememberSaveable { mutableStateOf("") }
         ConfirmDialog(

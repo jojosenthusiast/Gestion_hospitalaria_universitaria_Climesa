@@ -47,6 +47,10 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     val state by authModel.state.collectAsStateWithLifecycle()
     var registering by rememberSaveable { mutableStateOf(false) }
     var resetting by rememberSaveable { mutableStateOf(false) }
+    // Review of #117: signing out with queued milestones warns that they stay on the phone until the same account returns.
+    var confirmingSignOut by rememberSaveable { mutableStateOf(false) }
+    val logout={if(authModel.hasPendingWrites())confirmingSignOut=true else authModel.signOut()}
+    if(confirmingSignOut&&state.account!=null)ConfirmDialog(title=stringResource(R.string.cerrar_sesion_pendiente_titulo),confirmLabel=stringResource(R.string.cerrar_sesion),onConfirm={confirmingSignOut=false;authModel.signOut()},onDismiss={confirmingSignOut=false},message=stringResource(R.string.cerrar_sesion_pendiente_detalle))
     val sessionStores:SessionStoreHolder=viewModel()
     // Logout or expired session: clear the account's ViewModels (data, coroutines and realtime subscriptions).
     LaunchedEffect(state.account?.session?.userId){if(state.account==null)sessionStores.end()}
@@ -57,7 +61,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
         state.account==null&&state.confirmationEmail!=null -> CheckEmailScreen(state,state.confirmationEmail!!,authModel::resendConfirmation){registering=false;authModel.confirmedSignIn(state.confirmationEmail!!)}
         state.account==null&&resetting -> PasswordResetScreen(state,authModel.draft.email,authModel::requestPasswordReset,backToLogin)
         state.account==null -> if(registering) RegistrationScreen(state,backToLogin,authModel::register) else LoginScreen(state,authModel.draft,authModel::signIn,authModel::resendConfirmation,{resetting=true;authModel.clearRegistration()}){registering=true;authModel.clearRegistration()}
-        else -> SessionViewModelScope(sessionStores,state.account!!.session.userId){AuthorizedWorkspace(state.account!!,dark,setDark,state.signingOut,authModel::signOut)}
+        else -> SessionViewModelScope(sessionStores,state.account!!.session.userId){AuthorizedWorkspace(state.account!!,dark,setDark,state.signingOut,logout)}
     }
 }
 @Composable private fun AccessPending(error:String?,retry:()->Unit,logout:()->Unit){

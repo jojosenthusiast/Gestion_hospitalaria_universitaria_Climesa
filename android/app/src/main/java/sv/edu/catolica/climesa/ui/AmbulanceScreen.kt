@@ -184,11 +184,11 @@ private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: Ambula
     status.dispatchBlock?.let { block -> item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_no_despachable) + ". " + block.message + " " + block.action) } }
     item { Text(stringResource(R.string.amb_solicitudes_titulo, status.pendingRequests.size), style = MaterialTheme.typography.titleMedium) }
     if (status.pendingRequests.isEmpty()) item { EmptyState(stringResource(R.string.amb_sin_solicitudes)) }
-    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, status.dispatchBlock != null, state.busy, model) }
+    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, status.dispatchBlock != null, state.busy, model, status.availableCrew) }
 }
 
 @Composable
-private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, hasBlock: Boolean, busy: Boolean, model: AmbulanceViewModel) {
+private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, hasBlock: Boolean, busy: Boolean, model: AmbulanceViewModel, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>) {
     var dispatching by rememberSaveable(request.id) { mutableStateOf(false) }
     var discarding by rememberSaveable(request.id) { mutableStateOf(false) }
     val waiting = remember(request.createdAt) { runCatching { java.time.Duration.between(java.time.Instant.parse(request.createdAt), java.time.Instant.now()).toMinutes().coerceAtLeast(0) }.getOrDefault(0L) }
@@ -201,23 +201,33 @@ private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean,
         SecondaryButton(stringResource(R.string.amb_descartar), { discarding = true }, enabled = !busy)
         if (!available && !hasBlock) NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_unidad_no_disponible))
     }
-    if (dispatching) DispatchDialog(busy, onClose = { dispatching = false }) { type, priority, destination -> dispatching = false; model.dispatch(request, type, priority, destination) }
+    if (dispatching) DispatchDialog(busy, crewPool, onClose = { dispatching = false }) { type, priority, destination, crew -> dispatching = false; model.dispatch(request, type, priority, destination, crew) }
     if (discarding) ReasonDialog(stringResource(R.string.amb_descartar), busy, onClose = { discarding = false }) { reason -> discarding = false; model.discard(request, reason) }
 }
 
 @Composable
-private fun DispatchDialog(busy: Boolean, onClose: () -> Unit, onConfirm: (String, String, String) -> Unit) {
+private fun DispatchDialog(busy: Boolean, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, onClose: () -> Unit, onConfirm: (String, String, String, List<String>) -> Unit) {
+    // MA-AMB-02: the dispatcher picks the crew among the staff on duty; it comes proposed (paramedic with account + driver).
+    var crew by rememberSaveable { mutableStateOf(AmbulanceRules.defaultCrew(crewPool)) }
     var type by rememberSaveable { mutableStateOf(AmbulanceLabels.types.first().first) }
     var priority by rememberSaveable { mutableStateOf("naranja") }
     var destination by rememberSaveable { mutableStateOf("Hospital CLIMESA, emergencia") }
     ConfirmDialog(
-        title = stringResource(R.string.amb_despachar), confirmLabel = stringResource(R.string.amb_despachar), onConfirm = { onConfirm(type, priority, destination) }, onDismiss = onClose, busy = busy,
+        title = stringResource(R.string.amb_despachar), confirmLabel = stringResource(R.string.amb_despachar), onConfirm = { onConfirm(type, priority, destination, crew) }, onDismiss = onClose, busy = busy,
+        confirmEnabled = AmbulanceRules.crewProblem(crewPool, crew) == null,
         message = stringResource(R.string.amb_confirmado_telefono),
         body = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Choices(AmbulanceLabels.types, type) { type = it }
                 Choices(AmbulanceLabels.priorities, priority) { priority = it }
                 FormField(stringResource(R.string.amb_destino), destination, { destination = it.take(300) }, singleLine = false)
+                Text(stringResource(R.string.amb_tripulacion), style = MaterialTheme.typography.titleSmall)
+                if (crewPool.isEmpty()) Text(stringResource(R.string.amb_sin_tripulacion_turno), style = MaterialTheme.typography.bodySmall)
+                crewPool.forEach { member ->
+                    val label = AmbulanceLabels.crewRole(member.role) + if (member.role == "paramedico" && !member.hasAccount) " · " + stringResource(R.string.amb_sin_cuenta) else ""
+                    FilterChip(selected = member.staffId in crew, onClick = { crew = if (member.staffId in crew) crew - member.staffId else crew + member.staffId }, label = { Text("${member.name} · $label") })
+                }
+                AmbulanceRules.crewProblem(crewPool, crew)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             }
         },
     )

@@ -7,6 +7,8 @@ import org.json.JSONObject
 data class AmbulanceUnit(val id: String, val plate: String, val state: String, val version: Int, val stateReason: String = "", val stateSince: String = "")
 data class AmbulanceMilestone(val type: String, val occurredAt: String)
 data class AmbulanceCrewMember(val staffId: String, val role: String, val name: String)
+/** MA-AMB-02: paramédico o motorista de turno que el despachador puede elegir (`availableCrew`). */
+data class CrewCandidate(val staffId: String, val role: String, val name: String, val hasAccount: Boolean)
 data class AmbulanceService(
     val id: String,
     val type: String,
@@ -32,7 +34,7 @@ data class AmbulanceRequestRow(
 /** Por qué no se puede despachar ahora y qué hacer; la calcula la API (RN-29, RN-30). */
 data class DispatchBlock(val code: String, val message: String, val action: String)
 /** `driverOnDuty` (RN-30): an older API without the key counts as covered, so it never raises a false alarm. */
-data class AmbulanceStatus(val unit: AmbulanceUnit, val activeService: AmbulanceService?, val paramedicOnDuty: Boolean, val pendingRequests: List<AmbulanceRequestRow>, val dispatchBlock: DispatchBlock? = null, val driverOnDuty: Boolean = true)
+data class AmbulanceStatus(val unit: AmbulanceUnit, val activeService: AmbulanceService?, val paramedicOnDuty: Boolean, val pendingRequests: List<AmbulanceRequestRow>, val dispatchBlock: DispatchBlock? = null, val driverOnDuty: Boolean = true, val availableCrew: List<CrewCandidate> = emptyList())
 /** Servicio de la bitácora: sin nombre del paciente, solo su expediente enmascarado. */
 data class AmbulanceLogEntry(
     val id: String, val type: String, val priority: String, val origin: String, val destination: String, val dispatchedAt: String, val finalState: String?, val responseMinutes: Int?,
@@ -105,6 +107,7 @@ object AmbulanceLabels {
     private val states = mapOf("disponible" to "Disponible", "en_servicio" to "En servicio", "en_mantenimiento" to "En mantenimiento")
     private val signs = mapOf("heartRate" to "Frecuencia cardiaca", "systolic" to "Presión sistólica", "diastolic" to "Presión diastólica", "respiratoryRate" to "Frecuencia respiratoria", "oxygenSaturation" to "Saturación", "temperature" to "Temperatura", "glasgow" to "Glasgow")
     fun milestone(code: String) = milestones[code] ?: code
+    fun crewRole(code: String) = mapOf("paramedico" to "Paramédico", "motorista" to "Motorista", "medico" to "Médico", "enfermero" to "Enfermería")[code] ?: "Personal"
     fun finalState(code: String?) = code?.let { finals[it] ?: it } ?: "En curso"
     fun unitState(code: String) = states[code] ?: code
     fun priority(code: String) = priorities.firstOrNull { it.first == code }?.second ?: code
@@ -133,8 +136,25 @@ object AmbulanceRules {
         .put("address", address.trim()).put("reason", reason.trim()).put("contactPhone", contactPhone.trim())
         .apply { if (municipality.isNotBlank()) put("municipality", municipality.trim()) }
 
-    fun dispatchBody(unitVersion: Int, requestId: String, type: String, priority: String, destination: String): JSONObject =
-        JSONObject().put("version", unitVersion).put("requestId", requestId).put("type", type).put("priority", priority).put("destination", destination.trim())
+    fun dispatchBody(unitVersion: Int, requestId: String, type: String, priority: String, destination: String, crew: List<String>): JSONObject =
+        JSONObject().put("version", unitVersion).put("requestId", requestId).put("type", type).put("priority", priority).put("destination", destination.trim()).put("crew", JSONArray(crew))
+
+    /** MA-AMB-02: crew proposed to the dispatcher: the first paramedic with an account (records milestones) and the first driver. */
+    fun defaultCrew(pool: List<CrewCandidate>) = listOfNotNull(pool.firstOrNull { it.role == "paramedico" && it.hasAccount }, pool.firstOrNull { it.role == "motorista" }).map { it.staffId }
+
+    /** What the chosen crew lacks (RN-30, BL-05); null when the API will accept it. */
+    fun crewProblem(pool: List<CrewCandidate>, chosen: List<String>): String? {
+        val picked = pool.filter { it.staffId in chosen }
+        return when {
+            picked.none { it.role == "paramedico" && it.hasAccount } -> "Elige un paramédico con cuenta en la app: registra los hitos del servicio."
+            picked.none { it.role == "motorista" } -> "Elige un motorista de turno para el servicio."
+            else -> null
+        }
+    }
+
+    /** Finish choices: the API's `finalStates`, or (older API) the same rule over the recorded milestones; never a static list. */
+    fun finishOptions(service: AmbulanceService) =
+        AmbulanceLabels.finishChoices(service.finalStates.ifEmpty { allowedFinalStates(service.milestones.map { it.type }) })
 
     /**
      * Finalizar antes de llegar al hospital exige estado final y motivo; desde el hospital es "completado".
@@ -178,7 +198,8 @@ object AmbulanceRules {
     fun cancelBody(version: Int, reason: String): JSONObject = JSONObject().put("version", version).apply { if (reason.isNotBlank()) put("reason", reason.trim().take(300)) }
 
     /** MA-AMB-04: cuerpo de `POST /ambulancia/servicios/{id}/recepcion` con la versión del servicio que se vio. */
-    fun handoverBody(view: PrehospitalView): JSONObject = JSONObject().put("version", view.version)
+    /** MA-AMB-04: no body fields; the API makes the handover unique without the service version (milestones keep changing it). */
+    @Suppress("UNUSED_PARAMETER") fun handoverBody(view: PrehospitalView): JSONObject = JSONObject()
 
     /** La solicitud que sigue la pantalla del paciente: la activa más reciente (por confirmar o en camino). */
     fun activeRequest(requests: List<OwnAmbulanceRequest>) = requests.firstOrNull { it.active }
@@ -294,7 +315,8 @@ object AmbulanceParser {
             AmbulanceRequestRow(it.text("id"), it.text("channel"), it.text("address"), it.text("municipality"), it.text("reason"), it.text("contactPhone"), it.text("createdAt"), it.optInt("version", 1), it.text("requesterName"), it.text("callerName"), it.text("patientRecord"))
         }
         val block = root.optJSONObject("dispatchBlock")?.let { DispatchBlock(it.text("code"), it.text("message"), it.text("action")) }
-        return AmbulanceStatus(AmbulanceUnit(unit.text("id"), unit.text("plate"), unit.text("state"), unit.optInt("version", 1), unit.text("stateReason"), unit.text("stateSince")), service, root.optBoolean("paramedicOnDuty"), pending, block, root.optBoolean("driverOnDuty", true))
+        val crew = objects(root.optJSONArray("availableCrew")).map { CrewCandidate(it.text("staffId"), it.text("role"), it.text("name"), it.optBoolean("hasAccount")) }
+        return AmbulanceStatus(AmbulanceUnit(unit.text("id"), unit.text("plate"), unit.text("state"), unit.optInt("version", 1), unit.text("stateReason"), unit.text("stateSince")), service, root.optBoolean("paramedicOnDuty"), pending, block, root.optBoolean("driverOnDuty", true), crew)
     }
 
     fun log(value: Any?): List<AmbulanceLogEntry> = objects(value as? JSONArray).map {

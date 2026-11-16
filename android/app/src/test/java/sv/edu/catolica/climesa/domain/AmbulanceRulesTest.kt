@@ -105,6 +105,24 @@ class AmbulanceRulesTest {
         assertEquals("Paciente fallecido", AmbulanceLabels.finalState("fallecido"))
     }
 
+    /** Review of #117: without `finalStates` (older API) the choices follow the recorded milestones, never a static list. */
+    @Test fun sinFinalStatesLasOpcionesSalenDeLosHitos() {
+        val beforeTransport = AmbulanceService("s1", "emergencia_domicilio", "roja", "A", "B", "", false, emptyList(), listOf(AmbulanceMilestone("salida", ""), AmbulanceMilestone("en_escena", "")), listOf("trasladando", "finalizado"))
+        assertEquals(listOf("sin_traslado", "rechaza_traslado", "fallecido", "cancelado"), AmbulanceRules.finishOptions(beforeTransport).map { it.first })
+        val transporting = beforeTransport.copy(milestones = beforeTransport.milestones + AmbulanceMilestone("trasladando", ""))
+        assertEquals(listOf("fallecido", "desviado", "cancelado"), AmbulanceRules.finishOptions(transporting).map { it.first })
+        assertEquals(listOf("desviado"), AmbulanceRules.finishOptions(transporting.copy(finalStates = listOf("desviado"))).map { it.first })
+    }
+
+    /** MA-AMB-02: crew proposed for dispatch and what is missing from a selection. */
+    @Test fun laTripulacionPropuestaYLoQueFalta() {
+        val pool = listOf(CrewCandidate("par-2", "paramedico", "Beto", false), CrewCandidate("par-1", "paramedico", "Ana", true), CrewCandidate("mot-1", "motorista", "Carlos", false))
+        assertEquals(listOf("par-1", "mot-1"), AmbulanceRules.defaultCrew(pool))
+        assertNull(AmbulanceRules.crewProblem(pool, listOf("par-1", "mot-1")))
+        assertEquals("Elige un paramédico con cuenta en la app: registra los hitos del servicio.", AmbulanceRules.crewProblem(pool, listOf("par-2", "mot-1")))
+        assertEquals(listOf("par-1", "mot-1"), AmbulanceRules.dispatchBody(5, "r1", "emergencia_domicilio", "roja", "Hospital", listOf("par-1", "mot-1")).getJSONArray("crew").let { a -> (0 until a.length()).map(a::getString) })
+    }
+
     /** MA-AMB-04 / MA-AMB-05: handover and own requests are read from the server, with the actions it allows. */
     @Test fun laEntregaYLasSolicitudesPropiasSeLeenConSusAcciones() {
         val view = AmbulanceParser.prehospital(JSONObject().put("serviceId", "s1").put("version", 4).put("active", false).put("arrived", true).put("clinical", true)

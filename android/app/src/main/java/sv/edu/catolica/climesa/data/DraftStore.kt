@@ -3,6 +3,7 @@ package sv.edu.catolica.climesa.data
 import android.content.Context
 import java.io.File
 import org.json.JSONObject
+import sv.edu.catolica.climesa.domain.FormDrafts
 
 /**
  * Local drafts of long forms not yet saved in the API (consultation, vital signs, prehospital report, admission
@@ -14,18 +15,28 @@ interface DraftStore {
     fun save(userId: String, key: String, value: JSONObject): Boolean
     fun load(userId: String, key: String): JSONObject?
     fun clear(userId: String, key: String)
-    /** Keeps only [userId]'s drafts: a device shared by two accounts never shows one the other's notes. */
-    fun retainOnly(userId: String)
-    fun clearAll()
+    /** Keeps only [userId]'s drafts (plus every account's [keep] keys): a shared device never shows one account another's notes. */
+    fun retainOnly(userId: String, keep: Set<String> = emptySet())
+    /** Drops every draft except the [keep] keys of each account. */
+    fun clearAll(keep: Set<String> = emptySet())
 }
 
 /**
  * Drops drafts when the session changes: every draft when it ends (manual sign-out, the 5-minute inactivity
  * sign-out in `MainActivity`, or an expired session) and every other account's drafts when one signs in.
+ * Pending writes ([PENDING_WRITES]: the paramedic's offline milestone and prehospital queues and the provisional patient)
+ * are not drafts: they stay in their owner's folder, are only read by that account and are sent when it signs in again.
  */
 class SessionDrafts(private val drafts: DraftStore) {
-    fun signedIn(userId: String) = drafts.retainOnly(userId)
-    fun ended() = drafts.clearAll()
+    fun signedIn(userId: String) = drafts.retainOnly(userId, PENDING_WRITES)
+    fun ended() = drafts.clearAll(PENDING_WRITES)
+    /** True when [userId] still has milestones or a prehospital report waiting for signal (sign-out warns about it). */
+    fun hasPendingWrites(userId: String) =
+        (drafts.load(userId, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.length() ?: 0) > 0 || drafts.load(userId, FormDrafts.PREHOSPITAL_QUEUE) != null
+
+    companion object {
+        val PENDING_WRITES = setOf(FormDrafts.MILESTONE_QUEUE, FormDrafts.PREHOSPITAL_QUEUE, FormDrafts.PROVISIONAL_PATIENT)
+    }
 }
 
 /** Never stores anything; the default for ViewModels built without a store (JVM tests, previews). */
@@ -33,8 +44,8 @@ object NoDraftStore : DraftStore {
     override fun save(userId: String, key: String, value: JSONObject) = false
     override fun load(userId: String, key: String): JSONObject? = null
     override fun clear(userId: String, key: String) = Unit
-    override fun retainOnly(userId: String) = Unit
-    override fun clearAll() = Unit
+    override fun retainOnly(userId: String, keep: Set<String>) = Unit
+    override fun clearAll(keep: Set<String>) = Unit
 }
 
 /**
@@ -61,12 +72,20 @@ class FileDraftStore(private val root: File) : DraftStore {
 
     @Synchronized override fun clear(userId: String, key: String) { runCatching { file(userId, key).delete() } }
 
-    @Synchronized override fun retainOnly(userId: String) {
-        val keep = safe(userId)
-        runCatching { root.listFiles()?.filter { it.name != keep }?.forEach { it.deleteRecursively() } }
+    @Synchronized override fun retainOnly(userId: String, keep: Set<String>) {
+        val own = safe(userId)
+        runCatching { root.listFiles()?.filter { it.name != own }?.forEach { dropExcept(it, keep) } }
     }
 
-    @Synchronized override fun clearAll() { runCatching { root.listFiles()?.forEach { it.deleteRecursively() } } }
+    @Synchronized override fun clearAll(keep: Set<String>) { runCatching { root.listFiles()?.forEach { dropExcept(it, keep) } } }
+
+    /** Deletes a user folder except the files of the [keep] keys; the folder goes too when nothing is left. */
+    private fun dropExcept(folder: File, keep: Set<String>) {
+        val names = keep.map { safe(it) + ".json" }.toSet()
+        if (!folder.isDirectory) { folder.deleteRecursively(); return }
+        folder.listFiles()?.filter { it.name !in names }?.forEach { it.deleteRecursively() }
+        if (folder.listFiles().isNullOrEmpty()) folder.delete()
+    }
 
     companion object {
         fun of(context: Context) = FileDraftStore(File(context.noBackupFilesDir, "borradores"))
