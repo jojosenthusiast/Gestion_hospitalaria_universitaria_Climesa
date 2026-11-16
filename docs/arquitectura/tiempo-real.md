@@ -85,8 +85,8 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `fila.actualizada` | `ticket_fila` | Emitir, llamar, atender, completar, ausencia, iniciar consulta desde la fila | `fila.ver`, `fila.llamar`, `fila.gestionar`, `usuario:<paciente>` | 105 |
 | `fila.llamado` / `fila.estado` | `publico` | Derivado en la base (número sin nombre) | `publico` | 112 |
 | `consulta.actualizada` | `consulta` | Iniciar, borrador, signos, diagnóstico, receta, firmar | `expediente.ver` y el permiso del paso; al firmar, `usuario:<paciente>` | 106 |
-| `laboratorio.actualizado` | `orden_laboratorio` | Ordenar, muestra, resultado, completar, cancelar | `laboratorio.ver_cola`, `resultados.ver` (el paciente solo al revisar) | 107 |
-| `laboratorio.critico` | `orden_laboratorio` | Resultado con marca crítica | `resultados.ver`, `laboratorio.ver_cola` (nunca el paciente) | 107 |
+| `laboratorio.actualizado` | `orden_laboratorio` | Ordenar, muestra, resultado, enmienda, completar, cancelar | `laboratorio.ver_cola`, `resultados.ver` (el paciente solo al revisar o si se enmienda un resultado ya liberado; la enmienda también va a `usuario:<médico que pidió>`) | 107 |
+| `laboratorio.critico` | `orden_laboratorio` | Resultado o enmienda con marca crítica | `laboratorio.ver_cola`, `usuario:<médico que pidió>` y `usuario:<tratante de la admisión activa>` (RN-25; ni los demás médicos ni el paciente; los canales de `resultados.ver` reciben a la vez `laboratorio.actualizado`) | 107 |
 | `admision.creada` / `admision.actualizada` / `admision.cama_asignada` | `admision` | Admisión, indicación, cama, autorizar, notas, alta, salida, traslado | `admision.ver`, `camas.asignar` o `camas.ver_tablero` | 108 |
 | `ambulancia.estado_cambiado` | `unidad` o `solicitud` | Mantenimiento, despacho, descarte, cierre | `ambulancia`, `ambulancia.despachar`, `usuario:<solicitante>` | 109 |
 | `ambulancia.solicitud_creada` | `solicitud` | Solicitud de paciente o recepción | `ambulancia`, `ambulancia.despachar`, `usuario:<paciente>` | 109 |

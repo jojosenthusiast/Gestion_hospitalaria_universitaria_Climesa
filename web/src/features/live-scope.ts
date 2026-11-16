@@ -32,6 +32,8 @@ const rules: [RegExp, (match: RegExpMatchArray) => LiveScope][] = [
   [/^\/consultas(\/|\?|$)/, () => of('consulta', 'cita', 'ticket_fila')],
   [/^\/fila(\/|\?|$)/, () => of('ticket_fila', 'cita', 'consulta')],
   [/^\/laboratorio\/catalogo(\?|$)/, () => []],
+  // The exam catalog has no events of its own: it is read again after saving or on reconnection (MA-LAB-06).
+  [/^\/catalogo\/examenes(\?|$)/, () => []],
   [/^\/laboratorio(\/|\?|$)/, () => of('orden_laboratorio')],
   [new RegExp(`^/admisiones/${uuid}/sugerencias-cama$`), () => of('cama', 'admision')],
   // Doctors available at admission time depend on who is on shift, not on admissions.

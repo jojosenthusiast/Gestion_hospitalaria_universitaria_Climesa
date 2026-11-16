@@ -173,6 +173,16 @@ object LaboratoryEvents {
     fun matches(event: EventoDominio) = LiveEntities.matches(event, "orden_laboratorio", "laboratorio")
 }
 
+/**
+ * RN-25: a critical value publishes `laboratorio.critico` on `orden_laboratorio`, only to the lab role and the requesting and attending doctor's
+ * `usuario:<id>` channel. Only an account that may review results gets the app-wide notice.
+ */
+object LabCriticalEvents {
+    const val TYPE = "laboratorio.critico"
+    fun notifies(event: EventoDominio, permissions: Collection<String>) =
+        event.type == TYPE && event.entity == "orden_laboratorio" && "laboratorio.revisar" in permissions
+}
+
 /** Consultation agenda: consultations publish `consulta.*`; appointments publish `cita.*`. */
 object ConsultationEvents {
     fun matches(event: EventoDominio) = LiveEntities.matches(event, "consulta", "cita")

@@ -100,7 +100,7 @@ describe('Fase 0 · módulos clínicos (API-01, REQ-08)', () => {
     expect(sample.status).toBe(201);
     const item = await t.one<{ id: string }>('SELECT id FROM laboratorio.orden_item WHERE orden_id=$1', [order.body.id]);
     expect((await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/completar`, { version: sample.body.version })).status).toBe(409);
-    const result = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/resultados`, { orderItemId: item.id, value: 13.2 });
+    const result = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/resultados`, { orderItemId: item.id, value: 13.2, version: sample.body.version });
     expect(result.status).toBe(201);
     expect(result.body.marca).toBe('normal');
     // API-10: every captured result moves the order version.

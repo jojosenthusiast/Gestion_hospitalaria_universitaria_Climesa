@@ -1,16 +1,21 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { Actor, contextsOf } from '../platform/actor';
+import { Actor, contextsOf, hasPermission } from '../platform/actor';
 import { ageOn, ageRange, fichaFields } from '../patients/patient.privacy';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
-import { LabCancelDto, LabOrderDto, LabPriority, LabResultDto, LabSampleDto, LabVersionDto } from './laboratory.dto';
-import { classifyLabValue, matchesDoubleIdentification } from './laboratory.rules';
+import { auditLabReads } from './lab-read-audit';
+import { LabAmendDto, LabCancelDto, LabOrderDto, LabPriority, LabResultDto, LabSampleDto, LabVersionDto } from './laboratory.dto';
+import { LabPermissions, classifyLabValue, labOrderActions, matchesDoubleIdentification } from './laboratory.rules';
 
 type Row = Record<string, any>;
+type ResultInput = { value?: number; text?: string; unit?: string };
+
+/** Admission states that count as "active" (same as the unique index `admision_activa_unica`). */
+const ACTIVE_ADMISSION = "('pendiente_cama','hospitalizado','alta_firmada')";
 
 @Injectable()
 export class LaboratoryService {
@@ -19,8 +24,8 @@ export class LaboratoryService {
   private async order(c: PoolClient, id: string, lock = false) {
     const row = (await c.query(`SELECT o.id,o.consulta_id AS "consultationId",o.paciente_id AS "patientId",o.medico_id AS "doctorId",
       o.prioridad AS priority,o.estado AS state,o.muestra_tomada_en AS "sampleTakenAt",o.completada_en AS "completedAt",
-      o.revisada_en AS "reviewedAt",o.version,coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName"
-      FROM laboratorio.orden o JOIN pacientes.paciente p ON p.id=o.paciente_id WHERE o.id=$1 ${lock ? 'FOR UPDATE' : ''}`, [id])).rows[0] as Row | undefined;
+      o.revisada_en AS "reviewedAt",o.enmendada_en AS "amendedAt",o.version,coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName"
+      FROM laboratorio.orden o JOIN pacientes.paciente p ON p.id=o.paciente_id WHERE o.id=$1 ${lock ? 'FOR UPDATE OF o' : ''}`, [id])).rows[0] as Row | undefined;
     if (!row) throw new NotFoundException('No se encontró la orden de laboratorio.');
     return row;
   }
@@ -30,12 +35,39 @@ export class LaboratoryService {
       FROM laboratorio.examen WHERE activo ORDER BY es_panel DESC,nombre,codigo`);
   }
 
-  async list(actor: Actor) {
+  /** Who reads: the lab queue (`x`), the patient's own reviewed results, or a doctor (orders it requested or may review). */
+  private scope(actor: Actor) {
     const lab = contextsOf(actor, 'laboratorio.ver_cola').includes('x');
-    const patient = contextsOf(actor, 'resultados.ver').includes('propio_revisado') && actor.patientId;
+    const patient = contextsOf(actor, 'resultados.ver').includes('propio_revisado') && actor.patientId ? actor.patientId : null;
     const doctor = actor.staffId && contextsOf(actor, 'resultados.ver').includes('relacion') ? actor.staffId : null;
     if (!lab && !patient && !doctor) throw new ForbiddenException('No tienes permiso para consultar órdenes de laboratorio.');
-    return this.orders(actor, lab, patient || null, doctor);
+    return { lab, patient, doctor };
+  }
+
+  async list(actor: Actor) {
+    const { lab, patient, doctor } = this.scope(actor);
+    return (await this.orders(actor, lab, patient, doctor)).map(({ reviewer: _reviewer, ...row }) => row);
+  }
+
+  /**
+   * GET /laboratorio/ordenes/{id} (MA-LAB-06): the same row the list shows, plus the cancel reason and, for whoever sees
+   * the values, the correction history of each result. Outside the reader's scope the order does not exist (404).
+   */
+  async detail(actor: Actor, id: string) {
+    const { lab, patient, doctor } = this.scope(actor);
+    const [found] = await this.orders(actor, lab, patient, doctor, id);
+    if (!found) throw new NotFoundException('No se encontró la orden de laboratorio.');
+    const { reviewer, ...row } = found;
+    const seesValues = lab || (!!doctor && (row.doctorId === doctor || !!reviewer));
+    const extra = await this.db.transaction(async c => {
+      const reason = (await c.query('SELECT motivo_cancelacion AS reason FROM laboratorio.orden WHERE id=$1', [id])).rows[0]?.reason ?? null;
+      const history = seesValues ? (await c.query(`SELECT h.orden_item_id AS "orderItemId",h.version,h.valor::float8 AS value,h.texto AS text,h.marca AS mark,
+          h.cambiado_en AS "changedAt",nullif(concat_ws(' ',m.nombres,m.apellidos),'') AS "changedByName",h.motivo AS reason
+        FROM laboratorio.resultado_historial h JOIN laboratorio.orden_item oi ON oi.id=h.orden_item_id LEFT JOIN personal.persona m ON m.id=h.cambiado_por
+        WHERE oi.orden_id=$1 ORDER BY h.cambiado_en DESC,h.version DESC`, [id])).rows : [];
+      return { cancellationReason: reason as string | null, history };
+    });
+    return { ...row, ...extra };
   }
 
   /**
@@ -44,31 +76,85 @@ export class LaboratoryService {
    */
   async mine(actor: Actor) {
     if (!actor.patientId || !contextsOf(actor, 'resultados.ver').includes('propio_revisado')) throw new ProblemException('sin_vinculacion', 404, 'Tu cuenta todavía no está vinculada a un expediente.');
-    return this.orders(actor, false, actor.patientId, null);
+    return (await this.orders(actor, false, actor.patientId, null)).map(({ reviewer: _reviewer, ...row }) => row);
   }
 
-  private async orders(actor: Actor, lab: boolean, patient: string | null, doctor: string | null) {
+  /**
+   * MA-LAB-01: the lab's open work (pending, in process) is never cut off; completed orders are capped to the latest 300.
+   * For a doctor, completed orders still waiting for review count as open too (that is the doctor's work).
+   * MA-LAB-03: only a reader with laboratorio.revisar who is a doctor (laboratorio.puede_revisar) also sees, with values,
+   * the completed orders it may review; other `relacion` readers (nursing) keep seeing only orders they requested.
+   * Every row read is audited in one batched insert.
+   */
+  private async orders(actor: Actor, lab: boolean, patient: string | null, doctor: string | null, only?: string) {
     const rows = await this.db.transaction(async c => {
-      const result = await c.query(`SELECT o.id,o.consulta_id AS "consultationId",o.paciente_id AS "patientId",o.medico_id AS "doctorId",
-      o.prioridad AS priority,o.estado AS state,o.creada_en AS "createdAt",o.muestra_tomada_en AS "sampleTakenAt",
-      o.completada_en AS "completedAt",o.revisada_en AS "reviewedAt",o.version,
-      coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
-      p.expediente AS "patientRecord",p.sexo AS "patientSex",p.nacimiento::text AS "birthRaw",m.nombres||' '||m.apellidos AS "doctorName",
-      coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'result',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND o.medico_id=$3 OR $2::boolean AND o.revisada_en IS NOT NULL) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
-      FROM laboratorio.orden o JOIN pacientes.paciente p ON p.id=o.paciente_id LEFT JOIN personal.persona m ON m.id=o.medico_id
-      LEFT JOIN laboratorio.orden_item oi ON oi.orden_id=o.id LEFT JOIN laboratorio.examen e ON e.id=oi.examen_id LEFT JOIN laboratorio.resultado r ON r.orden_item_id=oi.id
-      WHERE ($1::boolean AND o.estado IN ('pendiente','en_proceso','completado')) OR ($4::uuid IS NOT NULL AND o.paciente_id=$4) OR ($3::uuid IS NOT NULL AND o.medico_id=$3)
-      GROUP BY o.id,p.id,m.id ORDER BY o.creada_en DESC LIMIT 300`, [lab, !!patient, doctor, patient]);
-      for (const row of result.rows) await this.commands.audit(c, actor, { action: 'laboratorio.leer', entity: 'orden_laboratorio', entityId: row.id, patientId: row.patientId, permission: 'resultados.ver' });
+      const result = await c.query(`WITH alcance AS (
+          SELECT o.id,o.creada_en,(o.estado IN ('pendiente','en_proceso') OR (NOT $1::boolean AND o.estado='completado' AND o.revisada_en IS NULL)) AS abierta
+          FROM laboratorio.orden o
+          WHERE ($5::uuid IS NULL OR o.id=$5) AND (($1::boolean AND o.estado IN ('pendiente','en_proceso','completado'))
+            OR ($4::uuid IS NOT NULL AND o.paciente_id=$4)
+            OR ($3::uuid IS NOT NULL AND (o.medico_id=$3 OR ($7::boolean AND o.estado='completado' AND o.revisada_en IS NULL AND laboratorio.puede_revisar(o.id,$3,$6)))))
+        ), elegidas AS (
+          SELECT id FROM alcance WHERE abierta
+          UNION ALL (SELECT id FROM alcance WHERE NOT abierta ORDER BY creada_en DESC LIMIT 300)
+        ), filas AS (
+          SELECT o.*,($7::boolean AND $3::uuid IS NOT NULL AND laboratorio.puede_revisar(o.id,$3,$6)) AS revisor FROM laboratorio.orden o JOIN elegidas e ON e.id=o.id
+        )
+        SELECT o.id,o.consulta_id AS "consultationId",o.paciente_id AS "patientId",o.medico_id AS "doctorId",
+        o.prioridad AS priority,o.estado AS state,o.creada_en AS "createdAt",o.muestra_tomada_en AS "sampleTakenAt",
+        o.completada_en AS "completedAt",o.revisada_en AS "reviewedAt",o.enmendada_en AS "amendedAt",o.version,o.revisor AS reviewer,
+        coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
+        p.expediente AS "patientRecord",p.sexo AS "patientSex",p.nacimiento::text AS "birthRaw",m.nombres||' '||m.apellidos AS "doctorName",
+        count(oi.id)::int AS "itemCount",count(r.orden_item_id)::int AS "capturedCount",
+        coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'unit',e.unidad,'result',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND (o.medico_id=$3 OR o.revisor) OR $2::boolean AND o.revisada_en IS NOT NULL) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
+        FROM filas o JOIN pacientes.paciente p ON p.id=o.paciente_id LEFT JOIN personal.persona m ON m.id=o.medico_id
+        LEFT JOIN laboratorio.orden_item oi ON oi.orden_id=o.id LEFT JOIN laboratorio.examen e ON e.id=oi.examen_id LEFT JOIN laboratorio.resultado r ON r.orden_item_id=oi.id
+        GROUP BY o.id,o.consulta_id,o.paciente_id,o.medico_id,o.prioridad,o.estado,o.creada_en,o.muestra_tomada_en,o.completada_en,o.revisada_en,o.enmendada_en,o.version,o.revisor,p.id,m.id
+        ORDER BY o.creada_en DESC`, [lab, !!patient, doctor, patient, only ?? null, this.clock.now(), hasPermission(actor, 'laboratorio.revisar')]);
+      await auditLabReads(c, actor, this.clock.now(), result.rows);
       return result.rows;
     });
     // Ronda 2 (obs. 4): la edad respeta la privacidad de la ficha (exacta con fecha visible, por decenio con `rango`, nada sin permiso).
     const today = this.clock.today();
-    return rows.map(({ birthRaw, ...row }) => {
+    const can = this.permissionsOf(actor);
+    return rows.map(({ birthRaw, itemCount, capturedCount, ...row }) => {
       const fields = fichaFields(actor, actor.patientId === row.patientId);
       const age = birthRaw ? ageOn(String(birthRaw).slice(0, 10), today) : null;
-      return { ...row, patientAge: fields.birth ? age : null, patientAgeRange: fields.ageRange ? ageRange(age) : null };
+      const allowedActions = labOrderActions({ state: row.state, reviewed: !!row.reviewedAt, allCaptured: itemCount > 0 && itemCount === capturedCount, reviewer: !!row.reviewer, own: !!actor.staffId && row.doctorId === actor.staffId }, can);
+      return { ...row, patientAge: fields.birth ? age : null, patientAgeRange: fields.ageRange ? ageRange(age) : null, allowedActions } as Row;
     });
+  }
+
+  private permissionsOf(actor: Actor): LabPermissions {
+    const cancel = contextsOf(actor, 'laboratorio.cancelar');
+    return {
+      process: contextsOf(actor, 'laboratorio.procesar').includes('x'),
+      validate: contextsOf(actor, 'laboratorio.validar').includes('x'),
+      review: hasPermission(actor, 'laboratorio.revisar'),
+      cancelAny: cancel.includes('x'),
+      cancelOwn: cancel.includes('autor'),
+    };
+  }
+
+  /** Active accounts of staff members. */
+  private async staffAccounts(c: PoolClient, staffIds: Array<string | null | undefined>) {
+    const ids = [...new Set(staffIds.filter((id): id is string => !!id))];
+    if (!ids.length) return [];
+    return (await c.query(`SELECT id FROM acceso.usuario WHERE persona_personal_id=ANY($1::uuid[]) AND estado='activo'`, [ids])).rows.map(r => r.id as string);
+  }
+
+  /**
+   * RN-25, MA-LAB-04: a result always publishes `laboratorio.actualizado` to the role channels (plus `users`, e.g. the
+   * patient after an amendment, never with values). A critical mark also publishes `laboratorio.critico`, but only to the
+   * lab role and to the own `usuario:` channel of the requesting doctor and of the attending doctor of the patient's
+   * active admission: other doctors and the patient never get the critical notice.
+   */
+  private async publishResult(c: PoolClient, order: Row, version: number, critical: boolean, users: Array<string | null> = []) {
+    await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', order.id, version, await channelsFor(c, ['resultados.ver', 'laboratorio.ver_cola'], { users }));
+    if (!critical) return;
+    const attending = (await c.query(`SELECT medico_tratante_id AS id FROM hospitalizacion.admision WHERE paciente_id=$1 AND estado IN ${ACTIVE_ADMISSION}`, [order.patientId])).rows.map(r => r.id as string);
+    const doctors = await this.staffAccounts(c, [order.doctorId, ...attending]);
+    await this.commands.event(c, 'laboratorio.critico', 'orden_laboratorio', order.id, version, await channelsFor(c, ['laboratorio.ver_cola'], { users: doctors }));
   }
 
   async create(actor: Actor, dto: LabOrderDto, key?: string) {
@@ -116,38 +202,89 @@ export class LaboratoryService {
     return this.commands.run(actor, `laboratorio.procesar:${id}:resultado:${dto.orderItemId}`, key, dto, async c => {
       const old = await this.order(c, id, true);
       if (old.state !== 'en_proceso') throw new ConflictException('La orden debe estar en proceso para capturar resultados.');
-      // API-10, N-18: two technicians cannot overwrite each other; every capture moves the order version.
-      if (dto.version !== undefined && old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
-      const item = (await c.query(`SELECT oi.id,e.id AS "examId",e.tipo_resultado AS "resultType",e.unidad AS unit,p.sexo AS sex,
-        CASE WHEN p.precision_nacimiento='exacta' THEN date_part('year',age((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,p.nacimiento))::int
-             WHEN p.precision_nacimiento='estimada' THEN p.edad_estimada + date_part('year',age((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,p.edad_estimada_en))::int END AS age,
-        (o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date AS "sampleDate"
-        FROM laboratorio.orden_item oi JOIN laboratorio.examen e ON e.id=oi.examen_id
-        JOIN laboratorio.orden o ON o.id=oi.orden_id JOIN pacientes.paciente p ON p.id=o.paciente_id
-        WHERE oi.id=$1 AND oi.orden_id=$2`, [dto.orderItemId, id])).rows[0];
-      if (!item) throw new BadRequestException('El examen no pertenece a esta orden.');
-      if (dto.value === undefined && dto.text === undefined) throw new BadRequestException('Captura un valor numérico o un resultado textual.');
-      if (item.resultType === 'numerico' && (dto.value === undefined || dto.text !== undefined)) throw new BadRequestException('Este examen requiere un valor numérico.');
-      if (item.resultType === 'texto' && (dto.text === undefined || dto.value !== undefined)) throw new BadRequestException('Este examen requiere un resultado textual.');
-      if (dto.unit !== undefined && dto.unit !== item.unit) throw new BadRequestException('La unidad debe coincidir con el catálogo del examen.');
+      // API-10, N-18, MA-LAB-01: two technicians cannot overwrite each other; every capture moves the order version.
+      if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
+      const item = await this.item(c, id, dto.orderItemId);
+      this.checkValue(item, dto);
       const previous = (await c.query('SELECT * FROM laboratorio.resultado WHERE orden_item_id=$1 FOR UPDATE', [dto.orderItemId])).rows[0];
       if (previous && !dto.reason?.trim()) throw new BadRequestException('Indica el motivo para corregir un resultado existente.');
-      const ranges = dto.value === undefined ? [] : (await c.query(`SELECT id,minimo,maximo,critico_bajo,critico_alto FROM laboratorio.rango_referencia
-        WHERE examen_id=$1 AND (sexo=$2 OR sexo='cualquiera') AND $3::int <@ edad_anios AND $4::date <@ vigencia
-        ORDER BY (sexo=$2) DESC LIMIT 1`, [item.examId, item.sex, item.age, item.sampleDate])).rows;
-      const range = ranges[0];
-      const value = dto.value;
-      const mark = classifyLabValue(value, range);
-      if (previous) await c.query(`INSERT INTO laboratorio.resultado_historial(orden_item_id,version,valor,texto,marca,cambiado_por,motivo)
-        VALUES($1,$2,$3,$4,$5,$6,$7)`, [dto.orderItemId, previous.version, previous.valor, previous.texto, previous.marca, actor.staffId, dto.reason!.trim()]);
-      const row = (await c.query(`INSERT INTO laboratorio.resultado(orden_item_id,valor,texto,marca,rango_id,capturado_por) VALUES($1,$2,$3,$4,$5,$6)
-        ON CONFLICT (orden_item_id) DO UPDATE SET valor=EXCLUDED.valor,texto=EXCLUDED.texto,marca=EXCLUDED.marca,rango_id=EXCLUDED.rango_id,capturado_por=EXCLUDED.capturado_por,capturado_en=now(),version=laboratorio.resultado.version+1
-        RETURNING orden_item_id AS "orderItemId",valor,texto,marca,version`, [dto.orderItemId, value ?? null, dto.text ?? null, mark, range?.id ?? null, actor.staffId])).rows[0];
+      const { mark, range } = await this.mark(c, item, dto.value);
+      if (previous) await this.archive(c, actor, previous, dto.reason!.trim());
+      const row = await this.store(c, actor, dto.orderItemId, dto, mark, range);
       await this.commands.audit(c, actor, { action: previous ? 'laboratorio.resultado_corregido' : 'laboratorio.resultado', entity: 'resultado_laboratorio', entityId: dto.orderItemId, patientId: old.patientId, permission: 'laboratorio.procesar', reason: dto.reason, detail: { mark, rangeId: range?.id ?? null } });
       const order = (await c.query('UPDATE laboratorio.orden SET version=version+1 WHERE id=$1 RETURNING version', [id])).rows[0];
-      await this.commands.event(c, mark.startsWith('critico_') ? 'laboratorio.critico' : 'laboratorio.actualizado', 'orden_laboratorio', id, order.version, await channelsFor(c, ['resultados.ver', 'laboratorio.ver_cola']));
+      await this.publishResult(c, old, order.version, mark.startsWith('critico_'));
       return { ...row, orderVersion: order.version };
     });
+  }
+
+  /**
+   * POST /laboratorio/ordenes/{id}/enmendar (MA-LAB-02, D-13, D-040): corrects a result of a completed order, even one
+   * already released. The previous value goes to the history with the reason; the order stays `completado` (the
+   * validar_orden trigger does not allow leaving it) and goes back to the doctor's review, so the patient stops seeing
+   * the values until a doctor releases them again.
+   */
+  async amend(actor: Actor, id: string, dto: LabAmendDto, key?: string) {
+    return this.commands.run(actor, `laboratorio.validar:${id}:enmienda:${dto.orderItemId}`, key, dto, async c => {
+      const old = await this.order(c, id, true);
+      if (old.state !== 'completado') throw new ConflictException('Solo se enmienda el resultado de una orden completada; mientras está en proceso se corrige en la captura.');
+      if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
+      const item = await this.item(c, id, dto.orderItemId);
+      this.checkValue(item, dto);
+      const previous = (await c.query('SELECT * FROM laboratorio.resultado WHERE orden_item_id=$1 FOR UPDATE', [dto.orderItemId])).rows[0];
+      if (!previous) throw new ConflictException('Este examen no tiene un resultado que enmendar.');
+      const { mark, range } = await this.mark(c, item, dto.value);
+      await this.archive(c, actor, previous, dto.reason.trim());
+      const row = await this.store(c, actor, dto.orderItemId, dto, mark, range);
+      const order = (await c.query(`UPDATE laboratorio.orden SET revisada_en=NULL,revisada_por=NULL,enmendada_en=$2,enmendada_por=$3,version=version+1 WHERE id=$1 RETURNING version`, [id, this.clock.now(), actor.staffId])).rows[0];
+      const wasReleased = !!old.reviewedAt;
+      await this.commands.audit(c, actor, { action: 'laboratorio.resultado_enmendado', entity: 'resultado_laboratorio', entityId: dto.orderItemId, patientId: old.patientId, permission: 'laboratorio.validar', reason: dto.reason, detail: { mark, rangeId: range?.id ?? null, previousVersion: previous.version, wasReleased } });
+      // The requesting doctor must review again; if the values were already released, the patient sees them go back to
+      // review through a plain update (SEG-05, D-040: never the critical notice, never values).
+      const users = [...await this.staffAccounts(c, [old.doctorId]), wasReleased ? await patientAccount(c, old.patientId) : null];
+      await this.publishResult(c, old, order.version, mark.startsWith('critico_'), users);
+      return { ...row, orderVersion: order.version };
+    });
+  }
+
+  private async item(c: PoolClient, orderId: string, orderItemId: string) {
+    const item = (await c.query(`SELECT oi.id,e.id AS "examId",e.tipo_resultado AS "resultType",e.unidad AS unit,p.sexo AS sex,
+      CASE WHEN p.precision_nacimiento='exacta' THEN date_part('year',age((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,p.nacimiento))::int
+           WHEN p.precision_nacimiento='estimada' THEN p.edad_estimada + date_part('year',age((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,p.edad_estimada_en))::int END AS age,
+      (o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date AS "sampleDate"
+      FROM laboratorio.orden_item oi JOIN laboratorio.examen e ON e.id=oi.examen_id
+      JOIN laboratorio.orden o ON o.id=oi.orden_id JOIN pacientes.paciente p ON p.id=o.paciente_id
+      WHERE oi.id=$1 AND oi.orden_id=$2`, [orderItemId, orderId])).rows[0] as Row | undefined;
+    if (!item) throw new BadRequestException('El examen no pertenece a esta orden.');
+    return item;
+  }
+
+  private checkValue(item: Row, dto: ResultInput) {
+    if (dto.value === undefined && dto.text === undefined) throw new BadRequestException('Captura un valor numérico o un resultado textual.');
+    if (item.resultType === 'numerico' && (dto.value === undefined || dto.text !== undefined)) throw new BadRequestException('Este examen requiere un valor numérico.');
+    if (item.resultType === 'texto' && (dto.text === undefined || dto.value !== undefined)) throw new BadRequestException('Este examen requiere un resultado textual.');
+    if (dto.unit !== undefined && dto.unit !== item.unit) throw new BadRequestException('La unidad debe coincidir con el catálogo del examen.');
+  }
+
+  /** The mark is always computed with the range valid on the sample date (RN-24), never chosen by the client. */
+  private async mark(c: PoolClient, item: Row, value?: number) {
+    const ranges = value === undefined ? [] : (await c.query(`SELECT id,minimo,maximo,critico_bajo,critico_alto FROM laboratorio.rango_referencia
+      WHERE examen_id=$1 AND (sexo=$2 OR sexo='cualquiera') AND $3::int <@ edad_anios AND $4::date <@ vigencia
+      ORDER BY (sexo=$2) DESC LIMIT 1`, [item.examId, item.sex, item.age, item.sampleDate])).rows;
+    const range = ranges[0] as Row | undefined;
+    return { mark: classifyLabValue(value, range as any), range };
+  }
+
+  /** Rule 6: nothing clinical is deleted; the replaced value stays in the history with who changed it and why. */
+  private async archive(c: PoolClient, actor: Actor, previous: Row, reason: string) {
+    await c.query(`INSERT INTO laboratorio.resultado_historial(orden_item_id,version,valor,texto,marca,cambiado_por,motivo)
+      VALUES($1,$2,$3,$4,$5,$6,$7)`, [previous.orden_item_id, previous.version, previous.valor, previous.texto, previous.marca, actor.staffId, reason]);
+  }
+
+  private async store(c: PoolClient, actor: Actor, orderItemId: string, dto: ResultInput, mark: string, range?: Row) {
+    return (await c.query(`INSERT INTO laboratorio.resultado(orden_item_id,valor,texto,marca,rango_id,capturado_por) VALUES($1,$2,$3,$4,$5,$6)
+      ON CONFLICT (orden_item_id) DO UPDATE SET valor=EXCLUDED.valor,texto=EXCLUDED.texto,marca=EXCLUDED.marca,rango_id=EXCLUDED.rango_id,capturado_por=EXCLUDED.capturado_por,capturado_en=now(),version=laboratorio.resultado.version+1
+      RETURNING orden_item_id AS "orderItemId",valor,texto,marca,version`, [orderItemId, dto.value ?? null, dto.text ?? null, mark, range?.id ?? null, actor.staffId])).rows[0];
   }
 
   async complete(actor: Actor, id: string, dto: LabVersionDto, key?: string) {
@@ -167,11 +304,13 @@ export class LaboratoryService {
   async review(actor: Actor, id: string, dto: LabVersionDto, key?: string) {
     return this.commands.run(actor, `laboratorio.revisar:${id}`, key, dto, async c => {
       const old = await this.order(c, id, true);
-      if (old.doctorId !== actor.staffId) throw new ForbiddenException('Solo el médico responsable puede revisar esta orden.');
+      // MA-LAB-03: requester, attending doctor, current care relationship or an on-duty substitute of the order's area after the grace period.
+      const allowed = !!actor.staffId && !!(await c.query('SELECT laboratorio.puede_revisar($1,$2,$3) AS ok', [id, actor.staffId, this.clock.now()])).rows[0]?.ok;
+      if (!allowed) throw new ForbiddenException('Solo revisa el médico que pidió la orden, el tratante, un médico con relación de atención vigente o, pasado el plazo sin revisión, un médico de turno del área de la orden.');
       if (old.state !== 'completado') throw new ConflictException('La orden debe estar completada antes de revisarla.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
       const row = (await c.query(`UPDATE laboratorio.orden SET revisada_en=$2,revisada_por=$3,version=version+1 WHERE id=$1 RETURNING id,version,revisada_en AS "reviewedAt"`, [id, this.clock.now(), actor.staffId])).rows[0];
-      await this.commands.audit(c, actor, { action: 'laboratorio.revisar', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.revisar' });
+      await this.commands.audit(c, actor, { action: 'laboratorio.revisar', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.revisar', detail: { substitute: old.doctorId !== actor.staffId } });
       // SEG-05: the patient hears about the order only once the doctor reviews and releases it (`propio_revisado`).
       await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['resultados.ver'], { users: [await patientAccount(c, old.patientId)] }));
       return row;

@@ -79,6 +79,37 @@ class ClinicalLiveViewModelsTest {
         assertNull(vm.state.value.error)
     }
 
+    private fun cancellableOrder() = sv.edu.catolica.climesa.domain.LaboratoryOrder("o1", "Ana", "rutina", "pendiente", 3, emptyList(), false, allowedActions = setOf("cancelar"))
+
+    @Test fun laboratoryCancelNeedsAReasonBeforeCallingTheApi() = runTest(dispatcher) {
+        val api = FakeGateway(); val vm = LaboratoryViewModel(api, ClinicalSignalBus())
+        vm.openCancel("o1"); vm.setCancelReason("corto"); vm.confirmCancel(cancellableOrder()); runCurrent()
+        assertEquals(0, api.calls.count { it.second == "POST" })
+        assertEquals("Indica el motivo, de al menos 10 caracteres.", vm.state.value.cancelError)
+        assertEquals("o1", vm.state.value.cancelOrderId)
+    }
+
+    @Test fun laboratoryCancelSendsVersionAndReasonThenClosesTheDialog() = runTest(dispatcher) {
+        val api = FakeGateway(); val vm = LaboratoryViewModel(api, ClinicalSignalBus())
+        vm.openCancel("o1"); vm.setCancelReason("  Paciente no se presentó  "); vm.confirmCancel(cancellableOrder()); runCurrent()
+        val post = api.calls.single { it.second == "POST" }
+        assertEquals("/laboratorio/ordenes/o1/cancelar", post.first)
+        assertEquals(3, post.third!!.getInt("version"))
+        assertEquals("Paciente no se presentó", post.third!!.getString("reason"))
+        assertEquals("Orden cancelada.", vm.state.value.notice)
+        assertNull(vm.state.value.cancelOrderId)
+        assertEquals("", vm.state.value.cancelReason)
+    }
+
+    @Test fun laboratoryCancelErrorStaysInTheDialogInSpanish() = runTest(dispatcher) {
+        val api = FakeGateway(); val vm = LaboratoryViewModel(api, ClinicalSignalBus())
+        api.failures["/laboratorio/ordenes/o1/cancelar"] = sv.edu.catolica.climesa.data.AuthRequestException("La orden cambió.", 409, "version_conflicto")
+        vm.openCancel("o1"); vm.setCancelReason("Paciente no se presentó"); vm.confirmCancel(cancellableOrder()); runCurrent()
+        assertEquals("o1", vm.state.value.cancelOrderId)
+        assertFalse(vm.state.value.cancelError.isNullOrBlank())
+        assertNull(vm.state.value.notice)
+    }
+
     @Test fun laboratoryReloadsOnLaboratoryEvents() = runTest(dispatcher) {
         val api = FakeGateway(); val bus = ClinicalSignalBus()
         val vm = LaboratoryViewModel(api, bus)

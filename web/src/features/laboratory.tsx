@@ -11,8 +11,11 @@ import './listas/lists.css';
 
 type LabResult = { value?: number | null; text?: string | null; mark: string; version: number };
 const sexShort: Record<string, string> = { femenino: 'F', masculino: 'M' };
-type LabItem = { id: string; code: string; name: string; result?: LabResult | null };
-type LabOrder = { id: string; patientName: string; patientRecord?: string | null; patientSex?: string | null; patientAge?: number | null; patientAgeRange?: string | null; doctorName?: string | null; priority: string; state: string; version: number; createdAt: string; sampleTakenAt?: string | null; completedAt?: string | null; reviewedAt?: string | null; items: LabItem[] };
+type LabItem = { id: string; code: string; name: string; unit?: string | null; result?: LabResult | null };
+/** `allowedActions` of the API (MA-LAB-01..05): every button below comes from this list, never from role or state guesses. */
+type LabAction = 'tomar_muestra' | 'capturar' | 'completar' | 'revisar' | 'cancelar' | 'enmendar';
+type LabOrder = { id: string; patientName: string; patientRecord?: string | null; patientSex?: string | null; patientAge?: number | null; patientAgeRange?: string | null; doctorName?: string | null; priority: string; state: string; version: number; createdAt: string; sampleTakenAt?: string | null; completedAt?: string | null; reviewedAt?: string | null; amendedAt?: string | null; items: LabItem[]; allowedActions?: LabAction[] };
+const allows = (order: LabOrder, action: LabAction) => (order.allowedActions ?? []).includes(action);
 
 /** Pasos que recorre una orden, en orden. Cada uno se marca solo con lo que la orden ya registró. */
 export const LAB_STEPS = ['Solicitada', 'Muestra tomada', 'En proceso', 'Completada', 'Revisada por médico', 'Visible al paciente'] as const;
@@ -37,6 +40,7 @@ export function nextActor(order: LabOrder): { who: string; what: string } | null
 }
 
 const stageLabel = (order: LabOrder, canReview: boolean) => {
+  if (order.state === 'completado' && order.amendedAt && !order.reviewedAt) return 'Resultado corregido · falta revisión médica';
   if (order.state === 'completado') return order.reviewedAt ? 'Revisada · visible al paciente' : canReview ? 'Pendiente de revisar' : 'Completada · falta revisión médica';
   if (order.state === 'pendiente') return 'Pendiente';
   return undefined;
@@ -56,7 +60,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
   const data = useData<LabOrder[]>(api, '/laboratorio/ordenes', version, can(profile, 'laboratorio.ver_cola') || can(profile, 'resultados.ver'));
   const [sampleFor, setSampleFor] = useState<LabOrder | null>(null), [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState(''), [stage, setStage] = useState<StageFilter>('todas'), [urgentOnly, setUrgentOnly] = useState(false), [criticalOnly, setCriticalOnly] = useState(false), [sort, setSort] = useState<WorkSort>('prioridad');
-  const [quick, consumeQuick] = useQuickAction(), isLab = can(profile, 'laboratorio.procesar'), canReview = can(profile, 'laboratorio.revisar');
+  const [quick, consumeQuick] = useQuickAction(), isLab = can(profile, 'laboratorio.procesar');
   const all = data.data ?? [];
   // El reloj se lee al pintar: cada evento en vivo vuelve a pintar la lista, así no hace falta ningún temporizador.
   const now = Date.now();
@@ -74,7 +78,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
   // `?accion=muestra`: abre la toma de muestra de la primera orden pendiente (la más antigua de la cola).
   useEffect(() => {
     if (!quick || !data.data) return;
-    if (quick === 'muestra' && isLab) { const first = [...data.data].reverse().find(o => o.state === 'pendiente'); if (first) { setSelectedId(first.id); setSampleFor(first); } }
+    if (quick === 'muestra' && isLab) { const first = [...data.data].reverse().find(o => allows(o, 'tomar_muestra')); if (first) { setSelectedId(first.id); setSampleFor(first); } }
     consumeQuick();
   }, [quick, data.data, isLab, consumeQuick]);
   const exportTable = () => ({
@@ -99,7 +103,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
         <p className="cl-count" aria-live="polite">{rows.length} de {all.length} órdenes · las urgentes y las que más esperan aparecen primero.</p>
         <div className="cl-master-detail">
           <ul className="cl-master" aria-label="Órdenes de laboratorio">{rows.map(order => <LabWorkRow key={order.id} order={order} now={now} current={order.id === selected?.id} onSelect={() => setSelectedId(order.id)} />)}</ul>
-          {selected && <LabDetail key={selected.id} api={api} profile={profile} order={selected} canReview={canReview} onChanged={data.refresh} onSample={() => setSampleFor(selected)} />}
+          {selected && <LabDetail key={selected.id} api={api} order={selected} onChanged={data.refresh} onSample={() => setSampleFor(selected)} />}
         </div></>
         : all.length ? <Empty title="Ninguna orden coincide con los filtros" description="Quita algún filtro o cambia lo que buscas." />
           : <Empty title="No hay órdenes de laboratorio" description="Las órdenes aparecerán cuando Medicina solicite estudios para una consulta." />}
@@ -132,26 +136,26 @@ function LabStepper({ order }: { order: LabOrder }) {
 }
 
 /** Panel de detalle: datos de la orden, avance por pasos, acciones y valores de cada examen. */
-function LabDetail({ api, profile, order, canReview, onChanged, onSample }: { api: Api; profile: AccessProfile; order: LabOrder; canReview: boolean; onChanged: () => void; onSample: () => void }) {
+function LabDetail({ api, order, onChanged, onSample }: { api: Api; order: LabOrder; onChanged: () => void; onSample: () => void }) {
   const action = useAction(api), [cancelOpen, setCancelOpen] = useState(false);
-  const isLab = can(profile, 'laboratorio.procesar'), canComplete = can(profile, 'laboratorio.validar') || isLab;
   const { captured, total } = labProgress(order), ready = total > 0 && captured === total, next = nextActor(order), stage = stageOf(order);
   const when = (value?: string | null) => value ? formatDateTime(value) : 'Pendiente';
   async function transition(path: string, body: unknown) { if (await action.run(path, body)) onChanged(); }
   return <aside className="cl-detail" aria-label={`Detalle de la orden de ${order.patientName}`}>
-    <header><StageChip stage={stage} /><h3>{order.patientName}</h3><p className="muted">{patientLine(order) || 'Sin datos del expediente'}</p><Tag value={order.state} label={stageLabel(order, canReview)} />
+    <header><StageChip stage={stage} /><h3>{order.patientName}</h3><p className="muted">{patientLine(order) || 'Sin datos del expediente'}</p><Tag value={order.state} label={stageLabel(order, allows(order, 'revisar'))} />
       {next && <small className="lab-next"><strong>Ahora: {next.who}</strong> {next.what}</small>}</header>
     <dl className="cl-facts"><div><dt>Prioridad</dt><dd>{order.priority === 'urgente' ? 'Urgente' : 'Rutina'}</dd></div><div><dt>Pidió</dt><dd>{order.doctorName ?? 'Sin dato'}</dd></div><div><dt>Solicitada</dt><dd>{formatDateTime(order.createdAt)}</dd></div><div><dt>Muestra</dt><dd>{when(order.sampleTakenAt)}</dd></div><div><dt>Completada</dt><dd>{when(order.completedAt)}</dd></div><div><dt>Revisada</dt><dd>{when(order.reviewedAt)}</dd></div></dl>
     <LabStepper order={order} />
     <WriteError error={action.error} onReload={onChanged} reloadLabel="Recargar la orden" />
     <div className="lw-actions">
-      {isLab && order.state === 'pendiente' && <button className="primary-button" onClick={onSample}>Tomar muestra</button>}
-      {canComplete && order.state === 'en_proceso' && <button className="primary-button" disabled={!ready || action.busy} title={ready ? undefined : `Faltan ${total - captured} valores para completar`} onClick={() => void transition(`/laboratorio/ordenes/${order.id}/completar`, { version: order.version })}>Completar</button>}
-      {canReview && order.state === 'completado' && !order.reviewedAt && <button className="primary-button" disabled={action.busy} onClick={() => void transition(`/laboratorio/ordenes/${order.id}/revisar`, { version: order.version })}>Revisar y liberar</button>}
-      {can(profile, 'laboratorio.cancelar') && (order.state === 'pendiente' || order.state === 'en_proceso') && <button className="secondary-button" onClick={() => setCancelOpen(true)}>Cancelar orden</button>}
+      {allows(order, 'tomar_muestra') && <button className="primary-button" onClick={onSample}>Tomar muestra</button>}
+      {(allows(order, 'completar') || allows(order, 'capturar')) && <button className="primary-button" disabled={!allows(order, 'completar') || action.busy} title={allows(order, 'completar') ? undefined : `Faltan ${total - captured} valores para completar`} onClick={() => void transition(`/laboratorio/ordenes/${order.id}/completar`, { version: order.version })}>Completar</button>}
+      {allows(order, 'revisar') && <button className="primary-button" disabled={action.busy} onClick={() => void transition(`/laboratorio/ordenes/${order.id}/revisar`, { version: order.version })}>Revisar y liberar</button>}
+      {allows(order, 'cancelar') && <button className="secondary-button" onClick={() => setCancelOpen(true)}>Cancelar orden</button>}
     </div>
-    {order.state === 'en_proceso' && isLab && <p className={`lab-requirement ${ready ? 'is-ready' : ''}`} role="status">Para completar la orden hace falta el valor de todos los exámenes: {captured} de {total} capturados{ready ? ' · lista para completar' : ''}.</p>}
-    <div className="lab-order-detail">{order.items.map(item => <LabItemRow key={item.id} api={api} profile={profile} order={order} item={item} onChanged={onChanged} />)}</div>
+    {order.amendedAt && <p className="lab-requirement" role="note">Un resultado se corrigió el {formatDateTime(order.amendedAt)}; el valor anterior queda en el historial.{order.reviewedAt ? '' : ' Medicina debe revisarlo de nuevo antes de que el paciente lo vea.'}</p>}
+    {allows(order, 'capturar') && <p className={`lab-requirement ${ready ? 'is-ready' : ''}`} role="status">Para completar la orden hace falta el valor de todos los exámenes: {captured} de {total} capturados{ready ? ' · lista para completar' : ''}.</p>}
+    <div className="lab-order-detail">{order.items.map(item => <LabItemRow key={item.id} api={api} order={order} item={item} onChanged={onChanged} />)}</div>
     {cancelOpen && <CancelDialog api={api} order={order} onClose={() => setCancelOpen(false)} onSaved={() => { setCancelOpen(false); onChanged(); }} />}
   </aside>;
 }
@@ -174,10 +178,31 @@ function SampleDialog({ api, order, onClose, onSaved }: { api: Api; order: LabOr
   return <Dialog title="Confirmar identidad para toma de muestra" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}><p className="form-intro">Confirma dos datos independientes antes de tomar la muestra: expediente y nombre completo.</p><WriteError error={action.error} onReload={onSaved} /><Field label="Número de expediente" value={expediente} onChange={setExpediente} required autoFocus /><Field label="Nombre completo" value={nombreCompleto} onChange={setNombreCompleto} required /><div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose}>Cancelar</button><button className="primary-button" type="submit" disabled={action.busy || !expediente.trim() || !nombreCompleto.trim()}>Confirmar identidad</button></div></form></Dialog>;
 }
 
-function LabItemRow({ api, profile, order, item, onChanged }: { api: Api; profile: AccessProfile; order: LabOrder; item: LabItem; onChanged: () => void }) {
-  const action = useAction(api);
+const resultText = (item: LabItem) => item.result ? `${item.result.text ?? item.result.value}${item.unit && item.result.text == null ? ` ${item.unit}` : ''}` : '';
+
+/** Capture while the order is in process (`capturar`, with the order version), amend once completed (`enmendar`), read-only otherwise. */
+function LabItemRow({ api, order, item, onChanged }: { api: Api; order: LabOrder; item: LabItem; onChanged: () => void }) {
+  const action = useAction(api), [amending, setAmending] = useState(false);
   const [value, setValue] = useState(item.result?.value?.toString() ?? ''), [text, setText] = useState(item.result?.text ?? ''), [reason, setReason] = useState('');
-  if (!can(profile, 'laboratorio.procesar')) return <div className="lab-result-row"><strong>{item.code} · {item.name}</strong>{item.result ? <span><Tag value={item.result.mark} /> {item.result.text ?? item.result.value}</span> : <span>Resultado pendiente</span>}</div>;
-  async function save() { const body = { orderItemId: item.id, ...(value.trim() ? { value: Number(value) } : { text: text.trim() }), ...(item.result ? { reason: reason.trim() } : {}) }; if (await action.run(`/laboratorio/ordenes/${order.id}/resultados`, body)) onChanged(); }
-  return <div className="lab-result-row"><strong>{item.code} · {item.name}</strong> {item.result ? <Tag value="completado" label="Valor capturado" /> : <Tag value="pendiente" label="Falta el valor" />}<p>La marca se calcula con el rango vigente; no se selecciona manualmente.</p><div className="form-grid"><Field label="Valor" type="number" value={value} onChange={setValue} /><Field label="Texto" value={text} onChange={setText} />{item.result && <Field label="Motivo de corrección" value={reason} onChange={setReason} />}</div><button className="secondary-button" type="button" onClick={() => void save()} disabled={action.busy || (!value.trim() && !text.trim()) || (!!item.result && !reason.trim())}>Guardar resultado</button><WriteError error={action.error} onReload={onChanged} reloadLabel="Recargar la orden" /></div>;
+  const title = <strong>{item.code} · {item.name}{item.unit ? <small className="muted"> ({item.unit})</small> : null}</strong>;
+  if (!allows(order, 'capturar')) return <div className="lab-result-row">{title}{item.result ? <span><Tag value={item.result.mark} /> {resultText(item)}</span> : <span>Resultado pendiente</span>}
+    {allows(order, 'enmendar') && item.result && <button className="secondary-button" type="button" onClick={() => setAmending(true)}>Corregir resultado</button>}
+    {amending && <AmendDialog api={api} order={order} item={item} onClose={() => setAmending(false)} onSaved={() => { setAmending(false); onChanged(); }} />}</div>;
+  async function save() { const body = { orderItemId: item.id, version: order.version, ...(value.trim() ? { value: Number(value) } : { text: text.trim() }), ...(item.result ? { reason: reason.trim() } : {}) }; if (await action.run(`/laboratorio/ordenes/${order.id}/resultados`, body)) onChanged(); }
+  return <div className="lab-result-row">{title} {item.result ? <Tag value="completado" label="Valor capturado" /> : <Tag value="pendiente" label="Falta el valor" />}<p>La marca se calcula con el rango vigente; no se selecciona manualmente.</p><div className="form-grid"><Field label="Valor" type="number" value={value} onChange={setValue} /><Field label="Texto" value={text} onChange={setText} />{item.result && <Field label="Motivo de corrección" value={reason} onChange={setReason} />}</div><button className="secondary-button" type="button" onClick={() => void save()} disabled={action.busy || (!value.trim() && !text.trim()) || (!!item.result && !reason.trim())}>Guardar resultado</button><WriteError error={action.error} onReload={onChanged} reloadLabel="Recargar la orden" /></div>;
+}
+
+/** MA-LAB-02 (D-13): amend a completed result with a reason of 10+ characters; the order goes back to the doctor's review. */
+function AmendDialog({ api, order, item, onClose, onSaved }: { api: Api; order: LabOrder; item: LabItem; onClose: () => void; onSaved: () => void }) {
+  const action = useAction(api), numeric = item.result?.text == null;
+  const [value, setValue] = useState(numeric ? item.result?.value?.toString() ?? '' : item.result?.text ?? ''), [reason, setReason] = useState('');
+  const ready = value.trim() !== '' && reason.trim().length >= 10;
+  async function save() { if (await action.run(`/laboratorio/ordenes/${order.id}/enmendar`, { orderItemId: item.id, version: order.version, ...(numeric ? { value: Number(value) } : { text: value.trim() }), reason: reason.trim() })) onSaved(); }
+  return <Dialog title={`Corregir ${item.name}`} onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
+    <p className="form-intro">El valor actual ({resultText(item)}) queda en el historial con tu motivo.{order.reviewedAt ? ' El paciente deja de ver los valores hasta que Medicina los revise de nuevo.' : ' Medicina revisa la orden con el valor corregido.'}</p>
+    <WriteError error={action.error} onReload={onSaved} reloadLabel="Recargar la orden" />
+    <Field label={numeric ? `Valor corregido${item.unit ? ` (${item.unit})` : ''}` : 'Resultado corregido'} type={numeric ? 'number' : 'text'} value={value} onChange={setValue} required autoFocus />
+    <Field label="Motivo de la corrección" value={reason} onChange={setReason} required minLength={10} maxLength={500} />
+    <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={action.busy}>Volver</button><SaveButton busy={action.busy} disabled={!ready} label="Guardar corrección" /></div>
+  </form></Dialog>;
 }

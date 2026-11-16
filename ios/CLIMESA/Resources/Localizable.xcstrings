@@ -3817,6 +3817,105 @@
           }
         }
       }
+    },
+    "results.critical.pending": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%ld resultado(s) con valor crítico esperan tu revisión."
+          }
+        }
+      }
+    },
+    "results.amended": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultado corregido: revísalo de nuevo."
+          }
+        }
+      }
+    },
+    "results.inProgress": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mis órdenes en curso"
+          }
+        }
+      }
+    },
+    "results.cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar orden"
+          }
+        }
+      }
+    },
+    "results.cancel.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar orden de laboratorio"
+          }
+        }
+      }
+    },
+    "results.cancel.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La orden deja de avanzar y el laboratorio ya no la procesa. Queda registrado quién la canceló y por qué."
+          }
+        }
+      }
+    },
+    "results.cancel.reason": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motivo de la cancelación"
+          }
+        }
+      }
+    },
+    "results.cancel.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orden cancelada."
+          }
+        }
+      }
+    },
+    "exams.amended": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El laboratorio corrigió un resultado; tu médico lo revisa de nuevo."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -29,7 +29,8 @@ function permisosDe(rol: string): { code: string; context: string }[] {
   const columna = cabecera.split(',').indexOf(rol);
   expect(columna, `rol ${rol} en permisos.csv`).toBeGreaterThan(1);
   return filas
-    .map((fila) => fila.split(','))
+    // Commas inside a quoted description do not separate columns («"Exámenes, paneles y rangos…"»).
+    .map((fila) => fila.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/))
     .filter((celdas) => celdas[columna]?.trim())
     .map((celdas) => ({ code: celdas[0], context: celdas[columna].trim() }));
 }
@@ -75,7 +76,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); window.l
 
 // FR-120-02 / escenario 1: cada rol con web ve únicamente el menú que sus permisos reales habilitan.
 const menuEsperado: Record<string, string[]> = {
-  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Métricas', 'Perfil'],
+  ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Catálogo de laboratorio', 'Métricas', 'Perfil'],
   JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Métricas', 'Perfil'],
   REC: ['Inicio', 'Pacientes', 'Vinculaciones', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Perfil'],
   LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Perfil'],
@@ -204,7 +205,7 @@ describe('el menú depende solo del permiso (regla 8)', () => {
     simular({ ...perfil('ADM', permisos), roles: ['ADM', 'LAB'] });
     render(<App />);
     const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Turnos', 'Laboratorio', 'Inventario', 'Métricas', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Turnos', 'Laboratorio', 'Catálogo de laboratorio', 'Inventario', 'Métricas', 'Perfil']);
     expect(screen.queryByRole('combobox', { name: 'Rol de trabajo' })).toBeNull();
     expect(screen.getByText('Administración · Laboratorio')).toBeTruthy();
   });

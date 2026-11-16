@@ -31,7 +31,7 @@ describe('Laboratorio (W20, W21)', () => {
   });
 
   it('completa una orden en proceso con su versión y recarga la cola', async () => {
-    const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar']);
+    const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', undefined, orden('en_proceso', { allowedActions: ['capturar', 'completar'] }));
     await userEvent.click(await screen.findByRole('button', { name: 'Completar' }));
     expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/completar`, { version: 4 }, 'POST');
     await vi.waitFor(() => expect(api.request).toHaveBeenCalledTimes(2));
@@ -44,7 +44,7 @@ describe('Laboratorio (W20, W21)', () => {
   });
 
   it('un 409 de versión al completar ofrece recargar la orden', async () => {
-    const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', vi.fn(async () => { throw new ApiError('La orden cambió.', 409, 'version_conflicto', 5); }) as Api['write']);
+    const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', vi.fn(async () => { throw new ApiError('La orden cambió.', 409, 'version_conflicto', 5); }) as Api['write'], orden('en_proceso', { allowedActions: ['capturar', 'completar'] }));
     await userEvent.click(await screen.findByRole('button', { name: 'Completar' }));
     await userEvent.click(await screen.findByRole('button', { name: /Recargar la orden/ }));
     await vi.waitFor(() => expect(api.request).toHaveBeenCalledTimes(2));
@@ -67,7 +67,7 @@ describe('Laboratorio (W20, W21)', () => {
   });
 
   it('una orden completada sin revisar se ve como pendiente de revisar para quien revisa y se libera con su versión', async () => {
-    const api = montar(['laboratorio.ver_cola', 'laboratorio.revisar'], 'completado', undefined, orden('completado', { completedAt: '2026-11-13T16:00:00Z', reviewedAt: null }));
+    const api = montar(['laboratorio.ver_cola', 'laboratorio.revisar'], 'completado', undefined, orden('completado', { completedAt: '2026-11-13T16:00:00Z', reviewedAt: null, allowedActions: ['revisar'] }));
     expect(await screen.findByText('Pendiente de revisar')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Revisar y liberar' }));
     expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/revisar`, { version: 4 }, 'POST');
@@ -80,7 +80,7 @@ describe('Laboratorio (W20, W21)', () => {
   });
 
   it('muestra qué falta para completar: todos los valores; sin ellos no deja completar', async () => {
-    const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', undefined, orden('en_proceso', {}, false));
+    const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', undefined, orden('en_proceso', { allowedActions: ['capturar'] }, false));
     const completar = await screen.findByRole('button', { name: 'Completar' }) as HTMLButtonElement;
     expect(completar.disabled).toBe(true);
     expect(screen.getByRole('status').textContent).toContain('0 de 1 capturados');
@@ -89,7 +89,7 @@ describe('Laboratorio (W20, W21)', () => {
   });
 
   it('cancela una orden pendiente con motivo y versión, solo con laboratorio.cancelar', async () => {
-    const api = montar(['laboratorio.ver_cola', 'laboratorio.cancelar'], 'pendiente');
+    const api = montar(['laboratorio.ver_cola', 'laboratorio.cancelar'], 'pendiente', undefined, orden('pendiente', { allowedActions: ['cancelar'] }));
     await userEvent.click(await screen.findByRole('button', { name: 'Cancelar orden' }));
     const dialogo = await screen.findByRole('dialog', { name: 'Cancelar orden de laboratorio' });
     await userEvent.type(within(dialogo).getByLabelText('Motivo de la cancelación'), 'Duplicada por error');
@@ -103,9 +103,36 @@ describe('Laboratorio (W20, W21)', () => {
 
   it('?accion=muestra abre la toma de muestra de la orden pendiente', async () => {
     location.hash = '#/laboratorio?accion=muestra';
-    montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'pendiente');
+    montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'pendiente', undefined, orden('pendiente', { allowedActions: ['tomar_muestra', 'cancelar'] }));
     expect(await screen.findByRole('dialog', { name: 'Confirmar identidad para toma de muestra' })).toBeTruthy();
     expect(location.hash).toBe('#/laboratorio');
     location.hash = '';
+  });
+  it('MA-LAB-01: guarda un resultado con la versión vigente de la orden', async () => {
+    const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', undefined, orden('en_proceso', { allowedActions: ['capturar'] }, false));
+    await userEvent.type(await screen.findByLabelText('Valor'), '13.4');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar resultado' }));
+    expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/resultados`, { orderItemId: 'i-1', version: 4, value: 13.4 }, 'POST');
+  });
+
+  it('MA-LAB-02: corrige un resultado ya liberado con motivo y avisa que vuelve a revisión', async () => {
+    const api = montar(['laboratorio.ver_cola', 'laboratorio.validar'], 'completado', undefined, orden('completado', { reviewedAt: '2026-11-13T17:00:00Z', allowedActions: ['enmendar'] }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Corregir resultado' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Corregir Hemoglobina' });
+    expect(within(dialogo).getByText(/El paciente deja de ver los valores/)).toBeTruthy();
+    const guardar = within(dialogo).getByRole('button', { name: 'Guardar corrección' }) as HTMLButtonElement;
+    await userEvent.clear(within(dialogo).getByLabelText(/Valor corregido/));
+    await userEvent.type(within(dialogo).getByLabelText(/Valor corregido/), '12.1');
+    await userEvent.type(within(dialogo).getByLabelText('Motivo de la corrección'), 'Error');
+    expect(guardar.disabled).toBe(true);
+    await userEvent.type(within(dialogo).getByLabelText('Motivo de la corrección'), ' de digitación');
+    await userEvent.click(guardar);
+    expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/enmendar`, { orderItemId: 'i-1', version: 4, value: 12.1, reason: 'Error de digitación' }, 'POST');
+  });
+
+  it('una orden con un resultado corregido dice que espera revisión otra vez y no ofrece acciones que el servidor no permite', async () => {
+    montar(['laboratorio.ver_cola', 'laboratorio.procesar', 'laboratorio.cancelar'], 'completado', undefined, orden('completado', { amendedAt: '2026-11-13T18:00:00Z', reviewedAt: null, allowedActions: [] }));
+    expect(await screen.findByText('Resultado corregido · falta revisión médica')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Corregir resultado|Cancelar orden|Completar|Revisar y liberar/ })).toBeNull();
   });
 });

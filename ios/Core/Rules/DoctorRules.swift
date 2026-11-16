@@ -14,6 +14,43 @@ public enum ReviewRules {
             return (left.completedAt ?? left.createdAt) < (right.completedAt ?? right.createdAt)
         }
     }
+
+    /// RN-25: órdenes con valor crítico que este médico puede revisar (`allowedActions` incluye `revisar`).
+    public static func criticalToReview(_ orders: [LabOrder]) -> Int {
+        orders.filter { $0.allows(.revisar) && isCritical($0) }.count
+    }
+
+    /// Órdenes propias en curso que la API deja cancelar, la más antigua primero.
+    public static func cancellable(_ orders: [LabOrder]) -> [LabOrder] {
+        orders.filter { $0.allows(.cancelar) }.sorted { $0.createdAt < $1.createdAt }
+    }
+
+    /// Un laboratorista corrigió un resultado y el médico todavía no lo vuelve a revisar.
+    public static func isAmendedPendingReview(_ order: LabOrder) -> Bool {
+        order.amendedAt != nil && order.state == .completado && order.reviewedAt == nil
+    }
+}
+
+/// MA-LAB-05: cancelar una orden de laboratorio propia. `LabCancelDto.reason` de 10 a 500 caracteres, igual que la web (D-13).
+public enum LabCancelRules {
+    public static let reasonRange = 10...500
+
+    public static func path(_ orderId: String) -> String { "/laboratorio/ordenes/\(orderId)/cancelar" }
+
+    public static func reasonCount(_ reason: String) -> Int { reason.trimmingCharacters(in: .whitespacesAndNewlines).count }
+
+    public static func reasonError(_ reason: String) -> String? {
+        let size = reasonCount(reason)
+        if size == 0 { return "Escribe el motivo para cancelar la orden." }
+        if size < reasonRange.lowerBound { return "El motivo necesita al menos 10 caracteres (llevas \(size))." }
+        if size > reasonRange.upperBound { return "El motivo admite hasta 500 caracteres (llevas \(size))." }
+        return nil
+    }
+
+    /// Cuerpo con la versión de la orden y el motivo sin espacios sobrantes.
+    public static func body(version: Int, reason: String) -> LabOrderCancelBody {
+        LabOrderCancelBody(version: version, reason: reason.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
 }
 
 /// I21: consulta. La API decide las transiciones; el cliente solo revisa longitudes del contrato.

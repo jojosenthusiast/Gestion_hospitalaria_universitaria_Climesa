@@ -43,9 +43,13 @@ object LabFlow {
 
     fun missingResults(order: LaboratoryOrder) = order.items.count { it.result == null }
 
+    /** A lab technician amended a result of the completed order and the doctor has not reviewed it again yet. */
+    fun isAmendedPendingReview(order: LaboratoryOrder) = order.amendedAtMillis != null && order.state == "completado" && !order.reviewed
+
     /** Next hand-off in plain words: who acts and on what. */
     fun nextStep(order: LaboratoryOrder, ownView: Boolean = false): String = when {
         order.state == "cancelado" -> "Orden cancelada: no continúa."
+        isAmendedPendingReview(order) -> if (ownView) "El laboratorio corrigió un resultado; tu médico lo revisa de nuevo." else "Resultado corregido: revísalo de nuevo."
         order.state == "pendiente" -> if (ownView) "Tu orden espera que el laboratorio tome la muestra." else "Siguiente: laboratorio toma la muestra y confirma la identidad."
         order.state == "en_proceso" && missingResults(order) > 0 ->
             if (ownView) "El laboratorio está procesando tu muestra." else "Siguiente: laboratorio captura ${missingResults(order)} resultado(s) pendiente(s)."

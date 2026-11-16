@@ -82,12 +82,12 @@ describe('Ronda 1 · administración y espacios', () => {
     const items = (await t.pg.query<{ id: string; codigo: string }>('SELECT oi.id,e.codigo FROM laboratorio.orden_item oi JOIN laboratorio.examen e ON e.id=oi.examen_id WHERE oi.orden_id=$1', [order.body.id])).rows;
     const normal: Record<string, number> = { HB: 14, HTO: 42, LEU: 7, PLQ: 250 };
     // Completar exige todos los valores (el mensaje lo muestra la web antes de intentarlo).
-    const partial = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/resultados`, { orderItemId: items[0].id, value: normal[items[0].codigo] ?? 10 });
+    const partial = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/resultados`, { orderItemId: items[0].id, value: normal[items[0].codigo] ?? 10, version: sample.body.version });
     expect(partial.status).toBe(201);
     expect((await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/completar`, { version: partial.body.orderVersion })).status).toBe(409);
     let version = partial.body.orderVersion as number;
     for (const item of items.slice(1)) {
-      const saved = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/resultados`, { orderItemId: item.id, value: normal[item.codigo] ?? 10 });
+      const saved = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/resultados`, { orderItemId: item.id, value: normal[item.codigo] ?? 10, version });
       expect(saved.status).toBe(201);
       version = saved.body.orderVersion;
     }

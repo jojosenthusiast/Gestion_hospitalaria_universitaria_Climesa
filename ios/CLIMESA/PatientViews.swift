@@ -523,7 +523,8 @@ struct LabOrderDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PatientTag(order.state.rawValue, label: order.state.label)
-            if !showValues { PatientNotice(text: L.text("exams.waiting_review")) }
+            // Solo el paciente ve este aviso (sin valores): el médico ve los valores y su propia etiqueta.
+            if !showValues { PatientNotice(text: L.text(ReviewRules.isAmendedPendingReview(order) ? "exams.amended" : "exams.waiting_review")) }
             ForEach(order.items) { item in
                 SectionCard(title: "\(item.name) (\(item.code))") {
                     if showValues {

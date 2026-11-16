@@ -116,6 +116,12 @@ class ContractFixturesTest {
         assertContract("reprogramacion-rechazar", "POST", AppointmentActions.path(AppointmentAction.REJECT_RESCHEDULE, APPOINTMENT, RESCHEDULE), AppointmentActions.body(AppointmentAction.REJECT_RESCHEDULE, 1, " El médico no tiene ese horario libre "), RESCHEDULE)
     }
 
+    @Test fun labOrderCancelledByTheDoctor() {
+        val order = "88888888-8888-4888-8888-888888888888"
+        assertContract("laboratorio-cancelar", "POST", sv.edu.catolica.climesa.domain.LabOrderRules.cancelPath(order),
+            sv.edu.catolica.climesa.domain.LabOrderRules.cancelBody(2, "  El paciente no se presentó a la toma "), order)
+    }
+
     @Test fun queueCallNext() {
         assertContract("fila-llamar-siguiente", "POST", "/fila/llamar-siguiente", sv.edu.catolica.climesa.domain.QueueRules.callNextBody("consulta_general"))
     }

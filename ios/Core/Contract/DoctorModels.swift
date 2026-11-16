@@ -129,6 +129,13 @@ public struct LabOrderCreated: Decodable, Sendable, Equatable {
     public let itemCount: Int
 }
 
+/// `LabOrderStateResponse` de `POST /laboratorio/ordenes/{id}/cancelar`.
+public struct LabOrderStateResult: Decodable, Sendable, Equatable {
+    public let id: String
+    public let state: LabOrderState
+    public let version: Int
+}
+
 /// `LabReviewResponse` de `POST /laboratorio/ordenes/{id}/revisar`.
 public struct LabReviewResult: Decodable, Sendable, Equatable {
     public let id: String

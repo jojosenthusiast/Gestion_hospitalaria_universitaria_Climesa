@@ -7,6 +7,8 @@ struct DoctorDay: Sendable {
     var agenda: [AgendaEntry]?
     var tickets: Part<[QueueTicket]>?
     var pendingResults: Part<Int>?
+    /// RN-25: órdenes con valor crítico que este médico puede revisar.
+    var criticalResults = 0
     var hospitalized: Part<Int>?
     /// m-22: consultas propias abiertas de cualquier día.
     var unsigned: Part<[UnsignedConsultation]>?
@@ -28,6 +30,11 @@ struct DoctorDayView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
             LoadState(loader: loader, retry: load) { day in
+                if day.criticalResults > 0 {
+                    Button { go(.resultados) } label: {
+                        MedicoAlert(text: String(format: L.text("results.critical.pending"), day.criticalResults))
+                    }.buttonStyle(.plain)
+                }
                 summary(day)
                 partErrors(day)
                 if let open = day.unsigned?.value, !open.isEmpty { unsignedSection(open) }
@@ -207,9 +214,13 @@ struct DoctorDayView: View {
             }
             if profile.hasPermission("fila.ver") { day.tickets = try await Part<[QueueTicket]>.load { try await api.get("/fila", as: [QueueTicket].self) } }
             if profile.hasPermission("resultados.ver") {
-                day.pendingResults = try await Part<Int>.load {
-                    let orders = try await api.get("/laboratorio/ordenes", as: [LabOrder].self)
-                    return ReviewRules.pending(orders).count
+                let orders = try await Part<[LabOrder]>.load { try await api.get("/laboratorio/ordenes", as: [LabOrder].self) }
+                switch orders {
+                case let .loaded(rows):
+                    day.pendingResults = .loaded(ReviewRules.pending(rows).count)
+                    day.criticalResults = ReviewRules.criticalToReview(rows)
+                case let .failed(message):
+                    day.pendingResults = .failed(message)
                 }
             }
             if profile.hasPermission("admision.ver") {
@@ -291,7 +302,8 @@ struct DoctorPatientsView: View {
     }
 }
 
-/// I23 · Resultados por revisar: críticos arriba en rojo; detalle con valores y marca; marcar revisado.
+/// I23 · Resultados por revisar: críticos arriba en rojo; detalle con valores y marca; marcar revisado. Debajo, las
+/// órdenes propias en curso que la API deja cancelar (MA-LAB-05).
 struct ResultsReviewView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
@@ -300,11 +312,23 @@ struct ResultsReviewView: View {
     var body: some View {
         LoadState(loader: loader, retry: load) { orders in
             let pending = ReviewRules.pending(orders)
+            let critical = ReviewRules.criticalToReview(orders)
+            let inProgress = ReviewRules.cancellable(orders)
+            if critical > 0 { MedicoAlert(text: String(format: L.text("results.critical.pending"), critical)) }
             if pending.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
             ForEach(pending) { order in
                 NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
-                    LabOrderRow(order: order, status: L.text("results.toReview"), critical: ReviewRules.isCritical(order))
+                    LabOrderRow(order: order, status: L.text(ReviewRules.isAmendedPendingReview(order) ? "results.amended" : "results.toReview"),
+                                critical: ReviewRules.isCritical(order))
                 }.buttonStyle(.plain)
+            }
+            if !inProgress.isEmpty {
+                Text("results.inProgress").font(Typo.subheading).foregroundStyle(Theme.ink).padding(.top, Spacing.m)
+                ForEach(inProgress) { order in
+                    NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
+                        LabOrderRow(order: order, status: order.state.label, critical: false)
+                    }.buttonStyle(.plain)
+                }
             }
         }
         .task(id: live.snapshot.version(.laboratory)) { await load() }
@@ -319,15 +343,25 @@ private struct ReviewDetailView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(\.dismiss) private var dismiss
     @State private var submission = Submission()
+    @State private var cancelSubmission = Submission()
+    @State private var cancelling = false
+    @State private var cancelled = false
 
     var body: some View {
         ScreenFrame(title: "results.detail") {
             if let name = order.patientName { Text(verbatim: name).font(Typo.heading).foregroundStyle(Theme.ink) }
             if ReviewRules.isCritical(order) { MedicoAlert(text: L.text("results.critical.notice")) }
+            if ReviewRules.isAmendedPendingReview(order) {
+                Text("results.amended").font(Typo.label).foregroundStyle(Theme.warning)
+            }
             LabOrderDetail(order: order, showValues: true)
             WriteNotice(submission: submission, reload: reload)
-            if account.can("laboratorio.revisar") {
+            // Los botones salen de `allowedActions` de la API para este médico, nunca del rol ni del estado.
+            if order.allows(.revisar) {
                 ClimesaButton(title: L.text("results.markReviewed"), loading: submission.busy) { Task { await review() } }
+            }
+            if order.allows(.cancelar) {
+                ClimesaButton(title: L.text("results.cancel"), kind: .secondary) { cancelling = true }
             }
             if account.can("expediente.ver") {
                 NavigationLink {
@@ -335,6 +369,9 @@ private struct ReviewDetailView: View {
                 } label: { Text("day.record") }
                     .buttonStyle(ClimesaButtonStyle(kind: .secondary))
             }
+        }
+        .sheet(isPresented: $cancelling, onDismiss: { if cancelled { dismiss() } }) {
+            CancelLabOrderSheet(order: order, submission: cancelSubmission, reload: reload) { cancelled = true }
         }
     }
 
@@ -345,6 +382,50 @@ private struct ReviewDetailView: View {
         }
         await reload()
         if ok { dismiss() }
+    }
+}
+
+/// MA-LAB-05 · Cancelar una orden propia en curso con motivo (10 a 500 caracteres, igual que la web).
+private struct CancelLabOrderSheet: View {
+    let order: LabOrder
+    let submission: Submission
+    let reload: () async -> Void
+    let onCancelled: () -> Void
+    @EnvironmentObject private var account: AccountModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var reason = ""
+    @State private var reasonError: String?
+
+    var body: some View {
+        NavigationStack {
+            ScreenFrame(title: "results.cancel.title") {
+                SectionCard {
+                    ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: order.patientName, meta: order.state.label)
+                }
+                Text("results.cancel.intro").font(Typo.small).foregroundStyle(Theme.muted)
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    MedicoTextArea(label: L.text("results.cancel.reason"), text: $reason, error: reasonError ?? submission.fieldErrors["reason"], lines: 3...6)
+                    CharacterCounter(count: LabCancelRules.reasonCount(reason), range: LabCancelRules.reasonRange)
+                }
+                .onChange(of: reason) { _, value in
+                    if reasonError != nil { reasonError = LabCancelRules.reasonError(value) }
+                }
+                WriteNotice(submission: submission, reload: reload)
+                ClimesaButton(title: L.text("results.cancel"), kind: .destructive, loading: submission.busy) { Task { await send() } }
+                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
+            }
+        }
+    }
+
+    private func send() async {
+        reasonError = LabCancelRules.reasonError(reason)
+        guard reasonError == nil else { return }
+        let body = LabCancelRules.body(version: order.version, reason: reason)
+        let ok = await submission.run(order.id, body: body, success: L.text("results.cancel.done")) { key in
+            _ = try await account.client().send("POST", LabCancelRules.path(order.id), body: body, key: key, as: LabOrderStateResult.self)
+        }
+        await reload()
+        if ok { onCancelled(); dismiss() }
     }
 }
 

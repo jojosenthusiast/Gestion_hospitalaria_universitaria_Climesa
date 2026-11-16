@@ -262,6 +262,8 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/laboratorio/catalogo` | `laboratorio.ordenar` o `catalogo.configurar` | Catálogo activo | R | 3 | ✔ | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes` | `laboratorio.ordenar` | Consulta propia | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/resultados` | `laboratorio.procesar` | Marca calculada en servidor | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
+| POST | `/api/v1/laboratorio/ordenes/{id}/enmendar` | `laboratorio.validar` | Solo Completado; motivo de 10 o más; vuelve a revisión médica | R | 4 | · | · | · | · | · | · | ✔ | · | · | · |
+| GET | `/api/v1/catalogo/examenes` | `catalogo.configurar` | Activos e inactivos, con componentes y rangos vigentes | R | 3 | ✔ | · | · | · | · | · | · | · | · | · |
 
 ### Spec 108
 

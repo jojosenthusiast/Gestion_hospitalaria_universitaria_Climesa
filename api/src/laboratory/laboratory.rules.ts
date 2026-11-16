@@ -23,3 +23,51 @@ export function normalizePatientName(value: string) {
 export function matchesDoubleIdentification(identity: { expediente: string; fullName: string }, expediente: string, nombreCompleto: string) {
   return expediente.trim() === identity.expediente && normalizePatientName(nombreCompleto) === normalizePatientName(identity.fullName);
 }
+
+/** Actions a reader may take on a lab order now (`allowedActions`); clients draw their buttons only from this list. */
+export const LAB_ORDER_ACTIONS = ['tomar_muestra', 'capturar', 'completar', 'revisar', 'cancelar', 'enmendar'] as const;
+export type LabOrderAction = typeof LAB_ORDER_ACTIONS[number];
+
+export type LabActionInput = {
+  state: string;
+  reviewed: boolean;
+  allCaptured: boolean;
+  /** The reader may review this order (laboratorio.puede_revisar: requester, attending doctor, care relationship or on-duty substitute). */
+  reviewer: boolean;
+  /** The reader is the doctor who ordered it. */
+  own: boolean;
+};
+
+export type LabPermissions = { process: boolean; validate: boolean; review: boolean; cancelAny: boolean; cancelOwn: boolean };
+
+export function labOrderActions(order: LabActionInput, can: LabPermissions): LabOrderAction[] {
+  const open = order.state === 'pendiente' || order.state === 'en_proceso';
+  const actions: LabOrderAction[] = [];
+  if (can.process && order.state === 'pendiente') actions.push('tomar_muestra');
+  if (can.process && order.state === 'en_proceso') actions.push('capturar');
+  if (can.validate && order.state === 'en_proceso' && order.allCaptured) actions.push('completar');
+  if (can.review && order.reviewer && order.state === 'completado' && !order.reviewed) actions.push('revisar');
+  if (open && (can.cancelAny || (can.cancelOwn && order.own))) actions.push('cancelar');
+  if (can.validate && order.state === 'completado') actions.push('enmendar');
+  return actions;
+}
+
+export type RangeInput = { sex: string; ageFrom: number; ageTo?: number | null; min?: number | null; max?: number | null; criticalLow?: number | null; criticalHigh?: number | null };
+
+/** W10: a reference range set is coherent before it reaches the exclusion constraint (message in Spanish, or null). */
+export function rangeProblem(ranges: RangeInput[]): string | null {
+  const has = (value?: number | null): value is number => value !== undefined && value !== null;
+  for (const r of ranges) {
+    if (has(r.ageTo) && r.ageTo <= r.ageFrom) return 'La edad final de un rango debe ser mayor que la inicial.';
+    if (!has(r.min) && !has(r.max) && !has(r.criticalLow) && !has(r.criticalHigh)) return 'Cada rango necesita al menos un límite.';
+    if (has(r.min) && has(r.max) && r.min > r.max) return 'El mínimo de un rango no puede ser mayor que el máximo.';
+    if (has(r.criticalLow) && has(r.min) && r.criticalLow > r.min) return 'El valor crítico bajo no puede ser mayor que el mínimo normal.';
+    if (has(r.criticalHigh) && has(r.max) && r.criticalHigh < r.max) return 'El valor crítico alto no puede ser menor que el máximo normal.';
+  }
+  const end = (r: RangeInput) => (has(r.ageTo) ? r.ageTo : Infinity);
+  for (let i = 0; i < ranges.length; i++) for (let j = i + 1; j < ranges.length; j++) {
+    const [a, b] = [ranges[i], ranges[j]];
+    if (a.sex === b.sex && a.ageFrom < end(b) && b.ageFrom < end(a)) return 'Dos rangos del mismo sexo se traslapan en edad.';
+  }
+  return null;
+}

@@ -48,12 +48,14 @@ describe('Fase 0 · fila y eventos sin datos ajenos para pacientes (SEG-01, SEG-
     const sample = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/muestra`, { version: order.body.version, expediente: identity.expediente, nombreCompleto: 'Critica Ficticio' });
     expect(sample.status).toBe(201);
     const item = await t.one<{ id: string }>('SELECT id FROM laboratorio.orden_item WHERE orden_id=$1', [order.body.id]);
-    expect((await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/resultados`, { orderItemId: item.id, value: 5.0 })).status).toBe(201);
+    expect((await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/resultados`, { orderItemId: item.id, value: 5.0, version: sample.body.version })).status).toBe(201);
     const critical = await t.events('laboratorio.critico', order.body.id);
     expect(critical).toHaveLength(1);
     expect(critical[0]).not.toContain(pac());
     expect(critical[0]).not.toContain('rol:PAC');
-    expect(critical[0]).toContain('rol:MED');
+    // MA-LAB-04: the critical notice goes to the lab and the requester's own channel, never to every doctor.
+    expect(critical[0]).toEqual(expect.arrayContaining(['rol:LAB', `usuario:${userId('MED')}`]));
+    expect(critical[0]).not.toContain('rol:MED');
     const before = await t.events('laboratorio.actualizado', order.body.id);
     for (const channels of before) expect(channels).not.toContain(pac());
     const completed = await t.call('LAB', 'POST', `/laboratorio/ordenes/${order.body.id}/completar`, { version: sample.body.version + 1 /* API-10: the captured result moved it */ });
