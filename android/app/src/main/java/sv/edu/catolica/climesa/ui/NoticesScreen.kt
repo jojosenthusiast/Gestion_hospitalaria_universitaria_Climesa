@@ -61,7 +61,7 @@ internal fun noticeInboxModel(account: AuthenticatedAccount): NoticeInboxViewMod
  * screen that shows the inbox and is cancelled with it; a new `proximoCambio` replaces it. No polling.
  */
 @Composable
-private fun RefreshAt(nextChange: String?, onDue: () -> Unit) {
+internal fun RefreshAt(nextChange: String?, onDue: () -> Unit) {
     LaunchedEffect(nextChange) {
         val wait = NoticeRefresh.delayMs(nextChange, System.currentTimeMillis()) ?: return@LaunchedEffect
         delay(wait)
@@ -85,7 +85,6 @@ internal fun NoticeLevelBadge(level: NoticeLevel, modifier: Modifier = Modifier)
 internal fun CriticalNoticeBanner(account: AuthenticatedAccount, onOpenNotices: () -> Unit, modifier: Modifier = Modifier) {
     val model = noticeInboxModel(account)
     val state by model.state.collectAsStateWithLifecycle()
-    RefreshAt(state.inbox?.nextChange, model::reload)
     val pending = NoticeInboxRules.banner(state.inbox, state.hidden)
     val notice = pending.firstOrNull() ?: return
     val colors = MaterialTheme.system

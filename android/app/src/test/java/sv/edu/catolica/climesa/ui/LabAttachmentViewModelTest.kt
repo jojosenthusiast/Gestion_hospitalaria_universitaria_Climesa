@@ -99,6 +99,16 @@ class LabAttachmentViewModelTest {
         assertNull(vm.state.value.uploadFailure)
     }
 
+    @Test fun anOfflineUploadDoesNotPromiseAFormThatAlreadyClosed() = runTest(dispatcher) {
+        val api = AttachmentGateway()
+        api.responses["/laboratorio/ordenes/o1/resultado-externo"] = JSONObject().put("id", "o1").put("attachmentId", "f1")
+        api.failures["/laboratorio/adjuntos/f1/archivo"] = AuthRequestException("Sin conexión. Conservamos el formulario; vuelve a intentar.")
+        val vm = vm(api)
+        vm.openExternalLoad("o1"); vm.setAttachment(picked); vm.setExternalValue("i1", "12"); vm.confirmExternalLoad(externalOrder()); runCurrent()
+        assertNull(vm.state.value.externalLoad)
+        assertEquals("Los valores se guardaron, pero el archivo no se subió: Sin conexión.", vm.state.value.uploadFailure)
+    }
+
     @Test fun oneBusyFlagCoversSavingAndUploading() = runTest(dispatcher) {
         val api = AttachmentGateway()
         api.responses["/laboratorio/ordenes/o1/resultado-externo"] = JSONObject().put("id", "o1").put("attachmentId", "f1")

@@ -45,6 +45,7 @@ import sv.edu.catolica.climesa.domain.RoleAccess
 import sv.edu.catolica.climesa.domain.NoticeInboxRules
 import sv.edu.catolica.climesa.ui.CompactHeader
 import sv.edu.catolica.climesa.ui.CriticalNoticeBanner
+import sv.edu.catolica.climesa.ui.RefreshAt
 import sv.edu.catolica.climesa.ui.noticeInboxModel
 import sv.edu.catolica.climesa.ui.ClimesaCard
 import sv.edu.catolica.climesa.ui.EmptyState
@@ -89,7 +90,11 @@ fun RoleDashboardScreen(
         model.start(role, account.profile.permissions, account.profile.channels, account.profile.patientId != null)
     }
     // S11: notices left the dashboard for their own area; "Inicio" keeps only the critical one for this role or area.
-    val inbox by noticeInboxModel(account).state.collectAsStateWithLifecycle()
+    val notices = noticeInboxModel(account)
+    val inbox by notices.state.collectAsStateWithLifecycle()
+    // The one re-read at `proximoCambio` lives here, outside the banner: a snoozed or scheduled critical notice must come
+    // back on time even while no banner is shown (the banner leaves composition when nothing is highlighted).
+    RefreshAt(inbox.inbox?.nextChange, notices::reload)
     val critical = NoticeInboxRules.banner(inbox.inbox, inbox.hidden).isNotEmpty()
     PageList(modifier) {
         item { DashboardHeader(account.profile.name, RoleAccess.label(role), stringResource(helpFor(role))) }

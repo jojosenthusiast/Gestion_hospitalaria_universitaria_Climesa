@@ -174,7 +174,7 @@ class LaboratoryViewModel @Inject constructor(
             val attachmentId = LabAttachmentRules.attachmentIdOf(saved)
             val uploadError = attachmentId?.let { id -> try { sendFile(id, file); null } catch (e: CancellationException) { throw e } catch (e: Exception) { labUploadMessage(e) } }
             mutable.value = if (uploadError != null) {
-                mutable.value.copy(externalLoad = null, uploadFailure = "Los valores se guardaron, pero el archivo no se subió: $uploadError")
+                mutable.value.copy(externalLoad = null, uploadFailure = "Los valores se guardaron, pero el archivo no se subió: ${uploadError.substringBefore(" Conservamos el formulario")}")
             } else {
                 mutable.value.copy(externalLoad = null, notice = if (attachmentId != null) "Resultado externo guardado con su archivo; la orden espera la revisión médica." else "Resultado externo guardado; la orden espera la revisión médica.")
             }
