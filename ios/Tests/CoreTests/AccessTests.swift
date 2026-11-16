@@ -62,27 +62,27 @@ final class AccessTests: XCTestCase {
             Permission(code: "sesion.perfil", context: "x"), Permission(code: "cuenta.vincular", context: "propio"),
             Permission(code: "expediente.ver", context: "propio_revisado"), Permission(code: "auditoria.mis_accesos", context: "propio")
         ])
-        XCTAssertEqual(AppSection.visible(for: "PAC", profile: pac), [.vinculacion, .historial, .hospital, .ubicacion, .accesos, .perfil])
+        XCTAssertEqual(AppSection.visible(for: "PAC", profile: pac), [.avisos, .vinculacion, .historial, .hospital, .ubicacion, .accesos, .perfil])
         let linked = AccessProfile(id: "u1", email: "ejemplo@example.test", name: "Cuenta ficticia", roles: ["PAC"], platforms: ["ios"], permissions: pac.permissions + [Permission(code: "ambulancia.solicitar", context: "propio")], patientId: "p1")
-        XCTAssertEqual(AppSection.visible(for: "PAC", profile: linked), [.historial, .ambulancia, .hospital, .ubicacion, .accesos, .perfil])
+        XCTAssertEqual(AppSection.visible(for: "PAC", profile: linked), [.avisos, .historial, .ambulancia, .hospital, .ubicacion, .accesos, .perfil])
     }
 
     func testLasSeccionesDelMedicoSalenDeSusPermisos() {
         let med = profile(["MED"], ["ios"], basePermissions + [Permission(code: "admision.ver", context: "relacion")])
-        XCTAssertEqual(AppSection.visible(for: "MED", profile: med), [.hospitalizados, .hospital, .ubicacion, .perfil])
+        XCTAssertEqual(AppSection.visible(for: "MED", profile: med), [.avisos, .hospitalizados, .hospital, .ubicacion, .perfil])
     }
 
     func testElMedicoVeAgendaYAmbulanciaConSusPermisos() {
         let med = profile(["MED"], ["ios"], basePermissions + [Permission(code: "consulta.iniciar", context: "x"), Permission(code: "ambulancia.ver_estado", context: "x"), Permission(code: "ambulancia.recibir_prehospital", context: "x")])
-        XCTAssertEqual(AppSection.visible(for: "MED", profile: med), [.agenda, .ambulanciaEstado, .llegadaAmbulancia, .hospital, .ubicacion, .perfil])
+        XCTAssertEqual(AppSection.visible(for: "MED", profile: med), [.avisos, .agenda, .ambulanciaEstado, .llegadaAmbulancia, .hospital, .ubicacion, .perfil])
     }
 
     func testMisDatosYMiHabitacionSoloConExpedienteVinculado() {
         let permissions = basePermissions + [Permission(code: "pacientes.ver_ficha", context: "propio"), Permission(code: "admision.ver", context: "propio")]
         let unlinked = AccessProfile(id: "u1", email: "ejemplo@example.test", name: "Cuenta ficticia", roles: ["PAC"], platforms: ["ios"], permissions: permissions)
-        XCTAssertEqual(AppSection.visible(for: "PAC", profile: unlinked), [.hospital, .ubicacion, .perfil])
+        XCTAssertEqual(AppSection.visible(for: "PAC", profile: unlinked), [.avisos, .hospital, .ubicacion, .perfil])
         let linked = AccessProfile(id: "u1", email: "ejemplo@example.test", name: "Cuenta ficticia", roles: ["PAC"], platforms: ["ios"], permissions: permissions, patientId: "p1")
-        XCTAssertEqual(AppSection.visible(for: "PAC", profile: linked), [.misDatos, .miHabitacion, .hospital, .ubicacion, .perfil])
+        XCTAssertEqual(AppSection.visible(for: "PAC", profile: linked), [.avisos, .misDatos, .miHabitacion, .hospital, .ubicacion, .perfil])
     }
 
     func testElPerfilDelContratoTraeExpedienteYPersonalYAceptaNombreNulo() throws {

@@ -86,11 +86,11 @@ enum Part<Value: Sendable>: Sendable {
     }
 }
 
-/// Revisión del PR #119: espera hasta el `proximoCambio` de los avisos (uno vence o empieza) y vuelve a leer la pantalla,
-/// igual que Android y la web. Si la lectura falla, la parte de avisos muestra su error en español en lugar de la lista vieja.
-/// Se llama desde `.task(id: notices?.nextChange)`, así un cambio de fecha o salir de la pantalla cancela la espera.
-func reloadAtNextChange(_ notices: PublicNotices?, reload: () async -> Void) async {
-    guard let delay = notices?.refreshDelay(now: Date()) else { return }
+/// Revisión del PR #119: espera hasta el `proximoCambio` de los avisos (uno vence o empieza, o vuelve un recordatorio) y
+/// vuelve a leer una sola vez, igual que Android y la web. Se llama desde `.task(id: proximoCambio)`, así un cambio de
+/// fecha o salir de la pantalla cancela la espera. Nunca sondea.
+func reloadAt(delay: TimeInterval?, reload: () async -> Void) async {
+    guard let delay else { return }
     try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
     if !Task.isCancelled { await reload() }
 }

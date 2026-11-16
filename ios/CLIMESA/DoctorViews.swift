@@ -16,10 +16,6 @@ struct DoctorDay: Sendable {
     var unsigned: Part<[UnsignedConsultation]>?
     /// CITA-02: citas propias con una solicitud de reprogramación que el médico puede decidir.
     var reschedules: Part<[Appointment]>?
-    /// MA-AVI-01: avisos públicos y los dirigidos a Medicina (`GET /me/avisos`), como en el inicio de Android.
-    var notices: Part<[PublicNotices.Notice]>?
-    /// La respuesta de `/me/avisos`, para volver a leer en su `proximoCambio`.
-    var noticeFeed: PublicNotices?
 }
 
 /// I20 · Mi día: citas del día, números de la fila, resultados por revisar y hospitalizados.
@@ -28,6 +24,8 @@ struct DoctorDayView: View {
     let go: (AppTab) -> Void
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
+    /// S11: only the highlighted critical notice shows here; every notice lives in Avisos (Más).
+    @State private var notices = NoticeInboxModel()
     @State private var loader = Loader<DoctorDay>()
     @State private var calling = Submission()
     @State private var deciding = Submission()
@@ -37,6 +35,7 @@ struct DoctorDayView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
+            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty { CriticalNoticeBanner(model: notices) }
             LoadState(loader: loader, retry: load) { day in
                 if day.criticalResults > 0 {
                     Button { go(.resultados) } label: {
@@ -45,10 +44,6 @@ struct DoctorDayView: View {
                 }
                 summary(day)
                 partErrors(day)
-                if let notices = day.notices?.value, !notices.isEmpty {
-                    SectionTitle("home.notices")
-                    ForEach(notices) { notice in NoticeCard(notice: notice) }
-                }
                 if let open = day.unsigned?.value, !open.isEmpty { unsignedSection(open) }
                 if let pending = day.reschedules?.value, !pending.isEmpty { rescheduleSection(pending) }
                 if let tickets = day.tickets?.value { queueSection(tickets, next: day.next) }
@@ -57,7 +52,7 @@ struct DoctorDayView: View {
             }
         }
         .task(id: live.snapshot.version([.appointments, .consultations, .queue, .laboratory, .admissions, .hospitalInfo])) { await load() }
-        .task(id: loader.value?.noticeFeed?.nextChange) { await reloadAtNextChange(loader.value?.noticeFeed, reload: load) }
+        .loadsNoticeInbox(notices, account: account, live: live)
         .sheet(item: $rejecting) { item in RejectRescheduleSheet(appointment: item, submission: deciding) { await load() } }
     }
 
@@ -114,8 +109,7 @@ struct DoctorDayView: View {
         let failed = [
             PartFailure(title: L.text("day.queue"), message: day.tickets?.error),
             PartFailure(title: L.text("day.results.title"), message: day.pendingResults?.error),
-            PartFailure(title: L.text("ds.medico.stat.hospitalized"), message: day.hospitalized?.error),
-            PartFailure(title: L.text("home.notices"), message: day.notices?.error)
+            PartFailure(title: L.text("ds.medico.stat.hospitalized"), message: day.hospitalized?.error)
         ].filter { $0.message != nil }
         ForEach(failed) { part in
             SectionCard(title: part.title) { PartError(message: part.message ?? "", retry: load) }
@@ -319,9 +313,6 @@ struct DoctorDayView: View {
                     return DischargeRules.current(admissions).count
                 }
             }
-            let feed = try await Part<PublicNotices>.load { try await api.get("/me/avisos", as: PublicNotices.self) }
-            day.noticeFeed = feed.value
-            day.notices = feed.value.map { .loaded($0.byPriority) } ?? .failed(feed.error ?? "")
             return day
         }
     }
@@ -529,6 +520,8 @@ private struct ReviewDetailView: View {
                 Text("results.amended").font(Typo.label).foregroundStyle(Theme.warning)
             }
             LabOrderDetail(order: order, showValues: true, staffView: true)
+            // T07c: the external report's photo or PDF, opened through a 5-minute signed link (same rule as the web).
+            if order.external && order.state == .completado { LabAttachmentsSection(order: order) }
             WriteNotice(submission: submission, reload: reload)
             // Los botones salen de `allowedActions` de la API para este médico, nunca del rol ni del estado.
             if order.allows(.revisar) {

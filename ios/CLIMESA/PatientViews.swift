@@ -10,21 +10,20 @@ struct PatientHome: Sendable {
     var nextAppointment: Part<Appointment?>?
     var labs: Part<[LabOrder]>?
     var room: Part<Admission?>?
-    var notices: Part<[PublicNotices.Notice]>?
-    /// La respuesta de `/me/avisos`, para volver a leer en su `proximoCambio`.
-    var noticeFeed: PublicNotices?
 }
 
-/// I04 · Inicio del paciente.
+/// I04 · Inicio del paciente. S11: los avisos viven en Avisos (Más); aquí solo sale el crítico destacado.
 struct PatientHomeView: View {
     let profile: AccessProfile
     let go: (AppTab) -> Void
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<PatientHome>()
+    @State private var notices = NoticeInboxModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty { CriticalNoticeBanner(model: notices) }
             if profile.patientId == nil {
                 // S13: while the account is not linked, linking is the one thing to do: open the form in one tap.
                 SectionCard {
@@ -51,19 +50,10 @@ struct PatientHomeView: View {
                 if let room = home.room {
                     if let error = room.error { failedCard("room.eyebrow", error) } else if let current = room.value ?? nil { RoomCard(admission: current) }
                 }
-                if let notices = home.notices {
-                    if let error = notices.error {
-                        SectionTitle("home.notices")
-                        SectionCard { PartError(message: error, retry: load) }
-                    } else if let list = notices.value, !list.isEmpty {
-                        SectionTitle("home.notices")
-                        ForEach(list) { notice in NoticeCard(notice: notice) }
-                    }
-                }
             }
         }
         .task(id: live.snapshot.version([.queue, .appointments, .laboratory, .hospitalInfo, .admissions])) { await load() }
-        .task(id: loader.value?.noticeFeed?.nextChange) { await reloadAtNextChange(loader.value?.noticeFeed, reload: load) }
+        .loadsNoticeInbox(notices, account: account, live: live)
     }
 
     @ViewBuilder private func failedCard(_ eyebrow: String, _ message: String) -> some View {
@@ -96,10 +86,6 @@ struct PatientHomeView: View {
                     return RoomRules.current(admissions, patientId: patientId)
                 }
             }
-            // MA-AVI-01: los avisos dirigidos a los roles de la persona además de los públicos.
-            let feed = try await Part<PublicNotices>.load { try await api.get("/me/avisos", as: PublicNotices.self) }
-            home.noticeFeed = feed.value
-            home.notices = feed.value.map { .loaded($0.byPriority) } ?? .failed(feed.error ?? "")
             return home
         }
     }
@@ -714,6 +700,7 @@ struct PatientSectionView: View {
             case .perfil: ProfileContent(profile: profile)
             case .hospitalizados: HospitalizedView()
             case .llegadaAmbulancia: AmbulanceArrivalView()
+            case .avisos: NoticesView()
             }
         }
     }

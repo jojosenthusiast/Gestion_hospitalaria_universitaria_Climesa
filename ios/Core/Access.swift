@@ -121,6 +121,8 @@ public enum AppSection: String, CaseIterable, Hashable, Sendable {
     case ubicacion
     // Médico (Más)
     case agenda, hospitalizados, ambulanciaEstado, llegadaAmbulancia
+    // Ambos: Avisos en su propia área (Fase 2, S11); basta la sesión
+    case avisos
 
     public var titleKey: String { "section.\(rawValue)" }
 
@@ -139,6 +141,7 @@ public enum AppSection: String, CaseIterable, Hashable, Sendable {
         case .ubicacion: return "map"
         case .agenda: return "calendar.badge.clock"
         case .ambulanciaEstado: return "cross.case"
+        case .avisos: return "bell"
         }
     }
 
@@ -155,15 +158,15 @@ public enum AppSection: String, CaseIterable, Hashable, Sendable {
         case .hospitalizados: return "admision.ver"
         case .ambulanciaEstado: return "ambulancia.ver_estado"
         case .llegadaAmbulancia: return "ambulancia.recibir_prehospital"
-        case .hospital, .ubicacion, .perfil: return nil
+        case .hospital, .ubicacion, .perfil, .avisos: return nil
         }
     }
 
     /// Secciones visibles para el rol de trabajo y los permisos del perfil.
     public static func visible(for role: String, profile: AccessProfile) -> [AppSection] {
         let candidates: [AppSection] = role == "MED"
-            ? [.agenda, .hospitalizados, .ambulanciaEstado, .llegadaAmbulancia, .hospital, .ubicacion, .perfil]
-            : [.vinculacion, .misDatos, .historial, .miHabitacion, .ambulancia, .hospital, .ubicacion, .accesos, .perfil]
+            ? [.avisos, .agenda, .hospitalizados, .ambulanciaEstado, .llegadaAmbulancia, .hospital, .ubicacion, .perfil]
+            : [.avisos, .vinculacion, .misDatos, .historial, .miHabitacion, .ambulancia, .hospital, .ubicacion, .accesos, .perfil]
         return candidates.filter { section in
             // La vinculación solo tiene sentido mientras la cuenta no tenga expediente.
             if section == .vinculacion && profile.patientId != nil { return false }
