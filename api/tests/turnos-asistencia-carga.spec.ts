@@ -21,7 +21,6 @@ const local=(day:string,time:string)=>`${day}T${time}:00-06:00`;
 jest.setTimeout(180000);
 
 describe('Reglas puras de turnos (ASIS-01, CARGA-01, MA-TUR-03)',()=>{
- const policy={margen_minutos:15,entrada_anticipada_minutos:30};
  const start=Date.parse(local('2026-11-10','07:00')),end=Date.parse(local('2026-11-10','15:00'));
  test('la entrada se confirma sola a la hora de inicio; ausente manda y nunca queda "sin confirmar"',()=>{
   const s={state:'publicado',start,end,presentSince:null};
