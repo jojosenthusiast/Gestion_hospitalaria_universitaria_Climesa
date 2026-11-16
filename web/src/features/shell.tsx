@@ -11,6 +11,7 @@ import { AppointmentsPage } from './appointments';
 import { ConsultationsPage } from './consultations';
 import { QueuePage } from './queue';
 import { LaboratoryPage } from './laboratory';
+import { LabCatalogPage } from './lab-catalog';
 import { InventoryPage } from './inventory';
 import { HospitalizationPage } from './hospitalization';
 import { AuditPage } from './privacy';
@@ -33,6 +34,7 @@ export const modules:Module[]=[
  {id:'turnos',label:'Turnos',permission:'turnos.ver'},
  {id:'auditoria',label:'Auditoría',permission:'auditoria.ver'},
  {id:'laboratorio',label:'Laboratorio',permission:'laboratorio.ver_cola',alsoPermissions:['laboratorio.ordenar']},
+ {id:'catalogo-laboratorio',label:'Catálogo de laboratorio',permission:'catalogo.configurar'},
  {id:'inventario',label:'Inventario',permission:'inventario.ver'},
  {id:'hospitalizacion',label:'Hospitalización',permission:'admision.ver',alsoPermissions:['admision.crear']},
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
@@ -42,7 +44,7 @@ export const modules:Module[]=[
  {id:'metricas',label:'Métricas',permission:'metricas.ver'},
  {id:'perfil',label:'Perfil'},
 ];
-const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',vinculaciones:'shield',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',perfil:'user',avisos:'info',metricas:'grid'};
+const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',vinculaciones:'shield',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',perfil:'user',avisos:'info',metricas:'grid'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
 export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
@@ -94,6 +96,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  else if(route==='consultas')content=<ConsultationsPage api={api} profile={profile} version={version}/>;
  else if(route==='fila')content=<QueuePage api={api} profile={profile} version={version}/>;
  else if(route==='laboratorio')content=<LaboratoryPage api={api} profile={profile} version={version}/>;
+ else if(route==='catalogo-laboratorio')content=<LabCatalogPage api={api} profile={profile} version={version}/>;
  else if(route==='inventario')content=<InventoryPage api={api} profile={profile} version={version}/>;
  else if(route==='hospitalizacion')content=<HospitalizationPage api={api} profile={profile} version={version}/>;
  else if(route==='avisos')content=<NoticesPage api={api} profile={profile} version={version}/>;
