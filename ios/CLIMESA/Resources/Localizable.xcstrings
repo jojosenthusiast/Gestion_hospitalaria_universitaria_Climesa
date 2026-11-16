@@ -78,6 +78,61 @@
         }
       }
     },
+    "ds.skeleton": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando información…"
+          }
+        }
+      }
+    },
+    "ds.legend.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leyenda de colores y estados"
+          }
+        }
+      }
+    },
+    "ds.legend.areas": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Áreas"
+          }
+        }
+      }
+    },
+    "ds.legend.statuses": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estados"
+          }
+        }
+      }
+    },
+    "ds.legend.priority": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prioridad"
+          }
+        }
+      }
+    },
     "ds.empty.title": {
       "extractionState": "manual",
       "localizations": {

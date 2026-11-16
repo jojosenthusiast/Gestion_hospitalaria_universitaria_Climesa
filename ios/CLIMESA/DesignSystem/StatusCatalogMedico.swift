@@ -23,18 +23,8 @@ struct MedicoTag: View {
     init(_ code: String, label: String? = nil) { self.code = code; self.label = label }
 
     var body: some View {
-        let text = StatusCatalog.style(for: code, label: label).label
-        let colors = Theme.colors(for: StatusCatalogMedico.tone(for: code))
-        HStack(spacing: 7) {
-            Circle().fill(colors.foreground).frame(width: 7, height: 7)
-            Text(verbatim: text).font(Typo.tag).lineLimit(1)
-        }
-        .foregroundStyle(colors.foreground)
-        .padding(.horizontal, 9).padding(.vertical, 5)
-        .background(colors.background, in: Capsule())
-        .overlay(Capsule().stroke(colors.foreground.opacity(0.24), lineWidth: 1))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: text))
+        // Fase 2: misma insignia que `StatusTag`; un código sin familia (triaje, `atendido`) conserva el tono del Médico.
+        StatusBadge(code, label: label, fallbackTone: StatusCatalogMedico.tone(for: code))
     }
 }
 
