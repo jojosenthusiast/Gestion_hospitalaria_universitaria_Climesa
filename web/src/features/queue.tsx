@@ -4,7 +4,7 @@ import { SearchPicker, type PickerItem } from '../components/search-picker';
 import { AreaTag, PriorityBadge, type Priority } from '../components/system';
 import { Icon, Notice } from '../components/ui';
 import { can, type AccessProfile, type Api, type Space } from '../lib/api';
-import { MOVE_LABEL, MOVE_PATH, SERVICE_AREA, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
+import { MOVE_LABEL, MOVE_PATH, SERVICE_AREA, canRemoveCall, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
 import { patientPicker } from './appointments';
 import { useQuickAction } from './personal/accion';
 import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, Tag, WriteError, formatDateTime, useAction, useData } from './common';
@@ -35,6 +35,9 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const data = useData<QueueTicket[]>(api, '/fila', version, can(profile, 'fila.ver'));
   const manage = can(profile, 'fila.gestionar'), call = can(profile, 'fila.llamar'), issue = can(profile, 'fila.emitir');
   const readOnly = !manage && !call && !issue;
+  // Mirrors the API (`seesWholeQueue`): only staff who read the whole queue get "who goes next"; a patient's own
+  // queue (context `propio`) would get 403.
+  const wholeQueue = profile.permissions.some(p => p.code === 'fila.ver' && p.context !== 'propio');
   const action = useAction(api);
   // Optimistic column while a move is in flight; cleared on success (the refresh brings the real state) and on error (reverts).
   const [pending, setPending] = useState<Record<string, BoardColumn>>({});
@@ -96,7 +99,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
           <ListToolbar trailing={<ExportMenu table={exportTable} disabled={!visible.length} />}><LiveSearch label="Buscar en la fila" placeholder="Número o paciente" value={query} onChange={setQuery} /></ListToolbar>
           <div className="cl-filter-row"><span className="cl-filter-label">Servicio</span><ChipGroup label="Servicio" value={service} onChange={setService} options={[{ value: 'todos', label: 'Todos', count: all.length }, ...services.map(([value, label]) => ({ value, label, count: all.filter(t => t.service === value).length }))]} /></div>
           <ActiveFilters filters={filters} onClear={() => { setService('todos'); setQuery(''); }} />
-          {service !== 'todos'
+          {service !== 'todos' && wholeQueue
             ? <NextPanel api={api} profile={profile} service={service} version={version + tick} busy={action.busy} canCall={call} waiting={waitingHere} onCallNext={callNext} />
             : !readOnly && <p className="muted qb-hint">Elige un servicio para ver quién pasa después y llamar al siguiente número.</p>}
           <div className="qb-counts" aria-label="Resumen de la fila">{COLUMNS.map(column => <div key={column} className={`qb-count tone-${COLUMN_TONE[column]}`}><strong>{summary.counts[column]}</strong><span>{COLUMN_LABEL[column]}</span></div>)}
@@ -129,7 +132,8 @@ function NextPanel({ api, profile, service, version, busy, canCall, waiting, onC
         ? <div className="qb-next-ticket"><AreaTag code={proposal.area || SERVICE_AREA[service] || 'GEN'} /><strong className="qb-number qb-number-lg mono-data">{proposal.numero}</strong>
             <div className="qb-next-who"><span>{proposal.patientName || 'Paciente no identificado'}</span><small>{proposal.reasonText}</small></div>
             {proposal.priority !== 'rutina' && <PriorityBadge value={proposal.priority} />}</div>
-        : <p className="muted">{next.loading && !next.data ? 'Calculando…' : 'Nadie espera en este servicio.'}</p>}
+        : next.error ? <Notice kind="error">{next.error.message}</Notice>
+        : <p className="muted">{next.loading || !result ? 'Calculando…' : 'Nadie espera en este servicio.'}</p>}
       {result && <small className="qb-rule">Regla: {result.rule}</small>}
     </div>
     {canCall && <div className="qb-next-actions">
@@ -191,7 +195,7 @@ function Lane({ column, tickets, now, busy, call, manage, pendingIds, onTransiti
           ? <button key={name} className="row-action" disabled={busy} onClick={() => void onTransition(ticket, actionPath[name])}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</button>
           : blocked.find(item => item.action === name) ? <button key={name} className="row-action" disabled title={blocked.find(item => item.action === name)!.reason}>{actionLabel(ticket, name)}</button> : null)}
         {ticket.state === 'en_atencion' && ticket.consultationId && ticket.consultationState === 'abierta' && <a className="row-action" href={`#/consultas?consulta=${ticket.consultationId}`}>Retomar consulta <Icon name="arrow" size={16} /></a>}
-        {(moves.length > 0 || changingPriority) && <CardMenu ticket={ticket} moves={moves} priorities={changingPriority} busy={busy} onMove={onMove} onPriority={onPriority} />}
+        {(moves.length > 0 || changingPriority || (call && canRemoveCall(ticket))) && <CardMenu ticket={ticket} moves={moves} priorities={changingPriority} removeCall={call && canRemoveCall(ticket)} busy={busy} onMove={onMove} onPriority={onPriority} onRemoveCall={() => void onTransition(ticket, 'deshacer-llamado')} />}
       </div>
       {blocked.map(item => <small key={item.action} className="form-hint">{actionLabel(ticket, item.action)}: {item.reason}</small>)}
       </li>;
@@ -199,14 +203,16 @@ function Lane({ column, tickets, now, busy, call, manage, pendingIds, onTransiti
 }
 
 /** Keyboard and touch alternative to dragging: a native menu with the moves the server accepts and the priority. */
-function CardMenu({ ticket, moves, priorities, busy, onMove, onPriority }: { ticket: QueueTicket; moves: { to: BoardColumn; action: QueueMoveAction }[]; priorities: boolean; busy: boolean; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void> }) {
+function CardMenu({ ticket, moves, priorities, removeCall, busy, onMove, onPriority, onRemoveCall }: { ticket: QueueTicket; moves: { to: BoardColumn; action: QueueMoveAction }[]; priorities: boolean; removeCall: boolean; busy: boolean; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void>; onRemoveCall: () => void }) {
   function choose(value: string) {
+    if (value === 'quitar-llamado') { onRemoveCall(); return; }
     const [kind, target] = value.split(':');
     if (kind === 'mover') void onMove(ticket, target as BoardColumn);
     if (kind === 'prioridad') void onPriority(ticket, target as Priority);
   }
   return <select className="qb-menu" value="" disabled={busy} onChange={event => choose(event.target.value)} aria-label={`Mover o cambiar prioridad de ${ticketCode(ticket)}`}>
     <option value="">Mover…</option>
+    {removeCall && <option value="quitar-llamado">Quitar un llamado (van {ticket.llamados})</option>}
     {moves.length > 0 && <optgroup label="Mover a">{moves.map(item => <option key={item.to} value={`mover:${item.to}`}>{COLUMN_LABEL[item.to as Column]} ({MOVE_LABEL[item.action].toLowerCase()})</option>)}</optgroup>}
     {priorities && <optgroup label="Prioridad">{(['emergencia', 'urgente', 'rutina'] as Priority[]).filter(p => p !== (ticket.priority ?? 'rutina')).map(p => <option key={p} value={`prioridad:${p}`}>{PRIORITY_LABEL[p]}</option>)}</optgroup>}
   </select>;

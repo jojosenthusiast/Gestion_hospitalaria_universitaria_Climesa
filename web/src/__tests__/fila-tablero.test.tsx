@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AccessProfile, Api } from '../lib/api';
+import { ApiError, type AccessProfile, type Api } from '../lib/api';
 import { destinations, moveFor } from '../lib/queue-moves';
 import { QueuePage } from '../features/queue';
 
@@ -106,5 +106,35 @@ describe('Fila del día · tablero (S9)', () => {
     await userEvent.click(within(dialogo).getByRole('radio', { name: 'Urgente' }));
     await userEvent.click(within(dialogo).getByRole('button', { name: /Emitir número/ }));
     expect(api.write).toHaveBeenCalledWith('/fila', { service: 'consulta_general', patientId: 'p-1', priority: 'urgente' }, 'POST');
+  });
+
+  it('con 2 o más llamados no se arrastra a "En espera": el menú ofrece "Quitar un llamado"', async () => {
+    const twice = { state: 'llamado', llamados: 2, allowedActions: ['atender'], undoActions: ['deshacer_llamado'] };
+    expect(moveFor(twice, 'espera')).toMatchObject({ allowed: false, action: null });
+    expect(destinations(twice).map(d => d.to)).toEqual(['atencion']);
+    expect(moveFor({ ...twice, llamados: 1 }, 'espera')).toEqual({ action: 'deshacer_llamado', allowed: true });
+    const api = montar(['fila.ver', 'fila.llamar'], [ticket({ state: 'llamado', llamados: 2, allowedActions: ['atender'], undoActions: ['deshacer_llamado'] })]);
+    const menu = await screen.findByRole('combobox', { name: 'Mover o cambiar prioridad de CON 7' });
+    expect(within(menu).queryByRole('option', { name: /En espera/ })).toBeNull();
+    await userEvent.selectOptions(menu, 'quitar-llamado');
+    await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/fila/t-7/deshacer-llamado', { version: 2 }, 'POST'));
+  });
+
+  it('un paciente (fila propia) no ve ni pide "Quién pasa después"', async () => {
+    const api = { request: vi.fn(async () => [ticket()]), write: vi.fn() } as unknown as Api & { request: ReturnType<typeof vi.fn> };
+    const paciente: AccessProfile = { ...perfil([]), roles: ['PAC'], permissions: [{ code: 'fila.ver', context: 'propio' }] };
+    render(<QueuePage api={api} profile={paciente} version={0} />);
+    await userEvent.click(await screen.findByRole('button', { name: /^Consulta general/ }));
+    expect(screen.queryByRole('region', { name: 'Quién pasa después' })).toBeNull();
+    expect(api.request.mock.calls.some(([path]) => String(path).startsWith('/fila/siguiente'))).toBe(false);
+  });
+
+  it('si la propuesta no se puede leer muestra el error, nunca "Nadie espera"', async () => {
+    const api = { request: vi.fn(async (path: string) => { if (path.startsWith('/fila/siguiente')) throw new ApiError('No se pudo calcular quién pasa después.', 500); return [ticket()]; }), write: vi.fn() } as unknown as Api;
+    render(<QueuePage api={api} profile={perfil(['fila.ver', 'fila.llamar'])} version={0} />);
+    await userEvent.click(await screen.findByRole('button', { name: /^Consulta general/ }));
+    const next = await screen.findByRole('region', { name: 'Quién pasa después' });
+    expect(await within(next).findByText(/No se pudo calcular quién pasa después/)).toBeTruthy();
+    expect(within(next).queryByText('Nadie espera en este servicio.')).toBeNull();
   });
 });

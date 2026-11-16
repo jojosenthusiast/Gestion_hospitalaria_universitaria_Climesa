@@ -5,7 +5,7 @@
  */
 export type BoardColumn = 'espera' | 'llamado' | 'atencion' | 'cerrado';
 export type QueueMoveAction = 'llamar' | 'atender' | 'completar' | 'no_se_presento' | 'deshacer_llamado';
-export type MovableTicket = { state: string; allowedActions?: string[]; undoActions?: string[]; blockedActions?: { action: string; reason: string }[] };
+export type MovableTicket = { state: string; llamados?: number; allowedActions?: string[]; undoActions?: string[]; blockedActions?: { action: string; reason: string }[] };
 
 export const columnOfState = (state: string): BoardColumn =>
   state === 'en_espera' ? 'espera' : state === 'llamado' ? 'llamado' : state === 'en_atencion' ? 'atencion' : 'cerrado';
@@ -28,11 +28,19 @@ export function moveFor(ticket: MovableTicket, to: BoardColumn): MoveCheck {
   if (from === to) return { action: null, allowed: false, reason: 'Ya está en esa columna.' };
   const action = MOVES[from]?.[to] ?? null;
   if (!action) return { action: null, allowed: false, reason: 'Ese cambio no existe en la fila: sigue el orden espera, llamado, atención, terminado.' };
+  // Undo removes one call; only the last one sends the number back to waiting. With more calls the card would drop
+  // into "En espera" and jump back to "Llamados", so it is not a column move (the menu offers "Quitar un llamado").
+  if (action === 'deshacer_llamado' && (ticket.llamados ?? 1) > 1)
+    return { action: null, allowed: false, reason: `Tiene ${ticket.llamados} llamados: usa «Quitar un llamado» en el menú de la tarjeta; vuelve a la espera al quitar el último.` };
   const server = action === 'deshacer_llamado' ? ticket.undoActions ?? [] : ticket.allowedActions ?? [];
   if (server.includes(action)) return { action, allowed: true };
   const blocked = ticket.blockedActions?.find(item => item.action === action);
   return { action, allowed: false, reason: blocked?.reason ?? 'Tu cuenta no puede hacer ese cambio ahora.' };
 }
+
+/** "Quitar un llamado": undo of one call when the number keeps being called (2 or more calls). Not a column move. */
+export const canRemoveCall = (ticket: MovableTicket) =>
+  ticket.state === 'llamado' && (ticket.llamados ?? 1) > 1 && (ticket.undoActions ?? []).includes('deshacer_llamado');
 
 /** Columns the card may move to now, for the keyboard / mobile menu and to highlight drop targets. */
 export function destinations(ticket: MovableTicket): { to: BoardColumn; action: QueueMoveAction }[] {
