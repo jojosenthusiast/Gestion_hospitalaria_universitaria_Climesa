@@ -14,7 +14,7 @@ afterEach(cleanup);
 const ORDER = '0a1b2c3d-1111-2222-3333-444455556666';
 const perfil = (permissions: string[]): AccessProfile => ({ id: 'u-1', user: { id: 'u-1' }, email: 'lab@example.test', name: 'Laboratorio Ficticio', roles: ['LAB'], platforms: ['web'], permissions: permissions.map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId: 's-1' });
 const resultado = { value: 13.2, mark: 'normal', version: 1 };
-const orden = (state: string, over: Record<string, unknown> = {}, captured = true) => ({ id: ORDER, patientName: 'Paciente Ficticio Dos', priority: 'urgente', state, version: 4, createdAt: '2026-11-13T15:00:00Z', items: [{ id: 'i-1', code: 'HB', name: 'Hemoglobina', result: captured ? resultado : null }], ...over });
+const orden = (state: string, over: Record<string, unknown> = {}, captured = true) => ({ id: ORDER, patientName: 'Paciente Ficticio Dos', priority: 'urgente', state, version: 4, createdAt: '2026-11-13T15:00:00Z', items: [{ id: 'i-1', code: 'HB', name: 'Hemoglobina', resultType: 'numerico', result: captured ? resultado : null }], ...over });
 
 function montar(permissions: string[], state = 'en_proceso', write: Api['write'] = vi.fn(async () => ({})) as Api['write'], order: unknown = orden(state)) {
   const api = { request: vi.fn(async () => [order]), write: vi.fn(write) } as unknown as Api & { request: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn> };
@@ -32,7 +32,8 @@ describe('Laboratorio (W20, W21)', () => {
 
   it('completa una orden en proceso con su versión y recarga la cola', async () => {
     const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', undefined, orden('en_proceso', { allowedActions: ['capturar', 'completar'] }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Completar' }));
+    // R7 C1: while capturing, the sheet's single primary action completes (nothing left to save).
+    await userEvent.click(await screen.findByRole('button', { name: 'Guardar y completar (1)' }));
     expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/completar`, { version: 4 }, 'POST');
     await vi.waitFor(() => expect(api.request).toHaveBeenCalledTimes(2));
   });
@@ -45,7 +46,7 @@ describe('Laboratorio (W20, W21)', () => {
 
   it('un 409 de versión al completar ofrece recargar la orden', async () => {
     const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', vi.fn(async () => { throw new ApiError('La orden cambió.', 409, 'version_conflicto', 5); }) as Api['write'], orden('en_proceso', { allowedActions: ['capturar', 'completar'] }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Completar' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Guardar y completar (1)' }));
     await userEvent.click(await screen.findByRole('button', { name: /Recargar la orden/ }));
     await vi.waitFor(() => expect(api.request).toHaveBeenCalledTimes(2));
   });
@@ -70,7 +71,13 @@ describe('Laboratorio (W20, W21)', () => {
     const api = montar(['laboratorio.ver_cola', 'laboratorio.revisar'], 'completado', undefined, orden('completado', { completedAt: '2026-11-13T16:00:00Z', reviewedAt: null, allowedActions: ['revisar'] }));
     expect(await screen.findByText('Pendiente de revisar')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Revisar y liberar' }));
-    expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/revisar`, { version: 4 }, 'POST');
+    // Sweep #12: release is irreversible, so it confirms with what the patient will see first.
+    const dialogo = await screen.findByRole('dialog', { name: 'Revisar y liberar al paciente' });
+    expect(within(dialogo).getByText('Hemoglobina 13.2')).toBeTruthy();
+    expect(api.write).not.toHaveBeenCalled();
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Liberar resultados' }));
+    expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/revisar`, { version: 4, followUp: true }, 'POST');
+    expect(await screen.findByText(/Resultados liberados: Paciente Ficticio Dos ya los ve/)).toBeTruthy();
   });
 
   it('revisada: todos los pasos hechos y el paciente ya puede verla', async () => {
@@ -81,10 +88,10 @@ describe('Laboratorio (W20, W21)', () => {
 
   it('muestra qué falta para completar: todos los valores; sin ellos no deja completar', async () => {
     const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', undefined, orden('en_proceso', { allowedActions: ['capturar'] }, false));
-    const completar = await screen.findByRole('button', { name: 'Completar' }) as HTMLButtonElement;
-    expect(completar.disabled).toBe(true);
-    expect(screen.getByRole('status').textContent).toContain('0 de 1 capturados');
-    expect(screen.getByText('Falta el valor')).toBeTruthy();
+    const guardar = await screen.findByRole('button', { name: 'Guardar resultados (0)' }) as HTMLButtonElement;
+    expect(guardar.disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: /^Completar/ })).toBeNull();
+    expect(screen.getByText('0 de 1 con valor')).toBeTruthy();
     expect(api.write).not.toHaveBeenCalled();
   });
 
@@ -110,9 +117,9 @@ describe('Laboratorio (W20, W21)', () => {
   });
   it('MA-LAB-01: guarda un resultado con la versión vigente de la orden', async () => {
     const api = montar(['laboratorio.ver_cola', 'laboratorio.procesar'], 'en_proceso', undefined, orden('en_proceso', { allowedActions: ['capturar'] }, false));
-    await userEvent.type(await screen.findByLabelText('Valor'), '13.4');
-    await userEvent.click(screen.getByRole('button', { name: 'Guardar resultado' }));
-    expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/resultados`, { orderItemId: 'i-1', version: 4, value: 13.4 }, 'POST');
+    await userEvent.type(await screen.findByLabelText('Hemoglobina'), '13.4');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar resultados (1)' }));
+    expect(api.write).toHaveBeenCalledWith(`/laboratorio/ordenes/${ORDER}/resultados/lote`, { version: 4, items: [{ orderItemId: 'i-1', value: 13.4 }] }, 'POST');
   });
 
   it('MA-LAB-02: corrige un resultado ya liberado con motivo y avisa que vuelve a revisión', async () => {

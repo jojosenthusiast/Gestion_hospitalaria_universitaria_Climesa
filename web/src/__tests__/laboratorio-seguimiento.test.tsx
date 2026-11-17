@@ -72,13 +72,15 @@ describe('Laboratorio · flujo C en pantalla', () => {
 
   it('una observación marcada como relevante viaja con el resultado', async () => {
     const api = montar([order('a', 'Ana Captura', 'en_proceso', { allowedActions: ['capturar'] })]);
-    await userEvent.type(await screen.findByLabelText('Valor'), '13.4');
-    const relevante = screen.getByRole('checkbox', { name: /Es relevante/ }) as HTMLInputElement;
+    await userEvent.type(await screen.findByLabelText('Hemoglobina (g/dL)'), '13.4');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar observación' }));
+    const relevante = screen.getByRole('checkbox', { name: 'Avisar al médico' }) as HTMLInputElement;
     expect(relevante.disabled).toBe(true);
-    await userEvent.type(screen.getByLabelText('Observación (opcional)'), 'Muestra hemolizada');
+    await userEvent.type(screen.getByLabelText('Observación de Hemoglobina'), 'Muestra hemolizada');
     await userEvent.click(relevante);
-    await userEvent.click(screen.getByRole('button', { name: 'Guardar resultado' }));
-    expect(api.write).toHaveBeenCalledWith('/laboratorio/ordenes/a/resultados', { orderItemId: 'i-1', version: 3, value: 13.4, observation: 'Muestra hemolizada', relevant: true }, 'POST');
+    // With laboratorio.validar and every value present, the one primary action also completes the order (R7 C1).
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar y completar (1)' }));
+    expect(api.write).toHaveBeenCalledWith('/laboratorio/ordenes/a/resultados/lote', { version: 3, complete: true, items: [{ orderItemId: 'i-1', value: 13.4, observation: 'Muestra hemolizada', relevant: true }] }, 'POST');
   });
 
   it('envía a externo una orden pendiente con el lugar y las instrucciones para el paciente', async () => {
