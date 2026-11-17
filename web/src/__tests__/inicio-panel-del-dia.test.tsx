@@ -33,7 +33,7 @@ const respuestas: Record<string, unknown> = {
   '/cuentas/vinculaciones': Array.from({ length: 5 }, (_, i) => ({ id: `v${i}`, createdAt: hoy, version: 1, account: { email: `v${i}@example.test`, name: i === 0 ? nombreLargo : `Cuenta ${i}` }, declared: { dui: '', birth: '' }, candidate: null, candidates: 0 })),
   '/admisiones': [{ id: 'a1', patientName: 'Paciente Sin Cama', state: 'pendiente_cama', requestedCategory: 'general', isolation: false, bed: '' }],
   '/ambulancia': { unit: { id: 'u', plate: 'P-1', state: 'disponible', version: 1 }, activeService: null, paramedicOnDuty: true, pendingRequests: [] },
-  '/inventario/existencias': Array.from({ length: 8 }, (_, i) => ({ articulo_id: `x${i}`, codigo: `R-${i}`, nombre: `Reactivo ${i}`, tipo: 'reactivo', unidad: 'u', minimo: 10, disponible: 2, vencido: 0, bajo_minimo: true })),
+  '/inventario/existencias': Array.from({ length: 8 }, (_, i) => ({ articulo_id: `x${i}`, codigo: `R-${i}`, nombre: i === 0 ? 'Jeringa de 5 ml' : `Reactivo ${i}`, tipo: 'reactivo', unidad: 'unidad', minimo: 10, disponible: i === 0 ? 0 : 2, vencido: 0, bajo_minimo: true })),
   '/laboratorio/ordenes': [
     ...Array.from({ length: 6 }, (_, i) => ({ id: `p${i}`, patientName: `Muestra ${i}`, priority: 'rutina', state: 'pendiente', createdAt: hoy, items: [{ id: 'i', name: 'Hemograma' }] })),
     ...Array.from({ length: 3 }, (_, i) => ({ id: `x${i}`, patientName: `Proceso ${i}`, priority: 'rutina', state: 'en_proceso', createdAt: hoy, items: [{ id: 'i', name: 'Glucosa' }] })),
@@ -109,6 +109,14 @@ describe('Inicio · panel del día', () => {
     const valores = datos(container);
     expect(valores.filter(v => v === '6')).toHaveLength(1);
     expect(new Set(valores).size).toBe(valores.length);
+  });
+
+  it('JOP: sin existencias se lee «Agotado», y los huecos dicen «0 de 1 persona»', async () => {
+    montar('JOP');
+    const inventario = await screen.findByRole('region', { name: 'Inventario bajo el mínimo' });
+    const fila = within(inventario).getByText('Jeringa de 5 ml').closest('li')!;
+    expect(within(fila).getByText('Agotado')).toBeTruthy();
+    expect(within(await screen.findByRole('region', { name: 'Huecos de cobertura' })).getByText(/0 de 1 persona$/)).toBeTruthy();
   });
 
   it('DPD: acciones con nombre legible, nunca el código del permiso', async () => {

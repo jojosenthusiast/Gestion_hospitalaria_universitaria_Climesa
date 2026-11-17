@@ -43,13 +43,12 @@
 
 /* Quick actions live in the compact header: one row of small buttons that scrolls sideways on a phone. */
 .compact-header .quick-actions { margin: 0; display: block; min-width: 0; }
-.compact-header .quick-actions > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* One row at every width (coordinator: a fifth action alone on a second row); it scrolls sideways when it does not fit. */
+.compact-header .heading-actions:has(.quick-actions) { min-width: 0; max-width: 100%; }
+.compact-header .quick-actions > div { display: flex; flex-wrap: nowrap; gap: var(--space-2); overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding-bottom: 2px; }
+.compact-header .quick-actions > div::-webkit-scrollbar { display: none; }
 .compact-header .quick-actions a { min-height: 40px; padding: 0 var(--space-3) 0 var(--space-2); display: inline-flex; align-items: center; gap: var(--space-2); border: 1px solid var(--control-line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); text-decoration: none; white-space: nowrap; transition: background-color var(--motion-instant) ease-out, border-color var(--motion-instant) ease-out; }
 .compact-header .quick-actions a strong { font-size: var(--text-sm); font-weight: 700; }
 .compact-header .quick-actions .quick-icon { color: var(--primary-text); display: inline-grid; }
 @media (hover: hover) and (pointer: fine) { .compact-header .quick-actions a:hover { border-color: var(--primary-text); background: var(--soft); } }
-@media (max-width: 720px) {
-  .compact-header .quick-actions > div { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding-bottom: 2px; }
-  .compact-header .quick-actions > div::-webkit-scrollbar { display: none; }
-}
 .lab-follow-up { margin: 0 0 var(--space-6); display: grid; gap: var(--space-3); }

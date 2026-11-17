@@ -17,7 +17,9 @@
 .workspace-role select { max-width: 260px; padding: 6px 28px 6px 0; border: 0; border-bottom: 1px solid #9aa6ba; background: transparent; color: #ffffff; }
 .workspace-role option { background: var(--navy); }
 /* R1: the day as plain small text in the topbar (it sits on the navy bar, so it uses the bar's light muted ink). */
-.topbar-date { min-width: 0; margin-left: auto; color: #d3dbe6; font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; text-transform: capitalize; font-variant-numeric: tabular-nums; }
+.topbar-date { min-width: 0; margin-left: auto; color: #d3dbe6; font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* R4a: «lunes, 16 de noviembre», never «Lunes, 16 De Noviembre»: only the first letter goes up. */
+.topbar-date::first-letter { text-transform: uppercase; }
 .nav-toggle { width: 46px; height: 46px; display: none; place-items: center; flex-shrink: 0; border: 1px solid rgb(255 255 255 / 0.3); border-radius: var(--radius-card); background: transparent; color: #ffffff; transition: background var(--motion-fast) ease, transform var(--motion-instant) ease; }
 .nav-toggle:hover { background: rgb(255 255 255 / 0.1); }
 .nav-toggle:active { transform: scale(0.96); }
@@ -520,7 +522,7 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .my-shift { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .my-shift strong { font-size: 15px; }
 .stepper { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
-.stepper li { padding: 8px 12px; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px dashed var(--line); border-radius: var(--radius-control); color: var(--muted); text-transform: capitalize; }
+.stepper li { padding: 8px 12px; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px dashed var(--line); border-radius: var(--radius-control); color: var(--muted); }
 .stepper li.is-done { border-style: solid; border-color: var(--success); background: var(--success-soft); color: var(--success); }
 .stepper small { font-variant-numeric: tabular-nums; }
 

@@ -104,7 +104,8 @@
 
 /* Agenda de citas. */
 .ag-day { display: grid; gap: 8px; margin-bottom: 16px; }
-.ag-day h3 { margin: 0; font-size: 15px; text-transform: capitalize; }
+.ag-day h3 { margin: 0; font-size: 15px; }
+.ag-day h3::first-letter { text-transform: uppercase; }
 .ag-doctor { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
 .ag-doctor > header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 /* R1: the StatusBadge of each slot carries its state; no second colour system on the edge. */

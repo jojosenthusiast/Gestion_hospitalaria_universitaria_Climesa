@@ -56,10 +56,12 @@ function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
   </Panel>;
 }
 
+/** Zero stock reads «Agotado» (urgent), never «Bajo mínimo» with the waiting clock (coordinator, prod). */
+const stockState = (r: { disponible: number; vencido: number }) => r.disponible <= 0 ? { tag: 'Agotado', status: 'agotado' } : r.vencido > 0 ? { tag: 'Vencido', status: 'vencido' } : { tag: 'Bajo mínimo', status: 'bajo_minimo' };
 const unitsOf = (unit: string) => unit === 'unidad' ? 'unidades' : /[aeiou]$/.test(unit) ? `${unit}s` : `${unit}es`;
 const lowStock = (d: DashboardData): TrayGroupSpec => ({
   id: 'inventario', title: 'Inventario bajo el mínimo', href: '#/inventario', masculine: true, state: asRemote(d.stock),
-  items: (d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: `${r.disponible} de ${plural(r.minimo, r.unidad, unitsOf(r.unidad))}${r.vencido > 0 ? ` · ${r.vencido} vencidos` : ''}`, tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', tag: r.vencido > 0 ? 'Vencido' : 'Bajo mínimo', status: r.vencido > 0 ? 'vencido' : 'bajo_minimo' })),
+  items: (d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: `${r.disponible} de ${plural(r.minimo, r.unidad, unitsOf(r.unidad))}${r.vencido > 0 ? ` · ${r.vencido} vencidos` : ''}`, tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', ...stockState(r) })),
 });
 const pendingAmbulance = (d: DashboardData): TrayGroupSpec => ({
   id: 'ambulancia', title: 'Ambulancia por confirmar', href: '#/ambulancia', state: asRemote(d.ambulance),
