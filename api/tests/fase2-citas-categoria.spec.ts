@@ -1,4 +1,6 @@
+import { DatabaseService } from '../src/platform/database.service';
 import { createTestApp, TestApp } from './support/app';
+import { recordSql } from './support/sql-recorder';
 
 jest.setTimeout(240000);
 const now = new Date('2026-11-16T15:00:00Z'); // 09:00 en El Salvador
@@ -158,6 +160,36 @@ describe('Fase 2 · solicitud de cita por categoría', () => {
   test('el paciente no cancela solicitudes ajenas', async () => {
     const foreign = await t.one(`INSERT INTO atencion.solicitud_cita(paciente_id,categorias,franja) VALUES($1,'{piel}','manana') RETURNING id`, [await t.patient()]);
     expect((await t.call('PAC', 'POST', `/citas/solicitudes-categoria/${foreign.id}/cancelar`, { version: 1 })).status).toBe(403);
+  });
+
+  // Auditoría T15: contar y luego insertar sin bloqueo deja pasar dos solicitudes concurrentes sobre el límite.
+  test('CITA-07: las dos clases de solicitud toman el mismo candado por paciente antes de contar', async () => {
+    const db = t.app.get(DatabaseService);
+    const lockThenCount = (sql: string[]) => {
+      const lock = sql.findIndex(q => /pg_advisory_xact_lock\(hashtext\('citas\.solicitudes:' \|\| \$1::text\)\)/.test(q));
+      const count = sql.findIndex(q => /count\(\*\) FROM atencion\.solicitud_cita/.test(q));
+      return lock >= 0 && lock < count;
+    };
+    expect(lockThenCount(await recordSql(db, async () => expect((await request()).status).toBe(201)))).toBe(true);
+    const slot = slotAt('2026-11-17T21:00:00.000Z');
+    expect(lockThenCount(await recordSql(db, async () => expect((await t.call('PAC', 'POST', '/citas/solicitudes', { doctorId, ...slot, reason: 'Control' })).status).toBe(201)))).toBe(true);
+  });
+
+  // Auditoría T15: resolver una solicitud usa el reloj de la API, como el resto del servicio.
+  test('asignar, rechazar y retirar guardan resuelta_en con el reloj de la API', async () => {
+    const later = new Date('2026-11-16T16:30:00Z');
+    t.setNow(later);
+    const resolvedAt = async (id: string) => (await t.one<{ at: Date }>('SELECT resuelta_en AS at FROM atencion.solicitud_cita WHERE id=$1', [id])).at;
+    const assigned = (await request()).body;
+    expect((await t.call('REC', 'POST', `/citas/solicitudes-categoria/${assigned.id}/asignar`, { version: 1, doctorId, ...slotAt('2026-11-17T21:20:00.000Z') })).status).toBe(201);
+    expect(await resolvedAt(assigned.id)).toEqual(later);
+    const rejected = (await request()).body;
+    expect((await t.call('REC', 'POST', `/citas/solicitudes-categoria/${rejected.id}/rechazar`, { version: 1, rejectionReason: 'No hay especialista disponible este mes.' })).status).toBe(201);
+    expect(await resolvedAt(rejected.id)).toEqual(later);
+    await t.pg.query("UPDATE atencion.cita SET estado='cancelada' WHERE estado IN ('solicitada','confirmada')");
+    const withdrawn = (await request()).body;
+    expect((await t.call('PAC', 'POST', `/citas/solicitudes-categoria/${withdrawn.id}/cancelar`, { version: 1 })).status).toBe(201);
+    expect(await resolvedAt(withdrawn.id)).toEqual(later);
   });
 
   test('la base no reabre una solicitud resuelta', async () => {
