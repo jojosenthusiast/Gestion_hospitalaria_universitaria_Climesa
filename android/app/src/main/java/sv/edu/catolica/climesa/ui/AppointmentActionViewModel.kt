@@ -62,7 +62,13 @@ class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway
     private val noShow = UndoWindow(
         viewModelScope, api, sv.edu.catolica.climesa.domain.FormDrafts.DEFERRED_NO_SHOW, drafts, now = { clock() },
         onSent = { item, _ -> mutable.update { it.copy(done = AppointmentActions.doneNotice(AppointmentAction.NO_SHOW, item.label.substringAfter("Cita de ").substringBefore(" marcada")), error = null) } },
-        onFailed = { item, e -> mutable.update { it.copy(error = businessMessage(e, "No se pudo marcar la inasistencia.") + " Queda guardada y se reintentará.", failedNoShow = item.id) } },
+        onFailed = { item, e, kept ->
+            mutable.update {
+                if (kept) it.copy(error = businessMessage(e, "No se pudo marcar la inasistencia.") + " Queda guardada y se reintentará.", failedNoShow = item.id)
+                else it.copy(error = businessMessage(e, "No se pudo marcar la inasistencia."), failedNoShow = null, done = null)
+            }
+        },
+        onExpired = { gone -> mutable.update { it.copy(error = "${gone.size} «No asistió» de hace más de 24 h no se enviaron.") } },
     ) { pending -> mutable.update { it.copy(pendingNoShow = pending) } }
 
     /** Signed-in user: a "No asistió" stored before the app closed is sent now if its window ended. */

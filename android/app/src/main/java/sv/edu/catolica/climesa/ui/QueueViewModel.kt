@@ -57,6 +57,8 @@ data class QueueState(
     val lastService: String = QueueLabels.services.first().first,
     /** B3 / D-3: "No se presentó" waits 8 s with "Deshacer" before it is sent. */
     val pendingAbsence: PendingUndo? = null,
+    /** A stored "No se presentó" whose last send failed and will be retried (it can be discarded). */
+    val failedAbsence: String? = null,
     /** B5: called numbers of the patient's service, for "faltan N" and the room once called. */
     val publicCalls: List<PublicCall> = emptyList(),
 )
@@ -77,9 +79,13 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
      */
     private val absence = UndoWindow(
         viewModelScope, api, sv.edu.catolica.climesa.domain.FormDrafts.DEFERRED_ABSENCE, drafts, now = { clock() },
-        prepare = { item -> JSONObject(item.body).also { body -> mutable.value.tickets.firstOrNull { it.id == item.key }?.let { body.put("version", it.version) } } },
-        onSent = { item, _ -> mutable.value = mutable.value.copy(notice = "${item.label.substringBefore(" se marcará")} marcado como no presentado.", error = null); load(silent = true) },
-        onFailed = { item, e -> mutable.value = mutable.value.copy(error = "${item.label.substringBefore(" se marcará")}: ${message(e)} Queda guardado y se reintentará.") },
+        onSent = { item, _ -> mutable.value = mutable.value.copy(notice = "${item.label.substringBefore(" se marcará")} marcado como no presentado.", error = null, failedAbsence = null); load(silent = true) },
+        onFailed = { item, e, kept ->
+            val code = item.label.substringBefore(" se marcará")
+            mutable.value = if (kept) mutable.value.copy(error = "$code: ${message(e)} Queda guardado y se reintentará.", failedAbsence = item.id)
+            else mutable.value.copy(error = "$code no se marcó como no presentado: ${message(e)}", failedAbsence = null).also { load(silent = true) }
+        },
+        onExpired = { gone -> mutable.value = mutable.value.copy(error = "${gone.size} «No se presentó» de hace más de 24 h no se enviaron.") },
     ) { pending -> mutable.value = mutable.value.copy(pendingAbsence = pending) }
 
     /** Signed-in user: a "No se presentó" stored before the app closed is sent now if its window ended. */
@@ -87,6 +93,13 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
 
     /** Screen back on top: sends what is due, failed ones again. */
     fun resume() = absence.resume()
+
+    /** The person drops a "No se presentó" that keeps failing, after reading why. */
+    fun discardFailedAbsence() {
+        val id = mutable.value.failedAbsence ?: return
+        absence.discard(id)
+        mutable.value = mutable.value.copy(failedAbsence = null, error = null)
+    }
     /** B5: a patient account also reads the public board of its own service. */
     private var patientMode = false
     fun followOwnTicket() { patientMode = true }
@@ -238,9 +251,8 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
 
     private fun mutate(path: String, body: JSONObject, notice: String, key: String, intentKey: String = path, describe: (Any) -> String? = { null }, undoOf: (Any) -> UndoableCall? = { null }, onDone: (Any) -> Unit = {}) {
         if (mutable.value.busy) return
-        // Another action sends a waiting "No se presentó" first, so the board never shows a stale state.
-        absence.flush()
-        viewModelScope.launch { send(path, body, notice, key, intentKey, describe, undoOf, onDone) }
+        // Another action waits until a pending "No se presentó" got its answer, so it never overtakes it.
+        viewModelScope.launch { absence.settle(); send(path, body, notice, key, intentKey, describe, undoOf, onDone) }
     }
 
     private suspend fun send(path: String, body: JSONObject, notice: String, key: String, intentKey: String = path, describe: (Any) -> String? = { null }, undoOf: (Any) -> UndoableCall? = { null }, onDone: (Any) -> Unit = {}) {

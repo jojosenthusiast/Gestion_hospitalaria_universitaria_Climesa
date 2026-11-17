@@ -130,7 +130,7 @@ class DeferredActionsTest {
     // "A failed send stays stored", with the error in place.
     @Test fun aFailedSendStaysStoredAndSaysWhy() = runTest(dispatcher) {
         val drafts = MemoryDrafts()
-        val api = FakeGateway(); api.failures["/citas/a1/no-asistio"] = AuthRequestException("Conflicto", 409, "conflicto_version")
+        val api = FakeGateway(); api.failures["/citas/a1/no-asistio"] = AuthRequestException("Servidor despertando", 503, null)
         val vm = AppointmentActionViewModel(api, drafts)
         vm.bindUser("rec-1"); runCurrent()
         vm.markNoShow(appointment("a1", "Ana"))
@@ -182,5 +182,49 @@ class DeferredActionsTest {
         reopened.orderLab(item, listOf("panel"), urgent = false); runCurrent()
         assertEquals(1, api.calls.count { it.first == "/laboratorio/ordenes" && it.second == "POST" })
         assertEquals("Ya ordenaste Perfil químico en esta consulta.", reopened.state.value.error)
+    }
+
+    // B1: a definitive 4xx is final: dropped from the store, said once, never resent.
+    @Test fun aDefinitiveRejectionIsDroppedAndSaidOnce() = runTest(dispatcher) {
+        val drafts = MemoryDrafts()
+        val api = FakeGateway(); api.failures["/citas/a1/no-asistio"] = AuthRequestException("La cita ya no admite ese cambio.", 409, "transicion_invalida")
+        val vm = AppointmentActionViewModel(api, drafts)
+        vm.bindUser("rec-1"); runCurrent()
+        vm.markNoShow(appointment("a1", "Ana"))
+        advanceTimeBy(8_001); runCurrent()
+        vm.resume(); runCurrent()
+        assertEquals(1, api.calls.count { it.first == "/citas/a1/no-asistio" })
+        assertNull(drafts.load("rec-1", FormDrafts.DEFERRED_NO_SHOW))
+        assertNotNull(vm.state.value.error)
+        assertNull(vm.state.value.failedNoShow)
+    }
+
+    // Advisory: another account on the same device never sends the previous account's waiting actions.
+    @Test fun bindingAnotherAccountDropsThePreviousOnesInMemory() = runTest(dispatcher) {
+        val drafts = MemoryDrafts()
+        val api = FakeGateway()
+        val vm = AppointmentActionViewModel(api, drafts)
+        vm.bindUser("rec-1"); runCurrent()
+        vm.markNoShow(appointment("a1", "Ana"))
+        vm.bindUser("rec-2"); runCurrent()
+        advanceTimeBy(20_000); runCurrent()
+        assertTrue(api.calls.none { it.second == "POST" })
+        assertNull(vm.state.value.pendingNoShow)
+        assertNotNull("still stored for its own account", drafts.load("rec-1", FormDrafts.DEFERRED_NO_SHOW))
+    }
+
+    // Advisory: another board action waits until the pending absence got its answer.
+    @Test fun aBoardActionWaitsForThePendingAbsence() = runTest(dispatcher) {
+        val drafts = MemoryDrafts()
+        val api = FakeGateway()
+        api.responses["/fila"] = JSONArray().put(JSONObject().put("id", "t1").put("numero", 7).put("service", "consulta_general").put("area", "CON").put("state", "llamado").put("priority", "normal").put("version", 4)
+            .put("allowedActions", JSONArray().put("no_se_presento").put("atender")).put("patientName", "Ana").put("createdAt", "2026-11-15T14:00:00Z"))
+            .put(JSONObject().put("id", "t2").put("numero", 8).put("service", "consulta_general").put("area", "CON").put("state", "llamado").put("priority", "normal").put("version", 2)
+            .put("allowedActions", JSONArray().put("atender")).put("patientName", "Beto").put("createdAt", "2026-11-15T14:01:00Z"))
+        val vm = QueueViewModel(api, quiet, drafts)
+        vm.bindUser("rec-1"); vm.load(); runCurrent()
+        vm.absent(vm.state.value.tickets.first { it.id == "t1" })
+        vm.attend(vm.state.value.tickets.first { it.id == "t2" }); runCurrent()
+        assertEquals(listOf("/fila/t1/no-se-presento", "/fila/t2/atender"), api.calls.filter { it.second == "POST" }.map { it.first })
     }
 }

@@ -127,7 +127,16 @@ fun QueueScreen(
         if (service != null && !state.loading) item {
             NextCard(state, service!!, canCall, primary = !canIssue, state.tickets.any { it.service == service && it.state == "en_espera" }, office, { office = it }) { model.callNext(service!!, office) }
         }
-        if (state.error != null && state.tickets.isNotEmpty()) item { NoticeBanner(NoticeKind.ERROR, state.error!!) }
+        if (state.error != null && state.tickets.isNotEmpty()) item {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                NoticeBanner(NoticeKind.ERROR, state.error!!)
+                // B1: a "No se presentó" kept for a retry can be retried now or dropped, as on Citas.
+                if (state.failedAbsence != null) Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    RowAction(stringResource(R.string.camas_reintentar), { model.resume() })
+                    RowAction(stringResource(R.string.rec7_descartar), { model.discardFailedAbsence() })
+                }
+            }
+        }
         when {
             // R3 A-23: the skeleton only stands in for an empty board; a reload keeps the numbers on screen.
             state.loading && state.tickets.isEmpty() -> item { LoadingState() }

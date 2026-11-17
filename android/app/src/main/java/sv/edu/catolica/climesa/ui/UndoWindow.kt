@@ -44,7 +44,10 @@ data class DeferredRequest(
  * inverse endpoint exists). The action is written to the account's [drafts] under [storeKey] at the tap, so a killed app,
  * a sign-out or a lost signal never loses it: [bind] and [resume] send every stored action whose window has ended, in tap
  * order, with its own idempotency key. An action leaves the store only when the server confirms it or the person undoes
- * or discards it; a failure keeps it, with the error, for the next [resume]. Starting another action sends the waiting one.
+ * or discards it, or the server rejects it for good (a 4xx such as `transicion_invalida`: resending cannot help, so it is
+ * dropped and [onFailed] says why once). No signal, 5xx, 401, 408 and 429 keep it for the next [resume]. The body is
+ * frozen at the tap and stored with its key: a retry is an exact replay (same key, same body), so the server's idempotency
+ * check never sees one key with two bodies. An action older than [MAX_AGE_MS] by its tap time is dropped and reported.
  */
 internal class UndoWindow(
     private val scope: CoroutineScope,
@@ -53,10 +56,11 @@ internal class UndoWindow(
     private val drafts: DraftStore = NoDraftStore,
     private val windowMs: Long = WINDOW_MS,
     private val now: () -> Long = System::currentTimeMillis,
-    /** The body to send; lets the owner refresh a version it knows to be newer. */
-    private val prepare: (DeferredRequest) -> JSONObject = { JSONObject(it.body) },
     private val onSent: (DeferredRequest, Any?) -> Unit = { _, _ -> },
-    private val onFailed: (DeferredRequest, Exception) -> Unit = { _, _ -> },
+    /** [kept] is true when the action stays stored for a retry, false when the server rejected it for good. */
+    private val onFailed: (DeferredRequest, Exception, kept: Boolean) -> Unit = { _, _, _ -> },
+    /** Actions dropped because their tap is older than [MAX_AGE_MS]. */
+    private val onExpired: (List<DeferredRequest>) -> Unit = {},
     private val onChange: (PendingUndo?) -> Unit,
 ) {
     private var userId: String? = null
@@ -76,6 +80,9 @@ internal class UndoWindow(
     /** Signed-in user: loads what that account left stored (a killed app, a sign-out) and sends what is due. */
     fun bind(user: String) {
         if (userId == user) return
+        // Another account on this device: nothing of the previous one stays in memory (its own store keeps it).
+        val previous = userId
+        if (previous != null) { timers.values.forEach { it.cancel() }; timers.clear(); items = emptyList() }
         userId = user
         val restored = drafts.load(user, storeKey)?.optJSONArray("items")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(DeferredRequest::fromJson) } }.orEmpty()
         items = (items + restored).distinctBy { it.id }.sortedBy { it.tappedAt }
@@ -119,6 +126,8 @@ internal class UndoWindow(
      */
     fun resume() {
         val t = now()
+        val expired = items.filter { it.id !in timers && it.tappedAt < t - MAX_AGE_MS }
+        if (expired.isNotEmpty()) { items = items - expired.toSet(); save(); onExpired(expired) }
         items.filter { it.id !in timers && it.error == null && it.dueAt > t }.forEach { schedule(it, (it.dueAt - t).coerceIn(0, windowMs)) }
         notifyChange()
         drain()
@@ -133,28 +142,51 @@ internal class UndoWindow(
         }
     }
 
-    /** Sends in tap order. A failure keeps the action and holds back the later ones on the same subject; no signal stops all. */
-    private fun drain() {
-        scope.launch {
+    /**
+     * Ends every window now and waits until each stored action got its answer, so another request on the same board is
+     * sent only after the waiting one (and never overtakes it).
+     */
+    suspend fun settle() {
+        timers.values.forEach { it.cancel() }
+        timers.clear()
+        notifyChange()
+        drainNow()
+    }
+
+    private fun drain() { scope.launch { drainNow() } }
+
+    /** Sends in tap order. A kept failure holds back the later ones on the same subject; no signal stops all. */
+    private suspend fun drainNow() {
             sending.withLock {
                 val held = mutableSetOf<String>()
                 for (item in items.filter { it.id !in timers }) {
                     if (item.key in held || items.none { it.id == item.id } || item.id in timers) continue
                     try {
-                        val result = withContext(RequestIntent(item.id)) { api.request(item.path, "POST", prepare(item)) }
+                        // Exact replay: the body stored at the tap, with the key stored at the tap.
+                        val result = withContext(RequestIntent(item.id)) { api.request(item.path, "POST", JSONObject(item.body)) }
                         remove(item.id)
                         onSent(item, result)
                     } catch (e: CancellationException) { throw e }
                     catch (e: Exception) {
+                        if (definitive(e)) {
+                            remove(item.id)
+                            onFailed(item, e, false)
+                            continue
+                        }
                         items = items.map { if (it.id == item.id) it.copy(error = userMessage(e, "No se pudo enviar.")) else it }
                         save()
                         held += item.key
-                        onFailed(item, e)
+                        onFailed(item, e, true)
                         if (e is AuthRequestException && e.statusCode == null) break
                     }
                 }
             }
-        }
+    }
+
+    /** A 4xx the same request will always get (invalid transition, key conflict, not found, forbidden, validation). */
+    private fun definitive(e: Exception): Boolean {
+        val status = (e as? AuthRequestException)?.statusCode ?: return false
+        return status in 400..499 && status !in setOf(401, 408, 429)
     }
 
     private fun remove(id: String) {
@@ -171,5 +203,9 @@ internal class UndoWindow(
         else drafts.save(user, storeKey, JSONObject().put("items", JSONArray().apply { items.forEach { put(it.toJson()) } }))
     }
 
-    companion object { const val WINDOW_MS = 8_000L }
+    companion object {
+        const val WINDOW_MS = 8_000L
+        /** 24 h from the tap, like the other pending writes (`SessionDrafts.PENDING_WRITES_TTL_MS`). */
+        const val MAX_AGE_MS = 24 * 3_600_000L
+    }
 }
