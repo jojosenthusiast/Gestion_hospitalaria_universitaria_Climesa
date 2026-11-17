@@ -21,4 +21,9 @@
     <string name="rec7_turno_pasa_a">Pasa a %1$s</string>
     <string name="rec7_turno_pasa">Te están llamando</string>
     <string name="rec7_turno_llamado_detalle">Acércate al área indicada con tu número.</string>
+    <!-- B4 consulta -->
+    <string name="rec7_consulta_diagnosticos">Diagnósticos (%1$d)</string>
+    <string name="rec7_consulta_receta">Receta (%1$d)</string>
+    <string name="rec7_consulta_examenes">Exámenes (%1$d)</string>
+    <string name="rec7_consulta_ya_ordenado">Ya ordenado</string>
 </resources>

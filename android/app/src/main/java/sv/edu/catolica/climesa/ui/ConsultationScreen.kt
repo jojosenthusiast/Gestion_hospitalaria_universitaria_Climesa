@@ -48,6 +48,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.ConsultationPrimary
+import sv.edu.catolica.climesa.domain.ConsultationRecord
+import sv.edu.catolica.climesa.domain.ConsultationRecordRules
 import sv.edu.catolica.climesa.domain.LabExam
 import sv.edu.catolica.climesa.domain.MedicalAppointment
 import sv.edu.catolica.climesa.domain.AccessProfile
@@ -75,7 +77,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     LaunchedEffect(state.resumed?.key) { state.resumed?.let { selected = it.key } }
     val selectedItem = state.appointments.firstOrNull { it.key == selected } ?: state.resumed?.takeIf { it.key == selected }
     // R3 A-3: the consultation is its own full screen (web `consultations.tsx`), not a dialog; system back leaves it.
-    selectedItem?.let { item -> ConsultationPage(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, modifier, onClose = { selected = null; model.closeResumed() }); return }
+    selectedItem?.let { item -> ConsultationPage(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, modifier, record = state.record?.takeIf { it.consultationId == item.consultationId }, stepNotice = state.stepNotice, onClose = { selected = null; model.closeResumed() }); return }
     val retry = { model.clearMessages(); model.load() }
     // S13: one primary action for the whole screen (call next, resume own patient, resume unsigned, or start a called number).
     val canCall = "fila.llamar" in permissions
@@ -166,7 +168,9 @@ private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, p
 }
 
 @Composable
-private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, onClose: () -> Unit) {
+private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, record: ConsultationRecord?, stepNotice: Pair<RecordSection, String>?, onClose: () -> Unit) {
+    // B4: what this consultation already has is listed under each step, so nothing is registered twice.
+    LaunchedEffect(item.consultationId) { item.consultationId?.let { model.loadRecord(it, withLabOrders = "resultados.ver" in profile?.permissions.orEmpty()) } }
     val draftId = item.consultationId?.takeIf { item.consultationState != "firmada" }
     val stored = remember(draftId) { draftId?.let(model::draft) }
     fun text(field: String, fallback: String) = DraftRules.text(stored, field, fallback)
@@ -210,7 +214,7 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
     // spans both writes so the button cannot send twice.
     if (confirmSign) ConfirmDialog(
         title = stringResource(R.string.consulta_firmar_titulo), confirmLabel = stringResource(R.string.consulta_firmar), busy = busy,
-        message = stringResource(R.string.consulta_firmar_detalle), dismissLabel = stringResource(R.string.borrador_seguir),
+        message = ConsultationRecordRules.signSummary(record) + "\n" + stringResource(R.string.consulta_firmar_detalle), dismissLabel = stringResource(R.string.borrador_seguir),
         onConfirm = { signSent.value = true; model.sign(item, reason, physicalExam, plan, onClose) }, onDismiss = { confirmSign = false },
         body = if (error != null) ({ NoticeBanner(NoticeKind.ERROR, error) }) else null,
     )
@@ -241,33 +245,53 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
             Text(stringResource(R.string.clin_consulta_signos), style = MaterialTheme.typography.titleSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_pa_sis), systolic, { systolic = it }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_pa_dia), diastolic, { diastolic = it }, Modifier.weight(1f)) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_fc), heartRate, { heartRate = it }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_temp), temperature, { temperature = it }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_sat), oxygenSaturation, { oxygenSaturation = it }, Modifier.weight(1f)) }
-            SecondaryButton(stringResource(R.string.consulta_registrar_signos), { model.signs(item, systolic, diastolic, heartRate, temperature, oxygenSaturation) }, enabled = !busy && listOf(systolic, diastolic, heartRate, temperature, oxygenSaturation).any { it.isNotBlank() })
+            SecondaryButton(stringResource(R.string.consulta_registrar_signos), { model.signs(item, systolic, diastolic, heartRate, temperature, oxygenSaturation) { systolic = ""; diastolic = ""; heartRate = ""; temperature = ""; oxygenSaturation = "" } }, enabled = !busy && listOf(systolic, diastolic, heartRate, temperature, oxygenSaturation).any { it.isNotBlank() })
+            StepNotice(stepNotice, RecordSection.SIGNS)
+        }
+        if (item.consultationId != null && (record?.diagnoses?.isNotEmpty() == true || (!signed && "consulta.registrar" in permissions))) {
+            Text(stringResource(R.string.rec7_consulta_diagnosticos, record?.diagnoses?.size ?: 0), style = MaterialTheme.typography.titleSmall)
+            record?.diagnoses?.forEach { d -> RecordLine(listOfNotNull(d.code, d.note).joinToString(" · "), if (d.principal) stringResource(R.string.consulta_principal) else null) }
         }
         if (item.consultationId != null && !signed && "consulta.registrar" in permissions) {
-            Text(stringResource(R.string.clin_consulta_diagnostico), style = MaterialTheme.typography.titleSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_codigo), diagnosisCode, { diagnosisCode = it.take(20) }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_nota), diagnosisNote, { diagnosisNote = it.take(2000) }, Modifier.weight(2f)) }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(diagnosisPrincipal, { diagnosisPrincipal = it }); Text(stringResource(R.string.consulta_principal)) }
             SecondaryButton(stringResource(R.string.consulta_registrar_diagnostico), { model.diagnosis(item, diagnosisCode, diagnosisNote, diagnosisPrincipal) { diagnosisCode = ""; diagnosisNote = ""; diagnosisPrincipal = false } }, enabled = !busy && diagnosisCode.trim().isNotBlank())
+            StepNotice(stepNotice, RecordSection.DIAGNOSIS)
         }
         Text(stringResource(R.string.consulta_paso2), style = MaterialTheme.typography.titleSmall)
         FormField(stringResource(R.string.consulta_plan), plan, { plan = it.take(5000) }, enabled = !signed, singleLine = false)
         if (item.consultationId != null) Text(stringResource(R.string.consulta_paso3), style = MaterialTheme.typography.titleSmall)
+        if (item.consultationId != null && (record?.medications?.isNotEmpty() == true || (!signed && "recetas.emitir" in permissions))) {
+            Text(stringResource(R.string.rec7_consulta_receta, record?.medications?.size ?: 0), style = MaterialTheme.typography.titleSmall)
+            record?.medications?.forEach { m -> RecordLine(m.medication, listOf(m.dose, m.frequency, m.duration).filter { it.isNotBlank() }.joinToString(" · ")) }
+        }
         if (item.consultationId != null && !signed && "recetas.emitir" in permissions) {
-            Text(stringResource(R.string.clin_consulta_receta), style = MaterialTheme.typography.titleSmall)
             FormField(stringResource(R.string.consulta_medicamento), medication, { medication = it.take(200) })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_dosis), dose, { dose = it.take(200) }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_via), route, { route = it.take(100) }, Modifier.weight(1f)) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_frecuencia), frequency, { frequency = it.take(200) }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_duracion), duration, { duration = it.take(100) }, Modifier.weight(1f)) }
             FormField(stringResource(R.string.consulta_indicaciones), instructions, { instructions = it.take(1000) }, singleLine = false)
             SecondaryButton(stringResource(R.string.consulta_emitir_receta), { model.prescription(item, medication, dose, route, frequency, duration, instructions) { medication = ""; dose = ""; route = ""; frequency = ""; duration = ""; instructions = "" } }, enabled = !busy && listOf(medication, dose, route, frequency, duration).all { it.trim().isNotBlank() })
+            StepNotice(stepNotice, RecordSection.PRESCRIPTION)
         }
         AdmissionIndicationEntry(item, profile, enabled = !busy)
         if (item.consultationId != null && "laboratorio.ordenar" in permissions) {
             LaunchedEffect(item.consultationId) { model.loadLabCatalog() }
             val chosen = labExams.split(',').filter { it.isNotBlank() }.toSet()
-            Text(stringResource(R.string.lab_orden_titulo), style = MaterialTheme.typography.titleSmall)
+            val orders = record?.labOrders.orEmpty().filter { it.state != "cancelado" }
+            Text(stringResource(R.string.rec7_consulta_examenes, orders.sumOf { it.exams.size }), style = MaterialTheme.typography.titleSmall)
+            orders.forEach { o -> RecordLine(o.exams.joinToString(), StatusCatalog.label(o.state)) }
+            StepNotice(stepNotice, RecordSection.LAB)
+            if (signed) return@Column
             if (labCatalog.isEmpty()) Text(stringResource(if (labCatalogLoading) R.string.lab_orden_cargando else R.string.lab_orden_sin_catalogo), style = MaterialTheme.typography.bodySmall)
             val panelLabel = stringResource(R.string.lab_orden_panel)
-            labCatalog.forEach { exam -> Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(exam.id in chosen, { checked -> labExams = (if (checked) chosen + exam.id else chosen - exam.id).joinToString(",") }, enabled = !busy); Text(if (exam.isPanel) "${exam.code} · ${exam.name} · $panelLabel" else "${exam.code} · ${exam.name}", style = MaterialTheme.typography.bodySmall) } }
+            val orderedLabel = stringResource(R.string.rec7_consulta_ya_ordenado)
+            labCatalog.forEach { exam ->
+                val ordered = record?.alreadyOrdered(exam) == true
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(exam.id in chosen && !ordered, { checked -> labExams = (if (checked) chosen + exam.id else chosen - exam.id).joinToString(",") }, enabled = !busy && !ordered)
+                    Text(listOfNotNull(exam.code, exam.name, panelLabel.takeIf { exam.isPanel }, orderedLabel.takeIf { ordered }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = if (ordered) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                }
+            }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(labUrgent, { labUrgent = it }, enabled = !busy); Text(stringResource(R.string.lab_orden_urgente)) }
             SecondaryButton(stringResource(R.string.lab_orden_emitir), { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty())
         }
@@ -283,10 +307,32 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
     ) {
         if (!signed && item.consultationId != null) RowAction(stringResource(R.string.consulta_guardar_borrador), { model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank())
         if (!signed && item.consultationId == null && item.canStart) PrimaryButton(stringResource(R.string.consulta_t_iniciar), { model.start(item, reason) }, enabled = reason.trim().isNotBlank(), loading = busy, fill = false)
-        else if (!signed && item.consultationId != null) PrimaryButton(stringResource(R.string.consulta_firmar), { confirmSign = true }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank(), fill = false)
+        else if (!signed && item.consultationId != null) {
+            // B4: a disabled "Firmar" says why next to it.
+            ConsultationRecordRules.signBlocker(reason.trim(), plan.trim())?.let { Text(it, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            PrimaryButton(stringResource(R.string.consulta_firmar), { confirmSign = true }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank(), fill = false)
+        }
         else RowAction(stringResource(R.string.consulta_cerrar), leave, enabled = !busy)
     }
     }
+}
+
+/** One thing the consultation already has: what it is and a short detail. */
+@Composable
+private fun RecordLine(title: String, detail: String?) {
+    Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        androidx.compose.material3.Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            detail?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+}
+
+/** B4: the success of a step, right under it. */
+@Composable
+private fun StepNotice(notice: Pair<RecordSection, String>?, section: RecordSection) {
+    notice?.takeIf { it.first == section }?.let { NoticeBanner(NoticeKind.SUCCESS, it.second) }
 }
 
 private fun appointmentState(value: String) = StatusCatalog.label(value)

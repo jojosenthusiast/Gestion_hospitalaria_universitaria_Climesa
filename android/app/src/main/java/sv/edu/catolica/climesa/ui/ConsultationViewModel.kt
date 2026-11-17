@@ -15,6 +15,9 @@ import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.DraftStore
 import sv.edu.catolica.climesa.data.NoDraftStore
 import sv.edu.catolica.climesa.domain.ConsultationResume
+import sv.edu.catolica.climesa.domain.ConsultationRecord
+import sv.edu.catolica.climesa.domain.ConsultationRecordRules
+import sv.edu.catolica.climesa.domain.RecordedLabOrder
 import sv.edu.catolica.climesa.domain.QueueConsultation
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
@@ -53,7 +56,14 @@ data class ConsultationState(
     val handoff: NextProposal? = null,
     /** B4: someone waits in general consultation (`GET /fila`), so a doctor who may call can call the first patient. */
     val waitingGeneral: Boolean = false,
+    /** B4: what the open consultation already has (diagnoses, medications, lab orders), listed under each step. */
+    val record: ConsultationRecord? = null,
+    /** B4: the success of a step, shown under that step ([RecordSection]) instead of behind the page. */
+    val stepNotice: Pair<RecordSection, String>? = null,
 )
+
+/** Steps of the consultation whose success shows in place. */
+enum class RecordSection { SIGNS, DIAGNOSIS, PRESCRIPTION, LAB }
 
 @HiltViewModel
 class ConsultationViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository, private val drafts: DraftStore = NoDraftStore) : ViewModel() {
@@ -159,7 +169,30 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     /** "Reanudar" an unsigned consultation: opens it by id like the queue does. */
     fun resume(consultation: UnsignedConsultation) { open(consultation.id, null) }
 
-    fun closeResumed() { mutable.value = mutable.value.copy(resumed = null) }
+    fun closeResumed() { mutable.value = mutable.value.copy(resumed = null, record = null, stepNotice = null) }
+
+    private var withLabOrders = false
+    /**
+     * B4: reads what the consultation already has: diagnoses and prescriptions from its detail, and the lab orders of this
+     * consultation from the physician's order list (needs `resultados.ver`). A failure keeps what was shown.
+     */
+    fun loadRecord(consultationId: String, withLabOrders: Boolean = this.withLabOrders) {
+        this.withLabOrders = withLabOrders
+        viewModelScope.launch {
+            try {
+                val detail = api.request("/consultas/$consultationId/detalle")
+                val orders = if (withLabOrders) optional { ConsultationRecordRules.labOrders(api.request("/laboratorio/ordenes"), consultationId) } ?: mutable.value.record?.takeIf { it.consultationId == consultationId }?.labOrders.orEmpty() else emptyList()
+                val ordered = mutable.value.record?.takeIf { it.consultationId == consultationId }?.orderedIds.orEmpty()
+                mutable.value = mutable.value.copy(record = ConsultationRecord(consultationId, ConsultationRecordRules.diagnoses(detail), ConsultationRecordRules.medications(detail), orders, ordered))
+            } catch (e: CancellationException) { throw e
+            } catch (_: Exception) { }
+        }
+    }
+
+    private fun stepDone(item: MedicalAppointment, section: RecordSection, text: String) {
+        mutable.value = mutable.value.copy(saving = false, stepNotice = section to text)
+        item.consultationId?.let { loadRecord(it) }
+    }
 
     fun save(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, onDone: () -> Unit = {}) {
         if (mutable.value.saving) return
@@ -232,7 +265,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
 
     fun dismissHandoff() { mutable.value = mutable.value.copy(handoff = null) }
 
-    fun signs(item: MedicalAppointment, systolic: String, diastolic: String, heartRate: String, temperature: String, oxygenSaturation: String) {
+    fun signs(item: MedicalAppointment, systolic: String, diastolic: String, heartRate: String, temperature: String, oxygenSaturation: String, onDone: () -> Unit = {}) {
         if (item.consultationId == null) return
         val body = JSONObject().apply {
             number(systolic)?.let { put("systolic", it) }
@@ -242,9 +275,10 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
             number(oxygenSaturation)?.let { put("oxygenSaturation", it) }
         }
         if (body.length() == 0) { mutable.value = mutable.value.copy(error = "Escribe al menos un signo vital."); return }
-        mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        if (mutable.value.saving) return
+        mutable.value = mutable.value.copy(saving = true, error = null, notice = null, stepNotice = null)
         viewModelScope.launch {
-            try { api.request("/consultas/${item.consultationId}/signos", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Signos vitales registrados.") }
+            try { api.request("/consultas/${item.consultationId}/signos", "POST", body); mutable.value = mutable.value.copy(saving = false, stepNotice = RecordSection.SIGNS to "Signos vitales registrados."); onDone() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
@@ -253,10 +287,11 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     /** [onDone] runs only after the API accepts the diagnosis, so the form keeps what was typed on failure. */
     fun diagnosis(item: MedicalAppointment, code: String, note: String, principal: Boolean, onDone: () -> Unit = {}) {
         if (item.consultationId == null || code.trim().isBlank()) return
+        if (mutable.value.saving) return
         val body = JSONObject().put("code", code.trim().uppercase()).put("principal", principal).apply { if (note.trim().isNotBlank()) put("note", note.trim()) }
-        mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        mutable.value = mutable.value.copy(saving = true, error = null, notice = null, stepNotice = null)
         viewModelScope.launch {
-            try { api.request("/consultas/${item.consultationId}/diagnosticos", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Diagnóstico registrado."); onDone() }
+            try { api.request("/consultas/${item.consultationId}/diagnosticos", "POST", body); stepDone(item, RecordSection.DIAGNOSIS, "Diagnóstico ${code.trim().uppercase()} registrado."); onDone() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
@@ -267,9 +302,10 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         if (item.consultationId == null || listOf(medication, dose, route, frequency, duration).any { it.trim().isBlank() }) { mutable.value = mutable.value.copy(error = "Completa medicamento, dosis, vía, frecuencia y duración."); return }
         val itemBody = JSONObject().put("medication", medication.trim()).put("dose", dose.trim()).put("route", route.trim()).put("frequency", frequency.trim()).put("duration", duration.trim()).apply { if (instructions.trim().isNotBlank()) put("instructions", instructions.trim()) }
         val body = JSONObject().put("items", JSONArray().put(itemBody))
-        mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        if (mutable.value.saving) return
+        mutable.value = mutable.value.copy(saving = true, error = null, notice = null, stepNotice = null)
         viewModelScope.launch {
-            try { api.request("/consultas/${item.consultationId}/receta", "POST", body); mutable.value = mutable.value.copy(saving = false, notice = "Receta emitida."); onDone() }
+            try { api.request("/consultas/${item.consultationId}/receta", "POST", body); stepDone(item, RecordSection.PRESCRIPTION, "Receta de ${medication.trim()} emitida."); onDone() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
@@ -291,11 +327,43 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     fun orderLab(item: MedicalAppointment, exams: Collection<String>, urgent: Boolean, onDone: () -> Unit = {}) {
         LabOrderRules.error(item.consultationId, exams)?.let { mutable.value = mutable.value.copy(error = it); return }
         val consultationId = item.consultationId ?: return
-        mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        if (mutable.value.saving) return
+        // B4: an exam already ordered in this consultation is never sent twice.
+        val record = mutable.value.record?.takeIf { it.consultationId == consultationId }
+        val repeated = record?.let { r -> mutable.value.labCatalog.filter { it.id in exams && r.alreadyOrdered(it) } }.orEmpty()
+        if (repeated.isNotEmpty()) { mutable.value = mutable.value.copy(error = "Ya ordenaste ${repeated.joinToString { it.name }} en esta consulta."); return }
+        mutable.value = mutable.value.copy(saving = true, error = null, notice = null, stepNotice = null)
         viewModelScope.launch {
-            try { api.request("/laboratorio/ordenes", "POST", LabOrderRules.body(consultationId, exams, urgent)); mutable.value = mutable.value.copy(saving = false, notice = "Orden de laboratorio emitida."); onDone() }
+            try {
+                api.request("/laboratorio/ordenes", "POST", LabOrderRules.body(consultationId, exams, urgent))
+                val names = mutable.value.labCatalog.filter { it.id in exams }.map { it.name }
+                // The order list may lag or be unreadable: what was just ordered is counted right away.
+                val local = RecordedLabOrder("local-${System.nanoTime()}", "pendiente", names.ifEmpty { exams.toList() }, exams.toSet(), mutable.value.labCatalog.filter { it.id in exams }.map { it.code }.toSet())
+                mutable.value.record?.takeIf { it.consultationId == consultationId }?.let { r -> mutable.value = mutable.value.copy(record = r.copy(labOrders = r.labOrders + local, orderedIds = r.orderedIds + exams)) }
+                    ?: run { mutable.value = mutable.value.copy(record = ConsultationRecord(consultationId, labOrders = listOf(local), orderedIds = exams.toSet())) }
+                mutable.value = mutable.value.copy(saving = false, stepNotice = RecordSection.LAB to "Orden emitida: ${names.ifEmpty { exams.toList() }.joinToString()}.")
+                onDone()
+                if (withLabOrders) loadRecordKeepingLocal(consultationId, local)
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
+        }
+    }
+
+    /** Reloads the record; an order just placed stays counted until the server list shows it. */
+    private fun loadRecordKeepingLocal(consultationId: String, local: RecordedLabOrder) {
+        viewModelScope.launch {
+            try {
+                val detail = api.request("/consultas/$consultationId/detalle")
+                val orders = ConsultationRecordRules.labOrders(api.request("/laboratorio/ordenes"), consultationId)
+                val before = mutable.value.record?.labOrders.orEmpty().count { !it.id.startsWith("local-") }
+                // A panel is listed by its component exams, so "seen" is a new order in the list, not the same ids.
+                val seen = orders.size > before || orders.any { o -> local.examIds.any { it in o.examIds } || local.examCodes.any { it in o.examCodes } }
+                val kept = mutable.value.record?.labOrders.orEmpty().filter { it.id.startsWith("local-") && it.id != local.id }
+                val ordered = mutable.value.record?.orderedIds.orEmpty()
+                mutable.value = mutable.value.copy(record = ConsultationRecord(consultationId, ConsultationRecordRules.diagnoses(detail), ConsultationRecordRules.medications(detail), orders + kept + if (seen) emptyList() else listOf(local), ordered))
+            } catch (e: CancellationException) { throw e
+            } catch (_: Exception) { }
         }
     }
 
