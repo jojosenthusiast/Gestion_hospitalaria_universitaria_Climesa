@@ -11031,6 +11031,125 @@
         "x-permiso": "laboratorio.procesar OR laboratorio.revisar"
       }
     },
+    "/api/v1/laboratorio/pacientes/{id}/resultado-externo": {
+      "post": {
+        "operationId": "LaboratoryController_recordExternal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabExternalRecordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabExternalRecordResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "R7 C-5 (D-5): registrar un examen hecho en otro sitio sin orden previa; solo el médico con relación de atención vigente",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "laboratorio.ordenar"
+      }
+    },
     "/api/v1/laboratorio/adjuntos/{id}/archivo": {
       "post": {
         "operationId": "LaboratoryController_storeAttachment",
@@ -27644,6 +27763,10 @@
           },
           "external": {
             "type": "boolean"
+          },
+          "patientNotified": {
+            "type": "boolean",
+            "description": "R7 C-6: el paciente tiene cuenta y ve «Examen en otro sitio» con las instrucciones en su app; si es false, entrégaselas impresas"
           }
         },
         "required": [
@@ -27767,6 +27890,98 @@
           "version",
           "completedAt",
           "attachmentId"
+        ]
+      },
+      "LabExternalRecordValueDto": {
+        "type": "object",
+        "properties": {
+          "examId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Examen del catálogo (no un panel)"
+          },
+          "value": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "examId"
+        ]
+      },
+      "LabExternalRecordDto": {
+        "type": "object",
+        "properties": {
+          "place": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "description": "Dónde se hizo el examen"
+          },
+          "attachment": {
+            "$ref": "#/components/schemas/LabAttachmentDto"
+          },
+          "results": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabExternalRecordValueDto"
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Nota sobre el informe externo"
+          }
+        },
+        "required": [
+          "place",
+          "attachment",
+          "results"
+        ]
+      },
+      "LabExternalRecordResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoOrdenLaboratorio"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attachmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Adjunto creado con la referencia; su archivo se sube con POST /laboratorio/adjuntos/{id}/archivo"
+          },
+          "consultationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "version",
+          "completedAt",
+          "attachmentId",
+          "consultationId"
         ]
       },
       "LabAttachmentStoredResponse": {
@@ -33886,6 +34101,7 @@
           "tripulante_sin_turno",
           "hito_hora_invalida",
           "hito_no_deshacible",
+          "sin_consulta",
           "sin_servicio_activo",
           "solicitud_resuelta",
           "unidad_en_mantenimiento",

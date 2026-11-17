@@ -36,4 +36,11 @@ describe('R7 · consulta: órdenes de laboratorio y CIE-10', () => {
     expect([short.status, short.body.codigo, short.body.campo]).toEqual([400, 'validacion', 'q']);
     expect((await t.call('PAC', 'GET', '/consultas/cie10?q=gripe')).status).toBe(403);
   });
+
+  test('A8: «%» y «_» se buscan como texto, no como comodines', async () => {
+    for (const q of ['%%', '__', '%_']) {
+      const wild = await t.call('MED', 'GET', `/consultas/cie10?q=${encodeURIComponent(q)}`);
+      expect([q, wild.status, wild.body]).toEqual([q, 200, []]);
+    }
+  });
 });

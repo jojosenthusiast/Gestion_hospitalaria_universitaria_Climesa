@@ -10,7 +10,7 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
 import { auditLabReads } from './lab-read-audit';
-import { MAX_ATTACHMENT_BYTES, LabAmendDto, LabCancelDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabPriority, LabProposalConfirmDto, LabProposalDiscardDto, LabResultBatchDto, LabResultBatchItemDto, LabResultDto, LabReviewDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
+import { MAX_ATTACHMENT_BYTES, LabAmendDto, LabCancelDto, LabExternalRecordDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabPriority, LabProposalConfirmDto, LabProposalDiscardDto, LabResultBatchDto, LabResultBatchItemDto, LabResultDto, LabReviewDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
 import { FollowUpReason, LabPermissions, appointmentMatchesProposal, classifyLabValue, detectAttachmentType, followUpReason, labExternalActions, labOrderActions, matchesDoubleIdentification } from './laboratory.rules';
 
 type Row = Record<string, any>;
@@ -469,9 +469,12 @@ export class LaboratoryService {
       const row = (await c.query(`UPDATE laboratorio.orden SET externa=true,lugar_externo=$2,instrucciones_externas=$3,externa_desde=$4,externa_por=$5,version=version+1
         WHERE id=$1 RETURNING id,estado AS state,version,externa AS external`, [id, dto.place.trim(), dto.instructions.trim(), this.clock.now(), actor.staffId])).rows[0];
       await this.commands.audit(c, actor, { action: 'laboratorio.enviar_externo', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: lab ? 'laboratorio.procesar' : 'laboratorio.ordenar', detail: { place: dto.place.trim() } });
-      const users = [await patientAccount(c, old.patientId), ...await this.staffAccounts(c, [old.doctorId])];
+      // C-6: the patient's app shows «Examen en otro sitio: <lugar>» with the instructions (`/me/laboratorio`); the
+      // answer says whether the patient has an account to receive it, so whoever sends it knows to hand over a printout.
+      const patient = await patientAccount(c, old.patientId);
+      const users = [patient, ...await this.staffAccounts(c, [old.doctorId])];
       await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver'], { users }));
-      return row;
+      return { ...row, patientNotified: !!patient };
     });
   }
 
@@ -497,6 +500,50 @@ export class LaboratoryService {
       if (given.size !== dto.results.length || items.length !== given.size || items.some(item => !given.has(item))) {
         throw new BadRequestException('Escribe el valor clave de cada examen de la orden, una sola vez cada uno.');
       }
+      return this.loadExternal(c, actor, old, dto, lab ? 'laboratorio.procesar' : 'laboratorio.revisar', 'laboratorio.resultado_externo');
+    });
+  }
+
+  /**
+   * POST /laboratorio/pacientes/{id}/resultado-externo (R7 C-5, owner decision D-5): an exam the patient had done
+   * elsewhere, with no order. Only a doctor with a care relationship in force with the patient (or the attending doctor
+   * of the active admission) records it. The order is created external and requested by this doctor, so the doctor
+   * reviews and releases it like any other; it hangs from the patient's latest consultation (preferring this doctor's),
+   * because published apps read `consultationId` as required.
+   */
+  async recordExternal(actor: Actor, patientId: string, dto: LabExternalRecordDto, key?: string) {
+    if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
+    return this.commands.run(actor, `laboratorio.ordenar:paciente:${patientId}:externo`, key, dto, async c => {
+      const now = this.clock.now();
+      const related = (await c.query(`SELECT 1 FROM personal.persona d WHERE d.id=$2 AND d.tipo='medico' AND d.activo AND (
+          EXISTS (SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=$1 AND r.profesional_id=$2 AND r.vigencia @> $3::timestamptz)
+          OR EXISTS (SELECT 1 FROM hospitalizacion.admision a WHERE a.paciente_id=$1 AND a.medico_tratante_id=$2 AND a.estado IN ${ACTIVE_ADMISSION}))`, [patientId, actor.staffId, now])).rowCount;
+      if (!related) throw new ForbiddenException('Solo el médico con relación de atención vigente con el paciente registra un resultado externo sin orden.');
+      const consultation = (await c.query(`SELECT id FROM atencion.consulta WHERE paciente_id=$1 AND estado IN ('abierta','firmada')
+        ORDER BY (medico_id=$2) DESC,iniciada_en DESC LIMIT 1`, [patientId, actor.staffId])).rows[0] as Row | undefined;
+      if (!consultation) throw new ProblemException('sin_consulta', 409, 'El paciente no tiene consultas registradas; registra el resultado desde su primera consulta.');
+      const examIds = dto.results.map(r => r.examId);
+      if (new Set(examIds).size !== examIds.length) throw new ProblemException('validacion', 400, 'Cada examen va una sola vez.', 'results');
+      for (const examId of examIds) {
+        const exam = (await c.query(`SELECT e.activo,(SELECT array_agg(h.id) FROM laboratorio.hojas(e.id) AS h(id)) AS leaves FROM laboratorio.examen e WHERE e.id=$1`, [examId])).rows[0] as Row | undefined;
+        if (!exam?.activo || exam.leaves?.length !== 1 || exam.leaves[0] !== examId) throw new ProblemException('validacion', 400, 'Elige exámenes activos del catálogo, uno por uno (sin paneles).', 'results');
+      }
+      const order = (await c.query(`INSERT INTO laboratorio.orden(consulta_id,paciente_id,medico_id,prioridad,externa,lugar_externo,instrucciones_externas,externa_desde,externa_por)
+        VALUES($1,$2,$3,'rutina',true,$4,$5,$6,$3) RETURNING id`, [consultation.id, patientId, actor.staffId, dto.place.trim(), 'Examen ya realizado; resultado traído por el paciente.', now])).rows[0];
+      const results = [];
+      for (const value of dto.results) {
+        const item = (await c.query('INSERT INTO laboratorio.orden_item(orden_id,examen_id,pedido_como) VALUES($1,$2,$2) RETURNING id', [order.id, value.examId])).rows[0];
+        results.push({ orderItemId: item.id as string, value: value.value, text: value.text });
+      }
+      const old = await this.order(c, order.id, true);
+      const loaded = await this.loadExternal(c, actor, old, { results, attachment: dto.attachment, note: dto.note }, 'laboratorio.ordenar', 'laboratorio.resultado_externo_sin_orden');
+      return { ...loaded, consultationId: consultation.id as string };
+    });
+  }
+
+  /** Shared by both external paths: values, attachment reference and completion in the caller's transaction. */
+  private async loadExternal(c: PoolClient, actor: Actor, old: Row, dto: Pick<LabExternalResultDto, 'results' | 'attachment' | 'note'>, permission: string, action: string) {
+      const id = old.id as string;
       const at = this.clock.now();
       await c.query(`UPDATE laboratorio.orden SET estado='en_proceso',muestra_tomada_en=$2,muestra_tomada_por=$3 WHERE id=$1`, [id, at, actor.staffId]);
       let critical = false, followUp: FollowUpReason | null = null;
@@ -515,12 +562,11 @@ export class LaboratoryService {
       const row = (await c.query(`UPDATE laboratorio.orden SET estado='completado',completada_en=$2,completada_por=$3,version=version+1 WHERE id=$1
         RETURNING id,estado AS state,version,completada_en AS "completedAt"`, [id, at, actor.staffId])).rows[0];
       // D-4: the follow-up appointment is proposed when the doctor reviews.
-      await this.commands.audit(c, actor, { action: 'laboratorio.resultado_externo', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: lab ? 'laboratorio.procesar' : 'laboratorio.revisar',
+      await this.commands.audit(c, actor, { action, entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission,
         detail: { attachmentId: attachment.id, mimeType: dto.attachment.mimeType, sizeBytes: dto.attachment.sizeBytes, marks } });
       await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver'], { users: followUp ? await this.staffAccounts(c, [old.doctorId]) : [] }));
       if (critical) await this.publishResult(c, old, row.version, true);
       return { ...row, attachmentId: attachment.id as string };
-    });
   }
 
   /**
@@ -618,6 +664,13 @@ export class LaboratoryService {
       if (!item || !actor.staffId) throw new NotFoundException('No se encontró el pendiente.');
       const allowed = item.doctorId === actor.staffId || !!(await c.query('SELECT laboratorio.puede_revisar($1,$2,$3) AS ok', [item.orderId, actor.staffId, this.clock.now()])).rows[0]?.ok;
       if (!allowed) throw new NotFoundException('No se encontró el pendiente.');
+      // A1: releasing the order (C-2) closes its items. An app released before that still marks the item afterwards with
+      // the version it read; it gets the item as it is now (201, idempotent) instead of a conflict it cannot resolve.
+      const closedByRelease = item.state === 'revisado' && !!(await c.query(`SELECT 1 FROM laboratorio.pendiente_medico f JOIN laboratorio.orden o ON o.id=f.orden_id
+        WHERE f.id=$1 AND o.revisada_en IS NOT NULL AND f.revisado_en=o.revisada_en`, [id])).rowCount;
+      if (closedByRelease) {
+        return (await c.query(`SELECT id,estado AS state,version,revisado_en AS "reviewedAt" FROM laboratorio.pendiente_medico WHERE id=$1`, [id])).rows[0];
+      }
       if (item.state !== 'pendiente') throw new ConflictException('Este pendiente ya se marcó como revisado.');
       if (item.version !== dto.version) throw new VersionConflictException(item.version, 'El pendiente cambió; vuelve a cargarlo.');
       const at = this.clock.now();

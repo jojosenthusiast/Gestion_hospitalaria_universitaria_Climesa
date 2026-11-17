@@ -66,6 +66,20 @@ describe('R7 · ambulancia: deshacer hito y cierre por recepción', () => {
     expect(received.body.unitState).toBeUndefined();
   });
 
+  test('A3: deshacer avisa también a quien recibe llegadas; A7: la base solo deja borrar el último hito de un servicio abierto', async () => {
+    t.setNow(at('12:00'));
+    const service = await dispatch();
+    for (const type of ['salida', 'en_escena', 'trasladando']) expect((await milestone(service.id, type)).status).toBe(201);
+    const events = () => t.events('ambulancia.hito', service.id);
+    const moved = (await events()).at(-1)!.filter(ch => !ch.startsWith('usuario:'));
+    expect(moved.length).toBeGreaterThan(1);
+    expect((await undo(service.id)).status).toBe(201);
+    expect((await events()).at(-1)).toEqual(expect.arrayContaining(moved));
+    await expect(t.one("DELETE FROM ambulancia.hito WHERE servicio_id=$1 AND tipo='salida' RETURNING id", [service.id])).rejects.toThrow(/solo se deshace el último hito/);
+    for (const type of ['trasladando', 'en_hospital', 'finalizado']) expect((await milestone(service.id, type)).status).toBe(201);
+    await expect(t.one("DELETE FROM ambulancia.hito WHERE servicio_id=$1 AND tipo='finalizado' RETURNING id", [service.id])).rejects.toThrow(/el servicio ya terminó/);
+  });
+
   test('G-4: un servicio sin hitos no tiene nada que deshacer', async () => {
     t.setNow(at('11:00'));
     const service = await dispatch();

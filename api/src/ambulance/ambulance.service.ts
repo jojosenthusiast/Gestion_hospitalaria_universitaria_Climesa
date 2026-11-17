@@ -7,7 +7,7 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
 import { AmbulanceRequestDto, CancelRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto, UndoMilestoneDto } from './ambulance.dto';
-import { CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, PREHOSPITAL_GRACE_MS, RECEIVING_AREA, crewOrder, defaultCrew, milestoneTimeError, UnitState, allowedFinalStates, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, nextMilestones, undoMilestoneError, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
+import { CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, PREHOSPITAL_GRACE_MS, RECEIVING_AREA, crewOrder, defaultCrew, milestoneTimeError, UnitState, allowedFinalStates, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, milestoneTypes, nextMilestones, undoMilestoneError, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
 
 type Unit = { id: string; estado: UnitState; version: number };
 type Service = { id: string; unidad_id: string; solicitud_id: string | null; paciente_id: string | null; despachado_en: Date; finalizado_en: Date | null; version: number };
@@ -281,7 +281,7 @@ export class AmbulanceService {
       const now = this.clock.now();
       const service = await this.crewService(c, actor, id);
       if (service.version !== dto.version) throw new VersionConflictException(service.version, 'El servicio cambió; vuelve a consultar el estado de la ambulancia.');
-      const recorded = (await c.query<{ id: string; tipo: string; registrado_en: Date }>('SELECT id,tipo,registrado_en FROM ambulancia.hito WHERE servicio_id=$1 ORDER BY ocurrido_en,registrado_en', [id])).rows;
+      const recorded = (await c.query<{ id: string; tipo: string; registrado_en: Date }>('SELECT id,tipo,registrado_en FROM ambulancia.hito WHERE servicio_id=$1 ORDER BY array_position($2::text[],tipo)', [id, [...milestoneTypes]])).rows;
       const last = recorded.at(-1);
       const received = !!(await c.query('SELECT 1 FROM ambulancia.servicio WHERE id=$1 AND recibido_por IS NOT NULL', [id])).rowCount;
       const error = service.finalizado_en ? undoMilestoneError({ tipo: 'finalizado', registrado_en: now }, received, now) : undoMilestoneError(last, received, now);
@@ -291,7 +291,9 @@ export class AmbulanceService {
       const version = (await c.query<{ version: number }>('UPDATE ambulancia.servicio SET version=version+1 WHERE id=$1 RETURNING version', [id])).rows[0].version;
       const account = await this.requesterAccount(c, service.solicitud_id);
       await this.commands.audit(c, actor, { action: 'ambulancia.hito_deshecho', entity: 'servicio', entityId: id, patientId: service.paciente_id ?? undefined, permission: 'ambulancia.operar', detail: { type: last!.tipo } });
-      await this.commands.event(c, 'ambulancia.hito', 'servicio', id, version, ['ambulancia', ...(account ? [`usuario:${account}`] : [])]);
+      // Those who receive arrivals (Enfermería, Emergencia) saw the undone milestone too, so they hear about the undo.
+      const receivers = await channelsFor(c, ['ambulancia.recibir_prehospital']);
+      await this.commands.event(c, 'ambulancia.hito', 'servicio', id, version, ['ambulancia', ...receivers, ...(account ? [`usuario:${account}`] : [])]);
       const done = recorded.slice(0, -1).map(r => r.tipo);
       return { id, undoneType: last!.tipo, version, nextMilestones: nextMilestones(done) };
     });
@@ -375,6 +377,8 @@ export class AmbulanceService {
     // Sin versión: el bloqueo de la fila, `recibido_por` y el disparador `servicio_cierre` hacen la entrega única.
     return this.commands.run(actor, `ambulancia.recibir_prehospital:servicio:${id}:recepcion`, key, {}, async c => {
       const now = this.clock.now();
+      // Same lock order as `milestone` and `close` (unit, then service), so a reception and a crew milestone never deadlock.
+      const unit = await this.lockUnit(c);
       const service = (await c.query<{ paciente_id: string | null; finalizado_en: Date | null; recibido_por: string | null }>('SELECT paciente_id,finalizado_en,recibido_por FROM ambulancia.servicio WHERE id=$1 FOR UPDATE', [id])).rows[0];
       if (!service) throw new NotFoundException('El servicio no existe.');
       if (!(await this.receivingContext(c, actor, service.paciente_id))) throw new ForbiddenException('Solo el personal de turno en Emergencia o con relación de atención con el paciente registra la entrega.');
@@ -389,7 +393,6 @@ export class AmbulanceService {
       // the `finalizado` milestone is recorded now as `completado` (the arrival exists) and the unit returns to Disponible.
       let serviceClosed = false, unitState: UnitState | undefined;
       if (!service.finalizado_en) {
-        const unit = await this.lockUnit(c);
         await c.query('INSERT INTO ambulancia.hito(servicio_id,tipo,ocurrido_en,registrado_en,registrado_por,clave_idempotencia) VALUES($1,$2,$3,$3,$4,$5)', [id, 'finalizado', now, actor.id, `${actor.id}:${key ?? id}:recepcion`]);
         version = (await c.query<{ version: number }>("UPDATE ambulancia.servicio SET finalizado_en=$2,estado_final='completado',version=version+1 WHERE id=$1 RETURNING version", [id, now])).rows[0].version;
         await this.commands.audit(c, actor, { action: 'ambulancia.hito', entity: 'servicio', entityId: id, patientId: service.paciente_id ?? undefined, permission: 'ambulancia.recibir_prehospital', detail: { type: 'finalizado', finalState: 'completado', byReception: true } });

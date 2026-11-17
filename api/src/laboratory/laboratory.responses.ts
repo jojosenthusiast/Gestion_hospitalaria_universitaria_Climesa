@@ -189,6 +189,7 @@ export class LabExternalSentResponse {
   @EnumProp(ESTADO_ORDEN_LABORATORIO, 'EstadoOrdenLaboratorio') state!: string;
   @IntProp() version!: number;
   @BoolProp() external!: boolean;
+  @BoolProp({ optional: true, description: 'R7 C-6: el paciente tiene cuenta y ve «Examen en otro sitio» con las instrucciones en su app; si es false, entrégaselas impresas' }) patientNotified?: boolean;
 }
 
 export class LabOrderCreatedResponse {
@@ -217,6 +218,11 @@ export class LabCompleteResponse extends LabOrderStateResponse {
 /** POST /laboratorio/ordenes/{id}/resultado-externo: the completed order and the attachment that receives its file next. */
 export class LabExternalResultResponse extends LabCompleteResponse {
   @UuidProp({ nullable: true, description: 'Adjunto creado con la referencia; su archivo se sube con POST /laboratorio/adjuntos/{id}/archivo' }) attachmentId!: string | null;
+}
+
+/** POST /laboratorio/pacientes/{id}/resultado-externo (R7 C-5): the order created and completed, and the consultation it hangs from. */
+export class LabExternalRecordResponse extends LabExternalResultResponse {
+  @UuidProp() consultationId!: string;
 }
 
 export class LabReviewResponse {

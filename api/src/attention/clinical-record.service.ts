@@ -55,13 +55,16 @@ export class ClinicalRecordService {
     });
   }
 
-  /** R7 B-7: CIE-10 search by code prefix or words of the description (accents ignored), at most 20. */
+  /**
+   * R7 B-7: CIE-10 search by code prefix or words of the description (accents ignored), at most 20. A8: `%`, `_` and `\`
+   * typed by the user are text, never LIKE wildcards (escaped with LIKE's default `\` escape).
+   */
   async searchCie10(q?: string) {
     const text = (q ?? '').trim();
     if (text.length < 2) throw new ProblemException('validacion', 400, 'Escribe al menos 2 letras o el inicio del código.', 'q');
     return (await this.db.query<{ code: string; description: string }>(`SELECT codigo AS code,descripcion AS description FROM atencion.cie10
        WHERE upper(codigo) LIKE upper($1)||'%' OR translate(lower(descripcion),'áéíóúü','aeiouu') LIKE '%'||translate(lower($1),'áéíóúü','aeiouu')||'%'
-       ORDER BY (upper(codigo) LIKE upper($1)||'%') DESC,codigo LIMIT 20`, [text.slice(0, 60)]));
+       ORDER BY (upper(codigo) LIKE upper($1)||'%') DESC,codigo LIMIT 20`, [text.slice(0, 60).replace(/[\\%_]/g, ch => `\\${ch}`)]));
   }
 
   async addVitalSigns(actor: Actor, id: string, dto: VitalSignsDto, key?: string) {

@@ -3,9 +3,9 @@ import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse,
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { readSingleFile } from '../platform/multipart';
-import { MAX_ATTACHMENT_BYTES, LabAmendDto, LabCancelDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabProposalConfirmDto, LabProposalDiscardDto, LabResultBatchDto, LabResultDto, LabReviewDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
+import { MAX_ATTACHMENT_BYTES, LabAmendDto, LabCancelDto, LabExternalRecordDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabProposalConfirmDto, LabProposalDiscardDto, LabResultBatchDto, LabResultDto, LabReviewDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
 import { LaboratoryService } from './laboratory.service';
-import { LabAttachmentLinkResponse, LabAttachmentStoredResponse, LabCompleteResponse, LabExamResponse, LabExternalResultResponse, LabExternalSentResponse, LabFollowUpResponse, LabFollowUpStateResponse, LabOrderCreatedResponse, LabOrderDetailResponse, LabOrderResponse, LabOrderStateResponse, LabProposalResponse, LabProposalStateResponse, LabResultBatchResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
+import { LabAttachmentLinkResponse, LabAttachmentStoredResponse, LabCompleteResponse, LabExamResponse, LabExternalRecordResponse, LabExternalResultResponse, LabExternalSentResponse, LabFollowUpResponse, LabFollowUpStateResponse, LabOrderCreatedResponse, LabOrderDetailResponse, LabOrderResponse, LabOrderStateResponse, LabProposalResponse, LabProposalStateResponse, LabResultBatchResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
 
 @ApiTags('laboratory') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('laboratorio')
 export class LaboratoryController {
@@ -49,6 +49,9 @@ export class LaboratoryController {
 
   @Post('ordenes/:id/resultado-externo') @RequirePermission('laboratorio.procesar', 'laboratorio.revisar') @ApiOperation({ summary: 'Cargar el resultado de una orden externa: referencia del adjunto (foto o PDF) y valor clave de cada examen; completa la orden' }) @ApiCreatedResponse({ type: LabExternalResultResponse })
   externalResult(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabExternalResultDto, @Headers('idempotency-key') key?: string) { return this.laboratory.externalResult(r.actor, id, dto, key); }
+
+  @Post('pacientes/:id/resultado-externo') @RequirePermission('laboratorio.ordenar') @ApiOperation({ summary: 'R7 C-5 (D-5): registrar un examen hecho en otro sitio sin orden previa; solo el médico con relación de atención vigente' }) @ApiCreatedResponse({ type: LabExternalRecordResponse })
+  recordExternal(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabExternalRecordDto, @Headers('idempotency-key') key?: string) { return this.laboratory.recordExternal(r.actor, id, dto, key); }
 
   @Post('adjuntos/:id/archivo') @RequirePermission('laboratorio.procesar', 'laboratorio.revisar') @ApiOperation({ summary: 'Subir la foto o el PDF de un adjunto que solo tiene la referencia (T07b): bucket privado, tipo leído del contenido, huella SHA-256 calculada en el servidor; no reemplaza un archivo guardado' })
   @ApiConsumes('multipart/form-data') @ApiBody({ schema: { type: 'object', required: ['archivo'], properties: { archivo: { type: 'string', format: 'binary', description: 'PDF, JPG, PNG, HEIC o WEBP de hasta 10 MB' } } } }) @ApiCreatedResponse({ type: LabAttachmentStoredResponse })
