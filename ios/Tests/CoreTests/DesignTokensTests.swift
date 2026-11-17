@@ -8,7 +8,7 @@ final class DesignTokensTests: XCTestCase {
     func testEachFamilyHasItsOwnIconPatternAndLabel() {
         let expected: [StatusFamily: (String, StatusPattern, String)] = [
             .espera: ("clock", .rayado, "En espera"),
-            .llamado: ("megaphone", .punteado, "Llamado o en proceso"),
+            .llamado: ("megaphone", .punteado, "Llamado"),
             .atencion: ("waveform.path.ecg", .solido, "En atención o en uso"),
             .listo: ("checkmark", .contorno, "Terminado o disponible"),
             .cerrado: ("xmark", .discontinuo, "Cancelado o fuera de servicio"),
@@ -29,7 +29,7 @@ final class DesignTokensTests: XCTestCase {
         let cases: [String: StatusFamily] = [
             "en_espera": .espera, "solicitada": .espera, "pendiente_cama": .espera, "provisional": .espera,
             "confirmada": .espera, "reprogramada": .espera, "bajo_minimo": .espera,
-            "llamado": .llamado, "en_proceso": .llamado,
+            "llamado": .llamado, "en_proceso": .atencion,
             "limpieza": .atencion, "en_atencion": .atencion, "ocupada": .atencion, "hospitalizado": .atencion, "abierta": .atencion,
             "atendida": .listo, "atendido": .listo, "alta_firmada": .listo, "libre": .listo, "normal": .listo, "aprobada": .listo,
             "cancelado": .cerrado, "cancelada": .cerrado, "no_se_presento": .cerrado, "en_mantenimiento": .cerrado,
