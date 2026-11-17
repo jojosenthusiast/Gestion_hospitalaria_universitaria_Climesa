@@ -87,6 +87,17 @@ fun QueueScreen(
     // B5: whoever calls may send the patient to an active consulting room (`/espacios`, with `espacios.ver`), like the web.
     LaunchedEffect(canCall) { if (canCall && "espacios.ver" in profile.permissions) model.loadOffices() }
     var office by rememberSaveable { mutableStateOf("") }
+    // Sweep #13 / B3: whoever calls opens on the service and room of their shift (`GET /fila/mi-puesto`), once; a later
+    // choice of the person wins.
+    LaunchedEffect(canCall) { if (canCall) model.loadMyPost() }
+    var postApplied by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.myPost) {
+        val post = state.myPost ?: return@LaunchedEffect
+        if (postApplied) return@LaunchedEffect
+        postApplied = true
+        if (service == null) post.service?.let { service = it }
+        if (office.isBlank()) post.officeId?.let { office = it }
+    }
     // A dashboard asked to "issue a number" or "call next": open the matching dialog once the day's queue is loaded.
     LaunchedEffect(quickAction, state.loading, state.tickets) {
         if (quickAction == null || state.loading) return@LaunchedEffect
@@ -123,6 +134,7 @@ fun QueueScreen(
             })
         }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        if (canCall) state.myPostError?.let { item { NoticeBanner(NoticeKind.WARNING, it) } }
         // Sweep: the call's undo lives only on its card ("Deshacer"), not again at the top.
         if (service != null && !state.loading) item {
             NextCard(state, service!!, canCall, primary = !canIssue, state.tickets.any { it.service == service && it.state == "en_espera" }, office, { office = it }) { model.callNext(service!!, office) }
@@ -319,7 +331,7 @@ private fun PatientTicketView(state: QueueState, modifier: Modifier, onRetry: ()
                         Text(mine.number.toString(), style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold), modifier = Modifier.semantics { contentDescription = QueueLabels.code(mine) })
                         Text(QueueLabels.progress(mine, canCall = false), style = MaterialTheme.typography.titleMedium)
                         if (mine.state == "en_espera") {
-                            val ahead = PatientQueue.ahead(mine.number, state.publicCalls)
+                            val ahead = PatientQueue.ahead(mine, state.publicCalls)
                             Text(
                                 when (ahead) { null -> stringResource(R.string.rec7_turno_sin_llamados); 0 -> stringResource(R.string.rec7_turno_eres_siguiente); else -> androidx.compose.ui.res.pluralStringResource(R.plurals.rec7_turno_antes, ahead, ahead) },
                                 style = MaterialTheme.typography.titleLarge,
@@ -371,6 +383,9 @@ internal fun IssuePanel(state: QueueState, model: QueueViewModel, modifier: Modi
     var service by rememberSaveable { mutableStateOf(state.lastService) }
     var priority by rememberSaveable { mutableStateOf("rutina") }
     val sending = state.busyKey == QueueViewModel.ISSUE
+    val chosen = state.issueSearch.patient
+    var withoutAppointment by rememberSaveable(chosen?.id) { mutableStateOf(false) }
+    val arrival = chosen?.canRegisterArrival == true && !withoutAppointment
     androidx.activity.compose.BackHandler(enabled = !sending) { onClose() }
     Column(modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(end = Spacing.md), verticalAlignment = Alignment.CenterVertically) {
@@ -391,9 +406,16 @@ internal fun IssuePanel(state: QueueState, model: QueueViewModel, modifier: Modi
             Text(stringResource(R.string.rec_agendar_paciente), style = MaterialTheme.typography.titleSmall)
             PatientSearchPicker(search.query, search.results, search.searching, search.hasMore, search.patient, model::issueQuery, model::pickIssuePatient, model::moreIssuePatients, enabled = !sending)
             search.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-            Text(stringResource(R.string.rec7_servicio), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                QueueLabels.services.forEach { (value, label) -> androidx.compose.material3.FilterChip(selected = service == value, onClick = { service = value }, enabled = !sending, label = { Text(label) }) }
+            // B1 / D-1: with an appointment today the primary action registers the arrival (Consulta general, linked to it);
+            // "Emitir sin la cita" falls back to the walk-in chips.
+            if (arrival) {
+                NoticeBanner(NoticeKind.INFO, stringResource(R.string.u5_llegada_explica))
+                TextButton(onClick = { withoutAppointment = true }, enabled = !sending, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.u5_emitir_sin_cita)) }
+            } else {
+                Text(stringResource(R.string.rec7_servicio), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    QueueLabels.services.forEach { (value, label) -> androidx.compose.material3.FilterChip(selected = service == value, onClick = { service = value }, enabled = !sending, label = { Text(label) }) }
+                }
             }
             Text(stringResource(R.string.fila_prioridad), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -403,7 +425,8 @@ internal fun IssuePanel(state: QueueState, model: QueueViewModel, modifier: Modi
         }
         HorizontalDivider(color = MaterialTheme.climesa.line)
         Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
-            PrimaryButton(
+            if (arrival) PrimaryButton(stringResource(R.string.u5_registrar_llegada), { model.registerArrival(priority) }, enabled = !state.busy, loading = sending)
+            else PrimaryButton(
                 state.issueSearch.patient?.let { stringResource(R.string.rec7_emitir_para, it.name) } ?: stringResource(R.string.rec7_emitir_numero),
                 { model.issue(service, priority) },
                 enabled = state.issueSearch.patient != null && !state.busy, loading = sending,

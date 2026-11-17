@@ -80,7 +80,11 @@ internal fun PatientSearchPicker(
 ) {
     if (chosen != null) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Column(Modifier.weight(1f)) { Text(chosen.name, style = MaterialTheme.typography.titleMedium); Text(chosen.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Column(Modifier.weight(1f)) {
+                Text(chosen.name, style = MaterialTheme.typography.titleMedium); Text(chosen.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                chosen.appointmentToday?.let { Text(it.chip, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
+                chosen.ticketToday?.let { Text(stringResource(R.string.u5_ya_tiene_numero, it.code), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
             TextButton(onClick = { onPick(null) }, enabled = enabled) { Text(stringResource(R.string.rec_agendar_cambiar)) }
         }
         return
@@ -89,7 +93,12 @@ internal fun PatientSearchPicker(
     if (searching && results.isEmpty()) LoadingState()
     results.forEach { p ->
         TextButton(onClick = { onPick(p) }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.fillMaxWidth()) { Text(p.name, style = MaterialTheme.typography.titleSmall); Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Column(Modifier.fillMaxWidth()) {
+                Text(p.name, style = MaterialTheme.typography.titleSmall); Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // B1: whether the person has an appointment today (time and doctor) decides the counter's primary action.
+                p.appointmentToday?.let { Text(it.chip, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
+                p.ticketToday?.let { Text(stringResource(R.string.u5_ya_tiene_numero, it.code), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
         }
     }
     if (hasMore) TextButton(onClick = onMore, enabled = !searching) { Text(stringResource(R.string.rec_agendar_mas)) }

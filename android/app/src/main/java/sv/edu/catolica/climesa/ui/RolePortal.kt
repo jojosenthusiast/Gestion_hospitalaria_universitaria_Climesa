@@ -142,6 +142,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     LaunchedEffect(page){if(page==AndroidSection.RESULT_REVIEW)model.dismissCriticalLab()}
     PortalScaffold(
         role=role,sections=sections,selected=page,onSelected={selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
+        badges=noticeBadges(account,sections),
     ) {outer->
       Column(Modifier.padding(outer).fillMaxSize()){
         if(criticalLab&&AndroidSection.RESULT_REVIEW in sections)CriticalLabNotice(onReview={model.dismissCriticalLab();selectedName=AndroidSection.RESULT_REVIEW.name},onDismiss=model::dismissCriticalLab)

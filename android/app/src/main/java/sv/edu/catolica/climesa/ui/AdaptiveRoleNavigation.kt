@@ -55,6 +55,12 @@ import androidx.compose.ui.unit.dp
 import sv.edu.catolica.climesa.domain.AndroidNavigationMode
 import sv.edu.catolica.climesa.domain.AndroidNavigationPolicy
 import sv.edu.catolica.climesa.domain.AndroidSection
+import sv.edu.catolica.climesa.domain.NoticeInboxRules
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 private fun compactLabel(section: AndroidSection): String = when (section) {
     AndroidSection.QUEUE -> "Fila"
@@ -136,13 +142,15 @@ internal fun AdaptiveRoleScaffold(
     onLogout: () -> Unit,
     showNavigation: Boolean = true,
     snackbarHost: @Composable () -> Unit = {},
+    /** D1: counts drawn on a section's entry (the unread notices on "Avisos"). */
+    badges: Map<AndroidSection, Int> = emptyMap(),
     content: @Composable (PaddingValues) -> Unit,
 ) {
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
         when (AndroidNavigationPolicy.mode(maxWidth.value.toInt())) {
-            AndroidNavigationMode.BOTTOM_BAR -> CompactRoleScaffold(role, sections, selected, onSelected, dark, setDark, topBar, onLogout, showNavigation, snackbarHost, content)
-            AndroidNavigationMode.RAIL -> RailRoleScaffold(sections, selected, onSelected, topBar, onLogout, showNavigation, snackbarHost, content)
-            AndroidNavigationMode.DRAWER -> DrawerRoleScaffold(sections, selected, onSelected, topBar, onLogout, showNavigation, snackbarHost, content)
+            AndroidNavigationMode.BOTTOM_BAR -> CompactRoleScaffold(role, sections, selected, onSelected, dark, setDark, topBar, onLogout, showNavigation, snackbarHost, badges, content)
+            AndroidNavigationMode.RAIL -> RailRoleScaffold(sections, selected, onSelected, topBar, onLogout, showNavigation, snackbarHost, badges, content)
+            AndroidNavigationMode.DRAWER -> DrawerRoleScaffold(sections, selected, onSelected, topBar, onLogout, showNavigation, snackbarHost, badges, content)
         }
     }
 }
@@ -163,6 +171,7 @@ private fun CompactRoleScaffold(
     onLogout: () -> Unit,
     showNavigation: Boolean,
     snackbarHost: @Composable () -> Unit,
+    badges: Map<AndroidSection, Int>,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val navigation = AndroidNavigationPolicy.compact(role, sections)
@@ -177,7 +186,7 @@ private fun CompactRoleScaffold(
                     NavigationBarItem(
                         selected = selected == section,
                         onClick = { onSelected(section) },
-                        icon = { Icon(iconFor(section), contentDescription = null) },
+                        icon = { SectionIcon(section, badges) },
                         label = { Text(compactLabel(section), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         colors = barItemColors(),
                     )
@@ -185,7 +194,7 @@ private fun CompactRoleScaffold(
                 NavigationBarItem(
                     selected = selected !in navigation.primary,
                     onClick = { moreOpen = true },
-                    icon = { Icon(Icons.Default.GridView, contentDescription = null) },
+                    icon = { BadgedIcon(Icons.Default.GridView, navigation.more.flatMap { it.sections }.sumOf { badges[it] ?: 0 }) },
                     label = { Text(stringResource(R.string.ui_mas), maxLines = 1) },
                     colors = barItemColors(),
                 )
@@ -193,7 +202,7 @@ private fun CompactRoleScaffold(
         },
         content = content,
     )
-    if (moreOpen) MoreSheet(navigation.more, selected, dark, setDark, { onSelected(it); moreOpen = false }, { moreOpen = false }, onLogout)
+    if (moreOpen) MoreSheet(navigation.more, selected, badges, dark, setDark, { onSelected(it); moreOpen = false }, { moreOpen = false }, onLogout)
 }
 
 @Composable
@@ -205,6 +214,7 @@ private fun RailRoleScaffold(
     onLogout: () -> Unit,
     showNavigation: Boolean,
     snackbarHost: @Composable () -> Unit,
+    badges: Map<AndroidSection, Int>,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Row(Modifier.fillMaxSize()) {
@@ -215,7 +225,7 @@ private fun RailRoleScaffold(
                         colors = railItemColors(),
                         selected = selected == section,
                         onClick = { onSelected(section) },
-                        icon = { Icon(iconFor(section), contentDescription = null) },
+                        icon = { SectionIcon(section, badges) },
                         label = { Text(section.label, maxLines = 2) },
                     )
                 }
@@ -246,6 +256,7 @@ private fun DrawerRoleScaffold(
     onLogout: () -> Unit,
     showNavigation: Boolean,
     snackbarHost: @Composable () -> Unit,
+    badges: Map<AndroidSection, Int>,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val screen: @Composable () -> Unit = {
@@ -272,7 +283,7 @@ private fun DrawerRoleScaffold(
                             label = { Text(section.label, maxLines = 2) },
                             selected = selected == section,
                             onClick = { onSelected(section) },
-                            icon = { Icon(iconFor(section), contentDescription = null) },
+                            icon = { SectionIcon(section, badges) },
                         )
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
@@ -289,6 +300,7 @@ private fun DrawerRoleScaffold(
 private fun MoreSheet(
     more: List<MoreEntry>,
     selected: AndroidSection,
+    badges: Map<AndroidSection, Int>,
     dark: Boolean,
     setDark: (Boolean) -> Unit,
     onSelected: (AndroidSection) -> Unit,
@@ -299,7 +311,7 @@ private fun MoreSheet(
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             more.forEach { entry ->
                 MoreHeading(entry.group.title)
-                entry.sections.forEach { section -> MoreRow(iconFor(section), section.label, selected == section) { onSelected(section) } }
+                entry.sections.forEach { section -> MoreRow(iconFor(section), section.label, selected == section, badge = badges[section] ?: 0) { onSelected(section) } }
             }
             MoreHeading(stringResource(R.string.ui_ajustes))
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -317,7 +329,7 @@ private fun MoreHeading(text: String) =
     Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp))
 
 @Composable
-private fun MoreRow(icon: ImageVector, label: String, selected: Boolean, chevron: Boolean = true, onClick: () -> Unit) {
+private fun MoreRow(icon: ImageVector, label: String, selected: Boolean, chevron: Boolean = true, badge: Int = 0, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
@@ -327,9 +339,27 @@ private fun MoreRow(icon: ImageVector, label: String, selected: Boolean, chevron
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Icon(icon, contentDescription = null, tint = if (selected) MaterialTheme.climesa.primaryText else MaterialTheme.colorScheme.onSurfaceVariant)
             Text(label, style = MaterialTheme.typography.bodyLarge, color = if (selected) MaterialTheme.climesa.primaryText else MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f), maxLines = 2)
+            NoticeInboxRules.badgeText(badge)?.let { CountBadge(it, badge) }
             if (chevron) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+/** D1: the section icon, with its count when it has one (screen readers hear "N avisos sin leer"). */
+@Composable
+private fun SectionIcon(section: AndroidSection, badges: Map<AndroidSection, Int>) = BadgedIcon(iconFor(section), badges[section] ?: 0)
+
+@Composable
+private fun BadgedIcon(icon: ImageVector, count: Int) {
+    val text = NoticeInboxRules.badgeText(count)
+    if (text == null) Icon(icon, contentDescription = null)
+    else BadgedBox(badge = { CountBadge(text, count) }) { Icon(icon, contentDescription = null) }
+}
+
+@Composable
+private fun CountBadge(text: String, count: Int) {
+    val description = pluralStringResource(R.plurals.u5_avisos_sin_leer, count, count)
+    Badge(Modifier.semantics { contentDescription = description }) { Text(text) }
 }
 
 // Selected section reads like the web nav: soft blue pill with the primary text colour.

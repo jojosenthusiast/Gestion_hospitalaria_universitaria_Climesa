@@ -2,15 +2,6 @@ package sv.edu.catolica.climesa.domain
 
 import java.time.Instant
 
-/** Escalera de avisos (D-071): del más urgente al menos. */
-enum class NoticePriority(val wire: String) {
-    CRITICAL("critico"), URGENT("urgente"), ATTENTION("atencion");
-
-    companion object {
-        fun of(wire: String?) = entries.firstOrNull { it.wire == wire } ?: ATTENTION
-    }
-}
-
 /** Cuándo volver a leer los avisos: una sola vez en `proximoCambio` (igual que iOS y la web), nunca por sondeo. */
 object NoticeRefresh {
     /** Margen tras `proximoCambio` para que el servidor ya vea el cambio al volver a leer. */

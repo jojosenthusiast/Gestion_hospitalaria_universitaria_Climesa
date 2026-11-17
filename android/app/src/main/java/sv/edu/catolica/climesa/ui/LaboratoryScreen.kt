@@ -68,6 +68,7 @@ import sv.edu.catolica.climesa.domain.LabExternalAction
 import sv.edu.catolica.climesa.domain.LabExternalRules
 import sv.edu.catolica.climesa.domain.LabFollowUp
 import sv.edu.catolica.climesa.domain.LabFollowUpRules
+import sv.edu.catolica.climesa.domain.LabInbox
 import sv.edu.catolica.climesa.domain.LabGroups
 import androidx.compose.ui.res.stringResource
 import sv.edu.catolica.climesa.R
@@ -122,7 +123,7 @@ fun LaboratoryScreen(
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         // RN-25 / R3 A-29: critical values stay first in the inbox (with their critical pill); the portal keeps the one
         // persistent notice, so no second red banner here.
-        if (reviewer) item { FollowUpInbox(state.followUps, state.followUpBusy, model) }
+        if (reviewer) item { FollowUpInbox(state.followUps, state.followUpBusy, state.busyIds, state.followUpsError, model) }
         when {
             state.loading && state.orders.isEmpty() -> item { LoadingState() }
             state.error != null && state.orders.isEmpty() -> item { ErrorState(state.error, retry) }
@@ -162,7 +163,7 @@ fun LaboratoryScreen(
         }
     }
     state.cancelOrderId?.let { id -> CancelOrderDialog(state, state.orders.firstOrNull { it.id == id }, model) }
-    state.reviewOrderId?.let { id -> state.orders.firstOrNull { it.id == id }?.let { ReviewOrderDialog(it, state, model) } }
+    if (state.reviewOrderId != null) model.reviewTarget()?.let { ReviewOrderDialog(it, state, model) }
     state.external?.let { draft -> SendExternalDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
     state.externalLoad?.let { draft -> ExternalResultDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
     state.uploadFailure?.let { message -> UploadFailureDialog(message, model::dismissUploadFailure) }
@@ -204,20 +205,33 @@ private fun LabGroupHeader(label: String, count: Int, open: Boolean?, onToggle: 
     }
 }
 
-/** S10: "Resultados por revisar". Critical values first; the doctor marks each one reviewed after reading it. */
+/**
+ * S10 / C1: "Resultados por revisar". One row per order, critical first, with its key values inline. "Revisar y liberar" opens
+ * the confirmation with the summary; an older API without the order version keeps the per-item "Marcar revisado".
+ */
 @Composable
-private fun FollowUpInbox(items: List<LabFollowUp>, busy: String?, model: LaboratoryViewModel) {
-    SectionCard(title = stringResource(R.string.lab_pendientes_titulo), eyebrow = stringResource(R.string.lab_pendientes_cuenta, items.size)) {
-        if (items.isEmpty()) Text(stringResource(R.string.lab_pendientes_vacio), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        items.forEach { item ->
+private fun FollowUpInbox(items: List<LabFollowUp>, busy: String?, busyOrders: Set<String>, error: String?, model: LaboratoryViewModel) {
+    val rows = LabInbox.rows(items)
+    SectionCard(title = stringResource(R.string.lab_pendientes_titulo), eyebrow = stringResource(R.string.lab_pendientes_cuenta, rows.size)) {
+        error?.let { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, it); SecondaryButton(stringResource(R.string.ui_reintentar), model::loadFollowUps, icon = Icons.Default.Refresh) } }
+        if (rows.isEmpty() && error == null) Text(stringResource(R.string.lab_pendientes_vacio), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // One primary per screen: only the first row that can be released gets the filled button.
+        val first = rows.firstOrNull { it.canRelease }?.orderId
+        rows.forEach { row ->
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(item.patientName, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    if (item.critical) CriticalPill(stringResource(R.string.lab_critico)) else FamilyBadge(stringResource(R.string.lab_pendiente_observacion), StatusFamily.ESPERA)
+                    Text(row.patientName, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    if (row.critical) CriticalPill(stringResource(R.string.lab_critico)) else FamilyBadge(stringResource(R.string.lab_pendiente_observacion), StatusFamily.ESPERA)
                 }
-                item.record?.let { Text(stringResource(R.string.lab_expediente, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Text(item.detail, style = MaterialTheme.typography.bodyMedium)
-                RowAction(stringResource(R.string.lab_pendiente_revisado), { model.reviewFollowUp(item) }, enabled = busy == null, loading = busy == item.id)
+                row.record?.let { Text(stringResource(R.string.lab_expediente, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                row.keyValues.take(3).forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                if (row.keyValues.isEmpty()) row.details.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                val rowBusy = row.orderId in busyOrders
+                when {
+                    row.canRelease && row.orderId == first -> PrimaryButton(stringResource(R.string.u5_lab_revisar_liberar), { model.openReview(row.orderId) }, icon = Icons.Default.Check, enabled = !rowBusy, loading = rowBusy)
+                    row.canRelease -> SecondaryButton(stringResource(R.string.u5_lab_revisar_liberar), { model.openReview(row.orderId) }, icon = Icons.Default.Check, enabled = !rowBusy)
+                    else -> items.filter { it.orderId == row.orderId }.forEach { item -> RowAction(stringResource(R.string.lab_pendiente_revisado), { model.reviewFollowUp(item) }, enabled = busy == null, loading = busy == item.id) }
+                }
             }
         }
     }
@@ -302,20 +316,24 @@ private fun describe(context: android.content.Context, uri: Uri): LabAttachment?
 /** Cancel with a reason (D-13: at least 10 characters). The reason and the open dialog live in the ViewModel, so a rotation keeps them. */
 /** R3 A-16: releasing a result to the patient is confirmed with what they will see; it closes only once the API accepts it. */
 @Composable
-private fun ReviewOrderDialog(order: LaboratoryOrder, state: LaboratoryState, model: LaboratoryViewModel) {
+private fun ReviewOrderDialog(target: LabReviewTarget, state: LaboratoryState, model: LaboratoryViewModel) {
+    val busy = target.orderId in state.busyIds
     ConfirmDialog(
         title = stringResource(R.string.lab_revisar_titulo),
-        message = stringResource(R.string.lab_revisar_efecto, order.patientName),
+        message = stringResource(R.string.lab_revisar_efecto, target.patientName),
         confirmLabel = stringResource(R.string.lab_revisar_confirmar),
-        onConfirm = { model.review(order) },
+        onConfirm = model::release,
         onDismiss = model::dismissReview,
-        busy = order.id in state.busyIds,
+        busy = busy,
         error = state.error,
         onDone = model::dismissReview,
         body = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                LabReviewSummary.lines(order).forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                if (LabReviewSummary.critical(order)) Text(stringResource(R.string.lab_revisar_critico), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                target.lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                if (target.critical) Text(stringResource(R.string.lab_revisar_critico), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // C1: on release the API proposes the follow-up appointment unless the doctor turns it off here.
+                CheckRow(stringResource(R.string.u5_lab_proponer_seguimiento), state.reviewFollowUp, !busy, model::setReviewFollowUp)
+                FormField(stringResource(R.string.u5_lab_nota_paciente), state.reviewNote, model::setReviewNote, singleLine = false, hint = stringResource(R.string.u5_lab_nota_ayuda))
             }
         },
     )

@@ -94,9 +94,11 @@ internal fun PortalScaffold(
     navigationIcon: @Composable () -> Unit = {},
     showNavigation: Boolean = true,
     snackbarHost: @Composable () -> Unit = {},
+    badges: Map<AndroidSection, Int> = emptyMap(),
     content: @Composable (PaddingValues) -> Unit,
 ) {
     AdaptiveRoleScaffold(
+        badges = badges,
         role = role,
         sections = sections,
         selected = selected,

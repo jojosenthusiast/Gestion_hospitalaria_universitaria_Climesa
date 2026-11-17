@@ -7,8 +7,27 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /** Row of `GET /pacientes/selector`: lo mínimo para elegir a alguien en una lista con búsqueda. */
-data class PickerPatient(val id: String, val record: String, val name: String, val age: Int?) {
+data class PickerPatient(
+    val id: String, val record: String, val name: String, val age: Int?,
+    /** B-2: the patient's confirmed appointment of today (`appointmentToday`), only for accounts that see appointments. */
+    val appointmentToday: TodayAppointment? = null,
+    /** B-2: the patient's live queue number of today (`ticketToday`). */
+    val ticketToday: TodayTicket? = null,
+) {
     val detail get() = "Expediente $record" + (age?.let { " · $it años" } ?: "")
+    /** B1 "Registrar llegada": an appointment today whose arrival is not registered yet with a live number. */
+    val canRegisterArrival get() = appointmentToday != null && ticketToday?.appointmentId != appointmentToday.id
+}
+
+/** `appointmentToday` of a selector row: the appointment and its doctor. */
+data class TodayAppointment(val id: String, val start: String, val doctorId: String, val doctorName: String) {
+    /** Sweep #11: "Cita 09:00 con Ana Médica"; never "· <doctor>", which reads as a second patient. */
+    val chip get() = "Cita ${AppointmentAgenda.time(start)} con $doctorName"
+}
+
+/** `ticketToday` of a selector row: the number the patient already holds today. */
+data class TodayTicket(val id: String, val service: String, val number: Int, val state: String, val appointmentId: String?) {
+    val code get() = "${QueueLabels.areaOf(service)} $number"
 }
 data class PickerPage(val items: List<PickerPatient>, val hasMore: Boolean)
 
@@ -73,7 +92,17 @@ object ReceptionScheduling {
     private fun JSONArray?.objects() = (0 until (this?.length() ?: 0)).mapNotNull { this?.optJSONObject(it) }
 
     fun pickerPage(json: JSONObject) = PickerPage(
-        json.optJSONArray("items").objects().map { PickerPatient(it.getString("id"), it.optString("record"), it.optString("fullName"), if (it.has("age") && !it.isNull("age")) it.optInt("age") else null) },
+        json.optJSONArray("items").objects().map {
+            PickerPatient(
+                it.getString("id"), it.optString("record"), it.optString("fullName"), if (it.has("age") && !it.isNull("age")) it.optInt("age") else null,
+                appointmentToday = it.optJSONObject("appointmentToday")?.let { a ->
+                    a.text("id")?.let { id -> TodayAppointment(id, a.optString("start"), a.optString("doctorId"), a.text("doctorName") ?: "") }
+                },
+                ticketToday = it.optJSONObject("ticketToday")?.let { t ->
+                    t.text("id")?.let { id -> TodayTicket(id, t.optString("service"), t.optInt("numero"), t.optString("state"), t.text("appointmentId")) }
+                },
+            )
+        },
         json.optBoolean("hasMore"),
     )
 
@@ -120,6 +149,8 @@ data class LinkRequestRow(
     val id: String, val version: Int, val createdAt: String, val email: String, val accountName: String,
     val declaredDui: String, val declaredBirth: String,
     val candidateRecord: String?, val candidateName: String?, val candidateBirth: String?, val candidates: Int,
+    /** G2: the nearest record when nothing matches exactly (one digit off, for example); shown to compare, never approvable. */
+    val closestRecord: String? = null, val closestName: String? = null, val closestBirth: String? = null, val closestDui: String? = null,
 ) {
     val hasCandidate get() = candidateRecord != null
     /** Regla de la pantalla: aprobar solo si un expediente coincide en DUI y nacimiento; la API lo vuelve a validar. */
@@ -128,16 +159,20 @@ data class LinkRequestRow(
     val guidance get() = when {
         hasCandidate -> "DUI y fecha de nacimiento coinciden con el expediente $candidateRecord. Verifica la identidad antes de aprobar."
         candidates > 1 -> "Más de un expediente coincide: resuelve el posible duplicado antes de aprobar."
+        closestRecord != null -> "No coincide exacto, pero el expediente $closestRecord se parece. Compara los datos con el paciente y corrige el que esté mal antes de aprobar."
         else -> "No hay expediente con ese DUI y esa fecha: búscalo en Pacientes y regístralo si no existe; después aprueba."
     }
 }
 object ReceptionLinking {
     fun parse(array: JSONArray) = (0 until array.length()).mapNotNull { array.optJSONObject(it) }.map { row ->
         val account = row.optJSONObject("account"); val declared = row.optJSONObject("declared"); val candidate = row.optJSONObject("candidate")
+        val closest = row.optJSONObject("closest")
+        fun JSONObject.text(key: String) = if (isNull(key)) null else optString(key).ifBlank { null }
         LinkRequestRow(
             row.optString("id"), row.optInt("version", 1), row.optString("createdAt"), account?.optString("email").orEmpty(), account?.optString("name").orEmpty(),
             declared?.optString("dui").orEmpty(), declared?.optString("birth").orEmpty(),
             candidate?.optString("record"), candidate?.optString("fullName"), candidate?.let { if (it.isNull("birth")) null else it.optString("birth") }, row.optInt("candidates"),
+            closest?.text("record"), closest?.text("fullName"), closest?.text("birth"), closest?.text("dui"),
         )
     }
     fun rejectError(reason: String) = if (reason.trim().length < 10) "El motivo debe tener al menos 10 caracteres." else null

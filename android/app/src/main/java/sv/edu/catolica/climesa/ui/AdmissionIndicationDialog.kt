@@ -111,7 +111,7 @@ internal fun AdmissionIndicationDialog(model: AdmissionIndicationViewModel) {
 
 /** Whole row toggles (48 dp target), not only the small box. */
 @Composable
-private fun CheckRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+internal fun CheckRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(checked, enabled = enabled, role = Role.Checkbox, onValueChange = onChange),
         verticalAlignment = Alignment.CenterVertically,

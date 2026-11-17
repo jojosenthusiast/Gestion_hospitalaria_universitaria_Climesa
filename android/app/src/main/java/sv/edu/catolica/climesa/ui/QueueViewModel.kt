@@ -63,6 +63,10 @@ data class QueueState(
     val failedAbsence: String? = null,
     /** B5: called numbers of the patient's service, for "faltan N" and the room once called. */
     val publicCalls: List<PublicCall> = emptyList(),
+    /** B3: service and room of the caller's shift (`GET /fila/mi-puesto`), preselected on the board; null until read. */
+    val myPost: sv.edu.catolica.climesa.domain.MyPost? = null,
+    /** Why the caller's post could not be read (the board still works, without preselection). */
+    val myPostError: String? = null,
 )
 
 @HiltViewModel
@@ -196,13 +200,40 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
      */
     fun issue(service: String, priority: String = "rutina") {
         val patient = mutable.value.issueSearch.patient ?: run { mutable.value = mutable.value.copy(error = "Elige al paciente que recibe el número."); return }
-        mutate("/fila", QueueRules.issueBody(service, priority, patient.id), "Número emitido para ${patient.name}.", key = ISSUE, intentKey = "/fila:${patient.id}:$service", onDone = { result ->
+        sendIssue(patient, service, priority, null, "Número emitido para ${patient.name}.")
+    }
+
+    /**
+     * B1 / D-1 "Registrar llegada": the patient has a confirmed appointment today, so the number is issued in Consulta
+     * general linked to it (`appointmentId`); the signature then closes both. One intent per appointment.
+     */
+    fun registerArrival(priority: String = "rutina") {
+        val patient = mutable.value.issueSearch.patient ?: run { mutable.value = mutable.value.copy(error = "Elige al paciente que recibe el número."); return }
+        val appointment = patient.appointmentToday?.takeIf { patient.canRegisterArrival }
+            ?: run { mutable.value = mutable.value.copy(error = "${patient.name} no tiene cita confirmada hoy."); return }
+        sendIssue(patient, ARRIVAL_SERVICE, priority, appointment.id, "Llegada registrada para ${patient.name}.")
+    }
+
+    private fun sendIssue(patient: PickerPatient, service: String, priority: String, appointmentId: String?, notice: String) {
+        val intentKey = "/fila:${patient.id}:$service" + (appointmentId?.let { ":$it" } ?: "")
+        mutate("/fila", QueueRules.issueBody(service, priority, patient.id, appointmentId), notice, key = ISSUE, intentKey = intentKey, onDone = { result ->
             val json = result as? JSONObject
             val number = json?.optInt("numero", 0) ?: 0
             val area = json?.let { ServerText.of(it, "area") } ?: QueueLabels.areaOf(service)
-            mutable.value = mutable.value.copy(lastService = service, issued = json?.optString("id")?.takeIf { it.isNotBlank() && number > 0 }?.let { IssuedTicket(it, "$area $number", patient.name, null) })
+            // The API counts who waits before it (`ahead`); the reload after issuing refreshes it from the board.
+            val ahead = json?.takeIf { it.has("ahead") && !it.isNull("ahead") }?.optInt("ahead")
+            mutable.value = mutable.value.copy(lastService = service, issued = json?.optString("id")?.takeIf { it.isNotBlank() && number > 0 }?.let { IssuedTicket(it, "$area $number", patient.name, ahead) })
             resetIssue()
         })
+    }
+
+    /** B3: reads the caller's post once so the board and "Llamar siguiente" open on its service and room. */
+    fun loadMyPost() {
+        viewModelScope.launch {
+            try { mutable.value = mutable.value.copy(myPost = QueueRules.myPost(api.request("/fila/mi-puesto")), myPostError = null) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.value = mutable.value.copy(myPostError = userMessage(e, "No se pudo leer tu puesto de turno.")) }
+        }
     }
 
     /** Consulting rooms for "Llamar siguiente" (only for accounts with `espacios.ver`); a failure leaves the call without room. */
@@ -287,6 +318,8 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     companion object {
         const val ISSUE = "emitir"
         const val NEXT = "siguiente"
+        /** The API registers an appointment's arrival only in Consulta general. */
+        const val ARRIVAL_SERVICE = "consulta_general"
     }
 }
 

@@ -176,6 +176,14 @@ object AppointmentReasons {
     const val OTHER = "Otro"
     /** D-8: the patient cancels with one tap and no typing. */
     val patientCancel = listOf("Ya no lo necesito", "No puedo a esa hora")
+    /** D-8: the API code of each quick reason; [OTHER] sends `otro` with the typed text (3+ characters). */
+    const val OTHER_MIN = 3
+    fun patientCancelCode(reason: String, other: Boolean): String? = when {
+        other -> "otro"
+        reason == patientCancel[0] -> "ya_no_lo_necesito"
+        reason == patientCancel[1] -> "no_puedo_a_esa_hora"
+        else -> null
+    }
     /** Reception cancels or rejects with a frequent reason. */
     fun reception(action: AppointmentAction): List<String> = when (action) {
         AppointmentAction.CANCEL -> listOf("Lo pidió el paciente", "El médico no estará disponible", "Cita registrada por error")
