@@ -5,7 +5,7 @@ import { PriorityBadge, StatusBadge } from '../components/system';
 import { ExportMenu } from '../components/export-menu';
 import { ApiError, can, type AccessProfile, type Api } from '../lib/api';
 import { downloadAttachment, uploadAttachment } from '../lib/lab-attachments';
-import { EXTERNAL_INSTRUCTIONS_TEMPLATE, attachmentProblem, externalResultBody, fingerprintFile, formatBytes, groupLabOrders, type LabGroupId } from '../lib/lab-flow';
+import { ATTACHMENT_ACCEPT, EXTERNAL_INSTRUCTIONS_TEMPLATE, attachmentMimeType, attachmentProblem, externalResultBody, fingerprintFile, formatBytes, groupLabOrders, type LabGroupId } from '../lib/lab-flow';
 import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import { newIntentKey, withIntentKey } from './intent';
 import { spanishProblem } from './problems';
@@ -278,7 +278,7 @@ function AttachmentRow({ api, file, canAttach, onStored }: { api: Api; file: Att
         ? <button type="button" className="secondary-button" disabled={busy} aria-label={`Descargar ${file.fileName}`} onClick={() => void attempt(() => downloadAttachment(api, file.id))}>{busy ? 'Preparando…' : 'Descargar'}</button>
         : <>
           <small className="muted">Solo se guardó la referencia del archivo (nombre, tipo, tamaño y huella) y los valores; el archivo no está en el sistema.</small>
-          {canAttach && <small>{busy ? 'Subiendo el archivo…' : 'Sube aquí la foto o el PDF (hasta 10 MB):'} <input type="file" aria-label={`Subir archivo de ${file.fileName}`} accept="application/pdf,image/jpeg,image/png,image/heic,image/webp" disabled={busy} onChange={event => upload(event.target.files?.[0] ?? null)} /></small>}
+          {canAttach && <small>{busy ? 'Subiendo el archivo…' : 'Sube aquí la foto o el PDF (hasta 10 MB):'} <input type="file" aria-label={`Subir archivo de ${file.fileName}`} accept={ATTACHMENT_ACCEPT} disabled={busy} onChange={event => upload(event.target.files?.[0] ?? null)} /></small>}
         </>}
       {error && <Notice kind="error">{error.message}</Notice>}</span>
   </li>;
@@ -309,7 +309,7 @@ function ExternalResultDialog({ api, order, onClose, onSaved }: { api: Api; orde
   async function save() {
     if (!file || problem || missing) return;
     const sha256 = await fingerprintFile(file);
-    const attachment = { fileName: file.name, mimeType: file.type, sizeBytes: file.size, ...(sha256 ? { sha256 } : {}) };
+    const attachment = { fileName: file.name, mimeType: attachmentMimeType(file) ?? file.type, sizeBytes: file.size, ...(sha256 ? { sha256 } : {}) };
     const body = externalResultBody(order.version, attachment, order.items.map(item => ({ id: item.id, numeric: isNumeric(item) })), values, note);
     const saved = await action.run<{ attachmentId?: string }>(`/laboratorio/ordenes/${order.id}/resultado-externo`, body);
     if (!saved) return;
@@ -331,7 +331,7 @@ function ExternalResultDialog({ api, order, onClose, onSaved }: { api: Api; orde
   return <Dialog title="Cargar resultado externo" onClose={onClose} busy={busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
     <p className="form-intro">Adjunta el informe que trajo el paciente y escribe el valor clave de cada examen. La marca (normal, alta, crítica) la calcula el sistema. Al guardar, la orden queda completada y espera la revisión médica.</p>
     <WriteError error={action.error} onReload={onSaved} reloadLabel="Recargar la orden" />
-    <FieldShell label="Informe (PDF o foto, hasta 10 MB)">{id => <input id={id} type="file" accept="application/pdf,image/jpeg,image/png,image/heic,image/webp" onChange={event => setFile(event.target.files?.[0] ?? null)} aria-required="true" />}</FieldShell>
+    <FieldShell label="Informe (PDF o foto, hasta 10 MB)">{id => <input id={id} type="file" accept={ATTACHMENT_ACCEPT} onChange={event => setFile(event.target.files?.[0] ?? null)} aria-required="true" />}</FieldShell>
     {file && (problem ? <Notice kind="error">{problem}</Notice> : <p className="muted">{file.name} · {formatBytes(file.size)}</p>)}
     <fieldset className="lab-external-values"><legend>Valores clave</legend>
       {order.items.map(item => <Field key={item.id} label={`${item.name}${isNumeric(item) && item.unit ? ` (${item.unit})` : ''}`} type={isNumeric(item) ? 'number' : 'text'} step="any" value={values[item.id] ?? ''} onChange={value => setValues(current => ({ ...current, [item.id]: value }))} required />)}
