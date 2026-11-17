@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './lab-follow-up.css';
 import { Field, Notice } from '../../components/ui';
 import { PriorityBadge, SectionState } from '../../components/system';
@@ -108,6 +108,17 @@ function ScheduleForm({ api, proposal, scheduled, onScheduled, onCancel, onDone 
   const { days, error: daysError } = useFreeDays(api, doctorId);
   const [day, setDay] = useState<string | null>(null), [slot, setSlot] = useState<Slot | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState<ApiError | null>(null);
+  // Sweep U6: a retry of the same body replays the same Idempotency-Key, so a lost response never books twice;
+  // a different body (another doctor or slot) gets its own key.
+  const keys = useRef(new Map<string, string>());
+  const intentKey = (path: string, body: unknown) => {
+    const signature = `${path} ${JSON.stringify(body)}`;
+    const known = keys.current.get(signature);
+    if (known) return known;
+    const key = newIntentKey();
+    keys.current.set(signature, key);
+    return key;
+  };
   // Opens on the first day with a free slot (A-1 for the follow-up journey), and again after switching doctor.
   useEffect(() => { setSlot(null); setDay(days?.find(d => d.slots.length)?.day ?? null); }, [days]);
   const current = days?.find(d => d.day === day) ?? null;
@@ -116,9 +127,11 @@ function ScheduleForm({ api, proposal, scheduled, onScheduled, onCancel, onDone 
     if (!slot && !scheduled) return;
     setBusy(true); setError(null);
     try {
-      const appointmentId = scheduled ?? (await withIntentKey(newIntentKey(), () => api.write<{ id: string }>('/citas', { patientId: proposal.patientId, doctorId, start: slot!.start, end: slot!.end, reason: FOLLOW_UP_REASON }, 'POST'))).id;
+      const booking = { patientId: proposal.patientId, doctorId, start: slot?.start, end: slot?.end, reason: FOLLOW_UP_REASON };
+      const appointmentId = scheduled ?? (await withIntentKey(intentKey('/citas', booking), () => api.write<{ id: string }>('/citas', booking, 'POST'))).id;
       onScheduled(appointmentId);
-      await withIntentKey(newIntentKey(), () => api.write(`/laboratorio/seguimientos/${proposal.id}/confirmar`, { version: proposal.version, appointmentId }, 'POST'));
+      const link = { version: proposal.version, appointmentId };
+      await withIntentKey(intentKey('confirmar', link), () => api.write(`/laboratorio/seguimientos/${proposal.id}/confirmar`, link, 'POST'));
       onDone(slot ? `Cita de seguimiento confirmada: ${proposal.patientName ?? 'el paciente'}, ${dayLabel(day!)} a las ${slotLabel(slot)} con ${chosenName}.` : 'Cita de seguimiento confirmada.');
     } catch (e) { setError(spanishProblem(e instanceof ApiError ? e : new ApiError('No se pudo agendar la cita.'))); }
     finally { setBusy(false); }

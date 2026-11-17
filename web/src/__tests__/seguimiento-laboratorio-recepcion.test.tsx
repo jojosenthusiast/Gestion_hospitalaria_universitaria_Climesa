@@ -39,6 +39,25 @@ describe('Citas de seguimiento por confirmar', () => {
     expect(api.request.mock.calls.some(([path]) => String(path).startsWith('/citas/disponibilidad?doctorId=med-1&date='))).toBe(true);
   });
 
+  it('U6: si agendar falla, el reintento del mismo horario reusa su clave; enlazar usa otra', async () => {
+    const uuid = vi.spyOn(crypto, 'randomUUID');
+    let bookings = 0;
+    const api = montar([proposal], async path => {
+      if (path === '/citas' && bookings++ === 0) throw new ApiError('Sin conexión.', 503, 'no_disponible');
+      return path === '/citas' ? { id: 'cita-9', version: 1, state: 'confirmada' } : { state: 'confirmada' };
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Agendar cita' }));
+    const form = await screen.findByRole('form', { name: /Agendar seguimiento/ });
+    await userEvent.click(await within(form).findByRole('radio'));
+    await userEvent.click(within(form).getByRole('button', { name: 'Confirmar cita' }));
+    await within(form).findByText(/Sin conexión/);
+    await userEvent.click(within(form).getByRole('button', { name: 'Confirmar cita' }));
+    await vi.waitFor(() => expect(api.write).toHaveBeenCalledTimes(3));
+    // One key for the booking (sent twice) and one for the link: never a new key for the same body.
+    expect(uuid).toHaveBeenCalledTimes(2);
+    uuid.mockRestore();
+  });
+
   it('si enlazar falla, reintenta con la misma cita sin agendar otra', async () => {
     let links = 0;
     const api = montar([proposal], async path => {

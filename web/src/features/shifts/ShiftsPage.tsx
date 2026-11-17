@@ -243,7 +243,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
         </div>}
         {plan && view === 'semana' && <div className="shift-plan-tools" role="group" aria-label="Planificar la semana">
           <button type="button" className="secondary-button" onClick={() => setTool('rotacion')}>Generar rotación</button>
-          {openBlocks.length > 0 && <button type="button" className="secondary-button" onClick={() => setFilling(true)}>Llenar todos los huecos ({openBlocks.length})</button>}
+          {openBlocks.length > 0 && <button type="button" className="secondary-button" onClick={() => setFilling(true)} title="Turnos que faltan en la semana que estás viendo, desde ahora">Llenar los huecos de esta semana ({openBlocks.length} {openBlocks.length === 1 ? 'turno' : 'turnos'})</button>}
           <button type="button" className="secondary-button" onClick={() => void copyPrevious()}>Copiar semana anterior</button>
           <button type="button" className="secondary-button" onClick={() => setTool('masiva')}>Asignación masiva</button>
           <button type="button" className="secondary-button" onClick={() => setTool('plantillas')}>Plantillas</button>

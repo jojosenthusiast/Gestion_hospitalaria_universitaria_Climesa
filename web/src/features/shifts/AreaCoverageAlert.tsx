@@ -36,7 +36,7 @@ export function AreaCoverageAlert({ api, version, now, onPlan }: { api: Api; ver
   if (!gaps.length) return null;
   const shown = gaps.slice(0, SHOWN);
   return <section className="crew-coverage" aria-label="Cobertura mínima por área">
-    <Notice kind="info"><strong>{gaps.length === 1 ? 'Un tramo' : `${gaps.length} tramos`} de los próximos {AREA_COVERAGE_DAYS} días con menos personal que el mínimo.</strong> Cada área necesita el personal que fija la política de cobertura mínima (RN-15).</Notice>
+    <Notice kind="info"><strong>{gaps.length === 1 ? 'Un tramo seguido' : `${gaps.length} tramos seguidos`} de los próximos {AREA_COVERAGE_DAYS} días con menos personal que el mínimo.</strong> Cada área necesita el personal que fija la política de cobertura mínima (RN-15).</Notice>
     <ul className="crew-coverage-list">{shown.map(g => <li key={`${g.areaId}-${g.role}-${g.start}`}><strong>{g.area} · {roleNames[g.role] ?? g.role}</strong> · {span(g)} · {g.actual} de {g.required}</li>)}</ul>
     {gaps.length > shown.length && <p className="crew-coverage-more">y {gaps.length - shown.length} tramos más.</p>}
     {onPlan ? <button type="button" className="secondary-button" onClick={onPlan}>Asignar un turno para cubrirlo</button> : <p className="crew-coverage-more">Avisa a la Jefatura de Operaciones para que asigne los turnos que faltan.</p>}

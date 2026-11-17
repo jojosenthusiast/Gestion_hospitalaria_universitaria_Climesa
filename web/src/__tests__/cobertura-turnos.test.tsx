@@ -26,7 +26,7 @@ describe('cobertura mínima por área en Turnos', () => {
     render(<AreaCoverageAlert api={api as unknown as Api} version={0} now={now} onPlan={plan} />);
     const region = await screen.findByRole('region', { name: 'Cobertura mínima por área' });
     expect(api.request).toHaveBeenCalledWith('/turnos/cobertura?from=2026-11-20&to=2026-11-26', expect.anything());
-    expect(within(region).getByText(/2 tramos de los próximos 7 días/)).toBeTruthy();
+    expect(within(region).getByText(/2 tramos seguidos de los próximos 7 días/)).toBeTruthy();
     expect(within(region).getByText('Emergencia · Enfermería')).toBeTruthy();
     expect(within(region).queryByText('Emergencia · Medicina')).toBeNull();
     await userEvent.click(within(region).getByRole('button', { name: 'Asignar un turno para cubrirlo' }));
