@@ -44,7 +44,7 @@ internal enum class StatusPattern { STRIPED, DOTTED, SOLID, OUTLINE, DASHED, DOU
 
 internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pattern: StatusPattern) {
     ESPERA("En espera", StatusIcon.SCHEDULE, StatusPattern.STRIPED),
-    LLAMADO("Llamado o en proceso", StatusIcon.CAMPAIGN, StatusPattern.DOTTED),
+    LLAMADO("Llamado", StatusIcon.CAMPAIGN, StatusPattern.DOTTED),
     ATENCION("En atención o en uso", StatusIcon.MONITOR_HEART, StatusPattern.SOLID),
     LISTO("Terminado o disponible", StatusIcon.CHECK, StatusPattern.OUTLINE),
     CERRADO("Cancelado o fuera de servicio", StatusIcon.CLOSE, StatusPattern.DASHED),
@@ -58,8 +58,9 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
                 "en_espera", "solicitada", "pendiente", "pendiente_cama", "borrador", "publicado", "reservada", "provisional",
                 "confirmada", "reprogramada",
             ).forEach { put(it, ESPERA) }
-            listOf("llamado", "en_proceso").forEach { put(it, LLAMADO) }
-            listOf("en_atencion", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta", "limpieza", "requiere_atencion").forEach { put(it, ATENCION) }
+            // Only a called number uses the megaphone; work in progress (`en_proceso`) is in attention, like the web.
+            put("llamado", LLAMADO)
+            listOf("en_atencion", "en_proceso", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta", "limpieza", "requiere_atencion").forEach { put(it, ATENCION) }
             listOf("atendida", "atendido", "ok", "completado", "firmada", "alta_firmada", "egresado", "libre", "disponible", "activo", "exito", "normal", "aprobada").forEach { put(it, LISTO) }
             listOf(
                 "cancelado", "cancelada", "no_asistio", "no_se_presento", "cerrado", "rechazada", "vencida", "bloqueada",

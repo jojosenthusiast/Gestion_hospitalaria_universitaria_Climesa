@@ -124,7 +124,7 @@ internal fun FamilyBadge(text: String, family: StatusFamily?, modifier: Modifier
         return
     }
     val (fam, soft) = MaterialTheme.system.status(family)
-    val fg = if (family.pattern == StatusPattern.SOLID) MaterialTheme.system.onStatus else fam
+    val fg = MaterialTheme.system.badge(family, MaterialTheme.colorScheme.surface).first
     Row(
         modifier.statusPattern(family.pattern, fam, soft, MaterialTheme.colorScheme.surface).padding(horizontal = Space2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,

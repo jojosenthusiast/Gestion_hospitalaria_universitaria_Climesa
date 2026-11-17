@@ -494,7 +494,7 @@ private fun LabStagePill(stage: LabStage) = FamilyBadge(stage.label, labStageFam
 
 internal fun labStageFamily(stage: LabStage): StatusFamily = when (stage) {
     LabStage.PENDING, LabStage.TO_REVIEW -> StatusFamily.ESPERA
-    LabStage.IN_PROCESS -> StatusFamily.LLAMADO
+    LabStage.IN_PROCESS -> StatusFamily.ATENCION
     LabStage.RELEASED -> StatusFamily.LISTO
     LabStage.CANCELLED -> StatusFamily.CERRADO
 }

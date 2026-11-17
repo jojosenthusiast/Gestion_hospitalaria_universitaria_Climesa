@@ -138,7 +138,21 @@ internal data class SystemColors(
         Area.GEN -> areaGen to areaGenSoft
     }
 
-    /** Strong and soft colour of a status family. Red belongs only to the critical family. */
+    /**
+ * Text and background of a family badge as [FamilyBadge] draws it: the solid family (atención) puts [onStatus] text on the
+ * strong colour, outline and dashed sit on the [surface], the rest put the strong colour on the soft tint. Tested for
+ * WCAG AA (4.5:1) in both themes, so a solid badge never shows blue text on blue.
+ */
+fun badge(family: StatusFamily, surface: Color): Pair<Color, Color> {
+    val (strong, soft) = status(family)
+    return when (family.pattern) {
+        StatusPattern.SOLID -> onStatus to strong
+        StatusPattern.OUTLINE, StatusPattern.DASHED -> strong to surface
+        else -> strong to soft
+    }
+}
+
+/** Strong and soft colour of a status family. Red belongs only to the critical family. */
     fun status(family: StatusFamily): Pair<Color, Color> = when (family) {
         StatusFamily.ESPERA -> statusEspera to statusEsperaSoft
         StatusFamily.LLAMADO -> statusLlamado to statusLlamadoSoft

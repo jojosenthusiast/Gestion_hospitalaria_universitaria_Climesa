@@ -20,7 +20,7 @@ class StatusFamilyMigrationTest {
 
     @Test fun `lab stages use the web stage table`() {
         assertEquals(StatusFamily.ESPERA, labStageFamily(LabStage.PENDING))
-        assertEquals(StatusFamily.LLAMADO, labStageFamily(LabStage.IN_PROCESS))
+        assertEquals(StatusFamily.ATENCION, labStageFamily(LabStage.IN_PROCESS))
         assertEquals(StatusFamily.ESPERA, labStageFamily(LabStage.TO_REVIEW))
         assertEquals(StatusFamily.LISTO, labStageFamily(LabStage.RELEASED))
         assertEquals(StatusFamily.CERRADO, labStageFamily(LabStage.CANCELLED))
@@ -45,7 +45,7 @@ class StatusFamilyMigrationTest {
             "bajo_minimo" to StatusFamily.ESPERA,
             "publicado" to StatusFamily.ESPERA,
             "llamado" to StatusFamily.LLAMADO,
-            "en_proceso" to StatusFamily.LLAMADO,
+            "en_proceso" to StatusFamily.ATENCION,
             "limpieza" to StatusFamily.ATENCION,
             "en_atencion" to StatusFamily.ATENCION,
             "libre" to StatusFamily.LISTO,
@@ -54,7 +54,7 @@ class StatusFamilyMigrationTest {
             "requiere_atencion" to StatusFamily.ATENCION,
         )
         expected.forEach { (value, family) -> assertEquals(value, family, StatusFamily.of(value)) }
-        val called = listOf("confirmada", "reprogramada", "bajo_minimo", "limpieza", "publicado").filter { StatusFamily.of(it) == StatusFamily.LLAMADO }
+        val called = listOf("confirmada", "reprogramada", "bajo_minimo", "limpieza", "publicado", "en_proceso").filter { StatusFamily.of(it) == StatusFamily.LLAMADO }
         assertEquals(emptyList<String>(), called)
     }
 
@@ -70,5 +70,22 @@ class StatusFamilyMigrationTest {
         val red = listOf("alto", "bajo", "agotado", "vencido", "sin_rango", "requiere_atencion", "critico_alto", "critico_bajo")
             .filter { StatusFamily.resolve(it, StatusCatalog.tone(it)) == StatusFamily.CRITICO }
         assertEquals(listOf("critico_alto", "critico_bajo"), red)
+    }
+
+    // Every family badge reads at WCAG AA (4.5:1) in light and dark: never blue text on a solid blue badge.
+    @Test fun `every family badge has AA contrast in both themes`() {
+        fun channel(v: Float) = if (v <= 0.03928f) v / 12.92 else Math.pow((v + 0.055) / 1.055, 2.4)
+        fun lum(c: androidx.compose.ui.graphics.Color) = 0.2126 * channel(c.red) + 0.7152 * channel(c.green) + 0.0722 * channel(c.blue)
+        fun ratio(a: androidx.compose.ui.graphics.Color, b: androidx.compose.ui.graphics.Color): Double {
+            val (hi, lo) = listOf(lum(a), lum(b)).sortedDescending(); return (hi + 0.05) / (lo + 0.05)
+        }
+        listOf(LightSystemColors to LightScheme.surface, DarkSystemColors to DarkScheme.surface).forEach { (colors, surface) ->
+            StatusFamily.entries.forEach { family ->
+                val (text, background) = colors.badge(family, surface)
+                val r = ratio(text, background)
+                assert(r >= 4.5) { "$family: contrast $r" }
+            }
+        }
+        assertEquals(LightSystemColors.onStatus, LightSystemColors.badge(StatusFamily.ATENCION, LightScheme.surface).first)
     }
 }
