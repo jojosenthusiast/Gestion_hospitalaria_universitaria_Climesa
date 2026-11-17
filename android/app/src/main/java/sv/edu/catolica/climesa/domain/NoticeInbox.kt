@@ -24,7 +24,6 @@ data class InboxNotice(
     val body: String,
     val from: String?,
     val until: String?,
-    val priority: NoticePriority,
     val isPublic: Boolean,
     val roles: List<String>,
     val level: NoticeLevel,
@@ -65,7 +64,8 @@ object NoticeInboxParser {
 
     private fun notice(r: JSONObject) = InboxNotice(
         id = r.optString("id"), title = r.optString("titulo"), body = r.optString("cuerpo"), from = text(r, "desde"), until = text(r, "hasta"),
-        priority = NoticePriority.of(text(r, "prioridad")), isPublic = r.optBoolean("publico", false), roles = strings(r.optJSONArray("roles")),
+        // D1: `nivel` is the single scale; the legacy `prioridad` is not read.
+        isPublic = r.optBoolean("publico", false), roles = strings(r.optJSONArray("roles")),
         level = NoticeLevel.of(text(r, "nivel")), areas = strings(r.optJSONArray("areas")), publishedAt = text(r, "publicadoEn"),
         targeted = r.optBoolean("dirigido", false), acknowledgedAt = text(r, "enteradoEn"), remindAt = text(r, "recordarEn"),
         highlighted = r.optBoolean("destacado", false),
@@ -104,6 +104,23 @@ object NoticeInboxRules {
         NoticeFilter.ALL -> null
         NoticeFilter.UNREAD -> inbox.unread
         NoticeFilter.CRITICAL -> inbox.critical
+    }
+
+    /**
+     * D1: the unread count on the "Avisos" entry. The API's `noLeidos`, minus the notices acknowledged here and not yet
+     * re-read (only those still unread in the inbox), never below 0.
+     */
+    fun badge(inbox: NoticeInbox?, hidden: Set<String> = emptySet()): Int {
+        val box = inbox ?: return 0
+        val handled = box.notices.count { it.id in hidden && it.acknowledgedAt == null }
+        return (box.unread - handled).coerceAtLeast(0)
+    }
+
+    /** "4", "9+" over nine, null for none (no badge). */
+    fun badgeText(count: Int): String? = when {
+        count <= 0 -> null
+        count > 9 -> "9+"
+        else -> count.toString()
     }
 
     /** Notices of "Inicio": only `destacado` (the API decides), minus the ones handled here and not yet re-read. */

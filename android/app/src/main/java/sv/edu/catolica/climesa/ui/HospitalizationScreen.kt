@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -122,7 +123,16 @@ data class HospitalizationState(
     val formError: String? = null,
     val error: String? = null,
     val notice: String? = null,
+    /** G3: "Ingresos indicados", each with the first suggested bed; one tap admits there. */
+    val tray: List<IndicatedAdmission> = emptyList(),
 )
+
+/** G3: one indicated admission of the tray; [error] stays on its row (a failed read is never shown as "no beds"). */
+data class IndicatedAdmission(
+    val admission: HospitalAdmission, val bed: HospitalBedSuggestion? = null, val loading: Boolean = true, val error: String? = null, val busy: Boolean = false,
+) {
+    val noBeds get() = !loading && error == null && bed == null
+}
 
 @HiltViewModel
 class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
@@ -137,9 +147,57 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
         if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            try { val admissions = AdmissionParser.admissions(api.request("/admisiones")); mutable.value = mutable.value.copy(loading = false, admissions = admissions) }
+            try { val admissions = AdmissionParser.admissions(api.request("/admisiones")); mutable.value = mutable.value.copy(loading = false, admissions = admissions); syncTray(admissions) }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = readable(e, "No se pudieron cargar las admisiones.")) }
+        }
+    }
+
+    /** G3: keeps a row per indicated admission; a row whose admission changed (new version) reads its suggested bed again. */
+    private fun syncTray(admissions: List<HospitalAdmission>) {
+        val previous = mutable.value.tray.associateBy { it.admission.id }
+        val rows = admissions.filter { it.indicated }.map { a -> previous[a.id]?.takeIf { it.admission.version == a.version && !it.loading }?.copy(admission = a) ?: IndicatedAdmission(a) }
+        mutable.update { it.copy(tray = rows) }
+        rows.filter { it.loading }.forEach { suggestBed(it.admission) }
+    }
+
+    private fun suggestBed(admission: HospitalAdmission) {
+        viewModelScope.launch {
+            val result = try { Result.success(AdmissionParser.suggestions(api.request("/admisiones/${admission.id}/sugerencias-cama")).firstOrNull()) }
+            catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
+            updateTray(admission.id) { row ->
+                result.fold({ row.copy(bed = it, loading = false, error = null) }, { row.copy(bed = null, loading = false, error = readable(it as Exception, "No se pudieron consultar las camas.")) })
+            }
+        }
+    }
+
+    private fun updateTray(id: String, change: (IndicatedAdmission) -> IndicatedAdmission) =
+        mutable.update { s -> s.copy(tray = s.tray.map { if (it.admission.id == id) change(it) else it }) }
+
+    /** "Ingresar" in the tray: assigns the suggested bed with no reason (it is the suggestion), and says where the patient went. */
+    fun admitIndicated(row: IndicatedAdmission) {
+        val bed = row.bed ?: return
+        if (row.busy || mutable.value.tray.any { it.busy }) return
+        updateTray(row.admission.id) { it.copy(busy = true, error = null) }
+        mutable.update { it.copy(notice = null) }
+        viewModelScope.launch {
+            try {
+                api.request("/admisiones/${row.admission.id}/cama", "POST", HospitalizationRules.assignBody(bed.id, bed.version, ""))
+                mutable.update { s -> s.copy(tray = s.tray.filterNot { it.admission.id == row.admission.id }, notice = "${row.admission.patientName}: ingresada · Cama ${bed.code}.") }
+                load(silent = true)
+            } catch (e: CancellationException) { throw e } catch (e: Exception) {
+                val stale = HospitalizationRules.staleCode((e as? AuthRequestException)?.code)
+                updateTray(row.admission.id) { it.copy(busy = false, error = failure(e)) }
+                // The bed was taken or the admission changed: read the suggestion again, keeping the error on the row.
+                if (stale) suggestBedKeepingError(row.admission)
+            }
+        }
+    }
+
+    private fun suggestBedKeepingError(admission: HospitalAdmission) {
+        viewModelScope.launch {
+            try { val bed = AdmissionParser.suggestions(api.request("/admisiones/${admission.id}/sugerencias-cama")).firstOrNull(); updateTray(admission.id) { it.copy(bed = bed) } }
+            catch (e: CancellationException) { throw e } catch (_: Exception) { /* The row already shows the admit error. */ }
         }
     }
     /** Idempotent per channel list: reloads when an admission event (`admision.actualizada`) arrives or after a reconnection gap. */
@@ -338,6 +396,7 @@ fun HospitalizationScreen(
         // One primary per screen: the first admission with a main action; "Ingresar paciente" is primary only when none has one.
         val primaryRow = HospitalizationRules.primaryAdmission(state.admissions)
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
+        if (state.tray.isNotEmpty()) item { IndicatedTray(state.tray, model) }
         if ("admision.crear" in permissions) item {
             if (primaryRow == null) PrimaryButton(stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, icon = Icons.Default.Add, enabled = !state.busy)
             else SecondaryButton(stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, icon = Icons.Default.Add, enabled = !state.busy)
@@ -350,6 +409,35 @@ fun HospitalizationScreen(
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
                 items(state.admissions, key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow, onOpenVitals) }
+            }
+        }
+    }
+}
+
+/**
+ * G3 "Ingresos indicados": admissions a doctor indicated from a consultation, each with the suggested bed. "Ingresar" is a
+ * row action (the list keeps its one primary); the result or the error shows in place.
+ */
+@Composable
+private fun IndicatedTray(rows: List<IndicatedAdmission>, model: HospitalizationViewModel) {
+    val anyBusy = rows.any { it.busy }
+    SectionCard(title = stringResource(R.string.u5_ingresos_indicados), eyebrow = rows.size.toString()) {
+        rows.forEachIndexed { index, row ->
+            if (index > 0) HorizontalDivider()
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text(row.admission.patientName, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                    if (row.admission.unstable) CriticalPill(stringResource(R.string.u5_inestable))
+                }
+                row.admission.motive?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                row.admission.attendingDoctorName?.let { Text(stringResource(R.string.u5_indicado_por, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                when {
+                    row.loading -> Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall)
+                    row.bed != null -> Text(stringResource(R.string.u5_cama_sugerida, row.bed.code, row.bed.room), style = MaterialTheme.typography.bodyMedium)
+                    row.noBeds -> Text(stringResource(R.string.hosp_sin_camas_compatibles), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                row.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+                if (row.bed != null) RowAction(stringResource(R.string.u5_ingresar), { model.admitIndicated(row) }, enabled = !anyBusy, loading = row.busy)
             }
         }
     }

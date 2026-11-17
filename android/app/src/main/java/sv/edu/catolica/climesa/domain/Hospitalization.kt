@@ -71,7 +71,14 @@ data class HospitalAdmission(
     val allowedActions: Set<AdmissionAction> = emptySet(),
     /** G5: lets the ward open "Signos vitales" on this patient. */
     val patientId: String? = null,
-)
+    /** G3: where the admission came from (cita, consulta, emergencia, ambulancia, programada) and why. */
+    val origin: String? = null,
+    val motive: String? = null,
+    val unstable: Boolean = false,
+) {
+    /** G3 "Ingresos indicados": a doctor indicated it from a consultation and it waits for a bed this reader can assign. */
+    val indicated get() = state == "pendiente_cama" && origin == "consulta" && AdmissionAction.ASSIGN_BED in allowedActions
+}
 
 data class HospitalBedSuggestion(val id: String, val version: Int, val code: String, val room: String, val category: String, val reason: String)
 
@@ -113,6 +120,9 @@ object AdmissionParser {
                 )
             },
             allowedActions = (0 until (actions?.length() ?: 0)).mapNotNull { i -> actions?.optString(i)?.let(AdmissionAction::fromWire) }.toSet(),
+            origin = row.textOrNull("origin"),
+            motive = row.textOrNull("motive"),
+            unstable = row.optBoolean("unstable"),
         )
     }
 

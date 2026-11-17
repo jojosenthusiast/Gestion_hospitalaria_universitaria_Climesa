@@ -12,7 +12,9 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.data.ApiProblems
 import sv.edu.catolica.climesa.data.SubmissionIntent
+import sv.edu.catolica.climesa.domain.AppointmentReasons
 import sv.edu.catolica.climesa.domain.AppointmentAction
 import sv.edu.catolica.climesa.domain.AppointmentActions
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
@@ -122,25 +124,70 @@ class PatientAppointmentsViewModel @Inject constructor(
     }
 
     /** Cancels through one [SubmissionIntent]; the API decides whether the deadline (`cancelableUntil`) still allows it. */
-    fun cancel(appointment: PatientAppointment, reason: String) {
-        if (AppointmentActions.reasonError(AppointmentAction.CANCEL, reason) != null) {
-            mutable.value = mutable.value.copy(error = "Escribe un motivo de al menos ${AppointmentActions.REASON_MIN} caracteres.")
-            return
+    fun cancel(appointment: PatientAppointment, reason: String, other: Boolean = false) {
+        // D-8: a quick reason needs no typing; "Otro" asks for a short text; free text without a code keeps the old 10-character rule.
+        val code = AppointmentReasons.patientCancelCode(reason, other)
+        val error = when {
+            other && reason.trim().length < AppointmentReasons.OTHER_MIN -> "Escribe brevemente el motivo (al menos ${AppointmentReasons.OTHER_MIN} caracteres)."
+            code == null && AppointmentActions.reasonError(AppointmentAction.CANCEL, reason) != null -> legacyReasonError
+            else -> null
         }
+        if (error != null) { mutable.value = mutable.value.copy(error = error); return }
         if (mutable.value.saving) return
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        val path = AppointmentActions.path(AppointmentAction.CANCEL, appointment.id)
         viewModelScope.launch {
             try {
-                cancelIntent.send { api.request(AppointmentActions.path(AppointmentAction.CANCEL, appointment.id), "POST", PatientAppointmentRules.cancelBody(appointment, reason)) }
+                var useLegacy = code == null || legacyServer
+                if (!useLegacy) {
+                    try {
+                        sendCancel(cancelIntent, path, PatientAppointmentRules.cancelBody(appointment, reason, code), coded = true)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // A server released before D-8 rejects the unknown `reasonCode` field; it still takes the released body.
+                        if (!ApiProblems.fieldErrors(e).containsKey("reasonCode")) throw e
+                        // That answer is definitive: the coded key is done, and from now on this server gets the released body.
+                        cancelIntent.reset(); codedBody = null
+                        legacyServer = true
+                        useLegacy = true
+                    }
+                }
+                if (useLegacy) {
+                    // The released body keeps the old 10-character rule; it goes under its own intent, so a retry after a
+                    // network error or 5xx replays it exactly with its pending key, and no other body ever takes that key.
+                    if (code != null && AppointmentActions.reasonError(AppointmentAction.CANCEL, reason) != null) throw LegacyReasonTooShort(legacyReasonError)
+                    sendCancel(legacyIntent, path, PatientAppointmentRules.cancelBody(appointment, reason), coded = false)
+                }
                 mutable.value = mutable.value.copy(saving = false, notice = "Cita cancelada.")
                 load()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                mutable.value = mutable.value.copy(saving = false, error = message(e))
+                mutable.value = mutable.value.copy(saving = false, error = if (e is LegacyReasonTooShort) e.message else message(e))
             }
         }
     }
+
+    /** The released cancel body `{version, reason}` has its own intent (D-8 fallback), apart from the coded one. */
+    private val legacyIntent = SubmissionIntent()
+    /** This server rejected `reasonCode` once: every later cancel sends the released body. */
+    private var legacyServer = false
+    private var codedBody: String? = null
+    private var legacyBody: String? = null
+
+    /** A pending key belongs to one body: a different body first drops it, so a key is never reused with another body. */
+    private suspend fun sendCancel(intent: SubmissionIntent, path: String, body: JSONObject, coded: Boolean) {
+        val text = body.toString()
+        val last = if (coded) codedBody else legacyBody
+        if (intent.pendingKey != null && last != text) intent.reset()
+        if (coded) codedBody = text else legacyBody = text
+        intent.send { api.request(path, "POST", body) }
+    }
+
+    private class LegacyReasonTooShort(message: String) : Exception(message)
+    private companion object { const val DOCTORS_UNAVAILABLE = "No se pudo cargar la lista de médicos. Vuelve a intentar." }
+    private val legacyReasonError = "Escribe un motivo de al menos ${AppointmentActions.REASON_MIN} caracteres."
 
     /** Opens the reschedule dialog on the day of the appointment (or today) with the same doctor's slots. */
     fun openReschedule(appointment: PatientAppointment) {
@@ -217,7 +264,8 @@ class PatientAppointmentsViewModel @Inject constructor(
             val days = (0L until 7L).map { from.plusDays(it) }
             val lists = days.mapNotNull { day -> try { parseDoctors(api.request("/citas/catalogos?date=$day")) } catch (e: CancellationException) { throw e } catch (_: Exception) { null } }
             val merged = lists.flatten().groupBy { it.id }.map { (_, same) -> same.firstOrNull { it.hasShift }?.copy(reason = null) ?: same.first() }
-            mutable.value = mutable.value.copy(requestDoctors = merged.ifEmpty { mutable.value.doctors })
+            // A day that fails is left out; when every day fails the form says so instead of an empty "Ya tengo médico".
+            mutable.value = mutable.value.copy(requestDoctors = merged.ifEmpty { mutable.value.doctors }, error = if (lists.isEmpty()) DOCTORS_UNAVAILABLE else mutable.value.error)
         }
     }
 

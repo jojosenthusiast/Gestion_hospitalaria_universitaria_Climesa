@@ -6,9 +6,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RoleNoticesTest {
-    @Test fun unknownPriorityFallsBackToAttention() {
-        assertEquals(NoticePriority.ATTENTION, NoticePriority.of(null))
-        assertEquals(NoticePriority.CRITICAL, NoticePriority.of("critico"))
+    // D1: notices have one scale, `nivel`; an unknown level reads as informative.
+    @Test fun unknownLevelFallsBackToInformative() {
+        assertEquals(NoticeLevel.INFORMATIVE, NoticeLevel.of(null))
+        assertEquals(NoticeLevel.CRITICAL, NoticeLevel.of("critico"))
     }
 
     @Test fun noticeEventsMatchTheAvisoEntity() {

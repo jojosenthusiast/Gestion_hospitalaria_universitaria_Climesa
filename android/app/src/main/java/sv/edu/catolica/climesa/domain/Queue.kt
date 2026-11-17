@@ -30,6 +30,10 @@ data class QueueTicket(
     /** Reversible actions the server accepts now (`undoActions`), apart from `allowedActions`. */
     val undoActions: List<String> = emptyList(),
     val officeCode: String? = null,
+    /** B2: the doctor of the linked appointment (`appointmentDoctorName`), so the chip says whose appointment it is. */
+    val appointmentDoctorName: String? = null,
+    /** B5: numbers waiting before this one, when the API sends it on the row (`ahead`); null otherwise. */
+    val ahead: Int? = null,
 ) {
     fun allows(action: QueueAction) = action in allowedActions
     /** The action is shown: allowed, or blocked with a reason from the server. */
@@ -56,6 +60,9 @@ object PatientQueue {
     /** People before [number] in its area: the numbers after the last one called (same rule as iOS); null before any call. */
     fun ahead(number: Int, called: List<PublicCall>): Int? = called.maxOfOrNull { it.number }?.let { maxOf(0, number - it - 1) }
 
+    /** B5: "N personas antes de ti": the API's count when the row carries it, else the estimate from the public board. */
+    fun ahead(ticket: QueueTicket, called: List<PublicCall>): Int? = ticket.ahead ?: ahead(ticket.number, called)
+
     /** Consulting room the patient was called to, from the ticket or the public board. */
     fun office(ticket: QueueTicket, called: List<PublicCall>): String? = ticket.officeCode ?: called.firstOrNull { it.number == ticket.number }?.office
 }
@@ -70,7 +77,10 @@ object QueueLabels {
     fun code(ticket: QueueTicket) = "${ticket.area} ${ticket.number}"
     fun priority(value: String) = mapOf("emergencia" to "Emergencia", "urgente" to "Urgente", "rutina" to "Rutina")[value] ?: value
     /** Cited (with the appointment time) or walk-in. */
-    fun arrival(ticket: QueueTicket) = ticket.appointmentAt?.let { "Cita ${AppointmentAgenda.time(it)}" } ?: "Sin cita"
+    fun arrival(ticket: QueueTicket) = ticket.appointmentAt?.let { at ->
+        // Sweep #11: "Cita 09:00 con <médico>"; a "·" before the doctor read as a second patient.
+        "Cita ${AppointmentAgenda.time(at)}" + (ticket.appointmentDoctorName?.let { " con $it" } ?: "")
+    } ?: "Sin cita"
     val services = listOf("consulta_general" to "Consulta general", "emergencia" to "Emergencia", "laboratorio" to "Laboratorio", "admisiones" to "Admisiones")
     fun service(value: String) = services.firstOrNull { it.first == value }?.second ?: value
     fun state(value: String) = mapOf("en_espera" to "En espera", "llamado" to "Llamado", "en_atencion" to "En atención", "atendido" to "Atendido", "no_se_presento" to "No se presentó", "cerrado" to "Cerrado sin atender")[value] ?: value
@@ -104,6 +114,8 @@ object QueueRules {
                 walkIn = if (row.has("walkIn")) row.optBoolean("walkIn", true) else ServerActions.text(row, "appointmentAt") == null,
                 undoActions = row.optJSONArray("undoActions")?.let { list -> (0 until list.length()).map { list.optString(it) } } ?: emptyList(),
                 officeCode = ServerActions.text(row, "officeCode"),
+                appointmentDoctorName = ServerActions.text(row, "appointmentDoctorName"),
+                ahead = if (row.has("ahead") && !row.isNull("ahead")) row.optInt("ahead") else null,
             )
         } }
     }
@@ -122,8 +134,18 @@ object QueueRules {
      * Reception issues a number for the patient it chose (`patientId`; the API answers 403 to a staff issue without it).
      * `rutina` is the server default: a routine number does not send `priority`.
      */
-    fun issueBody(service: String, priority: String, patientId: String) =
-        org.json.JSONObject().put("service", service).put("patientId", patientId).apply { if (priority != "rutina") put("priority", priority) }
+    fun issueBody(service: String, priority: String, patientId: String, appointmentId: String? = null) =
+        org.json.JSONObject().put("service", service).put("patientId", patientId).apply {
+            if (priority != "rutina") put("priority", priority)
+            // B-1 / D-1: "Registrar llegada" links the number to today's appointment (the API requires Consulta general).
+            appointmentId?.let { put("appointmentId", it) }
+        }
+
+    /** B3: the caller's post of the shift in progress (`GET /fila/mi-puesto`); every field is null without a shift. */
+    fun myPost(value: Any?): MyPost? {
+        val json = value as? org.json.JSONObject ?: return null
+        return MyPost(ServerActions.text(json, "service"), ServerActions.text(json, "officeId"), ServerActions.text(json, "officeCode"), ServerActions.text(json, "areaName"))
+    }
 
     /** Active consulting rooms of `GET /espacios`, the optional destination of a call (same filter as the web). */
     fun offices(value: Any?): List<QueueOffice> {
@@ -154,6 +176,9 @@ object QueueRules {
         return NextProposal(json.optString("service"), json.optString("area"), json.optString("rule"), proposal)
     }
 }
+
+/** Service and room of the caller's shift in progress, used to preselect the board and "Llamar siguiente". */
+data class MyPost(val service: String?, val officeId: String?, val officeCode: String?, val areaName: String?)
 
 /** A consulting room a called number can be sent to. */
 data class QueueOffice(val id: String, val code: String, val name: String) {

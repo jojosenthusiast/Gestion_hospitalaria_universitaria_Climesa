@@ -306,4 +306,29 @@
     <string name="consulta_quien_sigue">Consulta cerrada · quién pasa después</string>
     <string name="consulta_llamar_a">Llamar a %1$s</string>
     <string name="consulta_ahora_no">Ahora no</string>
+    <!-- U5: Registrar llegada (B1, D-1) -->
+    <string name="u5_registrar_llegada">Registrar llegada</string>
+    <string name="u5_llegada_explica">Tiene cita hoy: su número queda ligado a la cita, en Consulta general.</string>
+    <string name="u5_emitir_sin_cita">Emitir otro número sin la cita</string>
+    <string name="u5_ya_tiene_numero">Ya tiene el número %1$s</string>
+    <!-- U5: cancelar cita con motivo rápido (D-8) -->
+    <string name="u5_otro_minimo">Al menos 3 caracteres</string>
+    <!-- U5: bandeja de resultados (C1) -->
+    <string name="u5_lab_revisar_liberar">Revisar y liberar</string>
+    <string name="u5_lab_proponer_seguimiento">Proponer cita de seguimiento</string>
+    <string name="u5_lab_nota_paciente">Nota para el paciente (opcional)</string>
+    <string name="u5_lab_nota_ayuda">El paciente la leerá junto a sus resultados.</string>
+    <!-- U5: Ingresos indicados (G3) -->
+    <string name="u5_ingresos_indicados">Ingresos indicados</string>
+    <string name="u5_ingresar">Ingresar</string>
+    <string name="u5_inestable">Inestable</string>
+    <string name="u5_indicado_por">Indicado por %1$s</string>
+    <string name="u5_cama_sugerida">Cama sugerida: %1$s · %2$s</string>
+    <!-- U5: avisos sin leer (D1) -->
+    <plurals name="u5_avisos_sin_leer">
+        <item quantity="one">%1$d aviso sin leer</item>
+        <item quantity="other">%1$d avisos sin leer</item>
+    </plurals>
+    <!-- U5: vinculaciones, expediente parecido (G2) -->
+    <string name="u5_vinc_parecido">Parecido: %1$s · %2$s · DUI %3$s · nac. %4$s</string>
 </resources>
