@@ -1104,6 +1104,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fila/mi-puesto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Servicio y consultorio de quien llama, según su turno en curso (B-5): "Llamar siguiente" sin elegir servicio */
+        get: operations["QueueController_myPost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fila/{id}/anular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Anular un número recién emitido por error: solo quien lo emitió, mientras espera y dentro de 10 minutos (B-3) */
+        post: operations["QueueController_voidIssued"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fila/{id}/deshacer-llamado": {
         parameters: {
             query?: never;
@@ -1338,6 +1372,23 @@ export interface paths {
         put?: never;
         /** Pedir una cita por motivo (una a tres categorías), franja preferida y nota, sin elegir médico */
         post: operations["AppointmentRequestController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/citas/solicitudes-categoria/{id}/sugerencia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Primer día con hueco en la franja pedida (hasta 14 días), con el médico preferido o de las especialidades sugeridas (A-1) */
+        get: operations["AppointmentRequestController_suggestion"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2381,6 +2432,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/vinculacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de la vinculación de la cuenta: si ya está vinculada y su última solicitud (pendiente, aprobada o rechazada con motivo) */
+        get: operations["MyLinkController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/publico/ocupacion": {
         parameters: {
             query?: never;
@@ -2909,6 +2977,29 @@ export interface components {
             version: number;
             matchReason: string;
         };
+        PatientAppointmentTodayResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: uuid */
+            doctorId: string;
+            doctorName: string;
+        };
+        PatientTicketTodayResponse: {
+            /** Format: uuid */
+            id: string;
+            /** @description Servicio de la fila (consulta_general, emergencia, laboratorio, admisiones) */
+            service: string;
+            numero: number;
+            /** @description en_espera, llamado o en_atencion */
+            state: string;
+            /**
+             * Format: uuid
+             * @description Cita ligada al registrar la llegada
+             */
+            appointmentId: string | null;
+        };
         PatientPickerItemResponse: {
             /** Format: uuid */
             id: string;
@@ -2917,6 +3008,10 @@ export interface components {
             fullName: string;
             /** @description Edad en años; solo si el rol puede ver la fecha de nacimiento */
             age?: number;
+            /** @description Cita confirmada de hoy (B-2); solo con citas.ver global */
+            appointmentToday?: components["schemas"]["PatientAppointmentTodayResponse"] | null;
+            /** @description Número de fila vigente de hoy; solo con fila.ver global */
+            ticketToday?: components["schemas"]["PatientTicketTodayResponse"] | null;
         };
         PatientPickerResponse: {
             items: components["schemas"]["PatientPickerItemResponse"][];
@@ -3925,6 +4020,14 @@ export interface components {
             rejectionReason: string | null;
             version: number;
         };
+        /** @enum {string} */
+        EstadoFila: "en_espera" | "llamado" | "en_atencion" | "atendido" | "no_se_presento" | "cerrado";
+        AppointmentArrivalResponse: {
+            /** Format: uuid */
+            id: string;
+            numero: number;
+            state: components["schemas"]["EstadoFila"];
+        };
         /**
          * @description Acciones que el servidor acepta ahora para quien lee
          * @enum {string}
@@ -3970,6 +4073,12 @@ export interface components {
              * @description Hasta cuándo puede cancelar o reprogramar quien lee (RN-21: N h antes para el paciente)
              */
             cancelableUntil: string | null;
+            /** @description Opción rápida con la que el paciente canceló (D-8): ya_no_lo_necesito, no_puedo_a_esa_hora u otro */
+            cancelReasonCode: string | null;
+            /** @description Motivo escrito de la cancelación */
+            cancelReason: string | null;
+            /** @description Número de fila con el que Recepción registró la llegada (D-1) */
+            arrival: components["schemas"]["AppointmentArrivalResponse"] | null;
             /** @description Acciones que el servidor acepta ahora para quien lee */
             allowedActions: components["schemas"]["AccionCita"][];
             /** @description Acciones del rol bloqueadas ahora, con su motivo */
@@ -4007,7 +4116,13 @@ export interface components {
         };
         AppointmentCancelDto: {
             version: number;
-            reason: string;
+            /** @description Obligatorio (10 a 500 caracteres) sin reasonCode; con reasonCode es opcional y «otro» pide al menos 3 caracteres */
+            reason?: string;
+            /**
+             * @description Opción rápida del paciente (D-8)
+             * @enum {string}
+             */
+            reasonCode?: "ya_no_lo_necesito" | "no_puedo_a_esa_hora" | "otro";
         };
         AppointmentRescheduleDto: {
             version: number;
@@ -4141,6 +4256,8 @@ export interface components {
             version: number;
             reason: components["schemas"]["MotivoSiguiente"];
             reasonText: string;
+            /** @description D-2: true si es una cita de quien consulta, dentro de su ventana */
+            ownAppointment: boolean;
         };
         QueueNextProposalResponse: {
             service: components["schemas"]["ServicioFila"];
@@ -4160,8 +4277,6 @@ export interface components {
             /** @description Quién pasa después en el área de la consulta; null sin permiso de ver la fila completa */
             nextProposal: components["schemas"]["QueueNextProposalResponse"] | null;
         };
-        /** @enum {string} */
-        EstadoFila: "en_espera" | "llamado" | "en_atencion" | "atendido" | "no_se_presento" | "cerrado";
         /**
          * @description Acciones reversibles que el servidor acepta ahora
          * @enum {string}
@@ -4208,6 +4323,25 @@ export interface components {
             appointmentAt: string | null;
             /** @description Llegó sin cita */
             walkIn: boolean;
+            /**
+             * Format: uuid
+             * @description Cita del número: la ligada al registrar la llegada (D-1) o, sin enlace, la de hoy del paciente
+             */
+            appointmentId: string | null;
+            /**
+             * Format: uuid
+             * @description Médico de esa cita (B-4)
+             */
+            appointmentDoctorId: string | null;
+            /** @description Nombre del médico de esa cita (B-4) */
+            appointmentDoctorName: string | null;
+            /** @description true si el número se emitió al registrar la llegada de la cita (D-1) */
+            arrivalFromAppointment: boolean;
+            /**
+             * Format: date-time
+             * @description Hasta cuándo quien lo emitió puede anularlo (B-3); null para los demás o si ya no espera
+             */
+            voidableUntil: string | null;
             /** @description Acciones reversibles que el servidor acepta ahora */
             undoActions: components["schemas"]["DeshacerFila"][];
             /**
@@ -4239,6 +4373,11 @@ export interface components {
              * @enum {string}
              */
             priority?: "emergencia" | "urgente" | "rutina";
+            /**
+             * Format: uuid
+             * @description Cita de hoy cuya llegada se registra con este número
+             */
+            appointmentId?: string;
         };
         QueueIssuedResponse: {
             /** Format: uuid */
@@ -4257,6 +4396,20 @@ export interface components {
             priority: components["schemas"]["PrioridadFila"];
             /** Format: uuid */
             patientId: string;
+            /** @description Nombre del paciente, para mostrar el número donde se emitió */
+            patientName: string | null;
+            /**
+             * Format: uuid
+             * @description Cita cuya llegada se registró con este número (D-1)
+             */
+            appointmentId: string | null;
+            /** @description Números en espera antes de este en su área */
+            ahead: number;
+            /**
+             * Format: date-time
+             * @description Hasta cuándo quien lo emitió puede anularlo (B-3)
+             */
+            voidableUntil: string;
         };
         QueueCallNextDto: {
             /** @enum {string} */
@@ -4276,6 +4429,35 @@ export interface components {
             /** @description Por qué la regla eligió este número */
             reason: components["schemas"]["MotivoSiguiente"];
             reasonText: string;
+            /** @description D-2: true si es una cita de quien llama, dentro de su ventana */
+            ownAppointment: boolean;
+        };
+        QueueMyPostResponse: {
+            /** @description Servicio del área del turno en curso; null sin turno o en un área sin fila */
+            service: components["schemas"]["ServicioFila"] | null;
+            area: components["schemas"]["AreaFila"] | null;
+            /** @description Nombre del área del turno en curso */
+            areaName: string | null;
+            /**
+             * Format: uuid
+             * @description Consultorio de la última consulta o el último llamado de hoy
+             */
+            officeId: string | null;
+            officeCode: string | null;
+            /**
+             * Format: date-time
+             * @description Fin del turno en curso
+             */
+            shiftEnd: string | null;
+        };
+        QueueVoidDto: {
+            version: number;
+        };
+        QueueTransitionResponse: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            state: components["schemas"]["EstadoFila"];
         };
         QueueUndoDto: {
             version: number;
@@ -4305,12 +4487,6 @@ export interface components {
             /** Format: uuid */
             officeId?: string;
             reason?: string;
-        };
-        QueueTransitionResponse: {
-            /** Format: uuid */
-            id: string;
-            version: number;
-            state: components["schemas"]["EstadoFila"];
         };
         ConsultationSummaryResponse: {
             /** Format: uuid */
@@ -4681,6 +4857,23 @@ export interface components {
              * @description Cita confirmada creada al asignar
              */
             appointmentId?: string;
+        };
+        CategoryRequestSuggestionResponse: {
+            /** @description false si ningún médico candidato tiene hueco en la franja en 14 días */
+            found: boolean;
+            /** Format: uuid */
+            doctorId: string | null;
+            doctorName: string | null;
+            specialty: string | null;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            date: string | null;
+            /** Format: date-time */
+            start: string | null;
+            /** Format: date-time */
+            end: string | null;
         };
         CategoryRequestAssignDto: {
             version: number;
@@ -5908,6 +6101,24 @@ export interface components {
              * @description Día local, yyyy-MM-dd
              */
             birth: string | null;
+            /** @description DUI del expediente con guion (G-2), para compararlo con el declarado */
+            dui: string | null;
+            /** @description Siempre true: candidate solo es la coincidencia exacta de DUI y nacimiento */
+            exact?: boolean;
+        };
+        LinkClosestResponse: {
+            /** Format: uuid */
+            id: string;
+            /** @description Número de expediente */
+            record: string;
+            fullName: string | null;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            birth: string | null;
+            /** @description DUI del expediente con guion */
+            dui: string | null;
         };
         PendingLinkResponse: {
             /** Format: uuid */
@@ -5921,6 +6132,8 @@ export interface components {
             candidate: components["schemas"]["LinkCandidateResponse"] | null;
             /** @description Cuántos expedientes coinciden */
             candidates: number;
+            /** @description Sin coincidencia exacta: el expediente más parecido (mismo nacimiento, DUI distinto en un dígito). No se puede aprobar. */
+            closest?: components["schemas"]["LinkClosestResponse"] | null;
         };
         LinkApproveDto: {
             version: number;
@@ -5928,6 +6141,12 @@ export interface components {
         LinkRejectDto: {
             version: number;
             reason: string;
+        };
+        MyLinkResponse: {
+            /** @description La cuenta ya está vinculada a un expediente */
+            linked: boolean;
+            /** @description Última solicitud de vinculación; null si nunca pidió */
+            request: components["schemas"]["LinkRequestResponse"] | null;
         };
         PublicOccupancyRowResponse: {
             planta: number | null;
@@ -11864,6 +12083,143 @@ export interface operations {
             };
         };
     };
+    QueueController_myPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueMyPostResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    QueueController_voidIssued: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueVoidDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueTransitionResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     QueueController_undoCall: {
         parameters: {
             query?: never;
@@ -13047,6 +13403,72 @@ export interface operations {
             };
             /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AppointmentRequestController_suggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRequestSuggestionResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -17941,6 +18363,61 @@ export interface operations {
             };
             /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    MyLinkController_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyLinkResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
