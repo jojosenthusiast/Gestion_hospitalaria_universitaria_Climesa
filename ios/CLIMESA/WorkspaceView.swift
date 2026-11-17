@@ -44,6 +44,8 @@ struct RoleTabsView:View {
     /// Pestaña elegida, guardada por escena: al volver tras cerrarse la app por el sistema se abre la misma.
     @SceneStorage("workspace.tab") private var storedTab:String=""
     @State private var live=LiveViewModel()
+    /// D1: one notices inbox per session, so Inicio, Avisos and the badge always agree.
+    @State private var notices=NoticeInboxModel()
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var shifts=ShiftModel()
 
@@ -66,9 +68,13 @@ struct RoleTabsView:View {
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
                         .refreshable { await refresh(tab) }
                 }.tabItem { Label(LocalizedStringKey(tab.titleKey),systemImage:tab.symbol) }.tag(tab)
+                    // D1: Avisos lives in Más; its tab carries the unread count (`noLeidos`), 0 hides it.
+                    .badge(tab == .mas ? (NoticeRules.badge(notices.inbox) ?? 0) : 0)
             }
         }
         .environment(live)
+        .environment(notices)
+        .loadsNoticeInbox(notices,account:account,live:live)
         // Tiempo real: se suscribe al entrar y la conexión se cierra al cancelar la tarea. No hay temporizadores de datos.
         // `connectionGeneration` sube al volver a primer plano o al recuperar la red para reconectar de inmediato.
         .task(id:"\(profile.channels.joined(separator:"|"))#\(live.connectionGeneration)") {

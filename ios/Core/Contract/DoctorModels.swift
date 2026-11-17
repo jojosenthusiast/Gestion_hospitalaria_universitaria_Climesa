@@ -145,6 +145,10 @@ public struct LabReviewResult: Decodable, Sendable, Equatable {
     public let id: String
     public let version: Int
     public let reviewedAt: String
+    /// D-4: the follow-up appointment proposed to reception, or nil. Absent on an older API.
+    public let followUpProposalId: String?
+    /// D-4: why no follow-up was proposed (`no_pedida`, `hospitalizado`, `ya_propuesta`, `sin_consulta`).
+    public let followUpSkipped: String?
 }
 
 /// Acciones que la API permite sobre una admisión (`AdmissionResponse.allowedActions`). Los botones salen solo de

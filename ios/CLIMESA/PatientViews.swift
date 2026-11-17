@@ -21,7 +21,8 @@ struct PatientHomeView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<PatientHome>()
-    @State private var notices = NoticeInboxModel()
+    /// D1: the session's inbox (RoleTabsView loads it), so the banner and Avisos agree.
+    @Environment(NoticeInboxModel.self) private var notices
     /// G-7 (no "seen" in the API): the last visit to «Mis exámenes», read again each time Inicio shows.
     @State private var seenAt: Date?
     @State private var requesting = false
@@ -69,7 +70,6 @@ struct PatientHomeView: View {
         }
         .task(id: live.snapshot.version([.queue, .appointments, .laboratory, .hospitalInfo, .admissions])) { await load() }
         .onAppear { readSeen() }
-        .loadsNoticeInbox(notices, account: account, live: live)
         .sheet(isPresented: $requesting) {
             CategoryRequestSheet(reload: load) { requestSent = true }
         }
@@ -347,8 +347,9 @@ private struct QueueTicketCard: View {
                         .accessibilityLabel(Text(verbatim: "\(L.text("ds.paciente.queue.number")) \(ticket.number)"))
                 }
                 PatientTag(ticket.state.rawValue, label: ticket.state.label)
-                if ticket.state == .enEspera, let board, let ahead = QueueRules.ahead(of: ticket.number, called: board.called) {
-                    // B5: one sentence, not a bare figure ("3 personas antes de ti", "Eres el siguiente").
+                if ticket.state == .enEspera, let ahead = PatientTurnRules.ahead(ticket, called: board?.called) {
+                    // B5: one sentence, not a bare figure ("3 personas antes de ti", "Eres el siguiente"). The server's
+                    // `ahead` when it sends one; otherwise the estimate from the public board.
                     Text(verbatim: PatientTurnRules.aheadText(ahead)).font(Typo.subheading).foregroundStyle(Theme.ink)
                 }
                 Text(verbatim: String(format: L.text("queue.issued"), ClimesaDates.display(ticket.issuedAt, .time))).font(Typo.small).foregroundStyle(Theme.muted)
@@ -366,6 +367,8 @@ struct PatientAppointmentsView: View {
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<[Appointment]>()
     @State private var submission = Submission()
+    /// D-8: keys of the cancel bodies per appointment; outlives the sheet so a retry replays the same key.
+    @State private var cancelFlow = PatientCancelFlow()
     @State private var cancelling: Appointment?
     @State private var rescheduling: Appointment?
     @State private var requesting = false
@@ -443,7 +446,7 @@ struct PatientAppointmentsView: View {
         }
         .onDisappear { requestSent = false }
         .sheet(item: $cancelling) { item in
-            CancelAppointmentSheet(appointment: item, submission: submission, reload: load)
+            CancelAppointmentSheet(appointment: item, submission: submission, flow: cancelFlow, reload: load)
         }
         .sheet(item: $rescheduling) { item in RescheduleAppointmentSheet(appointment: item, reload: load) }
         .sheet(isPresented: $requesting) { CategoryRequestSheet(reload: load) { requestSent = true } }
@@ -513,6 +516,7 @@ private struct AppointmentRow: View {
 private struct CancelAppointmentSheet: View {
     let appointment: Appointment
     let submission: Submission
+    let flow: PatientCancelFlow
     let reload: () async -> Void
     @EnvironmentObject private var account: AccountModel
     @Environment(\.dismiss) private var dismiss
@@ -557,11 +561,15 @@ private struct CancelAppointmentSheet: View {
         }
     }
 
+    /// D-8: the quick reason goes with its `reasonCode`; `PatientCancelFlow` owns the keys and the fallback to the
+    /// released body for an API before D-8. The sheet waits for the answer and stays open with the error.
     private func send() async {
-        guard let reason else { return }
-        let body = AppointmentCancelBody(version: appointment.version, reason: reason)
-        let ok = await submission.run(appointment.id, body: body, success: L.text("appointments.cancelled")) { key in
-            _ = try await account.client().send("POST", "/citas/\(appointment.id)/cancelar", body: body, key: key, as: AppointmentCommandResult.self)
+        guard reason != nil else { return }
+        let path = "/citas/\(appointment.id)/cancelar"
+        let ok = await submission.perform(appointment.id, success: L.text("appointments.cancelled")) {
+            try await flow.cancel(appointment.id, version: appointment.version, chip: chip, otherText: other) { body, key in
+                _ = try await account.client().send("POST", path, body: body, key: key, as: AppointmentCommandResult.self)
+            }
         }
         await reload()
         if ok { dismiss() }
@@ -909,6 +917,7 @@ struct LabOrderDetail: View {
 struct MoreView: View {
     let profile: AccessProfile
     let role: String
+    @Environment(NoticeInboxModel.self) private var notices
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(AppSection.visible(for: role, profile: profile), id: \.self) { section in
@@ -918,12 +927,27 @@ struct MoreView: View {
                             Image(systemName: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
                             Text(LocalizedStringKey(section.titleKey)).font(Typo.subheading).foregroundStyle(Theme.ink)
                             Spacer()
+                            // D1: the unread count (`noLeidos`) on the Avisos entry.
+                            if section == .avisos, let unread = NoticeRules.badge(notices.inbox) { UnreadBadge(count: unread) }
                             Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
                         }
                     }
                 }.buttonStyle(.plain)
             }
         }
+    }
+}
+
+/// Unread count on an entry: a filled capsule with the number, read aloud as "3 avisos sin leer".
+private struct UnreadBadge: View {
+    let count: Int
+    var body: some View {
+        Text(verbatim: count > 99 ? "99+" : "\(count)")
+            .font(Typo.tag).monospacedDigit()
+            .foregroundStyle(Theme.onPrimary)
+            .padding(.horizontal, 8).frame(minWidth: 24, minHeight: 24)
+            .background(Theme.primary, in: Capsule())
+            .accessibilityLabel(Text(verbatim: NoticeRules.badgeLabel(count)))
     }
 }
 
@@ -954,48 +978,85 @@ struct PatientSectionView: View {
     }
 }
 
-/// I03 · Vincular expediente: DUI y fecha de nacimiento; cambia sola al aprobarse (`vinculacion.resuelta`).
+/// I03 · Vincular expediente (G2). Opens in the real state of the request (`GET /me/vinculacion`): the form when there is
+/// none, «En revisión desde …», approved, or rejected with the reason and «Volver a pedir» filled with what was declared.
+/// A failed read is shown with «Reintentar» and is never taken as "no request", so nobody asks twice. It rereads on
+/// `vinculacion.*` (tiempo real).
 struct LinkRecordView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
+    @State private var loader = Loader<MyLink>()
     @State private var submission = Submission()
     @State private var dui = ""
     @State private var birth = Calendar.current.date(byAdding: .year, value: -30, to: Date()) ?? Date()
     @State private var errors: [String: String] = [:]
-    @State private var result: LinkRequestResult?
-    @State private var rejected = false
+    /// The request this screen just created, until a read returns it.
+    @State private var sent: LinkRequestResult?
+    /// «Volver a pedir» after a rejection: the form, filled with what was declared.
+    @State private var retrying = false
+
+    private var profileLinked: Bool { account.profile?.patientId != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if account.profile?.patientId != nil {
+            if profileLinked {
                 PatientNotice(text: L.text("link.approved"))
-            } else if rejected {
-                PatientNotice(text: L.text("link.rejected"), failure: true)
-            } else if let result {
-                SectionCard(eyebrow: L.text("link.status")) {
-                    PatientTag(result.state.rawValue, label: result.state.label)
-                    EmptyNote("link.pending.body")
+            } else {
+                LoadState(loader: loader, retry: load) { link in
+                    content(LinkStatusRules.screen(link, profileLinked: false, sent: sent))
                 }
             }
-            if account.profile?.patientId == nil && (result == nil || rejected) {
-                Text("link.intro").font(Typo.body).foregroundStyle(Theme.muted)
-                SectionCard {
-                    FormField(label: L.text("link.dui"), text: $dui, error: errors["dui"])
-                        .keyboardType(.numbersAndPunctuation)
-                    VStack(alignment: .leading, spacing: Spacing.s) {
-                        DatePicker("link.birth", selection: $birth, in: ...Date(), displayedComponents: .date).font(Typo.label).foregroundStyle(Theme.ink)
-                        FieldError(text: errors["birth"])
+        }
+        .task(id: live.snapshot.version(.link)) { if !profileLinked { await load() } }
+    }
+
+    @ViewBuilder private func content(_ screen: LinkStatusRules.Screen) -> some View {
+        switch screen {
+        case .form:
+            form
+        case let .pending(since):
+            SectionCard(eyebrow: L.text("link.status")) {
+                PatientTag(LinkState.pendiente.rawValue, label: LinkStatusRules.pendingText(since))
+                EmptyNote("link.pending.body")
+            }
+        case .approved:
+            PatientNotice(text: L.text("link.approved"))
+        case let .rejected(reason, prefill):
+            PatientNotice(text: LinkStatusRules.rejectedText(reason), failure: true)
+            if retrying {
+                form
+            } else {
+                ClimesaButton(title: L.text("link.retry")) {
+                    if let prefill {
+                        dui = prefill.dui
+                        if let day = LinkStatusRules.birthDate(prefill.birth) { birth = day }
                     }
+                    retrying = true
                 }
-                PatientSubmissionNotice(submission: submission)
-                ClimesaButton(title: L.text("link.submit"), loading: submission.busy) { Task { await send() } }
             }
         }
-        .task(id: live.snapshot.version(.link)) {
-            guard result != nil, live.snapshot.lastEvent?.type == "vinculacion.resuelta" else { return }
-            await account.refreshProfile()
-            if account.profile?.patientId == nil { rejected = true }
+    }
+
+    @ViewBuilder private var form: some View {
+        Text("link.intro").font(Typo.body).foregroundStyle(Theme.muted)
+        SectionCard {
+            FormField(label: L.text("link.dui"), text: $dui, error: errors["dui"] ?? submission.fieldErrors["dui"])
+                .keyboardType(.numbersAndPunctuation)
+            VStack(alignment: .leading, spacing: Spacing.s) {
+                DatePicker("link.birth", selection: $birth, in: ...Date(), displayedComponents: .date).font(Typo.label).foregroundStyle(Theme.ink)
+                FieldError(text: errors["birth"] ?? submission.fieldErrors["birth"])
+            }
         }
+        PatientSubmissionNotice(submission: submission)
+        ClimesaButton(title: L.text("link.submit"), loading: submission.busy) { Task { await send() } }
+    }
+
+    private func load() async {
+        await loader.load { try await account.client().get("/me/vinculacion", as: MyLink.self) }
+        guard let link = loader.value else { return }
+        if link.request?.id == sent?.id { sent = nil }
+        // Approved on the server before the profile knows it: refresh the profile so the tabs follow.
+        if LinkStatusRules.screen(link, profileLinked: false) == .approved { await account.refreshProfile() }
     }
 
     private func send() async {
@@ -1007,7 +1068,10 @@ struct LinkRecordView: View {
         let ok = await submission.run(body: body) { key in
             created = try await account.client().send("POST", "/cuentas/vinculacion", body: body, key: key, as: LinkRequestResult.self)
         }
-        if ok, let created { result = created; rejected = false }
+        guard ok, let created else { return }
+        sent = created
+        retrying = false
+        await load()
     }
 
     /// La fecha elegida en el calendario del dispositivo, como `yyyy-MM-dd`.

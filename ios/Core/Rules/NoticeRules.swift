@@ -39,6 +39,17 @@ public enum NoticeRules {
         }
     }
 
+    /// D1: the badge on the notices entry is the API's `noLeidos` (notices without «Enterado»); nil hides it.
+    public static func badge(_ inbox: NoticeInbox?) -> Int? {
+        guard let unread = inbox?.unread, unread > 0 else { return nil }
+        return unread
+    }
+
+    /// The badge read aloud: "3 avisos sin leer".
+    public static func badgeLabel(_ count: Int) -> String {
+        count == 1 ? "1 aviso sin leer" : "\(count) avisos sin leer"
+    }
+
     /// Avisos del inicio: solo los `destacado` (la API decide), menos los que la persona acaba de atender aquí y
     /// todavía no se reflejan en una nueva lectura.
     public static func banner(_ inbox: NoticeInbox?, hiding hidden: Set<String> = []) -> [InboxNotice] {

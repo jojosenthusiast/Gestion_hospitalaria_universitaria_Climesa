@@ -102,24 +102,43 @@ public enum PatientResultsRules {
 
 // MARK: - A1, A4, A5 · Citas del paciente
 
-/// D-8: the patient cancels with a quick reason and no typing; only «Otro» asks for text (3 characters or more).
-/// The API still asks for a reason of 10 to 500 characters (gap A-2 / sweep #14: `reasonCode` is for the API), so a quick
-/// reason goes as written and «Otro» goes as "Otro motivo: <texto>".
+/// D-8: the patient cancels with a quick reason and no typing; only «Otro» asks for text (3 characters or more). The
+/// reason goes with its `reasonCode`. An API released before D-8 refuses that field; then the released body
+/// `{version, reason}` goes instead, and only that body keeps the old rule of 10 or more characters (it matters for
+/// «Otro»: every quick reason already has 10 characters).
 public enum PatientCancelReasons {
     public static let other = "Otro"
     public static let quick = ["Ya no lo necesito", "No puedo a esa hora"]
     public static let otherMinimum = 3
-    public static let prefix = "Otro motivo: "
+    /// The released body's rule (`AppointmentCancelDto.reason` without `reasonCode`).
+    public static let legacyMinimum = 10
+    public static let maximum = 500
+
+    public static let chooseError = "Elige un motivo."
+    public static let otherShort = "Escribe al menos \(otherMinimum) caracteres."
+    public static let legacyError = "Escribe un motivo de al menos \(legacyMinimum) caracteres."
+    /// What a server before D-8 says of `reasonCode` (whitelist validation): the only answer that switches to the released body.
+    public static let unsupportedField = "Este campo no se admite en la solicitud."
 
     public static var chips: [String] { quick + [other] }
 
-    /// The reason to send; nil while nothing valid is chosen (the confirm button stays off).
+    /// The API code of a chip (`AppointmentCancelDto.reasonCode`); nil while nothing is chosen.
+    public static func code(chip: String?) -> String? {
+        guard let chip else { return nil }
+        if chip == other { return "otro" }
+        if chip == quick[0] { return "ya_no_lo_necesito" }
+        if chip == quick[1] { return "no_puedo_a_esa_hora" }
+        return nil
+    }
+
+    /// The reason to send: the chip's words, or what was typed under «Otro». nil while nothing valid is chosen (the
+    /// confirm button stays off).
     public static func reason(chip: String?, otherText: String) -> String? {
         guard let chip else { return nil }
         if chip == other {
             let text = otherText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard text.count >= otherMinimum else { return nil }
-            return String((prefix + text).prefix(500))
+            return String(text.prefix(maximum))
         }
         return quick.contains(chip) ? chip : nil
     }
@@ -127,7 +146,107 @@ public enum PatientCancelReasons {
     /// Shown under the «Otro» field once something was typed and it is still too short.
     public static func otherError(_ text: String) -> String? {
         let size = text.trimmingCharacters(in: .whitespacesAndNewlines).count
-        return (1..<otherMinimum).contains(size) ? "Escribe al menos \(otherMinimum) caracteres." : nil
+        return (1..<otherMinimum).contains(size) ? otherShort : nil
+    }
+
+    /// The released body's rule; nil when the reason can go without a code.
+    public static func legacyReasonError(_ reason: String) -> String? {
+        reason.trimmingCharacters(in: .whitespacesAndNewlines).count < legacyMinimum ? legacyError : nil
+    }
+
+    /// A 400 whose field error on `reasonCode` is the unknown-field message: the server was released before D-8.
+    public static func refusesReasonCode(_ failure: APIFailure) -> Bool {
+        guard failure.status == 400, let problem = failure.problem else { return false }
+        return problem.errors.contains { $0.field == "reasonCode" && $0.message == unsupportedField }
+    }
+}
+
+/// A write the app refuses before sending anything, with its Spanish message.
+public struct CancelRefusal: Error, LocalizedError, Equatable, Sendable {
+    public let message: String
+    public init(message: String) { self.message = message }
+    public var errorDescription: String? { message }
+}
+
+/// A4 / D-8 · the patient's cancel, with the fallback to the released body for an API before D-8.
+/// - The coded body `{version, reason, reasonCode}` and the released body `{version, reason}` each keep their own
+///   idempotency key per appointment: a retry after no signal or a 5xx replays the same body under the same key.
+/// - A pending key never carries another body: a changed body (another chip, a new version) takes a new key.
+/// - When the API refuses `reasonCode` as an unknown field, the released body goes at once under a NEW key, and every
+///   later cancel of this session sends the released body.
+@MainActor
+public final class PatientCancelFlow {
+    public typealias Post = @MainActor (AppointmentCancelBody, String) async throws -> Void
+
+    /// One body and its pending key; the key is dropped on success and after `idempotencia_conflicto`.
+    private struct Lane {
+        var key: String?
+        var body: AppointmentCancelBody?
+    }
+
+    /// This server refused `reasonCode` once.
+    public private(set) var legacyServer: Bool
+    private var coded: [String: Lane] = [:]
+    private var released: [String: Lane] = [:]
+    private let makeKey: @MainActor () -> String
+
+    /// `nonisolated` so a view can hold it in `@State` (like `Submission`).
+    nonisolated public init(legacyServer: Bool = false, makeKey: @escaping @MainActor () -> String = { UUID().uuidString.lowercased() }) {
+        self.legacyServer = legacyServer
+        self.makeKey = makeKey
+    }
+
+    /// The key waiting for a retry of an appointment's coded body (or of its released body with `legacy`).
+    public func pendingKey(_ appointmentId: String, legacy: Bool = false) -> String? {
+        (legacy ? released : coded)[appointmentId]?.key
+    }
+
+    /// Sends the cancel; throws `CancelRefusal` when nothing could be sent, or the API's failure.
+    public func cancel(_ appointmentId: String, version: Int, chip: String?, otherText: String, post: Post) async throws {
+        guard let reason = PatientCancelReasons.reason(chip: chip, otherText: otherText) else {
+            throw CancelRefusal(message: chip == PatientCancelReasons.other ? PatientCancelReasons.otherShort : PatientCancelReasons.chooseError)
+        }
+        if let code = PatientCancelReasons.code(chip: chip), !legacyServer {
+            do {
+                try await send(AppointmentCancelBody(version: version, reason: reason, reasonCode: code), appointmentId, legacy: false, post: post)
+                return
+            } catch let failure as APIFailure where PatientCancelReasons.refusesReasonCode(failure) {
+                // A definitive answer: the coded key is done, and from now on this server gets the released body.
+                coded[appointmentId] = nil
+                legacyServer = true
+            }
+        }
+        if let error = PatientCancelReasons.legacyReasonError(reason) { throw CancelRefusal(message: error) }
+        try await send(AppointmentCancelBody(version: version, reason: reason), appointmentId, legacy: true, post: post)
+    }
+
+    private func send(_ body: AppointmentCancelBody, _ id: String, legacy: Bool, post: Post) async throws {
+        var lane = (legacy ? released[id] : coded[id]) ?? Lane()
+        // Same body: the pending key (an exact replay). Another body: a new key, never the pending one.
+        if lane.key == nil || lane.body != body { lane = Lane(key: makeKey(), body: body) }
+        store(lane, id, legacy: legacy)
+        let key = lane.key ?? ""
+        do {
+            try await post(body, key)
+        } catch {
+            // No signal, 5xx or a definitive 4xx with the same body keep the key; only a key conflict drops it.
+            if (error as? APIFailure)?.code == "idempotencia_conflicto" { settle(id, key: key, legacy: legacy) }
+            throw error
+        }
+        settle(id, key: key, legacy: legacy)
+    }
+
+    private func store(_ lane: Lane, _ id: String, legacy: Bool) {
+        if legacy { released[id] = lane } else { coded[id] = lane }
+    }
+
+    /// Drops the lane only if it still holds `key` (a newer body may have taken it while this one was in flight).
+    private func settle(_ id: String, key: String, legacy: Bool) {
+        if legacy {
+            if released[id]?.key == key { released[id] = nil }
+        } else if coded[id]?.key == key {
+            coded[id] = nil
+        }
     }
 }
 
@@ -175,6 +294,14 @@ public enum PatientTurnRules {
         case 1: return "1 persona antes de ti"
         default: return "\(ahead) personas antes de ti"
         }
+    }
+
+    /// The server's `ahead` when it sends one; otherwise the estimate from the public board (U4). nil before anyone
+    /// was called and without `ahead`.
+    public static func ahead(_ ticket: QueueTicket, called: [PublicQueue.Called]?) -> Int? {
+        if let ahead = ticket.ahead { return max(0, ahead) }
+        guard let called else { return nil }
+        return QueueRules.ahead(of: ticket.number, called: called)
     }
 
     /// "Pasa al consultorio 2" (or "Pasa al Consultorio 2" when the API already names it); without an office, "Es tu turno".
@@ -309,10 +436,46 @@ public enum ConsultationRecordRules {
 // MARK: - C1 · Revisar y liberar (#12)
 
 public enum ReleaseRules {
-    /// What the patient will see once released: "Ana Pérez verá: Hemoglobina 7.1 g/dL (crítico bajo), Glucosa 90 mg/dL."
+    public static let noteMaximum = 500
+
+    /// C1: critical marks first, then high or low, then normal, then the rest (no result, no range); the order of the
+    /// order is kept inside each group (Android `LabReviewSummary`).
+    public static func orderedItems(_ order: LabOrder) -> [LabOrderItem] {
+        func rank(_ mark: ResultMark?) -> Int {
+            switch mark {
+            case .criticoAlto?, .criticoBajo?: return 0
+            case .alto?, .bajo?: return 1
+            case .normal?: return 2
+            default: return 3
+            }
+        }
+        // `sorted` is not stable: the original index breaks ties.
+        return order.items.enumerated()
+            .sorted { (rank($0.element.result?.mark), $0.offset) < (rank($1.element.result?.mark), $1.offset) }
+            .map(\.element)
+    }
+
+    /// The release body: `{version}` unless the doctor turned the follow-up off or wrote a note for the patient.
+    public static func body(version: Int, followUp: Bool, note: String) -> LabReviewBody {
+        let text = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return LabReviewBody(version: version, followUp: followUp ? nil : false, patientNote: text.isEmpty ? nil : String(text.prefix(noteMaximum)))
+    }
+
+    /// What happened with the follow-up appointment (D-4); nil when nothing needs saying (or the doctor turned it off).
+    public static func followUpOutcome(proposalId: String?, skipped: String?) -> String? {
+        if let proposalId, !proposalId.isEmpty { return "Se propuso a Recepción una cita de seguimiento." }
+        switch skipped {
+        case "hospitalizado": return "Sin cita de seguimiento: el paciente está hospitalizado."
+        case "ya_propuesta": return "Ya había una cita de seguimiento propuesta."
+        case "sin_consulta": return "Sin cita de seguimiento: la orden no viene de una consulta."
+        default: return nil
+        }
+    }
+
+    /// What the patient will see once released, critical values first: "Ana Pérez verá: Hemoglobina 7.1 g/dL (crítico bajo), Glucosa 90 mg/dL."
     public static func summary(_ order: LabOrder) -> String {
         let who = order.patientName ?? "El paciente"
-        let values = order.items.map { item -> String in
+        let values = orderedItems(order).map { item -> String in
             var text = "\(item.name) \(PatientLabRules.valueText(item.result))"
             if let unit = item.unit, !unit.isEmpty, item.result?.value != nil { text += " \(unit)" }
             if let mark = item.result?.mark, mark != .normal, mark != .desconocido { text += " (\(mark.label.lowercased()))" }
@@ -324,6 +487,68 @@ public enum ReleaseRules {
 
     public static func done(_ order: LabOrder) -> String {
         "Resultados revisados y liberados. \(order.patientName ?? "El paciente") ya puede verlos."
+    }
+
+    /// `done` plus what happened with the follow-up appointment, from the API's answer.
+    public static func done(_ order: LabOrder, result: LabReviewResult?) -> String {
+        guard let outcome = followUpOutcome(proposalId: result?.followUpProposalId, skipped: result?.followUpSkipped) else { return done(order) }
+        return "\(done(order)) \(outcome)"
+    }
+}
+
+// MARK: - G2 · Vincular expediente
+
+/// G2: the link screen opens in the real state of the request (`GET /me/vinculacion`), so a patient who comes back never
+/// sees an empty form and never asks twice.
+public enum LinkStatusRules {
+    public enum Screen: Equatable, Sendable {
+        /// No request yet.
+        case form(prefill: MyLink.Declared?)
+        /// Waiting for reception, since `createdAt`.
+        case pending(since: String)
+        case approved
+        /// With the reason, and «Volver a pedir» with what was declared.
+        case rejected(reason: String?, prefill: MyLink.Declared?)
+    }
+
+    /// `sent` is the request this screen just created: until a read returns it, the screen stays pending instead of
+    /// showing the older state (no form, so it is never sent twice).
+    public static func screen(_ link: MyLink, profileLinked: Bool, sent: LinkRequestResult? = nil) -> Screen {
+        if profileLinked || link.linked { return .approved }
+        if let sent, link.request?.id != sent.id { return .pending(since: sent.createdAt) }
+        guard let request = link.request else { return .form(prefill: nil) }
+        switch request.state {
+        case .aprobada: return .approved
+        case .rechazada: return .rejected(reason: request.rejectionReason, prefill: link.declared)
+        // An unknown state is still a request: never the form, so it is not asked twice.
+        case .pendiente, .desconocido: return .pending(since: request.createdAt)
+        }
+    }
+
+    /// "En revisión desde 16/11" (day and month in El Salvador).
+    public static func pendingText(_ createdAt: String) -> String {
+        guard let date = ClimesaDates.parse(createdAt) else { return "En revisión" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "es_SV")
+        formatter.timeZone = ClimesaDates.zone
+        formatter.dateFormat = "dd/MM"
+        return "En revisión desde \(formatter.string(from: date))"
+    }
+
+    public static func rejectedText(_ reason: String?) -> String {
+        let text = reason?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return text.isEmpty ? "Tu solicitud fue rechazada. Revisa tus datos o acude a recepción." : "Tu solicitud fue rechazada. Motivo: \(text)"
+    }
+
+    /// The declared birth day (`yyyy-MM-dd`) as a date for the picker, at noon in `zone` so it never slips a day.
+    public static func birthDate(_ day: String?, zone: TimeZone = .current) -> Date? {
+        guard let day, day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = zone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.date(from: "\(day) 12:00")
     }
 }
 

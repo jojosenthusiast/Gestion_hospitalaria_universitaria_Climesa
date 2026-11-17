@@ -1,6 +1,50 @@
 {
   "sourceLanguage": "es",
   "strings": {
+    "link.retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver a pedir"
+          }
+        }
+      }
+    },
+    "results.release.followUp": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Proponer cita de seguimiento"
+          }
+        }
+      }
+    },
+    "results.release.followUp.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recepción recibe la propuesta con el médico que pidió la orden."
+          }
+        }
+      }
+    },
+    "results.release.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nota para el paciente (opcional)"
+          }
+        }
+      }
+    },
     "appointments.next": {
       "extractionState": "manual",
       "localizations": {

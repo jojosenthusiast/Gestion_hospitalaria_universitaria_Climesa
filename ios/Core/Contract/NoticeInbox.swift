@@ -39,7 +39,7 @@ public struct InboxNotice: Decodable, Sendable, Identifiable, Equatable {
     public let body: String
     public let from: String?
     public let until: String?
-    public let priority: NoticePriority
+    // D-6 / D1: `nivel` is the only importance scale shown; the legacy `prioridad` is not read.
     public let isPublic: Bool
     public let roles: [String]
     public let level: NoticeLevel
@@ -56,7 +56,7 @@ public struct InboxNotice: Decodable, Sendable, Identifiable, Equatable {
     public let highlighted: Bool
 
     enum CodingKeys: String, CodingKey {
-        case id, title = "titulo", body = "cuerpo", from = "desde", until = "hasta", priority = "prioridad", isPublic = "publico", roles
+        case id, title = "titulo", body = "cuerpo", from = "desde", until = "hasta", isPublic = "publico", roles
         case level = "nivel", areas, publishedAt = "publicadoEn", targeted = "dirigido", acknowledgedAt = "enteradoEn", remindAt = "recordarEn"
         case highlighted = "destacado"
     }
@@ -68,7 +68,6 @@ public struct InboxNotice: Decodable, Sendable, Identifiable, Equatable {
         body = try c.decode(String.self, forKey: .body)
         from = try c.decodeIfPresent(String.self, forKey: .from)
         until = try c.decodeIfPresent(String.self, forKey: .until)
-        priority = (try c.decodeIfPresent(String.self, forKey: .priority)).flatMap(NoticePriority.init(rawValue:)) ?? .atencion
         isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? false
         roles = try c.decodeIfPresent([String].self, forKey: .roles) ?? []
         level = (try c.decodeIfPresent(String.self, forKey: .level)).flatMap(NoticeLevel.init(rawValue:)) ?? .informativo

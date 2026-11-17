@@ -36,10 +36,13 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     /// Nil on an older server; a call by reception, an assistant or with no recorded caller sets neither.
     public var calledByMe: Bool? = nil
     public var calledByColleague: Bool? = nil
+    /// B5: numbers waiting before this one in its area, when the API sends it (today only the issue response does);
+    /// nil otherwise, and the public board gives the estimate.
+    public var ahead: Int? = nil
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
         case consultationId, consultationState, allowedActions, blockedActions, maxCalls, callsForAbsence
-        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague
+        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague, ahead
     }
 }
 
@@ -352,6 +355,22 @@ public struct LinkRequestResult: Decodable, Sendable, Equatable {
     public let resolvedAt: String?
     public let rejectionReason: String?
     public let version: Int
+}
+
+/// `MyLinkResponse` of `GET /me/vinculacion` (G2): the account's last link request, so the screen opens in its real state.
+public struct MyLink: Decodable, Sendable, Equatable {
+    /// `LinkDeclaredResponse`: what the account declared, to ask again with the form filled in.
+    public struct Declared: Decodable, Sendable, Equatable {
+        public let dui: String
+        /// Local day `yyyy-MM-dd`.
+        public let birth: String?
+        public init(dui: String, birth: String?) { self.dui = dui; self.birth = birth }
+    }
+    public let linked: Bool
+    /// nil when the account never asked.
+    public let request: LinkRequestResult?
+    /// Absent when the account never asked, and on a server before R7.
+    public let declared: Declared?
 }
 
 /// `MyAccessResponse` de `GET /me/accesos`: quién vio mi expediente, sin nombres de personas.
