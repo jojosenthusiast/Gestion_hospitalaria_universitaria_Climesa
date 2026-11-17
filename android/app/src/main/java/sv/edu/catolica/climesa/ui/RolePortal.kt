@@ -151,16 +151,17 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         page==AndroidSection.NOTICES->NoticesScreen(account,Modifier.padding(padding))
         page==AndroidSection.BEDS||page==AndroidSection.CLEANING->BedsScreen(account.profile,Modifier.padding(padding))
         page==AndroidSection.MY_APPOINTMENTS->PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
-        page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD->HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
+        page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD->HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled,
+            onOpenVitals=if(AndroidSection.VITAL_SIGNS in sections&&role!="MED"){subject->selectedName=AndroidSection.VITAL_SIGNS.name;inbox.post(QuickActionRequest(AndroidSection.VITAL_SIGNS,subject=subject))}else null)
         page==AndroidSection.SUPPLIES->InventoryScreen(Modifier.padding(padding),account.profile)
         page==AndroidSection.MY_ACCESS->MyAccessScreen(Modifier.padding(padding))
-        page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
-        page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW->LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page)
-        page==AndroidSection.LINK_RECORD->LinkRecordScreen(account.profile,Modifier.padding(padding))
+        page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,userId=account.session.userId)
+        page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW->LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page,userId=account.session.userId)
+        page==AndroidSection.LINK_RECORD->LinkRecordScreen(account.profile,Modifier.padding(padding),userId=account.session.userId)
         page==AndroidSection.HISTORY||page==AndroidSection.RECORD->ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding))
         page==AndroidSection.MEDICAL_DAY->ConsultationScreen(account.profile,Modifier.padding(padding),userId=account.session.userId)
         page==AndroidSection.HOSPITAL_INFO->HospitalInfoScreen(Modifier.padding(padding))
-        page==AndroidSection.VITAL_SIGNS->VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=role=="MED",userId=account.session.userId)
+        page==AndroidSection.VITAL_SIGNS->VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=role=="MED",userId=account.session.userId,subject=inbox.subjectFor(page),onSubjectHandled=handled)
         page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)->AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding))
         else->PageList(Modifier.padding(padding)){
             if(page==AndroidSection.PROFILE){

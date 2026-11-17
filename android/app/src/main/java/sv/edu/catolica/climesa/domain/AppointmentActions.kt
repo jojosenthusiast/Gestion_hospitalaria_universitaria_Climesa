@@ -167,3 +167,21 @@ object BusinessErrors {
         else -> null
     }
 }
+
+/**
+ * Quick reasons as chips (A4, D-8). Each one meets the API minimum of [AppointmentActions.REASON_MIN] characters, so a
+ * tap is enough; only [OTHER] asks for text.
+ */
+object AppointmentReasons {
+    const val OTHER = "Otro"
+    /** D-8: the patient cancels with one tap and no typing. */
+    val patientCancel = listOf("Ya no lo necesito", "No puedo a esa hora")
+    /** Reception cancels or rejects with a frequent reason. */
+    fun reception(action: AppointmentAction): List<String> = when (action) {
+        AppointmentAction.CANCEL -> listOf("Lo pidió el paciente", "El médico no estará disponible", "Cita registrada por error")
+        AppointmentAction.REJECT, AppointmentAction.REJECT_RESCHEDULE -> requestReject
+        else -> emptyList()
+    }
+    /** A2: templates to reject a request ("Sin cupo en la especialidad", "Necesita referencia"). */
+    val requestReject = listOf("Sin cupo en la especialidad", "Necesita referencia")
+}

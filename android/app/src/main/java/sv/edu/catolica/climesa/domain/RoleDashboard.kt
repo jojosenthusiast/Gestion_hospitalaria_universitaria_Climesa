@@ -168,6 +168,8 @@ object RoleDashboard {
         unavailable: Set<DashboardSource> = emptySet(),
         now: Instant = Instant.now(),
         linked: Boolean = true,
+        /** When the patient last opened their results (device marker until G-7); later releases only count as new. */
+        resultsSeenAt: Instant? = null,
     ): DashboardModel {
         val sections = AndroidSections.visible(role, permissions)
         fun target(section: AndroidSection) = section.takeIf { it in sections }
@@ -320,8 +322,10 @@ object RoleDashboard {
                 shiftKpi()
             }
             "PAC" -> {
-                data[DashboardSource.APPOINTMENTS]?.let { nextAppointment(it, now) }?.let { kpis += DashboardKpi("Próxima cita", it, DashboardTone.PROCESS, target = target(AndroidSection.MY_APPOINTMENTS)) }
-                if (data[DashboardSource.APPOINTMENTS] != null && nextAppointment(data[DashboardSource.APPOINTMENTS], now) == null) kpis += DashboardKpi("Próxima cita", "Sin citas", DashboardTone.NEUTRAL, target = target(AndroidSection.MY_APPOINTMENTS))
+                // G6: the patient's Inicio reads top-down: link first when unlinked, today's number or appointment, the next
+                // appointment (or "Pedir cita"), then new results. Every row carries its one action.
+                if (!linked && AndroidSection.LINK_RECORD in sections) attention += DashboardAttention("Vincula tu expediente", "Sin vincular no verás tus citas, turno ni resultados.", DashboardTone.WARNING, "Vincular", QuickActionRequest(AndroidSection.LINK_RECORD))
+                val appointments = data[DashboardSource.APPOINTMENTS]
                 data[DashboardSource.QUEUE]?.let { queueRows ->
                     val mine = rows(queueRows).firstOrNull { it.optString("state") in setOf("en_espera", "llamado", "en_atencion") }
                     kpis += if (mine == null) DashboardKpi("Mi turno en fila", "Sin número", DashboardTone.NEUTRAL, target = target(AndroidSection.PATIENT_QUEUE))
@@ -330,19 +334,46 @@ object RoleDashboard {
                     if (mine?.optString("state") == "llamado") {
                         val office = mine.optString("officeCode").takeIf { !mine.isNull("officeCode") && it.isNotBlank() }
                         attention += DashboardAttention("Es tu turno", office?.let { "Pasa al consultorio $it." } ?: "Atento al llamado en recepción.", DashboardTone.SUCCESS, "Ver mi turno", QuickActionRequest(AndroidSection.PATIENT_QUEUE))
+                    } else if (mine != null) {
+                        val code = "${text(mine, "area") ?: QueueLabels.areaOf(mine.optString("service"))} ${mine.optInt("numero")}"
+                        attention += DashboardAttention("Tu número $code", "${QueueLabels.state(mine.optString("state"))} · Te llamarán en pantalla y aquí.", DashboardTone.PROCESS, "Ver mi turno", QuickActionRequest(AndroidSection.PATIENT_QUEUE), covers = "Mi turno en fila")
                     }
                 }
+                todayAppointment(appointments, now)?.let { today -> attention += DashboardAttention("Hoy tienes cita", today, DashboardTone.PROCESS, "Ver cita", QuickActionRequest(AndroidSection.MY_APPOINTMENTS), covers = "Próxima cita") }
+                val next = appointments?.let { nextAppointment(it, now) }
+                if (next != null) kpis += DashboardKpi("Próxima cita", next, DashboardTone.PROCESS, target = target(AndroidSection.MY_APPOINTMENTS))
+                else if (appointments != null) {
+                    if ("citas.solicitar" in permissions && AndroidSection.MY_APPOINTMENTS in sections) attention += DashboardAttention("No tienes citas próximas", "Pide una por motivo; recepción te asigna médico y hora.", DashboardTone.PROCESS, "Pedir cita", QuickActionRequest(AndroidSection.MY_APPOINTMENTS, QuickAction.REQUEST_APPOINTMENT), covers = "Próxima cita")
+                    else kpis += DashboardKpi("Próxima cita", "Sin citas", DashboardTone.NEUTRAL, target = target(AndroidSection.MY_APPOINTMENTS))
+                }
                 lab?.let {
-                    kpis += DashboardKpi("Exámenes listos", it.released.toString(), if (it.released > 0) DashboardTone.SUCCESS else DashboardTone.NEUTRAL, target = target(AndroidSection.RESULTS))
                     kpis += DashboardKpi("Exámenes en trámite", (it.requested + it.inProcess + it.toReview).toString(), DashboardTone.PROCESS, target = target(AndroidSection.RESULTS))
-                    if (it.released > 0 && AndroidSection.RESULTS in sections) attention += DashboardAttention(counted(it.released, "examen con resultado", "exámenes con resultado"), "Tu médico ya los revisó; puedes verlos.", DashboardTone.SUCCESS, "Ver resultados", QuickActionRequest(AndroidSection.RESULTS), covers = "Exámenes listos")
+                    // G6: "Resultados nuevos" counts only those released in the last 7 days, not the whole history (gap G-7: no "seen").
+                    val recent = recentResults(data[DashboardSource.MY_LAB], now, resultsSeenAt)
+                    if (recent > 0 && AndroidSection.RESULTS in sections) attention += DashboardAttention("Resultados nuevos ($recent)", "Tu médico ya los revisó; puedes verlos.", DashboardTone.SUCCESS, "Ver resultados", QuickActionRequest(AndroidSection.RESULTS))
                 }
                 labChart("Mis exámenes")
-                if (!linked && AndroidSection.LINK_RECORD in sections) attention += DashboardAttention("Vincula tu expediente", "Sin vincular no verás tus citas, turno ni resultados.", DashboardTone.WARNING, "Vincular", QuickActionRequest(AndroidSection.LINK_RECORD))
             }
         }
         val covered = attention.mapNotNull { it.covers }.toSet()
         return DashboardModel(kpis.filter { it.label !in covered }, charts.filter { it.total > 0 }, attention, QuickActions.forRole(role, permissions), unavailable)
+    }
+
+    /** G6: today's appointment of the patient ("09:20 · Dra. Ejemplo"), confirmed or requested and not yet over. */
+    fun todayAppointment(value: Any?, now: Instant): String? {
+        val today = now.atZone(zone).toLocalDate()
+        val row = rows(value).filter { it.optString("state") in setOf("solicitada", "confirmada") }
+            .mapNotNull { r -> instant(text(r, "start"))?.let { it to r } }
+            .filter { (start, _) -> start.atZone(zone).toLocalDate() == today && start.isAfter(now.minusSeconds(3_600)) }
+            .minByOrNull { it.first } ?: return null
+        val time = java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(row.first.atZone(zone))
+        return listOfNotNull(time, text(row.second, "doctorName")).joinToString(" · ")
+    }
+
+    /** G6: results released (reviewed) in the last 7 days. */
+    fun recentResults(value: Any?, now: Instant, seenAt: Instant? = null): Int {
+        val since = listOfNotNull(now.minus(java.time.Duration.ofDays(7)), seenAt).max()
+        return rows(value).count { order -> order.optString("state") == "completado" && instant(text(order, "reviewedAt"))?.isAfter(since) == true }
     }
 
     fun unitLabel(state: String) = mapOf("disponible" to "Disponible", "en_servicio" to "En servicio", "en_mantenimiento" to "En mantenimiento")[state] ?: state

@@ -112,9 +112,15 @@ internal fun vitalLevelFamily(level: VitalLevel): StatusFamily? = when (level) {
  * latest take, the capture form (hidden when [readOnly]), the trend per measure and the history.
  */
 @Composable
-fun VitalSignsScreen(profile: AccessProfile, modifier: Modifier = Modifier, readOnly: Boolean = false, userId: String? = null, model: VitalSignsViewModel = viewModel()) {
+fun VitalSignsScreen(
+    profile: AccessProfile, modifier: Modifier = Modifier, readOnly: Boolean = false, userId: String? = null,
+    subject: sv.edu.catolica.climesa.domain.QuickSubject? = null, onSubjectHandled: () -> Unit = {},
+    model: VitalSignsViewModel = viewModel(),
+) {
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(userId) { userId?.let(model::bindUser) }
+    // G5: opened from a ward card: the patient is already chosen, with any unsaved measures restored.
+    LaunchedEffect(subject, userId) { subject?.let { model.open(sv.edu.catolica.climesa.domain.VitalsCandidate(it.id, it.name, it.detail)); onSubjectHandled() } }
     LaunchedEffect(profile.permissions) { model.loadSources(profile.permissions) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     BackHandler(enabled = state.patientId != null) { model.close() }

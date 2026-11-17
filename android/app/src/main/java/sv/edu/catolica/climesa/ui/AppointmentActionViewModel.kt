@@ -38,6 +38,12 @@ data class AppointmentActionState(
     /** Set after the API accepts the action; the screen shows it and reloads the list. */
     val done: String? = null,
     val error: String? = null,
+    /** D-3: "No asistió" waiting 8 s with "Deshacer" before it is sent ([PendingUndo.key] is the appointment id). */
+    val pendingNoShow: PendingUndo? = null,
+    /** Every "No asistió" still in its window, one per appointment. */
+    val pendingNoShows: List<PendingUndo> = emptyList(),
+    /** The stored "No asistió" whose last send failed (kept, with [error], until it goes through or is discarded). */
+    val failedNoShow: String? = null,
 ) {
     val reasonError: String? get() = serverError ?: action?.let { a -> AppointmentActions.reasonError(a, reason).takeIf { showErrors } }
     val canSubmit: Boolean get() = !busy && (action != AppointmentAction.RESCHEDULE || slot?.selectable == true)
@@ -48,11 +54,51 @@ data class AppointmentActionState(
  * reschedule to a free slot of the same doctor, mark a no-show, or decide a patient's reschedule request.
  */
 @HiltViewModel
-class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway) : ViewModel() {
+class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway, private val drafts: sv.edu.catolica.climesa.data.DraftStore = sv.edu.catolica.climesa.data.NoDraftStore) : ViewModel() {
     private val mutable = MutableStateFlow(AppointmentActionState())
     val state = mutable.asStateFlow()
     private val intent = SubmissionIntent()
     private var slotsJob: Job? = null
+    /** Clock of the undo window (tests move it to after a restart). */
+    var clock: () -> Long = { System.currentTimeMillis() }
+    private val noShow = UndoWindow(
+        viewModelScope, api, sv.edu.catolica.climesa.domain.FormDrafts.DEFERRED_NO_SHOW, drafts, now = { clock() },
+        onSent = { item, _ -> mutable.update { it.copy(done = AppointmentActions.doneNotice(AppointmentAction.NO_SHOW, item.label.substringAfter("Cita de ").substringBefore(" marcada")), error = null) } },
+        onFailed = { item, e, kept ->
+            mutable.update {
+                if (kept) it.copy(error = businessMessage(e, "No se pudo marcar la inasistencia.") + " Queda guardada y se reintentará.", failedNoShow = item.id)
+                else it.copy(error = businessMessage(e, "No se pudo marcar la inasistencia."), failedNoShow = null, done = null)
+            }
+        },
+        onExpired = { gone -> mutable.update { it.copy(error = "${gone.size} «No asistió» de hace más de 24 h no se enviaron.") } },
+    ) { pending -> mutable.update { it.copy(pendingNoShow = pending.lastOrNull(), pendingNoShows = pending) } }
+
+    /** Signed-in user: a "No asistió" stored before the app closed is sent now if its window ended. */
+    fun bindUser(id: String) = noShow.bind(id)
+
+    /** Screen back on top or signal back: sends what is due, failed ones again. */
+    fun resume() = noShow.resume()
+
+    /** The person drops a "No asistió" the API keeps rejecting, after reading why. */
+    fun discardFailedNoShow() {
+        val id = mutable.value.failedNoShow ?: return
+        noShow.discard(id)
+        mutable.update { it.copy(failedNoShow = null, error = null) }
+    }
+
+    /**
+     * D-3 (A4): "No asistió" is one tap with 8 s to undo, the same on web and Android. Nothing reaches the API until the
+     * window ends, so "Deshacer" leaves no trace (no inverse endpoint exists).
+     */
+    fun markNoShow(target: ReceptionAppointment) {
+        if (AppointmentAction.NO_SHOW !in target.allowedActions) return
+        val name = target.patientName.ifBlank { "el paciente" }
+        noShow.start(target.id, "Cita de $name marcada como no asistió.", AppointmentActions.path(AppointmentAction.NO_SHOW, target.id), AppointmentActions.body(AppointmentAction.NO_SHOW, target.version, ""))
+    }
+    fun undoNoShow(appointmentId: String? = null) { if (noShow.undo(appointmentId)) mutable.update { it.copy(done = "Se mantiene la cita.", error = null) } }
+
+    /** D-8 / A4: a quick reason chip fills the reason; "Otro" empties it for typing. */
+    fun quickReason(text: String?) = mutable.update { if (it.busy) it else it.copy(reason = text.orEmpty(), serverError = null, error = null) }
 
     fun open(target: ReceptionAppointment, action: AppointmentAction) {
         intent.reset()
@@ -61,7 +107,7 @@ class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway
         mutable.value = AppointmentActionState(target = target, action = action, date = date)
         if (action == AppointmentAction.RESCHEDULE) loadSlots()
     }
-    fun close() { if (!mutable.value.busy) { intent.reset(); slotsJob?.cancel(); mutable.update { AppointmentActionState(done = it.done) } } }
+    fun close() { if (!mutable.value.busy) { intent.reset(); slotsJob?.cancel(); mutable.update { AppointmentActionState(done = it.done, pendingNoShow = it.pendingNoShow, pendingNoShows = it.pendingNoShows, failedNoShow = it.failedNoShow, error = it.error.takeIf { _ -> it.failedNoShow != null }) } } }
     fun consumeDone() = mutable.update { it.copy(done = null) }
     fun reason(text: String) = mutable.update { if (it.busy) it else it.copy(reason = text.take(AppointmentActions.REASON_MAX), serverError = null, error = null) }
 
@@ -105,7 +151,7 @@ class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway
             try {
                 val result = intent.send { api.request(AppointmentActions.path(action, target.id, reschedule?.id), "POST", AppointmentActions.body(action, version, s.reason, s.slot)) }
                 val rescheduleState = (result as? JSONObject)?.optString("rescheduleState")?.takeIf { it.isNotBlank() }
-                mutable.value = AppointmentActionState(done = AppointmentActions.doneNotice(action, target.patientName.ifBlank { "el paciente" }, rescheduleState))
+                mutable.value = AppointmentActionState(done = AppointmentActions.doneNotice(action, target.patientName.ifBlank { "el paciente" }, rescheduleState), pendingNoShow = mutable.value.pendingNoShow, pendingNoShows = mutable.value.pendingNoShows)
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 val field = ApiProblems.fieldErrors(e)[AppointmentActions.reasonField(action)]
                 mutable.update { it.copy(busy = false, serverError = field, error = businessMessage(e, "No se pudo completar la acción.")) }

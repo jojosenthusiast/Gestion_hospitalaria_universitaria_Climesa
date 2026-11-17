@@ -99,7 +99,7 @@ class ConsultationViewModelTest {
         assertEquals("c1", body.getString("consultationId"))
         assertEquals("e1", body.getJSONArray("exams").getString(0))
         assertTrue(cleared)
-        assertEquals("Orden de laboratorio emitida.", vm.state.value.notice)
+        assertEquals(RecordSection.LAB to "Orden emitida: Hemograma.", vm.state.value.stepNotice)
     }
 
     @Test fun aLabOrderWithoutExamsNeverReachesTheApi() = runTest(dispatcher) {

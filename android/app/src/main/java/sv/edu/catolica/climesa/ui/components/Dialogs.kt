@@ -50,7 +50,7 @@ internal fun ConfirmDialog(
 ) {
     val submission = androidx.compose.runtime.remember { ConfirmSubmission() }
     if (onDone != null) androidx.compose.runtime.LaunchedEffect(busy, error) { if (submission.settle(busy, error)) onDone() }
-    val shownError = error?.takeIf { onDone != null }
+    val shownError = ConfirmDialogText.shownError(error, onDone != null)
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         shape = MaterialTheme.shapes.large,
@@ -72,4 +72,10 @@ internal fun ConfirmDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(dismissLabel, style = MaterialTheme.typography.labelLarge) } },
     )
+}
+
+/** What [ConfirmDialog] prints as its error. */
+internal object ConfirmDialogText {
+    /** #1: shown whenever it is set; dialogs without [onDone] (dispatch, discard, Recibido, finish) failed silently. */
+    fun shownError(error: String?, @Suppress("UNUSED_PARAMETER") hasOnDone: Boolean = true): String? = error
 }

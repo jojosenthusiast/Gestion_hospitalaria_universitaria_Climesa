@@ -182,10 +182,19 @@ internal fun CategoryRequestInbox(state: CategoryRequestsState, model: CategoryR
     }
     state.inbox.firstOrNull { it.id == rejecting }?.let { r ->
         var reason by rememberSaveable(r.id) { mutableStateOf("") }
+        var other by rememberSaveable(r.id) { mutableStateOf(false) }
+        val templates = sv.edu.catolica.climesa.domain.AppointmentReasons.requestReject
         ConfirmDialog(stringResource(R.string.cat_rechazar_titulo), stringResource(R.string.cat_rechazar_titulo), { model.reject(r, reason) }, { rejecting = null },
             message = "${r.patientName} · ${r.categoryNames}", destructive = true, busy = state.saving, error = state.error, onDone = { rejecting = null },
             confirmEnabled = CategoryRequestRules.rejectError(reason) == null,
-            body = { FormField(stringResource(R.string.cat_rechazar_motivo), reason, { reason = it.take(500) }, singleLine = false) })
+            body = {
+                // A2: the frequent reasons are templates; "Otro" opens the text.
+                ReasonChips(templates, if (other) sv.edu.catolica.climesa.domain.AppointmentReasons.OTHER else reason.takeIf { it in templates }, { picked ->
+                    other = picked == sv.edu.catolica.climesa.domain.AppointmentReasons.OTHER
+                    reason = if (other) "" else picked
+                }, enabled = !state.saving, other = sv.edu.catolica.climesa.domain.AppointmentReasons.OTHER)
+                if (other) FormField(stringResource(R.string.cat_rechazar_motivo), reason, { reason = it.take(500) }, singleLine = false)
+            })
     }
 }
 
@@ -194,7 +203,10 @@ private fun AssignPanel(state: CategoryRequestsState, model: CategoryRequestsVie
     val request = state.assigning ?: return
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(stringResource(R.string.cat_asignar_titulo, request.patientName), style = MaterialTheme.typography.titleSmall)
+        // A2 (break #6): reception can assign any of the next 7 days, not only today.
         Text(AppointmentAgenda.dayLabel(state.date.toString()), style = MaterialTheme.typography.bodySmall)
+        DayChips(state.date, model::selectDate, enabled = !state.saving)
+        if (state.searchingDay) Text(stringResource(R.string.rec7_buscando_dia), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         var doctorQuery by rememberSaveable(request.id) { mutableStateOf("") }
         var allDoctors by rememberSaveable(request.id) { mutableStateOf(false) }
         LiveSearchField(doctorQuery, { doctorQuery = it.take(60) }, stringResource(R.string.cat_buscar_medico))

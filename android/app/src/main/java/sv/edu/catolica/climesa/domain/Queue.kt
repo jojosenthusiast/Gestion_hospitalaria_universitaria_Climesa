@@ -45,7 +45,23 @@ object PatientQueue {
     fun current(tickets: List<QueueTicket>): QueueTicket? =
         tickets.firstOrNull { it.state in active } ?: tickets.maxByOrNull { it.issuedAtMillis ?: 0L }
     fun others(tickets: List<QueueTicket>): List<QueueTicket> = current(tickets)?.let { mine -> tickets.filter { it.id != mine.id } }.orEmpty()
+
+    /** B5: called numbers of the patient's service today (`GET /publico/fila/{servicio}`), without names. */
+    fun parsePublic(value: Any?): List<PublicCall> {
+        val rows = (value as? org.json.JSONObject)?.optJSONArray("llamados") ?: return emptyList()
+        return (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
+            .map { PublicCall(it.optInt("numero"), ServerActions.text(it, "consultorio")) }.filter { it.number > 0 }
+    }
+
+    /** People before [number] in its area: the numbers after the last one called (same rule as iOS); null before any call. */
+    fun ahead(number: Int, called: List<PublicCall>): Int? = called.maxOfOrNull { it.number }?.let { maxOf(0, number - it - 1) }
+
+    /** Consulting room the patient was called to, from the ticket or the public board. */
+    fun office(ticket: QueueTicket, called: List<PublicCall>): String? = ticket.officeCode ?: called.firstOrNull { it.number == ticket.number }?.office
 }
+
+/** One called number of the public board: its number and room, no name. */
+data class PublicCall(val number: Int, val office: String?)
 
 object QueueLabels {
     private val areas = mapOf("consulta_general" to "CON", "emergencia" to "EMG", "laboratorio" to "LAB", "admisiones" to "REC")
@@ -91,6 +107,10 @@ object QueueRules {
             )
         } }
     }
+
+    /** B1: numbers still waiting before [ticket] in its service (lower number, waiting), for "3 antes". */
+    fun ahead(tickets: List<QueueTicket>, ticket: QueueTicket): Int =
+        tickets.count { it.service == ticket.service && it.state == "en_espera" && it.number < ticket.number }
 
     /** Service preselected for "Llamar siguiente": the chosen filter, else the service of the first waiting number. */
     fun callNextService(tickets: List<QueueTicket>, filter: String?): String =

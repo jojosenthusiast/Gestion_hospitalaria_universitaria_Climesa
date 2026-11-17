@@ -37,7 +37,8 @@ fun ReceptionLinkingScreen(channels: List<String>, canVerify: Boolean, openPatie
     LaunchedEffect(Unit) { model.load(); model.startLive(channels) }
     val target = state.rows.firstOrNull { it.id == rejecting }
     val sent = remember { mutableStateOf(false) }
-    CloseWhenDone(state.busyId != null, sent) { rejecting = null }
+    // Sweep: a failed reject keeps its dialog (and the typed reason) open, with the error.
+    CloseWhenDone(state.busyId != null, sent, state.error) { rejecting = null }
     PageList(modifier) {
         item { LinkingGuide() }
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton(stringResource(R.string.ui_reintentar), { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
@@ -53,7 +54,7 @@ fun ReceptionLinkingScreen(channels: List<String>, canVerify: Boolean, openPatie
             }
         }
     }
-    if (target != null) RejectDialog(target, state.busyId == target.id, onConfirm = { reason -> sent.value = true; model.reject(target, reason) }, onDismiss = { rejecting = null })
+    if (target != null) RejectDialog(target, state.busyId == target.id, state.error, onConfirm = { reason -> sent.value = true; model.reject(target, reason) }, onDismiss = { rejecting = null })
 }
 
 @Composable
@@ -93,11 +94,11 @@ private fun LinkCard(row: LinkRequestRow, canVerify: Boolean, primary: Boolean, 
 }
 
 @Composable
-private fun RejectDialog(row: LinkRequestRow, busy: Boolean, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+private fun RejectDialog(row: LinkRequestRow, busy: Boolean, error: String?, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
     var reason by rememberSaveable(row.id) { mutableStateOf("") }
     ConfirmDialog(
         title = stringResource(R.string.rec_vinc_rechazo_titulo), confirmLabel = stringResource(R.string.rec_vinc_rechazar), onConfirm = { onConfirm(reason) }, onDismiss = onDismiss,
-        message = stringResource(R.string.rec_vinc_rechazo_mensaje, row.email), destructive = true, busy = busy,
+        message = stringResource(R.string.rec_vinc_rechazo_mensaje, row.email), destructive = true, busy = busy, error = error,
         confirmEnabled = ReceptionLinking.rejectError(reason) == null,
         body = { FormField(stringResource(R.string.rec_vinc_rechazo_motivo), reason, { reason = it.take(500) }, singleLine = false, hint = stringResource(R.string.ui_minimo_10)) },
     )

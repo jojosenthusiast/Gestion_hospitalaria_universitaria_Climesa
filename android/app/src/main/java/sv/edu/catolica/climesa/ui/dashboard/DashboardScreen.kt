@@ -92,8 +92,9 @@ fun RoleDashboardScreen(
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(role, account.profile.permissions, account.profile.channels, account.profile.patientId) {
-        model.start(role, account.profile.permissions, account.profile.channels, account.profile.patientId != null)
+        model.start(role, account.profile.permissions, account.profile.channels, account.profile.patientId != null, account.session.userId)
     }
+    LaunchedEffect(Unit) { model.refreshSeen() }
     // S11: notices left the dashboard for their own area; "Inicio" keeps only the critical one for this role or area.
     val notices = noticeInboxModel(account)
     val inbox by notices.state.collectAsStateWithLifecycle()

@@ -38,10 +38,11 @@ class SessionDrafts(private val drafts: DraftStore, private val now: () -> Long 
     private fun purgeStale() = drafts.expire(PENDING_WRITES, now() - PENDING_WRITES_TTL_MS)
     /** True when [userId] still has milestones or a prehospital report waiting for signal (sign-out warns about it). */
     fun hasPendingWrites(userId: String) =
-        (drafts.load(userId, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.length() ?: 0) > 0 || drafts.load(userId, FormDrafts.PREHOSPITAL_QUEUE) != null
+        (drafts.load(userId, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.length() ?: 0) > 0 || drafts.load(userId, FormDrafts.PREHOSPITAL_QUEUE) != null ||
+            listOf(FormDrafts.DEFERRED_NO_SHOW, FormDrafts.DEFERRED_ABSENCE).any { (drafts.load(userId, it)?.optJSONArray("items")?.length() ?: 0) > 0 }
 
     companion object {
-        val PENDING_WRITES = setOf(FormDrafts.MILESTONE_QUEUE, FormDrafts.PREHOSPITAL_QUEUE, FormDrafts.PROVISIONAL_PATIENT)
+        val PENDING_WRITES = setOf(FormDrafts.MILESTONE_QUEUE, FormDrafts.PREHOSPITAL_QUEUE, FormDrafts.PROVISIONAL_PATIENT, FormDrafts.DEFERRED_NO_SHOW, FormDrafts.DEFERRED_ABSENCE, ResultsSeen.KEY)
         /** 24 h, the API's `PREHOSPITAL_GRACE_MS`: after it the server rejects the milestone and the report is no longer received. */
         const val PENDING_WRITES_TTL_MS = 24 * 3_600_000L
     }

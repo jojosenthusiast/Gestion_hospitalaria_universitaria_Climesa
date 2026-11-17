@@ -305,6 +305,8 @@ fun HospitalizationScreen(
     profile: AccessProfile? = null,
     quickAction: QuickAction? = null,
     onQuickActionHandled: () -> Unit = {},
+    /** G5: "Signos" on a ward card opens Signos vitales on that patient; null when the role cannot record signs. */
+    onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null,
     model: HospitalizationViewModel = viewModel(),
     intake: AdmissionIntakeViewModel = viewModel(),
 ) {
@@ -347,7 +349,7 @@ fun HospitalizationScreen(
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                items(state.admissions, key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow) }
+                items(state.admissions, key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow, onOpenVitals) }
             }
         }
     }
@@ -355,7 +357,7 @@ fun HospitalizationScreen(
 
 /** Every button comes from the server's `allowedActions`; the main action of the state is the only primary button. */
 @Composable
-private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: HospitalizationViewModel, primary: Boolean) {
+private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: HospitalizationViewModel, primary: Boolean, onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)?) {
     val actions = row.allowedActions
     val main = HospitalizationRules.primaryAction(actions)?.takeIf { primary }
     @Composable fun act(action: AdmissionAction, text: String, onClick: () -> Unit, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
@@ -384,6 +386,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         if (AdmissionAction.REQUEST_DISCHARGE in actions) SecondaryButton(stringResource(R.string.hosp_solicitar_alta), { model.openReason(row, AdmissionAction.REQUEST_DISCHARGE) }, enabled = !busy)
         if (AdmissionAction.TRANSFER in actions) SecondaryButton(stringResource(R.string.hosp_trasladar), { model.openTransfer(row) }, icon = Icons.Default.SwapHoriz, enabled = !busy)
         if (AdmissionAction.NURSING_NOTE in actions) SecondaryButton(stringResource(R.string.hosp_notas), { model.openNotes(row) }, icon = Icons.AutoMirrored.Filled.Notes, enabled = !busy)
+        HospitalizationRules.vitalsSubject(row)?.let { subject -> onOpenVitals?.let { open -> RowAction(stringResource(R.string.rec7_hosp_signos), { open(subject) }) } }
         if (AdmissionAction.REVOKE_DISCHARGE in actions) SecondaryButton(stringResource(R.string.hosp_revocar_alta), { model.openReason(row, AdmissionAction.REVOKE_DISCHARGE) }, enabled = !busy)
         if (AdmissionAction.CANCEL in actions) SecondaryButton(stringResource(R.string.hosp_cancelar_admision), { model.openReason(row, AdmissionAction.CANCEL) }, enabled = !busy)
     }

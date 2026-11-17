@@ -48,6 +48,8 @@ data class CategoryRequestsState(
     val loadingSlots: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
+    /** A2: opening "Asignar" looks for the first of the next 7 days with a free slot in the requested time of day. */
+    val searchingDay: Boolean = false,
     /** The patient left "Pedir cita" with the back gesture; reopening resumes this draft. */
     val draftKept: Boolean = false,
     val notice: String? = null,
@@ -145,12 +147,16 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
     fun openAssign(request: CategoryRequest, date: LocalDate = ReceptionScheduling.today()) {
         if (!request.allows(CategoryRequestRules.ASSIGN)) return
         resolveIntent.reset()
-        mutable.update { it.copy(assigning = request, date = date, doctor = null, slots = emptyList(), slot = null, wholeDay = false, error = null, notice = null) }
+        mutable.update { it.copy(assigning = request, date = date, doctor = null, slots = emptyList(), slot = null, wholeDay = false, error = null, notice = null, searchingDay = true) }
+        daysLeft = SEARCH_DAYS - 1
         loadDoctors(prefill = true)
     }
+
+    /** Days still to try while looking for the first free one (A2; no API returns it, see gap A-1). */
+    private var daysLeft = 0
     fun closeAssign() { if (!mutable.value.saving) { slotsJob?.cancel(); doctorsJob?.cancel(); mutable.update { it.copy(assigning = null, slots = emptyList(), slot = null) } } }
 
-    fun selectDate(date: LocalDate) { mutable.update { it.copy(date = date, slots = emptyList(), slot = null) }; loadDoctors(prefill = false) }
+    fun selectDate(date: LocalDate) { daysLeft = 0; mutable.update { it.copy(date = date, slots = emptyList(), slot = null, searchingDay = false) }; loadDoctors(prefill = mutable.value.doctor == null) }
 
     fun pickDoctor(d: SchedulingDoctor) {
         if (!d.hasShift) return
@@ -202,9 +208,10 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
                     val kept = s.doctor?.let { d -> doctors.firstOrNull { it.id == d.id && it.hasShift } }
                     s.copy(doctors = doctors, doctor = kept ?: if (prefill) s.assigning?.let { CategoryRequestRules.suggestedDoctor(it, doctors) } else null)
                 }
-                if (mutable.value.doctor != null) loadSlots(keepSlot = false)
+                if (mutable.value.doctor != null) loadSlots(keepSlot = false) else advanceIfFull()
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                mutable.update { it.copy(error = message(e)) }
+                daysLeft = 0
+                mutable.update { it.copy(error = message(e), searchingDay = false) }
             }
         }
     }
@@ -221,13 +228,27 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
                     val kept = if (keepSlot) st.slot?.let { picked -> slots.firstOrNull { it.start == picked.start && it.selectable } } else null
                     st.copy(loadingSlots = false, slots = slots, slot = kept ?: st.assigning?.let { CategoryRequestRules.firstFreeSlot(slots, it.franja, st.wholeDay) })
                 }
+                advanceIfFull()
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                mutable.update { it.copy(loadingSlots = false, slots = emptyList(), slot = null, error = message(e)) }
+                daysLeft = 0
+                mutable.update { it.copy(loadingSlots = false, slots = emptyList(), slot = null, error = message(e), searchingDay = false) }
             }
         }
     }
 
+    /** While searching, a day with no free slot in the requested time of day moves on to the next one. */
+    private fun advanceIfFull() {
+        val s = mutable.value
+        if (!s.searchingDay) return
+        if (s.slot != null || daysLeft <= 0 || s.assigning == null) { daysLeft = 0; mutable.update { it.copy(searchingDay = false) }; return }
+        daysLeft--
+        mutable.update { it.copy(date = it.date.plusDays(1), slots = emptyList(), slot = null) }
+        loadDoctors(prefill = true)
+    }
+
     private fun message(error: Exception) = businessMessage(error, "No se pudo completar la operación.")
+
+    private companion object { const val SEARCH_DAYS = 7 }
 
     override fun onCleared() { live.stop(); slotsJob?.cancel(); doctorsJob?.cancel(); super.onCleared() }
 }

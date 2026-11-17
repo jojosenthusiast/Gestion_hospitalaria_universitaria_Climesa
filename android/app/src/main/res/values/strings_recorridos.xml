@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- R7 U2: textos de los recorridos rediseñados (fila, consulta, citas, vinculación, inicio del paciente, ambulancia, planta). -->
+<resources>
+    <!-- B1 mostrador -->
+    <string name="rec7_emitir_numero">Emitir número</string>
+    <string name="rec7_emitir_para">Emitir número para %1$s</string>
+    <string name="rec7_numero_emitido">Número emitido</string>
+    <string name="rec7_servicio">Servicio</string>
+    <plurals name="rec7_antes">
+        <item quantity="one">%1$d antes</item>
+        <item quantity="other">%1$d antes</item>
+    </plurals>
+    <!-- B5 Mi turno -->
+    <plurals name="rec7_turno_antes">
+        <item quantity="one">%1$d persona antes de ti</item>
+        <item quantity="other">%1$d personas antes de ti</item>
+    </plurals>
+    <string name="rec7_turno_eres_siguiente">Eres el siguiente</string>
+    <string name="rec7_turno_sin_llamados">Aún no han llamado a nadie en tu área</string>
+    <string name="rec7_turno_te_llamaran">Te llamarán en la pantalla de la sala y aquí.</string>
+    <string name="rec7_turno_pasa_a">Pasa a %1$s</string>
+    <string name="rec7_turno_pasa">Te están llamando</string>
+    <string name="rec7_turno_llamado_detalle">Acércate al área indicada con tu número.</string>
+    <!-- B4 consulta -->
+    <string name="rec7_consulta_diagnosticos">Diagnósticos (%1$d)</string>
+    <string name="rec7_consulta_receta">Receta (%1$d)</string>
+    <string name="rec7_consulta_examenes">Exámenes (%1$d)</string>
+    <string name="rec7_consulta_ya_ordenado">Ya ordenado</string>
+    <!-- A1-A5 citas -->
+    <string name="rec7_proxima_cita">Tu próxima cita</string>
+    <string name="rec7_reprogramar_titulo">Pedir otro horario</string>
+    <string name="rec7_enviar_solicitud">Enviar solicitud</string>
+    <string name="rec7_buscando_dia">Buscando el primer día con hueco…</string>
+    <!-- G2 vinculación -->
+    <string name="rec7_vinculo_desde">En revisión desde el %1$s</string>
+    <!-- G4 ambulancia -->
+    <string name="rec7_amb_falta_motivo">Escribe el motivo (qué pasa) para poder enviar.</string>
+    <!-- G5 planta -->
+    <string name="rec7_hosp_signos">Tomar signos</string>
+    <string name="rec7_descartar">Descartar</string>
+    <string name="rec7_volver_a_cargar">Volver a cargar</string>
+</resources>

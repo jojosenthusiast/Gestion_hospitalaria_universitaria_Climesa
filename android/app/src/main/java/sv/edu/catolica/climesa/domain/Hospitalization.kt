@@ -69,6 +69,8 @@ data class HospitalAdmission(
     val dischargeRequestedAt: String? = null,
     val discharge: AdmissionDischarge? = null,
     val allowedActions: Set<AdmissionAction> = emptySet(),
+    /** G5: lets the ward open "Signos vitales" on this patient. */
+    val patientId: String? = null,
 )
 
 data class HospitalBedSuggestion(val id: String, val version: Int, val code: String, val room: String, val category: String, val reason: String)
@@ -94,6 +96,7 @@ object AdmissionParser {
             isolation = row.optBoolean("isolation"),
             version = row.optInt("version", 1),
             occupationId = row.textOrNull("occupationId"),
+            patientId = row.textOrNull("patientId"),
             bedCategory = row.textOrNull("bedCategory"),
             authorized = row.optBoolean("authorized"),
             attendingDoctorName = row.textOrNull("attendingDoctorName"),
@@ -131,6 +134,13 @@ object AdmissionParser {
  * only keep the user from sending clinical text nobody wrote.
  */
 object HospitalizationRules {
+    /** G5: a hospitalized patient (or waiting for a bed) can have signs taken straight from the ward card. */
+    fun vitalsSubject(row: HospitalAdmission): QuickSubject? {
+        val id = row.patientId ?: return null
+        if (row.state !in setOf("hospitalizado", "pendiente_cama")) return null
+        return QuickSubject(id, row.patientName, if (row.bed.isBlank()) "Sin cama asignada" else "Cama ${row.bed}")
+    }
+
     /** S13: the main action of an admission's state, the only one drawn as primary; the rest stay secondary. */
     private val mainActions = listOf(AdmissionAction.ASSIGN_BED, AdmissionAction.SIGN_DISCHARGE, AdmissionAction.REGISTER_EXIT)
 

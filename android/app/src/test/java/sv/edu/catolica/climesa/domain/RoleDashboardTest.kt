@@ -124,7 +124,7 @@ class RoleDashboardTest {
         )
         assertTrue(model.kpis.first { it.label == "Próxima cita" }.value.contains("Dra. Ejemplo"))
         assertEquals("N.º 12", model.kpis.first { it.label == "Mi turno en fila" }.value)
-        assertTrue(model.attention.any { it.title == "1 examen con resultado" })
+        assertTrue(model.attention.any { it.title == "Resultados nuevos (1)" })
         assertTrue(model.kpis.none { it.label == "Exámenes listos" })
         assertEquals("Es tu turno", model.attention.first().title)
     }

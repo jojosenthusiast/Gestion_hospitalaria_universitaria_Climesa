@@ -7,6 +7,7 @@ import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -61,6 +62,8 @@ data class AmbulanceUiState(
     val error: String? = null,
     val formError: String? = null,
     val notice: String? = null,
+    /** G4: the milestone just tapped, held 10 s with "Deshacer" before it joins the queue (no inverse endpoint exists). */
+    val pendingMilestone: PendingUndo? = null,
 )
 
 enum class AmbulanceMode { STATUS, LOG, ARRIVAL, REQUEST, PARAMEDIC }
@@ -84,8 +87,9 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         if (provisional != null && mutable.value.provisional == null) mutable.value = mutable.value.copy(provisional = provisional)
         val milestones = drafts.load(id, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.let { items -> (0 until items.length()).mapNotNull { items.optJSONObject(it)?.let(QueuedMilestone::fromJson) } }.orEmpty()
         if (milestones.isNotEmpty() && mutable.value.queuedMilestones.isEmpty()) mutable.value = mutable.value.copy(queuedMilestones = milestones, notice = "Hay hitos en cola: se enviarán al volver la señal.")
-        // Signed in again (after a sign-out or the inactivity timeout): send what waited on the phone.
-        if (milestones.isNotEmpty()) flushMilestones()
+        // Signed in again (after a sign-out, the inactivity timeout or a killed app): send what waited on the phone. A
+        // milestone tapped just before the app died keeps only the rest of its undo window; one past it goes now.
+        if (milestones.isNotEmpty()) { resumeHeld(); flushMilestones() }
         if (queued != null) retryQueued()
     }
     private var restoredForm: JSONObject? = null
@@ -178,7 +182,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
                     if (AmbulanceEvents.isPrehospital(signal.event) || (signal.event.type == "ambulancia.hito" && signal.event.entity == "servicio")) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
                     load()
                 }
-                RealtimeSignal.Resync -> { load(); retryQueued(); flushMilestones() }
+                RealtimeSignal.Resync -> { load(); retryQueued(); resumeHeld(); flushMilestones() }
                 else -> Unit
             }
         }
@@ -229,17 +233,78 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
      * MA-AMB-06: every milestone goes through the ordered queue: without signal it stays on the phone (with its key and
      * time) and is resent on reconnect or with "Reintentar", so the paramedic keeps working offline.
      */
-    fun advance(service: AmbulanceService, type: String, finalState: String? = null, reason: String = "", notice: String = "Hito registrado.", at: Instant = Instant.now()) {
+    fun advance(service: AmbulanceService, type: String, finalState: String? = null, reason: String = "", notice: String = "Hito registrado.", at: Instant = Instant.now(), undoable: Boolean = false) {
         val current = projected(service)
         if (type == "finalizado" && AmbulanceRules.finishNeedsReason(current) && (finalState == null || reason.trim().length < 5)) {
             mutable.value = mutable.value.copy(formError = "Para terminar sin llegar al hospital elige cómo terminó y escribe el motivo."); return
         }
-        val item = QueuedMilestone(service.id, type, AmbulanceRules.milestoneBody(type, finalState, reason, at).toString(), java.util.UUID.randomUUID().toString())
-        saveMilestones(mutable.value.queuedMilestones + item)
+        // The phone time is the tap, not the end of the undo window.
+        val body = AmbulanceRules.milestoneBody(type, finalState, reason, at).toString()
+        val key = java.util.UUID.randomUUID().toString()
+        if (undoable) {
+            // G4: stored at once (it survives a killed app), held 10 s so "Deshacer" can drop it before it is sent.
+            releaseHeld()
+            val item = QueuedMilestone(service.id, type, body, key, holdUntil = clock() + MILESTONE_UNDO_MS)
+            mutable.value = mutable.value.copy(formError = null, notice = null)
+            saveMilestones(mutable.value.queuedMilestones + item)
+            hold(item, MILESTONE_UNDO_MS, notice)
+            return
+        }
+        // A milestone still in its window goes first, so the queue keeps the order the paramedic tapped.
+        releaseHeld()
+        saveMilestones(mutable.value.queuedMilestones + QueuedMilestone(service.id, type, body, key))
         flushMilestones(notice)
     }
 
-    fun retryMilestones() = flushMilestones()
+    /** G4: "Deshacer" inside the window: the milestone leaves the phone's queue and never reaches the API. */
+    fun undoMilestone() {
+        val held = mutable.value.queuedMilestones.lastOrNull { it.holdUntil > 0 } ?: return
+        holds.remove(held.key)?.cancel()
+        saveMilestones(mutable.value.queuedMilestones.filterNot { it.key == held.key })
+        mutable.value = mutable.value.copy(pendingMilestone = null, notice = "Hito anulado; no se registró.")
+    }
+
+    /** Clock of the undo window (tests move it to after a restart). */
+    var clock: () -> Long = { System.currentTimeMillis() }
+    private val holds = mutableMapOf<String, Job>()
+
+    private fun pendingOf(item: QueuedMilestone) = PendingUndo(item.serviceId, "Registrando «${AmbulanceLabels.milestone(item.type)}» a las ${localClock(runCatching { Instant.parse(item.occurredAt) }.getOrDefault(Instant.now()))}…")
+
+    private fun hold(item: QueuedMilestone, wait: Long, notice: String? = null) {
+        mutable.value = mutable.value.copy(pendingMilestone = pendingOf(item))
+        holds[item.key] = viewModelScope.launch {
+            delay(wait)
+            holds.remove(item.key)
+            free(item.key)
+            flushMilestones(notice)
+        }
+    }
+
+    /** Frees [key] from its window (in memory and on the phone) so the next flush sends it. */
+    private fun free(key: String) {
+        saveMilestones(mutable.value.queuedMilestones.map { if (it.key == key) it.copy(holdUntil = 0L) else it })
+        if (mutable.value.queuedMilestones.none { it.holdUntil > 0 }) mutable.value = mutable.value.copy(pendingMilestone = null)
+    }
+
+    /** Another milestone was tapped: the one still in its window is sent first, in tap order. */
+    private fun releaseHeld() {
+        mutable.value.queuedMilestones.filter { it.holdUntil > 0 }.forEach { holds.remove(it.key)?.cancel(); free(it.key) }
+    }
+
+    /** After a restart: a held milestone past its window is freed; one still inside it waits only for the rest. */
+    private fun resumeHeld() {
+        val now = clock()
+        mutable.value.queuedMilestones.filter { it.holdUntil > 0 && it.key !in holds }.forEach { item ->
+            if (item.holdUntil <= now) free(item.key) else hold(item, (item.holdUntil - now).coerceAtMost(MILESTONE_UNDO_MS))
+        }
+    }
+
+    private fun localClock(at: Instant) = java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(at.atZone(java.time.ZoneId.of("America/El_Salvador")))
+
+    fun retryMilestones() { resumeHeld(); flushMilestones() }
+
+    /** Screen back on top: what is past its window, or waited for signal, is sent now. */
+    fun resume() = retryMilestones()
 
     private var flushing = false
 
@@ -261,6 +326,8 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             try {
                 while (true) {
                     val next = mutable.value.queuedMilestones.firstOrNull() ?: break
+                    // A milestone in its undo window (and every later one) waits for the window to end.
+                    if (next.holdUntil > 0) break
                     try {
                         withContext(RequestIntent(next.key)) { api.request("/ambulancia/servicios/${next.serviceId}/hitos", "POST", JSONObject(next.body)) }
                         saveMilestones(mutable.value.queuedMilestones.drop(1))
@@ -382,4 +449,6 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             else -> userMessage(error, "No se pudo completar la operación.")
         }
     }
+
+    companion object { const val MILESTONE_UNDO_MS = 10_000L }
 }

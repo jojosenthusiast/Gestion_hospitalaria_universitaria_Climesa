@@ -93,7 +93,11 @@ class LaboratoryViewModel @Inject constructor(
     private val api: ApiGateway,
     realtime: RealtimeRepository,
     private val documents: DocumentReader,
+    private val drafts: sv.edu.catolica.climesa.data.DraftStore = sv.edu.catolica.climesa.data.NoDraftStore,
 ) : ViewModel() {
+    /** The patient opened "Mis exámenes": what is released until now is no longer "nuevo" on Inicio. */
+    fun markResultsSeen(userId: String) = sv.edu.catolica.climesa.data.ResultsSeen.mark(drafts, userId)
+
     private val mutable = MutableStateFlow(LaboratoryState())
     val state = mutable.asStateFlow()
     private val live = LiveSubscription(realtime)

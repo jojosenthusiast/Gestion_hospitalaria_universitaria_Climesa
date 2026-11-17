@@ -57,7 +57,7 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
     private var userId: String? = null
 
     /** Signed-in user: the unsaved measures of each patient are kept as that user's local draft. */
-    fun bindUser(id: String) { if (userId != id) { userId = id; drafts.retainOnly(id) } }
+    fun bindUser(id: String) { if (userId != id) { userId = id; drafts.retainOnly(id, sv.edu.catolica.climesa.data.SessionDrafts.PENDING_WRITES) } }
 
     private fun keepDraft(form: VitalsForm) {
         val user = userId ?: return

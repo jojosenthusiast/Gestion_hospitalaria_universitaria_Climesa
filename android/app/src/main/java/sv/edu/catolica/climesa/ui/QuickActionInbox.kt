@@ -33,6 +33,9 @@ class QuickActionInbox(initial: QuickActionRequest? = null) {
     /** The pending verb for [section], or null when the request is for another section or has no verb. */
     fun actionFor(section: AndroidSection): QuickAction? = request?.takeIf { it.section == section }?.action
 
+    /** G5: the person the request for [section] opens on, or null. */
+    fun subjectFor(section: AndroidSection): sv.edu.catolica.climesa.domain.QuickSubject? = request?.takeIf { it.section == section }?.subject
+
     fun consume(section: AndroidSection) { if (request?.section == section) request = null }
 
     /** Drops a request that was left behind when the user moved to another section. */
@@ -40,11 +43,17 @@ class QuickActionInbox(initial: QuickActionRequest? = null) {
 
     companion object {
         val Saver: Saver<QuickActionInbox, String> = Saver(
-            save = { inbox -> inbox.request?.let { "${it.section.name}|${it.action?.name.orEmpty()}" }.orEmpty() },
+            save = { inbox ->
+                inbox.request?.let { r ->
+                    val subject = r.subject?.let { listOf(it.id, it.name, it.detail.orEmpty()).joinToString("|") { part -> part.replace('|', '/') } }
+                    listOfNotNull(r.section.name, r.action?.name.orEmpty(), subject).joinToString("|")
+                }.orEmpty()
+            },
             restore = { saved ->
                 val parts = saved.split('|')
                 val section = AndroidSection.entries.firstOrNull { it.name == parts.getOrNull(0) }
-                QuickActionInbox(section?.let { QuickActionRequest(it, QuickAction.entries.firstOrNull { action -> action.name == parts.getOrNull(1) }) })
+                val subject = parts.getOrNull(2)?.takeIf { it.isNotBlank() }?.let { sv.edu.catolica.climesa.domain.QuickSubject(it, parts.getOrNull(3).orEmpty(), parts.getOrNull(4)?.ifBlank { null }) }
+                QuickActionInbox(section?.let { QuickActionRequest(it, QuickAction.entries.firstOrNull { action -> action.name == parts.getOrNull(1) }, subject) })
             },
         )
     }

@@ -73,12 +73,13 @@ data class OwnAmbulanceRequest(
 }
 
 /** MA-AMB-06: a milestone recorded without signal; the same key and phone time are resent until the API answers. */
-data class QueuedMilestone(val serviceId: String, val type: String, val body: String, val key: String) {
+/** [holdUntil] (epoch millis, 0 = free) keeps a just-tapped milestone in its undo window; it is stored like the rest. */
+data class QueuedMilestone(val serviceId: String, val type: String, val body: String, val key: String, val holdUntil: Long = 0L) {
     /** Phone time of the milestone, as it will reach the API. */
     val occurredAt: String get() = runCatching { JSONObject(body).optString("occurredAt") }.getOrDefault("")
-    fun toJson(): JSONObject = JSONObject().put("serviceId", serviceId).put("type", type).put("body", body).put("key", key)
+    fun toJson(): JSONObject = JSONObject().put("serviceId", serviceId).put("type", type).put("body", body).put("key", key).put("holdUntil", holdUntil)
     companion object {
-        fun fromJson(json: JSONObject): QueuedMilestone? = runCatching { QueuedMilestone(json.getString("serviceId"), json.getString("type"), json.getString("body"), json.getString("key")) }.getOrNull()
+        fun fromJson(json: JSONObject): QueuedMilestone? = runCatching { QueuedMilestone(json.getString("serviceId"), json.getString("type"), json.getString("body"), json.getString("key"), json.optLong("holdUntil", 0L)) }.getOrNull()
     }
 }
 
@@ -116,6 +117,23 @@ object AmbulanceLabels {
     fun priority(code: String) = priorities.firstOrNull { it.first == code }?.second ?: code
     fun type(code: String) = types.firstOrNull { it.first == code }?.second ?: code
     fun sign(code: String) = signs[code] ?: code
+
+    /**
+     * G4: the prehospital signs as the receiving nurse reads them: pressure joined ("120/80 mmHg"), each value with its unit,
+     * in the order of a triage sheet. Unknown codes keep their raw label at the end.
+     */
+    fun readableSigns(values: Map<String, String>): List<Pair<String, String>> = buildList {
+        val v = values.filterValues { it.isNotBlank() && it != "null" }
+        val sys = v["systolic"]; val dia = v["diastolic"]
+        if (sys != null || dia != null) add("Presión" to "${sys ?: "?"}/${dia ?: "?"} mmHg")
+        v["heartRate"]?.let { add("Pulso" to "$it lpm") }
+        v["oxygenSaturation"]?.let { add("Saturación" to "$it %") }
+        v["respiratoryRate"]?.let { add("Respiración" to "$it rpm") }
+        v["temperature"]?.let { add("Temperatura" to "$it °C") }
+        v["glasgow"]?.let { add("Glasgow" to "$it/15") }
+        val known = setOf("systolic", "diastolic", "heartRate", "oxygenSaturation", "respiratoryRate", "temperature", "glasgow")
+        v.filterKeys { it !in known }.forEach { (code, value) -> add(sign(code) to value) }
+    }
     /** Prioridad, estado final y tipo elegidos, como texto de chip. */
     fun chips(filters: LogFilters): List<Pair<String, String>> = buildList {
         if (filters.priority.isNotBlank()) add("priority" to "Prioridad: ${priority(filters.priority)}")
@@ -125,12 +143,15 @@ object AmbulanceLabels {
 }
 
 object AmbulanceRules {
+    /** Minimum length of the patient's reason (the API rule); "Enviar" stays off below it. */
+    const val REASON_MIN = 5
+
     const val NOTICE_911 = "Si hay riesgo de vida, llama al 911."
     private val phone = Regex("^[0-9+ -]{8,20}$")
 
     fun requestError(address: String, reason: String, contactPhone: String): String? = when {
         address.trim().length < 5 -> "Indica la dirección, de al menos 5 caracteres."
-        reason.trim().length < 5 -> "Indica el motivo, de al menos 5 caracteres."
+        reason.trim().length < REASON_MIN -> "Indica el motivo, de al menos 5 caracteres."
         !phone.matches(contactPhone.trim()) -> "Indica un teléfono de contacto de 8 a 20 dígitos."
         else -> null
     }

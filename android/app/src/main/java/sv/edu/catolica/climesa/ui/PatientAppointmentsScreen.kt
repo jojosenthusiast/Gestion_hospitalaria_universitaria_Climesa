@@ -42,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AppointmentAction
 import sv.edu.catolica.climesa.domain.AppointmentActions
+import sv.edu.catolica.climesa.domain.AppointmentReasons
 import sv.edu.catolica.climesa.domain.PatientAppointment
 import sv.edu.catolica.climesa.domain.QuickAction
 
@@ -72,7 +73,10 @@ fun PatientAppointmentsScreen(
     }
     // Fase 2, flow A: the patient asks by reason instead of picking one of every doctor; reception assigns doctor and time.
     BackHandler(enabled = requestState.formOpen) { requests.leaveForm() }
-    if (requestState.formOpen) { CategoryRequestForm(requestState, requests, state.doctors, modifier); return }
+    // A1: "Solicitud enviada" goes away by itself after 5 s (it also goes when leaving the screen).
+    LaunchedEffect(requestState.notice) { if (requestState.notice != null) { kotlinx.coroutines.delay(5_000); requests.clearMessages() } }
+    LaunchedEffect(requestState.formOpen) { if (requestState.formOpen) model.loadRequestDoctors() }
+    if (requestState.formOpen) { CategoryRequestForm(requestState, requests, state.requestDoctors.ifEmpty { state.doctors }, modifier); return }
     val cancelAppointment = state.appointments.firstOrNull { it.id == cancelTarget }
 
     if (cancelAppointment != null) {
@@ -107,7 +111,9 @@ fun PatientAppointmentsScreen(
             val split = PatientAppointmentRules.split(state.appointments, java.time.Instant.now())
             if (split.upcoming.isEmpty()) item { Text(stringResource(R.string.cita_sin_proximas), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             else item { Text(stringResource(R.string.cita_proximas), style = MaterialTheme.typography.titleSmall) }
-            items(split.upcoming, key = { it.id }) { appointment ->
+            // A5: the next appointment is large on top, with its actions; the rest follow in ascending order.
+            split.upcoming.firstOrNull()?.let { next -> item(key = "proxima-${next.id}") { NextAppointmentCard(next, onCancel = { cancelTarget = next.id }, onReschedule = { model.clearMessages(); model.openReschedule(next) }) } }
+            items(split.upcoming.drop(1), key = { it.id }) { appointment ->
                 AppointmentCard(appointment, onCancel = { cancelTarget = appointment.id }, onReschedule = { model.clearMessages(); model.openReschedule(appointment) })
             }
             if (split.past.isNotEmpty()) item(key = "pasadas") {
@@ -122,12 +128,36 @@ fun PatientAppointmentsScreen(
     }
 }
 
+/** A5: "Tu próxima cita", large: day and time, doctor, reason and its actions. */
+@Composable
+private fun NextAppointmentCard(appointment: PatientAppointment, onCancel: () -> Unit, onReschedule: () -> Unit) {
+    Column(Modifier.fillMaxWidth().areaSurface("CON").padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text(stringResource(R.string.rec7_proxima_cita), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PatientAppointmentTag(appointment.state)
+        }
+        Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start)), style = MaterialTheme.typography.titleLarge)
+        Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end), style = MaterialTheme.typography.headlineSmall)
+        Text(appointment.doctorName.ifBlank { "Médico asignado" }, style = MaterialTheme.typography.bodyLarge)
+        appointment.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2) }
+        AppointmentDetails(appointment, onCancel, onReschedule)
+    }
+}
+
 @Composable
 private fun AppointmentCard(appointment: PatientAppointment, onCancel: () -> Unit, onReschedule: () -> Unit) {
     // R3 A-41: one compact block per appointment (when, who, why) with its state on the right; no labels in capitals.
     SectionCard(appointment.doctorName.ifBlank { "Médico asignado" }, action = { PatientAppointmentTag(appointment.state) }) {
         Text("${sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start))} · ${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end)}", style = MaterialTheme.typography.bodyLarge)
         appointment.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
+        AppointmentDetails(appointment, onCancel, onReschedule)
+    }
+}
+
+/** Deadline, pending change and the actions the server allows, shared by both cards. */
+@Composable
+private fun AppointmentDetails(appointment: PatientAppointment, onCancel: () -> Unit, onReschedule: () -> Unit) {
+    run {
         // CITA-01: the deadline the API gives for cancelling or rescheduling.
         if (appointment.allows(AppointmentAction.CANCEL) || appointment.allows(AppointmentAction.RESCHEDULE)) appointment.cancelableUntil?.let {
             Text(stringResource(R.string.cita_plazo, sv.edu.catolica.climesa.domain.AppointmentAgenda.deadline(it, appointment.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -153,39 +183,22 @@ private fun PatientActionButton(appointment: PatientAppointment, action: Appoint
     if (appointment.allows(action)) RowAction(label, onClick)
 }
 
-/** CITA-01: the patient asks for another free slot of the same doctor; Recepción or the doctor decides. */
+/** CITA-01 / A4: the patient asks for another free slot of the same doctor in a bottom sheet with day chips. */
 @Composable
 private fun RescheduleRequestDialog(appointment: PatientAppointment, state: PatientAppointmentsState, model: PatientAppointmentsViewModel) {
-    var datePickerOpen by rememberSaveable { mutableStateOf(false) }
-    ConfirmDialog(
-        title = "Solicitar reprogramación",
-        confirmLabel = "Enviar solicitud",
-        onConfirm = model::reschedule,
-        onDismiss = model::closeReschedule,
-        message = "${appointment.doctorName} · ${formatAppointmentDateTime(appointment.start)}",
-        busy = state.saving,
-        confirmEnabled = state.rescheduleSlot?.selectable == true,
-        body = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                state.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
-                OutlinedButton(onClick = { datePickerOpen = true }, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(Icons.Default.CalendarMonth, contentDescription = null); Spacer(Modifier.padding(4.dp)); Text(stringResource(R.string.cita_fecha, state.rescheduleDate.format(appointmentDateFormatter))) }
-                when {
-                    state.loadingRescheduleSlots -> LoadingState()
-                    state.rescheduleSlots.isEmpty() -> Text(stringResource(R.string.cita_sin_franjas), style = MaterialTheme.typography.bodySmall)
-                    else -> { Text(stringResource(R.string.cita_elige_franja), style = MaterialTheme.typography.bodySmall); DaySlotGrid(state.rescheduleSlots, state.rescheduleSlot, model::pickRescheduleSlot) }
-                }
-            }
-        },
+    RescheduleSheet(
+        title = stringResource(R.string.rec7_reprogramar_titulo), summary = "${appointment.doctorName} · ${formatAppointmentDateTime(appointment.start)}",
+        date = state.rescheduleDate, onDate = model::selectRescheduleDate, loading = state.loadingRescheduleSlots, slots = state.rescheduleSlots,
+        slot = state.rescheduleSlot, onSlot = model::pickRescheduleSlot, error = state.error, busy = state.saving,
+        confirmLabel = stringResource(R.string.rec7_enviar_solicitud), onConfirm = model::reschedule, onDismiss = model::closeReschedule,
     )
-    if (datePickerOpen) {
-        val picker = rememberDatePickerState(initialSelectedDateMillis = state.rescheduleDate.atStartOfDay(sanSalvador).toInstant().toEpochMilli())
-        DatePickerDialog(onDismissRequest = { datePickerOpen = false }, confirmButton = { TextButton(onClick = { picker.selectedDateMillis?.let { model.selectRescheduleDate(Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate()) }; datePickerOpen = false }) { Text("Aceptar") } }, dismissButton = { TextButton(onClick = { datePickerOpen = false }) { Text("Cancelar") } }) { DatePicker(state = picker) }
-    }
 }
 
 @Composable
 private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boolean, error: String?, model: PatientAppointmentsViewModel, onClose: () -> Unit) {
+    // D-8: a quick reason is one tap and needs no typing; only "Otro" asks for text.
     var reason by rememberSaveable(appointment.id) { mutableStateOf("") }
+    var other by rememberSaveable(appointment.id) { mutableStateOf(false) }
     ConfirmDialog(
         title = "Cancelar cita",
         confirmLabel = "Confirmar",
@@ -197,7 +210,13 @@ private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boole
         destructive = true,
         busy = busy,
         confirmEnabled = reason.trim().length >= AppointmentActions.REASON_MIN,
-        body = { FormField("Motivo", reason, { reason = it.take(AppointmentActions.REASON_MAX) }, singleLine = false, hint = AppointmentActions.counter(reason)) },
+        body = {
+            ReasonChips(AppointmentReasons.patientCancel, if (other) AppointmentReasons.OTHER else reason.takeIf { it in AppointmentReasons.patientCancel }, { picked ->
+                other = picked == AppointmentReasons.OTHER
+                reason = if (other) "" else picked
+            }, enabled = !busy, other = AppointmentReasons.OTHER)
+            if (other) FormField("Motivo", reason, { reason = it.take(AppointmentActions.REASON_MAX) }, singleLine = false, hint = AppointmentActions.counter(reason))
+        },
     )
 }
 
