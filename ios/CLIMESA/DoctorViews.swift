@@ -626,7 +626,6 @@ private struct SendExternalSheet: View {
     var body: some View {
         NavigationStack {
             ScreenFrame(title: "results.external.send", onClose: { dismiss() }) {
-                Text("results.external.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 MedicoTextArea(label: L.text("results.external.place"), text: $place, error: problem ?? submission.fieldErrors["place"], lines: 1...2)
                 MedicoTextArea(label: L.text("results.external.instructions"), text: $instructions, error: submission.fieldErrors["instructions"], lines: 3...6)
                 WriteNotice(submission: submission, reload: reload)
@@ -664,7 +663,6 @@ private struct CancelLabOrderSheet: View {
                 SectionCard {
                     ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: order.patientName, meta: order.state.label)
                 }
-                Text("results.cancel.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     MedicoTextArea(label: L.text("results.cancel.reason"), text: $reason, error: reasonError ?? submission.fieldErrors["reason"], lines: 3...6)
                     CharacterCounter(count: LabCancelRules.reasonCount(reason), range: LabCancelRules.reasonRange)

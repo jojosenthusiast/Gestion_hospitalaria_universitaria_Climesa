@@ -2234,17 +2234,6 @@
         }
       }
     },
-    "queue.ahead.hint": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calculado con los números llamados hoy; puede variar."
-          }
-        }
-      }
-    },
     "queue.called": {
       "extractionState": "manual",
       "localizations": {
@@ -2406,17 +2395,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Se realiza en otro sitio"
-          }
-        }
-      }
-    },
-    "results.external.intro": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La orden queda como externa: ya no se toma muestra aquí. El paciente ve el lugar y estas instrucciones en sus exámenes."
           }
         }
       }
@@ -3670,7 +3648,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Elige otra franja libre del mismo médico. Tu cita actual sigue vigente hasta que Recepción o tu médico acepten el cambio."
+            "value": "Tu cita actual sigue vigente hasta que acepten el cambio."
           }
         }
       }
@@ -3968,17 +3946,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancelar orden de laboratorio"
-          }
-        }
-      }
-    },
-    "results.cancel.intro": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La orden deja de avanzar y el laboratorio ya no la procesa. Queda registrado quién la canceló y por qué."
           }
         }
       }
@@ -4309,17 +4276,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Solicitud retirada."
-          }
-        }
-      }
-    },
-    "appointments.category.intro": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elige el motivo; recepción te asigna médico y hora."
           }
         }
       }
@@ -5233,6 +5189,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Expediente %@"
+          }
+        }
+      }
+    },
+    "appointments.actions": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acciones de la cita"
           }
         }
       }

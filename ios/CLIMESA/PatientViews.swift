@@ -158,8 +158,9 @@ private struct HomeLabCard: View {
             let pending = PatientLabRules.pendingCount(labs)
             let ready = labs.filter { $0.reviewedAt != nil }.count
             HStack(spacing: Spacing.m) {
-                StatTile(value: String(pending), label: L.text("ds.paciente.home.pending"))
-                StatTile(value: String(ready), label: L.text("ds.paciente.home.ready"))
+                // I-10: figures inside the card are plain, not cards of their own.
+                StatTile(value: String(pending), label: L.text("ds.paciente.home.pending"), plain: true)
+                StatTile(value: String(ready), label: L.text("ds.paciente.home.ready"), plain: true)
             }
         }
     }
@@ -216,8 +217,7 @@ private struct QueueTicketCard: View {
                 }
                 PatientTag(ticket.state.rawValue, label: ticket.state.label)
                 if ticket.state == .enEspera, let board, let ahead = QueueRules.ahead(of: ticket.number, called: board.called) {
-                    StatTile(value: String(ahead), label: String(format: L.text("queue.ahead"), ahead))
-                    Text("queue.ahead.hint").font(Typo.caption).foregroundStyle(Theme.muted)
+                    StatTile(value: String(ahead), label: String(format: L.text("queue.ahead"), ahead), plain: true)
                 }
                 Text(verbatim: String(format: L.text("queue.issued"), ClimesaDates.display(ticket.issuedAt, .time))).font(Typo.small).foregroundStyle(Theme.muted)
             }
@@ -242,9 +242,9 @@ struct PatientAppointmentsView: View {
     @State private var requestSent = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Spacing.space4) {
             // Fase 2, flujo A: se pide por motivo, no eligiendo entre todos los médicos; recepción asigna médico y hora.
-            if account.can("citas.solicitar") { ClimesaButton(title: L.text("appointments.request")) { requestSent = false; requesting = true } }
+            // S1 / I-25: «Pedir cita» is the screen's primary action, in the bar (HIG), not a full-width button.
             if requestSent { PatientNotice(text: L.text("appointments.category.sent")) }
             PatientSubmissionNotice(submission: submission)
             if let message = requests.error {
@@ -257,16 +257,32 @@ struct PatientAppointmentsView: View {
                 // CITA-04: el reloj de interfaz (cada minuto) solo recalcula qué acciones siguen válidas; no pide datos.
                 TimelineView(.everyMinute) { context in
                     let split = AppointmentRules.split(list, now: context.date)
-                    VStack(alignment: .leading, spacing: 16) {
-                        SectionTitle("appointments.upcoming")
-                        if split.upcoming.isEmpty { EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar") }
-                        ForEach(split.upcoming) { item in
-                            AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date, cancel: { cancelling = item }, reschedule: { rescheduling = item })
+                    VStack(alignment: .leading, spacing: Spacing.space4) {
+                        // I-26: one empty state per screen; inside a section, one line.
+                        if split.upcoming.isEmpty && split.past.isEmpty {
+                            EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar")
+                        } else {
+                            if split.upcoming.isEmpty {
+                                SectionCard(title: L.text("appointments.upcoming")) { EmptyNote("appointments.upcoming.none") }
+                            } else {
+                                ListCard(title: L.text("appointments.upcoming"), items: split.upcoming) { item in
+                                    AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date, cancel: { cancelling = item }, reschedule: { rescheduling = item })
+                                }
+                            }
+                            if !split.past.isEmpty {
+                                ListCard(title: L.text("appointments.past"), items: split.past) { item in
+                                    AppointmentRow(appointment: item, option: .hidden, now: context.date, cancel: {}, reschedule: nil)
+                                }
+                            }
                         }
-                        SectionTitle("appointments.past")
-                        if split.past.isEmpty { EmptyStateView(title: L.text("appointments.past.none"), symbol: "clock.arrow.circlepath") }
-                        ForEach(split.past) { item in AppointmentRow(appointment: item, option: .hidden, now: context.date, cancel: {}, reschedule: nil) }
                     }
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if account.can("citas.solicitar") {
+                    Button(L.text("appointments.request")) { requestSent = false; requesting = true }
                 }
             }
         }
@@ -288,47 +304,54 @@ struct PatientAppointmentsView: View {
     }
 }
 
-/// Una cita con solo las acciones válidas para su estado y su hora (CITA-04): el plazo para cancelar se ve antes de
-/// tocar el botón y, dentro del plazo, el botón queda desactivado con el motivo.
+/// Una cita con solo las acciones válidas para su estado y su hora (CITA-04). I-12 / I-13: las acciones van en un menú
+/// compacto de la fila; lo que el servidor bloquea no se muestra ni se explica con su motivo interno. El plazo para
+/// cancelar (regla de la app, no del servidor) queda como una línea corta.
 private struct AppointmentRow: View {
     let appointment: Appointment
     let option: AppointmentRules.CancelOption
     let now: Date
     let cancel: () -> Void
     let reschedule: (() -> Void)?
+
+    private var canCancel: Bool { if case .allowed = option { return true }; return false }
+    private var canReschedule: Bool { reschedule != nil && AppointmentRules.canReschedule(appointment) }
+
     var body: some View {
-        SectionCard {
-            ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName, meta: appointment.reason) {
-                PatientTag(appointment.state.rawValue, label: appointment.state.label)
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(alignment: .center, spacing: Spacing.s) {
+                ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName, meta: appointment.reason) {
+                    PatientTag(appointment.state.rawValue, label: appointment.state.label)
+                }
+                if canCancel || canReschedule {
+                    Menu {
+                        if canReschedule, let reschedule { Button(L.text("appointments.reschedule"), action: reschedule) }
+                        if canCancel { Button(L.text("appointments.cancel"), role: .destructive, action: cancel) }
+                    } label: {
+                        Image(systemName: "ellipsis.circle").font(Typo.heading).foregroundStyle(Theme.primaryText)
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(Text("appointments.actions"))
+                }
             }
             if let rejection = appointment.rejectionReason, !rejection.isEmpty {
                 Text(verbatim: String(format: L.text("appointments.rejected.reason"), rejection)).font(Typo.small).foregroundStyle(Theme.warning)
             }
             switch option {
-            case .hidden: EmptyView()
             case let .allowed(deadline):
                 Label { Text(verbatim: AppointmentRules.cancelDeadlineText(deadline, now: now)) } icon: { Image(systemName: "clock") }
                     .font(Typo.small).foregroundStyle(Theme.muted)
-                ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel)
             case .tooLate:
-                ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel).disabled(true)
                 Text(verbatim: AppointmentRules.cancelTooLateText()).font(Typo.small).foregroundStyle(Theme.muted)
-            case let .blocked(reason):
-                ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel).disabled(true)
-                Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted)
+            case .hidden, .blocked:
+                EmptyView()
             }
-            // CITA-02: reprogramar solo si el servidor lo permite; si no, el motivo.
+            // CITA-02: el estado de una solicitud de cambio de horario (pendiente, rechazada) sí importa al paciente.
             if let text = AppointmentRules.rescheduleText(appointment) {
                 Text(verbatim: text).font(Typo.small).foregroundStyle(appointment.reschedule?.state == .rechazada ? Theme.warning : Theme.muted)
             }
-            if let reschedule {
-                if AppointmentRules.canReschedule(appointment) {
-                    ClimesaButton(title: L.text("appointments.reschedule"), kind: .secondary, action: reschedule)
-                } else if let reason = AppointmentRules.blockedReason(appointment, .reprogramar), appointment.reschedule?.state != .pendiente {
-                    Text(verbatim: "\(L.text("appointments.reschedule")): \(reason)").font(Typo.small).foregroundStyle(Theme.muted)
-                }
-            }
         }
+        .padding(.bottom, Spacing.s)
     }
 }
 
@@ -485,7 +508,6 @@ private struct CategoryRequestSheet: View {
         NavigationStack {
             ScreenFrame(title: "appointments.request.title", onClose: { dismiss() }) {
                 Group {
-                Text("appointments.category.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 SectionTitle("appointments.category.reason")
                 Text(verbatim: String(format: L.text("appointments.category.count"), picked.count)).font(Typo.caption).foregroundStyle(Theme.muted)
                 searchField(L.text("appointments.category.search"), text: $query)
@@ -666,7 +688,7 @@ struct LabOrderDetail: View {
             }
             if !showValues && PatientLabRules.awaitsReview(order) && LabExternalRules.patientNote(order) == nil { PatientNotice(text: L.text(ReviewRules.isAmendedPendingReview(order) ? "exams.amended" : "exams.waiting_review")) }
             ForEach(order.items) { item in
-                SectionCard(title: "\(item.name) (\(item.code))") {
+                SectionCard(title: staffView ? "\(item.name) (\(item.code))" : item.name) {
                     if showValues {
                         HStack {
                             Text(verbatim: PatientLabRules.valueText(item.result)).font(Typo.heading).foregroundStyle(Theme.ink)
