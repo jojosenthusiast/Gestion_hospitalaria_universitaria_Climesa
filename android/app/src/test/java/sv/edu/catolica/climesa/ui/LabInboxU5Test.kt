@@ -112,6 +112,17 @@ class LabInboxU5Test {
         assertTrue(vm.state.value.followUpsError != null)
     }
 
+    // Verifier B2: with the order loaded, the release summary lists critical values first, then high/low, then normal.
+    @Test fun theReleaseSummaryOfALoadedOrderIsCriticalFirst() {
+        fun item(id: String, name: String, mark: String) = JSONObject().put("id", id).put("code", id).put("name", name).put("unit", "u")
+            .put("result", JSONObject().put("value", 1.0).put("mark", mark))
+        val order = sv.edu.catolica.climesa.domain.LaboratoryParser.orders(JSONArray().put(JSONObject().put("id", "o9").put("patientName", "Ana").put("priority", "rutina")
+            .put("state", "completado").put("version", 2).put("reviewedAt", JSONObject.NULL).put("items", JSONArray().put(item("i1", "Glucosa", "normal")).put(item("i2", "Sodio", "alto"))
+                .put(item("i3", "Hemoglobina", "critico_bajo")).put(item("i4", "Urea", "normal")).put(item("i5", "Potasio", "critico_alto"))))).single()
+        val names = LabReviewSummary.lines(order).map { it.substringBefore(":") }
+        assertEquals(listOf("Hemoglobina", "Potasio", "Sodio", "Glucosa", "Urea"), names)
+    }
+
     @Test fun skippedFollowUpReasonsAreWorded() {
         assertEquals("Sin cita de seguimiento: el paciente está hospitalizado.", LabInbox.followUpOutcome(null, "hospitalizado"))
         assertEquals("Ya había una cita de seguimiento propuesta.", LabInbox.followUpOutcome(null, "ya_propuesta"))

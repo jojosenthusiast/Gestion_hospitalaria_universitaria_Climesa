@@ -36,7 +36,16 @@ import sv.edu.catolica.climesa.domain.LaboratoryLabels
  * read once the result is released. An exam without a result says so.
  */
 internal object LabReviewSummary {
-    fun lines(order: LaboratoryOrder): List<String> = order.items.map { item ->
+    /** C1: critical marks first, then high or low, then normal (and the rest); stable inside each group. */
+    private fun rank(mark: String?) = when {
+        mark == null -> 3
+        mark.startsWith("critico") -> 0
+        mark == "alto" || mark == "bajo" -> 1
+        mark == "normal" -> 2
+        else -> 3
+    }
+
+    fun lines(order: LaboratoryOrder): List<String> = order.items.sortedBy { rank(it.result?.mark) }.map { item ->
         val value = item.result?.let { LaboratoryLabels.valueAndMark(it, item.unit) } ?: "Sin resultado"
         "${item.name}: $value"
     }
