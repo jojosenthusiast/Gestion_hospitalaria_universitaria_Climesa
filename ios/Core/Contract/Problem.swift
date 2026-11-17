@@ -163,7 +163,7 @@ public enum ProblemText {
     /// Texto en español por `codigo` cuando el `detail` falta o no se puede mostrar. Nil si el código no tiene uno propio.
     public static func codeMessage(_ code: String, field: String?) -> String? {
         switch code {
-        case "transicion_invalida": return "La admisión cambió de estado; vuelve a cargar."
+        case "transicion_invalida": return "El registro cambió de estado; vuelve a cargar."
         case "validacion":
             guard let field, let label = fieldLabel(field) else { return "Revisa los datos e inténtalo de nuevo." }
             return "Revisa el dato «\(label)» e inténtalo de nuevo."

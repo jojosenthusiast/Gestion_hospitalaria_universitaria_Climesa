@@ -46,16 +46,29 @@ public enum DoctorDayActionRules {
     /// day's next step; otherwise calling the next waiting number. Nil when there is nothing to do.
     /// `/fila` is not scoped to the doctor: a ticket in attention is this doctor's only when it carries `consultationId`
     /// (the API returns it only for the reader's own consultation), and other services' calls belong to other areas.
-    /// `/fila` also lists the called numbers of every office, so a called number counts only when this doctor called it.
-    public static func primary(tickets: [QueueTicket], canAttend: Bool, canCallNext: Bool, calledByMe: String? = nil) -> DoctorDayAction? {
+    /// `/fila` also lists the called numbers of every office, so a called number counts only when the API says this
+    /// doctor called it (`calledByMe`).
+    public static func primary(tickets: [QueueTicket], canAttend: Bool, canCallNext: Bool) -> DoctorDayAction? {
         if canAttend {
             let mine = tickets.filter { $0.service == .consultaGeneral }
             let inAttention = mine.filter { $0.state == .enAtencion && $0.consultationId != nil }.min { $0.number < $1.number }
-            let called = mine.first { $0.id == calledByMe && $0.state == .llamado }
+            let called = mine.filter { $0.state == .llamado && $0.calledByMe == true }.min { $0.number < $1.number }
             if let current = inAttention ?? called { return .attend(current.id) }
         }
         if canCallNext, QueueRules.nextToCall(tickets) != nil { return .callNext }
         return nil
+    }
+
+    /// A called number without an own consultation belongs to another office only when another clinician called it
+    /// (web `calledElsewhere`). A call by reception or an assistant, or with no recorded caller, stays actionable.
+    public static func calledElsewhere(_ ticket: QueueTicket) -> Bool {
+        ticket.state == .llamado && ticket.consultationId == nil && ticket.calledByColleague == true
+    }
+
+    /// The «Deshacer» line after a call stays only while that number is still called and the server still accepts
+    /// undoing it (`undoActions` contains `deshacer_llamado`).
+    public static func canUndoCall(_ id: String, tickets: [QueueTicket]) -> Bool {
+        tickets.contains { $0.id == id && $0.state == .llamado && ($0.undoActions ?? []).contains(QueueMove.deshacerLlamado.rawValue) }
     }
 }
 

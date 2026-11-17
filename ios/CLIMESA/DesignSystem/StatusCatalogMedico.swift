@@ -56,7 +56,7 @@ struct WriteNotice: View {
 
     var body: some View {
         if submission.lastFailure?.isVersionConflict == true {
-            ConflictBanner { Task { await reload() } }
+            ConflictBanner { Task { submission.clearFailure(); await reload() } }
         } else {
             SubmissionNotice(submission: submission)
         }

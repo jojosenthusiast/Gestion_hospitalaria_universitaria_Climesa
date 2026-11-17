@@ -127,7 +127,11 @@ struct AmbulanceOverviewView: View {
                 Text(verbatim: crew).font(Typo.small).foregroundStyle(Theme.ink)
             }
             if let block = value.dispatchBlock {
-                MedicoAlert(text: block.message)
+                // A dispatch block is a warning, not a critical value: warning tone, red stays for critical.
+                HStack(alignment: .top, spacing: Spacing.s) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning).accessibilityHidden(true)
+                    Text(verbatim: block.message).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                }
                 Text(verbatim: AmbulanceLogRules.blockAdvice(block, canPlanShifts: account.can("turnos.planificar"))).font(Typo.small).foregroundStyle(Theme.ink)
             }
         }

@@ -3,6 +3,14 @@ import Foundation
 /// "Mis turnos" (I26): estado, asistencia y orden por día (ASIS-01). La entrada se confirma sola a la hora de inicio en
 /// la API (el estado sigue al reloj), así que la app no ofrece marcarla; solo Jefatura registra ausencias.
 public enum ShiftAttendanceRules {
+    /// Estado que se muestra (web `shifts/week.ts` `displayState`): el de la API, salvo un publicado cuyo horario ya
+    /// empezó o terminó, que se ve en curso o completado aunque el evento del barrido aún no haya llegado.
+    public static func displayState(_ state: String, start: Date?, end: Date?, now: Date) -> String {
+        guard state == "publicado", let start, let end else { return state }
+        if now < start { return "publicado" }
+        return now < end ? "en_curso" : "completado"
+    }
+
     /// Nombre del estado del turno; nunca el código crudo.
     public static func stateLabel(_ state: String) -> String {
         switch state {

@@ -222,6 +222,23 @@ public enum PatientLabRules {
         return order.state.label
     }
 
+    /// Status family value of an order's badge (web `laboratory.tsx` STAGE_STATUS): a completed order still waiting
+    /// for the doctor's review is "en espera", never a "done" check; a reviewed one is done.
+    public static func badgeValue(_ order: LabOrder) -> String {
+        if order.reviewedAt != nil { return "firmada" }
+        if order.state == .completado { return "en_espera" }
+        return order.state.rawValue
+    }
+
+    /// The patient's "Exámenes pendientes": orders still at the laboratory (pending or in process).
+    public static func pendingCount(_ orders: [LabOrder]) -> Int {
+        orders.filter { $0.state == .pendiente || $0.state == .enProceso }.count
+    }
+
+    /// "Waiting for the doctor's review" only applies to a completed order without its review; a cancelled or
+    /// pending order never says so.
+    public static func awaitsReview(_ order: LabOrder) -> Bool { order.state == .completado && order.reviewedAt == nil }
+
     public static func valueText(_ result: LabItemResult?) -> String {
         guard let result else { return "—" }
         if let value = result.value {
@@ -298,4 +315,16 @@ public enum CategoryRequestRules {
 
     /// Clave de Localizable.xcstrings con el estado de la solicitud.
     public static func stateKey(_ state: String) -> String { "appointments.category.state.\(state)" }
+
+    /// Status family value of the request's badge, as the web `REQUEST_STATE`: pending waits, an assigned request
+    /// reads as a confirmed appointment, rejected and withdrawn are closed.
+    public static func badgeValue(_ state: String) -> String {
+        switch state {
+        case "pendiente": return "en_espera"
+        case "asignada": return "confirmada"
+        case "rechazada": return "rechazada"
+        case "cancelada": return "cancelada"
+        default: return state
+        }
+    }
 }

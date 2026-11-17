@@ -32,10 +32,14 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     public var walkIn: Bool? = nil
     public var officeCode: String? = nil
     public var undoActions: [String]? = nil
+    /// Who called this number: the reader (`calledByMe`) or another account with `consulta.iniciar` (`calledByColleague`).
+    /// Nil on an older server; a call by reception, an assistant or with no recorded caller sets neither.
+    public var calledByMe: Bool? = nil
+    public var calledByColleague: Bool? = nil
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
         case consultationId, consultationState, allowedActions, blockedActions, maxCalls, callsForAbsence
-        case area, priority, appointmentAt, walkIn, officeCode, undoActions
+        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague
     }
 }
 

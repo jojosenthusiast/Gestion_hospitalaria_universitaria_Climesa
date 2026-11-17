@@ -108,6 +108,20 @@ public enum AreaCode: String, CaseIterable, Sendable {
         if let first = parts.first, let numbered = numberedPrefixes[first], parts.count > 1, !parts[1].isEmpty, parts[1].allSatisfy(\.isNumber) { return numbered }
         return parts.lazy.compactMap({ aliases[$0] }).first ?? .gen
     }
+
+    /// Words of a space name and the area they belong to, in the order of web `AREA_NAMES` (`components/identity.tsx`).
+    private static let names: [([String], AreaCode)] = [
+        (["emergenc", "urgenc", "trauma"], .emg), (["laborator"], .lab), (["hospitaliz", "internamiento", "encamad"], .hos),
+        (["consult", "ambulator"], .con), (["recepci", "admision", "citas"], .rec), (["ambulanc", "transporte"], .amb)
+    ]
+
+    /// Área de un espacio por su nombre ("Emergencia" → EMG, "Hospitalización semiprivada" → HOS), como la web. APIs
+    /// como `/turnos/mios` entregan el nombre, no el código; si el nombre no dice el área, se lee como código.
+    public static func of(name: String?) -> AreaCode {
+        let folded = (name ?? "").folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).lowercased()
+        if let match = names.first(where: { words, _ in words.contains { folded.contains($0) } }) { return match.1 }
+        return of(name)
+    }
 }
 
 // MARK: - Estados (S7)
@@ -191,15 +205,16 @@ public enum StatusFamily: String, CaseIterable, Sendable {
 
     private static let byValue: [String: StatusFamily] = [
         "en_espera": .espera, "solicitada": .espera, "pendiente": .espera, "pendiente_cama": .espera, "borrador": .espera,
-        "publicado": .espera, "reservada": .espera, "provisional": .espera,
+        "publicado": .espera, "reservada": .espera, "provisional": .espera, "por_vencer": .espera, "revisar": .espera,
         "llamado": .llamado, "confirmada": .llamado, "en_proceso": .llamado, "limpieza": .llamado, "reprogramada": .llamado,
+        "bajo_minimo": .llamado,
         "en_atencion": .atencion, "en_curso": .atencion, "ocupada": .atencion, "hospitalizado": .atencion,
         "en_servicio": .atencion, "abierta": .atencion,
         "atendida": .listo, "atendido": .listo, "completado": .listo, "firmada": .listo, "alta_firmada": .listo, "egresado": .listo, "libre": .listo,
-        "disponible": .listo, "activo": .listo, "exito": .listo, "normal": .listo, "aprobada": .listo,
+        "disponible": .listo, "activo": .listo, "exito": .listo, "normal": .listo, "aprobada": .listo, "ok": .listo, "coincide": .listo,
         "cancelado": .cerrado, "cancelada": .cerrado, "no_asistio": .cerrado, "no_se_presento": .cerrado, "cerrado": .cerrado,
         "rechazada": .cerrado, "vencida": .cerrado, "vencido": .cerrado, "bloqueada": .cerrado, "inactivo": .cerrado,
-        "desactivado": .cerrado, "denegado": .cerrado, "fallido": .cerrado, "en_mantenimiento": .cerrado,
+        "desactivado": .cerrado, "denegado": .cerrado, "fallido": .cerrado, "en_mantenimiento": .cerrado, "agotado": .cerrado,
         "critico_alto": .critico, "critico_bajo": .critico
     ]
 

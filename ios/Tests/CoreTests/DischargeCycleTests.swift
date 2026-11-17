@@ -94,7 +94,7 @@ final class DischargeCycleTests: XCTestCase {
 
     func testCodigosDelServidorEnEspanol() {
         let transition = APIFailure.from(status: 409, body: Data(#"{"status":409,"codigo":"transicion_invalida","detail":"Invalid transition from alta_firmada"}"#.utf8))
-        XCTAssertEqual(transition.message, "La admisión cambió de estado; vuelve a cargar.")
+        XCTAssertEqual(transition.message, "El registro cambió de estado; vuelve a cargar.")
         let spanish = APIFailure.from(status: 409, body: Data(#"{"status":409,"codigo":"transicion_invalida","detail":"La admisión ya no está hospitalizada."}"#.utf8))
         XCTAssertEqual(spanish.message, "La admisión ya no está hospitalizada.")
         let field = APIFailure.from(status: 400, body: Data(#"{"status":400,"codigo":"validacion","detail":"reason must be longer than or equal to 10 characters","campo":"reason"}"#.utf8))
