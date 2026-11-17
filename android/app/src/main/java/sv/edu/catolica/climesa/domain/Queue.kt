@@ -36,6 +36,17 @@ data class QueueTicket(
     fun shows(action: QueueAction) = allows(action) || action in blockedActions
 }
 
+/**
+ * R3 A-6: what a patient sees in "Mi turno": only their own ticket, never the reception board. The active one (waiting,
+ * called or in attention) comes first; with none active, the most recent of the day.
+ */
+object PatientQueue {
+    private val active = setOf("en_espera", "llamado", "en_atencion")
+    fun current(tickets: List<QueueTicket>): QueueTicket? =
+        tickets.firstOrNull { it.state in active } ?: tickets.maxByOrNull { it.issuedAtMillis ?: 0L }
+    fun others(tickets: List<QueueTicket>): List<QueueTicket> = current(tickets)?.let { mine -> tickets.filter { it.id != mine.id } }.orEmpty()
+}
+
 object QueueLabels {
     private val areas = mapOf("consulta_general" to "CON", "emergencia" to "EMG", "laboratorio" to "LAB", "admisiones" to "REC")
     fun areaOf(service: String) = areas[service] ?: "GEN"

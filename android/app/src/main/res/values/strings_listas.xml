@@ -17,6 +17,10 @@
     <string name="fila_buscar">Número o paciente</string>
     <string name="fila_solo_lectura">Vista de solo lectura: aquí sigues la fila; llamar y atender corresponde a Recepción, Asistencia y Medicina.</string>
     <string name="fila_todos">Todos</string>
+    <string name="fila_paciente_sin_numero">Hoy no tienes número en la fila.</string>
+    <string name="fila_paciente_sin_numero_detalle">Recepción te da uno cuando llegas.</string>
+    <string name="fila_paciente_pasa">Pasa al consultorio %1$s</string>
+    <string name="fila_paciente_otros">Tus otros números de hoy</string>
     <string name="fila_espera_promedio">Espera promedio: %1$s · máxima %2$s</string>
     <string name="fila_espera">Espera %1$s</string>
     <!-- Citas -->

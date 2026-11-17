@@ -82,7 +82,6 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     val primary = ConsultationPrimary.pick(state.queue, state.unsigned.map { it.id }, canCallNext = state.handoff?.proposal != null && canCall,
         canCallWaiting = state.handoff == null && canCall && state.waitingGeneral)
     PageList(modifier) {
-        item { SectionIntro("", stringResource(R.string.consulta_mi_consultorio)) }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         state.handoff?.let { handoff -> item { NextPatientHandoff(handoff, canCall, state.saving, onCall = { model.callProposed() }, onDismiss = { model.dismissHandoff() }) } }
         // B4: with nobody in the office yet, calling who waits in general consultation is the day's first action.

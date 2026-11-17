@@ -9,6 +9,10 @@
     <string name="cita_reprog_rechazada">Tu solicitud de reprogramación fue rechazada: %1$s</string>
     <string name="cita_reprog_rechazada_sin_motivo">Tu solicitud de reprogramación fue rechazada.</string>
     <string name="cita_reprogramada_a">Esta cita se movió a otro horario.</string>
+    <string name="cita_proximas">Próximas</string>
+    <string name="cita_sin_proximas">No tienes citas próximas.</string>
+    <string name="cita_ver_anteriores">Ver anteriores (%1$d)</string>
+    <string name="cita_ocultar_anteriores">Ocultar anteriores (%1$d)</string>
     <string name="cita_plazo">Puedes cancelar o reprogramar hasta %1$s</string>
     <string name="cita_fecha">Fecha: %1$s</string>
     <string name="cita_elige_franja">Toca una franja libre de 20 minutos del mismo médico.</string>

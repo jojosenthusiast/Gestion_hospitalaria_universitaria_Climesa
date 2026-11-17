@@ -41,8 +41,21 @@ data class AppointmentWorkPeriod(
     val end: String,
 )
 
+/** R3 A-7: "Mis citas" split like the web `upcoming()`: what is ahead (soonest first) and what already passed or closed. */
+data class AppointmentSplit(val upcoming: List<PatientAppointment>, val past: List<PatientAppointment>)
+
 /** `POST /citas/solicitudes`: the patient asks for a slot; Recepción confirms or rejects it. */
 object PatientAppointmentRules {
+    private val closed = setOf("cancelada", "atendida", "no_asistio", "rechazada", "vencida", "reprogramada")
+
+    /** Upcoming: an open appointment whose end is still ahead, ascending. Past: the rest, most recent first. */
+    fun split(appointments: List<PatientAppointment>, now: java.time.Instant): AppointmentSplit {
+        fun instant(value: String) = runCatching { java.time.Instant.parse(value) }.getOrNull()
+            ?: runCatching { java.time.OffsetDateTime.parse(value).toInstant() }.getOrNull()
+        val (upcoming, past) = appointments.partition { a -> a.state !in closed && (instant(a.end) ?: instant(a.start))?.isAfter(now) != false }
+        return AppointmentSplit(upcoming.sortedBy { instant(it.start) }, past.sortedByDescending { instant(it.start) })
+    }
+
     fun parse(value: Any): List<PatientAppointment> {
         val rows = value as? JSONArray ?: return emptyList()
         return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->

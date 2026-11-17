@@ -108,4 +108,56 @@ class AndroidR3ViewModelsTest {
         assertTrue(vm.state.value.open)
         assertTrue(!vm.state.value.kept)
     }
+
+    // A-23: reloading the queue keeps the tickets on screen, and a failed reload keeps them with the error.
+    @Test fun queueKeepsTicketsWhileReloading() = runTest(dispatcher) {
+        val api = FakeGateway(org.json.JSONArray().put(org.json.JSONObject().put("id", "t1").put("service", "consulta_general").put("numero", 3).put("state", "en_espera").put("version", 1)))
+        val vm = QueueViewModel(api, R3Bus())
+        vm.load(); runCurrent()
+        assertEquals(listOf("t1"), vm.state.value.tickets.map { it.id })
+        vm.load()
+        assertTrue(vm.state.value.loading)
+        assertEquals("tickets stay while reloading", listOf("t1"), vm.state.value.tickets.map { it.id })
+        api.failGets = true
+        runCurrent()
+        assertEquals(listOf("t1"), vm.state.value.tickets.map { it.id })
+        assertTrue(vm.state.value.error != null)
+    }
+
+    // A-23: a portal section (Mis turnos, Unidad) keeps its data while the same path reloads, and after a failed reload.
+    @Test fun portalSectionKeepsDataWhileReloading() = runTest(dispatcher) {
+        var fail = false
+        val source = object : RoleDataSource {
+            override suspend fun get(path: String): Any = if (fail) throw org.json.JSONException("No value for rows") else org.json.JSONArray().put(path)
+            override suspend fun post(path: String, body: org.json.JSONObject): Any = org.json.JSONObject()
+        }
+        val vm = RoleViewModel(source, R3Bus())
+        vm.load("/turnos/mios"); runCurrent()
+        val first = vm.state.value.data
+        fail = true
+        vm.load("/turnos/mios"); runCurrent()
+        assertEquals(first, vm.state.value.data)
+        assertEquals("No se pudo cargar la información.", vm.state.value.error)
+    }
+
+    // A-6: the patient sees only their own ticket: the active one first, else the latest of the day.
+    @Test fun patientQueueShowsOnlyTheOwnActiveTicket() {
+        fun t(id: String, state: String, at: Long) = sv.edu.catolica.climesa.domain.QueueTicket(id, "consulta_general", 1, "Ana", state, 0, 1, issuedAtMillis = at)
+        val tickets = listOf(t("a", "atendido", 1), t("b", "llamado", 2), t("c", "no_se_presento", 3))
+        assertEquals("b", sv.edu.catolica.climesa.domain.PatientQueue.current(tickets)?.id)
+        assertEquals(listOf("a", "c"), sv.edu.catolica.climesa.domain.PatientQueue.others(tickets).map { it.id })
+        assertEquals("c", sv.edu.catolica.climesa.domain.PatientQueue.current(listOf(t("a", "atendido", 1), t("c", "atendido", 3)))?.id)
+        assertNull(sv.edu.catolica.climesa.domain.PatientQueue.current(emptyList()))
+    }
+
+    // A-7: upcoming appointments first and ascending; past or closed ones apart, most recent first.
+    @Test fun patientAppointmentsSplitUpcomingAndPast() {
+        fun a(id: String, start: String, state: String = "confirmada") = sv.edu.catolica.climesa.domain.PatientAppointment(id, "Dra. Ejemplo", start, start.replace("T14", "T15"), state, null, 1)
+        val now = java.time.Instant.parse("2026-11-16T12:00:00Z")
+        val split = sv.edu.catolica.climesa.domain.PatientAppointmentRules.split(
+            listOf(a("old", "2026-11-10T14:00:00Z"), a("late", "2026-11-30T14:00:00Z"), a("soon", "2026-11-17T14:00:00Z"), a("cancel", "2026-11-20T14:00:00Z", "cancelada")), now,
+        )
+        assertEquals(listOf("soon", "late"), split.upcoming.map { it.id })
+        assertEquals(listOf("cancel", "old"), split.past.map { it.id })
+    }
 }
