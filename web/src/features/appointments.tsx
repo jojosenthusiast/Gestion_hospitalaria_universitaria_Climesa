@@ -89,7 +89,17 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   const [noShows, setNoShows] = useState<Record<string, true>>({});
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const sendNoShow = useRef<(row: Appointment) => void>(() => undefined);
-  sendNoShow.current = row => { timers.current.delete(row.id); setNoShows(current => { const next = { ...current }; delete next[row.id]; return next; }); void direct.run(`/citas/${row.id}/no-asistio`, { version: row.version }).then(ok => { if (ok) data.refresh(); }); };
+  // The row is read again when the hold ends: a refresh during the 8 s brings the live version (and state) to send.
+  const noShow = useAction(api), [noShowChanged, setNoShowChanged] = useState(false);
+  const liveRows = useRef<Appointment[]>([]);
+  liveRows.current = Array.isArray(data.data) ? data.data : [];
+  sendNoShow.current = row => {
+    timers.current.delete(row.id); setNoShows(current => { const next = { ...current }; delete next[row.id]; return next; });
+    const live = liveRows.current.find(item => item.id === row.id) ?? row;
+    setNoShowChanged(false);
+    if (live.state !== row.state) { setNoShowChanged(true); data.refresh(); return; }
+    void noShow.run(`/citas/${row.id}/no-asistio`, { version: live.version }).then(ok => { data.refresh(); if (!ok) setNoShowChanged(true); });
+  };
   const pendingRows = useRef(new Map<string, Appointment>());
   useEffect(() => () => { for (const [id, timer] of timers.current) { clearTimeout(timer); const row = pendingRows.current.get(id); if (row) sendNoShow.current(row); } }, []);
   function holdNoShow(row: Appointment) {
@@ -159,6 +169,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
           <span className="ag-toolbar-end">{filtered && <button type="button" className="cl-link-button" onClick={clear}>Quitar filtros</button>}<ExportMenu table={exportTable} disabled={!rows.length} /></span>
         </div>
         <WriteError error={direct.error} onReload={data.refresh} reloadLabel="Recargar las citas" />
+        {noShowChanged && (!noShow.error || noShow.error.status === 409) ? <Notice kind="error">La cita cambió mientras esperaba; no se marcó «No asistió».</Notice> : <WriteError error={noShow.error} />}
         <WriteError error={arrive.error} />
         {rows.length ? <>
           {ahead.map(dayGroup)}

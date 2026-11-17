@@ -60,7 +60,7 @@ Un paciente que creó su cuenta en la app pide vincularla a su expediente con su
   - **Reprogramar**: aplica el cambio de inmediato. La cita original queda `reprogramada` y enlazada a la nueva. Máximo 2 reprogramaciones por cadena.
   - **Aceptar nuevo horario** o **Rechazar nuevo horario**: cuando el paciente pidió el cambio.
   - **Cancelar**: el diálogo muestra paciente, médico y hora; escribe el motivo (10 caracteres o más). Si canceló el paciente desde su app, la cita muestra su motivo (por ejemplo "No puedo a esa hora").
-  - **No asistió**: solo desde la hora de inicio y si no hubo consulta. Se envía a los 8 segundos; mientras tanto **Deshacer** lo anula.
+  - **No asistió**: solo desde la hora de inicio y si no hubo consulta. Se envía a los 8 segundos; mientras tanto **Deshacer** lo anula. Si la cita cambió en esos segundos, no se marca y se avisa.
 - Las solicitudes cuya hora ya pasó quedan `Vencidas` solas; el sistema hace ese barrido cada minuto.
 
 ### Fila del día
@@ -70,7 +70,7 @@ Un paciente que creó su cuenta en la app pide vincularla a su expediente con su
   - Sin cita: elige el servicio y la **prioridad** con sus botones (Rutina, Urgente o Emergencia; por omisión Rutina) y **Emitir número**.
   - Si ya tiene un número vigente, no se ofrece otro.
   - El número emitido queda grande en el mostrador con el paciente y cuántos esperan antes. **Anular este número** lo retira si fue un error (solo quien lo emitió, en espera y dentro de 10 minutos; también desde el menú de la tarjeta). **Siguiente paciente** limpia el mostrador.
-  - ¿No aparece? **Registrar paciente nuevo**.
+  - ¿No aparece? **Registrar paciente nuevo**: el formulario trae el DUI o el nombre que buscaste; al guardar, **Emitir número** abre el mostrador con ese paciente ya elegido.
 - El número cuenta desde 1 en cada área y se muestra grande junto al código del área: **CON 7** (consulta general), **EMG** (emergencia), **LAB** (laboratorio), **REC** (admisiones).
 - Cada tarjeta dice si el paciente tiene cita hoy (**Cita 10:30 · médico**, y **Llegada registrada** si se emitió desde la cita) o llegó sin cita (**Sin cita**), y muestra la prioridad cuando no es rutina. Si una acción falla, el motivo aparece en la misma tarjeta.
 - Arriba está la fila y abajo el tablero por estado: **En espera**, **Llamados**, **En atención** y **Terminados**.

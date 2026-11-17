@@ -23249,8 +23249,9 @@
           },
           "reason": {
             "type": "string",
-            "minLength": 0,
-            "maxLength": 500
+            "minLength": 10,
+            "maxLength": 500,
+            "description": "Obligatorio (10 a 500 caracteres) sin reasonCode; con reasonCode es opcional y «otro» pide al menos 3 caracteres"
           },
           "reasonCode": {
             "type": "string",
@@ -30151,7 +30152,7 @@
           },
           "exact": {
             "type": "boolean",
-            "description": "true si DUI y nacimiento coinciden con lo declarado; false si es el expediente más parecido (mismo nacimiento, DUI distinto en un dígito) y no se puede aprobar"
+            "description": "Siempre true: candidate solo es la coincidencia exacta de DUI y nacimiento"
           }
         },
         "required": [
@@ -30159,8 +30160,42 @@
           "record",
           "fullName",
           "birth",
-          "dui",
-          "exact"
+          "dui"
+        ]
+      },
+      "LinkClosestResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "record": {
+            "type": "string",
+            "description": "Número de expediente"
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "birth": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd",
+            "nullable": true
+          },
+          "dui": {
+            "type": "string",
+            "nullable": true,
+            "description": "DUI del expediente con guion"
+          }
+        },
+        "required": [
+          "id",
+          "record",
+          "fullName",
+          "birth",
+          "dui"
         ]
       },
       "PendingLinkResponse": {
@@ -30185,7 +30220,7 @@
           },
           "candidate": {
             "nullable": true,
-            "description": "El único expediente que coincide o, sin coincidencia, el más parecido (exact=false)",
+            "description": "Solo si un único expediente coincide",
             "type": "object",
             "allOf": [
               {
@@ -30196,6 +30231,16 @@
           "candidates": {
             "type": "integer",
             "description": "Cuántos expedientes coinciden"
+          },
+          "closest": {
+            "nullable": true,
+            "description": "Sin coincidencia exacta: el expediente más parecido (mismo nacimiento, DUI distinto en un dígito). No se puede aprobar.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LinkClosestResponse"
+              }
+            ]
           }
         },
         "required": [

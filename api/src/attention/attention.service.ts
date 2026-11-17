@@ -368,14 +368,16 @@ export class AttentionService {
     await c.query(`UPDATE atencion.reprogramacion SET estado='vencida',version=version+1 WHERE cita_id=$1 AND estado='pendiente'`, [id]);
   }
 
-  /** D-8: reception (and any reader without `reasonCode`) writes 10+ characters; the patient's quick reason needs no text, `otro` 3+. */
+  /** D-8: without `reasonCode` the DTO keeps the pre-R7 rule (10+ characters); the patient's quick reason needs no text, `otro` 3+. */
   private cancelReason(actor: Actor, dto: AppointmentCancelDto) {
-    const text = dto.reason?.trim() ?? '';
+    if (!dto.reasonCode) return { code: null, text: dto.reason?.trim() || null, audit: dto.reason };
     const patientOnly = !contextsOf(actor, 'citas.cancelar').some(context => context !== 'propio');
-    if (dto.reasonCode && !patientOnly) throw new ProblemException('validacion', 400, 'Recepción escribe el motivo de la cancelación.', 'reasonCode');
+    if (!patientOnly) throw new ProblemException('validacion', 400, 'Recepción escribe el motivo de la cancelación.', 'reasonCode');
+    const raw: unknown = dto.reason;
+    if (raw !== undefined && raw !== null && (typeof raw !== 'string' || raw.length > 500)) throw new ProblemException('validacion', 400, 'El motivo admite hasta 500 caracteres.', 'reason');
+    const text = typeof raw === 'string' ? raw.trim() : '';
     if (dto.reasonCode === 'otro' && text.length < 3) throw new ProblemException('validacion', 400, 'Escribe brevemente el motivo.', 'reason');
-    if (!dto.reasonCode && text.length < 10) throw new ProblemException('validacion', 400, 'El motivo debe tener al menos 10 caracteres.', 'reason');
-    return { code: dto.reasonCode ?? null, text: text || null };
+    return { code: dto.reasonCode, text: text || null, audit: text || undefined };
   }
 
   async cancel(actor: Actor, id: string, dto: AppointmentCancelDto, key?: string) {
@@ -404,7 +406,7 @@ export class AttentionService {
       }
       const row = (await c.query("UPDATE atencion.cita SET estado='cancelada',cancelacion_codigo=$2,cancelacion_motivo=$3,version=version+1 WHERE id=$1 RETURNING version", [id, reason.code, reason.text])).rows[0];
       await this.expirePendingReschedules(c, id);
-      await this.commands.audit(c, actor, { action: 'citas.cancelar', entity: 'cita', entityId: id, permission: 'citas.cancelar', reason: reason.text ?? undefined, detail: reason.code ? { reasonCode: reason.code } : undefined });
+      await this.commands.audit(c, actor, { action: 'citas.cancelar', entity: 'cita', entityId: id, permission: 'citas.cancelar', reason: reason.audit, detail: reason.code ? { reasonCode: reason.code } : undefined });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, old.paciente_id));
       return { id, version: row.version, state: 'cancelada' };
     });

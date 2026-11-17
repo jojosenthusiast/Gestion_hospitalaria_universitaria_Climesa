@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { handOffPatientSearch } from './patient-handoff';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
 import { AreaTag, PriorityBadge, type Priority } from '../components/system';
 import { Icon, Notice } from '../components/ui';
@@ -49,6 +50,8 @@ function useDeskSearch(api: Api) {
 
 export function FrontDeskDialog({ api, patientId, onClose, onIssued }: { api: Api; patientId?: string | null; onClose: () => void; onIssued: () => void }) {
   const desk = useDeskSearch(api);
+  // B1: the text typed goes to «Registrar paciente nuevo» in memory, never in the address.
+  const typed = useRef('');
   const action = useAction(api), voiding = useAction(api);
   const [picked, setPicked] = useState<PickerItem | null>(null), [patient, setPatient] = useState<DeskPatient | null>(null);
   const [service, setService] = useState('consulta_general'), [priority, setPriority] = useState<Priority>('rutina');
@@ -93,9 +96,9 @@ export function FrontDeskDialog({ api, patientId, onClose, onIssued }: { api: Ap
     <div className="module-form fd-desk">
       {issued ? <IssuedCard issued={issued} appointment={appointment} busy={busy} onVoid={() => void voidIssued()} />
         : <>
-          <SearchPicker label="Paciente" value={picked} onChange={choose} search={desk.search} required disabled={loadingPatient}
+          <SearchPicker label="Paciente" value={picked} onChange={choose} search={desk.search} onQueryChange={text => { typed.current = text; }} required disabled={loadingPatient}
             placeholder={loadingPatient ? 'Cargando paciente…' : 'Nombre, DUI o expediente'} emptyText="No hay pacientes con ese nombre, DUI o expediente." />
-          {!picked && <p className="form-hint">¿No aparece? <a className="cl-link-button" href="#/pacientes?accion=registrar">Registrar paciente nuevo</a></p>}
+          {!picked && <p className="form-hint">¿No aparece? <a className="cl-link-button" href="#/pacientes?accion=registrar" onClick={() => handOffPatientSearch(typed.current)}>Registrar paciente nuevo</a></p>}
           {voided && <Notice kind="success">Se anuló {deskCode(voided)}. Puedes emitir otro número.</Notice>}
           <WriteError error={action.error} />
           {patient && holding && <Notice kind="info">{patient.fullName} ya tiene el número {deskCode(holding)} ({TICKET_STATE[holding.state] ?? holding.state}). No hace falta otro.</Notice>}

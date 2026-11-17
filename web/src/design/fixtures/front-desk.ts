@@ -120,7 +120,7 @@ export class FrontDeskFixtures {
       const a = this.patients[10], b = this.patients[11];
       return [
         { id: uuid(9001), createdAt: new Date(Date.now() - 40 * MIN).toISOString(), version: 1, account: { email: 'maria.jose.hernandez.ejemplo@example.test', name: a.fullName }, declared: { dui: a.dui, birth: a.birth }, candidate: { id: a.id, record: a.record, fullName: a.fullName, birth: a.birth, dui: a.dui, exact: true }, candidates: 1 },
-        { id: uuid(9002), createdAt: new Date(Date.now() - 25 * MIN).toISOString(), version: 1, account: { email: 'jose.roberto.prueba@example.test', name: b.fullName }, declared: { dui: `${b.dui.slice(0, 7)}${(Number(b.dui[7]) + 1) % 10}-${b.dui[9]}`, birth: b.birth }, candidate: { id: b.id, record: b.record, fullName: b.fullName, birth: b.birth, dui: b.dui, exact: false }, candidates: 0 },
+        { id: uuid(9002), createdAt: new Date(Date.now() - 25 * MIN).toISOString(), version: 1, account: { email: 'jose.roberto.prueba@example.test', name: b.fullName }, declared: { dui: `${b.dui.slice(0, 7)}${(Number(b.dui[7]) + 1) % 10}-${b.dui[9]}`, birth: b.birth }, candidate: null, candidates: 0, closest: { id: b.id, record: b.record, fullName: b.fullName, birth: b.birth, dui: b.dui } },
         { id: uuid(9003), createdAt: new Date(Date.now() - 5 * MIN).toISOString(), version: 1, account: { email: 'cuenta.nueva@example.test', name: 'Gabriela Alejandra Sin Expediente' }, declared: { dui: '09876543-2', birth: '2001-07-19' }, candidate: null, candidates: 0 },
       ];
     }

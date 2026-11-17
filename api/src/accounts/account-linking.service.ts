@@ -84,22 +84,24 @@ export class AccountLinkingService {
         const dui = String(row.dui_declarado);
         const found = await this.matches(c, dui, row.nacimiento);
         const candidateId = found.length === 1 ? found[0] : null;
-        // G-2: with no exact match, the closest record (same birth, DUI one digit away) is shown as not approvable.
-        const shownId = candidateId ?? (found.length ? null : await this.closest(c, dui, row.nacimiento));
-        let candidate = null;
-        if (shownId) {
+        // G-2: `candidate` stays the exact match only (released apps approve any non-null candidate). With no exact
+        // match, the closest record (same birth, DUI one digit away) travels in `closest` and is never approvable.
+        const closestId = found.length ? null : await this.closest(c, dui, row.nacimiento);
+        const recordOf = async (id: string) => {
           const p = (await c.query(`SELECT p.id,p.expediente,p.nacimiento::text AS nacimiento,coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS nombre,
               (SELECT i.valor_normalizado FROM pacientes.identificador i WHERE i.paciente_id=p.id AND i.tipo='dui' AND i.estado IN ('sin_verificar','verificado') LIMIT 1) AS dui
-            FROM pacientes.paciente p WHERE p.id=$1`, [shownId])).rows[0];
+            FROM pacientes.paciente p WHERE p.id=$1`, [id])).rows[0];
           const recordDui = p.dui ? String(p.dui).replace(/-/g, '') : null;
-          candidate = { id: p.id, record: p.expediente, fullName: p.nombre, birth: dateText(p.nacimiento), dui: recordDui ? `${recordDui.slice(0, 8)}-${recordDui.slice(8)}` : null, exact: shownId === candidateId };
-          await this.commands.audit(c, actor, { action: 'vinculacion.leer', entity: 'vinculacion_paciente', entityId: row.id, patientId: shownId, permission: 'cuentas.verificar', detail: { exact: shownId === candidateId } });
-        }
+          await this.commands.audit(c, actor, { action: 'vinculacion.leer', entity: 'vinculacion_paciente', entityId: row.id, patientId: id, permission: 'cuentas.verificar', detail: { exact: id === candidateId } });
+          return { id: p.id, record: p.expediente, fullName: p.nombre, birth: dateText(p.nacimiento), dui: recordDui ? `${recordDui.slice(0, 8)}-${recordDui.slice(8)}` : null };
+        };
+        const candidate = candidateId ? { ...(await recordOf(candidateId)), exact: true } : null;
+        const closest = closestId ? await recordOf(closestId) : null;
         result.push({
           id: row.id, createdAt: row.creado_en, version: row.version,
           account: { email: row.correo, name: row.nombre_mostrar },
           declared: { dui: `${dui.slice(0, 8)}-${dui.slice(8)}`, birth: dateText(row.nacimiento) },
-          candidate, candidates: found.length,
+          candidate, candidates: found.length, closest,
         });
       }
       return result;

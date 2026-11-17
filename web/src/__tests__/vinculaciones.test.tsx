@@ -88,7 +88,7 @@ describe('W27 · vinculaciones por verificar (FR-101-08 a FR-101-11)', () => {
 
   it('G2: compares the record DUI (not the declared one); the closest record is marked ✗ and cannot be approved', async () => {
     const near: LinkRequest = { id: 'v-3', createdAt: '2026-11-13T17:00:00Z', version: 1, account: { email: 'ana@example.test', name: 'Ana Ficticia' }, declared: { dui: '04567892-9', birth: '1990-01-01' },
-      candidate: { id: 'pac-3', record: '000500-1', fullName: 'Ana Ficticia', birth: '1990-01-01', dui: '04567891-1', exact: false }, candidates: 0 };
+      candidate: null, candidates: 0, closest: { id: 'pac-3', record: '000500-1', fullName: 'Ana Ficticia', birth: '1990-01-01', dui: '04567891-1' } };
     mount(['cuentas.verificar'], [near]);
     const card = await screen.findByRole('listitem', { name: 'Solicitud de ana@example.test' });
     const dui = within(card).getByRole('row', { name: /DUI/ });

@@ -133,7 +133,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
         // someone waiting (in the order of the service list), and the line says which service that is.
         const nextService = service !== 'todos' ? service : services.find(([value]) => all.some(t => t.service === value && t.state === 'en_espera'))?.[0] ?? null;
         const exportTable = () => ({ filename: 'fila-del-dia', title: 'Fila del día', subtitle: `${visible.length} números`, columns: ['Número', 'Servicio', 'Paciente', 'Prioridad', 'Cita', 'Estado', 'Llamados', 'Emitido', 'Espera'], rows: visible.map(t => [ticketCode(t), serviceNames[t.service] ?? t.service, t.patientName ?? 'Paciente no identificado', PRIORITY_LABEL[t.priority ?? 'rutina'], t.appointmentAt ? localTime(t.appointmentAt) : 'Sin cita', COLUMN_LABEL[columnOf(t)], t.llamados, formatDateTime(t.issuedAt), minutesText(waitMinutes(t, now))]) });
-        const waitingHere = all.some(t => t.service === nextService && t.state === 'en_espera');
+        const waitingHere = all.filter(t => t.service === nextService && t.state === 'en_espera').length;
         return <>
           <div className="cl-toolbar qb-toolbar">
             <LiveSearch label="Buscar en la fila" placeholder="Número o paciente" value={query} onChange={setQuery} />
@@ -168,7 +168,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
  * R4a: one line on top of the board. «Quién sigue» names the number the server rule proposes (the rule itself is the
  * tooltip, not printed text), with the consulting room picker and «Llamar siguiente» inline next to it.
  */
-function NextPanel({ api, profile, service, named, version, busy, canCall, waiting, initialOffice = '', onCallNext }: { api: Api; profile: AccessProfile; service: string; named: boolean; version: number; busy: boolean; canCall: boolean; waiting: boolean; initialOffice?: string; onCallNext: (service: string, officeId: string) => Promise<void> }) {
+function NextPanel({ api, profile, service, named, version, busy, canCall, waiting, initialOffice = '', onCallNext }: { api: Api; profile: AccessProfile; service: string; named: boolean; version: number; busy: boolean; canCall: boolean; waiting: number; initialOffice?: string; onCallNext: (service: string, officeId: string) => Promise<void> }) {
   const next = useData<NextProposal>(api, `/fila/siguiente?service=${service}`, version);
   const rooms = useData<Space[]>(api, '/espacios', 0, canCall && can(profile, 'espacios.ver'));
   const [office, setOffice] = useState(initialOffice);
@@ -184,11 +184,12 @@ function NextPanel({ api, profile, service, named, version, busy, canCall, waiti
             <div className="qb-next-who"><span>{proposal.patientName || 'Paciente no identificado'}</span><small>{proposal.reasonText}</small></div>
             {proposal.priority !== 'rutina' && <PriorityBadge value={proposal.priority} />}</div>
         : next.error ? <Notice kind="error">{next.error.message}</Notice>
-        : <p className="muted">{next.loading || !result ? 'Calculando…' : 'Nadie espera en este servicio.'}</p>}
+                // The server proposes only whom this account may call (a doctor sees their own patients): others may still wait.
+        : <p className="muted">{next.loading || !result ? 'Calculando…' : waiting > 0 ? `Esperan ${waiting} ${waiting === 1 ? 'paciente' : 'pacientes'} de otros médicos.` : 'Nadie espera en este servicio.'}</p>}
     </div>
     {canCall && <div className="qb-next-actions">
       {offices.length > 0 && <label className="qb-office"><span className="sr-only">Consultorio</span><select aria-label="Consultorio" value={office} onChange={event => setOffice(event.target.value)}><option value="">Sin consultorio</option>{offices.map(room => <option key={room.id} value={room.id}>{room.code} · {room.name}</option>)}</select></label>}
-      <button className="primary-button" disabled={busy || !waiting} onClick={() => void onCallNext(service, office)}><Icon name="megaphone" size={18} />Llamar siguiente</button>
+      <button className="primary-button" disabled={busy || waiting === 0} onClick={() => void onCallNext(service, office)}><Icon name="megaphone" size={18} />Llamar siguiente</button>
     </div>}
   </section>;
 }

@@ -25,6 +25,8 @@ type Props = {
   emptyText?: string;
   /** Texto con el que se abre el selector por primera vez (por ejemplo lo que se buscó antes). */
   initialQuery?: string;
+  /** Called with each text typed (for example, to hand it to another form). */
+  onQueryChange?: (query: string) => void;
 };
 
 /**
@@ -32,7 +34,7 @@ type Props = {
  * flechas para moverse, Enter para elegir, Escape para cerrar. Los elementos no disponibles se muestran
  * apagados con su motivo y no se pueden elegir. Sirve para miles de filas porque solo pide páginas cortas.
  */
-export function SearchPicker({ label, value, onChange, search, items, minChars = 2, debounceMs = 250, placeholder, hint, required = false, disabled = false, emptyText = 'Sin coincidencias.', initialQuery = '' }: Props) {
+export function SearchPicker({ label, value, onChange, search, items, minChars = 2, debounceMs = 250, placeholder, hint, required = false, disabled = false, emptyText = 'Sin coincidencias.', initialQuery = '', onQueryChange }: Props) {
   const baseId = useId();
   const inputId = `${baseId}-input`;
   const listId = `${baseId}-list`;
@@ -131,7 +133,7 @@ export function SearchPicker({ label, value, onChange, search, items, minChars =
         placeholder={placeholder ?? (local ? 'Escribe para filtrar' : `Escribe al menos ${minChars} letras`)}
         required={required}
         disabled={disabled}
-        onChange={event => { setQuery(event.target.value); setOpen(true); }}
+        onChange={event => { setQuery(event.target.value); onQueryChange?.(event.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
       />

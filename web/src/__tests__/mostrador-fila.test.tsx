@@ -121,6 +121,14 @@ describe('B2-B3 · tablero', () => {
     expect(location.hash).not.toContain('accion=');
   });
 
+  it('with no proposal while others wait (patients of other doctors), it says so instead of «Nadie espera»', async () => {
+    location.hash = '#/fila?accion=llamar';
+    montar([ticket({ service: 'laboratorio', area: 'LAB' }), ticket({ id: 't-8', numero: 8, service: 'laboratorio', area: 'LAB' })]);
+    const next = await screen.findByRole('region', { name: 'Quién sigue' });
+    expect(await within(next).findByText('Esperan 2 pacientes de otros médicos.')).toBeTruthy();
+    expect(within(next).queryByText('Nadie espera en este servicio.')).toBeNull();
+  });
+
   it('the card shows the appointment time with the doctor and that the arrival was registered', async () => {
     montar([ticket({ appointmentAt: '2026-11-17T16:20:00Z', appointmentDoctorName: 'Dra. Rosa Prueba', arrivalFromAppointment: true })]);
     const card = within(await screen.findByRole('region', { name: 'En espera' })).getByRole('listitem');

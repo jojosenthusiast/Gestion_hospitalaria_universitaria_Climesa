@@ -106,7 +106,10 @@ describe('R7 U1 · mostrador: citas, búsqueda y vinculación', () => {
       expect(near.status).toBe(201);
       const row = (await t.call('REC', 'GET', '/cuentas/vinculaciones')).body.find((r: any) => r.id === near.body.id);
       expect(row.candidates).toBe(0);
-      expect(row.candidate).toMatchObject({ id: record, dui: '04567891-1', exact: false, birth: '1990-01-01' });
+      // Contract kept for released apps (Android REC enables Aprobar on any non-null candidate): a near miss is never
+      // `candidate`; it travels in the new optional `closest`.
+      expect(row.candidate).toBeNull();
+      expect(row.closest).toEqual({ id: record, record: expect.any(String), fullName: expect.any(String), dui: '04567891-1', birth: '1990-01-01' });
       expect((await t.call('REC', 'POST', `/cuentas/vinculaciones/${near.body.id}/aprobar`, { version: near.body.version })).body.codigo).toBe('sin_expediente');
       await t.call('REC', 'POST', `/cuentas/vinculaciones/${near.body.id}/rechazar`, { version: near.body.version, reason: 'El DUI declarado no coincide' });
 
@@ -114,6 +117,7 @@ describe('R7 U1 · mostrador: citas, búsqueda y vinculación', () => {
       const exact = await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui, birth: '1990-01-01' });
       const match = (await t.call('REC', 'GET', '/cuentas/vinculaciones')).body.find((r: any) => r.id === exact.body.id);
       expect(match.candidate).toMatchObject({ id: record, dui: '04567891-1', exact: true });
+      expect(match.closest).toBeNull();
       expect((await t.call('REC', 'POST', `/cuentas/vinculaciones/${exact.body.id}/aprobar`, { version: exact.body.version })).status).toBe(201);
       expect((await t.call('PAC', 'GET', '/me/vinculacion')).body).toMatchObject({ linked: true, request: { state: 'aprobada' } });
     });

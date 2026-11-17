@@ -9,9 +9,11 @@ export type LinkRequest = {
   id: string; createdAt: string; version: number;
   account: { email: string; name: string };
   declared: { dui: string; birth: string };
-  /** G-2: `dui` is the record's own DUI; `exact` false marks the closest record (same birth, DUI one digit away). */
+  /** Only the exact match (DUI and birth). G-2: `dui` is the record's own DUI. */
   candidate: { id: string; record: string; fullName: string; birth: string | null; dui?: string | null; exact?: boolean } | null;
   candidates: number;
+  /** G-2: with no exact match, the closest record (same birth, DUI one digit away). Never approvable. */
+  closest?: { id: string; record: string; fullName: string; birth: string | null; dui: string | null } | null;
 };
 
 /**
@@ -54,13 +56,13 @@ function LinkingGuide() {
   </section>;
 }
 
-/** The record can be approved only when DUI and birth match exactly (older APIs without `exact` send only exact matches). */
-const exactMatch = (row: LinkRequest) => !!row.candidate && row.candidate.exact !== false;
+/** The record can be approved only when DUI and birth match exactly: `candidate` carries only that match. */
+const exactMatch = (row: LinkRequest) => !!row.candidate;
 const digits = (value: string | null | undefined) => (value ?? '').replace(/\D/g, '');
 
 function LinkRequestCard({ api, row, allowed, onReject, onSaved }: { api: Api; row: LinkRequest; allowed: boolean; onReject: () => void; onSaved: () => void }) {
   const action = useAction(api);
-  const candidate = row.candidate, exact = exactMatch(row);
+  const exact = exactMatch(row), candidate = row.candidate ?? row.closest ?? null;
   const [confirming, setConfirming] = useState(false);
   async function approve() { if (await action.run(`/cuentas/vinculaciones/${row.id}/aprobar`, { version: row.version })) { setConfirming(false); onSaved(); } }
   // G-2: each row compares the declared value with the record's own value (the DUI shown is the record's, not the declared one).
@@ -87,7 +89,7 @@ function LinkRequestCard({ api, row, allowed, onReject, onSaved }: { api: Api; r
       {exact ? <button type="button" className="primary-button" onClick={() => setConfirming(true)} disabled={action.busy}>Aprobar</button>
         : !candidate && row.candidates <= 1 && <a className="row-action" href="#/pacientes?accion=registrar">Registrar paciente</a>}
     </div>}
-    {confirming && candidate && <Dialog title="Aprobar vinculación" onClose={() => setConfirming(false)} busy={action.busy}><div className="module-form">
+    {confirming && exact && candidate && <Dialog title="Aprobar vinculación" onClose={() => setConfirming(false)} busy={action.busy}><div className="module-form">
       <p>La cuenta <strong>{row.account.email}</strong> verá el expediente <strong>{candidate.record} · {candidate.fullName}</strong>: citas, resultados e historial.</p>
       <p>Apruébala solo si verificaste la identidad de la persona.</p>
       <WriteError error={action.error} />

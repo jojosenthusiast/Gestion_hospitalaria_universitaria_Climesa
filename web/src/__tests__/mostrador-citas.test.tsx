@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AccessProfile, Api } from '../lib/api';
+import { ApiError, type AccessProfile, type Api } from '../lib/api';
 import { AppointmentsPage, NO_SHOW_DELAY_MS } from '../features/appointments';
 
 // R7 U1 (odd/tasks/fase2-recorridos-auditoria.md), journeys A2-A4 and B1 from the agenda: the arrival is registered
@@ -81,6 +81,35 @@ describe('A3 · «No asistió» con deshacer (D-3)', () => {
     expect(api.write).not.toHaveBeenCalled();
     await act(async () => { vi.advanceTimersByTime(200); });
     expect(api.write).toHaveBeenCalledWith('/citas/c-1/no-asistio', { version: 4 }, 'POST');
+  });
+
+  const CHANGED = 'La cita cambió mientras esperaba; no se marcó «No asistió».';
+  it('sends the live version: a refresh during the 8 s wins over the version of the click', async () => {
+    const rows = [row()];
+    const api = { request: vi.fn(async (path: string) => (path === '/citas' ? rows : path.startsWith('/citas/catalogos') ? { patients: [], doctors } : [])), write: vi.fn(async (..._args: unknown[]) => ({})) };
+    const view = render(<AppointmentsPage api={api as unknown as Api} profile={rec()} version={0} />);
+    const button = await screen.findByRole('button', { name: 'No asistió · Ana Ficticia Agenda' });
+    vi.useRealTimers(); vi.useFakeTimers({ now: NOW, toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    fireEvent.click(button);
+    rows[0] = row({ version: 5, note: 'editada' });
+    view.rerender(<AppointmentsPage api={api as unknown as Api} profile={rec()} version={1} />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    expect(api.request.mock.calls.filter(([p]) => p === '/citas').length).toBe(2);
+    expect(api.write).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(NO_SHOW_DELAY_MS); });
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/citas/c-1/no-asistio', { version: 5 }, 'POST'));
+  });
+
+  it('a 409 (the appointment changed meanwhile) says so in plain words', async () => {
+    const write = vi.fn(async (..._args: unknown[]) => { throw new ApiError('La cita cambió; vuelve a abrirla.', 409, 'version_conflicto', 5); });
+    mount(rec(), [row()], write);
+    const button = await screen.findByRole('button', { name: 'No asistió · Ana Ficticia Agenda' });
+    vi.useRealTimers(); vi.useFakeTimers({ now: NOW, toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    fireEvent.click(button);
+    await act(async () => { vi.advanceTimersByTime(NO_SHOW_DELAY_MS + 100); });
+    vi.useRealTimers();
+    expect(await screen.findByText(CHANGED)).toBeTruthy();
   });
 });
 
