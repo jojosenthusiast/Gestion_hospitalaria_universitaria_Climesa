@@ -88,6 +88,36 @@ class PatientCancelU5Test {
         assertEquals("Cita cancelada.", vm.state.value.notice)
     }
 
+    /** An old server whose first released-body POST fails like a dropped connection. */
+    private class FlakyOldServer : ApiGateway {
+        val posts = mutableListOf<Pair<JSONObject, String?>>()
+        override suspend fun request(path: String, method: String, body: JSONObject?): Any {
+            if (method == "GET") return JSONArray()
+            posts += body!! to coroutineContext[RequestIntent]?.idempotencyKey
+            if (body.has("reasonCode")) throw AuthRequestException("Este campo no se admite en la solicitud.", 400, "validacion",
+                JSONObject().put("codigo", "validacion").put("errors", JSONArray().put(JSONObject().put("field", "reasonCode").put("message", "Este campo no se admite en la solicitud."))).toString())
+            if (posts.count { !it.first.has("reasonCode") } == 1) throw java.io.IOException("connection reset")
+            return JSONObject().put("id", "a1").put("version", 4).put("state", "cancelada")
+        }
+    }
+
+    // Verifier B1: once the fallback is active, a retry replays the released body exactly, under its pending key.
+    @Test fun aRetryAfterTheFallbackFailedReplaysTheReleasedBodyWithItsKey() = runTest(dispatcher) {
+        val api = FlakyOldServer()
+        val vm = PatientAppointmentsViewModel(api, quiet)
+        vm.cancel(mine, AppointmentReasons.patientCancel[0]); runCurrent()
+        assertTrue(vm.state.value.error != null)
+        vm.cancel(mine, AppointmentReasons.patientCancel[0]); runCurrent()
+        assertEquals("coded, released (failed), released replay", 3, api.posts.size)
+        assertTrue(api.posts[0].first.has("reasonCode"))
+        assertEquals(api.posts[1].first.toString(), api.posts[2].first.toString())
+        assertEquals("the replay keeps the pending key", api.posts[1].second, api.posts[2].second)
+        assertNotEquals(api.posts[0].second, api.posts[1].second)
+        // No key ever carries two different bodies.
+        api.posts.groupBy { it.second }.values.forEach { same -> assertEquals(1, same.map { it.first.toString() }.distinct().size) }
+        assertEquals("Cita cancelada.", vm.state.value.notice)
+    }
+
     // PAC request: when no day of the doctor catalog can be read, the form says so (never an empty silent list).
     @Test fun aDoctorCatalogThatFailsEveryDayIsShown() = runTest(dispatcher) {
         val api = FakeGateway()

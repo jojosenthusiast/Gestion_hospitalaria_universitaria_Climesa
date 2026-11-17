@@ -138,18 +138,26 @@ class PatientAppointmentsViewModel @Inject constructor(
         val path = AppointmentActions.path(AppointmentAction.CANCEL, appointment.id)
         viewModelScope.launch {
             try {
-                try {
-                    cancelIntent.send { api.request(path, "POST", PatientAppointmentRules.cancelBody(appointment, reason, code)) }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // A server released before D-8 rejects the unknown `reasonCode` field; it still takes the released body. That
-                    // body differs, so it goes under a new key, and only when the text meets the old 10-character rule.
-                    if (code == null || !ApiProblems.fieldErrors(e).containsKey("reasonCode")) throw e
-                    // The coded body got a definitive answer; the next attempt is another body, so it never reuses that key.
-                    cancelIntent.reset()
-                    if (AppointmentActions.reasonError(AppointmentAction.CANCEL, reason) != null) throw LegacyReasonTooShort(legacyReasonError)
-                    cancelIntent.send { api.request(path, "POST", PatientAppointmentRules.cancelBody(appointment, reason)) }
+                var useLegacy = code == null || legacyServer
+                if (!useLegacy) {
+                    try {
+                        sendCancel(cancelIntent, path, PatientAppointmentRules.cancelBody(appointment, reason, code), coded = true)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // A server released before D-8 rejects the unknown `reasonCode` field; it still takes the released body.
+                        if (!ApiProblems.fieldErrors(e).containsKey("reasonCode")) throw e
+                        // That answer is definitive: the coded key is done, and from now on this server gets the released body.
+                        cancelIntent.reset(); codedBody = null
+                        legacyServer = true
+                        useLegacy = true
+                    }
+                }
+                if (useLegacy) {
+                    // The released body keeps the old 10-character rule; it goes under its own intent, so a retry after a
+                    // network error or 5xx replays it exactly with its pending key, and no other body ever takes that key.
+                    if (code != null && AppointmentActions.reasonError(AppointmentAction.CANCEL, reason) != null) throw LegacyReasonTooShort(legacyReasonError)
+                    sendCancel(legacyIntent, path, PatientAppointmentRules.cancelBody(appointment, reason), coded = false)
                 }
                 mutable.value = mutable.value.copy(saving = false, notice = "Cita cancelada.")
                 load()
@@ -159,6 +167,22 @@ class PatientAppointmentsViewModel @Inject constructor(
                 mutable.value = mutable.value.copy(saving = false, error = if (e is LegacyReasonTooShort) e.message else message(e))
             }
         }
+    }
+
+    /** The released cancel body `{version, reason}` has its own intent (D-8 fallback), apart from the coded one. */
+    private val legacyIntent = SubmissionIntent()
+    /** This server rejected `reasonCode` once: every later cancel sends the released body. */
+    private var legacyServer = false
+    private var codedBody: String? = null
+    private var legacyBody: String? = null
+
+    /** A pending key belongs to one body: a different body first drops it, so a key is never reused with another body. */
+    private suspend fun sendCancel(intent: SubmissionIntent, path: String, body: JSONObject, coded: Boolean) {
+        val text = body.toString()
+        val last = if (coded) codedBody else legacyBody
+        if (intent.pendingKey != null && last != text) intent.reset()
+        if (coded) codedBody = text else legacyBody = text
+        intent.send { api.request(path, "POST", body) }
     }
 
     private class LegacyReasonTooShort(message: String) : Exception(message)
