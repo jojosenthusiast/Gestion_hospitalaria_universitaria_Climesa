@@ -21,8 +21,8 @@ data class PickerPatient(
 
 /** `appointmentToday` of a selector row: the appointment and its doctor. */
 data class TodayAppointment(val id: String, val start: String, val doctorId: String, val doctorName: String) {
-    /** Sweep #11: "Cita 09:00 con Ana Médica"; never "· <doctor>", which reads as a second patient. */
-    val chip get() = "Cita ${AppointmentAgenda.time(start)} con $doctorName"
+    /** Sweep #11: "Cita 09:00 con Ana Médica"; never "· <doctor>", which reads as a second patient. Without a name, "Cita 09:00". */
+    val chip get() = "Cita ${AppointmentAgenda.time(start)}" + doctorName.trim().let { if (it.isEmpty()) "" else " con $it" }
 }
 
 /** `ticketToday` of a selector row: the number the patient already holds today. */
