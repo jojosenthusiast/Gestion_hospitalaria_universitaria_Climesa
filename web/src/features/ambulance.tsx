@@ -1,6 +1,6 @@
 import { useEffect,useRef,useState } from 'react';
 import { Notice } from '../components/ui';
-import { Dialog,CompactHeader,RemoteState,formatDateTime,useData } from './common';
+import { Dialog,CompactHeader,RemoteState,WriteError,formatDateTime,useAction,useData } from './common';
 import { PriorityBadge,StatusBadge } from '../components/system';
 import { formatRelative,formatTime } from '../lib/format';
 import { can,type AccessProfile,type Api } from '../lib/api';
@@ -23,7 +23,9 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  const [dispatching,setDispatching]=useState<AmbulanceRequest|'direct'|null>(null),[discarding,setDiscarding]=useState<AmbulanceRequest|null>(null),[calling,setCalling]=useState(false),[report,setReport]=useState<string|null>(null);
  const pendingCount=data.data?.pendingRequests?.length??0,previous=useRef<number|null>(null);
  useEffect(()=>{if(previous.current!==null&&pendingCount>previous.current)beep();if(data.data)previous.current=pendingCount;},[pendingCount,data.data]);
- const saved=()=>{setDispatching(null);setDiscarding(null);setCalling(false);data.refresh();};
+ // R7 G4: every dialog closes only on success and leaves a sentence in place saying what happened.
+ const [done,setDone]=useState('');
+ const saved=(message='')=>{setDispatching(null);setDiscarding(null);setCalling(false);setDone(message);data.refresh();};
  // S13: the home quick action «Solicitar ambulancia» (#/ambulancia?accion=solicitud) opens the call form directly.
  const [quick,consumeQuick]=useQuickAction();
  useEffect(()=>{if(quick==='solicitud'&&phoneDesk)setCalling(true);if(quick)consumeQuick();},[quick,phoneDesk,consumeQuick]);
@@ -31,19 +33,24 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
   {/* R4a: one readable line for the unit (normal type, code on one line, state as a badge), not a strip of giant numbers. */}
   <div className="amb-unit"><div className="amb-unit-id"><span className="sr-only">Unidad</span><strong className="nowrap-code">{s.unit.plate}</strong><StatusBadge value={s.unit.state} label={stateNames[s.unit.state]}/></div><div className="amb-unit-crew"><CrewCoverage status={s}/></div></div>
   {dispatcher&&s.dispatchBlock&&<section aria-label="Despacho bloqueado"><Notice kind="info"><strong>No se puede despachar ahora.</strong> {s.dispatchBlock.message} {s.dispatchBlock.action}</Notice>{missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}
-  {s.activeService?<ActiveService api={api} onSaved={data.refresh} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:<p className="muted">Sin servicio activo</p>}
+  {done&&<Notice kind="success">{done}</Notice>}
+  {s.activeService?<ActiveService api={api} canOperate={can(profile,'ambulancia.operar')} onSaved={saved} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:<p className="muted">Sin servicio activo</p>}
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
   {dispatcher&&s.unit.state==='disponible'&&!s.dispatchBlock&&<p><button type="button" className="secondary-button" onClick={()=>setDispatching('direct')}>Despachar traslado sin solicitud</button></p>}
   {manage&&s.unit.state!=='en_servicio'&&<MaintenancePanel status={s} api={api} profile={profile} onSaved={data.refresh}/>}
-  {dispatching&&<DispatchForm api={api} unitVersion={s.unit.version} crewPool={s.availableCrew??[]} request={dispatching==='direct'?null:dispatching} onClose={()=>setDispatching(null)} onSaved={saved}/>}
-  {discarding&&<DiscardForm api={api} request={discarding} onClose={()=>setDiscarding(null)} onSaved={saved}/>}
+  {dispatching&&<DispatchForm api={api} unitVersion={s.unit.version} crewPool={s.availableCrew??[]} request={dispatching==='direct'?null:dispatching} onClose={()=>setDispatching(null)} onSaved={()=>saved(dispatching==='direct'?'Ambulancia despachada para el traslado.':`Ambulancia despachada a ${dispatching.address}.`)}/>}
+  {discarding&&<DiscardForm api={api} request={discarding} onClose={()=>setDiscarding(null)} onSaved={()=>saved('Solicitud descartada.')}/>}
  </section>}</RemoteState>
- {calling&&<PhoneRequestForm api={api} profile={profile} onClose={()=>setCalling(false)} onSaved={saved}/>}
+ {calling&&<PhoneRequestForm api={api} profile={profile} onClose={()=>setCalling(false)} onSaved={()=>saved(dispatcher?'Llamada registrada: la solicitud está abajo, lista para despachar.':'Llamada registrada: queda por confirmar en despacho.')}/>}
  {report&&<PrehospitalDialog api={api} serviceId={report} version={version} onClose={()=>setReport(null)}/>}
  </>;
 }
-function ActiveService({api,service,onReport,onSaved}:{api:Api;service:NonNullable<AmbulanceStatus['activeService']>;onReport?:()=>void;onSaved:()=>void}){
+function ActiveService({api,service,canOperate,onReport,onSaved}:{api:Api;service:NonNullable<AmbulanceStatus['activeService']>;canOperate:boolean;onReport?:()=>void;onSaved:(message?:string)=>void}){
  const milestones=service.milestones??[],withoutAccount=service.crew.some(c=>c.hasAccount===false);
+ const last=[...milestones].sort((a,b)=>a.occurredAt.localeCompare(b.occurredAt)).at(-1),undo=useAction(api);
+ // R7 G-4: the crew undoes a milestone tapped by mistake; the server keeps the window (15 min) and who undid it.
+ const undoable=canOperate&&!!last&&last.type!=='finalizado'&&typeof service.version==='number';
+ async function undoLast(){if(!last||undo.busy)return;if(await undo.run(`/ambulancia/servicios/${service.id}/hitos/deshacer`,{version:service.version}))onSaved(`Se deshizo «${milestoneNames[last.type]??last.type}»; vuelve a marcarlo cuando ocurra.`);}
  return <section aria-label="Servicio activo"><h2>Servicio activo</h2><dl className="detail-grid">
   <div><dt>Tipo</dt><dd>{typeNames[service.type]??service.type}</dd></div><div><dt>Prioridad</dt><dd><PriorityBadge value={priorityLevel(service.priority)} label={priorityNames[service.priority]??service.priority}/></dd></div>
   <div><dt>Origen</dt><dd>{service.origin}</dd></div><div><dt>Destino</dt><dd>{service.destination}</dd></div>
@@ -53,8 +60,10 @@ function ActiveService({api,service,onReport,onSaved}:{api:Api;service:NonNullab
   {service.lastLocation&&<div><dt>Última ubicación</dt><dd><a className="row-action" href={mapLink(service.lastLocation)} target="_blank" rel="noopener noreferrer">Ver en el mapa</a> <small className="muted">{formatRelative(service.lastLocation.capturedAt)}</small></dd></div>}
  </dl>
  <ol className="milestone-list" aria-label="Hitos del servicio">{['salida','en_escena','trasladando','en_hospital','finalizado'].map(type=>{const m=milestones.find(x=>x.type===type);return <li key={type} className={m?'done':''}><strong>{milestoneNames[type]}</strong> <span>{m?formatDateTime(m.occurredAt):'Pendiente'}</span></li>;})}</ol>
+ {undoable&&<p><button type="button" className="secondary-button" disabled={undo.busy} onClick={undoLast}>{undo.busy?'Deshaciendo…':`Deshacer «${milestoneNames[last!.type]??last!.type}»`}</button></p>}
+ {undo.error&&<WriteError error={undo.error}/>}
  {onReport&&<button type="button" className="row-action" onClick={onReport}>Ver reporte prehospital</button>}
- <AdminCloseAction api={api} service={service} onSaved={onSaved}/>
+ <AdminCloseAction api={api} service={service} onSaved={()=>onSaved('Servicio cerrado por Jefatura; la unidad quedó disponible.')}/>
  </section>;
 }
 /** FR-109-11: reporte prehospital; la API omite motivo y signos a quien no tiene relación de atención. */
