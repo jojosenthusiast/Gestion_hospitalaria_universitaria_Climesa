@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AppointmentAction
+import sv.edu.catolica.climesa.domain.AppointmentReasons
 import sv.edu.catolica.climesa.domain.AppointmentActions
 import sv.edu.catolica.climesa.domain.PickerPatient
 import sv.edu.catolica.climesa.domain.QuickAction
@@ -79,6 +80,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     PageList(modifier) {
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
         (actionState.done ?: state.notice)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        actionState.error?.takeIf { actionState.target == null }?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
         if (canSchedule) item { CompactHeader("", actions = { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = Icons.Default.Add, fill = false) }) }
         if (canSchedule) {
             requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
@@ -97,7 +99,12 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                 // Por día y, dentro del día, por hora: cada cita en una sola línea con su rango "08:00 – 08:20".
                 sv.edu.catolica.climesa.domain.AppointmentAgenda.groupByDay(visible) { it.start }.forEach { (day, rows) ->
                     item(key = "d-$day") { Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(day), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                    items(rows, key = { it.id }) { row -> AppointmentRow(row) { action -> actions.open(row, action) } }
+                    items(rows, key = { it.id }) { row ->
+                        // D-3: "No asistió" is one tap; the row offers "Deshacer" for 8 s before anything is sent.
+                        val pending = actionState.pendingNoShow?.takeIf { it.key == row.id }
+                        if (pending != null) PendingUndoRow(pending.label) { actions.undoNoShow() }
+                        else AppointmentRow(row) { action -> if (action == AppointmentAction.NO_SHOW) { actions.markNoShow(row) } else actions.open(row, action) }
+                    }
                 }
             }
         }
@@ -113,6 +120,14 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
         if (a.state == AppointmentActions.EXPIRED) Text(stringResource(R.string.cita_vencida_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (a.state == AppointmentActions.RESCHEDULED) Text(stringResource(R.string.cita_reprogramada_a), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         AppointmentActionButtons(AppointmentActions.available(a), AppointmentActions.blocked(a), onAction)
+    }
+}
+
+/** A change held in its undo window, in the row it changes: what will happen and "Deshacer". */
+@Composable internal fun PendingUndoRow(label: String, onUndo: () -> Unit) {
+    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        RowAction(stringResource(R.string.fila_deshacer), onUndo)
     }
 }
 
@@ -138,7 +153,15 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
 internal fun AppointmentActionDialog(state: AppointmentActionState, model: AppointmentActionViewModel) {
     val target = state.target ?: return
     val action = state.action ?: return
-    var datePicker by rememberSaveable { mutableStateOf(false) }
+    // A4/A-5: rescheduling is a bottom sheet with day chips and free slots, never a date picker on top of a dialog.
+    if (action == AppointmentAction.RESCHEDULE) {
+        RescheduleSheet(
+            title = stringResource(R.string.cita_reprogramar_titulo), summary = "${target.patientName.ifBlank { "Paciente" }} · ${formatInstant(target.start)} · ${target.doctorName}",
+            date = state.date, onDate = model::selectDate, loading = state.loadingSlots, slots = state.slots, slot = state.slot, onSlot = model::pickSlot,
+            error = state.error, busy = state.busy, confirmLabel = action.label, onConfirm = model::submit, onDismiss = model::close,
+        )
+        return
+    }
     val title = when (action) {
         AppointmentAction.CONFIRM -> stringResource(R.string.rec_cita_confirmar_titulo)
         AppointmentAction.REJECT -> stringResource(R.string.rec_cita_rechazar_titulo)
@@ -162,25 +185,18 @@ internal fun AppointmentActionDialog(state: AppointmentActionState, model: Appoi
         confirmEnabled = state.canSubmit,
     ) {
         state.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
-        if (action == AppointmentAction.RESCHEDULE) {
-            OutlinedButton(onClick = { datePicker = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(Icons.Default.CalendarMonth, null); Spacer(Modifier.padding(4.dp)); Text(stringResource(R.string.cita_fecha, state.date.format(dayFormat))) }
-            when {
-                state.loadingSlots -> LoadingState()
-                state.slots.isEmpty() -> Text(stringResource(R.string.cita_sin_franjas), style = MaterialTheme.typography.bodySmall)
-                else -> { Text(stringResource(R.string.cita_elige_franja), style = MaterialTheme.typography.bodySmall); DaySlotGrid(state.slots, state.slot, model::pickSlot) }
-            }
-        }
         if (action.needsReason) {
-            FormField(stringResource(R.string.rec_cita_motivo), state.reason, model::reason, singleLine = false, enabled = !state.busy, error = state.reasonError, hint = AppointmentActions.counter(state.reason))
+            // A4: frequent reasons are one tap; "Otro" opens the text.
+            val quick = AppointmentReasons.reception(action)
+            var other by rememberSaveable(target.id, action) { mutableStateOf(false) }
+            if (quick.isNotEmpty()) ReasonChips(quick, if (other) AppointmentReasons.OTHER else state.reason.takeIf { it in quick }, { picked ->
+                other = picked == AppointmentReasons.OTHER
+                model.quickReason(if (other) "" else picked)
+            }, enabled = !state.busy, other = AppointmentReasons.OTHER)
+            if (quick.isEmpty() || other) FormField(stringResource(R.string.rec_cita_motivo), state.reason, model::reason, singleLine = false, enabled = !state.busy, error = state.reasonError, hint = AppointmentActions.counter(state.reason))
         } else if (action == AppointmentAction.NO_SHOW) {
             FormField(stringResource(R.string.cita_comentario), state.reason, model::reason, singleLine = false, enabled = !state.busy, error = state.reasonError, hint = AppointmentActions.counter(state.reason, required = false))
         }
-    }
-    if (datePicker) {
-        val picker = rememberDatePickerState(initialSelectedDateMillis = state.date.atStartOfDay(zone).toInstant().toEpochMilli())
-        DatePickerDialog(onDismissRequest = { datePicker = false },
-            confirmButton = { TextButton(onClick = { picker.selectedDateMillis?.let { model.selectDate(Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate()) }; datePicker = false }) { Text("Aceptar") } },
-            dismissButton = { TextButton(onClick = { datePicker = false }) { Text(stringResource(R.string.ui_cancelar)) } }) { DatePicker(state = picker) }
     }
 }
 
