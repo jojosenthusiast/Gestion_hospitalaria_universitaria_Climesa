@@ -65,9 +65,13 @@ fun QueueScreen(
     modifier: Modifier = Modifier,
     quickAction: QuickAction? = null,
     onQuickActionHandled: () -> Unit = {},
+    userId: String? = null,
     model: QueueViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
+    // D-3: a stored "No se presentó" is sent on sign-in and every time the board comes back.
+    LaunchedEffect(userId) { userId?.let(model::bindUser) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { model.resume(); onPauseOrDispose { } }
     var issueOpen by rememberSaveable { mutableStateOf(false) }
     var callNextOpen by rememberSaveable { mutableStateOf(false) }
     val canIssue = "fila.emitir" in profile.permissions

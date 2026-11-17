@@ -11,6 +11,12 @@ object FormDrafts {
     const val MILESTONE_QUEUE = "hitos:cola"
     /** MA-AMB-06: provisional patient created on this phone, linked with the next prehospital report. */
     const val PROVISIONAL_PATIENT = "prehospital:provisional"
+    /** D-3: "No asistió" taps waiting in, or past, their undo window until the API confirms them. */
+    const val DEFERRED_NO_SHOW = "diferidas:no_asistio"
+    /** D-3: "No se presentó" taps on the queue board, same rule. */
+    const val DEFERRED_ABSENCE = "diferidas:no_presento"
+    /** Catalog ids ordered from this device for one consultation, so a repeat stays blocked after leaving it. */
+    fun orderedExamsKey(consultationId: String) = "consulta:examenes:$consultationId"
 
     fun vitals(form: VitalsForm) = JSONObject().apply { form.values.forEach { (measure, text) -> if (text.isNotBlank()) put(measure.key, text) }; if (form.note.isNotBlank()) put("note", form.note) }
 

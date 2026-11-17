@@ -37,4 +37,5 @@
     <string name="rec7_amb_falta_motivo">Escribe el motivo (qué pasa) para poder enviar.</string>
     <!-- G5 planta -->
     <string name="rec7_hosp_signos">Tomar signos</string>
+    <string name="rec7_descartar">Descartar</string>
 </resources>

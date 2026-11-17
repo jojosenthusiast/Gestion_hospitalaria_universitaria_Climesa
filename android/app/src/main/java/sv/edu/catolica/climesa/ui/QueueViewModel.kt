@@ -62,14 +62,31 @@ data class QueueState(
 )
 
 @HiltViewModel
-class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
+class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository, private val drafts: sv.edu.catolica.climesa.data.DraftStore = sv.edu.catolica.climesa.data.NoDraftStore) : ViewModel() {
     private val mutable = MutableStateFlow(QueueState())
     val state = mutable.asStateFlow()
     private val live = LiveSubscription(realtime)
     private var loadJob: Job? = null
     /** One user intent per command path: a retry of the same command reuses its Idempotency-Key. */
     private val intents = mutableMapOf<String, SubmissionIntent>()
-    private val absence = UndoWindow(viewModelScope) { pending -> mutable.value = mutable.value.copy(pendingAbsence = pending) }
+    /** Clock of the undo window (tests move it to after a restart). */
+    var clock: () -> Long = { System.currentTimeMillis() }
+    /**
+     * D-3: "No se presentó" is stored at the tap and sent when its window ends, or on the next sign-in, resume or signal
+     * if the app died first. The version is the one of the ticket when it is sent, so a call in between gives no 409.
+     */
+    private val absence = UndoWindow(
+        viewModelScope, api, sv.edu.catolica.climesa.domain.FormDrafts.DEFERRED_ABSENCE, drafts, now = { clock() },
+        prepare = { item -> JSONObject(item.body).also { body -> mutable.value.tickets.firstOrNull { it.id == item.key }?.let { body.put("version", it.version) } } },
+        onSent = { item, _ -> mutable.value = mutable.value.copy(notice = "${item.label.substringBefore(" se marcará")} marcado como no presentado.", error = null); load(silent = true) },
+        onFailed = { item, e -> mutable.value = mutable.value.copy(error = "${item.label.substringBefore(" se marcará")}: ${message(e)} Queda guardado y se reintentará.") },
+    ) { pending -> mutable.value = mutable.value.copy(pendingAbsence = pending) }
+
+    /** Signed-in user: a "No se presentó" stored before the app closed is sent now if its window ended. */
+    fun bindUser(id: String) = absence.bind(id)
+
+    /** Screen back on top: sends what is due, failed ones again. */
+    fun resume() = absence.resume()
     /** B5: a patient account also reads the public board of its own service. */
     private var patientMode = false
     fun followOwnTicket() { patientMode = true }
@@ -103,6 +120,7 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     /** Idempotent per channel list: reloads when a queue event arrives or after a reconnection gap. */
     fun startLive(channels: List<String>) {
         live.start(viewModelScope, channels) { signal ->
+            if (signal is RealtimeSignal.Resync) absence.resume()
             if (signal is RealtimeSignal.Event && QueueEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load(silent = true)
         }
     }
@@ -202,11 +220,8 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
      * version is the one of the ticket when the window ends, so a call in between does not produce a 409.
      */
     fun absent(ticket: QueueTicket) {
-        absence.start(PendingUndo(ticket.id, "${QueueLabels.code(ticket)} se marcará como no presentado.")) {
-            val current = mutable.value.tickets.firstOrNull { it.id == ticket.id } ?: ticket
-            if (QueueAction.ABSENT !in current.allowedActions) { mutable.value = mutable.value.copy(error = "${QueueLabels.code(ticket)} ya no se puede marcar como no presentado."); return@start }
-            send("/fila/${ticket.id}/no-se-presento", JSONObject().put("version", current.version), "${QueueLabels.code(ticket)} marcado como no presentado.", key = ticket.id)
-        }
+        if (QueueAction.ABSENT !in ticket.allowedActions) return
+        absence.start(ticket.id, "${QueueLabels.code(ticket)} se marcará como no presentado.", "/fila/${ticket.id}/no-se-presento", JSONObject().put("version", ticket.version))
     }
     fun undoAbsence() { if (absence.undo()) mutable.value = mutable.value.copy(notice = "Se mantiene en la fila.", error = null) }
 

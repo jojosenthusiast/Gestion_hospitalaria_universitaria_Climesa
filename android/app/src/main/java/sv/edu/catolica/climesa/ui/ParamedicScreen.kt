@@ -79,6 +79,8 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
     LaunchedEffect(Unit) { model.clearMessages(); model.open(AmbulanceMode.PARAMEDIC) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     LaunchedEffect(accountId) { model.bindUser(accountId) }
+    // A milestone held or queued while the app was in the background goes out when it comes back.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { model.resume(); onPauseOrDispose { } }
     // Solo repinta el «hace X min»; no consulta nada a la red.
     val now by produceState(Instant.now()) { while (true) { delay(30_000); value = Instant.now() } }
     val status = state.status
@@ -99,9 +101,11 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         state.queued?.let { item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_en_cola)) } }
-        if (state.queuedMilestones.isNotEmpty()) item {
+        // The milestone in its undo window is not "waiting for signal": it has its own Deshacer row.
+        val waiting = state.queuedMilestones.count { it.holdUntil == 0L }
+        if (waiting > 0) item {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                NoticeBanner(NoticeKind.WARNING, pluralStringResource(R.plurals.par_hitos_en_cola, state.queuedMilestones.size, state.queuedMilestones.size))
+                NoticeBanner(NoticeKind.WARNING, pluralStringResource(R.plurals.par_hitos_en_cola, waiting, waiting))
                 SecondaryButton(stringResource(R.string.camas_reintentar), { model.retryMilestones() }, enabled = !state.busy)
             }
         }

@@ -56,7 +56,7 @@ private val zone = ZoneId.of("America/El_Salvador")
 
 /** A32 Citas de Recepción: lista de citas y flujo para agendar con búsqueda de paciente, médicos con/sin turno y franjas del día. */
 @Composable
-fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, permissions: Collection<String> = emptyList(), model: ReceptionAppointmentsViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel(), requests: CategoryRequestsViewModel = viewModel(), followUps: LabProposalsViewModel = viewModel()) {
+fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, userId: String? = null, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, permissions: Collection<String> = emptyList(), model: ReceptionAppointmentsViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel(), requests: CategoryRequestsViewModel = viewModel(), followUps: LabProposalsViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     val requestState by requests.state.collectAsStateWithLifecycle()
     val followUpState by followUps.state.collectAsStateWithLifecycle()
@@ -66,6 +66,9 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     LaunchedEffect(requestState.notice) { if (requestState.notice != null) model.load() }
     val actionState by actions.state.collectAsStateWithLifecycle()
     LaunchedEffect(actionState.done) { if (actionState.done != null) model.load() }
+    // D-3: a stored "No asistió" (app killed, signal lost) is sent on sign-in and every time the screen comes back.
+    LaunchedEffect(userId) { userId?.let(actions::bindUser) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { actions.resume(); onPauseOrDispose { } }
     AppointmentActionDialog(actionState, actions)
     var query by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels); if (canSchedule) { requests.load(); requests.startLive(channels); followUps.load(); followUps.startLive(channels) } }
@@ -80,7 +83,15 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     PageList(modifier) {
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
         (actionState.done ?: state.notice)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
-        actionState.error?.takeIf { actionState.target == null }?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+        actionState.error?.takeIf { actionState.target == null }?.let { error -> item {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                NoticeBanner(NoticeKind.ERROR, error)
+                if (actionState.failedNoShow != null) androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    RowAction(stringResource(R.string.camas_reintentar), { actions.resume() })
+                    RowAction(stringResource(R.string.rec7_descartar), { actions.discardFailedNoShow() })
+                }
+            }
+        } }
         if (canSchedule) item { CompactHeader("", actions = { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = Icons.Default.Add, fill = false) }) }
         if (canSchedule) {
             requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }

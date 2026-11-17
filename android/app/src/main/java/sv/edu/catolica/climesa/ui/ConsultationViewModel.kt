@@ -81,7 +81,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
      * consultations and the patients' reschedule requests of the own appointments.
      */
     fun configure(userId: String, withQueue: Boolean, withUnsigned: Boolean = false, withReschedules: Boolean = false) {
-        if (this.userId != userId) { this.userId = userId; drafts.retainOnly(userId) }
+        if (this.userId != userId) { this.userId = userId; drafts.retainOnly(userId, sv.edu.catolica.climesa.data.SessionDrafts.PENDING_WRITES) }
         this.withQueue = withQueue
         this.withUnsigned = withUnsigned
         this.withReschedules = withReschedules
@@ -182,7 +182,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
             try {
                 val detail = api.request("/consultas/$consultationId/detalle")
                 val orders = if (withLabOrders) optional { ConsultationRecordRules.labOrders(api.request("/laboratorio/ordenes"), consultationId) } ?: mutable.value.record?.takeIf { it.consultationId == consultationId }?.labOrders.orEmpty() else emptyList()
-                val ordered = mutable.value.record?.takeIf { it.consultationId == consultationId }?.orderedIds.orEmpty()
+                val ordered = mutable.value.record?.takeIf { it.consultationId == consultationId }?.orderedIds.orEmpty() + storedOrdered(consultationId)
                 mutable.value = mutable.value.copy(record = ConsultationRecord(consultationId, ConsultationRecordRules.diagnoses(detail), ConsultationRecordRules.medications(detail), orders, ordered))
             } catch (e: CancellationException) { throw e
             } catch (_: Exception) { }
@@ -341,6 +341,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
                 val local = RecordedLabOrder("local-${System.nanoTime()}", "pendiente", names.ifEmpty { exams.toList() }, exams.toSet(), mutable.value.labCatalog.filter { it.id in exams }.map { it.code }.toSet())
                 mutable.value.record?.takeIf { it.consultationId == consultationId }?.let { r -> mutable.value = mutable.value.copy(record = r.copy(labOrders = r.labOrders + local, orderedIds = r.orderedIds + exams)) }
                     ?: run { mutable.value = mutable.value.copy(record = ConsultationRecord(consultationId, labOrders = listOf(local), orderedIds = exams.toSet())) }
+                rememberOrdered(consultationId, mutable.value.record?.orderedIds.orEmpty())
                 mutable.value = mutable.value.copy(saving = false, stepNotice = RecordSection.LAB to "Orden emitida: ${names.ifEmpty { exams.toList() }.joinToString()}.")
                 onDone()
                 if (withLabOrders) loadRecordKeepingLocal(consultationId, local)
@@ -348,6 +349,14 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
+    }
+
+    /** Exams ordered from this device for [consultationId], kept for the session so leaving and coming back still blocks a repeat. */
+    private fun storedOrdered(consultationId: String): Set<String> = userId?.let { drafts.load(it, sv.edu.catolica.climesa.domain.FormDrafts.orderedExamsKey(consultationId)) }
+        ?.optJSONArray("ids")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() }.toSet() }.orEmpty()
+
+    private fun rememberOrdered(consultationId: String, ids: Set<String>) {
+        userId?.let { drafts.save(it, sv.edu.catolica.climesa.domain.FormDrafts.orderedExamsKey(consultationId), JSONObject().put("ids", org.json.JSONArray(ids.toList()))) }
     }
 
     /** Reloads the record; an order just placed stays counted until the server list shows it. */

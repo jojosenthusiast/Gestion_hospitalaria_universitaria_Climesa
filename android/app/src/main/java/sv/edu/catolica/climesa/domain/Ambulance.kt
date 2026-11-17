@@ -73,12 +73,13 @@ data class OwnAmbulanceRequest(
 }
 
 /** MA-AMB-06: a milestone recorded without signal; the same key and phone time are resent until the API answers. */
-data class QueuedMilestone(val serviceId: String, val type: String, val body: String, val key: String) {
+/** [holdUntil] (epoch millis, 0 = free) keeps a just-tapped milestone in its undo window; it is stored like the rest. */
+data class QueuedMilestone(val serviceId: String, val type: String, val body: String, val key: String, val holdUntil: Long = 0L) {
     /** Phone time of the milestone, as it will reach the API. */
     val occurredAt: String get() = runCatching { JSONObject(body).optString("occurredAt") }.getOrDefault("")
-    fun toJson(): JSONObject = JSONObject().put("serviceId", serviceId).put("type", type).put("body", body).put("key", key)
+    fun toJson(): JSONObject = JSONObject().put("serviceId", serviceId).put("type", type).put("body", body).put("key", key).put("holdUntil", holdUntil)
     companion object {
-        fun fromJson(json: JSONObject): QueuedMilestone? = runCatching { QueuedMilestone(json.getString("serviceId"), json.getString("type"), json.getString("body"), json.getString("key")) }.getOrNull()
+        fun fromJson(json: JSONObject): QueuedMilestone? = runCatching { QueuedMilestone(json.getString("serviceId"), json.getString("type"), json.getString("body"), json.getString("key"), json.optLong("holdUntil", 0L)) }.getOrNull()
     }
 }
 
