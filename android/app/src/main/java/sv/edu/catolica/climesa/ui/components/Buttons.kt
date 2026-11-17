@@ -37,9 +37,12 @@ private fun ButtonBody(text: String, icon: ImageVector?, loading: Boolean, spinn
     }
 }
 
+/** Width of a button: [fill] stretches it to the row (forms, dialogs), otherwise it wraps its label (rows, bars). */
+private fun Modifier.buttonSize(fill: Boolean) = if (fill) fillMaxWidth().heightIn(min = 52.dp) else heightIn(min = Spacing.touch)
+
 /**
- * Filled primary action. `loading` shows a spinner and "Un momento…" and blocks taps, so a double tap cannot send twice.
- * Full width by default, 52dp tall like the web `.primary-button`.
+ * Filled primary action, one per screen. `loading` shows a spinner and "Un momento…" and blocks taps, so a double tap cannot
+ * send twice. Full width by default, 52dp tall like the web `.primary-button`; `fill = false` wraps the label (48dp target).
  */
 @Composable
 internal fun PrimaryButton(
@@ -49,16 +52,17 @@ internal fun PrimaryButton(
     icon: ImageVector? = null,
     enabled: Boolean = true,
     loading: Boolean = false,
+    fill: Boolean = true,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled && !loading,
-        modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
+        modifier = modifier.buttonSize(fill),
         contentPadding = ButtonPadding,
     ) { ButtonBody(text, icon, loading, MaterialTheme.colorScheme.onPrimary) }
 }
 
-/** Outlined secondary action (web `.secondary-button`). */
+/** Outlined secondary action (web `.secondary-button`). `fill = false` wraps the label for actions in a row. */
 @Composable
 internal fun SecondaryButton(
     text: String,
@@ -67,12 +71,33 @@ internal fun SecondaryButton(
     icon: ImageVector? = null,
     enabled: Boolean = true,
     loading: Boolean = false,
+    fill: Boolean = true,
 ) {
     OutlinedButton(
         onClick = onClick,
         enabled = enabled && !loading,
-        modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
+        modifier = modifier.buttonSize(fill),
         border = BorderStroke(1.dp, if (enabled) MaterialTheme.climesa.controlLine else MaterialTheme.climesa.line),
         contentPadding = ButtonPadding,
     ) { ButtonBody(text, icon, loading, MaterialTheme.colorScheme.primary) }
+}
+
+/**
+ * Compact action inside a list row (R3 A-17): a text button that wraps its label and keeps the 48dp touch target, so a row
+ * never stacks full-width buttons. `loading` is per row: only the row being saved shows "Un momento…".
+ */
+@Composable
+internal fun RowAction(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+) {
+    androidx.compose.material3.TextButton(
+        onClick = onClick,
+        enabled = enabled && !loading,
+        modifier = modifier.heightIn(min = Spacing.touch),
+        contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.sm),
+    ) { ButtonBody(text, null, loading, MaterialTheme.colorScheme.primary) }
 }

@@ -5,9 +5,8 @@
     <string name="dash_bienvenida">Bienvenido a CLIMESA</string>
     <string name="dash_resumen">Resumen</string>
     <string name="dash_atencion">Requiere tu atención</string>
-    <string name="dash_atencion_ok">Todo al día: no hay pendientes para ti ahora.</string>
+    <string name="dash_atencion_ok">No tienes pendientes ahora.</string>
     <string name="dash_acciones">Acciones rápidas</string>
-    <string name="dash_acciones_ayuda">Abren la sección con la acción lista. Solo aparecen las que tu rol puede hacer.</string>
     <string name="dash_graficos">Panorama</string>
     <string name="dash_datos_parciales">Algunos datos no se pudieron cargar. Lo que ves está incompleto; vuelve a abrir Inicio para reintentar.</string>
     <string name="dash_vacio">Todavía no hay nada que resumir</string>

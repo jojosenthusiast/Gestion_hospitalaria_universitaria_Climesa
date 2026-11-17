@@ -11,7 +11,7 @@ import sv.edu.catolica.climesa.domain.VitalLevel
 class StatusFamilyMigrationTest {
     @Test fun `stock states follow the shared families and are never critical`() {
         assertEquals(StatusFamily.CERRADO, stockFamily(StockStatus.OUT))
-        assertEquals(StatusFamily.LLAMADO, stockFamily(StockStatus.LOW))
+        assertEquals(StatusFamily.ESPERA, stockFamily(StockStatus.LOW))
         assertEquals(StatusFamily.ESPERA, stockFamily(StockStatus.EXPIRING))
         assertEquals(StatusFamily.LISTO, stockFamily(StockStatus.OK))
         assertEquals(StatusFamily.CERRADO, stockFamily(StockStatus.INACTIVE))
@@ -35,5 +35,25 @@ class StatusFamilyMigrationTest {
     @Test fun `link checks read as match or review`() {
         assertEquals(StatusFamily.LISTO, StatusFamily.of(LinkCheck.MATCH))
         assertEquals(StatusFamily.ESPERA, StatusFamily.of(LinkCheck.REVIEW))
+    }
+
+    // R3 / A-35: same table on web, Android and iOS. Only a called number or a lab sample in process uses the megaphone.
+    @Test fun `each status value maps to the family shared with web and iOS`() {
+        val expected = mapOf(
+            "confirmada" to StatusFamily.ESPERA,
+            "reprogramada" to StatusFamily.ESPERA,
+            "bajo_minimo" to StatusFamily.ESPERA,
+            "publicado" to StatusFamily.ESPERA,
+            "llamado" to StatusFamily.LLAMADO,
+            "en_proceso" to StatusFamily.LLAMADO,
+            "limpieza" to StatusFamily.ATENCION,
+            "en_atencion" to StatusFamily.ATENCION,
+            "libre" to StatusFamily.LISTO,
+            "cancelada" to StatusFamily.CERRADO,
+            "critico_alto" to StatusFamily.CRITICO,
+        )
+        expected.forEach { (value, family) -> assertEquals(value, family, StatusFamily.of(value)) }
+        val called = listOf("confirmada", "reprogramada", "bajo_minimo", "limpieza", "publicado").filter { StatusFamily.of(it) == StatusFamily.LLAMADO }
+        assertEquals(emptyList<String>(), called)
     }
 }

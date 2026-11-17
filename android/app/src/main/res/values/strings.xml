@@ -278,6 +278,7 @@
     <string name="cat_rechazar">Rechazar</string>
     <string name="cat_asignar_titulo">Asignar cita a %1$s</string>
     <string name="cat_sugerido">Sugerido</string>
+    <string name="cat_elegido">Elegido</string>
     <string name="cat_ver_todo_dia">Ver todo el día</string>
     <string name="cat_solo_franja">Solo la franja pedida</string>
     <string name="cat_sin_libres_franja">No hay franjas libres en la franja pedida. Mira todo el día u otra fecha.</string>

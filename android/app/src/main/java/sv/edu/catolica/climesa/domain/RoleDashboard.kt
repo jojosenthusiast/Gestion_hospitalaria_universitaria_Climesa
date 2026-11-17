@@ -29,8 +29,21 @@ data class DashboardChart(val title: String, val kind: ChartKind, val slices: Li
     val total: Int get() = slices.sumOf { it.value }
 }
 
-/** A "needs attention" item: what is pending and the one action that clears it. */
-data class DashboardAttention(val title: String, val detail: String, val tone: DashboardTone, val actionLabel: String, val request: QuickActionRequest)
+/**
+ * A "needs attention" item: what is pending and the one action that clears it. [covers] names the KPI tile that shows the
+ * same count; the tile is dropped so Inicio never says the same number twice (R3 A-28).
+ */
+data class DashboardAttention(
+    val title: String,
+    val detail: String,
+    val tone: DashboardTone,
+    val actionLabel: String,
+    val request: QuickActionRequest,
+    val covers: String? = null,
+)
+
+/** "1 número esperando" / "3 números esperando": Spanish count without "número(s)" (R3 A-48). */
+internal fun counted(n: Int, singular: String, plural: String) = "$n ${if (n == 1) singular else plural}"
 
 data class DashboardModel(
     val kpis: List<DashboardKpi>,
@@ -178,7 +191,7 @@ object RoleDashboard {
         fun bedKpis(withCleaning: Boolean = true) {
             val states = bedStates ?: return
             val total = states.values.sum()
-            kpis += DashboardKpi("Camas libres", free.toString(), if (free == 0 && total > 0) DashboardTone.DANGER else DashboardTone.SUCCESS, "de $total", target = target(AndroidSection.BEDS))
+            kpis += DashboardKpi("Camas libres", free.toString(), if (free == 0 && total > 0) DashboardTone.WARNING else DashboardTone.NEUTRAL, "de $total", target = target(AndroidSection.BEDS))
             if (withCleaning) kpis += DashboardKpi("En limpieza", cleaning.toString(), if (cleaning > 0) DashboardTone.WARNING else DashboardTone.NEUTRAL, target = target(AndroidSection.BEDS))
             charts += DashboardChart(
                 "Ocupación de camas", ChartKind.DONUT,
@@ -220,13 +233,13 @@ object RoleDashboard {
         fun shiftKpi() { shift?.let { kpis += DashboardKpi("Mi próximo turno", it, DashboardTone.PROCESS, target = target(AndroidSection.SHIFTS)) } }
         fun assignBedAttention() {
             if (pendingBed > 0 && QuickActions.allowed(QuickAction.ASSIGN_BED, permissions) && AndroidSection.ADMISSION in sections) {
-                attention += DashboardAttention("$pendingBed admisión(es) sin cama", "Asigna una cama sugerida para que el paciente pase a hospitalización.", DashboardTone.WARNING, "Asignar cama", QuickActionRequest(AndroidSection.ADMISSION, QuickAction.ASSIGN_BED))
+                attention += DashboardAttention(counted(pendingBed, "admisión sin cama", "admisiones sin cama"), "Asigna una cama sugerida para que el paciente pase a hospitalización.", DashboardTone.WARNING, "Asignar cama", QuickActionRequest(AndroidSection.ADMISSION, QuickAction.ASSIGN_BED), covers = "Admisiones sin cama")
             }
         }
         fun stockAttention(section: AndroidSection?) {
             val counts = stock ?: return
-            if (counts.belowMinimum > 0 && section != null) attention += DashboardAttention("${counts.belowMinimum} artículo(s) bajo el mínimo", "Revisa las existencias antes de que falte material.", DashboardTone.WARNING, "Ver insumos", QuickActionRequest(section))
-            if (counts.expired > 0 && section != null) attention += DashboardAttention("${counts.expired} lote(s) vencido(s)", "No los uses; retíralos según el protocolo.", DashboardTone.DANGER, "Ver insumos", QuickActionRequest(section))
+            if (counts.belowMinimum > 0 && section != null) attention += DashboardAttention(counted(counts.belowMinimum, "artículo bajo el mínimo", "artículos bajo el mínimo"), "Revisa las existencias antes de que falte material.", DashboardTone.WARNING, "Ver insumos", QuickActionRequest(section), covers = "Insumos bajo mínimo")
+            if (counts.expired > 0 && section != null) attention += DashboardAttention(counted(counts.expired, "lote vencido", "lotes vencidos"), "No los uses; retíralos según el protocolo.", DashboardTone.WARNING, "Ver insumos", QuickActionRequest(section))
         }
 
         when (role) {
@@ -243,13 +256,13 @@ object RoleDashboard {
                 bedKpis(withCleaning = false)
                 shiftKpi()
                 if (waiting > 0 && QuickActions.allowed(QuickAction.ISSUE_NUMBER, permissions)) {
-                    attention += DashboardAttention("$waiting número(s) esperando", "Revisa la fila del día.", DashboardTone.WARNING, "Abrir fila", QuickActionRequest(AndroidSection.QUEUE))
+                    attention += DashboardAttention(counted(waiting, "número esperando", "números esperando"), "Revisa la fila del día.", DashboardTone.WARNING, "Abrir fila", QuickActionRequest(AndroidSection.QUEUE), covers = "En espera")
                 }
-                if (requested > 0 && AndroidSection.APPOINTMENTS in sections) attention += DashboardAttention("$requested solicitud(es) de cita", "Confirma, rechaza o reprograma las solicitudes de los pacientes.", DashboardTone.WARNING, "Abrir citas", QuickActionRequest(AndroidSection.APPOINTMENTS, requestsAction))
-                if ((links ?: 0) > 0 && AndroidSection.LINKING in sections) attention += DashboardAttention("$links vinculación(es) por verificar", "Verifica la identidad antes de enlazar la cuenta con el expediente.", DashboardTone.WARNING, "Verificar", QuickActionRequest(AndroidSection.LINKING))
+                if (requested > 0 && AndroidSection.APPOINTMENTS in sections) attention += DashboardAttention(counted(requested, "solicitud de cita", "solicitudes de cita"), "Confirma, rechaza o reprograma las solicitudes de los pacientes.", DashboardTone.WARNING, "Abrir citas", QuickActionRequest(AndroidSection.APPOINTMENTS, requestsAction), covers = "Citas por confirmar")
+                if ((links ?: 0) > 0 && AndroidSection.LINKING in sections) attention += DashboardAttention(counted(links ?: 0, "vinculación por verificar", "vinculaciones por verificar"), "Verifica la identidad antes de enlazar la cuenta con el expediente.", DashboardTone.WARNING, "Verificar", QuickActionRequest(AndroidSection.LINKING), covers = "Vinculaciones por verificar")
                 assignBedAttention()
                 ambulance?.pendingRequests?.size?.takeIf { it > 0 && QuickActions.allowed(QuickAction.DISPATCH, permissions) && AndroidSection.DISPATCH in sections }?.let {
-                    attention += DashboardAttention("$it solicitud(es) de ambulancia", "Confirma y despacha la unidad si está disponible.", DashboardTone.DANGER, "Despachar", QuickActionRequest(AndroidSection.DISPATCH, QuickAction.DISPATCH))
+                    attention += DashboardAttention(counted(it, "solicitud de ambulancia", "solicitudes de ambulancia"), "Confirma y despacha la unidad si está disponible.", DashboardTone.WARNING, "Despachar", QuickActionRequest(AndroidSection.DISPATCH, QuickAction.DISPATCH))
                 }
             }
             "AST" -> {
@@ -260,7 +273,7 @@ object RoleDashboard {
                 }
                 shiftKpi()
                 if (waiting > 0 && QuickActions.allowed(QuickAction.CALL_NEXT, permissions) && AndroidSection.ASSISTANT_STATION in sections) {
-                    attention += DashboardAttention("$waiting número(s) esperando", "Llama al siguiente número de tu consultorio.", DashboardTone.WARNING, "Llamar siguiente", QuickActionRequest(AndroidSection.ASSISTANT_STATION, QuickAction.CALL_NEXT))
+                    attention += DashboardAttention(counted(waiting, "número esperando", "números esperando"), "Llama al siguiente número de tu consultorio.", DashboardTone.WARNING, "Llamar siguiente", QuickActionRequest(AndroidSection.ASSISTANT_STATION, QuickAction.CALL_NEXT), covers = "En espera")
                 }
             }
             "ENF" -> {
@@ -269,10 +282,10 @@ object RoleDashboard {
                 bedKpis()
                 stock?.let { kpis += DashboardKpi("Insumos bajo mínimo", it.belowMinimum.toString(), if (it.belowMinimum > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.SUPPLIES)) }
                 shiftKpi()
-                if (cleaning > 0) attention += DashboardAttention("$cleaning cama(s) en limpieza", "Cuando estén listas vuelven a quedar libres para admisión.", DashboardTone.WARNING, "Ver mi planta", QuickActionRequest(AndroidSection.WARD))
+                if (cleaning > 0) attention += DashboardAttention(counted(cleaning, "cama en limpieza", "camas en limpieza"), "Cuando estén listas vuelven a quedar libres para admisión.", DashboardTone.WARNING, "Ver mi planta", QuickActionRequest(AndroidSection.WARD), covers = "En limpieza")
                 stockAttention(target(AndroidSection.SUPPLIES))
                 ambulance?.activeService?.takeIf { it.hasPrehospital && AndroidSection.AMBULANCE_RECEPTION in sections }?.let {
-                    attention += DashboardAttention("Ambulancia en camino", "Hay un reporte prehospital: prepara la recepción.", DashboardTone.DANGER, "Recepción", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION))
+                    attention += DashboardAttention("Ambulancia en camino", "Hay un reporte prehospital: prepara la recepción.", DashboardTone.WARNING, "Recepción", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION))
                 }
             }
             "MED" -> {
@@ -289,19 +302,19 @@ object RoleDashboard {
                 shiftKpi()
                 labChart("Mis exámenes por etapa")
                 lab?.takeIf { it.critical > 0 && AndroidSection.RESULT_REVIEW in sections }?.let {
-                    attention += DashboardAttention("${it.critical} resultado(s) con valor crítico", "Revísalos primero: el paciente solo los ve después de tu revisión.", DashboardTone.DANGER, "Revisar", QuickActionRequest(AndroidSection.RESULT_REVIEW))
+                    attention += DashboardAttention(counted(it.critical, "resultado con valor crítico", "resultados con valor crítico"), "Revísalos primero: el paciente solo los ve después de tu revisión.", DashboardTone.DANGER, "Revisar", QuickActionRequest(AndroidSection.RESULT_REVIEW), covers = "Resultados por revisar")
                 }
                 lab?.takeIf { it.toReview - it.critical > 0 && AndroidSection.RESULT_REVIEW in sections }?.let {
-                    attention += DashboardAttention("${it.toReview - it.critical} resultado(s) por revisar", "Al revisar, el resultado queda visible para el paciente.", DashboardTone.WARNING, "Revisar", QuickActionRequest(AndroidSection.RESULT_REVIEW))
+                    attention += DashboardAttention(counted(it.toReview - it.critical, "resultado por revisar", "resultados por revisar"), "Al revisar, el resultado queda visible para el paciente.", DashboardTone.WARNING, "Revisar", QuickActionRequest(AndroidSection.RESULT_REVIEW), covers = "Resultados por revisar")
                 }
             }
             "PAR" -> {
                 ambulance?.let {
                     kpis += DashboardKpi("Unidad ${it.unit.plate}".trim(), unitLabel(it.unit.state), unitTone(it.unit.state), target = target(AndroidSection.SERVICE))
                     kpis += DashboardKpi("Solicitudes pendientes", it.pendingRequests.size.toString(), if (it.pendingRequests.isNotEmpty()) DashboardTone.WARNING else DashboardTone.SUCCESS)
-                    kpis += DashboardKpi("Servicio", if (it.activeService != null) "En curso" else "Sin servicio", if (it.activeService != null) DashboardTone.DANGER else DashboardTone.NEUTRAL, target = target(AndroidSection.SERVICE))
+                    kpis += DashboardKpi("Servicio", if (it.activeService != null) "En curso" else "Sin servicio", if (it.activeService != null) DashboardTone.PROCESS else DashboardTone.NEUTRAL, target = target(AndroidSection.SERVICE))
                     it.activeService?.takeIf { AndroidSection.SERVICE in sections }?.let { service ->
-                        attention += DashboardAttention("Servicio en curso", "${service.origin} → ${service.destination}", DashboardTone.DANGER, "Registrar hito", QuickActionRequest(AndroidSection.SERVICE))
+                        attention += DashboardAttention("Servicio en curso", "${service.origin} → ${service.destination}", DashboardTone.PROCESS, "Registrar hito", QuickActionRequest(AndroidSection.SERVICE), covers = "Servicio")
                     }
                 }
                 shiftKpi()
@@ -322,20 +335,21 @@ object RoleDashboard {
                 lab?.let {
                     kpis += DashboardKpi("Exámenes listos", it.released.toString(), if (it.released > 0) DashboardTone.SUCCESS else DashboardTone.NEUTRAL, target = target(AndroidSection.RESULTS))
                     kpis += DashboardKpi("Exámenes en trámite", (it.requested + it.inProcess + it.toReview).toString(), DashboardTone.PROCESS, target = target(AndroidSection.RESULTS))
-                    if (it.released > 0 && AndroidSection.RESULTS in sections) attention += DashboardAttention("${it.released} examen(es) con resultado", "Tu médico ya los revisó; puedes verlos.", DashboardTone.SUCCESS, "Ver resultados", QuickActionRequest(AndroidSection.RESULTS))
+                    if (it.released > 0 && AndroidSection.RESULTS in sections) attention += DashboardAttention(counted(it.released, "examen con resultado", "exámenes con resultado"), "Tu médico ya los revisó; puedes verlos.", DashboardTone.SUCCESS, "Ver resultados", QuickActionRequest(AndroidSection.RESULTS), covers = "Exámenes listos")
                 }
                 labChart("Mis exámenes")
                 if (!linked && AndroidSection.LINK_RECORD in sections) attention += DashboardAttention("Vincula tu expediente", "Sin vincular no verás tus citas, turno ni resultados.", DashboardTone.WARNING, "Vincular", QuickActionRequest(AndroidSection.LINK_RECORD))
             }
         }
-        return DashboardModel(kpis, charts.filter { it.total > 0 }, attention, QuickActions.forRole(role, permissions), unavailable)
+        val covered = attention.mapNotNull { it.covers }.toSet()
+        return DashboardModel(kpis.filter { it.label !in covered }, charts.filter { it.total > 0 }, attention, QuickActions.forRole(role, permissions), unavailable)
     }
 
     fun unitLabel(state: String) = mapOf("disponible" to "Disponible", "en_servicio" to "En servicio", "en_mantenimiento" to "En mantenimiento")[state] ?: state
 
     fun unitTone(state: String) = when (state) {
         "disponible" -> DashboardTone.SUCCESS
-        "en_servicio" -> DashboardTone.DANGER
+        "en_servicio" -> DashboardTone.PROCESS
         "en_mantenimiento" -> DashboardTone.BLOCKED
         else -> DashboardTone.NEUTRAL
     }

@@ -52,9 +52,14 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
 
     companion object {
         private val byValue: Map<String, StatusFamily> = buildMap {
-            listOf("en_espera", "solicitada", "pendiente", "pendiente_cama", "borrador", "publicado", "reservada", "provisional").forEach { put(it, ESPERA) }
-            listOf("llamado", "confirmada", "en_proceso", "limpieza", "reprogramada").forEach { put(it, LLAMADO) }
-            listOf("en_atencion", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta").forEach { put(it, ATENCION) }
+            // A confirmed or rescheduled appointment waits for its time: it is not "Llamado" (megaphone). Same table as the
+            // web `familyOfValue` and iOS `StatusFamily.byValue`.
+            listOf(
+                "en_espera", "solicitada", "pendiente", "pendiente_cama", "borrador", "publicado", "reservada", "provisional",
+                "confirmada", "reprogramada",
+            ).forEach { put(it, ESPERA) }
+            listOf("llamado", "en_proceso").forEach { put(it, LLAMADO) }
+            listOf("en_atencion", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta", "limpieza").forEach { put(it, ATENCION) }
             listOf("atendida", "atendido", "ok", "completado", "firmada", "alta_firmada", "egresado", "libre", "disponible", "activo", "exito", "normal", "aprobada").forEach { put(it, LISTO) }
             listOf(
                 "cancelado", "cancelada", "no_asistio", "no_se_presento", "cerrado", "rechazada", "vencida", "vencido", "bloqueada",
@@ -63,7 +68,7 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
             listOf("critico_alto", "critico_bajo").forEach { put(it, CRITICO) }
             // Stock (inventory) and link checks (account linking). Never critical: red stays for clinical values.
             put("agotado", CERRADO)
-            put("bajo_minimo", LLAMADO)
+            put("bajo_minimo", ESPERA)
             put("por_vencer", ESPERA)
             put("coincide", LISTO)
             put("revisar", ESPERA)

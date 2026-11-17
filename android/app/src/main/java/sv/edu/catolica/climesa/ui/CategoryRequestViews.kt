@@ -199,8 +199,8 @@ private fun AssignPanel(state: CategoryRequestsState, model: CategoryRequestsVie
                     Column(Modifier.weight(1f)) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.detail, style = MaterialTheme.typography.bodySmall) }
                     when {
                         !d.hasShift -> FamilyBadge(d.reason ?: stringResource(R.string.rec_agendar_sin_turno), StatusFamily.CERRADO)
-                        state.doctor?.id == d.id -> FamilyBadge(stringResource(R.string.rec_leyenda_libre), StatusFamily.LISTO)
-                        CategoryRequestRules.isSuggested(request, d) -> FamilyBadge(stringResource(R.string.cat_sugerido), StatusFamily.ATENCION)
+                        state.doctor?.id == d.id -> FamilyBadge(stringResource(R.string.cat_elegido), StatusFamily.LISTO)
+                        CategoryRequestRules.isSuggested(request, d) -> FamilyBadge(stringResource(R.string.cat_sugerido), null)
                     }
                 }
             }

@@ -205,7 +205,7 @@ private fun FollowUpInbox(items: List<LabFollowUp>, busy: String?, model: Labora
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Text(item.patientName, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                    if (item.critical) CriticalPill(stringResource(R.string.lab_critico)) else FamilyBadge(stringResource(R.string.lab_pendiente_observacion), StatusFamily.ATENCION)
+                    if (item.critical) CriticalPill(stringResource(R.string.lab_critico)) else FamilyBadge(stringResource(R.string.lab_pendiente_observacion), StatusFamily.ESPERA)
                 }
                 item.record?.let { Text(stringResource(R.string.lab_expediente, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 Text(item.detail, style = MaterialTheme.typography.bodyMedium)
