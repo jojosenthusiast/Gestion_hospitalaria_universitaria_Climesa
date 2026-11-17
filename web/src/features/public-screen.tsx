@@ -70,7 +70,7 @@ export function PublicScreen({ api: given }: { api?: Api }) {
       <Panel title="Médicos de turno" state={doctors} empty="No hay médicos de turno registrados en este momento." isEmpty={d => d.medicos.length === 0}>{d =>
         <ul className="public-doctors">{d.medicos.map((m, i) => <li key={`${m.nombre}-${i}`}><strong>{m.nombre}</strong><span>{m.especialidad}{m.area ? ` · ${m.area}` : ''}</span><small>Hasta las {hour(m.hasta)}</small></li>)}</ul>}
       </Panel>
-      <Panel title="Avisos" state={notices} empty="No hay avisos vigentes." isEmpty={d => d.avisos.length === 0} className="public-panel-notices">{d =>
+      <Panel title="Avisos" state={notices} empty="No hay avisos vigentes." isEmpty={d => d.avisos.length === 0}>{d =>
         <ul className="public-notices">{d.avisos.map(a => <li key={a.id}><strong>{a.titulo}</strong>{a.prioridad && a.prioridad !== 'atencion' && <span className={`notice-badge notice-${a.prioridad}`}>{a.prioridad === 'critico' ? 'Crítico' : 'Urgente'}</span>}<p>{a.cuerpo}</p></li>)}</ul>}
       </Panel>
     </main>

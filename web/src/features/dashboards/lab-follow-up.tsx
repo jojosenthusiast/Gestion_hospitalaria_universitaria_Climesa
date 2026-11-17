@@ -30,7 +30,7 @@ export function LabFollowUpPanel({ api, version }: { api: Api; version: number }
   // and a retry links the same appointment instead of posting /citas again.
   const [scheduled, setScheduled] = useState<Record<string, string>>({});
   const remember = (proposalId: string, appointmentId: string) => setScheduled(current => ({ ...current, [proposalId]: appointmentId }));
-  return <section className="work-inbox lab-follow-up" aria-labelledby="lab-follow-up-title">
+  return <section className="work-inbox" aria-labelledby="lab-follow-up-title">
     <div><h2 id="lab-follow-up-title">Citas de seguimiento por confirmar</h2><p className="muted">Resultados de laboratorio que ya llegaron: agenda la cita con el médico que los pidió.</p></div>
     <RemoteState state={data} skeletonRows={2}>{() => rows.length
       ? <ul className="lab-follow-up-list">{rows.map(row => <ProposalRow key={row.id} api={api} proposal={row} scheduled={scheduled[row.id] ?? null} onScheduled={id => remember(row.id, id)} onDone={data.refresh} />)}</ul>

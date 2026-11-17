@@ -38,7 +38,7 @@ const countdown = (ms: number) => { const s = Math.max(0, Math.ceil(ms / 1000));
 export function SessionExpiryWarning({ remaining, onContinue, onLogout }: { remaining: number | null; onContinue: () => void; onLogout: () => void }) {
   if (remaining === null) return null;
   return <Dialog title={`Tu sesión se cierra en ${countdown(remaining)}`} onClose={onContinue}>
-    <div className="module-form session-warning">
+    <div className="module-form">
       <p>Por privacidad, la sesión se cierra a los 15 minutos sin actividad. Lo que guardaste no se pierde.</p>
       <div className="dialog-actions">
         <button type="button" className="secondary-button" onClick={onLogout}><Icon name="logout" size={18} />Cerrar sesión</button>

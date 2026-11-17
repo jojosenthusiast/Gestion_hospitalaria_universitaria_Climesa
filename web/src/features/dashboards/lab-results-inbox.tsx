@@ -22,7 +22,7 @@ export function LabResultsInbox({ api, profile, version }: { api: Api; profile: 
   if (!allowed) return null;
   const rows = data.data ? sortFollowUps(data.data) : null;
   const error = spanishProblem(data.error);
-  return <section className="work-inbox lab-follow-up" aria-labelledby="lab-results-inbox-title">
+  return <section className="work-inbox" aria-labelledby="lab-results-inbox-title">
     <div>
       <h2 id="lab-results-inbox-title">Resultados por revisar</h2>
       <p className="muted">{rows ? `${rows.length} ${rows.length === 1 ? 'pendiente' : 'pendientes'}` : 'Valores críticos y observaciones del laboratorio en las órdenes que pediste.'}</p>

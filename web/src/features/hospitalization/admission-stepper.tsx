@@ -67,7 +67,7 @@ function OriginStep({ api, form, update }: StepProps & { api: Api }) {
   return <>
     <p className="form-intro">El ingreso nace de un registro del paciente: elige de dónde viene y cuál es.</p>
     <RemoteState state={records}>{rows => <>
-      <fieldset className="choice-list origin-kinds"><legend>Origen</legend><div className="chip-row">{originKinds.map(kind => {
+      <fieldset className="choice-list"><legend>Origen</legend><div className="chip-row">{originKinds.map(kind => {
         const count = rows.filter(row => row.origin === kind).length;
         return <label key={kind} className={`choice-chip${form.origin === kind ? ' is-selected' : ''}${count === 0 ? ' is-disabled' : ''}`}><input type="radio" name="origin-kind" checked={form.origin === kind} disabled={count === 0} onChange={() => update({ origin: kind, originRecord: null })} /><strong>{originNames[kind]}</strong><small>{count === 0 ? 'Sin registros' : `${count} reciente${count === 1 ? '' : 's'}`}</small></label>;
       })}</div></fieldset>

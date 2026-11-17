@@ -189,6 +189,7 @@
   border: 1px solid var(--line); border-left-width: 4px; border-radius: var(--radius-control); }
 .shift-preview-item.has-conflict { border-left-color: var(--danger); background: color-mix(in srgb, var(--danger) 6%, var(--surface)); }
 .shift-preview-who { min-width: 0; display: grid; gap: 2px; }
+.shift-preview-result { min-width: 0; font-size: var(--text-sm); }
 .shift-preview-time, .shift-preview-note, .shift-preview-pending { color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
 .shift-preview-ok { color: var(--success); font-weight: 700; }
 .shift-preview-error { color: var(--danger); font-weight: 700; }

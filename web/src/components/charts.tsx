@@ -68,7 +68,7 @@ export function BarChart({ title, data, unit = '', height = 160, threshold, desc
 export function HBarList({ title, data, unit = '', description, table = 'sr', empty = 'Sin datos para mostrar.', total }: { title: string; data: Datum[]; unit?: string; description?: string; table?: TableMode; empty?: string; total?: number }) {
   const max = Math.max(1, total ?? 0, ...data.map(d => d.value ?? 0));
   if (data.length === 0) return <p className="chart-empty" role="status">{empty}</p>;
-  return <Figure title={title} description={description} rows={data} unit={unit} table={table} className="chart-hbars">
+  return <Figure title={title} description={description} rows={data} unit={unit} table={table}>
     <ul className="hbar-list" aria-hidden="true">{data.map(d => <li key={d.label}><span className="hbar-label">{d.label}</span><span className="hbar-track"><span className="hbar-fill" style={{ width: `${d.value == null ? 0 : Math.max(d.value > 0 ? 3 : 0, (d.value / max) * 100)}%`, background: toneColor[d.tone ?? 'primary'] }} /></span><strong className="hbar-value">{fmt(d.value, unit)}</strong></li>)}</ul>
   </Figure>;
 }
@@ -93,7 +93,7 @@ export function Donut({ title, segments, centerValue, centerLabel, unit = '', de
   if (total === 0) return <p className="chart-empty" role="status">{empty}</p>;
   let acc = 0;
   return <Figure title={title} description={description} rows={segments} unit={unit} table={table} className="chart-donut">
-    <svg className="chart-svg chart-donut-svg" viewBox="0 0 42 42" role="img" aria-labelledby={titleId}>
+    <svg className="chart-svg" viewBox="0 0 42 42" role="img" aria-labelledby={titleId}>
       <title id={titleId}>{`${title}: ${segments.map(s => `${s.label} ${s.value}`).join(', ')}`}</title>
       <circle className="chart-ring" cx="21" cy="21" r="15.915" fill="none" strokeWidth="5.5" />
       {segments.filter(s => s.value > 0).map(s => {
@@ -144,7 +144,7 @@ export function Gauge({ title, value, max = 100, unit = '%', tone = 'primary', c
       <title id={titleId}>{`${title}: ${fmt(value, unit)}`}</title>
       <path className="chart-ring" d={`M${arc(0)} A${r} ${r} 0 0 1 ${arc(1)}`} fill="none" strokeWidth="9" strokeLinecap="round" />
       {ratio > 0 && <path d={`M${arc(0)} A${r} ${r} 0 ${ratio > 0.5 ? 1 : 0} 1 ${arc(ratio)}`} fill="none" stroke={toneColor[tone]} strokeWidth="9" strokeLinecap="round" />}
-      <text className="chart-center chart-center-big" x="50" y="48" textAnchor="middle">{new Intl.NumberFormat('es-SV', { maximumFractionDigits: 1 }).format(value)}{unit}</text>
+      <text className="chart-center" x="50" y="48" textAnchor="middle">{new Intl.NumberFormat('es-SV', { maximumFractionDigits: 1 }).format(value)}{unit}</text>
     </svg>
     {caption && <figcaption className="chart-caption">{caption}</figcaption>}
   </Figure>;

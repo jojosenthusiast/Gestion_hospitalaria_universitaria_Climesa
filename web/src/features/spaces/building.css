@@ -53,3 +53,6 @@
 .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .space-guide { margin: 0 0 12px; }
 @media (max-width: 900px) { .building-split { grid-template-columns: 1fr; } .plan-side { position: static; } }
+
+/* R1: panel de una cama: estado, ocupante, avisos y acciones, apilados con el espacio del sistema. */
+.bed-panel { display: grid; gap: var(--space-3); }
