@@ -27,6 +27,10 @@
     <string name="pac_ficha_faltan">Faltan datos: %1$s.</string>
     <string name="pac_ficha_completa">Ficha completa para los datos que tu rol puede ver.</string>
     <string name="lab_revisar">Revisar</string>
+    <string name="lab_revisar_titulo">Revisar y liberar resultados</string>
+    <string name="lab_revisar_efecto">%1$s verá estos valores en su portal en cuanto confirmes.</string>
+    <string name="lab_revisar_confirmar">Liberar al paciente</string>
+    <string name="lab_revisar_critico">Incluye un valor crítico: confirma que ya lo atendiste o avisaste.</string>
     <string name="lab_cancelar_orden">Cancelar orden</string>
     <string name="lab_cancelar_titulo">Cancelar orden de laboratorio</string>
     <string name="lab_cancelar_efecto">La orden de %1$s deja de avanzar y el laboratorio ya no la procesa. Queda registrado quién la canceló y por qué.</string>

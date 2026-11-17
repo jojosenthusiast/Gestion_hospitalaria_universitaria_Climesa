@@ -69,7 +69,7 @@ fun PatientAppointmentsScreen(
     val cancelAppointment = state.appointments.firstOrNull { it.id == cancelTarget }
 
     if (cancelAppointment != null) {
-        CancelAppointmentDialog(cancelAppointment, state.saving, model, onClose = { cancelTarget = null })
+        CancelAppointmentDialog(cancelAppointment, state.saving, state.error, model, onClose = { cancelTarget = null })
     }
     state.rescheduleTarget?.let { RescheduleRequestDialog(it, state, model) }
 
@@ -89,7 +89,7 @@ fun PatientAppointmentsScreen(
         if (canRequest) {
             item { PrimaryButton(stringResource(R.string.cat_pedir_cita), { model.clearMessages(); requests.openForm() }, icon = Icons.Default.CalendarMonth) }
         }
-        if (requestState.requests.isNotEmpty()) item { MyCategoryRequests(requestState.requests, requestState.saving, requests::withdraw) }
+        if (requestState.requests.isNotEmpty()) item { MyCategoryRequests(requestState.requests, requestState.saving, requests::withdraw, requestState.error) }
         if (state.loading) {
             item { LoadingState() }
         } else if (state.appointments.isEmpty()) {
@@ -165,13 +165,15 @@ private fun RescheduleRequestDialog(appointment: PatientAppointment, state: Pati
 }
 
 @Composable
-private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boolean, model: PatientAppointmentsViewModel, onClose: () -> Unit) {
+private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boolean, error: String?, model: PatientAppointmentsViewModel, onClose: () -> Unit) {
     var reason by rememberSaveable(appointment.id) { mutableStateOf("") }
     ConfirmDialog(
         title = "Cancelar cita",
         confirmLabel = "Confirmar",
-        onConfirm = { model.cancel(appointment, reason); onClose() },
+        onConfirm = { model.cancel(appointment, reason) },
         onDismiss = onClose,
+        error = error,
+        onDone = onClose,
         message = "${appointment.doctorName} · ${formatAppointmentDateTime(appointment.start)}",
         destructive = true,
         busy = busy,

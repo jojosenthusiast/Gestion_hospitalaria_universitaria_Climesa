@@ -138,7 +138,7 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
 
 /** The patient's own requests with their state; "Retirar solicitud" only when the server allows it. */
 @Composable
-internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, onWithdraw: (CategoryRequest) -> Unit) {
+internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, onWithdraw: (CategoryRequest) -> Unit, error: String? = null) {
     var confirm by rememberSaveable { mutableStateOf<String?>(null) }
     SectionCard(stringResource(R.string.cat_mis_solicitudes)) {
         requests.forEach { r ->
@@ -151,8 +151,8 @@ internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, 
         }
     }
     requests.firstOrNull { it.id == confirm }?.let { r ->
-        ConfirmDialog(stringResource(R.string.cat_retirar), stringResource(R.string.cat_retirar), { onWithdraw(r); confirm = null }, { confirm = null },
-            message = stringResource(R.string.cat_retirar_mensaje), destructive = true, busy = busy)
+        ConfirmDialog(stringResource(R.string.cat_retirar), stringResource(R.string.cat_retirar), { onWithdraw(r) }, { confirm = null },
+            message = stringResource(R.string.cat_retirar_mensaje), destructive = true, busy = busy, error = error, onDone = { confirm = null })
     }
 }
 
@@ -180,8 +180,8 @@ internal fun CategoryRequestInbox(state: CategoryRequestsState, model: CategoryR
     }
     state.inbox.firstOrNull { it.id == rejecting }?.let { r ->
         var reason by rememberSaveable(r.id) { mutableStateOf("") }
-        ConfirmDialog(stringResource(R.string.cat_rechazar_titulo), stringResource(R.string.cat_rechazar_titulo), { model.reject(r, reason); rejecting = null }, { rejecting = null },
-            message = "${r.patientName} · ${r.categoryNames}", destructive = true, busy = state.saving,
+        ConfirmDialog(stringResource(R.string.cat_rechazar_titulo), stringResource(R.string.cat_rechazar_titulo), { model.reject(r, reason) }, { rejecting = null },
+            message = "${r.patientName} · ${r.categoryNames}", destructive = true, busy = state.saving, error = state.error, onDone = { rejecting = null },
             confirmEnabled = CategoryRequestRules.rejectError(reason) == null,
             body = { FormField(stringResource(R.string.cat_rechazar_motivo), reason, { reason = it.take(500) }, singleLine = false) })
     }

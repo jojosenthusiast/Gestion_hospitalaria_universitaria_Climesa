@@ -137,7 +137,7 @@ fun LaboratoryScreen(
                 val now = System.currentTimeMillis()
                 val visible = LabWorklist.sorted(state.orders.filter { filter.matches(it) && (!urgentOnly || LabWorklist.isUrgent(it)) && LabWorklist.matches(it, query) })
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
-                if (ownResults) items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, true, state.busy, model, now) }
+                if (ownResults) items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, true, order.id in state.busyIds, model, now) }
                 else {
                     // S10: grouped by what comes next; closed groups start folded unless the person filters or searches.
                     val foldable = filter == LabFilter.ALL && query.isBlank()
@@ -148,13 +148,14 @@ fun LaboratoryScreen(
                                 openGroups = if (group.name in openGroups) openGroups - group.name else openGroups + group.name
                             }
                         }
-                        if (open) items(orders, key = { it.id }) { order -> LaboratoryOrderCard(order, false, state.busy, model, now) }
+                        if (open) items(orders, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now) }
                     }
                 }
             }
         }
     }
     state.cancelOrderId?.let { id -> CancelOrderDialog(state, state.orders.firstOrNull { it.id == id }, model) }
+    state.reviewOrderId?.let { id -> state.orders.firstOrNull { it.id == id }?.let { ReviewOrderDialog(it, state, model) } }
     state.external?.let { draft -> SendExternalDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
     state.externalLoad?.let { draft -> ExternalResultDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
     state.uploadFailure?.let { message -> UploadFailureDialog(message, model::dismissUploadFailure) }
@@ -292,6 +293,27 @@ private fun describe(context: android.content.Context, uri: Uri): LabAttachment?
 }.getOrNull()
 
 /** Cancel with a reason (D-13: at least 10 characters). The reason and the open dialog live in the ViewModel, so a rotation keeps them. */
+/** R3 A-16: releasing a result to the patient is confirmed with what they will see; it closes only once the API accepts it. */
+@Composable
+private fun ReviewOrderDialog(order: LaboratoryOrder, state: LaboratoryState, model: LaboratoryViewModel) {
+    ConfirmDialog(
+        title = stringResource(R.string.lab_revisar_titulo),
+        message = stringResource(R.string.lab_revisar_efecto, order.patientName),
+        confirmLabel = stringResource(R.string.lab_revisar_confirmar),
+        onConfirm = { model.review(order) },
+        onDismiss = model::dismissReview,
+        busy = order.id in state.busyIds,
+        error = state.error,
+        onDone = model::dismissReview,
+        body = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                LabReviewSummary.lines(order).forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                if (LabReviewSummary.critical(order)) Text(stringResource(R.string.lab_revisar_critico), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+    )
+}
+
 @Composable
 private fun CancelOrderDialog(state: LaboratoryState, order: LaboratoryOrder?, model: LaboratoryViewModel) {
     // The order left the list or no longer allows cancelling (realtime update): the dialog closes on its own.
@@ -348,7 +370,7 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
         // T07c: the report file of a completed external order. Never in the patient's own view.
         if (!ownView && order.external && order.state == "completado") ExternalReport(order, model)
         if (canLoadExternal) PrimaryButton(stringResource(R.string.lab_cargar_externo), { model.openExternalLoad(order.id) }, enabled = !busy)
-        if (canReview) PrimaryButton(stringResource(R.string.lab_revisar), { model.review(order) }, enabled = !busy, loading = busy)
+        if (canReview) PrimaryButton(stringResource(R.string.lab_revisar), { model.openReview(order.id) }, enabled = !busy, loading = busy)
         if (canSendExternal) SecondaryButton(stringResource(R.string.lab_externo_titulo), { model.openExternal(order.id) }, enabled = !busy)
         if (canCancel) SecondaryButton(stringResource(R.string.lab_cancelar_orden), { model.openCancel(order.id) }, enabled = !busy)
         if (!ownView && !(canReview || canLoadExternal || canSendExternal)) TextButton(onClick = { expanded = false }) { Text(stringResource(R.string.lab_ocultar_detalle)) }

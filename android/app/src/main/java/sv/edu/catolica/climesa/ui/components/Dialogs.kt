@@ -10,9 +10,28 @@ import androidx.compose.ui.res.stringResource
 import sv.edu.catolica.climesa.R
 
 /**
+ * Close-on-success contract of a confirmation (R3 A-19), pure so it is tested on the JVM. [confirm] marks the write as sent;
+ * [settle] runs each time `busy` or `error` changes and answers true only when the sent write finished without an error.
+ * After an error the dialog stays open with what the person typed, and the next confirm starts again.
+ */
+internal class ConfirmSubmission {
+    var sent: Boolean = false
+        private set
+
+    fun confirm() { sent = true }
+
+    fun settle(busy: Boolean, error: String?): Boolean {
+        if (!sent || busy) return false
+        sent = false
+        return error == null
+    }
+}
+
+/**
  * Confirmation before a consequential action. While `busy` the dialog cannot be dismissed and the confirm button shows progress,
  * so the write is not sent twice. `destructive` paints the confirm action in the error colour.
- * Extra inputs (a reason field, an error) go in `body`.
+ * Extra inputs (a reason field) go in `body`. With [onDone] the dialog closes itself only when the write succeeds; [error]
+ * then shows inside the dialog and the typed reason is kept, so a failure never loses it.
  */
 @Composable
 internal fun ConfirmDialog(
@@ -25,22 +44,28 @@ internal fun ConfirmDialog(
     destructive: Boolean = false,
     busy: Boolean = false,
     confirmEnabled: Boolean = true,
+    error: String? = null,
+    onDone: (() -> Unit)? = null,
     body: (@Composable () -> Unit)? = null,
 ) {
+    val submission = androidx.compose.runtime.remember { ConfirmSubmission() }
+    if (onDone != null) androidx.compose.runtime.LaunchedEffect(busy, error) { if (submission.settle(busy, error)) onDone() }
+    val shownError = error?.takeIf { onDone != null }
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         shape = MaterialTheme.shapes.large,
         containerColor = MaterialTheme.colorScheme.surface,
         title = { Text(title, style = MaterialTheme.typography.titleLarge) },
-        text = if (message != null || body != null) ({
+        text = if (message != null || body != null || shownError != null) ({
             androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
                 message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 body?.invoke()
+                shownError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             }
         }) else null,
         confirmButton = {
             TextButton(
-                onClick = onConfirm,
+                onClick = { if (onDone != null) submission.confirm(); onConfirm() },
                 enabled = confirmEnabled && !busy,
                 colors = if (destructive) ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.textButtonColors(),
             ) { Text(if (busy) stringResource(R.string.ui_un_momento) else confirmLabel, style = MaterialTheme.typography.labelLarge) }
