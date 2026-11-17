@@ -95,3 +95,8 @@
 /* R7 C2: a reference-only attachment shows «Archivo pendiente · Reintentar» and confirms the chosen file before uploading. */
 .lab-attachment-retry, .lab-attachment-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
 .lab-attachment-retry label { cursor: pointer; }
+
+/* R7 C-5: exam picker of «Registrar resultado externo». */
+.lab-external-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.lab-external-add select { flex: 1 1 200px; min-width: 0; }
+.lab-external-value { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }

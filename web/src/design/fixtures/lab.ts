@@ -176,8 +176,12 @@ export class LabFixtures {
         return { ...this.bump(o, d), attachmentId: attachment.id };
       }
       Object.assign(o, next[verb] ?? {});
+      // R7 C-6: the fixture patient has the app, so the notice reaches them.
+      if (verb === 'externa') return { ...this.bump(o, d), patientNotified: true };
       return this.bump(o, d);
     }
+    // R7 C-5: an exam done elsewhere without a prior order; the API ties it to the latest consultation.
+    if (parts[1] === 'laboratorio' && parts[2] === 'pacientes' && parts[4] === 'resultado-externo') return { id: this.nextId(), version: 3, state: 'completado', attachmentId: this.nextId(), consultationId: this.nextId() };
     if (parts[1] === 'laboratorio' && parts[2] === 'seguimientos' && parts[3]) { this.proposals = this.proposals.filter(x => x.id !== parts[3]); return { id: parts[3], version: 2 }; }
     if (parts[1] === 'laboratorio' && parts[2] === 'pendientes' && parts[3]) { this.pending = this.pending.filter(x => x.id !== parts[3]); return { id: parts[3], version: 2 }; }
     if (parts[1] === 'catalogo' && parts[2] === 'examenes' && parts[3]) {
