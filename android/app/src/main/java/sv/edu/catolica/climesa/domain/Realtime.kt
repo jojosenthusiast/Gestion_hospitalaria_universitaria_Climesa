@@ -188,6 +188,14 @@ object ConsultationEvents {
     fun matches(event: EventoDominio) = LiveEntities.matches(event, "consulta", "cita")
 }
 
+/**
+ * "Mi día" of the doctor: the agenda plus the day's queue, so it also reloads on `fila.*` / `ticket_fila` (web live
+ * scope of `/consultas`: consulta, cita, ticket_fila). Kept apart so the clinical history does not reload on the queue.
+ */
+object DoctorDayEvents {
+    fun matches(event: EventoDominio) = ConsultationEvents.matches(event) || QueueEvents.matches(event)
+}
+
 /** Hospitalization list: admissions publish `admision.*`. */
 object AdmissionEvents {
     fun matches(event: EventoDominio) = LiveEntities.matches(event, "admision", "alta")

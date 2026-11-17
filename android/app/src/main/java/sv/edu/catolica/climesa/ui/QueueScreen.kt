@@ -12,7 +12,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import sv.edu.catolica.climesa.domain.NextProposal
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import sv.edu.catolica.climesa.domain.NextStatus
+import sv.edu.catolica.climesa.domain.QueueOffice
 import sv.edu.catolica.climesa.domain.QueueMove
 import sv.edu.catolica.climesa.domain.QueueMoves
 import androidx.compose.foundation.layout.Column
@@ -73,6 +76,9 @@ fun QueueScreen(
     // The chosen area also selects whose "who goes next" proposal is shown on top (RN-FILA-SIGUIENTE).
     LaunchedEffect(service) { model.chooseArea(service) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
+    // B5: whoever calls may send the patient to an active consulting room (`/espacios`, with `espacios.ver`), like the web.
+    LaunchedEffect(canCall) { if (canCall && "espacios.ver" in profile.permissions) model.loadOffices() }
+    var office by rememberSaveable { mutableStateOf("") }
     // A dashboard asked to "issue a number" or "call next": open the matching dialog once the day's queue is loaded.
     LaunchedEffect(quickAction, state.loading, state.tickets) {
         if (quickAction == null || state.loading) return@LaunchedEffect
@@ -80,21 +86,33 @@ fun QueueScreen(
         if (quickAction == QuickAction.CALL_NEXT && canCall) callNextOpen = true
         onQuickActionHandled()
     }
-    // The API picks the first waiting number of the service; the app never chooses it locally.
+    // The API picks who goes next by its rule (RN-FILA-SIGUIENTE); the app never chooses the number locally.
     if (callNextOpen) QueueServiceDialog(
         title = stringResource(R.string.fila_llamar_siguiente), confirmLabel = "Llamar", initial = QueueRules.callNextService(state.tickets, service), busy = state.busy,
         message = { stringResource(R.string.fila_llamar_siguiente_mensaje, QueueLabels.service(it)) },
-        onClose = { callNextOpen = false }, onSubmit = { chosen, _ -> callNextOpen = false; model.callNext(chosen) },
+        onClose = { callNextOpen = false }, onSubmit = { chosen, _ -> callNextOpen = false; model.callNext(chosen, office) },
+        extra = { OfficePicker(state.offices, office, state.busy) { office = it } },
     )
+    // B1: reception issues the number for a patient it finds with the same search as booking an appointment.
+    val closeIssue = { issueOpen = false; model.resetIssue() }
     if (issueOpen) QueueServiceDialog(title = "Emitir número", confirmLabel = "Emitir", initial = QueueLabels.services.first().first, busy = state.busy, message = { stringResource(R.string.fila_emitir_mensaje) }, withPriority = true,
-        onClose = { issueOpen = false }, onSubmit = { service, priority -> issueOpen = false; model.issue(service, priority) })
+        onClose = closeIssue, onSubmit = { service, priority -> issueOpen = false; model.issue(service, priority) },
+        confirmEnabled = state.issueSearch.patient != null,
+        extra = {
+            val search = state.issueSearch
+            Text(stringResource(R.string.rec_agendar_paciente), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
+            PatientSearchPicker(search.query, search.results, search.searching, search.hasMore, search.patient, model::issueQuery, model::pickIssuePatient, model::moreIssuePatients, enabled = !state.busy)
+            search.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        })
     PageList(modifier) {
         item { SectionIntro("Atención / Llegada", "Fila del día", "El número se emite al llegar y avanza sin alterar la hora de la cita.") }
         if (canIssue) item { PrimaryButton("Emitir número", { issueOpen = true }, icon = Icons.Default.Add, enabled = !state.busy) }
         if (canCall && service == null) item { SecondaryButton(stringResource(R.string.fila_llamar_siguiente), { model.clearMessages(); callNextOpen = true }, icon = Icons.Default.Phone, enabled = !state.busy) }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         state.undo?.let { undo -> item { UndoRow(undo.label, state.busy) { model.undoLastCall() } } }
-        if (service != null && !state.loading) item { NextCard(state.next, service!!, canCall, state.busy, state.tickets.any { it.service == service && it.state == "en_espera" }) { model.callNext(service!!) } }
+        if (service != null && !state.loading) item {
+            NextCard(state, service!!, canCall, state.tickets.any { it.service == service && it.state == "en_espera" }, office, { office = it }) { model.callNext(service!!, office) }
+        }
         if (state.error != null && state.tickets.isNotEmpty()) item { NoticeBanner(NoticeKind.ERROR, state.error!!) }
         when {
             state.loading -> item { LoadingState() }
@@ -136,10 +154,15 @@ fun QueueScreen(
 
 /** Who goes next in the chosen area by the server rule, and "Llamar siguiente" right under it. */
 @Composable
-private fun NextCard(next: NextProposal?, service: String, canCall: Boolean, busy: Boolean, waiting: Boolean, onCallNext: () -> Unit) {
+private fun NextCard(state: QueueState, service: String, canCall: Boolean, waiting: Boolean, office: String, onOffice: (String) -> Unit, onCallNext: () -> Unit) {
+    val next = state.next
+    val busy = state.busy
     val proposal = next?.proposal
     Column(Modifier.fillMaxWidth().areaSurface(next?.area ?: QueueLabels.areaOf(service)).padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(stringResource(R.string.fila_quien_sigue), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val status = QueueRules.nextStatus(next, state.nextLoading, state.nextError)
+        if (status == NextStatus.ERROR) NoticeBanner(NoticeKind.ERROR, state.nextError.orEmpty())
+        if (status == NextStatus.LOADING) Text(stringResource(R.string.fila_calculando), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (proposal != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 AreaTag(proposal.area)
@@ -148,9 +171,27 @@ private fun NextCard(next: NextProposal?, service: String, canCall: Boolean, bus
             }
             Text(proposal.patientName, style = MaterialTheme.typography.bodyLarge)
             Text(proposal.reasonText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else Text(stringResource(R.string.fila_nadie_espera), style = MaterialTheme.typography.bodyMedium)
+        } else if (status == NextStatus.NONE) Text(stringResource(R.string.fila_nadie_espera), style = MaterialTheme.typography.bodyMedium)
         next?.rule?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.fila_regla, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        if (canCall) PrimaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, icon = Icons.Default.Phone, enabled = !busy && waiting)
+        if (canCall) {
+            OfficePicker(state.offices, office, busy, onOffice)
+            PrimaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, icon = Icons.Default.Phone, enabled = !busy && waiting)
+        }
+    }
+}
+
+/** Optional consulting room for the call ("Sin asignar" by default); hidden when there is none to choose. */
+@Composable
+private fun OfficePicker(offices: List<QueueOffice>, selected: String, busy: Boolean, onSelect: (String) -> Unit) {
+    if (offices.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    val label = offices.firstOrNull { it.id == selected }?.label ?: stringResource(R.string.fila_consultorio_sin_asignar)
+    Box {
+        TextButton(onClick = { open = true }, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.fila_consultorio, label)) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.fila_consultorio_sin_asignar)) }, onClick = { open = false; onSelect("") })
+            offices.forEach { room -> DropdownMenuItem(text = { Text(room.label) }, onClick = { open = false; onSelect(room.id) }) }
+        }
     }
 }
 
@@ -184,8 +225,9 @@ private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Bo
         }
         // Buttons come from the API (`allowedActions`); a blocked one stays visible, disabled, with its reason.
         QueueActionButton(ticket, QueueAction.CALL, if (ticket.state == "llamado") "Llamar de nuevo" else "Llamar", busy, primary = false) { model.call(ticket) }
-        QueueActionButton(ticket, QueueAction.ATTEND, "Atender", busy, primary = true) { model.attend(ticket) }
-        QueueActionButton(ticket, QueueAction.COMPLETE, "Completar", busy, primary = true) { model.complete(ticket) }
+        // B8: card actions are secondary; the screen keeps one primary action (issue a number or call next).
+        QueueActionButton(ticket, QueueAction.ATTEND, "Iniciar atención", busy, primary = false) { model.attend(ticket) }
+        QueueActionButton(ticket, QueueAction.COMPLETE, "Completar", busy, primary = false) { model.complete(ticket) }
         QueueActionButton(ticket, QueueAction.ABSENT, "No se presentó", busy, primary = false) { model.absent(ticket) }
         CardMenu(ticket, canCall, canManage, busy, model)
     }
@@ -225,7 +267,10 @@ private fun QueueActionButton(ticket: QueueTicket, action: QueueAction, label: S
 
 /** Service picker dialog shared by "Emitir número" and "Llamar siguiente". */
 @Composable
-private fun QueueServiceDialog(title: String, confirmLabel: String, initial: String, busy: Boolean, message: @Composable (String) -> String, onClose: () -> Unit, withPriority: Boolean = false, onSubmit: (String, String) -> Unit) {
+private fun QueueServiceDialog(
+    title: String, confirmLabel: String, initial: String, busy: Boolean, message: @Composable (String) -> String, onClose: () -> Unit, withPriority: Boolean = false,
+    confirmEnabled: Boolean = true, extra: @Composable () -> Unit = {}, onSubmit: (String, String) -> Unit,
+) {
     var service by rememberSaveable { mutableStateOf(initial) }
     var priority by rememberSaveable { mutableStateOf("rutina") }
     ConfirmDialog(
@@ -235,8 +280,10 @@ private fun QueueServiceDialog(title: String, confirmLabel: String, initial: Str
         onDismiss = onClose,
         busy = busy,
         message = message(service),
+        confirmEnabled = confirmEnabled,
         body = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                extra()
                 QueueLabels.services.forEach { (value, label) ->
                     Row(Modifier.fillMaxWidth().heightIn(min = Spacing.touch).selectable(selected = service == value, role = Role.RadioButton, onClick = { service = value }), verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = service == value, onClick = null)

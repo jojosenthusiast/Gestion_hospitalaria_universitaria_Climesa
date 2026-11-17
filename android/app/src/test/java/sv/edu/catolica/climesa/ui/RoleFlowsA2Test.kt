@@ -14,6 +14,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
@@ -61,14 +62,14 @@ class RoleFlowsA2Test {
         assertNull(HospitalizationRules.primaryAdmission(listOf(admission("a", AdmissionAction.TRANSFER))))
     }
 
-    private fun ticket(id: String, number: Int, state: String, consultation: String? = null, service: String? = "consulta_general") =
-        QueueConsultation(id, number, "P$number", state, consultation, if (consultation == null) null else "abierta", service)
+    private fun ticket(id: String, number: Int, state: String, consultation: String? = null, service: String? = "consulta_general", byMe: Boolean = false, byColleague: Boolean = false) =
+        QueueConsultation(id, number, "P$number", state, consultation, if (consultation == null) null else "abierta", service, calledByMe = byMe, calledByColleague = byColleague)
 
     @Test fun `a ticket in attention is the doctor's own only when it carries consultationId`() {
-        val queue = listOf(ticket("t1", 3, "en_atencion"), ticket("t2", 5, "llamado"), ticket("t3", 2, "llamado", service = "laboratorio"))
+        val queue = listOf(ticket("t1", 3, "en_atencion"), ticket("t2", 5, "llamado", byMe = true), ticket("t3", 2, "llamado", service = "laboratorio", byMe = true))
         // t1 is someone else's (no consultationId), t3 belongs to another service: the next step is calling-in t2,
-        // but only when this doctor called t2.
-        assertEquals(ConsultationPrimary.StartTicket("t2"), ConsultationPrimary.pick(queue, unsigned = emptyList(), canCallNext = false, calledByMe = "t2"))
+        // because the API says this doctor called t2 (`calledByMe`).
+        assertEquals(ConsultationPrimary.StartTicket("t2"), ConsultationPrimary.pick(queue, unsigned = emptyList(), canCallNext = false))
         val mine = queue + ticket("t4", 9, "en_atencion", consultation = "c4")
         assertEquals(ConsultationPrimary.ResumeTicket("t4"), ConsultationPrimary.pick(mine, unsigned = listOf("c8"), canCallNext = false))
         assertEquals(ConsultationPrimary.ResumeUnsigned("c8"), ConsultationPrimary.pick(queue.take(1), unsigned = listOf("c8"), canCallNext = false))
@@ -78,18 +79,18 @@ class RoleFlowsA2Test {
     }
 
     @Test fun `a called number another doctor called is never this doctor's main action`() {
-        // /fila lists the called numbers of every office; t2 was called by a colleague.
-        val queue = listOf(ticket("t2", 5, "llamado"), ticket("t6", 7, "llamado"))
-        assertNull(ConsultationPrimary.pick(queue, unsigned = emptyList(), canCallNext = false))
-        assertNull(ConsultationPrimary.pick(queue, unsigned = emptyList(), canCallNext = false, calledByMe = "t9"))
-        assertEquals(ConsultationPrimary.StartTicket("t6"), ConsultationPrimary.pick(queue, unsigned = emptyList(), canCallNext = false, calledByMe = "t6"))
+        // /fila lists the called numbers of every office; t2 was called by a colleague, t6 by this doctor.
+        val queue = listOf(ticket("t2", 5, "llamado", byColleague = true), ticket("t6", 7, "llamado", byMe = true))
+        assertNull(ConsultationPrimary.pick(queue.take(1), unsigned = emptyList(), canCallNext = false))
+        assertTrue(queue[0].calledElsewhere)
+        assertEquals(ConsultationPrimary.StartTicket("t6"), ConsultationPrimary.pick(queue, unsigned = emptyList(), canCallNext = false))
     }
 
     @Test fun `the queue reads the ticket service from the API's service field`() {
         // GET /fila sends `service` (api/src/attention/queue.service.ts: t.servicio AS service).
-        val rows = ConsultationResume.parseQueue(JSONArray().put(JSONObject().put("id", "t1").put("numero", 4).put("patientName", "Ana").put("state", "llamado").put("service", "laboratorio")))
+        val rows = ConsultationResume.parseQueue(JSONArray().put(JSONObject().put("id", "t1").put("numero", 4).put("patientName", "Ana").put("state", "llamado").put("service", "laboratorio").put("calledByMe", true)))
         assertEquals("laboratorio", rows.single().service)
-        assertNull(ConsultationPrimary.pick(rows, unsigned = emptyList(), canCallNext = false, calledByMe = "t1"))
+        assertNull(ConsultationPrimary.pick(rows, unsigned = emptyList(), canCallNext = false))
     }
 
     @Test fun `signing is one busy sequence, a second tap sends nothing and the sign uses the saved version`() = runTest(dispatcher) {

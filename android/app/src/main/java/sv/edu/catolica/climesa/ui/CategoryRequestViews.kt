@@ -70,12 +70,11 @@ internal fun categoryIcon(key: String): ImageVector = when (key) {
     else -> Icons.Default.MedicalServices
 }
 
+/** A1: the web pairs (pendiente waits, asignada is called, rechazada and cancelada are closed) through the shared table. */
 @Composable
-private fun requestStateTag(state: String) = when (state) {
-    "pendiente" -> FamilyBadge(stringResource(R.string.cat_estado_pendiente), null)
-    "asignada" -> FamilyBadge(stringResource(R.string.cat_estado_asignada), StatusFamily.LISTO)
-    "rechazada" -> FamilyBadge(stringResource(R.string.cat_estado_rechazada), null)
-    else -> FamilyBadge(stringResource(R.string.cat_estado_cancelada), null)
+private fun RequestStateTag(state: String) {
+    val (value, label) = CategoryRequestRules.status(state)
+    StatusTag(value, label = label)
 }
 
 /** A06 Android: the patient asks by reason (one to three categories with icon and search), time of day and note; the doctor is optional. */
@@ -144,7 +143,7 @@ internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, 
     SectionCard(stringResource(R.string.cat_mis_solicitudes)) {
         requests.forEach { r ->
             Column {
-                DataRow(r.categoryNames, subtitle = listOfNotNull(r.franja.label, r.note).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { requestStateTag(r.state) })
+                DataRow(r.categoryNames, subtitle = listOfNotNull(r.franja.label, r.note).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) })
                 r.appointment?.let { Text(stringResource(R.string.cat_asignada_detalle, it.doctorName, formatShort(it.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
                 r.rejectionReason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (r.allows(CategoryRequestRules.CANCEL)) TextButton(onClick = { confirm = r.id }, enabled = !busy) { Text(stringResource(R.string.cat_retirar)) }
@@ -164,9 +163,11 @@ internal fun CategoryRequestInbox(state: CategoryRequestsState, model: CategoryR
     SectionCard(stringResource(R.string.cat_bandeja_titulo), eyebrow = state.inbox.size.toString()) {
         Text(stringResource(R.string.cat_bandeja_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (state.inbox.isEmpty()) Text(stringResource(R.string.cat_bandeja_vacia), style = MaterialTheme.typography.bodyMedium)
+        // A4: how long each request has waited, read when the inbox is drawn (every realtime reload redraws it; no timers).
+        val now = System.currentTimeMillis()
         state.inbox.forEach { r ->
             Column {
-                DataRow(r.patientName, subtitle = listOfNotNull(r.record, r.categoryNames, r.franja.label).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { requestStateTag(r.state) })
+                DataRow(r.patientName, subtitle = listOfNotNull(r.record, r.categoryNames, r.franja.label, CategoryRequestRules.waitingFor(r.createdAt, now)).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) })
                 r.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 r.preferredDoctorName?.let { Text(stringResource(R.string.cat_prefiere, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (state.assigning?.id == r.id) AssignPanel(state, model)

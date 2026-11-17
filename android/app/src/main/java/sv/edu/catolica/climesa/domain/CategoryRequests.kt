@@ -40,6 +40,26 @@ object CategoryRequestRules {
     const val PATH = "/citas/solicitudes-categoria"
     const val CATEGORIES_PATH = "/citas/categorias"
 
+    /** State value that picks the shared family, and its label: the same pairs as the web `REQUEST_STATE`. */
+    fun status(state: String): Pair<String, String> = when (state) {
+        PENDING -> "en_espera" to "Por asignar"
+        "asignada" -> "confirmada" to "Cita asignada"
+        "rechazada" -> "rechazada" to "Rechazada"
+        "cancelada" -> "cancelada" to "Retirada"
+        else -> state to state
+    }
+
+    /** How long a request has waited, like the web `waitingFor`: "hace 5 min", "hace 2 h", "hace 3 d". */
+    fun waitingFor(createdAt: String, nowMillis: Long): String? {
+        val created = parseMillis(createdAt) ?: return null
+        val minutes = maxOf(0L, Math.round((nowMillis - created) / 60_000.0))
+        return when {
+            minutes < 60 -> "hace $minutes min"
+            minutes < 1440 -> "hace ${minutes / 60} h"
+            else -> "hace ${minutes / 1440} d"
+        }
+    }
+
     private val zone = ZoneId.of("America/El_Salvador")
     private fun JSONObject.text(key: String) = if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
     private fun JSONArray?.objects() = (0 until (this?.length() ?: 0)).mapNotNull { this?.optJSONObject(it) }

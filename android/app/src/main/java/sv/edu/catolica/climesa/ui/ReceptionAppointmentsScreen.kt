@@ -53,16 +53,19 @@ private val zone = ZoneId.of("America/El_Salvador")
 
 /** A32 Citas de Recepción: lista de citas y flujo para agendar con búsqueda de paciente, médicos con/sin turno y franjas del día. */
 @Composable
-fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, permissions: Collection<String> = emptyList(), model: ReceptionAppointmentsViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel(), requests: CategoryRequestsViewModel = viewModel()) {
+fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, permissions: Collection<String> = emptyList(), model: ReceptionAppointmentsViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel(), requests: CategoryRequestsViewModel = viewModel(), followUps: LabProposalsViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     val requestState by requests.state.collectAsStateWithLifecycle()
+    val followUpState by followUps.state.collectAsStateWithLifecycle()
+    // C1: a confirmed follow-up is a new appointment, so the list reloads with it.
+    LaunchedEffect(followUpState.notice) { if (followUpState.notice != null) model.load() }
     // Fase 2, flow A: an assigned category request becomes a confirmed appointment, so the list reloads with it.
     LaunchedEffect(requestState.notice) { if (requestState.notice != null) model.load() }
     val actionState by actions.state.collectAsStateWithLifecycle()
     LaunchedEffect(actionState.done) { if (actionState.done != null) model.load() }
     AppointmentActionDialog(actionState, actions)
     var query by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(Unit) { model.load(); model.startLive(channels); if (canSchedule) { requests.load(); requests.startLive(channels) } }
+    LaunchedEffect(Unit) { model.load(); model.startLive(channels); if (canSchedule) { requests.load(); requests.startLive(channels); followUps.load(); followUps.startLive(channels) } }
     LaunchedEffect(quickAction) {
         if (quickAction == null) return@LaunchedEffect
         if (quickAction == QuickAction.SCHEDULE_APPOINTMENT && canSchedule) model.openScheduling()
@@ -79,6 +82,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
             requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
             requestState.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
             item { CategoryRequestInbox(requestState, requests) }
+            item { LabProposalInbox(followUpState, followUps) }
         }
         when {
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
@@ -110,12 +114,8 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     }
 }
 
-/** States the server adds (vencida, reprogramada) labelled in Spanish; the rest use the shared catalog. */
-@Composable internal fun AppointmentStateTag(state: String) = when (state) {
-    AppointmentActions.EXPIRED -> FamilyBadge(stringResource(R.string.rec_cita_vencida), null)
-    AppointmentActions.RESCHEDULED -> FamilyBadge(stringResource(R.string.cita_reprogramada), null)
-    else -> StatusTag(state)
-}
+/** Every appointment state, `vencida` (closed) and `reprogramada` (called) included, uses the shared table like the web. */
+@Composable internal fun AppointmentStateTag(state: String) = StatusTag(state)
 
 /** Allowed actions as buttons, two per line; blocked ones disabled with the server's reason under them. */
 @Composable internal fun AppointmentActionButtons(allowed: List<AppointmentAction>, blocked: List<Pair<AppointmentAction, String>>, onAction: (AppointmentAction) -> Unit) {
@@ -213,23 +213,8 @@ private fun SchedulingForm(state: ReceptionAppointmentsState, model: ReceptionAp
 @Composable
 private fun PatientPicker(state: ReceptionAppointmentsState, model: ReceptionAppointmentsViewModel) {
     SectionCard(stringResource(R.string.rec_agendar_paciente)) {
-        val chosen = state.patient
-        if (chosen != null) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f)) { Text(chosen.name, style = MaterialTheme.typography.titleMedium); Text(chosen.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                TextButton(onClick = { model.pickPatient(null) }) { Text(stringResource(R.string.rec_agendar_cambiar)) }
-            }
-        } else {
-            FormField(stringResource(R.string.rec_agendar_buscar), state.query, model::query, hint = stringResource(R.string.rec_agendar_buscar_ayuda))
-            if (state.searching && state.results.isEmpty()) LoadingState()
-            state.results.forEach { p -> PatientResult(p) { model.pickPatient(p) } }
-            if (state.hasMore) TextButton(onClick = model::moreResults, enabled = !state.searching) { Text(stringResource(R.string.rec_agendar_mas)) }
-            if (!state.searching && state.results.isEmpty() && sv.edu.catolica.climesa.domain.ReceptionScheduling.canSearch(state.query)) Text(stringResource(R.string.rec_agendar_sin_resultados), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        PatientSearchPicker(state.query, state.results, state.searching, state.hasMore, state.patient, model::query, model::pickPatient, model::moreResults)
     }
-}
-@Composable private fun PatientResult(p: PickerPatient, pick: () -> Unit) {
-    TextButton(onClick = pick, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { Text(p.name, style = MaterialTheme.typography.titleSmall); Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
 }
 
 /** Médicos del día: los que no tienen turno salen apagados y con su motivo, y no se pueden elegir. */

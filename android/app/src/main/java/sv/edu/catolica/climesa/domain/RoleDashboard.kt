@@ -312,8 +312,12 @@ object RoleDashboard {
                 data[DashboardSource.QUEUE]?.let { queueRows ->
                     val mine = rows(queueRows).firstOrNull { it.optString("state") in setOf("en_espera", "llamado", "en_atencion") }
                     kpis += if (mine == null) DashboardKpi("Mi turno en fila", "Sin número", DashboardTone.NEUTRAL, target = target(AndroidSection.PATIENT_QUEUE))
-                    else DashboardKpi("Mi turno en fila", "N.º ${mine.optInt("numero")}", if (mine.optString("state") == "llamado") DashboardTone.DANGER else DashboardTone.PROCESS, hint = QueueLabels.state(mine.optString("state")), target = target(AndroidSection.PATIENT_QUEUE))
-                    if (mine?.optString("state") == "llamado") attention += DashboardAttention("Es tu turno", "Pasa al consultorio indicado.", DashboardTone.DANGER, "Ver mi turno", QuickActionRequest(AndroidSection.PATIENT_QUEUE))
+                    else DashboardKpi("Mi turno en fila", "N.º ${mine.optInt("numero")}", if (mine.optString("state") == "llamado") DashboardTone.SUCCESS else DashboardTone.PROCESS, hint = QueueLabels.state(mine.optString("state")), target = target(AndroidSection.PATIENT_QUEUE))
+                    // G2: being called is good news, never red. B5: name the office only when the ticket carries it.
+                    if (mine?.optString("state") == "llamado") {
+                        val office = mine.optString("officeCode").takeIf { !mine.isNull("officeCode") && it.isNotBlank() }
+                        attention += DashboardAttention("Es tu turno", office?.let { "Pasa al consultorio $it." } ?: "Atento al llamado en recepción.", DashboardTone.SUCCESS, "Ver mi turno", QuickActionRequest(AndroidSection.PATIENT_QUEUE))
+                    }
                 }
                 lab?.let {
                     kpis += DashboardKpi("Exámenes listos", it.released.toString(), if (it.released > 0) DashboardTone.SUCCESS else DashboardTone.NEUTRAL, target = target(AndroidSection.RESULTS))

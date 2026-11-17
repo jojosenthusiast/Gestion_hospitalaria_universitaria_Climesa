@@ -110,7 +110,7 @@ private fun AppointmentCard(appointment: PatientAppointment, onCancel: () -> Uni
         appointment.reason?.let { LabeledValue("Motivo", it) }
         // CITA-01: the deadline the API gives for cancelling or rescheduling.
         if (appointment.allows(AppointmentAction.CANCEL) || appointment.allows(AppointmentAction.RESCHEDULE)) appointment.cancelableUntil?.let {
-            Text(stringResource(R.string.cita_plazo, formatTime(it)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.cita_plazo, sv.edu.catolica.climesa.domain.AppointmentAgenda.deadline(it, appointment.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         appointment.reschedule?.let { r ->
             when (r.state) {
@@ -181,4 +181,3 @@ private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boole
 }
 
 private fun formatAppointmentDateTime(value: String) = runCatching { appointmentTimeFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
-private fun formatTime(value: String) = runCatching { java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)

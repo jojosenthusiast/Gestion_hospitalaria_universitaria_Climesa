@@ -87,8 +87,28 @@ object QueueRules {
 
     fun callNextBody(service: String, officeId: String? = null) = org.json.JSONObject().put("service", service).apply { officeId?.let { put("officeId", it) } }
 
-    /** `rutina` is the server default: a routine number keeps the body it always had. */
-    fun issueBody(service: String, priority: String) = org.json.JSONObject().put("service", service).apply { if (priority != "rutina") put("priority", priority) }
+    /**
+     * Reception issues a number for the patient it chose (`patientId`; the API answers 403 to a staff issue without it).
+     * `rutina` is the server default: a routine number does not send `priority`.
+     */
+    fun issueBody(service: String, priority: String, patientId: String) =
+        org.json.JSONObject().put("service", service).put("patientId", patientId).apply { if (priority != "rutina") put("priority", priority) }
+
+    /** Active consulting rooms of `GET /espacios`, the optional destination of a call (same filter as the web). */
+    fun offices(value: Any?): List<QueueOffice> {
+        val rows = value as? JSONArray ?: return emptyList()
+        return (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
+            .filter { it.optString("type") == "consultorio" && it.optBoolean("active", false) }
+            .map { QueueOffice(it.optString("id"), it.optString("code"), it.optString("name")) }
+    }
+
+    /** What the "who goes next" panel shows: computing until an answer arrives, the error, nobody waiting, or the proposal. */
+    fun nextStatus(next: NextProposal?, loading: Boolean, error: String?): NextStatus = when {
+        next?.proposal != null -> NextStatus.PROPOSAL
+        error != null -> NextStatus.ERROR
+        loading || next == null -> NextStatus.LOADING
+        else -> NextStatus.NONE
+    }
     fun undoBody(version: Int) = org.json.JSONObject().put("version", version)
     fun priorityBody(version: Int, priority: String) = org.json.JSONObject().put("version", version).put("priority", priority)
 
@@ -103,6 +123,13 @@ object QueueRules {
         return NextProposal(json.optString("service"), json.optString("area"), json.optString("rule"), proposal)
     }
 }
+
+/** A consulting room a called number can be sent to. */
+data class QueueOffice(val id: String, val code: String, val name: String) {
+    val label get() = "$code · $name"
+}
+
+enum class NextStatus { LOADING, ERROR, NONE, PROPOSAL }
 
 data class ProposedTicket(val id: String, val number: Int, val area: String, val patientName: String, val priority: String, val version: Int, val reason: String, val reasonText: String) {
     val code get() = "$area $number"

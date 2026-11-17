@@ -56,8 +56,9 @@ object ParamedicRules {
     /** Qué hacer ante el bloqueo de la unidad (RN-30); quien planifica turnos puede arreglarlo, los demás saben a quién llamar. */
     fun blockGuidance(code: String, canPlanShifts: Boolean): String = when (code) {
         "sin_paramedico_de_turno" ->
-            if (canPlanShifts) "Publica un turno de paramédico para esta unidad en Turnos."
-            else "Pide a Jefatura de Operaciones que publique tu turno de paramédico."
+            // Since #145 the block also counts the app account: a paramedic on shift without an account does not unblock it.
+            if (canPlanShifts) "Publica un turno de paramédico para esta unidad en Turnos, a alguien con cuenta en la app."
+            else "Pide a Jefatura de Operaciones que publique tu turno de paramédico y confirma que tu cuenta de la app esté vinculada."
         "sin_motorista_de_turno" ->
             if (canPlanShifts) "Publica un turno de motorista para esta unidad en Turnos; sin quien la conduzca no puede despacharse."
             else "Falta el turno del motorista: avisa a la Jefatura de Operaciones."

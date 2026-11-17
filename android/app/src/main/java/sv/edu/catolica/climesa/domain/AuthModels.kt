@@ -75,7 +75,7 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     AMBULANCE_ARRIVAL("A25", "Llegada de ambulancia", "ambulancia.recibir_prehospital", true),
     SHIFTS("A26", "Mis turnos", "turnos.ver", true),
     PATIENTS("A30", "Pacientes", "pacientes.buscar", true),
-    QUEUE("A31", "Emitir número", "fila.emitir", true),
+    QUEUE("A31", "Fila del día", "fila.emitir", true),
     APPOINTMENTS("A32", "Citas", "citas.ver", true),
     LINKING("A33", "Vinculaciones", "cuentas.verificar", true),
     ADMISSION("A34", "Admisión y cama", "admision.crear", true),

@@ -22,6 +22,8 @@ import sv.edu.catolica.climesa.domain.QueueMove
 import sv.edu.catolica.climesa.domain.QueueMoves
 import sv.edu.catolica.climesa.domain.QueueRules
 import sv.edu.catolica.climesa.domain.QueueTicket
+import sv.edu.catolica.climesa.domain.QueueOffice
+import sv.edu.catolica.climesa.domain.PickerPatient
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 
 /** Last call, reversible with "Deshacer" (`POST /fila/{id}/deshacer-llamado` with the version the call returned). */
@@ -31,7 +33,14 @@ data class QueueState(
     val loading: Boolean = true, val tickets: List<QueueTicket> = emptyList(), val busy: Boolean = false, val error: String? = null, val notice: String? = null,
     /** Who goes next in the chosen area (`GET /fila/siguiente`), null until an area is chosen. */
     val next: NextProposal? = null,
+    /** "Calculando…" while the proposal of the chosen area is being read, and its error (B6: three states, like the web). */
+    val nextLoading: Boolean = false,
+    val nextError: String? = null,
     val undo: UndoableCall? = null,
+    /** Patient chosen for "Emitir número" (`patientId` is required for reception). */
+    val issueSearch: PatientSearchState = PatientSearchState(),
+    /** Active consulting rooms (`GET /espacios`), the optional destination of "Llamar siguiente". */
+    val offices: List<QueueOffice> = emptyList(),
 )
 
 @HiltViewModel
@@ -53,11 +62,14 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
         loadJob = viewModelScope.launch {
             try {
                 val tickets = QueueRules.parse(api.request("/fila"))
-                val next = nextService?.let { service -> runCatching { QueueRules.parseNext(api.request("/fila/siguiente?service=$service")) }.getOrNull() }
-                mutable.value = mutable.value.copy(loading = false, tickets = tickets, next = next)
+                mutable.value = mutable.value.copy(loading = false, tickets = tickets)
+                loadNext()
             }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) }
+            catch (e: Exception) {
+                mutable.value = mutable.value.copy(nextLoading = false)
+                if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e))
+            }
         }
     }
 
@@ -68,15 +80,51 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
         }
     }
 
+    /** The proposal of the chosen area; a failure is shown in the panel instead of reading as "nobody waiting". */
+    private suspend fun loadNext() {
+        val service = nextService ?: return
+        mutable.value = mutable.value.copy(nextLoading = true)
+        try {
+            val next = QueueRules.parseNext(api.request("/fila/siguiente?service=$service"))
+            if (service == nextService) mutable.value = mutable.value.copy(next = next, nextLoading = false, nextError = null)
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { if (service == nextService) mutable.value = mutable.value.copy(nextLoading = false, nextError = userMessage(e, "No se pudo calcular quién pasa después.")) }
+    }
+
     private var nextService: String? = null
     /** Chooses the area whose "who goes next" proposal is shown; null hides it. */
     fun chooseArea(service: String?) {
         if (service == nextService) return
         nextService = service
-        if (service == null) mutable.value = mutable.value.copy(next = null) else load(silent = true)
+        mutable.value = mutable.value.copy(next = null, nextError = null, nextLoading = service != null)
+        if (service != null) load(silent = true)
     }
 
-    fun issue(service: String, priority: String = "rutina") = mutate("/fila", QueueRules.issueBody(service, priority), "Número emitido.")
+    private val patients = PatientSelectorSearch(api, viewModelScope, { mutable.value.issueSearch }) { change -> mutable.value = mutable.value.copy(issueSearch = change(mutable.value.issueSearch)) }
+    /** Wait between keystrokes of the patient search; tests set it to zero. */
+    internal var debounceMs: Long
+        get() = patients.debounceMs
+        set(value) { patients.debounceMs = value }
+    fun issueQuery(text: String) = patients.query(text)
+    fun moreIssuePatients() = patients.more()
+    fun pickIssuePatient(patient: PickerPatient?) = patients.pick(patient)
+    /** Clears the chosen patient when the dialog closes, so the next number starts with a new search. */
+    fun resetIssue() { patients.cancel(); mutable.value = mutable.value.copy(issueSearch = PatientSearchState()) }
+
+    /** Reception issues the number for the chosen patient; without one nothing is sent. */
+    fun issue(service: String, priority: String = "rutina") {
+        val patient = mutable.value.issueSearch.patient ?: run { mutable.value = mutable.value.copy(error = "Elige al paciente que recibe el número."); return }
+        mutate("/fila", QueueRules.issueBody(service, priority, patient.id), "Número emitido para ${patient.name}.", onDone = { resetIssue() })
+    }
+
+    /** Consulting rooms for "Llamar siguiente" (only for accounts with `espacios.ver`); a failure leaves the call without room. */
+    fun loadOffices() {
+        viewModelScope.launch {
+            try { mutable.value = mutable.value.copy(offices = QueueRules.offices(api.request("/espacios"))) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { mutable.value = mutable.value.copy(offices = emptyList()) }
+        }
+    }
     fun call(ticket: QueueTicket) = mutate("/fila/${ticket.id}/llamar", JSONObject().put("version", ticket.version), "Número llamado.", undoOf = { result -> undoable(result, ticket.id, QueueLabels.code(ticket)) })
     /** Card menu (keyboard and touch alternative to dragging): the move is one server action the API already allows. */
     fun move(ticket: QueueTicket, move: QueueMove) {
@@ -93,20 +141,23 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     fun complete(ticket: QueueTicket) = mutate("/fila/${ticket.id}/completar", JSONObject().put("version", ticket.version), "Atención completada.")
     fun absent(ticket: QueueTicket) = mutate("/fila/${ticket.id}/no-se-presento", JSONObject().put("version", ticket.version), "Paciente marcado como no presentado.")
 
-    /** The API picks the first waiting number of [service] (`POST /fila/llamar-siguiente`); 409 `fila_sin_espera` when none. */
-    fun callNext(service: String) = mutate("/fila/llamar-siguiente", QueueRules.callNextBody(service), "Número llamado.", describe = { result ->
+    /**
+     * The API picks who goes next in [service] by RN-FILA-SIGUIENTE (priority, appointments in their window, then arrival)
+     * with `POST /fila/llamar-siguiente`, optionally to [officeId]; 409 `fila_sin_espera` when nobody waits.
+     */
+    fun callNext(service: String, officeId: String? = null) = mutate("/fila/llamar-siguiente", QueueRules.callNextBody(service, officeId?.takeIf { it.isNotBlank() }), "Número llamado.", describe = { result ->
         (result as? JSONObject)?.optInt("numero", 0)?.takeIf { it > 0 }?.let { "Se llamó al N.º $it de ${QueueLabels.service(service)}." }
     }, undoOf = { result -> (result as? JSONObject)?.let { undoable(it, it.optString("id"), "${QueueLabels.areaOf(service)} ${it.optInt("numero")}") } })
 
     private fun undoable(result: Any, ticketId: String, code: String): UndoableCall? =
         (result as? JSONObject)?.optInt("version", 0)?.takeIf { it > 0 && ticketId.isNotBlank() }?.let { UndoableCall(ticketId, it, "Llamaste $code.") }
 
-    private fun mutate(path: String, body: JSONObject, notice: String, describe: (Any) -> String? = { null }, undoOf: (Any) -> UndoableCall? = { null }) {
+    private fun mutate(path: String, body: JSONObject, notice: String, describe: (Any) -> String? = { null }, undoOf: (Any) -> UndoableCall? = { null }, onDone: () -> Unit = {}) {
         if (mutable.value.busy) return
         mutable.value = mutable.value.copy(busy = true, error = null, notice = null, undo = null)
         val intent = intents.getOrPut(path) { SubmissionIntent() }
         viewModelScope.launch {
-            try { val result = intent.send { api.request(path, "POST", body) }; mutable.value = mutable.value.copy(busy = false, notice = describe(result) ?: notice, undo = undoOf(result)); load() }
+            try { val result = intent.send { api.request(path, "POST", body) }; mutable.value = mutable.value.copy(busy = false, notice = describe(result) ?: notice, undo = undoOf(result)); onDone(); load() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(busy = false, error = message(e)) }
         }

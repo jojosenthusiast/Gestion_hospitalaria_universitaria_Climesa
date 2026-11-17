@@ -55,7 +55,7 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
             listOf("en_espera", "solicitada", "pendiente", "pendiente_cama", "borrador", "publicado", "reservada", "provisional").forEach { put(it, ESPERA) }
             listOf("llamado", "confirmada", "en_proceso", "limpieza", "reprogramada").forEach { put(it, LLAMADO) }
             listOf("en_atencion", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta").forEach { put(it, ATENCION) }
-            listOf("atendida", "completado", "firmada", "alta_firmada", "egresado", "libre", "disponible", "activo", "exito", "normal", "aprobada").forEach { put(it, LISTO) }
+            listOf("atendida", "atendido", "ok", "completado", "firmada", "alta_firmada", "egresado", "libre", "disponible", "activo", "exito", "normal", "aprobada").forEach { put(it, LISTO) }
             listOf(
                 "cancelado", "cancelada", "no_asistio", "no_se_presento", "cerrado", "rechazada", "vencida", "vencido", "bloqueada",
                 "inactivo", "desactivado", "denegado", "fallido", "en_mantenimiento",

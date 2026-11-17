@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="cita_reprogramada">Reprogramada</string>
     <string name="cita_reprogramar_titulo">Reprogramar la cita</string>
     <string name="cita_no_asistio_titulo">¿Marcar que no asistió?</string>
     <string name="cita_aceptar_reprog_titulo">¿Aceptar el nuevo horario?</string>
@@ -10,7 +9,7 @@
     <string name="cita_reprog_rechazada">Tu solicitud de reprogramación fue rechazada: %1$s</string>
     <string name="cita_reprog_rechazada_sin_motivo">Tu solicitud de reprogramación fue rechazada.</string>
     <string name="cita_reprogramada_a">Esta cita se movió a otro horario.</string>
-    <string name="cita_plazo">Puedes cancelar o reprogramar hasta las %1$s</string>
+    <string name="cita_plazo">Puedes cancelar o reprogramar hasta %1$s</string>
     <string name="cita_fecha">Fecha: %1$s</string>
     <string name="cita_elige_franja">Toca una franja libre de 20 minutos del mismo médico.</string>
     <string name="cita_sin_franjas">No hay franjas para esta fecha.</string>
@@ -23,10 +22,30 @@
     <string name="fila_llamado_n_de_m">Llamado %1$d de %2$d</string>
     <string name="fila_presente">Presente, en atención</string>
     <string name="fila_llamar_siguiente">Llamar siguiente</string>
-    <string name="fila_llamar_siguiente_mensaje">Se llamará al primer número en espera de %1$s.</string>
+    <string name="fila_llamar_siguiente_mensaje">Se llamará a quien sigue en %1$s según prioridad y citas.</string>
+    <string name="fila_calculando">Calculando…</string>
+    <string name="fila_consultorio">Consultorio: %1$s</string>
+    <string name="fila_consultorio_sin_asignar">Sin asignar</string>
     <string name="clin_sin_firmar_titulo">Consultas sin firmar</string>
     <string name="clin_sin_firmar_item">Iniciada %1$s</string>
     <string name="clin_reanudar">Reanudar</string>
     <string name="clin_reprog_titulo">Solicitudes de reprogramación</string>
     <string name="clin_reprog_detalle">Ahora: %1$s · Pide: %2$s</string>
+    <string name="clin_llamar_primero_titulo">Nadie en tu consultorio</string>
+    <string name="clin_llamar_primero_detalle">Hay pacientes esperando en consulta general. El sistema elige a quien sigue según prioridad y citas.</string>
+    <string name="clin_fila_otro_consultorio">Llamado desde otro consultorio</string>
+    <string name="seg_titulo">Citas de seguimiento por confirmar</string>
+    <string name="seg_detalle">Resultados de laboratorio que ya llegaron: agenda la cita con el médico que los pidió.</string>
+    <string name="seg_vacio">Al día: no hay citas de seguimiento por confirmar.</string>
+    <string name="seg_agendar">Agendar cita</string>
+    <string name="seg_descartar">Descartar</string>
+    <string name="seg_dia">Día: %1$s</string>
+    <string name="seg_sin_horas">El médico no tiene horas libres ese día. Prueba otro día.</string>
+    <string name="seg_confirmar">Confirmar cita</string>
+    <string name="seg_enlazar">Enlazar la cita</string>
+    <string name="seg_enlace_pendiente">La cita ya quedó agendada; falta enlazarla a la propuesta. Vuelve a intentar.</string>
+    <string name="seg_volver">Volver</string>
+    <string name="seg_motivo">Motivo para no agendar</string>
+    <string name="seg_motivo_ayuda">Al menos 10 caracteres. Por ejemplo: el paciente ya tiene control agendado.</string>
+    <string name="seg_descartar_confirmar">Descartar propuesta</string>
 </resources>
