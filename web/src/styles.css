@@ -243,13 +243,19 @@ table, time, .tabular, .mono-data, .number-strip strong, .status-badge, .priorit
   line-height: 1.35;
   text-align: center;
   text-decoration: none;
-  transition: transform var(--motion-instant) ease, background var(--motion-fast) ease, border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, color var(--motion-fast) ease;
+  /* R1 (better-ui): only the properties that change; press feedback is a 0.96 scale over 150 ms. */
+  transition-property: scale, background-color, border-color, box-shadow, color;
+  transition-duration: 150ms, var(--motion-fast), var(--motion-fast), var(--motion-fast), var(--motion-fast);
+  transition-timing-function: ease-out;
 }
 .primary-button { border: 1px solid var(--primary); background: var(--primary); color: var(--on-primary); box-shadow: 0 5px 14px rgb(0 67 178 / 0.16); }
-.primary-button:hover:not(:disabled) { border-color: var(--primary-strong); background: var(--primary-strong); box-shadow: 0 8px 20px rgb(0 67 178 / 0.22); transform: translateY(-1px); }
+.primary-button:hover:not(:disabled) { border-color: var(--primary-strong); background: var(--primary-strong); box-shadow: 0 6px 16px rgb(0 67 178 / 0.2); }
 .secondary-button { border: 1px solid var(--control-line); background: var(--surface); color: var(--ink); }
-.secondary-button:hover:not(:disabled) { border-color: var(--primary-text); color: var(--primary-text); background: var(--soft); transform: translateY(-1px); }
-.primary-button:active:not(:disabled), .secondary-button:active:not(:disabled) { transform: translateY(1px) scale(0.99); box-shadow: none; }
+.secondary-button:hover:not(:disabled) { border-color: var(--primary-text); color: var(--primary-text); background: var(--soft); }
+@media (prefers-reduced-motion: no-preference) {
+  .primary-button:active:not(:disabled):not([aria-disabled="true"]), .secondary-button:active:not(:disabled):not([aria-disabled="true"]) { scale: 0.96; }
+}
+.primary-button:active:not(:disabled), .secondary-button:active:not(:disabled) { box-shadow: none; }
 .primary-button:disabled, .secondary-button:disabled { border-color: var(--disabled); background: var(--disabled); color: var(--muted); opacity: 0.72; box-shadow: none; }
 
 .field { display: grid; gap: 8px; min-width: 0; color: var(--ink); font-size: 14px; font-weight: 700; }
@@ -447,5 +453,4 @@ table, time, .tabular, .mono-data, .number-strip strong, .status-badge, .priorit
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-  .primary-button:hover, .secondary-button:hover { transform: none; }
 }

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../../components/ui';
 import { AreaTag, SectionState, StatusBadge, type AreaCode } from '../../components/system';
-import { toneColor, type Tone } from '../../components/charts';
+import { type Tone } from '../../components/charts';
 import { can, type AccessProfile } from '../../lib/api';
 import type { Remote } from '../common';
 
@@ -48,7 +48,7 @@ export type AttentionItem = { id: string; title: string; detail?: string; tone: 
 /** Lista de «qué necesita mi atención»: cada fila lleva su acción directa; vacía, lo dice con claridad. */
 export function AttentionList({ items, empty = 'Nada pendiente por ahora.', limit = 6 }: { items: AttentionItem[]; empty?: string; limit?: number }) {
   if (items.length === 0) return <p className="section-empty" role="status">{empty}</p>;
-  return <ul className="attention-list">{items.slice(0, limit).map(item => <li key={item.id} style={{ ['--attn' as string]: toneColor[item.tone] }}>
+  return <ul className="attention-list">{items.slice(0, limit).map(item => <li key={item.id}>
     <div><strong>{item.title}</strong>{item.detail && <span>{item.detail}</span>}</div>
     {item.status ? <StatusBadge value={item.status} label={item.tag} /> : item.area ? <AreaTag code={item.area} showName /> : item.tag && <span className="attention-tag">{item.tag}</span>}
     <a className="row-action" href={item.href}>{item.action}<Icon name="arrow" size={16} /></a>
