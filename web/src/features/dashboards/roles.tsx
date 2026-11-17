@@ -47,8 +47,9 @@ function AppointmentsToday({ appts }: { appts: Remote<Appointment[]> }) {
   </Panel>;
 }
 
-function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
-  return <Panel title="Mi turno" icon="clock" action={{ label: 'Ver turnos', href: '#/turnos' }}>
+/** R7 F3: today's (or the next) own shift, with the way to «Mis turnos» (the calendar filtered to this person). */
+export function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
+  return <Panel title="Mi turno" icon="clock" action={{ label: 'Ver mis turnos', href: '#/turnos?persona=yo' }}>
     <PanelState state={shifts} empty={rows => nextShift(rows) ? null : 'No tienes turnos publicados próximos.'}>{rows => {
       const next = nextShift(rows)!, active = new Date(next.start).getTime() <= Date.now();
       return <div className="my-shift"><StatusBadge value={active ? 'en_curso' : 'publicado'} label={active ? 'En curso' : 'Próximo'} /><strong>{shiftText(next)}</strong></div>;
