@@ -43,7 +43,10 @@ export class AccountLinkingService {
     return this.db.transaction(async c => {
       const account = (await c.query('SELECT paciente_id FROM acceso.usuario WHERE id=$1', [actor.id])).rows[0];
       const latest = (await c.query("SELECT * FROM acceso.vinculacion_paciente WHERE usuario_id=$1 ORDER BY (estado='pendiente') DESC,creado_en DESC,id DESC LIMIT 1", [actor.id])).rows[0];
-      return { linked: !!account?.paciente_id, request: latest ? this.view(latest) : null };
+      if (!latest) return { linked: !!account?.paciente_id, request: null };
+      // U7: what the account itself declared (its own data, not a record), so a rejected patient asks again prefilled.
+      const dui = String(latest.dui_declarado);
+      return { linked: !!account?.paciente_id, request: this.view(latest), declared: { dui: `${dui.slice(0, 8)}-${dui.slice(8)}`, birth: dateText(latest.nacimiento_declarado) } };
     });
   }
 

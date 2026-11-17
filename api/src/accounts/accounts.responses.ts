@@ -53,4 +53,5 @@ export class PendingLinkResponse {
 export class MyLinkResponse {
   @BoolProp({ description: 'La cuenta ya está vinculada a un expediente' }) linked!: boolean;
   @ClassProp(LinkRequestResponse, { nullable: true, description: 'Última solicitud de vinculación; null si nunca pidió' }) request!: LinkRequestResponse | null;
+  @ClassProp(LinkDeclaredResponse, { optional: true, description: 'Lo que la cuenta declaró en esa solicitud, para volver a pedir con el formulario prellenado. Ausente si nunca pidió.' }) declared?: LinkDeclaredResponse;
 }

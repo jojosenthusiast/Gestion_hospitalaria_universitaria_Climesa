@@ -31479,6 +31479,14 @@
                 "$ref": "#/components/schemas/LinkRequestResponse"
               }
             ]
+          },
+          "declared": {
+            "description": "Lo que la cuenta declaró en esa solicitud, para volver a pedir con el formulario prellenado. Ausente si nunca pidió.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LinkDeclaredResponse"
+              }
+            ]
           }
         },
         "required": [
