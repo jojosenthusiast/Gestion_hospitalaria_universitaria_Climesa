@@ -1532,6 +1532,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/laboratorio/ordenes/{id}/resultados/lote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** C-1: guardar los resultados de todos los exámenes de una orden en un solo paso (todo o nada, una sola versión); con complete=true también la completa */
+        post: operations["LaboratoryController_resultBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/laboratorio/ordenes/{id}/enmendar": {
         parameters: {
             query?: never;
@@ -1575,7 +1592,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revisar y liberar resultados al paciente */
+        /** Revisar y liberar resultados al paciente; cierra los pendientes de la orden en «Resultados por revisar» (C-2) y, si el médico lo decide, propone la cita de seguimiento (D-4) */
         post: operations["LaboratoryController_review"];
         delete?: never;
         options?: never;
@@ -4912,6 +4929,12 @@ export interface components {
             /** @description S10: la observación es relevante (abrió un pendiente para el médico); solo para el personal */
             relevant?: boolean;
         };
+        LabItemRangeResponse: {
+            min: number | null;
+            max: number | null;
+            criticalLow: number | null;
+            criticalHigh: number | null;
+        };
         LabOrderItemResponse: {
             /** Format: uuid */
             id: string;
@@ -4925,6 +4948,8 @@ export interface components {
             resultType: components["schemas"]["TipoResultadoLaboratorio"];
             /** @description null sin resultado o si el actor aún no puede ver valores */
             result: components["schemas"]["LabItemResultResponse"] | null;
+            /** @description C-3: rango de referencia y críticos vigentes para este paciente; solo para quien ve valores */
+            referenceRange?: components["schemas"]["LabItemRangeResponse"] | null;
         };
         /**
          * @description Acciones que el servidor acepta ahora para quien lee
@@ -5139,6 +5164,44 @@ export interface components {
             /** @description Versión de la orden después de la captura */
             orderVersion: number;
         };
+        LabResultBatchItemDto: {
+            /** Format: uuid */
+            orderItemId: string;
+            value?: number;
+            text?: string;
+            /** @description Unidad del catálogo; si se envía debe coincidir. */
+            unit?: string;
+            /** @description Obligatorio al corregir un resultado existente. */
+            reason?: string;
+            observation?: string;
+            relevant?: boolean;
+        };
+        LabResultBatchDto: {
+            /** @description Versión vigente de la orden. */
+            version: number;
+            items: components["schemas"]["LabResultBatchItemDto"][];
+            /** @description Completar la orden después de guardar (requiere laboratorio.validar) */
+            complete?: boolean;
+        };
+        LabBatchResultItemResponse: {
+            /** Format: uuid */
+            orderItemId: string;
+            mark: components["schemas"]["MarcaResultado"];
+            /** @description Versión del resultado */
+            version: number;
+        };
+        LabResultBatchResponse: {
+            /** Format: uuid */
+            id: string;
+            state: components["schemas"]["EstadoOrdenLaboratorio"];
+            /** @description Versión de la orden después del lote */
+            orderVersion: number;
+            results: components["schemas"]["LabBatchResultItemResponse"][];
+            /** @description Valores críticos del lote (avisan al médico que pidió la orden) */
+            criticalCount: number;
+            /** Format: date-time */
+            completedAt: string | null;
+        };
         LabAmendDto: {
             /** Format: uuid */
             orderItemId: string;
@@ -5163,12 +5226,25 @@ export interface components {
             /** Format: date-time */
             completedAt: string;
         };
+        LabReviewDto: {
+            version: number;
+            reason?: string;
+            /** @description D-4: proponer a recepción una cita de seguimiento con el médico que pidió la orden. Si no se envía, se propone (comportamiento anterior). */
+            followUp?: boolean;
+        };
         LabReviewResponse: {
             /** Format: uuid */
             id: string;
             version: number;
             /** Format: date-time */
             reviewedAt: string;
+            /** @description C-2: pendientes de «Resultados por revisar» que se cerraron con la revisión */
+            followUpsClosed?: number;
+            /**
+             * Format: uuid
+             * @description D-4: propuesta de cita de seguimiento creada para recepción, o null
+             */
+            followUpProposalId?: string | null;
         };
         LabCancelDto: {
             version: number;
@@ -5251,6 +5327,14 @@ export interface components {
         MotivoPendienteLaboratorio: "critico" | "observacion";
         /** @enum {string} */
         EstadoPendienteLaboratorio: "pendiente" | "revisado";
+        LabFollowUpValueResponse: {
+            code: string;
+            name: string;
+            unit: string | null;
+            value: number | null;
+            text: string | null;
+            mark: components["schemas"]["MarcaResultado"];
+        };
         LabFollowUpResponse: {
             /** Format: uuid */
             id: string;
@@ -5272,6 +5356,12 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             version: number;
+            /** @description C-4: versión vigente de la orden, para revisarla desde la bandeja */
+            orderVersion?: number;
+            /** @description C-4: acciones sobre la orden que el servidor acepta ahora para quien lee */
+            orderActions?: components["schemas"]["AccionOrdenLaboratorio"][];
+            /** @description C-4: valores capturados de la orden, críticos primero */
+            values?: components["schemas"]["LabFollowUpValueResponse"][];
         };
         LabFollowUpReviewDto: {
             version: number;
@@ -14144,6 +14234,88 @@ export interface operations {
             };
         };
     };
+    LaboratoryController_resultBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabResultBatchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabResultBatchResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     LaboratoryController_amend: {
         parameters: {
             query?: never;
@@ -14322,7 +14494,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LabVersionDto"];
+                "application/json": components["schemas"]["LabReviewDto"];
             };
         };
         responses: {

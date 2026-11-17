@@ -23,6 +23,14 @@ export class LabItemResultResponse {
   @BoolProp({ optional: true, description: 'S10: la observación es relevante (abrió un pendiente para el médico); solo para el personal' }) relevant?: boolean;
 }
 
+/** C-3: reference range valid for this patient (sex, age at the sample or today); null without a range or without values. */
+export class LabItemRangeResponse {
+  @NumProp({ nullable: true }) min!: number | null;
+  @NumProp({ nullable: true }) max!: number | null;
+  @NumProp({ nullable: true }) criticalLow!: number | null;
+  @NumProp({ nullable: true }) criticalHigh!: number | null;
+}
+
 export class LabOrderItemResponse {
   @UuidProp() id!: string;
   @UuidProp() examId!: string;
@@ -31,6 +39,7 @@ export class LabOrderItemResponse {
   @StrProp({ nullable: true, description: 'Unidad del catálogo' }) unit!: string | null;
   @EnumProp(TIPO_RESULTADO, 'TipoResultadoLaboratorio', { description: 'S10: numérico (valor) o texto' }) resultType!: string;
   @ClassProp(LabItemResultResponse, { nullable: true, description: 'null sin resultado o si el actor aún no puede ver valores' }) result!: LabItemResultResponse | null;
+  @ClassProp(LabItemRangeResponse, { nullable: true, optional: true, description: 'C-3: rango de referencia y críticos vigentes para este paciente; solo para quien ve valores' }) referenceRange?: LabItemRangeResponse | null;
 }
 
 export class LabOrderResponse {
@@ -114,6 +123,16 @@ export const MOTIVO_PENDIENTE_LABORATORIO = ['critico', 'observacion'] as const;
 export const ESTADO_PENDIENTE_LABORATORIO = ['pendiente', 'revisado'] as const;
 export const ESTADO_PROPUESTA_CITA = ['propuesta', 'confirmada', 'descartada'] as const;
 
+/** C-4: one captured value shown inline in the doctor's tray. */
+export class LabFollowUpValueResponse {
+  @StrProp() code!: string;
+  @StrProp() name!: string;
+  @StrProp({ nullable: true }) unit!: string | null;
+  @NumProp({ nullable: true }) value!: number | null;
+  @StrProp({ nullable: true }) text!: string | null;
+  @EnumProp(MARCA_RESULTADO, 'MarcaResultado') mark!: string;
+}
+
 /** S10: one item of the doctor's "Resultados por revisar". */
 export class LabFollowUpResponse {
   @UuidProp() id!: string;
@@ -130,6 +149,9 @@ export class LabFollowUpResponse {
   @DateTimeProp() createdAt!: string;
   @DateTimeProp() updatedAt!: string;
   @IntProp() version!: number;
+  @IntProp({ optional: true, description: 'C-4: versión vigente de la orden, para revisarla desde la bandeja' }) orderVersion?: number;
+  @EnumArrayProp(LAB_ORDER_ACTIONS, 'AccionOrdenLaboratorio', { optional: true, description: 'C-4: acciones sobre la orden que el servidor acepta ahora para quien lee' }) orderActions?: string[];
+  @ClassArrayProp(LabFollowUpValueResponse, { optional: true, description: 'C-4: valores capturados de la orden, críticos primero' }) values?: LabFollowUpValueResponse[];
 }
 
 export class LabFollowUpStateResponse {
@@ -201,6 +223,24 @@ export class LabReviewResponse {
   @UuidProp() id!: string;
   @IntProp() version!: number;
   @DateTimeProp() reviewedAt!: string;
+  @IntProp({ optional: true, description: 'C-2: pendientes de «Resultados por revisar» que se cerraron con la revisión' }) followUpsClosed?: number;
+  @UuidProp({ nullable: true, optional: true, description: 'D-4: propuesta de cita de seguimiento creada para recepción, o null' }) followUpProposalId?: string | null;
+}
+
+export class LabBatchResultItemResponse {
+  @UuidProp() orderItemId!: string;
+  @EnumProp(MARCA_RESULTADO, 'MarcaResultado') mark!: string;
+  @IntProp({ description: 'Versión del resultado' }) version!: number;
+}
+
+/** C-1: outcome of a batch capture. */
+export class LabResultBatchResponse {
+  @UuidProp() id!: string;
+  @EnumProp(ESTADO_ORDEN_LABORATORIO, 'EstadoOrdenLaboratorio') state!: string;
+  @IntProp({ description: 'Versión de la orden después del lote' }) orderVersion!: number;
+  @ClassArrayProp(LabBatchResultItemResponse) results!: LabBatchResultItemResponse[];
+  @IntProp({ description: 'Valores críticos del lote (avisan al médico que pidió la orden)' }) criticalCount!: number;
+  @DateTimeProp({ nullable: true }) completedAt!: string | null;
 }
 
 export class LabResultResponse {

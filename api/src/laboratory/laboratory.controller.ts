@@ -3,9 +3,9 @@ import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse,
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { readSingleFile } from '../platform/multipart';
-import { MAX_ATTACHMENT_BYTES, LabAmendDto, LabCancelDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabProposalConfirmDto, LabProposalDiscardDto, LabResultDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
+import { MAX_ATTACHMENT_BYTES, LabAmendDto, LabCancelDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabProposalConfirmDto, LabProposalDiscardDto, LabResultBatchDto, LabResultDto, LabReviewDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
 import { LaboratoryService } from './laboratory.service';
-import { LabAttachmentLinkResponse, LabAttachmentStoredResponse, LabCompleteResponse, LabExamResponse, LabExternalResultResponse, LabExternalSentResponse, LabFollowUpResponse, LabFollowUpStateResponse, LabOrderCreatedResponse, LabOrderDetailResponse, LabOrderResponse, LabOrderStateResponse, LabProposalResponse, LabProposalStateResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
+import { LabAttachmentLinkResponse, LabAttachmentStoredResponse, LabCompleteResponse, LabExamResponse, LabExternalResultResponse, LabExternalSentResponse, LabFollowUpResponse, LabFollowUpStateResponse, LabOrderCreatedResponse, LabOrderDetailResponse, LabOrderResponse, LabOrderStateResponse, LabProposalResponse, LabProposalStateResponse, LabResultBatchResponse, LabResultResponse, LabReviewResponse, LabSampleResponse } from './laboratory.responses';
 
 @ApiTags('laboratory') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('laboratorio')
 export class LaboratoryController {
@@ -29,14 +29,17 @@ export class LaboratoryController {
   @Post('ordenes/:id/resultados') @RequirePermission('laboratorio.procesar') @ApiOperation({ summary: 'Capturar o actualizar el resultado de un examen' }) @ApiCreatedResponse({ type: LabResultResponse })
   result(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabResultDto, @Headers('idempotency-key') key?: string) { return this.laboratory.result(r.actor, id, dto, key); }
 
+  @Post('ordenes/:id/resultados/lote') @RequirePermission('laboratorio.procesar') @ApiOperation({ summary: 'C-1: guardar los resultados de todos los exámenes de una orden en un solo paso (todo o nada, una sola versión); con complete=true también la completa' }) @ApiCreatedResponse({ type: LabResultBatchResponse })
+  resultBatch(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabResultBatchDto, @Headers('idempotency-key') key?: string) { return this.laboratory.resultBatch(r.actor, id, dto, key); }
+
   @Post('ordenes/:id/enmendar') @RequirePermission('laboratorio.validar') @ApiOperation({ summary: 'Enmendar un resultado de una orden completada; vuelve a revisión médica' }) @ApiCreatedResponse({ type: LabResultResponse })
   amend(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabAmendDto, @Headers('idempotency-key') key?: string) { return this.laboratory.amend(r.actor, id, dto, key); }
 
   @Post('ordenes/:id/completar') @RequirePermission('laboratorio.validar') @ApiOperation({ summary: 'Completar una orden con todos sus resultados' }) @ApiCreatedResponse({ type: LabCompleteResponse })
   complete(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabVersionDto, @Headers('idempotency-key') key?: string) { return this.laboratory.complete(r.actor, id, dto, key); }
 
-  @Post('ordenes/:id/revisar') @RequirePermission('laboratorio.revisar') @ApiOperation({ summary: 'Revisar y liberar resultados al paciente' }) @ApiCreatedResponse({ type: LabReviewResponse })
-  review(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabVersionDto, @Headers('idempotency-key') key?: string) { return this.laboratory.review(r.actor, id, dto, key); }
+  @Post('ordenes/:id/revisar') @RequirePermission('laboratorio.revisar') @ApiOperation({ summary: 'Revisar y liberar resultados al paciente; cierra los pendientes de la orden en «Resultados por revisar» (C-2) y, si el médico lo decide, propone la cita de seguimiento (D-4)' }) @ApiCreatedResponse({ type: LabReviewResponse })
+  review(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabReviewDto, @Headers('idempotency-key') key?: string) { return this.laboratory.review(r.actor, id, dto, key); }
 
   @Post('ordenes/:id/cancelar') @RequirePermission('laboratorio.cancelar') @ApiOperation({ summary: 'Cancelar una orden pendiente o en proceso' }) @ApiCreatedResponse({ type: LabOrderStateResponse })
   cancel(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LabCancelDto, @Headers('idempotency-key') key?: string) { return this.laboratory.cancel(r.actor, id, dto, key); }

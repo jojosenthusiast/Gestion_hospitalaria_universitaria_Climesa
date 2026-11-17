@@ -10117,6 +10117,125 @@
         "x-permiso": "laboratorio.procesar"
       }
     },
+    "/api/v1/laboratorio/ordenes/{id}/resultados/lote": {
+      "post": {
+        "operationId": "LaboratoryController_resultBatch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabResultBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabResultBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "C-1: guardar los resultados de todos los exámenes de una orden en un solo paso (todo o nada, una sola versión); con complete=true también la completa",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "laboratorio.procesar"
+      }
+    },
     "/api/v1/laboratorio/ordenes/{id}/enmendar": {
       "post": {
         "operationId": "LaboratoryController_amend",
@@ -10385,7 +10504,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LabVersionDto"
+                "$ref": "#/components/schemas/LabReviewDto"
               }
             }
           }
@@ -10467,7 +10586,7 @@
             "bearer": []
           }
         ],
-        "summary": "Revisar y liberar resultados al paciente",
+        "summary": "Revisar y liberar resultados al paciente; cierra los pendientes de la orden en «Resultados por revisar» (C-2) y, si el médico lo decide, propone la cita de seguimiento (D-4)",
         "tags": [
           "laboratory"
         ],
@@ -26038,6 +26157,33 @@
           "version"
         ]
       },
+      "LabItemRangeResponse": {
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "number",
+            "nullable": true
+          },
+          "max": {
+            "type": "number",
+            "nullable": true
+          },
+          "criticalLow": {
+            "type": "number",
+            "nullable": true
+          },
+          "criticalHigh": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "min",
+          "max",
+          "criticalLow",
+          "criticalHigh"
+        ]
+      },
       "LabOrderItemResponse": {
         "type": "object",
         "properties": {
@@ -26075,6 +26221,16 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/LabItemResultResponse"
+              }
+            ]
+          },
+          "referenceRange": {
+            "nullable": true,
+            "description": "C-3: rango de referencia y críticos vigentes para este paciente; solo para quien ve valores",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LabItemRangeResponse"
               }
             ]
           }
@@ -26784,6 +26940,133 @@
           "orderVersion"
         ]
       },
+      "LabResultBatchItemDto": {
+        "type": "object",
+        "properties": {
+          "orderItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "value": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unidad del catálogo; si se envía debe coincidir."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Obligatorio al corregir un resultado existente."
+          },
+          "observation": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "relevant": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "orderItemId"
+        ]
+      },
+      "LabResultBatchDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Versión vigente de la orden."
+          },
+          "items": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabResultBatchItemDto"
+            }
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "Completar la orden después de guardar (requiere laboratorio.validar)"
+          }
+        },
+        "required": [
+          "version",
+          "items"
+        ]
+      },
+      "LabBatchResultItemResponse": {
+        "type": "object",
+        "properties": {
+          "orderItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mark": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MarcaResultado"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "description": "Versión del resultado"
+          }
+        },
+        "required": [
+          "orderItemId",
+          "mark",
+          "version"
+        ]
+      },
+      "LabResultBatchResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoOrdenLaboratorio"
+              }
+            ]
+          },
+          "orderVersion": {
+            "type": "integer",
+            "description": "Versión de la orden después del lote"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabBatchResultItemResponse"
+            }
+          },
+          "criticalCount": {
+            "type": "integer",
+            "description": "Valores críticos del lote (avisan al médico que pidió la orden)"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "orderVersion",
+          "results",
+          "criticalCount",
+          "completedAt"
+        ]
+      },
       "LabAmendDto": {
         "type": "object",
         "properties": {
@@ -26863,6 +27146,25 @@
           "completedAt"
         ]
       },
+      "LabReviewDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string"
+          },
+          "followUp": {
+            "type": "boolean",
+            "description": "D-4: proponer a recepción una cita de seguimiento con el médico que pidió la orden. Si no se envía, se propone (comportamiento anterior)."
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
       "LabReviewResponse": {
         "type": "object",
         "properties": {
@@ -26876,6 +27178,16 @@
           "reviewedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "followUpsClosed": {
+            "type": "integer",
+            "description": "C-2: pendientes de «Resultados por revisar» que se cerraron con la revisión"
+          },
+          "followUpProposalId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "D-4: propuesta de cita de seguimiento creada para recepción, o null"
           }
         },
         "required": [
@@ -27179,6 +27491,44 @@
           "revisado"
         ]
       },
+      "LabFollowUpValueResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          },
+          "mark": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MarcaResultado"
+              }
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "unit",
+          "value",
+          "text",
+          "mark"
+        ]
+      },
       "LabFollowUpResponse": {
         "type": "object",
         "properties": {
@@ -27247,6 +27597,24 @@
           },
           "version": {
             "type": "integer"
+          },
+          "orderVersion": {
+            "type": "integer",
+            "description": "C-4: versión vigente de la orden, para revisarla desde la bandeja"
+          },
+          "orderActions": {
+            "type": "array",
+            "description": "C-4: acciones sobre la orden que el servidor acepta ahora para quien lee",
+            "items": {
+              "$ref": "#/components/schemas/AccionOrdenLaboratorio"
+            }
+          },
+          "values": {
+            "description": "C-4: valores capturados de la orden, críticos primero",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabFollowUpValueResponse"
+            }
           }
         },
         "required": [

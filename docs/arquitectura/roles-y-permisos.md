@@ -274,6 +274,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/laboratorio/catalogo` | `laboratorio.ordenar` o `catalogo.configurar` | Catálogo activo | R | 3 | ✔ | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes` | `laboratorio.ordenar` | Consulta propia | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/resultados` | `laboratorio.procesar` | Marca calculada en servidor | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
+| POST | `/api/v1/laboratorio/ordenes/{id}/resultados/lote` | `laboratorio.procesar` | Solo En Proceso; todo o nada con una versión; complete=true exige laboratorio.validar | R | 4 | · | · | · | · | · | · | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/enmendar` | `laboratorio.validar` | Solo Completado; motivo de 10 o más; vuelve a revisión médica | R | 4 | · | · | · | · | · | · | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/externa` | `laboratorio.procesar` o `laboratorio.ordenar` | Solo Pendiente; laboratorio o médico que pidió; lugar e instrucciones para el paciente | R | 4 | · | · | · | · | · | relación | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/resultado-externo` | `laboratorio.procesar` o `laboratorio.revisar` | Solo orden externa Pendiente; referencia del adjunto y valor de cada examen; completa la orden | R | 4 | · | · | · | · | · | relación | ✔ | · | · | · |
