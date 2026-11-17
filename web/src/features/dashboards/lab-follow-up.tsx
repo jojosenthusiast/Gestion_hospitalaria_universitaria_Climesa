@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './lab-follow-up.css';
-import { Field, Icon, Notice } from '../../components/ui';
-import { PriorityBadge } from '../../components/system';
+import { Field, Notice } from '../../components/ui';
+import { PriorityBadge, SectionState } from '../../components/system';
 import { ApiError, type Api } from '../../lib/api';
 import { RemoteState, WriteError, formatDateTime, useAction, useData } from '../common';
 import { newIntentKey, withIntentKey } from '../intent';
@@ -30,11 +30,11 @@ export function LabFollowUpPanel({ api, version }: { api: Api; version: number }
   // and a retry links the same appointment instead of posting /citas again.
   const [scheduled, setScheduled] = useState<Record<string, string>>({});
   const remember = (proposalId: string, appointmentId: string) => setScheduled(current => ({ ...current, [proposalId]: appointmentId }));
-  return <section className="work-inbox" aria-labelledby="lab-follow-up-title">
-    <div><h2 id="lab-follow-up-title">Citas de seguimiento por confirmar</h2><p className="muted">Resultados de laboratorio que ya llegaron: agenda la cita con el médico que los pidió.</p></div>
-    <RemoteState state={data} skeletonRows={2}>{() => rows.length
-      ? <ul className="lab-follow-up-list">{rows.map(row => <ProposalRow key={row.id} api={api} proposal={row} scheduled={scheduled[row.id] ?? null} onScheduled={id => remember(row.id, id)} onDone={data.refresh} />)}</ul>
-      : <p className="muted lab-follow-up-empty"><Icon name="check" size={18} />Al día: no hay citas de seguimiento por confirmar.</p>}</RemoteState>
+  // R1: with nothing to confirm the section is one quiet line; the heading appears only with rows.
+  return <section className="work-inbox" aria-label="Citas de seguimiento por confirmar">
+    {rows.length > 0 && <header className="section-head"><h2 className="section-title">Citas de seguimiento por confirmar</h2><span className="section-count">{rows.length}</span></header>}
+    <SectionState state={data} compact empty={list => list.length ? null : 'Al día: no hay citas de seguimiento por confirmar.'}>{() =>
+      <ul className="lab-follow-up-list">{rows.map(row => <ProposalRow key={row.id} api={api} proposal={row} scheduled={scheduled[row.id] ?? null} onScheduled={id => remember(row.id, id)} onDone={data.refresh} />)}</ul>}</SectionState>
   </section>;
 }
 

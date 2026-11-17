@@ -94,9 +94,6 @@
 .module-state strong { color: var(--ink); font-size: 18px; }
 .module-state span { line-height: 1.45; }
 .module-state .status-symbol { width: 62px; height: 62px; margin: 0; }
-.module-state-error { align-items: flex-start; flex-direction: column; }
-.module-state-error .notice { width: 100%; }
-.module-state-error > .secondary-button { align-self: flex-start; }
 .empty-state { position: relative; min-height: 300px; padding: 52px 24px; display: grid; align-content: center; justify-items: center; gap: 12px; overflow: hidden; color: var(--muted); text-align: center; }
 .empty-state::before { content: ""; position: absolute; width: 220px; height: 220px; border: 1px solid color-mix(in srgb, var(--primary-text) 11%, transparent); border-radius: 50%; box-shadow: 0 0 0 36px color-mix(in srgb, var(--primary-text) 3%, transparent); pointer-events: none; }
 .empty-state-icon { width: 54px; height: 54px; z-index: 1; display: grid; place-items: center; border-radius: 50%; background: var(--soft); color: var(--primary-text); }
@@ -449,7 +446,8 @@
 .hbar-track { height: 12px; overflow: hidden; border-radius: 999px; background: var(--soft); }
 .hbar-fill { display: block; height: 100%; border-radius: inherit; transition: width var(--motion-standard) ease; }
 .hbar-value { text-align: right; font-variant-numeric: tabular-nums; }
-.chart-empty, .panel-empty { margin: 0; padding: 14px 16px; display: flex; align-items: center; gap: 10px; border: 1px dashed var(--line); border-radius: var(--radius-card); background: var(--bg); color: var(--muted); font-size: 14px; }
+/* R1: un gráfico o panel sin datos es una línea tranquila, como `.section-empty`. */
+.chart-empty, .panel-empty { margin: 0; padding: var(--space-2) 0; color: var(--muted); font-size: var(--text-md); line-height: 1.45; }
 .chart-data summary { width: fit-content; color: var(--primary-text); font-size: 13px; font-weight: 700; cursor: pointer; }
 .chart-table { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 13px; }
 .chart-table caption { text-align: left; color: var(--muted); padding-bottom: 6px; }
@@ -513,9 +511,6 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .dash-panel h2 { margin: 0; display: flex; align-items: center; gap: 8px; }
 .dash-panel h2 svg { color: var(--primary-text); }
 .panel-hint { margin: -4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
-.panel-state { margin: 0; padding: 12px 0; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
-.panel-state-error { flex-wrap: wrap; justify-content: space-between; color: var(--danger); }
-.attention-empty { color: var(--success); border-color: color-mix(in srgb, var(--success) 35%, var(--line)); background: var(--success-soft); }
 .attention-list { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
 .attention-list li { padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; border: 1px solid var(--line); border-left: 4px solid var(--attn, var(--primary)); border-radius: var(--radius-control); background: var(--bg); }
 .attention-list li > div { display: grid; gap: 2px; min-width: 0; }
@@ -596,7 +591,22 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .skeleton-line { display: block; height: 44px; border-radius: var(--radius-control); background: color-mix(in srgb, var(--line) 70%, transparent); }
 .skeleton-line:nth-child(3n) { width: 72%; }
 .skeleton-line:nth-child(3n + 1) { width: 88%; }
-.panel-state + .skeleton, .board-card .skeleton { min-height: 0; }
+.board-card .skeleton, .dash-panel .skeleton, .work-inbox .skeleton { min-height: 0; }
+/* R1: el estado único de sección (SectionState). Error en su lugar, con el mismo texto y el mismo reintento. */
+.section-state-error { padding: var(--space-4); display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--space-2) var(--space-3); border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line)); border-radius: var(--radius-card); background: var(--danger-soft); color: var(--danger); }
+.section-state-error > svg { margin-top: 2px; }
+.section-state-error > div { min-width: 0; display: grid; gap: var(--space-1); }
+.section-state-error strong { font-size: var(--text-base); }
+.section-state-error span { color: var(--ink); font-size: var(--text-md); line-height: 1.5; overflow-wrap: anywhere; }
+.section-state-error > button { grid-column: 2; justify-self: start; }
+.section-state-error.is-compact { padding: var(--space-2) 0; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; border: 0; background: transparent; }
+.section-state-error.is-compact > div { display: block; }
+.section-state-error.is-compact strong { margin-right: var(--space-2); font-size: var(--text-md); }
+.section-state-error.is-compact > button { grid-column: auto; }
+/* R1: sección vacía: una sola línea tranquila, sin segundo título ni caja. */
+.section-empty { margin: 0; padding: var(--space-2) 0; color: var(--muted); font-size: var(--text-md); line-height: 1.45; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.section-count { color: var(--muted); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
 /* Revalidación en segundo plano: una línea de 2 px que no empuja el contenido. */
 .refresh-line { display: block; height: 2px; margin-bottom: -2px; border-radius: 1px; background: color-mix(in srgb, var(--primary-text) 45%, transparent); }
 

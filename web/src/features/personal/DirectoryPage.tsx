@@ -77,7 +77,8 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   return <>
     <CompactHeader breadcrumb={accountsOnly ? 'Protección de datos / Cuentas' : 'Administración / Equipo'} title="Personal"
       actions={manage ? <button className="primary-button" onClick={() => { setEdit(null); setStaffOpen(true); }}><Icon name="plus" size={18} />Registrar personal</button> : canInvite && <button className="primary-button" onClick={() => setInvite({ person: null })}><Icon name="mail" size={18} />Invitar persona</button>} />
-    {canStaff && canAccounts && <div className="number-strip"><div><strong>{rows.filter(r => r.staff && r.staff.active).length}</strong><span>Personal activo</span></div><div><strong>{withAccount}</strong><span>Con cuenta de acceso</span></div><div><strong>{withoutAccount}</strong><span>Sin cuenta todavía</span></div></div>}
+    {/* R1 (S3): figures only once both lists arrived; never zeros while loading or after an error. */}
+    {canStaff && canAccounts && staffData.data && users.data && !staffData.error && !users.error && <div className="number-strip"><div><strong>{rows.filter(r => r.staff && r.staff.active).length}</strong><span>Personal activo</span></div><div><strong>{withAccount}</strong><span>Con cuenta de acceso</span></div><div><strong>{withoutAccount}</strong><span>Sin cuenta todavía</span></div></div>}
     <section className="data-workbench">
       <div className="table-toolbar">
         <Field label="Buscar en el directorio" value={query} onChange={setQuery} placeholder={accountsOnly ? 'Nombre, correo o rol' : 'Nombre, correo, especialidad o rol'} />

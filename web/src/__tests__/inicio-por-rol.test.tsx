@@ -100,7 +100,8 @@ describe('inicio por rol', () => {
   it('una fuente que falla no tumba el resto: muestra el error con reintento y sigue con lo demás', async () => {
     montar(perfil('REC'), ['/fila']);
     expect(await screen.findByText('El servicio no está disponible.')).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: /Reintentar/ }).length).toBeGreaterThan(0);
+    // R1: one section state everywhere; the retry reads «Volver a intentar» in modules, panels and trays.
+    expect(screen.getAllByRole('button', { name: 'Volver a intentar' }).length).toBeGreaterThan(0);
     expect((await screen.findAllByText('Luis Ficticio')).length).toBeGreaterThan(0);
   });
 

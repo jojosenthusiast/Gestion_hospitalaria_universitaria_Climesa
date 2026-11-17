@@ -1,5 +1,4 @@
-import { Icon, Notice } from '../../components/ui';
-import { Skeleton, StatusBadge } from '../../components/system';
+import { SectionState, StatusBadge } from '../../components/system';
 import { can, type AccessProfile, type Api } from '../../lib/api';
 import { WriteError, useAction, useData } from '../common';
 import { spanishProblem } from '../problems';
@@ -21,19 +20,11 @@ export function LabResultsInbox({ api, profile, version }: { api: Api; profile: 
   const data = useData<LabFollowUp[]>(api, '/laboratorio/pendientes', version, allowed);
   if (!allowed) return null;
   const rows = data.data ? sortFollowUps(data.data) : null;
-  const error = spanishProblem(data.error);
-  return <section className="work-inbox" aria-labelledby="lab-results-inbox-title">
-    <div>
-      <h2 id="lab-results-inbox-title">Resultados por revisar</h2>
-      <p className="muted">{rows ? `${rows.length} ${rows.length === 1 ? 'pendiente' : 'pendientes'}` : 'Valores críticos y observaciones del laboratorio en las órdenes que pediste.'}</p>
-    </div>
-    {data.loading && !rows
-      ? <Skeleton rows={2} />
-      : error && !rows
-        ? <div className="module-state module-state-error"><Notice kind="error">{error.status === 403 ? 'Tu cuenta no tiene permiso para ver estos resultados.' : error.message}</Notice><button type="button" className="secondary-button" onClick={data.refresh}><Icon name="retry" size={18} />Reintentar</button></div>
-        : rows && (rows.length
-          ? <ul className="lab-follow-up-list">{rows.map(item => <FollowUpRow key={item.id} api={api} item={item} onDone={data.refresh} />)}</ul>
-          : <p className="muted lab-follow-up-empty"><Icon name="check" size={18} />Al día: no tienes resultados por revisar.</p>)}
+  // R1: with nothing pending the section is one quiet line; the heading and count appear only with rows.
+  return <section className="work-inbox" aria-label="Resultados por revisar">
+    {rows && rows.length > 0 && <header className="section-head"><h2 className="section-title">Resultados por revisar</h2><span className="section-count">{rows.length} {rows.length === 1 ? 'pendiente' : 'pendientes'}</span></header>}
+    <SectionState state={{ ...data, error: spanishProblem(data.error) }} compact empty={list => list.length ? null : 'Al día: no tienes resultados por revisar.'}>{() =>
+      <ul className="lab-follow-up-list">{rows!.map(item => <FollowUpRow key={item.id} api={api} item={item} onDone={data.refresh} />)}</ul>}</SectionState>
   </section>;
 }
 

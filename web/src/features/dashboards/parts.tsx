@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../../components/ui';
-import { AreaTag, Skeleton, StatusBadge, type AreaCode } from '../../components/system';
+import { AreaTag, SectionState, StatusBadge, type AreaCode } from '../../components/system';
 import { toneColor, type Tone } from '../../components/charts';
 import { can, type AccessProfile } from '../../lib/api';
 import type { Remote } from '../common';
@@ -38,20 +38,16 @@ export function Panel({ title, icon, action, children, wide = false, hint }: { t
   </section>;
 }
 
-/** Estado de carga, error y permiso dentro de una tarjeta: una fuente que falla no tumba el resto del inicio. */
+/** Estado dentro de una tarjeta: el `SectionState` común en su forma de una línea. Una fuente que falla no tumba el resto. */
 export function PanelState<T>({ state, children, empty }: { state: Remote<T>; children: (data: T) => ReactNode; empty?: (data: T) => string | null }) {
-  if (state.loading && !state.data) return <Skeleton rows={2} label="Cargando…" />;
-  if (state.error) return <div className="panel-state panel-state-error" role="alert"><span>{state.error.status === 403 ? 'Tu cuenta no tiene permiso para ver esta información.' : state.error.message}</span><button type="button" className="row-action" onClick={state.refresh}><Icon name="retry" size={16} />Reintentar</button></div>;
-  if (!state.data) return null;
-  const message = empty?.(state.data);
-  return message ? <p className="panel-empty" role="status">{message}</p> : <>{children(state.data)}</>;
+  return <SectionState state={state} compact empty={empty}>{children}</SectionState>;
 }
 
 /** `tag` is the visible label; with `status` it shows as a StatusBadge, with `area` as an AreaTag, otherwise as plain text. */
 export type AttentionItem = { id: string; title: string; detail?: string; tone: Tone; href: string; action: string; tag?: string; status?: string; area?: AreaCode };
 /** Lista de «qué necesita mi atención»: cada fila lleva su acción directa; vacía, lo dice con claridad. */
 export function AttentionList({ items, empty = 'Nada pendiente por ahora.', limit = 6 }: { items: AttentionItem[]; empty?: string; limit?: number }) {
-  if (items.length === 0) return <p className="panel-empty attention-empty" role="status"><Icon name="check" size={18} />{empty}</p>;
+  if (items.length === 0) return <p className="section-empty" role="status">{empty}</p>;
   return <ul className="attention-list">{items.slice(0, limit).map(item => <li key={item.id} style={{ ['--attn' as string]: toneColor[item.tone] }}>
     <div><strong>{item.title}</strong>{item.detail && <span>{item.detail}</span>}</div>
     {item.status ? <StatusBadge value={item.status} label={item.tag} /> : item.area ? <AreaTag code={item.area} showName /> : item.tag && <span className="attention-tag">{item.tag}</span>}

@@ -31,6 +31,34 @@ export function Skeleton({ rows = 3, label = 'Cargando información…', minHeig
   </div>;
 }
 
+/** What a section reads: the same shape as `useData` (features/common.tsx), kept structural so the system has no API import. */
+export type SectionSource<T> = { data: T | null; loading: boolean; error: { status?: number; message: string } | null; refresh: () => void };
+
+/**
+ * R1 (S2, S3): the one loading, error and empty state of a section. Every module, home panel and tray uses it, so the
+ * skeleton, the wording and the retry are the same everywhere. `compact` is the one-line form for panels and trays.
+ * With `empty`, a section with nothing to show collapses to a single quiet line; no second heading.
+ */
+export function SectionState<T>({ state, children, rows = 4, compact = false, empty }: { state: SectionSource<T>; children: (data: T) => ReactNode; rows?: number; compact?: boolean; empty?: (data: T) => string | null }) {
+  if (state.loading && !state.data) return <Skeleton rows={compact ? 2 : rows} />;
+  if (state.error) {
+    // WEB-04: "no permission" and "load failed" are distinct; both can retry (access can be granted meanwhile).
+    const denied = state.error.status === 403;
+    const title = denied ? 'No tienes acceso a esta información' : 'No pudimos cargar esta información';
+    const message = denied ? 'Tu cuenta no tiene permiso para consultar esta sección.' : state.error.message;
+    return <div className={`section-state-error${compact ? ' is-compact' : ''}`} role="alert">
+      <Icon name="alert" size={compact ? 16 : 20} />
+      <div><strong>{title}</strong><span>{message}</span>{denied && !compact && <span>Si la necesitas para tu trabajo, pide a un administrador que revise los permisos de tu cuenta y vuelve a intentar.</span>}</div>
+      <button type="button" className={compact ? 'row-action' : 'secondary-button'} onClick={state.refresh}><Icon name="retry" size={compact ? 16 : 18} />Volver a intentar</button>
+    </div>;
+  }
+  if (!state.data) return null;
+  const message = empty?.(state.data);
+  if (message) return <p className="section-empty" role="status">{message}</p>;
+  // Background revalidation: a thin line that does not push the content; the text is for screen readers.
+  return <>{state.loading && <span className="refresh-line" role="status" aria-live="polite"><span className="sr-only">Actualizando información…</span></span>}{children(state.data)}</>;
+}
+
 // ---------------------------------------------------------------- Áreas (S7)
 
 export type AreaCode = 'EMG' | 'CON' | 'LAB' | 'HOS' | 'REC' | 'AMB' | 'GEN';
