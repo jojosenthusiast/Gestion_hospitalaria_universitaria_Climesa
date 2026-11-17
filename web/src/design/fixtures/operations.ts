@@ -160,7 +160,14 @@ export class OperationsFixtures {
     if (p === '/turnos/catalogo') return this.catalog();
     if (p === '/turnos/cobertura') {
       const from = q.get('from') ?? localDay(), to = q.get('to') ?? addDays(from, 6), area = this.spaces.find(s => s.code === 'P2') ?? this.spaces[0];
-      return { from, to, gaps: [{ areaId: area.id, area: area.name, role: 'enfermero', start: localInstant(addDays(from, 2), 19), end: localInstant(addDays(from, 2), 23), required: 3, actual: 2 }, { areaId: area.id, area: area.name, role: 'medico', start: localInstant(addDays(from, 5), 0), end: localInstant(addDays(from, 5), 6), required: 1, actual: 0 }] };
+      // `role` is the function code the API returns (MED, ENF, REC, LAB).
+      return { from, to, gaps: [{ areaId: area.id, area: area.name, role: 'ENF', start: localInstant(addDays(from, 2), 19), end: localInstant(addDays(from, 2), 23), required: 3, actual: 2 }, { areaId: area.id, area: area.name, role: 'MED', start: localInstant(addDays(from, 5), 0), end: localInstant(addDays(from, 5), 6), required: 1, actual: 0 }] };
+    }
+    // R7 F-1: who can take a gap; the first people of the function are valid, one is resting.
+    if (p === '/turnos/candidatos') {
+      const type = q.get('role') === 'MED' ? 'medico' : q.get('role') === 'ENF' ? 'enfermero' : q.get('role') === 'LAB' ? 'laboratorista' : 'recepcionista';
+      const people = this.people.filter(x => x.type === type && x.active !== false).slice(0, 4).map((x, i) => ({ staffId: x.id, person: `${x.givenNames} ${x.surnames}`, sameArea: x.areaId === q.get('areaId'), weekHours: 12 * i }));
+      return { candidatos: people.slice(0, 3).map(x => ({ ...x, advertencias: [] })), descartados: people.slice(3).map(x => ({ ...x, codigo: 'personal_en_descanso', mensaje: 'Necesita 8 horas de descanso entre turnos.' })) };
     }
     if (p === '/turnos/mios') {
       const me = this.people[0], area = this.spaces.find(s => s.id === me.areaId) ?? this.spaces[0];

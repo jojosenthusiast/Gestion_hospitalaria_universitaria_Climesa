@@ -100,3 +100,7 @@
 .lab-external-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .lab-external-add select { flex: 1 1 200px; min-width: 0; }
 .lab-external-value { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+
+/* R7 C-6: the instructions to print for a patient without the app; only this block prints. */
+.lab-external-print p { white-space: pre-wrap; }
+@media print { body * { visibility: hidden; } .lab-external-print, .lab-external-print * { visibility: visible; } .lab-external-print { position: absolute; inset: 0 auto auto 0; } }

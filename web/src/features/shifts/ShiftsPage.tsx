@@ -12,6 +12,7 @@ import { Field } from '../../components/ui';
 import { ShiftForm, type ShiftDraft } from './ShiftForm';
 import { CrewCoverageAlert } from './CrewCoverageAlert';
 import { AreaCoverageAlert, type CoverageWeek } from './AreaCoverageAlert';
+import { FillGapsDialog, GapCoverDialog, blockLabel, gapBlocks, type GapBlock } from './GapCover';
 import { AttendanceDialog } from './AttendanceDialog';
 import { SpecialistsWeek } from './SpecialistsWeek';
 import { DAY_VIEW_LANES, ShiftWeek, StateLegend, timeRange, type CalendarPlanning } from './ShiftWeek';
@@ -116,6 +117,9 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const rows = drawn.filter(t => Date.parse(t.start) >= weekStart).sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.person.localeCompare(b.person, 'es'));
   const assigned = inWeek.filter(t => Date.parse(t.start) >= weekStart).length;
   const gaps = (coverage.data?.gaps ?? []).filter(g => area === 'todos' || g.areaId === area);
+  // R7 F2: holes still ahead, joined into shift-sized blocks for «Cubrir hueco» and «Llenar todos los huecos».
+  const openBlocks = useMemo(() => gapBlocks((coverage.data?.gaps ?? []).filter(g => (area === 'todos' || g.areaId === area) && Date.parse(g.start) >= at)), [coverage.data, area, at]);
+  const [covering, setCovering] = useState<GapBlock | null>(null), [filling, setFilling] = useState(false);
 
   const active: { key: string; label: string; clear: () => void }[] = [
     ...(person ? [{ key: 'persona', label: `Persona: ${person.label}`, clear: () => setPerson(null) }] : []),
@@ -239,6 +243,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
         </div>}
         {plan && view === 'semana' && <div className="shift-plan-tools" role="group" aria-label="Planificar la semana">
           <button type="button" className="secondary-button" onClick={() => setTool('rotacion')}>Generar rotación</button>
+          {openBlocks.length > 0 && <button type="button" className="secondary-button" onClick={() => setFilling(true)}>Llenar todos los huecos ({openBlocks.length})</button>}
           <button type="button" className="secondary-button" onClick={() => void copyPrevious()}>Copiar semana anterior</button>
           <button type="button" className="secondary-button" onClick={() => setTool('masiva')}>Asignación masiva</button>
           <button type="button" className="secondary-button" onClick={() => setTool('plantillas')}>Plantillas</button>
@@ -268,6 +273,9 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
         {coverage.error && coverage.error.status !== 403 && <Notice kind="error">No pudimos dibujar los huecos de cobertura de esta semana: {coverage.error.message} <button type="button" className="secondary-button" onClick={coverage.refresh}>Volver a intentar</button></Notice>}
         <ShiftWeek days={visibleDays} today={today} now={at} shifts={drawn} gaps={gaps} onOpen={setDetail} onShowDay={date => { setFocusDay(date); setView('lista'); }}
           planning={planning} highlight={highlight} maxLanes={scale === 'dia' ? DAY_VIEW_LANES : undefined} />
+        {plan && openBlocks.length > 0 && <section className="gap-list" aria-label="Huecos por cubrir"><h3>Huecos por cubrir ({openBlocks.length})</h3><ul>
+          {openBlocks.slice(0, 12).map(b => <li key={b.key}><span>{blockLabel(b)}{b.missing > 1 ? ` · faltan ${b.missing}` : ''}</span><button type="button" className="secondary-button" aria-label={`Cubrir hueco: ${blockLabel(b)}`} onClick={() => setCovering(b)}>Cubrir hueco</button></li>)}
+        </ul>{openBlocks.length > 12 && <p className="muted">Y {openBlocks.length - 12} más; «Llenar todos los huecos» los incluye.</p>}</section>}
         {!drawn.length && <Empty title="Sin turnos en esta semana" description={active.length ? 'Ajusta los filtros o la búsqueda para consultar otros horarios.' : plan ? 'Haz clic en una hora del calendario, usa el botón + de cada día, genera una rotación o copia la semana anterior.' : 'Cambia de semana.'} />}
       </section> : drawn.length ? <ShiftDayList days={days} today={today} now={at} rows={drawn} plan={plan} byPerson={sort === 'persona'} typeOf={typeOf} actions={actions} />
         : <Empty title="Sin turnos en esta vista" description="Ajusta los filtros, la búsqueda o la semana para consultar otros horarios." />}</RemoteState>
@@ -283,6 +291,8 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
       onPublished={result => { setTool(null); setAnnounce(`${result.published === 1 ? 'Se publicó 1 turno' : `Se publicaron ${result.published} turnos`}. El personal ya los ve en Mis turnos.${result.warnings?.length ? ` Quedan ${result.warnings.length === 1 ? '1 hueco' : `${result.warnings.length} huecos`} de cobertura.` : ''}`); reload(); }} />}
     {batch && <BatchPreview api={api} catalog={catalog} items={batch.items} initial={batch.initial} onClose={() => { setBatch(null); setTool(null); }} onBack={tool === 'rotacion' ? () => setBatch(null) : undefined} onCreated={count => { setTool(null); created(count); }} />}
     {marking && <AttendanceDialog api={api} shift={marking} onClose={() => setMarking(null)} onSaved={() => { setMarking(null); data.refresh(); if (!covered) weekData.refresh(); }} onAssignSubstitute={plan ? id => assignSubstitute(marking, id) : undefined} />}
+    {covering && <GapCoverDialog api={api} block={covering} onClose={() => setCovering(null)} onPick={item => { setCovering(null); setBatch({ items: [item] }); }} />}
+    {filling && <FillGapsDialog api={api} blocks={openBlocks} onClose={() => setFilling(false)} onPreview={items => { setFilling(false); setBatch({ items }); }} />}
     {cancelling && <CancelShiftForm api={api} shift={cancelling} onClose={() => { setCancelling(null); source.refresh(); }} onSaved={() => { setCancelling(null); source.refresh(); }} />}
 
   </>;
