@@ -89,4 +89,15 @@ final class PlatformParityTests: XCTestCase {
         XCTAssertEqual(ShiftAttendanceRules.displayState("cancelado", start: start, end: end, now: during), "cancelado")
         XCTAssertEqual(ShiftAttendanceRules.displayState("publicado", start: nil, end: end, now: during), "publicado")
     }
+
+    // MARK: - Area by space name (web components/identity.tsx AREA_NAMES)
+
+    func testAreaPorNombreDelEspacioComoLaWeb() {
+        let expected: [String: AreaCode] = [
+            "Emergencia": .emg, "Laboratorio": .lab, "Hospitalización semiprivada": .hos, "Consulta externa": .con,
+            "Recepción": .rec, "Ambulancia": .amb, "Bodega central": .gen, "P1-EMG": .emg, "C-101": .con
+        ]
+        for (name, area) in expected { XCTAssertEqual(AreaCode.of(name: name), area, name) }
+        XCTAssertEqual(AreaCode.of(name: nil), .gen)
+    }
 }

@@ -150,7 +150,7 @@ struct ShiftsContent:View {
                     let shown=ShiftAttendanceRules.displayState(shift.state,start:ShiftAttendanceRules.date(shift.start),end:ShiftAttendanceRules.date(shift.end),now:Date())
                     VStack(alignment:.leading,spacing:Spacing.m) {
                         HStack(spacing:Spacing.s) {
-                            AreaTag(shift.area)
+                            AreaTag(AreaCode.of(name: shift.area).rawValue)
                             Text(verbatim:shift.area).font(Typo.subheading).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
                         }
                         Text(verbatim:ShiftAttendanceRules.hours(start:ShiftAttendanceRules.date(shift.start),end:ShiftAttendanceRules.date(shift.end),type:shift.type)).font(Typo.body).foregroundStyle(Theme.ink)
@@ -159,7 +159,7 @@ struct ShiftsContent:View {
                     }
                     .padding(Spacing.l)
                     .frame(maxWidth:.infinity,alignment:.leading)
-                    .areaSurface(shift.area)
+                    .areaSurface(AreaCode.of(name: shift.area).rawValue)
                 }
             }
         }
