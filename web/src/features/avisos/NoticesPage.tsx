@@ -67,7 +67,7 @@ function NoticeDetail({ api, notice, hours, onDone }: { api: Api; notice: InboxN
   const send = async (verb: 'enterado' | 'posponer') => { if (await action.run(`/me/avisos/${notice.id}/${verb}`, {})) onDone(); };
   const snoozable = notice.nivel === 'critico' && notice.dirigido && !notice.enteradoEn;
   return <section className="notice-detail" aria-label="Detalle del aviso">
-    <NoticeCard notice={notice} />
+    <NoticeCard notice={notice} emptyAudience="Tu área" />
     <dl className="notice-detail-meta">
       <div><dt>Publicado</dt><dd>{notice.publicadoEn ? formatDateTime(notice.publicadoEn) : '—'}</dd></div>
       <div><dt>Vigente hasta</dt><dd>{notice.hasta ? formatDateTime(notice.hasta) : '—'}</dd></div>

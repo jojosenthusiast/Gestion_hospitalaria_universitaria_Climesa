@@ -291,7 +291,7 @@ const med: RoleDashboard = {
       <Panel title="Mi agenda de hoy" icon="calendar" action={{ label: 'Abrir mi consultorio', href: '#/consultas' }} hint="Línea del día con el estado de cada consulta.">
         <PanelState state={d.agenda} empty={rows => rows.filter(a => isToday(a.start)).length === 0 ? 'No tienes citas para hoy.' : null}>{rows => <Timeline items={rows.filter(a => isToday(a.start)).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 8).map(a => ({ id: a.appointmentId, start: a.start, end: a.end, title: a.patientName, detail: a.reason ?? undefined, tag: <Tag value={a.consultationState ?? a.appointmentState} /> }))} />}</PanelState>
       </Panel>
-      <Panel title="Resultados por revisar" icon="alert" action={{ label: 'Abrir laboratorio', href: '#/laboratorio' }} hint="Cuando los revisas, el paciente puede ver sus valores.">
+      <Panel title="Resultados por liberar" icon="alert" action={{ label: 'Abrir laboratorio', href: '#/laboratorio' }} hint="Cuando los revisas, el paciente puede ver sus valores.">
         <PanelState state={d.lab}>{rows => <AttentionList empty="No hay resultados esperando revisión." items={pendingReview(rows).map(o => ({ id: o.id, title: o.patientName ?? 'Paciente', detail: o.items.map(i => i.name).join(', '), tone: (o.priority === 'urgente' ? 'urgent' : 'warn') as Tone, href: '#/laboratorio', action: 'Revisar', tag: o.priority === 'urgente' ? 'Urgente' : 'Completado' }))} />}</PanelState>
       </Panel>
       <Panel title="Mis órdenes por estado" icon="lab">

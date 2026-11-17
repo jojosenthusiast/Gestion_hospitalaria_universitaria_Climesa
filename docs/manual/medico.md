@@ -88,6 +88,10 @@ Mi día, Pacientes, Resultados, Turnos y **Más** (Avisos, Agenda, Mis hospitali
 
 La app iOS compila y pasa sus pruebas en CI, pero no se ha probado en un iPhone.
 
+## Web
+
+El rol MED solo no entra a la web. Una cuenta que además tiene un rol de la web (por ejemplo Administración) ve en **Inicio** el tablero **Mi día** con la bandeja **Resultados por revisar**: valores críticos (en rojo) y observaciones relevantes de las órdenes que pediste, los críticos primero y luego los más antiguos. Cada fila muestra el paciente, su expediente, el examen y el hallazgo, con **Marcar como revisado**; la lista se recarga al marcar y cuando el laboratorio registra algo. Sin pendientes dice "Al día: no tienes resultados por revisar."; si no carga, muestra el error y **Reintentar**. Las órdenes completadas que esperan liberarse al paciente están en el panel **Resultados por liberar**.
+
 ## Lo que no está disponible
 
 Una consulta firmada no se puede corregir: el addendum está pendiente.

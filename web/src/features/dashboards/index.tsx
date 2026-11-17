@@ -6,6 +6,7 @@ import { CriticalNoticeBanner } from '../avisos/CriticalNoticeBanner';
 import { WorkInbox } from '../inbox';
 import { useDashboardData, type Source } from './data';
 import { LabFollowUpPanel } from './lab-follow-up';
+import { LabResultsInbox } from './lab-results-inbox';
 import { QuickActions } from './parts';
 import { roleDashboards, roleOrder, type RoleId } from './roles';
 
@@ -36,6 +37,8 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
         {index === 0 && <WorkInbox api={api} profile={profile} version={version} />}
         {/* S10: citas de seguimiento que el sistema propone al llegar resultados; Recepción las confirma. */}
         {index === 0 && can(profile, 'citas.agendar') && <LabFollowUpPanel api={api} version={version} />}
+        {/* S10: «Resultados por revisar» del médico (valores críticos y observaciones); se oculta sin `laboratorio.revisar`. */}
+        {index === 0 && <LabResultsInbox api={api} profile={profile} version={version} />}
         {dash.render({ d: data, profile })}
       </div>;
     })}
