@@ -6,8 +6,9 @@ import SwiftUI
 struct DoctorDay: Sendable {
     var agenda: Part<[AgendaEntry]>?
     var tickets: Part<[QueueTicket]>?
-    /// S9: who goes next in consulta general by the server rule (`GET /fila/siguiente`); nil when unreadable.
-    var next: QueueNextProposal?
+    /// S9: who goes next in consulta general by the server rule (`GET /fila/siguiente`). B3: a failed read shows its
+    /// error in place; `.loaded(nil)` is a doctor who only sees their own queue (403).
+    var next: Part<QueueNextProposal?>?
     var pendingResults: Part<Int>?
     /// RN-25: órdenes con valor crítico que este médico puede revisar.
     var criticalResults = 0
@@ -27,11 +28,14 @@ struct DoctorDayView: View {
     /// S11: only the highlighted critical notice shows here; every notice lives in Avisos (Más).
     @State private var notices = NoticeInboxModel()
     @State private var loader = Loader<DoctorDay>()
+    /// «Llamar siguiente» only; every called number has its own write state in `rows` (B3: no global spinner).
     @State private var calling = Submission()
+    @State private var rows = SubmissionBook()
     @State private var deciding = Submission()
-    /// Last call made here, undoable while it is still "llamado" and the server accepts undoing it (S9): ticket id,
-    /// returned version and "CON 7".
-    @State private var undo: (id: String, version: Int, code: String)?
+    /// B3: numbers called from this screen; each keeps its own «Deshacer» while still called (with `calledByMe`).
+    @State private var calledHere: Set<String> = []
+    /// D-3: "No se presentó" waits 8 s with «Deshacer», stored at the tap.
+    @State private var absences = DeferredAbsences()
     @State private var rejecting: Appointment?
 
     var body: some View {
@@ -52,7 +56,11 @@ struct DoctorDayView: View {
                 moreSection(day)
             }
         }
-        .task(id: live.snapshot.version([.appointments, .consultations, .queue, .laboratory, .admissions, .hospitalInfo])) { await load() }
+        .task(id: live.snapshot.version([.appointments, .consultations, .queue, .laboratory, .admissions, .hospitalInfo])) {
+            // Stored "No se presentó" left by a closed app or a lost signal goes first (in tap order), then the day.
+            await absences.bind(user: profile.id, account: account) { await load() }
+            await load()
+        }
         .loadsNoticeInbox(notices, account: account, live: live)
         .sheet(item: $rejecting) { item in RejectRescheduleSheet(appointment: item, submission: deciding) { await load() } }
     }
@@ -112,7 +120,7 @@ struct DoctorDayView: View {
         }
     }
 
-    @ViewBuilder private func queueSection(_ tickets: [QueueTicket], next: QueueNextProposal?) -> some View {
+    @ViewBuilder private func queueSection(_ tickets: [QueueTicket], next: Part<QueueNextProposal?>?) -> some View {
         let waiting = tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count
         // S13: one primary on the day: attend the number already called, otherwise call the next one.
         let primary = DoctorDayActionRules.primary(tickets: tickets, canAttend: account.can("consulta.iniciar"), canCallNext: account.can("fila.llamar"))
@@ -120,19 +128,17 @@ struct DoctorDayView: View {
         SectionCard(title: L.text("day.queue")) {
             Text(verbatim: String(format: L.text("day.queue.waiting"), waiting)).font(Typo.body).foregroundStyle(Theme.ink)
             // S9 / RN-FILA-SIGUIENTE: the server proposes who goes next and says why; "Llamar siguiente" calls that number.
-            if let next { nextCard(next) }
-            if account.can("fila.llamar"), QueueRules.nextToCall(tickets) != nil {
-                ClimesaButton(title: L.text("day.queue.callNext"), kind: primary == .callNext ? .primary : .secondary, loading: calling.busyId == "siguiente") { Task { await callNext() } }
-                    .disabled(calling.busy)
+            // B3: a failed read says so here with «Reintentar»; it never disappears in silence.
+            if let message = next?.error {
+                PartError(message: message, retry: load)
+            } else if let proposal = next?.value ?? nil {
+                nextCard(proposal)
             }
-            if let undo, DoctorDayActionRules.canUndoCall(undo.id, tickets: tickets) {
-                HStack(spacing: Spacing.m) {
-                    Text(verbatim: String(format: L.text("queue.called.undoable"), undo.code)).font(Typo.body).foregroundStyle(Theme.ink)
-                    Spacer()
-                    Button(L.text("queue.undo")) { Task { await undoCall() } }.disabled(calling.busy).frame(minHeight: 44)
-                }
+            if account.can("fila.llamar"), QueueRules.nextToCall(tickets) != nil {
+                ClimesaButton(title: L.text("day.queue.callNext"), kind: primary == .callNext ? .primary : .secondary, loading: calling.busy) { Task { await callNext() } }
             }
             WriteNotice(submission: calling, reload: load)
+            absenceNotices
             // I-9: called numbers are rows of this card, not one card each.
             ForEach(called) { ticket in
                 Divider().overlay(Theme.line)
@@ -141,7 +147,23 @@ struct DoctorDayView: View {
         }
     }
 
+    /// D-3: what happened to a deferred "No se presentó": sent, dropped for good (said once), or kept for a retry.
+    @ViewBuilder private var absenceNotices: some View {
+        if let sent = absences.lastSent { PatientNotice(text: sent) }
+        if let report = absences.report { PatientNotice(text: report, failure: true) }
+        ForEach(absences.failed) { item in
+            VStack(alignment: .leading, spacing: Spacing.s) {
+                PatientNotice(text: String(format: L.text("day.queue.absent.failed"), item.label, item.error ?? ""), failure: true)
+                HStack(spacing: Spacing.m) {
+                    ClimesaButton(title: L.text("ds.retry"), kind: .secondary) { Task { await absences.retry() } }
+                    ClimesaButton(title: L.text("day.queue.absent.discard"), kind: .secondary) { absences.discard(item.id) }
+                }
+            }
+        }
+    }
+
     @ViewBuilder private func calledRow(_ ticket: QueueTicket, primary: DoctorDayAction?) -> some View {
+        let row = rows[ticket.id]
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack(spacing: Spacing.s) {
                 AreaTag(QueueBoardRules.area(ticket))
@@ -155,27 +177,46 @@ struct DoctorDayView: View {
                 if QueueBoardRules.priority(ticket) != "rutina" { PriorityBadge(ticket.priority) }
                 Text(verbatim: QueueBoardRules.arrival(ticket)).font(Typo.small).foregroundStyle(ticket.appointmentAt == nil ? Theme.muted : Theme.ink)
             }
-            // FILA-01: volver a llamar o "No se presentó" solo cuando el servidor lo permite. I-12: an action the server
-            // blocks is hidden, its internal reason is not printed. I-15: the spinner shows only on this number.
-            let allowed = ticket.allowedActions ?? []
-            let rowBusy = calling.busyId == ticket.id
-            if allowed.contains(.llamar) || allowed.contains(.noSePresento) {
+            if absences.isPending(ticket.id) {
+                // D-3: nothing reached the server yet; «Deshacer» cancels it with no API call.
                 HStack(spacing: Spacing.m) {
-                    if allowed.contains(.llamar) { ClimesaButton(title: L.text("day.queue.callAgain"), kind: .secondary, loading: rowBusy) { Task { await call(ticket) } }.disabled(calling.busy) }
-                    if allowed.contains(.noSePresento) { ClimesaButton(title: QueueAction.noSePresento.label, kind: .secondary) { Task { await absent(ticket) } }.disabled(calling.busy) }
+                    Text(verbatim: DoctorDayActionRules.absencePending(ticket)).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Button(L.text("queue.undo")) { absences.undo(ticket.id) }.font(Typo.label).frame(minHeight: 44)
                 }
+                .padding(Spacing.m).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.soft, in: RoundedRectangle(cornerRadius: Radius.control))
+                .accessibilityElement(children: .combine)
+            } else {
+                rowActions(ticket, row: row, primary: primary)
             }
-            cardMenu(ticket)
-            if DoctorDayActionRules.calledElsewhere(ticket) {
-                // Another clinician called this number: it is theirs to attend (web `calledElsewhere`).
-                Text("day.queue.calledElsewhere").font(Typo.small).foregroundStyle(Theme.muted)
-            } else if account.can("consulta.iniciar") {
-                // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
-                NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
-                    .buttonStyle(ClimesaButtonStyle(kind: primary == .attend(ticket.id) ? .primary : .secondary))
-            }
+            WriteNotice(submission: row, reload: load)
         }
         .padding(.vertical, Spacing.s)
+    }
+
+    /// FILA-01: volver a llamar o "No se presentó" solo cuando el servidor lo permite. I-12: an action the server blocks is
+    /// hidden, its internal reason is not printed. B3 / I-15: the spinner and the lock are this number's only.
+    @ViewBuilder private func rowActions(_ ticket: QueueTicket, row: Submission, primary: DoctorDayAction?) -> some View {
+        let allowed = ticket.allowedActions ?? []
+        let undoable = account.can("fila.llamar") && DoctorDayActionRules.canUndo(ticket, calledHere: calledHere)
+        if allowed.contains(.llamar) || allowed.contains(.noSePresento) || undoable {
+            HStack(spacing: Spacing.m) {
+                if undoable { ClimesaButton(title: L.text("queue.undo"), kind: .secondary, loading: row.busy && row.busyId == "undo-\(ticket.id)") { Task { await undoCall(ticket) } }.disabled(row.busy) }
+                if allowed.contains(.llamar) { ClimesaButton(title: L.text("day.queue.callAgain"), kind: .secondary, loading: row.busy && row.busyId == ticket.id) { Task { await call(ticket) } }.disabled(row.busy) }
+                if allowed.contains(.noSePresento) { ClimesaButton(title: QueueAction.noSePresento.label, kind: .secondary) { Task { await absent(ticket) } }.disabled(row.busy) }
+            }
+        }
+        cardMenu(ticket, row: row, undoable: undoable)
+        if DoctorDayActionRules.calledElsewhere(ticket) {
+            // Another clinician called this number: it is theirs to attend (web `calledElsewhere`).
+            Text("day.queue.calledElsewhere").font(Typo.small).foregroundStyle(Theme.muted)
+        } else if account.can("consulta.iniciar") {
+            // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
+            NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
+                .buttonStyle(ClimesaButtonStyle(kind: primary == .attend(ticket.id) ? .primary : .secondary))
+                .disabled(row.busy)
+        }
     }
 
     @ViewBuilder private func nextCard(_ next: QueueNextProposal) -> some View {
@@ -192,10 +233,9 @@ struct DoctorDayView: View {
             } else {
                 Text("queue.next.none").font(Typo.body).foregroundStyle(Theme.ink)
             }
-            // I-31: the rule stays one tap away instead of a sentence under every proposal.
+            // I-31: the rule stays one tap away. B3: in the app's own words, never the server's raw `rule` text.
             DisclosureGroup {
-                Text(verbatim: String(format: L.text("queue.next.rule"), next.rule)).font(Typo.small).foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                NextRuleList()
             } label: { Text("queue.next.why").font(Typo.small).foregroundStyle(Theme.primaryText).frame(minHeight: 44) }
         }
         .padding(Spacing.m)
@@ -204,10 +244,11 @@ struct DoctorDayView: View {
     }
 
     /// Board moves without dragging: only the moves the server accepts now, plus the priority (S9).
-    @ViewBuilder private func cardMenu(_ ticket: QueueTicket) -> some View {
+    @ViewBuilder private func cardMenu(_ ticket: QueueTicket, row: Submission, undoable: Bool) -> some View {
         let moves = QueueBoardRules.destinations(ticket)
         let priorities = account.can("fila.gestionar") ? QueueBoardRules.priorityChoices(ticket) : []
-        let removeCall = account.can("fila.llamar") && QueueBoardRules.canRemoveCall(ticket)
+        // «Deshacer» on the row already removes one call; the menu does not repeat it.
+        let removeCall = !undoable && account.can("fila.llamar") && QueueBoardRules.canRemoveCall(ticket)
         if !moves.isEmpty || !priorities.isEmpty || removeCall {
             Menu {
                 if removeCall {
@@ -220,7 +261,7 @@ struct DoctorDayView: View {
                     Button(String(format: L.text("queue.priority.to"), QueueBoardRules.priorityLabel(value))) { Task { await setPriority(ticket, value) } }
                 }
             } label: { Text("queue.menu").frame(minHeight: 44).contentShape(Rectangle()) }
-            .disabled(calling.busy)
+            .disabled(row.busy)
             .accessibilityLabel(String(format: L.text("queue.menu.for"), QueueBoardRules.code(ticket)))
         }
     }
@@ -322,15 +363,18 @@ struct DoctorDayView: View {
             }
             if profile.hasPermission("fila.ver") {
                 day.tickets = try await Part<[QueueTicket]>.load { try await api.get("/fila", as: [QueueTicket].self) }
-                // Optional: a doctor who only sees their own queue gets 403 and simply no proposal.
-                day.next = try? await api.get("/fila/siguiente?service=consulta_general", as: QueueNextProposal.self)
+                // A doctor who only sees their own queue gets 403 and simply no proposal; any other failure is shown (B3).
+                day.next = try await Part<QueueNextProposal?>.load {
+                    do { return try await api.get("/fila/siguiente?service=consulta_general", as: QueueNextProposal.self) }
+                    catch let failure as APIFailure where failure.isForbidden { return nil }
+                }
             }
             if profile.hasPermission("resultados.ver") {
                 let orders = try await Part<[LabOrder]>.load { try await api.get("/laboratorio/ordenes", as: [LabOrder].self) }
                 switch orders {
-                case let .loaded(rows):
-                    day.pendingResults = .loaded(ReviewRules.pending(rows).count)
-                    day.criticalResults = ReviewRules.criticalToReview(rows)
+                case let .loaded(list):
+                    day.pendingResults = .loaded(ReviewRules.pending(list).count)
+                    day.criticalResults = ReviewRules.criticalToReview(list)
                 case let .failed(message):
                     day.pendingResults = .failed(message)
                 }
@@ -343,8 +387,10 @@ struct DoctorDayView: View {
             }
             return day
         }
-        // The undo line outlives neither the call nor the server's undo window.
-        if let last = undo, let tickets = loader.value?.tickets?.value, !DoctorDayActionRules.canUndoCall(last.id, tickets: tickets) { undo = nil }
+        // A number that is no longer called has nothing to undo.
+        if let tickets = loader.value?.tickets?.value {
+            calledHere = calledHere.filter { id in tickets.contains { $0.id == id && $0.state == .llamado } }
+        }
     }
 
     private func callNext() async {
@@ -354,61 +400,142 @@ struct DoctorDayView: View {
             called = try await account.client().send("POST", "/fila/llamar-siguiente", body: body, key: key, as: QueueCallNextResult.self)
         }
         if let called {
-            let code = "\(QueueBoardRules.area(of: .consultaGeneral)) \(called.number)"
-            calling.notice = QueueBoardRules.moveDone(code, .llamar)
-            undo = (called.id, called.version, code)
+            calling.notice = QueueBoardRules.moveDone("\(QueueBoardRules.area(of: .consultaGeneral)) \(called.number)", .llamar)
+            calledHere.insert(called.id)
         }
         await load()
     }
 
-    private func undoCall() async {
-        guard let last = undo else { return }
-        let body = VersionBody(version: last.version)
-        let ok = await calling.run(last.id, body: body, success: String(format: L.text("queue.undone"), last.code)) { key in
-            _ = try await account.client().send("POST", "/fila/\(last.id)/deshacer-llamado", body: body, key: key, as: QueueTransitionResult.self)
+    /// B3: each called number undoes its own call (`deshacer-llamado` at its current version); the others stay called.
+    private func undoCall(_ ticket: QueueTicket) async {
+        let body = VersionBody(version: ticket.version)
+        let ok = await rows[ticket.id].run("undo-\(ticket.id)", body: body, success: DoctorDayActionRules.undoDone(ticket)) { key in
+            _ = try await account.client().send("POST", "/fila/\(ticket.id)/deshacer-llamado", body: body, key: key, as: QueueTransitionResult.self)
         }
-        if ok { undo = nil }
+        if ok && ticket.calls <= 1 { calledHere.remove(ticket.id) }
         await load()
     }
 
     private func move(_ ticket: QueueTicket, _ move: QueueMove) async {
+        // D-3: "No se presentó" from the menu also waits 8 s with «Deshacer».
+        if move == .noSePresento { await absent(ticket); return }
         let body = VersionBody(version: ticket.version)
-        var result: QueueTransitionResult?
-        await calling.run(ticket.id, body: body, success: QueueBoardRules.moveDone(QueueBoardRules.code(ticket), move)) { key in
-            result = try await account.client().send("POST", QueueBoardRules.path(ticket, move), body: body, key: key, as: QueueTransitionResult.self)
+        let ok = await rows[ticket.id].run(ticket.id, body: body, success: QueueBoardRules.moveDone(QueueBoardRules.code(ticket), move)) { key in
+            _ = try await account.client().send("POST", QueueBoardRules.path(ticket, move), body: body, key: key, as: QueueTransitionResult.self)
         }
-        if move == .llamar, let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)) } else if result != nil { undo = nil }
+        if ok && move == .llamar { calledHere.insert(ticket.id) }
         await load()
     }
 
     private func setPriority(_ ticket: QueueTicket, _ priority: String) async {
         let body = QueuePriorityBody(version: ticket.version, priority: priority)
-        await calling.run(ticket.id, body: body, success: "\(QueueBoardRules.code(ticket)): \(QueueBoardRules.priorityLabel(priority))") { key in
+        await rows[ticket.id].run(ticket.id, body: body, success: "\(QueueBoardRules.code(ticket)): \(QueueBoardRules.priorityLabel(priority))") { key in
             _ = try await account.client().send("POST", "/fila/\(ticket.id)/prioridad", body: body, key: key, as: QueueTransitionResult.self)
         }
         await load()
     }
 
+    /// D-3: stored at the tap and sent after 8 s unless «Deshacer»; the row says so in place.
     private func absent(_ ticket: QueueTicket) async {
-        let body = VersionBody(version: ticket.version)
-        await calling.run(ticket.id, body: body, success: QueueBoardRules.moveDone(QueueBoardRules.code(ticket), .noSePresento)) { key in
-            _ = try await account.client().send("POST", "/fila/\(ticket.id)/no-se-presento", body: body, key: key, as: QueueTransitionResult.self)
-        }
-        await load()
+        rows[ticket.id].clearFailure()
+        await absences.start(ticket)
     }
 
     private func call(_ ticket: QueueTicket) async {
         let body = VersionBody(version: ticket.version)
-        var result: QueueCallResult?
-        await calling.run(ticket.id, body: body, success: QueueBoardRules.moveDone(QueueBoardRules.code(ticket), .llamar)) { key in
-            result = try await account.client().send("POST", "/fila/\(ticket.id)/llamar", body: body, key: key, as: QueueCallResult.self)
+        let ok = await rows[ticket.id].run(ticket.id, body: body, success: QueueBoardRules.moveDone(QueueBoardRules.code(ticket), .llamar)) { key in
+            _ = try await account.client().send("POST", "/fila/\(ticket.id)/llamar", body: body, key: key, as: QueueCallResult.self)
         }
-        if let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)) }
+        if ok { calledHere.insert(ticket.id) }
         await load()
     }
 }
 
-/// Pestaña Pacientes: buscar y abrir el expediente (I22). I-27: busca mientras se escribe (con una pausa breve tras la
+/// RN-FILA-SIGUIENTE, one numbered step per line, in the app's words.
+struct NextRuleList: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            ForEach(NextRuleText.lines, id: \.self) { line in
+                Text(verbatim: line).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// D-3 on Mi día: "No se presentó" waits 8 s with «Deshacer» before it is sent (no inverse endpoint, gap B-8). Each one
+/// is stored per account at the tap (`DraftStore`), so a closed app or a lost signal never loses it; `DeferredQueue`
+/// replays it exactly, drops a definitive 4xx with one notice, and rebases a `version_conflicto` once.
+@MainActor @Observable
+final class DeferredAbsences {
+    static let storeKey = "fila-no-se-presento"
+
+    private(set) var pending: [DeferredRequest] = []
+    private(set) var failed: [DeferredRequest] = []
+    /// "CON 7 marcado como no se presentó" once the server accepted it.
+    private(set) var lastSent: String?
+    /// A request dropped for good or expired, said once.
+    private(set) var report: String?
+    @ObservationIgnored private var queue: DeferredQueue?
+    @ObservationIgnored private var user: String?
+
+    nonisolated init() {}
+
+    func isPending(_ ticketId: String) -> Bool { pending.contains { $0.subject == ticketId } }
+
+    func bind(user: String, account: AccountModel, reload: @escaping @MainActor () async -> Void) async {
+        guard self.user != user || queue == nil else { await queue?.resume(); return }
+        self.user = user
+        let store = DraftStore.shared, key = Self.storeKey
+        let queue = DeferredQueue(
+            stored: store.load([DeferredRequest].self, user: user, key: key) ?? [],
+            save: { items in
+                if items.isEmpty { store.clear(user: user, key: key) } else { _ = store.save(items, user: user, key: key) }
+            },
+            send: { item in try await account.client().sendRaw("POST", item.path, body: item.body, key: item.id) },
+            rebase: { item in
+                // 409: the number changed; read it again and send its current version under a new key, if it still applies.
+                let tickets = try await account.client().get("/fila", as: [QueueTicket].self)
+                let ticket = tickets.first { $0.id == item.subject }
+                guard DoctorDayActionRules.absenceStillApplies(ticket), let ticket else { return nil }
+                return try JSONBody.encode(VersionBody(version: ticket.version))
+            })
+        queue.onChange = { [weak self, weak queue] in
+            guard let self, let queue else { return }
+            self.pending = queue.pending
+            self.failed = queue.failed
+        }
+        queue.onSent = { [weak self] item in
+            self?.lastSent = QueueBoardRules.moveDone(item.label, .noSePresento)
+            Task { await reload() }
+        }
+        queue.onReport = { [weak self] message in self?.report = message }
+        self.queue = queue
+        await queue.resume()
+    }
+
+    func start(_ ticket: QueueTicket) async {
+        lastSent = nil; report = nil
+        guard let queue, let body = try? JSONBody.encode(VersionBody(version: ticket.version)) else {
+            report = "\(QueueBoardRules.code(ticket)): no se pudo guardar la acción. Vuelve a intentar."
+            return
+        }
+        await queue.start(subject: ticket.id, label: QueueBoardRules.code(ticket), path: QueueBoardRules.path(ticket, .noSePresento), body: body)
+    }
+
+    func undo(_ ticketId: String) {
+        if queue?.undo(ticketId) == true { lastSent = nil }
+    }
+
+    func retry() async {
+        report = nil
+        await queue?.resume()
+    }
+
+    func discard(_ id: String) { queue?.discard(id) }
+}
+
+// Pestaña Pacientes: buscar y abrir el expediente (I22). I-27: busca mientras se escribe (con una pausa breve tras la
 /// última tecla), sin botón ni frases de ayuda; la nota de privacidad va solo en el estado vacío.
 struct DoctorPatientsView: View {
     @EnvironmentObject private var account: AccountModel
@@ -475,7 +602,7 @@ struct ResultsReviewView: View {
                 if let message = followUps?.error {
                     SectionCard(title: L.text("results.followUp.title")) { PartError(message: message, retry: loadFollowUps) }
                 } else if let items = followUps?.value {
-                    LabFollowUpInbox(items: items, submission: followUpSubmission, review: review)
+                    LabFollowUpInbox(items: items, orders: orders, submission: followUpSubmission, review: review, reload: load)
                 }
             }
             // I-32: critical results are tagged on their row (critical first); no extra banner repeating the count.
@@ -528,8 +655,11 @@ struct ResultsReviewView: View {
 /// S10 · «Resultados por revisar»: críticos primero (rojo solo para el valor crítico); cada uno se marca revisado.
 private struct LabFollowUpInbox: View {
     let items: [LabFollowUp]
+    /// The doctor's orders, so a row opens its order (C1: the values and «Revisar y liberar» are one tap away).
+    let orders: [LabOrder]
     let submission: Submission
     let review: (LabFollowUp) async -> Void
+    let reload: () async -> Void
 
     var body: some View {
         SectionCard(title: L.text("results.followUp.title")) {
@@ -545,11 +675,15 @@ private struct LabFollowUpInbox: View {
                     }
                     if let record = item.patientRecord { Text(verbatim: String(format: L.text("results.followUp.record"), record)).font(Typo.small).foregroundStyle(Theme.muted) }
                     Text(verbatim: item.detail).font(Typo.small).foregroundStyle(Theme.ink)
+                    if let order = orders.first(where: { $0.id == item.orderId }) {
+                        NavigationLink { ReviewDetailView(order: order, reload: reload) } label: { Text("results.followUp.open") }
+                            .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+                    }
                     ClimesaButton(title: L.text("results.followUp.review"), kind: .secondary, loading: submission.busyId == item.id) { Task { await review(item) } }
                         .disabled(submission.busy)
                 }
             }
-            WriteNotice(submission: submission, reload: {})
+            WriteNotice(submission: submission, reload: reload)
         }
     }
 }
@@ -565,6 +699,10 @@ private struct ReviewDetailView: View {
     @State private var cancelled = false
     @State private var sendingExternal = false
     @State private var externalSubmission = Submission()
+    /// #12 / §4.7: releasing results to the patient is clinical and cannot be undone, so it asks first with a summary.
+    @State private var confirmingRelease = false
+    /// Set once the API accepted the release: the result stays on this screen instead of closing it in silence.
+    @State private var released: String?
 
     var body: some View {
         ScreenFrame(title: "results.detail") {
@@ -577,15 +715,24 @@ private struct ReviewDetailView: View {
             // T07c: the external report's photo or PDF, opened through a 5-minute signed link (same rule as the web).
             if order.external && order.state == .completado { LabAttachmentsSection(order: order) }
             WriteNotice(submission: submission, reload: reload)
-            // Los botones salen de `allowedActions` de la API para este médico, nunca del rol ni del estado.
-            if order.allows(.revisar) {
-                ClimesaButton(title: L.text("results.markReviewed"), loading: submission.busy) { Task { await review() } }
-            }
-            if order.allowsExternal(.enviarExterno) {
-                ClimesaButton(title: L.text("results.external.send"), kind: .secondary) { sendingExternal = true }
-            }
-            if order.allows(.cancelar) {
-                ClimesaButton(title: L.text("results.cancel"), kind: .secondary) { cancelling = true }
+            if let released {
+                PatientNotice(text: released)
+            } else {
+                // Los botones salen de `allowedActions` de la API para este médico, nunca del rol ni del estado.
+                if order.allows(.revisar) {
+                    ClimesaButton(title: L.text("results.release"), loading: submission.busy) { confirmingRelease = true }
+                        .confirmationDialog(L.text("results.release.confirm"), isPresented: $confirmingRelease, titleVisibility: .visible) {
+                            Button(L.text("results.release")) { Task { await review() } }
+                        } message: {
+                            Text(verbatim: ReleaseRules.summary(order))
+                        }
+                }
+                if order.allowsExternal(.enviarExterno) {
+                    ClimesaButton(title: L.text("results.external.send"), kind: .secondary) { sendingExternal = true }
+                }
+                if order.allows(.cancelar) {
+                    ClimesaButton(title: L.text("results.cancel"), kind: .secondary) { cancelling = true }
+                }
             }
             if account.can("expediente.ver") {
                 NavigationLink {
@@ -607,8 +754,8 @@ private struct ReviewDetailView: View {
         let ok = await submission.run(order.id, body: body) { key in
             _ = try await account.client().send("POST", "/laboratorio/ordenes/\(order.id)/revisar", body: body, key: key, as: LabReviewResult.self)
         }
+        if ok { released = ReleaseRules.done(order) }
         await reload()
-        if ok { dismiss() }
     }
 }
 
@@ -794,10 +941,22 @@ private struct DischargeView: View {
     @State private var pending: [PendingLine] = []
     @State private var errors: [String: String] = [:]
     @State private var confirming = false
+    /// G3: the signature stays visible where it was made ("Alta firmada · Recepción registrará la salida").
+    @State private var signed = false
 
     var body: some View {
         ScreenFrame(title: "hospitalized.discharge") {
             Text(verbatim: admission.patientName ?? L.text("day.patient.unknown")).font(Typo.heading).foregroundStyle(Theme.ink)
+            if signed {
+                PatientNotice(text: DischargeConfirmRules.signedNotice)
+                ClimesaButton(title: L.text("discharge.done.back"), kind: .secondary) { dismiss() }
+            } else {
+                form
+            }
+        }
+    }
+
+    @ViewBuilder private var form: some View {
             SectionCard {
                 VStack(alignment: .leading, spacing: Spacing.s) {
                     Text("discharge.type").font(Typo.label).foregroundStyle(Theme.ink)
@@ -850,9 +1009,9 @@ private struct DischargeView: View {
             .confirmationDialog(L.text("discharge.sign.confirm"), isPresented: $confirming, titleVisibility: .visible) {
                 Button(L.text("discharge.sign")) { Task { await sign() } }
             } message: {
-                Text(verbatim: DischargeConfirmRules.signSummary(type: type, pendingCount: lines.count))
+                // §4.7: who, what type, the pending items and the summary, before the signature.
+                Text(verbatim: DischargeConfirmRules.signRecap(patient: admission.patientName, type: type, pendingCount: lines.count, summary: summary))
             }
-        }
     }
 
     private var lines: [DischargePendingBody] {
@@ -868,8 +1027,8 @@ private struct DischargeView: View {
         let ok = await submission.run(admission.id, body: body) { key in
             _ = try await account.client().send("POST", "/admisiones/\(admission.id)/alta", body: body, key: key, as: AdmissionCommandResult.self)
         }
+        if ok { signed = true }
         await reload()
-        if ok { dismiss() }
     }
 }
 

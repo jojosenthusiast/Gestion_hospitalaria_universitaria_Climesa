@@ -1,6 +1,72 @@
 {
   "sourceLanguage": "es",
   "strings": {
+    "results.followUp.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver valores"
+          }
+        }
+      }
+    },
+    "results.release": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revisar y liberar"
+          }
+        }
+      }
+    },
+    "results.release.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Liberar los resultados al paciente?"
+          }
+        }
+      }
+    },
+    "discharge.done.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver a hospitalizados"
+          }
+        }
+      }
+    },
+    "day.queue.absent.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: no se envió «No se presentó». %@"
+          }
+        }
+      }
+    },
+    "day.queue.absent.discard": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descartar"
+          }
+        }
+      }
+    },
     "ds.paciente.queue.number": {
       "extractionState": "manual",
       "localizations": {
