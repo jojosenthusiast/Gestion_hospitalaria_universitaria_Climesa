@@ -25,10 +25,22 @@ describe('familias de estado corregidas (R1, WC-9, WC-10, WC-11)', () => {
     expect(statusFamily('limpieza')).toBe('atencion');
   });
 
-  it('bajo mínimo es urgente (ámbar), no un estado de llamado', () => {
-    expect(statusFamily('bajo_minimo')).toBeNull();
-    expect(statusPriority('bajo_minimo')).toBe('urgente');
-    expect(badge('bajo_minimo').className).toContain('priority-urgente');
+  // Cross-platform mapping (web, iOS, Android): stock below the minimum waits for a restock.
+  it('bajo mínimo espera reposición: reloj, no megáfono', () => {
+    expect(statusFamily('bajo_minimo')).toBe('espera');
+    expect(statusPriority('bajo_minimo')).toBeNull();
+    expect(badge('bajo_minimo').className).toContain('fam-espera');
+  });
+
+  it('llamado y en proceso son los únicos valores de la familia llamado', () => {
+    expect(statusFamily('llamado')).toBe('llamado');
+    expect(statusFamily('en_proceso')).toBe('llamado');
+  });
+
+  it('una métrica que requiere atención es un estado de atención', () => {
+    expect(statusFamily('requiere_atencion')).toBe('atencion');
+    render(<StatusBadge value="requiere_atencion" />);
+    expect(screen.getByText('Requiere atención').closest('.status-badge')!.className).toContain('fam-atencion');
   });
 
   it('un valor de laboratorio alto es urgente, con ícono y etiqueta', () => {

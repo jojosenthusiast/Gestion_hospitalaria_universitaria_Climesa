@@ -29,9 +29,9 @@ El estado lleva siempre **ícono + etiqueta + patrón**. El color acompaña, nun
 
 | Familia | Patrón | Ícono | Valores de la API que la usan |
 |---|---|---|---|
-| En espera | rayado diagonal | reloj | `en_espera`, `solicitada`, `pendiente`, `pendiente_cama`, `borrador`, `publicado`, `reservada`, `provisional`, `por_vencer`, `revisar`, `confirmada`, `reprogramada` |
+| En espera | rayado diagonal | reloj | `en_espera`, `solicitada`, `pendiente`, `pendiente_cama`, `borrador`, `publicado`, `reservada`, `provisional`, `por_vencer`, `revisar`, `confirmada`, `reprogramada`, `bajo_minimo` |
 | Llamado o en proceso | punteado | megáfono | `llamado`, `en_proceso` |
-| En atención o en uso | sólido | pulso | `en_atencion`, `en_curso`, `ocupada`, `hospitalizado`, `en_servicio`, `abierta`, `limpieza` |
+| En atención o en uso | sólido | pulso | `en_atencion`, `en_curso`, `ocupada`, `hospitalizado`, `en_servicio`, `abierta`, `limpieza`, `requiere_atencion` |
 | Terminado o disponible | contorno | check | `atendida`, `atendido`, `completado`, `firmada`, `alta_firmada`, `egresado`, `libre`, `disponible`, `activo`, `exito`, `normal`, `aprobada`, `ok`, `coincide` |
 | Cancelado o fuera de servicio | contorno discontinuo | cruz | `cancelado(a)`, `no_asistio`, `no_se_presento`, `cerrado`, `rechazada`, `vencida`, `vencido`, `bloqueada`, `inactivo`, `desactivado`, `denegado`, `fallido`, `en_mantenimiento` |
 | Crítico | borde doble | alerta | `critico_alto`, `critico_bajo` |
@@ -39,10 +39,11 @@ El estado lleva siempre **ícono + etiqueta + patrón**. El color acompaña, nun
 Existencias (`agotado`, `bajo_minimo`, `por_vencer`, `ok`) y verificación de vinculación (`coincide`, `revisar`) usan la
 misma tabla que Android; nunca rojo.
 
-**Valores que piden atención (R1, 2026-11-16).** `alto`, `bajo` (laboratorio fuera de rango, no crítico), `bajo_minimo`,
+**Valores que piden atención (R1, 2026-11-16).** `alto`, `bajo` (laboratorio fuera de rango, no crítico),
 `agotado` y `vencido` (existencias) no son un paso de un flujo: se muestran con la prioridad **urgente** (ámbar, doble
 flecha arriba) dentro del mismo `StatusBadge`. Una cita `confirmada` o `reprogramada` espera su hora (reloj, no
-megáfono) y una cama en `limpieza` está en uso. Solo `sin_rango` queda neutro, con un punto y su texto. Android e iOS
+megáfono), igual que `bajo_minimo` (espera reposición); una cama en `limpieza` está en uso y una métrica que
+`requiere_atencion` es atención. La familia llamado queda solo para `llamado` y `en_proceso` (misma tabla en web, iOS y Android). Solo `sin_rango` queda neutro, con un punto y su texto. Android e iOS
 deben copiar esta tabla (pendiente en R2/R3).
 Componente web: `StatusBadge` (el `Tag` de siempre ahora lo usa, así que todas las vistas lo heredan).
 

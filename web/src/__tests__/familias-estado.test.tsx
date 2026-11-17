@@ -9,10 +9,10 @@ import { StatusChip } from '../features/inventory/parts';
 afterEach(cleanup);
 
 describe('familias de estado de existencias y de verificación (S13)', () => {
-  // R1: agotado and bajo_minimo moved to urgent priority (amber): they ask for action, they are not a flow step.
+  // R1: agotado moved to urgent priority (amber); bajo_minimo waits for a restock (shared web/iOS/Android mapping).
   it('asigna cada estado de existencias a su familia, sin rojo', () => {
     expect(statusPriority('agotado')).toBe('urgente');
-    expect(statusPriority('bajo_minimo')).toBe('urgente');
+    expect(statusFamily('bajo_minimo')).toBe('espera');
     expect(statusFamily('por_vencer')).toBe('espera');
     expect(statusFamily('ok')).toBe('listo');
   });
@@ -51,7 +51,7 @@ describe('prioridad de ambulancia y lista de atención (S13)', () => {
       { id: '1', title: 'Guantes', tone: 'warn', href: '#/inventario', action: 'Ver', tag: 'Bajo mínimo', status: 'bajo_minimo' },
       { id: '2', title: 'Caída en casa', tone: 'urgent', href: '#/ambulancia', action: 'Despachar', tag: 'Ambulancia', area: 'AMB' },
     ]} />);
-    expect(screen.getByText('Bajo mínimo').closest('.status-badge')!.className).toContain('priority-urgente');
+    expect(screen.getByText('Bajo mínimo').closest('.status-badge')!.className).toContain('fam-espera');
     expect(document.querySelector('.attention-tag')).toBeNull();
     expect(screen.getByText('AMB')).toBeTruthy();
   });

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Field, Icon, Notice } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
+import { ActionButton } from '../components/system';
 import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
 import { addDays, dayKey, dayLabel, groupAgenda, minutesBetween, timeRange, weekOf } from './listas/schedule';
 import './listas/lists.css';
@@ -143,7 +144,7 @@ function AppointmentForm({ api, version, onClose, onSaved }: { api: Api; version
 
 const isDialogued = (name: AppointmentAction): name is Dialogued => name === 'rechazar' || name === 'cancelar' || name === 'reprogramar' || name === 'rechazar_reprogramacion';
 
-/** CITA-04: buttons come from the server's `allowedActions`; blocked ones are shown disabled with their reason. */
+/** CITA-04, R1: buttons come from the server's `allowedActions`; a blocked action is not drawn and its reason is not body text. */
 function AppointmentRowActions({ row, busy, onDirect, onDialog }: { row: Appointment; busy: boolean; onDirect: (name: AppointmentAction) => void; onDialog: (name: Dialogued) => void }) {
   const allowed = row.allowedActions ?? [], blocked = row.blockedActions ?? [];
   const pending = row.reschedule?.state === 'pendiente' ? row.reschedule : null;
@@ -151,10 +152,7 @@ function AppointmentRowActions({ row, busy, onDirect, onDialog }: { row: Appoint
     {pending && <small className="form-hint">Pide cambiar a {formatDateTime(pending.start)}{pending.reason ? ` · ${pending.reason}` : ''}</small>}
     {row.reschedule?.state === 'rechazada' && <small className="form-hint">Reprogramación rechazada: {row.reschedule.rejectionReason}</small>}
     {row.state === 'reprogramada' && <small className="form-hint">Se movió a otra franja.</small>}
-    {ROW_ACTIONS.map(name => allowed.includes(name)
-      ? <button key={name} className="row-action" disabled={busy} aria-label={`${ACTION_LABEL[name]} · ${row.patientName}`} onClick={() => isDialogued(name) ? onDialog(name) : onDirect(name)}>{ACTION_LABEL[name]}</button>
-      : null)}
-    {blocked.filter(item => ROW_ACTIONS.includes(item.action)).map(item => <small key={item.action} className="form-hint" title={item.reason}>{ACTION_LABEL[item.action]}: {item.reason}</small>)}
+    {ROW_ACTIONS.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} disabled={busy} aria-label={`${ACTION_LABEL[name]} · ${row.patientName}`} onClick={() => isDialogued(name) ? onDialog(name) : onDirect(name)}>{ACTION_LABEL[name]}</ActionButton>)}
   </div>;
 }
 

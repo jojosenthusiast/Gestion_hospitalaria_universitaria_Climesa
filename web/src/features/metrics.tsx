@@ -34,7 +34,7 @@ const presets = [{ days: 7, label: 'Últimos 7 días' }, { days: 14, label: 'Úl
 const readTone = (value: number | null, spec: Indicator): Tone | 'neutral' => value == null ? 'neutral' : value >= spec.danger ? 'urgent' : value >= spec.warn ? 'warn' : 'ok';
 const toneWord = { ok: 'Dentro de lo esperado', warn: 'Requiere atención', urgent: 'Fuera de la referencia', neutral: 'Sin datos' } as const;
 /** S13, R1: the reading uses the shared families. These are operating references, not clinical values: never red. */
-const toneStatus = { ok: 'normal', warn: 'revisar', urgent: 'alto', neutral: 'sin_rango' } as const;
+const toneStatus = { ok: 'normal', warn: 'requiere_atencion', urgent: 'alto', neutral: 'sin_rango' } as const;
 const toneKey = (tone: Tone | 'neutral') => (tone === 'ok' || tone === 'warn' || tone === 'urgent' ? tone : 'neutral');
 const stats = (series: IndicatorSeries) => {
   const values = series.serie.map(p => p.valor).filter((v): v is number => v != null);

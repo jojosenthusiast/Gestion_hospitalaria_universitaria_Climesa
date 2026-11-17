@@ -66,6 +66,12 @@
 .row-action { min-height: 42px; padding: 8px 4px; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--primary-text); font-size: 14px; font-weight: 700; line-height: 1.4; text-decoration: none; cursor: pointer; transition: background var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-instant) ease; }
 .row-action:hover { background: var(--soft); text-decoration: none; }
 .row-action:active { transform: translateY(1px); }
+/* R1: acción bloqueada que conviene ver: desactivada pero enfocable; el motivo aparece al pasar o enfocar. */
+.action-blocked { position: relative; display: inline-flex; }
+.action-blocked > [aria-disabled="true"] { color: var(--muted); cursor: not-allowed; }
+.action-blocked > [aria-disabled="true"]:hover { background: transparent; }
+.action-tooltip { position: absolute; z-index: 25; bottom: calc(100% + var(--space-1)); left: 0; width: max-content; max-width: 260px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); background: var(--ink); color: var(--surface); font-size: var(--text-sm); font-weight: 600; line-height: 1.4; box-shadow: var(--shadow-soft); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--motion-fast) var(--ease-out), visibility var(--motion-fast); }
+.action-blocked:hover > .action-tooltip, .action-blocked:focus-within > .action-tooltip { opacity: 1; visibility: visible; }
 .row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .row-actions > .row-action { white-space: nowrap; }
 
