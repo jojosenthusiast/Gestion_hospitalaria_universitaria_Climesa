@@ -12,7 +12,9 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.data.ApiProblems
 import sv.edu.catolica.climesa.data.SubmissionIntent
+import sv.edu.catolica.climesa.domain.AppointmentReasons
 import sv.edu.catolica.climesa.domain.AppointmentAction
 import sv.edu.catolica.climesa.domain.AppointmentActions
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
@@ -122,25 +124,46 @@ class PatientAppointmentsViewModel @Inject constructor(
     }
 
     /** Cancels through one [SubmissionIntent]; the API decides whether the deadline (`cancelableUntil`) still allows it. */
-    fun cancel(appointment: PatientAppointment, reason: String) {
-        if (AppointmentActions.reasonError(AppointmentAction.CANCEL, reason) != null) {
-            mutable.value = mutable.value.copy(error = "Escribe un motivo de al menos ${AppointmentActions.REASON_MIN} caracteres.")
-            return
+    fun cancel(appointment: PatientAppointment, reason: String, other: Boolean = false) {
+        // D-8: a quick reason needs no typing; "Otro" asks for a short text; free text without a code keeps the old 10-character rule.
+        val code = AppointmentReasons.patientCancelCode(reason, other)
+        val error = when {
+            other && reason.trim().length < AppointmentReasons.OTHER_MIN -> "Escribe brevemente el motivo (al menos ${AppointmentReasons.OTHER_MIN} caracteres)."
+            code == null && AppointmentActions.reasonError(AppointmentAction.CANCEL, reason) != null -> legacyReasonError
+            else -> null
         }
+        if (error != null) { mutable.value = mutable.value.copy(error = error); return }
         if (mutable.value.saving) return
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        val path = AppointmentActions.path(AppointmentAction.CANCEL, appointment.id)
         viewModelScope.launch {
             try {
-                cancelIntent.send { api.request(AppointmentActions.path(AppointmentAction.CANCEL, appointment.id), "POST", PatientAppointmentRules.cancelBody(appointment, reason)) }
+                try {
+                    cancelIntent.send { api.request(path, "POST", PatientAppointmentRules.cancelBody(appointment, reason, code)) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // A server released before D-8 rejects the unknown `reasonCode` field; it still takes the released body. That
+                    // body differs, so it goes under a new key, and only when the text meets the old 10-character rule.
+                    if (code == null || !ApiProblems.fieldErrors(e).containsKey("reasonCode")) throw e
+                    // The coded body got a definitive answer; the next attempt is another body, so it never reuses that key.
+                    cancelIntent.reset()
+                    if (AppointmentActions.reasonError(AppointmentAction.CANCEL, reason) != null) throw LegacyReasonTooShort(legacyReasonError)
+                    cancelIntent.send { api.request(path, "POST", PatientAppointmentRules.cancelBody(appointment, reason)) }
+                }
                 mutable.value = mutable.value.copy(saving = false, notice = "Cita cancelada.")
                 load()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                mutable.value = mutable.value.copy(saving = false, error = message(e))
+                mutable.value = mutable.value.copy(saving = false, error = if (e is LegacyReasonTooShort) e.message else message(e))
             }
         }
     }
+
+    private class LegacyReasonTooShort(message: String) : Exception(message)
+    private companion object { const val DOCTORS_UNAVAILABLE = "No se pudo cargar la lista de médicos. Vuelve a intentar." }
+    private val legacyReasonError = "Escribe un motivo de al menos ${AppointmentActions.REASON_MIN} caracteres."
 
     /** Opens the reschedule dialog on the day of the appointment (or today) with the same doctor's slots. */
     fun openReschedule(appointment: PatientAppointment) {
@@ -217,7 +240,8 @@ class PatientAppointmentsViewModel @Inject constructor(
             val days = (0L until 7L).map { from.plusDays(it) }
             val lists = days.mapNotNull { day -> try { parseDoctors(api.request("/citas/catalogos?date=$day")) } catch (e: CancellationException) { throw e } catch (_: Exception) { null } }
             val merged = lists.flatten().groupBy { it.id }.map { (_, same) -> same.firstOrNull { it.hasShift }?.copy(reason = null) ?: same.first() }
-            mutable.value = mutable.value.copy(requestDoctors = merged.ifEmpty { mutable.value.doctors })
+            // A day that fails is left out; when every day fails the form says so instead of an empty "Ya tengo médico".
+            mutable.value = mutable.value.copy(requestDoctors = merged.ifEmpty { mutable.value.doctors }, error = if (lists.isEmpty()) DOCTORS_UNAVAILABLE else mutable.value.error)
         }
     }
 

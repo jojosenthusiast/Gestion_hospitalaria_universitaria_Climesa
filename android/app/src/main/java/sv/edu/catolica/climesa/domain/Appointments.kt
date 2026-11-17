@@ -76,7 +76,9 @@ object PatientAppointmentRules {
     fun rescheduleBody(appointment: PatientAppointment, slot: AppointmentSlot): JSONObject =
         JSONObject().put("version", appointment.version).put("start", slot.start).put("end", slot.end)
 
-    fun cancelBody(appointment: PatientAppointment, reason: String): JSONObject = JSONObject().put("version", appointment.version).put("reason", reason.trim())
+    /** The released body is `{version, reason}`; D-8 adds `reasonCode` only when the patient picked a quick reason or "Otro". */
+    fun cancelBody(appointment: PatientAppointment, reason: String, reasonCode: String? = null): JSONObject =
+        JSONObject().put("version", appointment.version).put("reason", reason.trim()).apply { if (reasonCode != null) put("reasonCode", reasonCode) }
 
     fun requestBody(doctorId: String, slot: AppointmentSlot, reason: String): JSONObject = JSONObject()
         .put("doctorId", doctorId).put("start", slot.start).put("end", slot.end)

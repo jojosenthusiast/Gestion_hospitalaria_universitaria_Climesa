@@ -202,20 +202,20 @@ private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boole
     ConfirmDialog(
         title = "Cancelar cita",
         confirmLabel = "Confirmar",
-        onConfirm = { model.cancel(appointment, reason) },
+        onConfirm = { model.cancel(appointment, reason, other) },
         onDismiss = onClose,
         error = error,
         onDone = onClose,
         message = "${appointment.doctorName} · ${formatAppointmentDateTime(appointment.start)}",
         destructive = true,
         busy = busy,
-        confirmEnabled = reason.trim().length >= AppointmentActions.REASON_MIN,
+        confirmEnabled = if (other) reason.trim().length >= AppointmentReasons.OTHER_MIN else reason in AppointmentReasons.patientCancel,
         body = {
             ReasonChips(AppointmentReasons.patientCancel, if (other) AppointmentReasons.OTHER else reason.takeIf { it in AppointmentReasons.patientCancel }, { picked ->
                 other = picked == AppointmentReasons.OTHER
                 reason = if (other) "" else picked
             }, enabled = !busy, other = AppointmentReasons.OTHER)
-            if (other) FormField("Motivo", reason, { reason = it.take(AppointmentActions.REASON_MAX) }, singleLine = false, hint = AppointmentActions.counter(reason))
+            if (other) FormField("Motivo", reason, { reason = it.take(AppointmentActions.REASON_MAX) }, singleLine = false, hint = stringResource(R.string.u5_otro_minimo))
         },
     )
 }
