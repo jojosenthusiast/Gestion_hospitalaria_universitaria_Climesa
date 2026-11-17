@@ -141,12 +141,13 @@ describe('W28 · bandeja de solicitudes por asignar (Recepción)', () => {
 });
 
 describe('inicio de Recepción · solicitudes por asignar', () => {
-  it('aparecen en "Requiere tu atención" con su motivo y la acción Asignar', async () => {
+  // R4a: the tray group «Solicitudes de cita» holds them (one count with the asked appointments, S8).
+  it('aparecen en «Solicitudes de cita» con su motivo y la acción Asignar', async () => {
     const api = { request: vi.fn(async (path: string) => path === '/citas/solicitudes-categoria' ? [pending] : path === '/inicio' ? { beds: null, patients: null } : []), write: vi.fn() };
     render(<Dashboard api={api as unknown as Api} profile={rec()} version={0} />);
-    const attention = await screen.findByRole('region', { name: 'Requiere tu atención' });
+    const attention = await screen.findByRole('region', { name: 'Solicitudes de cita' });
     expect(await within(attention).findByText('Paciente Ficticio Uno')).toBeTruthy();
-    expect(within(attention).getByText(/Pide cita por piel: Mancha en el brazo/)).toBeTruthy();
+    expect(within(attention).getByText(/Piel · Mancha en el brazo/)).toBeTruthy();
     expect(within(attention).getByRole('link', { name: /Asignar/ }).getAttribute('href')).toBe('#/citas');
   });
 });

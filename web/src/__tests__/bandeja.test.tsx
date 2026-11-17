@@ -1,44 +1,39 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AccessProfile, Api } from '../lib/api';
-import { WorkInbox } from '../features/inbox';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { PendingTray, TrayGroup } from '../features/dashboards/parts';
+import { appointmentRequestCount } from '../features/listas/requests';
 
-// W04 «Inicio de trabajo» (FR-113-04): pendientes por permiso, con contadores de los listados existentes.
+// W04 «Inicio de trabajo», R4a: the old row of counters (`WorkInbox`, glued links «5Vinculaciones→6Solicitudes…»)
+// became the ONE pending tray of Inicio. These tests replace the counter tests: the tray groups own the counts.
 afterEach(cleanup);
+const remote = <T,>(data: T) => ({ data, loading: false, error: null, refresh: () => undefined });
+const row = (id: string, title: string) => ({ id, title, tone: 'warn' as const, href: '#/citas', action: 'Confirmar' });
 
-const perfil = (permissions: string[]): AccessProfile => ({ id: 'u-1', user: { id: 'u-1' }, email: 'rec@example.test', name: 'Cuenta Ficticia', roles: ['REC'], platforms: ['web'], permissions: permissions.map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId: null });
-const respuestas: Record<string, unknown> = {
-  '/cuentas/vinculaciones': [{ id: 'v-1' }, { id: 'v-2' }],
-  '/citas': [{ id: 'c-1', state: 'solicitada' }, { id: 'c-2', state: 'confirmada' }],
-  '/ambulancia': { unit: { id: 'a', plate: 'P-0', state: 'disponible', version: 1 }, activeService: null, paramedicOnDuty: true, pendingRequests: [{ id: 'r-1' }] },
-  '/admisiones': [{ state: 'pendiente_cama' }, { state: 'hospitalizado' }, { state: 'pendiente_cama' }],
-  '/laboratorio/ordenes': [{ state: 'pendiente' }, { state: 'completado' }],
-};
-const montar = (permissions: string[]) => {
-  const api = { request: vi.fn(async (path: string) => respuestas[path]), write: vi.fn() } as unknown as Api & { request: ReturnType<typeof vi.fn> };
-  render(<WorkInbox api={api} profile={perfil(permissions)} version={0} />);
-  return api;
-};
-const contador = async (label: string) => (await screen.findByText(label)).closest('a')!;
-
-describe('bandeja de inicio de trabajo (W04)', () => {
-  it('Recepción ve vinculaciones, solicitudes de cita y ambulancia, y admisiones sin cama', async () => {
-    montar(['cuentas.verificar', 'citas.agendar', 'ambulancia.ver_estado', 'admision.ver']);
-    expect((await contador('Vinculaciones por verificar')).textContent).toMatch(/^2/);
-    expect((await contador('Solicitudes de cita')).textContent).toMatch(/^1/);
-    expect((await contador('Solicitudes de ambulancia por confirmar')).getAttribute('href')).toBe('#/ambulancia');
-    await vi.waitFor(async () => expect((await contador('Admisiones sin cama')).textContent).toMatch(/^2/));
-    expect(screen.queryByText(/laboratorio/)).toBeNull();
+describe('bandeja de pendientes (W04, R4a)', () => {
+  it('cuenta las solicitudes de cita igual en Inicio y en Citas: solicitadas + por motivo pendientes (S8)', () => {
+    expect(appointmentRequestCount([{ state: 'solicitada' }, { state: 'confirmada' }, { state: 'solicitada' }], [{ state: 'pendiente' }, { state: 'asignada' }])).toBe(3);
   });
 
-  it('Laboratorio ve su cola', async () => {
-    montar(['laboratorio.ver_cola']);
-    await vi.waitFor(async () => expect((await contador('Órdenes de laboratorio en cola')).textContent).toMatch(/^1/));
+  it('un grupo muestra su cuenta una vez y oculta lo que no tiene', () => {
+    render(<PendingTray groups={[
+      { id: 'a', title: 'Solicitudes de cita', href: '#/citas', items: [row('1', 'Ana'), row('2', 'Luis')], state: remote([]) },
+      { id: 'b', title: 'Admisiones sin cama', href: '#/hospitalizacion', items: [], state: remote([]) },
+    ]} />);
+    const grupo = screen.getByRole('region', { name: 'Solicitudes de cita' });
+    expect(within(grupo).getByText('2').className).toContain('tray-count');
+    expect(screen.queryByRole('region', { name: 'Admisiones sin cama' })).toBeNull();
+    expect(screen.queryByText('Al día: nada pendiente.')).toBeNull();
   });
 
-  it('sin permisos de trabajo no muestra la bandeja ni pide datos', () => {
-    const api = montar(['sesion.perfil']);
-    expect(screen.queryByText('Pendientes de tu trabajo')).toBeNull();
-    expect(api.request).not.toHaveBeenCalled();
+  it('con todo vacío dice una sola vez que está al día', () => {
+    render(<PendingTray groups={[{ id: 'b', title: 'Admisiones sin cama', href: '#/hospitalizacion', items: [], state: remote([]) }]} />);
+    expect(screen.getByText('Al día: nada pendiente.')).toBeTruthy();
+  });
+
+  it('un grupo que falla muestra su error con reintento y no un cero falso', () => {
+    render(<TrayGroup group={{ id: 'c', title: 'Vinculaciones por verificar', href: '#/vinculaciones', items: [], state: { data: null, loading: false, error: { message: 'El servicio no está disponible.', status: 500 } as never, refresh: () => undefined } }} />);
+    expect(screen.getByText('El servicio no está disponible.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Volver a intentar' })).toBeTruthy();
+    expect(document.querySelector('.tray-count')).toBeNull();
   });
 });

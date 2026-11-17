@@ -3,7 +3,8 @@ import './lab-follow-up.css';
 import { Field, Notice } from '../../components/ui';
 import { PriorityBadge, SectionState } from '../../components/system';
 import { ApiError, type Api } from '../../lib/api';
-import { RemoteState, WriteError, formatDateTime, useAction, useData } from '../common';
+import { RemoteState, WriteError, useAction, useData, type Remote } from '../common';
+import { formatDate } from '../../lib/format';
 import { newIntentKey, withIntentKey } from '../intent';
 
 /**
@@ -23,15 +24,22 @@ export function localDay(from: Date, days = 0) {
 const slotLabel = (slot: Slot) => new Intl.DateTimeFormat('es-SV', { timeStyle: 'short', timeZone: 'America/El_Salvador' }).format(new Date(slot.start));
 export const FOLLOW_UP_REASON = 'Seguimiento de resultados de laboratorio';
 
-export function LabFollowUpPanel({ api, version }: { api: Api; version: number }) {
-  const data = useData<LabProposal[]>(api, '/laboratorio/seguimientos', version);
+/** `state` comes from Inicio, which already reads the list for its pending tray (`inTray`: a tray group, hidden when empty). */
+export function LabFollowUpPanel({ api, version, state, inTray = false }: { api: Api; version: number; state?: Remote<LabProposal[]>; inTray?: boolean }) {
+  const own = useData<LabProposal[]>(api, '/laboratorio/seguimientos', version, !state);
+  const data = state ?? own;
   const rows = data.data ?? [];
   // Appointment already created for a proposal whose link failed. It lives here, not in the form, so "Volver" never loses it
   // and a retry links the same appointment instead of posting /citas again.
   const [scheduled, setScheduled] = useState<Record<string, string>>({});
   const remember = (proposalId: string, appointmentId: string) => setScheduled(current => ({ ...current, [proposalId]: appointmentId }));
+  if (inTray && data.data && !data.error && rows.length === 0) return null;
+  if (inTray) return <section className="tray-group" aria-label="Citas de seguimiento por confirmar">
+    <header><h3>Citas de seguimiento por confirmar</h3>{rows.length > 0 && <span className="tray-count">{rows.length}</span>}</header>
+    <SectionState state={data} compact>{() => <ul className="lab-follow-up-list">{rows.map(row => <ProposalRow key={row.id} api={api} proposal={row} scheduled={scheduled[row.id] ?? null} onScheduled={id => remember(row.id, id)} onDone={data.refresh} />)}</ul>}</SectionState>
+  </section>;
   // R1: with nothing to confirm the section is one quiet line; the heading appears only with rows.
-  return <section className="work-inbox" aria-label="Citas de seguimiento por confirmar">
+  return <section className="lab-follow-up" aria-label="Citas de seguimiento por confirmar">
     {rows.length > 0 && <header className="section-head"><h2 className="section-title">Citas de seguimiento por confirmar</h2><span className="section-count">{rows.length}</span></header>}
     <SectionState state={data} compact empty={list => list.length ? null : 'Al día: no hay citas de seguimiento por confirmar.'}>{() =>
       <ul className="lab-follow-up-list">{rows.map(row => <ProposalRow key={row.id} api={api} proposal={row} scheduled={scheduled[row.id] ?? null} onScheduled={id => remember(row.id, id)} onDone={data.refresh} />)}</ul>}</SectionState>
@@ -45,12 +53,12 @@ function ProposalRow({ api, proposal, scheduled, onScheduled, onDone }: { api: A
   return <li className="lab-follow-up-row">
     <div className="lab-follow-up-who">
       <strong>{proposal.patientName ?? 'Paciente'}</strong>
-      <small className="muted">{[proposal.patientRecord ? `Exp. ${proposal.patientRecord}` : null, proposal.doctorName ? `Con ${proposal.doctorName}` : null, `Resultados del ${formatDateTime(proposal.resultsAt)}`].filter(Boolean).join(' · ')}</small>
+      <small className="muted">{[proposal.patientRecord ? `Exp. ${proposal.patientRecord}` : null, proposal.doctorName ? `Con ${proposal.doctorName}` : null, `Resultados del ${formatDate(proposal.resultsAt)}`].filter(Boolean).join(' · ')}</small>
     </div>
     {proposal.priority === 'urgente' && <PriorityBadge value="urgente" />}
     {mode === 'idle' && <div className="lw-actions">
-      <button type="button" className="primary-button" onClick={() => setMode('schedule')}>Agendar cita</button>
-      <button type="button" className="secondary-button" onClick={() => setMode('discard')}>Descartar</button>
+      <button type="button" className="row-action" onClick={() => setMode('schedule')}>Agendar cita</button>
+      <button type="button" className="row-action" onClick={() => setMode('discard')}>Descartar</button>
     </div>}
     {mode === 'schedule' && <ScheduleForm api={api} proposal={proposal} scheduled={scheduled} onScheduled={onScheduled} onCancel={() => setMode('idle')} onDone={onDone} />}
     {mode === 'discard' && <DiscardForm api={api} proposal={proposal} onCancel={() => setMode('idle')} onDone={onDone} />}

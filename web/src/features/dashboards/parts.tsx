@@ -3,32 +3,19 @@ import { Icon, type IconName } from '../../components/ui';
 import { AreaTag, SectionState, StatusBadge, type AreaCode } from '../../components/system';
 import { type Tone } from '../../components/charts';
 import { can, type AccessProfile } from '../../lib/api';
+import { formatNumber, formatTime, localDayKey, plural as pluralOf } from '../../lib/format';
 import type { Remote } from '../common';
+import './day-panel.css';
 
 /** Zona horaria del hospital: «hoy» y las horas se leen siempre en hora de El Salvador. */
-const ZONE = 'America/El_Salvador';
-export const localDay = (value: string | Date = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(typeof value === 'string' ? new Date(value) : value);
-export const timeLabel = (iso: string) => new Intl.DateTimeFormat('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23', timeZone: ZONE }).format(new Date(iso));
+export const localDay = (value: string | Date = new Date()) => localDayKey(value);
+export const timeLabel = (iso: string) => formatTime(iso);
 export const isToday = (iso: string) => localDay(iso) === localDay();
 export const minutesBetween = (from: string, to: string) => Math.max(0, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 60000));
-export const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+export const plural = pluralOf;
 
 /** Estado de un valor frente a umbrales. Pasar el umbral alto es urgente (ámbar), nunca rojo crítico. */
 export const toneFor = (value: number, warnAt: number, urgentAt: number): Tone => value >= urgentAt ? 'urgent' : value >= warnAt ? 'warn' : 'ok';
-
-export type KpiProps = { icon: IconName; label: string; value: string | number; sub?: string; tone?: Tone | 'neutral'; href?: string };
-/** Tarjeta de cifra con estado de color. El color acompaña a la palabra del subtítulo, nunca la sustituye. */
-export function Kpi({ icon, label, value, sub, tone = 'neutral', href }: KpiProps) {
-  const body = <>
-    <span className="kpi-icon" aria-hidden="true"><Icon name={icon} size={22} /></span>
-    <span className="kpi-label">{label}</span>
-    <strong className="kpi-value">{value}</strong>
-    {sub && <span className="kpi-sub">{sub}</span>}
-  </>;
-  const className = `kpi kpi-${tone}`;
-  return href ? <a className={className} href={href}>{body}</a> : <div className={className}>{body}</div>;
-}
-export const KpiRow = ({ children }: { children: ReactNode }) => <div className="kpi-row">{children}</div>;
 
 /** R1 (S1): a panel is a title, an optional link and its content. No helper sentence under the title. */
 export function Panel({ title, icon, action, children, wide = false }: { title: string; icon?: IconName; action?: { label: string; href: string }; children: ReactNode; wide?: boolean }) {
@@ -43,16 +30,73 @@ export function PanelState<T>({ state, children, empty }: { state: Remote<T>; ch
   return <SectionState state={state} compact empty={empty}>{children}</SectionState>;
 }
 
+// ───────────────────────────── R4a · panel del día: bandeja única y cifras una sola vez
+
 /** `tag` is the visible label; with `status` it shows as a StatusBadge, with `area` as an AreaTag, otherwise as plain text. */
 export type AttentionItem = { id: string; title: string; detail?: string; tone: Tone; href: string; action: string; tag?: string; status?: string; area?: AreaCode };
-/** Lista de «qué necesita mi atención»: cada fila lleva su acción directa; vacía, lo dice con claridad. */
-export function AttentionList({ items, empty = 'Nada pendiente por ahora.', limit = 6 }: { items: AttentionItem[]; empty?: string; limit?: number }) {
+
+/**
+ * Rows of a pending group. The name owns line 1 at full width (a 4-part Salvadoran name never wraps into 4 lines
+ * because a chip or button ate the width); state and detail go on line 2; the action sits at the right of both.
+ */
+export function AttentionList({ items, empty = 'Nada pendiente por ahora.', limit = 4 }: { items: AttentionItem[]; empty?: string; limit?: number }) {
   if (items.length === 0) return <p className="section-empty" role="status">{empty}</p>;
-  return <ul className="attention-list">{items.slice(0, limit).map(item => <li key={item.id}>
-    <div><strong>{item.title}</strong>{item.detail && <span>{item.detail}</span>}</div>
-    {item.status ? <StatusBadge value={item.status} label={item.tag} /> : item.area ? <AreaTag code={item.area} showName /> : item.tag && <span className="attention-tag">{item.tag}</span>}
-    <a className="row-action" href={item.href}>{item.action}<Icon name="arrow" size={16} /></a>
-  </li>)}{items.length > limit && <li className="attention-more">y {items.length - limit} más</li>}</ul>;
+  return <ul className="tray-list">{items.slice(0, limit).map(item => <li key={item.id} className="tray-row">
+    <strong className="tray-row-name">{item.title}</strong>
+    <a className="row-action tray-row-action" href={item.href}>{item.action}<Icon name="arrow" size={16} /></a>
+    {(item.detail || item.status || item.area || item.tag) && <span className="tray-row-meta">
+      {item.status ? <StatusBadge value={item.status} label={item.tag} /> : item.area ? <AreaTag code={item.area} /> : item.tag && <span className="tray-row-tag">{item.tag}</span>}
+      {item.detail && <span className="tray-row-detail">{item.detail}</span>}
+    </span>}
+  </li>)}</ul>;
+}
+
+/** One group of the pending tray. Hidden when it has nothing; its count is the only place this number appears. */
+export type TrayGroupSpec = { id: string; title: string; href: string; items: AttentionItem[]; state?: Remote<unknown>; masculine?: boolean; limit?: number };
+export function TrayGroup({ group }: { group: TrayGroupSpec }) {
+  const { state, items, limit = 4 } = group;
+  if (state && (state.error || (!state.data && state.loading))) {
+    return <section className="tray-group" aria-label={group.title}><header><h3>{group.title}</h3></header><SectionState state={state} compact rows={1}>{() => null}</SectionState></section>;
+  }
+  if (items.length === 0) return null;
+  return <section className="tray-group" aria-label={group.title}>
+    <header><h3>{group.title}</h3><span className="tray-count">{formatNumber(items.length)}</span>
+      {items.length > limit && <a className="row-action tray-more" href={group.href}>{`Ver ${group.masculine ? 'los' : 'las'} ${formatNumber(items.length)}`}</a>}</header>
+    <AttentionList items={items} limit={limit} />
+  </section>;
+}
+
+const settled = (group: TrayGroupSpec) => !group.state || (!!group.state.data && !group.state.error);
+/** The ONE pending tray of Inicio: every group that waits on this account; one quiet line when everything is clear. */
+export function PendingTray({ groups, children, othersClear = true }: { groups: TrayGroupSpec[]; children?: ReactNode; othersClear?: boolean }) {
+  const clear = othersClear && groups.every(g => settled(g) && g.items.length === 0);
+  return <section className="pending-tray" aria-label="Pendientes">
+    <h2 className="pending-tray-title">Pendientes</h2>
+    {groups.map(group => <TrayGroup key={group.id} group={group} />)}
+    {children}
+    {clear && <p className="section-empty" role="status">Al día: nada pendiente.</p>}
+  </section>;
+}
+
+/** A figure of the day. `value` null means «not applicable now» and hides it; the remote drives loading and error. */
+export type Figure = { id: string; label: string; value: number | string | null; state: Remote<unknown>; href?: string; of?: string };
+const shown = (figure: Figure) => figure.state.error ? '—' : !figure.state.data ? null : typeof figure.value === 'number' ? formatNumber(figure.value) : figure.value;
+/** The day's figures, each shown once. A failed source shows «—» and one line with its retry under the strip. */
+export function DayFigures({ figures }: { figures: Figure[] }) {
+  const visible = figures.filter(f => !(f.state.data && !f.state.error && f.value === null));
+  if (visible.length === 0) return null;
+  const failed = [...new Set(visible.filter(f => f.state.error).map(f => f.state))];
+  return <section className="day-figures" aria-label="Cifras del día">
+    <ul>{visible.map(figure => {
+      const value = shown(figure);
+      const body = <>
+        <span className={`figure-value${value === null ? ' is-loading' : ''}`}>{value ?? ''}</span>
+        <span className="figure-label">{figure.label}{figure.of && value !== null && value !== '—' ? <small> {figure.of}</small> : null}</span>
+      </>;
+      return <li key={figure.id} data-figure={figure.id} aria-busy={value === null ? true : undefined}>{figure.href ? <a href={figure.href}>{body}</a> : <span>{body}</span>}</li>;
+    })}</ul>
+    {failed.map((state, i) => <SectionState key={i} state={state} compact>{() => null}</SectionState>)}
+  </section>;
 }
 
 /** `hint` is the native tooltip of the action; it is not printed under the label (R1, S1). */
@@ -61,5 +105,5 @@ export type QuickAction = { id: string; label: string; hint: string; icon: IconN
 export function QuickActions({ actions, profile }: { actions: QuickAction[]; profile: AccessProfile }) {
   const allowed = actions.filter(action => can(profile, action.permission));
   if (allowed.length === 0) return null;
-  return <section className="quick-actions" aria-label="Acciones rápidas"><div>{allowed.map(action => <a key={action.id} href={action.href} title={action.hint}><span className="quick-icon" aria-hidden="true"><Icon name={action.icon} size={20} /></span><strong>{action.label}</strong></a>)}</div></section>;
+  return <section className="quick-actions" aria-label="Acciones rápidas"><div>{allowed.map(action => <a key={action.id} href={action.href} title={action.hint}><span className="quick-icon" aria-hidden="true"><Icon name={action.icon} size={18} /></span><strong>{action.label}</strong></a>)}</div></section>;
 }
