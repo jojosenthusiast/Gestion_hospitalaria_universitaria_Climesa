@@ -210,7 +210,7 @@ function LabStepper({ order }: { order: LabOrder }) {
  */
 function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample }: { api: Api; order: LabOrder; canAttach: boolean; canComplete: boolean; onChanged: () => void; onSample: () => void }) {
   const action = useAction(api), [cancelOpen, setCancelOpen] = useState(false), [externalOpen, setExternalOpen] = useState(false), [loadOpen, setLoadOpen] = useState(false);
-  const [releaseOpen, setReleaseOpen] = useState(false), [done, setDone] = useState<string | null>(null);
+  const [releaseOpen, setReleaseOpen] = useState(false), [done, setDone] = useState<string | null>(null), [completeOpen, setCompleteOpen] = useState(false);
   const capturing = allows(order, 'capturar');
   const next = nextActor(order), stage = stageOf(order);
   const when = (value?: string | null) => value ? formatDateTime(value) : 'Pendiente';
@@ -225,7 +225,8 @@ function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample }: 
       {allows(order, 'tomar_muestra') && <button className="primary-button" onClick={onSample}>Tomar muestra</button>}
       {allowsExternal(order, 'cargar_externo') && <button className="primary-button" onClick={() => setLoadOpen(true)}>Cargar resultado externo</button>}
       {/* While capturing, the sheet below has the one primary action («Guardar y completar»). */}
-      {allows(order, 'completar') && !capturing && <button className="primary-button" disabled={action.busy} onClick={() => void transition(`/laboratorio/ordenes/${order.id}/completar`, { version: order.version })}>Completar</button>}
+      {/* Sweep U6: completing hands the order to the doctor's review and cannot be undone here, so it asks first. */}
+      {allows(order, 'completar') && !capturing && <button className="primary-button" disabled={action.busy} onClick={() => setCompleteOpen(true)}>Completar</button>}
       {allows(order, 'revisar') && <button className="primary-button" disabled={action.busy} onClick={() => { setDone(null); setReleaseOpen(true); }}>Revisar y liberar</button>}
       {allowsExternal(order, 'enviar_externo') && <button className="secondary-button" onClick={() => setExternalOpen(true)}>Se realiza en otro sitio</button>}
       {allows(order, 'cancelar') && <button className="secondary-button" onClick={() => setCancelOpen(true)}>Cancelar orden</button>}
@@ -240,6 +241,11 @@ function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample }: 
       <dl className="cl-facts"><div><dt>Prioridad</dt><dd>{order.priority === 'urgente' ? 'Urgente' : 'Rutina'}</dd></div><div><dt>Pidió</dt><dd>{order.doctorName ?? 'Sin dato'}</dd></div><div><dt>Solicitada</dt><dd>{formatDateTime(order.createdAt)}</dd></div><div><dt>{order.external ? 'Informe recibido' : 'Muestra'}</dt><dd>{when(order.sampleTakenAt)}</dd></div><div><dt>Completada</dt><dd>{when(order.completedAt)}</dd></div><div><dt>Revisada</dt><dd>{when(order.reviewedAt)}</dd></div></dl>
     </details>
     <LabStepper order={order} />
+    {completeOpen && <Dialog title="Completar orden" onClose={() => setCompleteOpen(false)} busy={action.busy}><div className="module-form">
+      <p>La orden de <strong>{order.patientName}</strong> pasa a revisión de {order.doctorName ?? 'el médico que la pidió'}. Ya no se pueden agregar resultados desde aquí.</p>
+      <WriteError error={spanishProblem(action.error)} onReload={() => { setCompleteOpen(false); onChanged(); }} reloadLabel="Recargar la orden" />
+      <div className="dialog-actions"><button type="button" className="secondary-button" disabled={action.busy} onClick={() => setCompleteOpen(false)}>Volver</button>
+        <button type="button" className="primary-button" disabled={action.busy} onClick={async () => { if (await action.run(`/laboratorio/ordenes/${order.id}/completar`, { version: order.version })) { setCompleteOpen(false); onChanged(); } }}>{action.busy ? 'Completando…' : 'Completar'}</button></div></div></Dialog>}
     {cancelOpen && <CancelDialog api={api} order={order} onClose={() => setCancelOpen(false)} onSaved={() => { setCancelOpen(false); onChanged(); }} />}
     {externalOpen && <SendExternalDialog api={api} order={order} onClose={() => setExternalOpen(false)} onSaved={() => { setExternalOpen(false); onChanged(); }} />}
     {releaseOpen && <ReleaseDialog api={api} target={{ orderId: order.id, version: order.version, patientName: order.patientName, doctorName: order.doctorName, values: order.items.map(item => ({ name: item.name, value: item.result?.value, text: item.result?.text, unit: item.unit, mark: item.result?.mark })) }}

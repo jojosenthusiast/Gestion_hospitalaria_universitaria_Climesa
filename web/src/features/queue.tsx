@@ -84,14 +84,15 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
     return !!result;
   }
   /** Drag, keyboard and the card menu end here: the server decides, the card shows where it goes meanwhile. */
-  async function move(ticket: QueueTicket, to: BoardColumn, confirmed = false) {
+  async function move(ticket: QueueTicket, to: BoardColumn, confirmed = false): Promise<boolean> {
     const check = moveFor(ticket, to);
-    if (!check.allowed) { setMoveError({ ticketId: ticket.id, text: check.reason }); return; }
+    if (!check.allowed) { setMoveError({ ticketId: ticket.id, text: check.reason }); return false; }
     // R7 U1: closing a number (no-show or finished) is not undoable: it asks first, naming the patient.
-    if (to === 'cerrado' && !confirmed) { setClosing(ticket); return; }
+    if (to === 'cerrado' && !confirmed) { setClosing(ticket); return false; }
     setPending(current => ({ ...current, [ticket.id]: to }));
-    await transition(ticket, MOVE_PATH[check.action]);
+    const done = await transition(ticket, MOVE_PATH[check.action]);
     setPending(current => { const next = { ...current }; delete next[ticket.id]; return next; });
+    return done;
   }
   async function undoCall(item: Undo | null) {
     if (!item) return;
@@ -149,7 +150,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
           {visible.length ? <div className="qb-board">{COLUMNS.map(column => <Lane key={column} column={column} tickets={sortColumn(shown.filter(t => t.column === column), column)} now={now} busy={action.busy} call={call} manage={manage} issue={issue}
               pendingIds={pending} averageWait={column === 'espera' ? summary.averageWait : 0} current={id => all.find(t => t.id === id) ?? null} undos={undos}
               cardError={id => failedId === id && action.error && !isVersionConflict(action.error) ? action.error.message : moveError?.ticketId === id ? moveError.text : null}
-              onTransition={transition} onMove={move} onPriority={changePriority} onUndo={item => void undoCall(item)} onVoid={ticket => void voidTicket(ticket)} />)}</div>
+              onTransition={transition} onMove={async (ticket, to) => { await move(ticket, to); }} onPriority={changePriority} onUndo={item => void undoCall(item)} onVoid={ticket => void voidTicket(ticket)} />)}</div>
             : <Empty title={all.length ? 'Ningún número coincide con los filtros' : 'La fila está vacía'} description={all.length ? 'Quita algún filtro para ver todos los números del día.' : 'Los números emitidos para este día aparecerán aquí.'} />}
         </>;
       }}</RemoteState>
@@ -159,8 +160,10 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
       : <FrontDeskDialog api={api} patientId={deskPatient} onClose={() => { setIssueOpen(false); setDeskPatient(null); }} onIssued={refresh} />)}
     {closing && <Dialog title="Cerrar número" onClose={() => setClosing(null)} busy={action.busy}><div className="module-form">
       <p>{closing.state === 'en_atencion' ? 'Completar' : 'Marcar «No se presentó» a'} <strong>{ticketCode(closing)} · {closing.patientName || 'Paciente no identificado'}</strong>. El número sale de la fila y no se puede deshacer.</p>
+      {/* Sweep U6: the dialog stays open until the server answers, so a failure is shown here, not lost. */}
+      <WriteError error={action.error} onReload={() => { setClosing(null); refresh(); }} reloadLabel="Recargar la fila" />
       <div className="dialog-actions"><button type="button" className="secondary-button" onClick={() => setClosing(null)} disabled={action.busy}>Volver</button>
-        <button type="button" className="primary-button" disabled={action.busy} onClick={() => { const ticket = (data.data ?? []).find(t => t.id === closing.id) ?? closing; setClosing(null); void move(ticket, 'cerrado', true); }}>{closing.state === 'en_atencion' ? 'Completar' : 'No se presentó'}</button></div></div></Dialog>}
+        <button type="button" className="primary-button" disabled={action.busy} onClick={async () => { const ticket = (data.data ?? []).find(t => t.id === closing.id) ?? closing; if (await move(ticket, 'cerrado', true)) setClosing(null); }}>{closing.state === 'en_atencion' ? 'Completar' : 'No se presentó'}</button></div></div></Dialog>}
   </>;
 }
 
