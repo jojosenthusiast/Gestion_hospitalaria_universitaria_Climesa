@@ -126,6 +126,21 @@ describe('Fase 2 · fila del día y tablero (S9)', () => {
       expect((await t.call('JOP', 'POST', `/fila/${issued.id}/deshacer-llamado`, { version: undone.body.version })).status).toBe(403);
     });
 
+    // T15 audit: a number back in the queue shows no office on the public board; with calls left it keeps its office.
+    test('undoing the last call clears the office; undoing one of two calls keeps it', async () => {
+      const office = await t.one<{ id: string }>("SELECT id FROM infra.espacio WHERE tipo='consultorio' ORDER BY codigo LIMIT 1");
+      const officeOf = async (id: string) => (await t.one<{ office: string | null }>('SELECT consultorio_id AS office FROM atencion.ticket_fila WHERE id=$1', [id])).office;
+      const issued = await issue('laboratorio');
+      const first = (await t.call('REC', 'POST', `/fila/${issued.id}/llamar`, { version: issued.version, officeId: office.id })).body;
+      const second = (await t.call('REC', 'POST', `/fila/${issued.id}/llamar`, { version: first.version })).body;
+      const once = await t.call('REC', 'POST', `/fila/${issued.id}/deshacer-llamado`, { version: second.version });
+      expect(once.body).toMatchObject({ state: 'llamado', llamados: 1 });
+      expect(await officeOf(issued.id)).toBe(office.id);
+      const last = await t.call('REC', 'POST', `/fila/${issued.id}/deshacer-llamado`, { version: once.body.version });
+      expect(last.body).toMatchObject({ state: 'en_espera', llamados: 0 });
+      expect(await officeOf(issued.id)).toBeNull();
+    });
+
     test('the call → attend rule still holds after the change', async () => {
       const issued = await issue('admisiones');
       const called = (await t.call('REC', 'POST', `/fila/${issued.id}/llamar`, { version: issued.version })).body;

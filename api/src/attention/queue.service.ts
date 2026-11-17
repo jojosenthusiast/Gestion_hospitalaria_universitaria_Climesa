@@ -223,14 +223,17 @@ export class QueueService {
     });
   }
 
-  /** Undo of a call (S9): one call less; with none left the number goes back to waiting. The state machine allows llamado → en_espera. */
+  /**
+   * Undo of a call (S9): one call less; with none left the number goes back to waiting without caller or office (the
+   * public board shows no office for it). The state machine allows llamado → en_espera.
+   */
   async undoCall(actor: Actor, id: string, dto: QueueUndoDto, key?: string) {
     return this.commands.run(actor, `fila.llamar:deshacer:${id}`, key, dto, async c => {
       const old = await this.ownTicket(c, actor, id);
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
       if (old.state !== 'llamado' || old.llamados < 1) throw new ProblemException('transicion_invalida', 409, 'Solo se deshace el llamado de un número llamado.');
       const row = (await c.query(`UPDATE atencion.ticket_fila SET llamados=llamados-1,estado=CASE WHEN llamados-1=0 THEN 'en_espera' ELSE estado END,
-        llamado_por=CASE WHEN llamados-1=0 THEN NULL ELSE llamado_por END,version=version+1
+        llamado_por=CASE WHEN llamados-1=0 THEN NULL ELSE llamado_por END,consultorio_id=CASE WHEN llamados-1=0 THEN NULL ELSE consultorio_id END,version=version+1
         WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [id])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.deshacer_llamado', entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.llamar', detail: { from: old.state, to: row.state, calls: row.llamados } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));
