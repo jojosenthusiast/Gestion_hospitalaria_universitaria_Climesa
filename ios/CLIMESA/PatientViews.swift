@@ -343,7 +343,7 @@ private struct CancelAppointmentSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "appointments.cancel.title") {
+            ScreenFrame(title: "appointments.cancel.title", onClose: { dismiss() }) {
                 SectionCard {
                     ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName)
                 }
@@ -352,7 +352,6 @@ private struct CancelAppointmentSheet: View {
                 PatientSubmissionNotice(submission: submission)
                 if submission.lastFailure?.code == "version_conflicto" { ConflictBanner { Task { await reload(); dismiss() } } }
                 ClimesaButton(title: L.text("appointments.cancel.confirm"), kind: .destructive, loading: submission.busy) { Task { await send() } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }
@@ -382,7 +381,7 @@ private struct RescheduleAppointmentSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "appointments.reschedule.title") {
+            ScreenFrame(title: "appointments.reschedule.title", onClose: { dismiss() }) {
                 SectionCard { ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName) }
                 Text("appointments.reschedule.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 DatePicker("appointments.date", selection: $day, in: Date()..., displayedComponents: .date)
@@ -404,7 +403,6 @@ private struct RescheduleAppointmentSheet: View {
                 }
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.reschedule.submit"), loading: submission.busy) { Task { await send() } }.disabled(slot == nil)
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
             .task(id: ClimesaDates.localDay(day)) { slot = nil; await loadSlots() }
         }
@@ -485,7 +483,7 @@ private struct CategoryRequestSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "appointments.request.title") {
+            ScreenFrame(title: "appointments.request.title", onClose: { dismiss() }) {
                 Group {
                 Text("appointments.category.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 SectionTitle("appointments.category.reason")
@@ -509,7 +507,6 @@ private struct CategoryRequestSheet: View {
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.category.submit"), loading: submission.busy) { Task { await send() } }
                     .disabled(!CategoryRequestRules.canSend(picked: picked, note: note))
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
             .task { await loadCategories() }
             .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await loadCatalog() } }
@@ -980,11 +977,10 @@ struct AmbulanceRequestView: View {
 
     private func cancelSheet(_ request: OwnAmbulanceRequest) -> some View {
         NavigationStack {
-            ScreenFrame(title: "ambulance.cancel") {
+            ScreenFrame(title: "ambulance.cancel", onClose: { cancelling = nil }) {
                 Text("ambulance.cancel.detail").font(Typo.body).foregroundStyle(Theme.ink)
                 PatientTextArea(label: L.text("ambulance.cancel.reason"), text: $cancelReason, lines: 2...4, error: nil)
                 ClimesaButton(title: L.text("ambulance.cancel"), kind: .destructive, loading: submission.busy) { Task { await cancel(request) } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { cancelling = nil }
             }
         }
     }

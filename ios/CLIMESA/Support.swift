@@ -187,8 +187,12 @@ struct LoadState<Value: Sendable, Content: View>: View {
     let retry: () async -> Void
     @ViewBuilder let content: (Value) -> Content
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if let error = loader.error { ErrorStateView(message: error) { Task { await retry() } } }
+        VStack(alignment: .leading, spacing: Spacing.space4) {
+            // Con datos en caché, una revalidación fallida es una línea compacta; el contenido válido sigue visible.
+            if let error = loader.error {
+                if loader.value != nil { PartError(message: error, retry: retry) }
+                else { ErrorStateView(message: error) { Task { await retry() } } }
+            }
             if let value = loader.value { content(value) }
             // S3: después del ingreso no hay spinner; la sección reserva su lugar con un esqueleto.
             else if loader.loading { Skeleton() }
@@ -200,22 +204,45 @@ struct LoadState<Value: Sendable, Content: View>: View {
 struct SubmissionNotice: View {
     let submission: Submission
     var body: some View {
-        if let error = submission.error { Notice(text: error, failure: true) }
-        if let notice = submission.notice { Notice(text: notice) }
+        if let error = submission.error { PatientNotice(text: error, failure: true) }
+        if let notice = submission.notice { PatientNotice(text: notice) }
     }
 }
 
-/// Pantalla secundaria con el mismo marco que las pestañas.
+/// Pantalla secundaria (detalle empujado u hoja) con el mismo marco y la misma barra azul marino que las pestañas.
+/// En una hoja, `onClose` pone «Cerrar» en la barra (HIG), no como botón de ancho completo al final del contenido.
 struct ScreenFrame<Content: View>: View {
     let title: LocalizedStringKey
-    @ViewBuilder let content: () -> Content
+    var onClose: (() -> Void)?
+    let content: () -> Content
+
+    init(title: LocalizedStringKey, onClose: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title; self.onClose = onClose; self.content = content
+    }
+
     var body: some View {
         ScrollView {
             // S1: sin título gigante; el título va en línea en la barra de navegación (HIG).
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: Spacing.space5) {
                 content()
-            }.padding(24).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
-        }.background(Theme.bg).navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+            }.padding(Spacing.space6).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
+        }
+        .background(Theme.bg).navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+        .climesaNavBar()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                if let onClose { Button(L.text("common.close"), action: onClose) }
+            }
+        }
+    }
+}
+
+extension View {
+    /// Barra de navegación azul marino con texto claro: pestañas, detalles empujados y hojas (I-6).
+    func climesaNavBar() -> some View {
+        toolbarBackground(Theme.navy, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
     }
 }
 

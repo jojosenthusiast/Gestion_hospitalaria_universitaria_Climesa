@@ -595,13 +595,12 @@ private struct SendExternalSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "results.external.send") {
+            ScreenFrame(title: "results.external.send", onClose: { dismiss() }) {
                 Text("results.external.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 MedicoTextArea(label: L.text("results.external.place"), text: $place, error: problem ?? submission.fieldErrors["place"], lines: 1...2)
                 MedicoTextArea(label: L.text("results.external.instructions"), text: $instructions, error: submission.fieldErrors["instructions"], lines: 3...6)
                 WriteNotice(submission: submission, reload: reload)
                 ClimesaButton(title: L.text("results.external.confirm"), loading: submission.busy) { Task { await send() } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }
@@ -631,7 +630,7 @@ private struct CancelLabOrderSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "results.cancel.title") {
+            ScreenFrame(title: "results.cancel.title", onClose: { dismiss() }) {
                 SectionCard {
                     ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: order.patientName, meta: order.state.label)
                 }
@@ -645,7 +644,6 @@ private struct CancelLabOrderSheet: View {
                 }
                 WriteNotice(submission: submission, reload: reload)
                 ClimesaButton(title: L.text("results.cancel"), kind: .destructive, loading: submission.busy) { Task { await send() } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }
@@ -1009,17 +1007,16 @@ private struct RejectRescheduleSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "day.reschedules.reject.title") {
+            ScreenFrame(title: "day.reschedules.reject.title", onClose: { dismiss() }) {
                 SectionCard {
                     ListRow(title: appointment.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.display(appointment.start),
                             meta: appointment.reschedule.map { "→ \(ClimesaDates.display($0.start))" })
                 }
-                TextField(L.text("day.reschedules.reject.reason"), text: $reason, axis: .vertical).lineLimit(3...6).textFieldStyle(.roundedBorder)
+                MedicoTextArea(label: L.text("day.reschedules.reject.reason"), text: $reason, error: submission.fieldErrors["reason"], lines: 3...6)
                 CharacterCounter(count: trimmed.count, range: 10...500)
                 WriteNotice(submission: submission, reload: reload)
                 ClimesaButton(title: L.text("day.reschedules.reject"), kind: .destructive, loading: submission.busy) { Task { await send() } }
                     .disabled(!(10...500).contains(trimmed.count))
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }

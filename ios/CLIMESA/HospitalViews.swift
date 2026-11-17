@@ -257,7 +257,7 @@ private struct EditMyDataSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "mydata.edit") {
+            ScreenFrame(title: "mydata.edit", onClose: { dismiss() }) {
                 SectionCard {
                     FormField(label: L.text("mydata.phone"), text: $phone, error: error("phone")).keyboardType(.phonePad).textContentType(.telephoneNumber)
                     FormField(label: L.text("mydata.email"), text: $email, error: error("email")).textContentType(.emailAddress)
@@ -272,7 +272,6 @@ private struct EditMyDataSheet: View {
                     SubmissionNotice(submission: submission)
                 }
                 ClimesaButton(title: L.text("mydata.save"), loading: submission.busy) { Task { await save() } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }
