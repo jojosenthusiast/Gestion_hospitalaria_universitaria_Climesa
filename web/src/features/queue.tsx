@@ -213,8 +213,13 @@ type LaneProps = { column: Column; tickets: (QueueTicket & { column: Column })[]
   onTransition: (ticket: QueueTicket, path: string) => Promise<boolean>; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void>;
   onUndo: (item: Undo) => void; onVoid: (ticket: QueueTicket) => void };
 
+const LANE_FOLD = 4;
 function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, averageWait, current, undos, cardError, onTransition, onMove, onPriority, onUndo, onVoid }: LaneProps) {
   const [over, setOver] = useState(false);
+  // #15: on a phone a long lane shows its first cards; the rest open on «Ver N más» (the page was 6,800 px tall).
+  const [phone] = useState(() => typeof globalThis.matchMedia === 'function' && globalThis.matchMedia('(max-width: 767px)').matches);
+  const [unfolded, setUnfolded] = useState(false);
+  const shownTickets = phone && !unfolded && tickets.length > LANE_FOLD ? tickets.slice(0, LANE_FOLD) : tickets;
   const dropped = (event: DragEvent) => {
     event.preventDefault(); setOver(false);
     const raw = event.dataTransfer.getData(DRAG_TYPE);
@@ -228,7 +233,7 @@ function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, ave
     onDragLeave={() => setOver(false)} onDrop={dropped}>
     <h3><span>{COLUMN_LABEL[column]}</span><span className={`cl-stage tone-${COLUMN_TONE[column]}`} aria-label={plural(tickets.length, 'número', 'números')}>{tickets.length}</span>
       {averageWait > 0 && <small className="qb-avg" title="Espera promedio de quienes esperan">prom. {formatDuration(averageWait)}</small>}</h3>
-    {tickets.length ? <ul>{tickets.map(ticket => {
+    {tickets.length ? <><ul>{shownTickets.map(ticket => {
       const allowed = ticket.allowedActions ?? [];
       const blocked = ticket.blockedActions ?? [];
       const moves = destinations(ticket);
@@ -242,7 +247,7 @@ function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, ave
       {/* R4a: booked or walk-in is on every card, so the order of the column reads at a glance. */}
       <div className="qb-marks">
         {ticket.priority && ticket.priority !== 'rutina' && <PriorityBadge value={ticket.priority} />}
-        {ticket.appointmentAt ? <span className="qb-cita"><Icon name="clock" size={14} />Cita {localTime(ticket.appointmentAt)}{ticket.appointmentDoctorName ? ` · ${ticket.appointmentDoctorName}` : ''}</span> : <span className="qb-walkin">Sin cita</span>}
+        {ticket.appointmentAt ? <span className="qb-cita"><Icon name="clock" size={14} />Cita {localTime(ticket.appointmentAt)}{ticket.appointmentDoctorName ? ` con ${ticket.appointmentDoctorName}` : ''}</span> : <span className="qb-walkin">Sin cita</span>}
         {ticket.arrivalFromAppointment && <span className="qb-walkin">Llegada registrada</span>}
       </div>
       {cardError(ticket.id) && <p className="qb-card-error" role="alert">{cardError(ticket.id)}</p>}
@@ -258,7 +263,7 @@ function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, ave
         {(moves.length > 0 || changingPriority || (call && canRemoveCall(ticket)) || voidable(ticket, issue, now)) && <CardMenu ticket={ticket} moves={moves} priorities={changingPriority} removeCall={call && canRemoveCall(ticket)} canVoid={voidable(ticket, issue, now)} busy={busy} onMove={onMove} onPriority={onPriority} onRemoveCall={() => void onTransition(ticket, 'deshacer-llamado')} onVoid={() => onVoid(ticket)} />}
       </div>
       </li>;
-    })}</ul> : <p className="muted">Nadie por ahora.</p>}</section>;
+    })}</ul>{shownTickets.length < tickets.length && <button type="button" className="cl-link-button qb-more" onClick={() => setUnfolded(true)}>Ver {tickets.length - shownTickets.length} más</button>}</> : <p className="muted">Nadie por ahora.</p>}</section>;
 }
 
 /** Keyboard and touch alternative to dragging: a native menu with the moves the server accepts and the priority. */

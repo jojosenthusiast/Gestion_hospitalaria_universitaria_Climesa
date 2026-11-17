@@ -180,7 +180,7 @@ const rec: RoleDashboard = {
   actions: [
     { id: 'registrar', label: 'Registrar paciente', hint: 'Busca primero y registra si no existe', icon: 'userPlus', href: '#/pacientes?accion=registrar', permission: 'pacientes.registrar' },
     { id: 'agendar', label: 'Agendar cita', hint: 'Paciente, médico y horario disponible', icon: 'calendar', href: '#/citas?accion=agendar', permission: 'citas.agendar' },
-    { id: 'emitir', label: 'Emitir número', hint: 'Número de fila para quien llega', icon: 'queue', href: '#/fila?accion=emitir', permission: 'fila.emitir' },
+    { id: 'emitir', label: 'Emitir número', hint: 'Número de fila para quien llega', icon: 'queue', href: '#/fila?accion=emitir', permission: 'fila.emitir', primary: true },
     { id: 'llamar', label: 'Llamar siguiente', hint: 'Llama al próximo número en espera', icon: 'megaphone', href: '#/fila?accion=llamar', permission: 'fila.llamar' },
     { id: 'ambulancia', label: 'Solicitar ambulancia', hint: 'Registrar una solicitud de traslado', icon: 'ambulance', href: '#/ambulancia?accion=solicitud', permission: 'ambulancia.solicitar' },
   ],
@@ -188,7 +188,7 @@ const rec: RoleDashboard = {
     // S8: asked appointments and requests by category both wait on Recepción: one group, one count (same as Citas).
     { id: 'solicitudes', title: 'Solicitudes de cita', href: '#/citas', state: requestsState(d),
       items: [
-        ...(d.apptRequests.data ?? []).filter(isPendingCategoryRequest).map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: `${r.categories.map(c => c.name).join(', ')}${r.note ? ` · ${r.note}` : ''} · ${formatRelative(r.createdAt)}`, tone: 'warn' as Tone, href: '#/citas', action: 'Asignar', tag: 'Por asignar', status: 'pendiente' })),
+        ...(d.apptRequests.data ?? []).filter(isPendingCategoryRequest).map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: `${r.categories.map(c => c.name).join(', ')}${r.note ? ` · ${r.note}` : ''} · ${formatRelative(r.createdAt)}`, tone: 'warn' as Tone, href: `#/citas?asignar=${r.id}`, action: 'Asignar', tag: 'Por asignar', status: 'pendiente' })),
         ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `${formatDate(a.start, { withYear: false })}, ${timeLabel(a.start)} · ${a.doctorName}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Por confirmar', status: 'solicitada' })),
       ] },
     { id: 'vinculaciones', title: 'Vinculaciones por verificar', href: '#/vinculaciones', state: asRemote(d.links),

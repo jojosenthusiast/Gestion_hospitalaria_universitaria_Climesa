@@ -47,7 +47,7 @@ describe('B1 · mostrador', () => {
     montar();
     const dialog = await openDesk();
     await userEvent.type(within(dialog).getByRole('combobox', { name: 'Paciente' }), 'fic');
-    expect(await within(dialog).findByRole('option', { name: /Ana Ficticia Mostrador.*Cita hoy 10:20 · Dra. Rosa Prueba/ })).toBeTruthy();
+    expect(await within(dialog).findByRole('option', { name: /Ana Ficticia Mostrador.*Cita hoy 10:20 con Dra. Rosa Prueba/ })).toBeTruthy();
     expect(within(dialog).getByRole('option', { name: /Marta Ficticia Con Número.*Ya tiene LAB 4 \(en espera\)/ })).toBeTruthy();
   });
 
@@ -82,6 +82,19 @@ describe('B1 · mostrador', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anular este número' }));
     expect(api.write).toHaveBeenCalledWith('/fila/t-5/anular', { version: 1 }, 'POST');
     expect(await within(dialog).findByText('Se anuló LAB 5. Puedes emitir otro número.')).toBeTruthy();
+  });
+
+  it('#8: the search has the focus on open and again after «Siguiente paciente»', async () => {
+    const write = vi.fn(async () => ({ id: 't-5', numero: 5, service: 'consulta_general', area: 'CON', state: 'en_espera', version: 1, patientName: walkIn.fullName, appointmentId: null, ahead: 0, voidableUntil: new Date(Date.now() + 600_000).toISOString() }));
+    // Like a browser: showModal() (run after the content mounted) moves the focus to the first focusable element.
+    HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); (this.querySelector('button, input') as HTMLElement | null)?.focus(); };
+    montar([], write as unknown as Api['write']);
+    const dialog = await openDesk();
+    await vi.waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole('combobox', { name: 'Paciente' })));
+    await pick(dialog, /Luis Ficticio Sin Cita/);
+    await userEvent.click(within(dialog).getByRole('button', { name: /Emitir número/ }));
+    await userEvent.click(await within(dialog).findByRole('button', { name: /Siguiente paciente/ }));
+    await vi.waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole('combobox', { name: 'Paciente' })));
   });
 
   it('a patient who already holds a number gets no second issue button', async () => {
@@ -121,6 +134,19 @@ describe('B2-B3 · tablero', () => {
     expect(location.hash).not.toContain('accion=');
   });
 
+  it('#15: on a phone each lane shows its first 4 cards and «Ver 2 más»', async () => {
+    const media = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: query.includes('max-width'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined })) as unknown as typeof window.matchMedia;
+    try {
+      montar([1, 2, 3, 4, 5, 6].map(n => ticket({ id: `t-${n}`, numero: n })));
+      const lane = await screen.findByRole('region', { name: 'En espera' });
+      await within(lane).findByText('Ver 2 más');
+      expect(lane.querySelectorAll('.qb-ticket')).toHaveLength(4);
+      await userEvent.click(within(lane).getByRole('button', { name: 'Ver 2 más' }));
+      expect(lane.querySelectorAll('.qb-ticket')).toHaveLength(6);
+    } finally { window.matchMedia = media; }
+  });
+
   it('with no proposal while others wait (patients of other doctors), it says so instead of «Nadie espera»', async () => {
     location.hash = '#/fila?accion=llamar';
     montar([ticket({ service: 'laboratorio', area: 'LAB' }), ticket({ id: 't-8', numero: 8, service: 'laboratorio', area: 'LAB' })]);
@@ -132,7 +158,7 @@ describe('B2-B3 · tablero', () => {
   it('the card shows the appointment time with the doctor and that the arrival was registered', async () => {
     montar([ticket({ appointmentAt: '2026-11-17T16:20:00Z', appointmentDoctorName: 'Dra. Rosa Prueba', arrivalFromAppointment: true })]);
     const card = within(await screen.findByRole('region', { name: 'En espera' })).getByRole('listitem');
-    expect(within(card).getByText(/Cita 10:20 · Dra. Rosa Prueba/)).toBeTruthy();
+    expect(within(card).getByText(/Cita 10:20 con Dra. Rosa Prueba/)).toBeTruthy();
     expect(within(card).getByText('Llegada registrada')).toBeTruthy();
   });
 

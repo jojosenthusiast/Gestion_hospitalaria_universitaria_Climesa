@@ -75,7 +75,8 @@ export function Dialog({title,onClose,busy=false,children}:{title:string;onClose
  return <dialog ref={ref} className="work-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} onCancel={e=>{e.preventDefault();if(!busy)onClose();}}><header><h2 id={titleId}>{title}</h2><button className="icon-button" type="button" aria-label="Cerrar formulario" disabled={busy} onClick={onClose}><Icon name="close"/></button></header><div className="dialog-content">{children}</div></dialog>;
 }
 export const formatDate=(s:string|undefined|null)=>s?new Intl.DateTimeFormat('es-SV',{timeZone:'UTC'}).format(new Date(s.length===10?s+'T12:00:00Z':s)):'Sin registrar';
-export const formatDateTime=(s:string)=>new Intl.DateTimeFormat('es-SV',{dateStyle:'medium',timeStyle:'short',timeZone:'America/El_Salvador'}).format(new Date(s));
+// 24-hour clock: «8:00 a. m.» ends in a period that a sentence doubles («a. m..»), and the rest of the app uses 24 h.
+export const formatDateTime=(s:string)=>new Intl.DateTimeFormat('es-SV',{dateStyle:'medium',timeStyle:'short',hourCycle:'h23',timeZone:'America/El_Salvador'}).format(new Date(s));
 /** `label` reemplaza la etiqueta común cuando el mismo código significa otra cosa en un módulo (por ejemplo `pendiente` en laboratorio). */
 export function Tag({value,label}:{value:string;label?:string}){return <StatusBadge value={value} label={label}/>;}
 export function Select({label,value,onChange,children,required=false,disabled=false}:{label:string;value:string;onChange:(v:string)=>void;children:ReactNode;required?:boolean;disabled?:boolean}){const id=useId();return <div className="select-field"><label htmlFor={id}>{label}</label><select id={id} value={value} onChange={e=>onChange(e.target.value)} required={required} disabled={disabled}>{children}</select></div>;}

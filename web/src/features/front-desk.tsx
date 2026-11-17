@@ -33,7 +33,7 @@ export function deskDetail(p: DeskPatient) {
   const parts = [`Expediente ${p.record}`];
   if (typeof p.age === 'number') parts.push(`${p.age} años`);
   if (p.ticketToday) parts.push(`Ya tiene ${deskCode(p.ticketToday)} (${TICKET_STATE[p.ticketToday.state] ?? p.ticketToday.state})`);
-  else if (p.appointmentToday) parts.push(`Cita hoy ${localTime(p.appointmentToday.start)} · ${p.appointmentToday.doctorName}`);
+  else if (p.appointmentToday) parts.push(`Cita hoy ${localTime(p.appointmentToday.start)} con ${p.appointmentToday.doctorName}`);
   return parts.join(' · ');
 }
 
@@ -96,7 +96,7 @@ export function FrontDeskDialog({ api, patientId, onClose, onIssued }: { api: Ap
     <div className="module-form fd-desk">
       {issued ? <IssuedCard issued={issued} appointment={appointment} busy={busy} onVoid={() => void voidIssued()} />
         : <>
-          <SearchPicker label="Paciente" value={picked} onChange={choose} search={desk.search} onQueryChange={text => { typed.current = text; }} required disabled={loadingPatient}
+          <SearchPicker label="Paciente" value={picked} onChange={choose} search={desk.search} autoFocus={!loadingPatient} onQueryChange={text => { typed.current = text; }} required disabled={loadingPatient}
             placeholder={loadingPatient ? 'Cargando paciente…' : 'Nombre, DUI o expediente'} emptyText="No hay pacientes con ese nombre, DUI o expediente." />
           {!picked && <p className="form-hint">¿No aparece? <a className="cl-link-button" href="#/pacientes?accion=registrar" onClick={() => handOffPatientSearch(typed.current)}>Registrar paciente nuevo</a></p>}
           {voided && <Notice kind="success">Se anuló {deskCode(voided)}. Puedes emitir otro número.</Notice>}

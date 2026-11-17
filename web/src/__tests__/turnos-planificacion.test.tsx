@@ -112,7 +112,7 @@ describe('turnos · calendario para planificar', () => {
     montar(true);
     await userEvent.click(await screen.findByRole('button', { name: 'Asignar turno el jueves, 12 de noviembre' }));
     const dialogo = await screen.findByRole('dialog', { name: 'Asignar turno' });
-    expect((within(dialogo).getByLabelText('Fecha de inicio') as HTMLInputElement).value).toBe('2026-11-12');
+    expect((within(dialogo).getByLabelText('Fecha de inicio') as HTMLInputElement).value).toBe('12/11/2026');
   });
 
   it('la vista Día muestra un solo día y permite elegir otro de la semana', async () => {

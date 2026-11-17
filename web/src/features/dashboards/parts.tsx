@@ -100,10 +100,10 @@ export function DayFigures({ figures }: { figures: Figure[] }) {
 }
 
 /** `hint` is the native tooltip of the action; it is not printed under the label (R1, S1). */
-export type QuickAction = { id: string; label: string; hint: string; icon: IconName; href: string; permission: string };
+export type QuickAction = { id: string; label: string; hint: string; icon: IconName; href: string; permission: string; /** The one main action of the role (sweep 2026-11-17: one primary per Inicio). */ primary?: boolean };
 /** Acciones rápidas reales: abren el formulario del módulo con `?accion=` y solo aparecen si la cuenta tiene el permiso. */
 export function QuickActions({ actions, profile }: { actions: QuickAction[]; profile: AccessProfile }) {
   const allowed = actions.filter(action => can(profile, action.permission));
   if (allowed.length === 0) return null;
-  return <section className="quick-actions" aria-label="Acciones rápidas"><div>{allowed.map(action => <a key={action.id} href={action.href} title={action.hint}><span className="quick-icon" aria-hidden="true"><Icon name={action.icon} size={18} /></span><strong>{action.label}</strong></a>)}</div></section>;
+  return <section className="quick-actions" aria-label="Acciones rápidas"><div>{allowed.map(action => <a key={action.id} href={action.href} title={action.hint} className={action.primary ? 'is-primary' : undefined}><span className="quick-icon" aria-hidden="true"><Icon name={action.icon} size={18} /></span><strong>{action.label}</strong></a>)}</div></section>;
 }

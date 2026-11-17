@@ -59,6 +59,58 @@ describe('B1 desde la agenda · registrar llegada (D-1)', () => {
   });
 });
 
+describe('#9 and #15 · the request tray', () => {
+  it('#/citas?asignar=<id> opens the assign panel of that request and clears the address', async () => {
+    location.hash = '#/citas?asignar=s-1';
+    mount(rec());
+    expect((await screen.findByRole('button', { name: 'Asignar · Ana Ficticia Agenda' })).getAttribute('aria-expanded')).toBe('true');
+    expect(location.hash).not.toContain('asignar=');
+  });
+
+  it('on a phone a tray of more than 3 folds to 3 with «Ver las N restantes»', async () => {
+    const media = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: query.includes('max-width'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined })) as unknown as typeof window.matchMedia;
+    try {
+      const asked = [1, 2, 3, 4].map(n => row({ id: `a-${n}`, state: 'solicitada', patientName: `Pide Ficticia ${n}`, start: `2026-11-2${n}T16:20:00Z`, end: `2026-11-2${n}T16:40:00Z`, allowedActions: ['confirmar', 'rechazar'] }));
+      mount(rec(), asked);
+      const tray = await screen.findByRole('region', { name: 'Solicitudes por asignar' });
+      await within(tray).findByText('Ana Ficticia Agenda');
+      expect(tray.querySelectorAll('.rq-row')).toHaveLength(3);
+      await userEvent.click(within(tray).getByRole('button', { name: 'Ver las 2 restantes' }));
+      expect(tray.querySelectorAll('.rq-row')).toHaveLength(5);
+    } finally { window.matchMedia = media; }
+  });
+
+  it('on a phone each doctor of the day starts folded (except the first) and opens on its header', async () => {
+    const media = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: query.includes('max-width'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined })) as unknown as typeof window.matchMedia;
+    try {
+      mount(rec(), [row(), row({ id: 'c-3', doctorId: 'd-2', doctorName: 'Dr. Otro Médico', patientName: 'Segunda Ficticia', start: '2026-11-17T17:20:00Z', end: '2026-11-17T17:40:00Z' })]);
+      await screen.findByRole('button', { name: /Dr. Otro Médico/ });
+      const headers = [/Dr. Otro Médico/, /Dra. Rosa Prueba/].map(name => screen.getByRole('button', { name }));
+      expect(headers.map(h => h.getAttribute('aria-expanded')).sort()).toEqual(['false', 'true']);
+      const folded = headers.find(h => h.getAttribute('aria-expanded') === 'false')!;
+      const hidden = folded === headers[0] ? 'Segunda Ficticia' : 'Ana Ficticia Agenda';
+      expect(screen.queryAllByText(hidden).filter(n => n.closest('.ag-day'))).toHaveLength(0);
+      await userEvent.click(folded);
+      expect(screen.queryAllByText(hidden).filter(n => n.closest('.ag-day')).length).toBeGreaterThan(0);
+    } finally { window.matchMedia = media; }
+  });
+
+  it('on a phone reception sees one day with day navigation; «Quitar filtros» does not appear for it', async () => {
+    const media = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: query.includes('max-width'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined })) as unknown as typeof window.matchMedia;
+    try {
+      mount(rec(), [row(), row({ id: 'c-2', start: '2026-11-25T16:20:00Z', end: '2026-11-25T16:40:00Z', patientName: 'Otro Día Ficticia' })]);
+      expect((await screen.findAllByText('Ana Ficticia Agenda')).length).toBeGreaterThan(0);
+      expect((screen.getByRole('combobox', { name: 'Fechas' }) as HTMLSelectElement).value).toBe('dia');
+      expect(screen.getByRole('button', { name: 'Día siguiente' })).toBeTruthy();
+      expect(screen.queryByText('Otro Día Ficticia')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Quitar filtros' })).toBeNull();
+    } finally { window.matchMedia = media; }
+  });
+});
+
 describe('A3 · «No asistió» con deshacer (D-3)', () => {
   it('waits 8 s before sending; «Deshacer» sends nothing', async () => {
     const api = mount(rec());
