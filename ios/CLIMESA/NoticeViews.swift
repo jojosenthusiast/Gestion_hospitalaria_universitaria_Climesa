@@ -176,7 +176,9 @@ struct NoticesView: View {
                 Skeleton()
             }
         }
-        .loadsNoticeInbox(model, account: account, live: live)
+        // RoleTabsView already follows live events for the shared inbox. A second loader here would cancel that fetch and,
+        // on leaving Avisos, could leave the badge stale; so opening Avisos only reads it once, in a task not tied to the view.
+        .onAppear { Task { await reload() } }
     }
 
     private func label(_ option: NoticeFilter) -> String {
