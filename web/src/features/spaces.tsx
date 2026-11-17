@@ -74,8 +74,9 @@ export function BedsPage({ api, profile, version }: { api: Api; profile: AccessP
   const all = data.data ?? [];
   return <>
     <CompactHeader breadcrumb="Operaciones / Disponibilidad" title="Camas"/>
+    {/* R4a: one quiet line of hospital totals, not three giant cards (the plan below has the per-floor counts). */}
     {/* R1 (S3): figures only from loaded data; while loading or after an error there is no number to show. */}
-    {data.data && !data.error && <div className="number-strip"><div><strong>{all.length}</strong><span>Camas de hospitalización</span></div><div><strong>{all.filter(b => b.state === 'libre').length}</strong><span>Libres</span></div><div><strong>{all.filter(b => b.state === 'ocupada').length}</strong><span>Ocupadas</span></div></div>}
+    {data.data && !data.error && <dl className="beds-summary" aria-label="Camas del hospital"><div><dd>{all.length}</dd><dt>Camas de hospitalización</dt></div><div><dd>{all.filter(b => b.state === 'libre').length}</dd><dt>Libres</dt></div><div><dd>{all.filter(b => b.state === 'ocupada').length}</dd><dt>Ocupadas</dt></div></dl>}
     <section className="data-workbench">
       <RemoteState state={data}>{beds => <BuildingBoard api={api} profile={profile} version={version} spaces={spaces} beds={beds} focus="camas" onRefresh={data.refresh} />}</RemoteState>
     </section>
