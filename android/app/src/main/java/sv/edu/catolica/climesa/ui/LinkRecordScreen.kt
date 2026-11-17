@@ -23,11 +23,11 @@ import sv.edu.catolica.climesa.domain.LinkStatus
 
 /** A03 · Vincular expediente (spec 101). The typed DUI and date survive rotation (`rememberSaveable`). */
 @Composable
-fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: LinkRecordViewModel = viewModel()) {
+fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, userId: String? = null, model: LinkRecordViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     var dui by rememberSaveable { mutableStateOf("") }
     var birth by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(profile.patientId) { model.init(profile.patientId) }
+    LaunchedEffect(profile.patientId, userId) { model.init(profile.patientId, userId) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     PageList(modifier) {
         when (state.status) {
@@ -38,6 +38,8 @@ fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, mode
             }
             LinkStatus.PENDING -> item {
                 SectionCard(stringResource(R.string.vinculo_en_verificacion), action = { StatusTag("en_espera") }) {
+                    // G2: the request the patient sent, with its day, instead of an empty form.
+                    state.since?.let { Text(stringResource(R.string.rec7_vinculo_desde, it.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"))), style = MaterialTheme.typography.titleSmall) }
                     Text(stringResource(R.string.vinculo_en_verificacion_detalle), style = MaterialTheme.typography.bodyMedium)
                 }
             }

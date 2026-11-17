@@ -156,7 +156,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         page==AndroidSection.MY_ACCESS->MyAccessScreen(Modifier.padding(padding))
         page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
         page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW->LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page)
-        page==AndroidSection.LINK_RECORD->LinkRecordScreen(account.profile,Modifier.padding(padding))
+        page==AndroidSection.LINK_RECORD->LinkRecordScreen(account.profile,Modifier.padding(padding),userId=account.session.userId)
         page==AndroidSection.HISTORY||page==AndroidSection.RECORD->ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding))
         page==AndroidSection.MEDICAL_DAY->ConsultationScreen(account.profile,Modifier.padding(padding),userId=account.session.userId)
         page==AndroidSection.HOSPITAL_INFO->HospitalInfoScreen(Modifier.padding(padding))

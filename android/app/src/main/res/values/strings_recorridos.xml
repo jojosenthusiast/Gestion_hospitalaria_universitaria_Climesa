@@ -31,4 +31,6 @@
     <string name="rec7_reprogramar_titulo">Pedir otro horario</string>
     <string name="rec7_enviar_solicitud">Enviar solicitud</string>
     <string name="rec7_buscando_dia">Buscando el primer día con hueco…</string>
+    <!-- G2 vinculación -->
+    <string name="rec7_vinculo_desde">En revisión desde el %1$s</string>
 </resources>

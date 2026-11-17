@@ -63,6 +63,9 @@ object QuickActions {
             Entry("Pedir cita", AndroidSection.MY_APPOINTMENTS, QuickAction.REQUEST_APPOINTMENT, "citas.solicitar"),
             Entry("Pedir ambulancia", AndroidSection.AMBULANCE_REQUEST, QuickAction.REQUEST_AMBULANCE, "ambulancia.solicitar"),
             Entry("Mi turno en la fila", AndroidSection.PATIENT_QUEUE, null, "fila.ver"),
+            // G6: the four shortcuts of the patient's Inicio: Pedir cita, Ambulancia, Exámenes and Hospital.
+            Entry("Mis exámenes", AndroidSection.RESULTS, null, "resultados.ver"),
+            Entry("Hospital", AndroidSection.HOSPITAL_INFO, null, "sesion.perfil"),
         ),
     )
 
