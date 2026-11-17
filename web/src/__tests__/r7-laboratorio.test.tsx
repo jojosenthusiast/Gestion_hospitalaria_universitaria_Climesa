@@ -105,6 +105,23 @@ describe('R7 C1 · MED revisa y libera desde la bandeja', () => {
   });
 });
 
+describe('R7 C1 · A5 nota al paciente y motivo real sin cita', () => {
+  const pending = { id: 'f-2', orderId: 'o-2', patientId: 'p-1', patientName: 'Ana Pérez Ficticia', patientRecord: '000123', reason: 'critico', detail: '', createdAt: '2026-12-02T14:40:00Z', version: 1, orderVersion: 6, orderActions: ['revisar'],
+    values: [{ code: 'GLU', name: 'Glucosa', unit: 'mg/dL', value: 88, text: null, mark: 'normal' }] };
+
+  it('envía la nota opcional y, con el paciente hospitalizado, dice que no se propuso cita', async () => {
+    const write = vi.fn(async () => ({ id: 'o-2', version: 7, reviewedAt: '2026-12-02T15:00:00Z', followUpsClosed: 1, followUpProposalId: null, followUpSkipped: 'hospitalizado' }));
+    render(<LabResultsInbox api={{ request: vi.fn(async () => [pending]), write } as unknown as Api} profile={perfil(['laboratorio.revisar'])} version={0} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Revisar y liberar' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Revisar y liberar al paciente' });
+    await userEvent.type(within(dialog).getByLabelText('Nota para el paciente (opcional)'), 'Repetir en ayunas el lunes.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Liberar resultados' }));
+    expect(write).toHaveBeenCalledWith('/laboratorio/ordenes/o-2/revisar', { version: 6, followUp: true, patientNote: 'Repetir en ayunas el lunes.' }, 'POST');
+    expect(await screen.findByText('Resultados liberados: Ana Pérez Ficticia ya los ve. No se propuso cita de seguimiento porque el paciente está ingresado.')).toBeTruthy();
+    expect(screen.queryByText(/ya estaba propuesta/)).toBeNull();
+  });
+});
+
 describe('R7 C1 · REC agenda el seguimiento', () => {
   it('sin hueco hoy abre en el primer día con hueco y ofrece otro médico de la misma especialidad', async () => {
     const proposal = { id: 'pr-1', orderId: 'o-1', patientId: 'p-1', patientName: 'Ana Pérez Ficticia', patientRecord: '000123', doctorId: 'd-1', doctorName: 'Dra. Ana Isabel Ejemplo López', priority: 'rutina', resultsAt: '2026-12-02T14:00:00Z', createdAt: '2026-12-02T14:30:00Z', version: 2 };

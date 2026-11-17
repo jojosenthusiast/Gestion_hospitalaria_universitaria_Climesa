@@ -48,7 +48,10 @@ describe('R7 G3 · ingresos indicados', () => {
     expect(within(dialog).getByRole('link', { name: 'Ver tablero' }).getAttribute('href')).toBe('#/camas');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ingresar sin cama' }));
     expect(write).not.toHaveBeenCalled();
-    expect(await screen.findByText(/queda ingresada sin cama/)).toBeTruthy();
+    // The message says where the patient really stays: the row is still under «Ingresos indicados», waiting for a bed.
+    expect(await screen.findByText('Ana Pérez Ficticia queda pendiente de cama en «Ingresos indicados»; asígnale una desde ahí cuando se libere.')).toBeTruthy();
+    expect(screen.queryByText(/Admisiones sin cama/)).toBeNull();
+    expect(within(await screen.findByRole('region', { name: 'Ingresos indicados' })).getByText('Ana Pérez Ficticia')).toBeTruthy();
   });
 
   it('?ingresar=<id> desde Inicio abre directo la elección de cama', async () => {
