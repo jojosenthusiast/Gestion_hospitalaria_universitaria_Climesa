@@ -57,7 +57,8 @@ export { CompactHeader,headerText } from '../components/system';
 export function RemoteState<T>({state,children,skeletonRows=4,empty}:{state:Remote<T>;children:(data:T)=>ReactNode;skeletonRows?:number;empty?:(data:T)=>string|null}){
  return <SectionState state={state} rows={skeletonRows} empty={empty}>{children}</SectionState>;
 }
-export function Empty({title,description}:{title:string;description:string}){return <div className="empty-state" role="status"><span className="empty-state-icon"><Icon name="search" size={28}/></span><h2>{title}</h2><p>{description}</p></div>;}
+/** R1 (S1): an empty list is one quiet line (what is missing, then what to do); no second heading, no decoration. */
+export function Empty({title,description}:{title:string;description?:string}){return <p className="empty-state" role="status"><strong>{title}</strong>{description&&<span>{description}</span>}</p>;}
 /** WEB-04: with `onReload`, a version conflict offers the common "Cerrar y recargar" action (design 04, state "Conflicto"). */
 /** Error de una escritura. Se desplaza a la vista al aparecer: en un formulario largo quedaba arriba, fuera de pantalla, y parecía que el botón no hacía nada. */
 export function WriteError({error,onReload,reloadLabel='Cerrar y recargar'}:{error:ApiError|null;onReload?:()=>void;reloadLabel?:string}){

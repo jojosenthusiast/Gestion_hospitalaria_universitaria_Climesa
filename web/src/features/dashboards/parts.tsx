@@ -30,10 +30,10 @@ export function Kpi({ icon, label, value, sub, tone = 'neutral', href }: KpiProp
 }
 export const KpiRow = ({ children }: { children: ReactNode }) => <div className="kpi-row">{children}</div>;
 
-export function Panel({ title, icon, action, children, wide = false, hint }: { title: string; icon?: IconName; action?: { label: string; href: string }; children: ReactNode; wide?: boolean; hint?: string }) {
+/** R1 (S1): a panel is a title, an optional link and its content. No helper sentence under the title. */
+export function Panel({ title, icon, action, children, wide = false }: { title: string; icon?: IconName; action?: { label: string; href: string }; children: ReactNode; wide?: boolean }) {
   return <section className={`dash-panel${wide ? ' dash-panel-wide' : ''}`} aria-label={title}>
     <header><h2>{icon && <Icon name={icon} size={18} />}{title}</h2>{action && <a className="row-action" href={action.href}>{action.label}<Icon name="arrow" size={16} /></a>}</header>
-    {hint && <p className="panel-hint">{hint}</p>}
     {children}
   </section>;
 }
@@ -55,10 +55,11 @@ export function AttentionList({ items, empty = 'Nada pendiente por ahora.', limi
   </li>)}{items.length > limit && <li className="attention-more">y {items.length - limit} más</li>}</ul>;
 }
 
+/** `hint` is the native tooltip of the action; it is not printed under the label (R1, S1). */
 export type QuickAction = { id: string; label: string; hint: string; icon: IconName; href: string; permission: string };
 /** Acciones rápidas reales: abren el formulario del módulo con `?accion=` y solo aparecen si la cuenta tiene el permiso. */
 export function QuickActions({ actions, profile }: { actions: QuickAction[]; profile: AccessProfile }) {
   const allowed = actions.filter(action => can(profile, action.permission));
   if (allowed.length === 0) return null;
-  return <section className="quick-actions" aria-label="Acciones rápidas"><h2>Acciones rápidas</h2><div>{allowed.map(action => <a key={action.id} href={action.href}><span className="quick-icon" aria-hidden="true"><Icon name={action.icon} size={22} /></span><span><strong>{action.label}</strong><small>{action.hint}</small></span></a>)}</div></section>;
+  return <section className="quick-actions" aria-label="Acciones rápidas"><div>{allowed.map(action => <a key={action.id} href={action.href} title={action.hint}><span className="quick-icon" aria-hidden="true"><Icon name={action.icon} size={20} /></span><strong>{action.label}</strong></a>)}</div></section>;
 }
