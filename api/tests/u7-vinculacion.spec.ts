@@ -42,3 +42,33 @@ describe('U7 · estado de la vinculación con lo declarado', () => {
     expect((await t.call('REC', 'GET', '/me/vinculacion')).status).toBe(403);
   });
 });
+
+/**
+ * Requests store the declared DUI as digits, but seeded or older rows may carry the hyphen ("04567891-1"). Reception must
+ * still see one hyphen, find the record and approve; before the fix it showed "04567891--1" and never matched.
+ */
+describe('vinculación con el DUI declarado guardado con guion', () => {
+  let t: TestApp;
+  afterAll(async () => { await t?.close(); });
+
+  test('the hyphenated row shows one hyphen, matches its record and can be approved', async () => {
+    t = await createTestApp(now);
+    const patientId = await t.patient({ name: 'Rosa' });
+    await t.pg.query(`INSERT INTO pacientes.identificador(paciente_id,tipo,emisor,valor_original,valor_normalizado,estado,exclusivo)
+      VALUES($1,'dui','RNPN','04567891-1','045678911','sin_verificar',true)`, [patientId]);
+    await t.pg.query('UPDATE acceso.usuario SET paciente_id=NULL WHERE id=$1', [userId('PAC')]);
+    const row = (await t.pg.query<{ id: string }>(`INSERT INTO acceso.vinculacion_paciente(usuario_id,dui_declarado,nacimiento_declarado,creado_en)
+      VALUES($1,'04567891-1','1990-01-01',$2) RETURNING id`, [userId('PAC'), now])).rows[0];
+
+    const list = await t.call('REC', 'GET', '/cuentas/vinculaciones');
+    expect(list.status).toBe(200);
+    const item = list.body.find((r: any) => r.id === row.id);
+    expect(item.declared).toEqual({ dui: '04567891-1', birth: '1990-01-01' });
+    expect(item.candidate).toMatchObject({ id: patientId, dui: '04567891-1', exact: true });
+    expect((await t.call('PAC', 'GET', '/me/vinculacion')).body.declared).toEqual({ dui: '04567891-1', birth: '1990-01-01' });
+
+    const approved = await t.call('REC', 'POST', `/cuentas/vinculaciones/${row.id}/aprobar`, { version: item.version });
+    expect(approved.status).toBeLessThan(300);
+    expect((await t.one('SELECT paciente_id FROM acceso.usuario WHERE id=$1', [userId('PAC')])).paciente_id).toBe(patientId);
+  });
+});

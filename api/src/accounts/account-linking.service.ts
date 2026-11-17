@@ -11,6 +11,9 @@ import { LinkApproveDto, LinkRejectDto, LinkRequestDto } from './account-linking
 
 type Row = Record<string, any>;
 const dateText = (value: unknown) => value instanceof Date ? value.toISOString().slice(0, 10) : value ? String(value).slice(0, 10) : null;
+/** The declared DUI as stored digits: requests store digits only, but older or seeded rows may carry the hyphen. */
+const declaredDigits = (value: unknown) => String(value).replace(/-/g, '');
+const duiText = (digits: string) => `${digits.slice(0, 8)}-${digits.slice(8)}`;
 
 /**
  * Spec 101 (FR-101-08 a FR-101-11, RN-39, D-032). The patient asks to link the account with DUI and date of birth;
@@ -45,8 +48,8 @@ export class AccountLinkingService {
       const latest = (await c.query("SELECT * FROM acceso.vinculacion_paciente WHERE usuario_id=$1 ORDER BY (estado='pendiente') DESC,creado_en DESC,id DESC LIMIT 1", [actor.id])).rows[0];
       if (!latest) return { linked: !!account?.paciente_id, request: null };
       // U7: what the account itself declared (its own data, not a record), so a rejected patient asks again prefilled.
-      const dui = String(latest.dui_declarado);
-      return { linked: !!account?.paciente_id, request: this.view(latest), declared: { dui: `${dui.slice(0, 8)}-${dui.slice(8)}`, birth: dateText(latest.nacimiento_declarado) } };
+      const dui = declaredDigits(latest.dui_declarado);
+      return { linked: !!account?.paciente_id, request: this.view(latest), declared: { dui: duiText(dui), birth: dateText(latest.nacimiento_declarado) } };
     });
   }
 
@@ -84,7 +87,7 @@ export class AccountLinkingService {
         FROM acceso.vinculacion_paciente v JOIN acceso.usuario u ON u.id=v.usuario_id WHERE v.estado='pendiente' ORDER BY v.creado_en,v.id LIMIT 200`)).rows;
       const result = [];
       for (const row of rows) {
-        const dui = String(row.dui_declarado);
+        const dui = declaredDigits(row.dui_declarado);
         const found = await this.matches(c, dui, row.nacimiento);
         const candidateId = found.length === 1 ? found[0] : null;
         // G-2: `candidate` stays the exact match only (released apps approve any non-null candidate). With no exact
@@ -103,7 +106,7 @@ export class AccountLinkingService {
         result.push({
           id: row.id, createdAt: row.creado_en, version: row.version,
           account: { email: row.correo, name: row.nombre_mostrar },
-          declared: { dui: `${dui.slice(0, 8)}-${dui.slice(8)}`, birth: dateText(row.nacimiento) },
+          declared: { dui: duiText(dui), birth: dateText(row.nacimiento) },
           candidate, candidates: found.length, closest,
         });
       }
@@ -124,7 +127,7 @@ export class AccountLinkingService {
     return this.commands.run(actor, `cuentas.verificar:aprobar:${id}`, key, dto, async c => {
       const row = await this.locked(c, actor, id, dto.version);
       // FR-101-11: with no record, reception creates it ("buscar antes de crear") and approves again.
-      const found = await this.matches(c, String(row.dui_declarado), dateText(row.nacimiento_declarado)!);
+      const found = await this.matches(c, declaredDigits(row.dui_declarado), dateText(row.nacimiento_declarado)!);
       if (!found.length) throw new ProblemException('sin_expediente', 409, 'Ningún expediente activo tiene ese DUI y esa fecha de nacimiento. Búscalo o regístralo antes de aprobar.');
       if (found.length > 1) throw new ConflictException('Más de un expediente coincide; resuelve el posible duplicado antes de aprobar.');
       const patientId = found[0];

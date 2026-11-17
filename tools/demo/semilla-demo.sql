@@ -1958,7 +1958,8 @@ where id = pg_temp.did('0010', 3) and paciente_id is null
 
 insert into acceso.vinculacion_paciente (id, usuario_id, dui_declarado, nacimiento_declarado, paciente_candidato_id, estado, motivo_rechazo,
   verificado_por, creado_en, resuelto_en)
-select pg_temp.did('0011', v.n), pg_temp.did('0010', v.n), v.dui, v.nac, pg_temp.did('0001', v.pac), v.estado, v.motivo,
+-- dui_declarado holds digits only, as the API stores it (account-linking.service.ts `request`).
+select pg_temp.did('0011', v.n), pg_temp.did('0010', v.n), replace(v.dui, '-', ''), v.nac, pg_temp.did('0001', v.pac), v.estado, v.motivo,
        case when v.estado <> 'pendiente' then (select usuario_id from cuentas where rol = 'REC') end, now() - v.hace,
        case when v.estado <> 'pendiente' then now() - v.hace + interval '30 minutes' end
 from (
@@ -2031,7 +2032,7 @@ where u.id = pg_temp.did('0010', v.u) and u.paciente_id is null
 
 insert into acceso.vinculacion_paciente (id, usuario_id, dui_declarado, nacimiento_declarado, paciente_candidato_id, estado, motivo_rechazo,
   verificado_por, creado_en, resuelto_en)
-select pg_temp.did('0011', v.u), pg_temp.did('0010', v.u), p.dui, p.nac + v.dnac, pg_temp.did('0001', p.n), v.estado, v.motivo,
+select pg_temp.did('0011', v.u), pg_temp.did('0010', v.u), replace(p.dui, '-', ''), p.nac + v.dnac, pg_temp.did('0001', p.n), v.estado, v.motivo,
        case when v.estado <> 'pendiente' then (select usuario_id from cuentas where rol = 'REC') end, now() - v.hace,
        case when v.estado <> 'pendiente' then now() - v.hace + interval '40 minutes' end
 from (values
