@@ -13,7 +13,7 @@ final class PlatformParityTests: XCTestCase {
 
     func testFamiliasDeEstadoIgualesALaWeb() {
         let expected: [String: StatusFamily] = [
-            "por_vencer": .espera, "revisar": .espera, "bajo_minimo": .llamado,
+            "por_vencer": .espera, "revisar": .espera, "bajo_minimo": .espera,
             "ok": .listo, "coincide": .listo, "agotado": .cerrado, "atendido": .listo
         ]
         for (value, family) in expected { XCTAssertEqual(StatusFamily.of(value), family, value) }

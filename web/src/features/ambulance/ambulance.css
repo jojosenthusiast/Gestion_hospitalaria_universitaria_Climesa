@@ -5,7 +5,7 @@
 .amb-request-item:hover { border-color: var(--primary); }
 .amb-request-item:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .amb-request-item.is-selected { border-color: var(--primary); background: var(--soft); }
-.amb-request-item.is-urgent .amb-wait { color: var(--danger); font-weight: 700; }
+.amb-request-item.is-urgent .amb-wait { color: var(--priority-urgente); font-weight: 700; }
 .amb-request-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
 .amb-wait { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .amb-request-where { font-size: 14px; }
@@ -34,7 +34,7 @@
 .amb-service { display: grid; gap: 10px; padding: 16px 18px; border: 1.5px solid var(--line); border-left-width: 6px; border-radius: var(--radius-control, 10px); background: var(--surface); }
 .amb-service > header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .amb-service > header time { color: var(--muted); font-size: 14px; margin-left: auto; }
-.amb-prio-roja { border-left-color: var(--danger); }
+.amb-prio-roja { border-left-color: var(--critical); }
 .amb-prio-naranja { border-left-color: var(--warning); }
 .amb-prio-amarilla { border-left-color: #b8860b; }
 .amb-prio-verde { border-left-color: var(--success); }

@@ -29,7 +29,7 @@ export function AmbulanceLogPage({api,version}:{api:Api;version:number}){
  const chips=activeFilters(filters),anyActive=chips.length>0||filters.q!=='';
  const clear=()=>{setFilters(emptyFilters);setText('');};
  return <><CompactHeader breadcrumb="Operaciones / Ambulancia" title="Bitácora de ambulancia"/>
- <section className="data-workbench amb-log" aria-label="Bitácora de servicios">
+ <section className="data-workbench" aria-label="Bitácora de servicios">
   <div className="amb-toolbar">
    <div className="amb-search"><Field label="Buscar en la bitácora" type="search" placeholder="Lugar, municipio o tripulación" value={text} onChange={setText} maxLength={80}/></div>
    <button type="button" className="secondary-button" aria-expanded={open} aria-controls={panel} onClick={()=>setOpen(v=>!v)}><Icon name="chart" size={18}/>Filtros{chips.length?` (${chips.length})`:''}</button>

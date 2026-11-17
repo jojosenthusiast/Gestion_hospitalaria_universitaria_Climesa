@@ -92,7 +92,7 @@ export function ShiftDetail({ shift, now, plan, typeOf, actions, onClose }: {
   const st = displayState(shift, now);
   const run = (fn: (t: ShiftRow) => void) => () => { onClose(); fn(shift); };
   return <Dialog title={shift.person} onClose={onClose}>
-    <div className="module-form shift-detail">
+    <div className="module-form">
       <p className="shift-summary"><RoleChip code={typeOf(shift)} /><AreaChip name={shift.area} /><Tag value={st} label={stateName(st)} /></p>
       <dl className="shift-detail-list">
         <div><dt>Horario</dt><dd>{formatDateTime(shift.start)} a {formatDateTime(shift.end)}</dd></div>

@@ -2,7 +2,8 @@ import SwiftUI
 
 // MARK: - Contenedores
 
-/// Tarjeta de sección: superficie, borde y sombra suave (`.board-card` / `.panel` de web). Título opcional en mayúsculas.
+/// Tarjeta de sección: superficie y borde de 1 pt (`.board-card` / `.panel` de web), sin sombra: agrupa un bloque, no
+/// cada fila (I-9). Título opcional.
 struct SectionCard<Content: View>: View {
     var title: String?
     var eyebrow: String?
@@ -22,7 +23,26 @@ struct SectionCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Theme.line, lineWidth: 1))
-        .shadow(color: Theme.ink.opacity(0.07), radius: 12, y: 4)
+    }
+}
+
+/// I-9: una tarjeta por grupo con sus filas separadas por una línea de 1 pt, nunca una tarjeta por fila.
+struct ListCard<Data: RandomAccessCollection, Row: View>: View where Data.Element: Identifiable {
+    var title: String?
+    let items: Data
+    let row: (Data.Element) -> Row
+
+    init(title: String? = nil, items: Data, @ViewBuilder row: @escaping (Data.Element) -> Row) {
+        self.title = title; self.items = items; self.row = row
+    }
+
+    var body: some View {
+        SectionCard(title: title) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { Divider().overlay(Theme.line) }
+                row(item)
+            }
+        }
     }
 }
 
@@ -32,6 +52,8 @@ struct StatTile: View {
     let label: String
     var unit: String?
     var title: String?
+    /// I-10: dentro de otra tarjeta va sin fondo ni borde (nada de tarjeta dentro de tarjeta).
+    var plain = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
@@ -42,10 +64,10 @@ struct StatTile: View {
             }
             Text(verbatim: label).font(Typo.small).foregroundStyle(Theme.muted)
         }
-        .padding(Spacing.l)
+        .padding(plain ? 0 : Spacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card))
-        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Theme.line, lineWidth: 1))
+        .background(plain ? Color.clear : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(plain ? Color.clear : Theme.line, lineWidth: 1))
         .accessibilityElement(children: .combine)
     }
 }
@@ -71,24 +93,37 @@ struct ListRow<Trailing: View>: View {
     var subtitle: String?
     var meta: String?
     @ViewBuilder let trailing: () -> Trailing
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     init(title: String, subtitle: String? = nil, meta: String? = nil, @ViewBuilder trailing: @escaping () -> Trailing) {
         self.title = title; self.subtitle = subtitle; self.meta = meta; self.trailing = trailing
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: Spacing.m) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(verbatim: title).font(Typo.subheading).foregroundStyle(Theme.ink)
-                if let subtitle, !subtitle.isEmpty { Text(verbatim: subtitle).font(Typo.small).foregroundStyle(Theme.muted) }
-                if let meta, !meta.isEmpty { Text(verbatim: meta).font(Typo.eyebrow).foregroundStyle(Theme.muted) }
-            }
-            Spacer(minLength: Spacing.s)
+        // I-24: con tamaños de accesibilidad la insignia baja debajo del título en lugar de cortarlo.
+        let stacked = typeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.s))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: Spacing.m))
+        layout {
+            texts
+            if !stacked { Spacer(minLength: Spacing.s) }
             trailing()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, Spacing.m)
         .frame(minHeight: Spacing.control)
         .accessibilityElement(children: .combine)
+    }
+}
+
+private extension ListRow {
+    var texts: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(verbatim: title).font(Typo.subheading).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+            if let subtitle, !subtitle.isEmpty { Text(verbatim: subtitle).font(Typo.small).foregroundStyle(Theme.muted) }
+            if let meta, !meta.isEmpty { Text(verbatim: meta).font(Typo.eyebrow).foregroundStyle(Theme.muted) }
+        }
     }
 }
 
@@ -254,7 +289,7 @@ private struct StateLayout<Body: View>: View {
 
     var body: some View {
         VStack(spacing: Spacing.m) {
-            Image(systemName: symbol).font(.system(size: 26, weight: .semibold)).foregroundStyle(tint)
+            Image(systemName: symbol).font(Typo.title).foregroundStyle(tint)
                 .frame(width: 64, height: 64).background(tintSoft, in: Circle()).accessibilityHidden(true)
             content()
         }
@@ -454,7 +489,7 @@ private struct FamilyBadge: View {
         let solid = family.pattern == .solido
         HStack(spacing: 6) {
             Image(systemName: family.symbol).imageScale(.small).accessibilityHidden(true)
-            Text(verbatim: text).lineLimit(1)
+            Text(verbatim: text).lineLimit(2).fixedSize(horizontal: false, vertical: true)
         }
         .font(Typo.tag)
         .foregroundStyle(solid ? Theme.onStatus : colors.strong)
@@ -472,7 +507,7 @@ private struct NeutralBadge: View {
         let colors = Theme.colors(for: tone)
         HStack(spacing: 6) {
             Circle().fill(colors.foreground).frame(width: 7, height: 7).accessibilityHidden(true)
-            Text(verbatim: text).lineLimit(1)
+            Text(verbatim: text).lineLimit(2).fixedSize(horizontal: false, vertical: true)
         }
         .font(Typo.tag)
         .foregroundStyle(colors.foreground)

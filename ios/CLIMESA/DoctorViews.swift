@@ -43,7 +43,7 @@ struct DoctorDayView: View {
                         MedicoAlert(text: String(format: L.text("results.critical.pending"), day.criticalResults))
                     }.buttonStyle(.plain)
                 }
-                summary(day)
+                // I-11: no tile grid repeating what each section already says.
                 partErrors(day)
                 if let open = day.unsigned?.value, !open.isEmpty { unsignedSection(open) }
                 if let pending = day.reschedules?.value, !pending.isEmpty { rescheduleSection(pending) }
@@ -58,24 +58,31 @@ struct DoctorDayView: View {
     }
 
     @ViewBuilder private func unsignedSection(_ open: [UnsignedConsultation]) -> some View {
-        SectionCard(title: L.text("day.unsigned")) {
-            ForEach(open) { item in
-                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.display(item.startedAt))
-                NavigationLink { ConsultationView(origin: .resume(item), profile: profile) } label: { Text("day.unsigned.resume") }
-                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
-            }
+        ListCard(title: L.text("day.unsigned"), items: open) { item in
+            NavigationLink { ConsultationView(origin: .resume(item), profile: profile) } label: {
+                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.display(item.startedAt)) {
+                    HStack(spacing: Spacing.s) {
+                        Text("day.unsigned.resume").font(Typo.label).foregroundStyle(Theme.primaryText)
+                        Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                    }
+                }
+                .contentShape(Rectangle())
+            }.buttonStyle(.plain)
         }
     }
 
     @ViewBuilder private func rescheduleSection(_ pending: [Appointment]) -> some View {
         SectionCard(title: L.text("day.reschedules")) {
             WriteNotice(submission: deciding, reload: load)
-            ForEach(pending) { item in
+            ForEach(Array(pending.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { Divider().overlay(Theme.line) }
                 ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.display(item.start),
                         meta: item.reschedule.map { "→ \(ClimesaDates.display($0.start))" })
                 // S13: a list of decisions has no primary of its own; "Llamar siguiente" / "Atender" is the day's primary.
+                // I-15: the spinner shows only on the row being decided.
                 HStack(spacing: Spacing.m) {
-                    ClimesaButton(title: L.text("day.reschedules.accept"), kind: .secondary, loading: deciding.busy) { Task { await accept(item) } }
+                    ClimesaButton(title: L.text("day.reschedules.accept"), kind: .secondary, loading: deciding.busyId != nil && deciding.busyId == item.reschedule?.id) { Task { await accept(item) } }
+                        .disabled(deciding.busy)
                     ClimesaButton(title: L.text("day.reschedules.reject"), kind: .secondary) { rejecting = item }
                         .disabled(deciding.busy)
                 }
@@ -90,19 +97,6 @@ struct DoctorDayView: View {
             _ = try await account.client().send("POST", "/citas/reprogramaciones/\(request.id)/aceptar", body: body, key: key, as: AppointmentCommandResult.self)
         }
         await load()
-    }
-
-    @ViewBuilder private func summary(_ day: DoctorDay) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: Spacing.m), GridItem(.flexible(), spacing: Spacing.m)], spacing: Spacing.m) {
-            if let pending = day.pendingResults?.value {
-                Button { go(.resultados) } label: { StatTile(value: "\(pending)", label: L.text("day.results")) }.buttonStyle(.plain)
-            }
-            if let agenda = day.agenda?.value { StatTile(value: "\(agenda.count)", label: L.text("day.appointments")) }
-            if let tickets = day.tickets?.value {
-                StatTile(value: "\(tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count)", label: L.text("ds.medico.stat.waiting"))
-            }
-            if let count = day.hospitalized?.value { StatTile(value: "\(count)", label: L.text("ds.medico.stat.hospitalized")) }
-        }
     }
 
     /// Partes del día que no se pudieron leer, cada una con su título y «Reintentar».
@@ -122,59 +116,66 @@ struct DoctorDayView: View {
         let waiting = tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count
         // S13: one primary on the day: attend the number already called, otherwise call the next one.
         let primary = DoctorDayActionRules.primary(tickets: tickets, canAttend: account.can("consulta.iniciar"), canCallNext: account.can("fila.llamar"))
+        let called = tickets.filter { $0.state == .llamado || $0.state == .enAtencion }.sorted { $0.number < $1.number }
         SectionCard(title: L.text("day.queue")) {
             Text(verbatim: String(format: L.text("day.queue.waiting"), waiting)).font(Typo.body).foregroundStyle(Theme.ink)
             // S9 / RN-FILA-SIGUIENTE: the server proposes who goes next and says why; "Llamar siguiente" calls that number.
             if let next { nextCard(next) }
             if account.can("fila.llamar"), QueueRules.nextToCall(tickets) != nil {
-                ClimesaButton(title: L.text("day.queue.callNext"), kind: primary == .callNext ? .primary : .secondary, loading: calling.busy) { Task { await callNext() } }
+                ClimesaButton(title: L.text("day.queue.callNext"), kind: primary == .callNext ? .primary : .secondary, loading: calling.busyId == "siguiente") { Task { await callNext() } }
+                    .disabled(calling.busy)
             }
             if let undo, DoctorDayActionRules.canUndoCall(undo.id, tickets: tickets) {
                 HStack(spacing: Spacing.m) {
                     Text(verbatim: String(format: L.text("queue.called.undoable"), undo.code)).font(Typo.body).foregroundStyle(Theme.ink)
                     Spacer()
-                    Button(L.text("queue.undo")) { Task { await undoCall() } }.disabled(calling.busy)
+                    Button(L.text("queue.undo")) { Task { await undoCall() } }.disabled(calling.busy).frame(minHeight: 44)
                 }
             }
             WriteNotice(submission: calling, reload: load)
-        }
-        let called = tickets.filter { $0.state == .llamado || $0.state == .enAtencion }.sorted { $0.number < $1.number }
-        ForEach(called) { ticket in
-            SectionCard {
-                HStack(spacing: Spacing.s) {
-                    AreaTag(QueueBoardRules.area(ticket))
-                    // The per-area number, large, as it is called out ("CON 7").
-                    Text(verbatim: "\(ticket.number)").font(Typo.number(22)).foregroundStyle(Theme.ink).accessibilityLabel(QueueBoardRules.code(ticket))
-                    Spacer()
-                    MedicoTag(ticket.state.rawValue, label: ticket.state.label)
-                }
-                Text(verbatim: ticket.patientName ?? ticket.service.label).font(Typo.body).foregroundStyle(Theme.ink)
-                HStack(spacing: Spacing.s) {
-                    if QueueBoardRules.priority(ticket) != "rutina" { PriorityBadge(ticket.priority) }
-                    Text(verbatim: QueueBoardRules.arrival(ticket)).font(Typo.small).foregroundStyle(ticket.appointmentAt == nil ? Theme.muted : Theme.ink)
-                }
-                // FILA-01: volver a llamar o "No se presentó" solo cuando el servidor lo permite; si no, su motivo.
-                let allowed = ticket.allowedActions ?? []
-                if allowed.contains(.llamar) || allowed.contains(.noSePresento) {
-                    HStack(spacing: Spacing.m) {
-                        if allowed.contains(.llamar) { ClimesaButton(title: L.text("day.queue.callAgain"), kind: .secondary, loading: calling.busy) { Task { await call(ticket) } } }
-                        if allowed.contains(.noSePresento) { ClimesaButton(title: QueueAction.noSePresento.label, kind: .secondary, loading: calling.busy) { Task { await absent(ticket) } } }
-                    }
-                }
-                ForEach(ticket.blockedActions ?? [], id: \.action) { item in
-                    Text(verbatim: "\(item.action.label): \(item.reason)").font(Typo.small).foregroundStyle(Theme.muted)
-                }
-                cardMenu(ticket)
-                if DoctorDayActionRules.calledElsewhere(ticket) {
-                    // Another clinician called this number: it is theirs to attend (web `calledElsewhere`).
-                    Text("day.queue.calledElsewhere").font(Typo.small).foregroundStyle(Theme.muted)
-                } else if account.can("consulta.iniciar") {
-                    // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
-                    NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
-                        .buttonStyle(ClimesaButtonStyle(kind: primary == .attend(ticket.id) ? .primary : .secondary))
-                }
+            // I-9: called numbers are rows of this card, not one card each.
+            ForEach(called) { ticket in
+                Divider().overlay(Theme.line)
+                calledRow(ticket, primary: primary)
             }
         }
+    }
+
+    @ViewBuilder private func calledRow(_ ticket: QueueTicket, primary: DoctorDayAction?) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(spacing: Spacing.s) {
+                AreaTag(QueueBoardRules.area(ticket))
+                // The per-area number, large, as it is called out ("CON 7").
+                Text(verbatim: "\(ticket.number)").font(Typo.number(22)).foregroundStyle(Theme.ink).accessibilityLabel(QueueBoardRules.code(ticket))
+                Spacer()
+                MedicoTag(ticket.state.rawValue, label: ticket.state.label)
+            }
+            Text(verbatim: ticket.patientName ?? ticket.service.label).font(Typo.body).foregroundStyle(Theme.ink)
+            HStack(spacing: Spacing.s) {
+                if QueueBoardRules.priority(ticket) != "rutina" { PriorityBadge(ticket.priority) }
+                Text(verbatim: QueueBoardRules.arrival(ticket)).font(Typo.small).foregroundStyle(ticket.appointmentAt == nil ? Theme.muted : Theme.ink)
+            }
+            // FILA-01: volver a llamar o "No se presentó" solo cuando el servidor lo permite. I-12: an action the server
+            // blocks is hidden, its internal reason is not printed. I-15: the spinner shows only on this number.
+            let allowed = ticket.allowedActions ?? []
+            let rowBusy = calling.busyId == ticket.id
+            if allowed.contains(.llamar) || allowed.contains(.noSePresento) {
+                HStack(spacing: Spacing.m) {
+                    if allowed.contains(.llamar) { ClimesaButton(title: L.text("day.queue.callAgain"), kind: .secondary, loading: rowBusy) { Task { await call(ticket) } }.disabled(calling.busy) }
+                    if allowed.contains(.noSePresento) { ClimesaButton(title: QueueAction.noSePresento.label, kind: .secondary) { Task { await absent(ticket) } }.disabled(calling.busy) }
+                }
+            }
+            cardMenu(ticket)
+            if DoctorDayActionRules.calledElsewhere(ticket) {
+                // Another clinician called this number: it is theirs to attend (web `calledElsewhere`).
+                Text("day.queue.calledElsewhere").font(Typo.small).foregroundStyle(Theme.muted)
+            } else if account.can("consulta.iniciar") {
+                // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
+                NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
+                    .buttonStyle(ClimesaButtonStyle(kind: primary == .attend(ticket.id) ? .primary : .secondary))
+            }
+        }
+        .padding(.vertical, Spacing.s)
     }
 
     @ViewBuilder private func nextCard(_ next: QueueNextProposal) -> some View {
@@ -191,12 +192,15 @@ struct DoctorDayView: View {
             } else {
                 Text("queue.next.none").font(Typo.body).foregroundStyle(Theme.ink)
             }
-            Text(verbatim: String(format: L.text("queue.next.rule"), next.rule)).font(Typo.small).foregroundStyle(Theme.muted)
+            // I-31: the rule stays one tap away instead of a sentence under every proposal.
+            DisclosureGroup {
+                Text(verbatim: String(format: L.text("queue.next.rule"), next.rule)).font(Typo.small).foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } label: { Text("queue.next.why").font(Typo.small).foregroundStyle(Theme.primaryText).frame(minHeight: 44) }
         }
         .padding(Spacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
         .areaSurface(next.area)
-        .accessibilityElement(children: .combine)
     }
 
     /// Board moves without dragging: only the moves the server accepts now, plus the priority (S9).
@@ -215,7 +219,7 @@ struct DoctorDayView: View {
                 ForEach(priorities, id: \.self) { value in
                     Button(String(format: L.text("queue.priority.to"), QueueBoardRules.priorityLabel(value))) { Task { await setPriority(ticket, value) } }
                 }
-            } label: { Text("queue.menu") }
+            } label: { Text("queue.menu").frame(minHeight: 44).contentShape(Rectangle()) }
             .disabled(calling.busy)
             .accessibilityLabel(String(format: L.text("queue.menu.for"), QueueBoardRules.code(ticket)))
         }
@@ -223,29 +227,32 @@ struct DoctorDayView: View {
 
     @ViewBuilder private func agendaSection(_ agenda: [AgendaEntry]) -> some View {
         if agenda.isEmpty {
-            SectionCard(title: L.text("day.agenda")) { EmptyStateView(title: L.text("day.agenda.none")) }
+            // I-37: one line inside the section, not a large empty block.
+            SectionCard(title: L.text("day.agenda")) { EmptyNote("day.agenda.none") }
         } else {
-            Text("day.agenda").font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).accessibilityAddTraits(.isHeader)
-        }
-        ForEach(agenda) { entry in
-            SectionCard {
-                ListRow(title: entry.patientName ?? L.text("day.patient.unknown"), subtitle: entry.reason, meta: ClimesaDates.display(entry.start, .time)) {
-                    if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
-                    else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
-                }
-                HStack(spacing: Spacing.m) {
-                    // MA-CIT-03: iniciar solo el día de la cita (lo decide el servidor con `allowedActions`).
-                    if entry.consultationId != nil || (account.can("consulta.iniciar") && (entry.allowedActions?.contains(.iniciarConsulta) ?? (entry.appointmentState == .confirmada))) {
-                        NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: { Text(LocalizedStringKey(Self.consultationLinkKey(entry))) }
-                            .buttonStyle(ClimesaButtonStyle(kind: .secondary))
-                    } else if let reason = entry.blockedActions?.first(where: { $0.action == .iniciarConsulta })?.reason {
-                        Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted)
+            ListCard(title: L.text("day.agenda"), items: agenda) { entry in
+                VStack(alignment: .leading, spacing: Spacing.s) {
+                    ListRow(title: entry.patientName ?? L.text("day.patient.unknown"), subtitle: entry.reason, meta: ClimesaDates.display(entry.start, .time)) {
+                        if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
+                        else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
                     }
-                    if account.can("expediente.ver") {
-                        NavigationLink {
-                            PatientRecordScreen(patientId: entry.patientId)
-                        } label: { Text("day.record") }
-                            .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+                    // MA-CIT-03: iniciar solo el día de la cita (lo decide el servidor con `allowedActions`). I-12: a blocked
+                    // start is hidden; its server reason is not body text.
+                    let canOpen = entry.consultationId != nil || (account.can("consulta.iniciar") && (entry.allowedActions?.contains(.iniciarConsulta) ?? (entry.appointmentState == .confirmada)))
+                    if canOpen || account.can("expediente.ver") {
+                        HStack(spacing: Spacing.m) {
+                            if canOpen {
+                                NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: { Text(LocalizedStringKey(Self.consultationLinkKey(entry))) }
+                                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+                            }
+                            if account.can("expediente.ver") {
+                                NavigationLink {
+                                    PatientRecordScreen(patientId: entry.patientId)
+                                } label: { Text("day.record") }
+                                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+                            }
+                        }
+                        .padding(.bottom, Spacing.s)
                     }
                 }
             }
@@ -260,8 +267,22 @@ struct DoctorDayView: View {
 
     @ViewBuilder private func moreSection(_ day: DoctorDay) -> some View {
         let sections = AppSection.visible(for: "MED", profile: profile).filter { [.agenda, .hospitalizados, .llegadaAmbulancia].contains($0) }
-        if !sections.isEmpty {
+        let pendingResults = day.pendingResults?.value ?? 0
+        if !sections.isEmpty || pendingResults > 0 {
             SectionCard(title: L.text("day.more")) {
+                // The pending count lives here once, as a link to Resultados (I-11).
+                if pendingResults > 0 {
+                    Button { go(.resultados) } label: {
+                        ListRow(title: L.text("day.results.title")) {
+                            HStack(spacing: Spacing.s) {
+                                Text(verbatim: "\(pendingResults)").font(Typo.label).monospacedDigit().foregroundStyle(Theme.ink)
+                                Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }.buttonStyle(.plain)
+                    if !sections.isEmpty { Divider().overlay(Theme.line) }
+                }
                 ForEach(Array(sections.enumerated()), id: \.element) { index, section in
                     if index > 0 { Divider().overlay(Theme.line) }
                     NavigationLink { PatientSectionView(section: section, profile: profile) } label: {
@@ -387,43 +408,51 @@ struct DoctorDayView: View {
     }
 }
 
-/// Pestaña Pacientes: buscar y abrir el expediente (I22).
+/// Pestaña Pacientes: buscar y abrir el expediente (I22). I-27: busca mientras se escribe (con una pausa breve tras la
+/// última tecla), sin botón ni frases de ayuda; la nota de privacidad va solo en el estado vacío.
 struct DoctorPatientsView: View {
     @EnvironmentObject private var account: AccountModel
     @State private var query = ""
     @State private var loader = Loader<[PatientCandidate]>()
 
+    private var trimmed: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
-            SectionCard {
-                FormField(label: L.text("patients.search"), text: $query, hint: L.text("patients.search.hint"))
-                    .textInputAutocapitalization(.words).autocorrectionDisabled().submitLabel(.search)
-                    .onSubmit { Task { await search() } }
-                ClimesaButton(title: L.text("ds.medico.search"), loading: loader.loading) { Task { await search() } }
-                Text("patients.treating_only").font(Typo.caption).foregroundStyle(Theme.muted)
-            }
+            FormField(label: L.text("patients.search"), text: $query)
+                .textInputAutocapitalization(.words).autocorrectionDisabled().submitLabel(.search)
+                .onSubmit { Task { await search() } }
+            if trimmed.count == 1 { EmptyNote("patients.search.hint") }
             LoadState(loader: loader, retry: search) { rows in
-                if rows.isEmpty { EmptyStateView(title: L.text("patients.none"), symbol: "magnifyingglass") }
-                ForEach(rows) { patient in
-                    NavigationLink {
-                        PatientRecordScreen(patientId: patient.id)
-                    } label: {
-                        SectionCard {
+                if rows.isEmpty {
+                    EmptyStateView(title: L.text("patients.none"), message: L.text("patients.treating_only"), symbol: "magnifyingglass")
+                } else {
+                    ListCard(items: rows) { patient in
+                        NavigationLink {
+                            PatientRecordScreen(patientId: patient.id)
+                        } label: {
                             ListRow(title: patient.fullName, meta: patient.record) {
                                 HStack(spacing: Spacing.s) {
                                     if !patient.active { StatusTag("inactivo", label: L.text("patients.inactive")) }
                                     Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
                                 }
                             }
-                        }
-                    }.buttonStyle(.plain)
+                            .contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    }
                 }
             }
+        }
+        // Debounce of the user's typing (not a refresh timer): the search runs 0.4 s after the last key.
+        .task(id: trimmed) {
+            guard trimmed.count >= 2 else { loader.clear(); return }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            if !Task.isCancelled { await search() }
         }
     }
 
     private func search() async {
-        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = trimmed
         guard text.count >= 2 else { loader.clear(); return }
         await loader.load { try await account.client().get("/pacientes?query=\(Query.encode(text))&limit=20", as: [PatientCandidate].self) }
     }
@@ -449,19 +478,19 @@ struct ResultsReviewView: View {
                     LabFollowUpInbox(items: items, submission: followUpSubmission, review: review)
                 }
             }
+            // I-32: critical results are tagged on their row (critical first); no extra banner repeating the count.
             let pending = ReviewRules.pending(orders)
-            let critical = ReviewRules.criticalToReview(orders)
             let inProgress = ReviewRules.cancellable(orders)
-            if critical > 0 { MedicoAlert(text: String(format: L.text("results.critical.pending"), critical)) }
             if pending.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
-            ForEach(pending) { order in
-                NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
-                    LabOrderRow(order: order, status: L.text(ReviewRules.rowStatusKey(order)), critical: ReviewRules.isCritical(order))
-                }.buttonStyle(.plain)
+            else {
+                ListCard(items: pending) { order in
+                    NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
+                        LabOrderRow(order: order, status: L.text(ReviewRules.rowStatusKey(order)), critical: ReviewRules.isCritical(order))
+                    }.buttonStyle(.plain)
+                }
             }
             if !inProgress.isEmpty {
-                Text("results.inProgress").font(Typo.subheading).foregroundStyle(Theme.ink).padding(.top, Spacing.m)
-                ForEach(inProgress) { order in
+                ListCard(title: L.text("results.inProgress"), items: inProgress) { order in
                     NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
                         LabOrderRow(order: order, status: order.state.label, critical: false)
                     }.buttonStyle(.plain)
@@ -503,9 +532,10 @@ private struct LabFollowUpInbox: View {
     let review: (LabFollowUp) async -> Void
 
     var body: some View {
-        SectionCard(title: L.text("results.followUp.title"), eyebrow: String(format: L.text("results.followUp.count"), items.count)) {
+        SectionCard(title: L.text("results.followUp.title")) {
             if items.isEmpty { Text("results.followUp.none").font(Typo.small).foregroundStyle(Theme.muted) }
-            ForEach(items) { item in
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { Divider().overlay(Theme.line) }
                 VStack(alignment: .leading, spacing: Spacing.s) {
                     HStack(spacing: Spacing.s) {
                         Text(verbatim: item.patientName ?? L.text("results.followUp.patient")).font(Typo.label).foregroundStyle(Theme.ink)
@@ -513,7 +543,7 @@ private struct LabFollowUpInbox: View {
                         // A relevant observation is not a process state: neutral tag; red only for the critical value.
                         PatientTag(item.critical ? "critico_alto" : "observacion", label: L.text(item.critical ? "results.critical" : "results.followUp.observation"))
                     }
-                    if let record = item.patientRecord { Text(verbatim: "Exp. \(record)").font(Typo.small).foregroundStyle(Theme.muted) }
+                    if let record = item.patientRecord { Text(verbatim: String(format: L.text("results.followUp.record"), record)).font(Typo.small).foregroundStyle(Theme.muted) }
                     Text(verbatim: item.detail).font(Typo.small).foregroundStyle(Theme.ink)
                     ClimesaButton(title: L.text("results.followUp.review"), kind: .secondary, loading: submission.busyId == item.id) { Task { await review(item) } }
                         .disabled(submission.busy)
@@ -595,13 +625,11 @@ private struct SendExternalSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "results.external.send") {
-                Text("results.external.intro").font(Typo.small).foregroundStyle(Theme.muted)
+            ScreenFrame(title: "results.external.send", onClose: { dismiss() }) {
                 MedicoTextArea(label: L.text("results.external.place"), text: $place, error: problem ?? submission.fieldErrors["place"], lines: 1...2)
                 MedicoTextArea(label: L.text("results.external.instructions"), text: $instructions, error: submission.fieldErrors["instructions"], lines: 3...6)
                 WriteNotice(submission: submission, reload: reload)
                 ClimesaButton(title: L.text("results.external.confirm"), loading: submission.busy) { Task { await send() } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }
@@ -631,11 +659,10 @@ private struct CancelLabOrderSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "results.cancel.title") {
+            ScreenFrame(title: "results.cancel.title", onClose: { dismiss() }) {
                 SectionCard {
                     ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: order.patientName, meta: order.state.label)
                 }
-                Text("results.cancel.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     MedicoTextArea(label: L.text("results.cancel.reason"), text: $reason, error: reasonError ?? submission.fieldErrors["reason"], lines: 3...6)
                     CharacterCounter(count: LabCancelRules.reasonCount(reason), range: LabCancelRules.reasonRange)
@@ -645,7 +672,6 @@ private struct CancelLabOrderSheet: View {
                 }
                 WriteNotice(submission: submission, reload: reload)
                 ClimesaButton(title: L.text("results.cancel"), kind: .destructive, loading: submission.busy) { Task { await send() } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }
@@ -704,7 +730,7 @@ private struct HospitalizedRow: View {
                     Text(verbatim: hint).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Spacing.s).frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.warningSoft, in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.warningSoft, in: RoundedRectangle(cornerRadius: Radius.control))
                 .accessibilityElement(children: .combine)
             }
             if let discharge = actions.discharge { SignedDischarge(discharge: discharge) }
@@ -790,15 +816,30 @@ private struct DischargeView: View {
                 }
             }
             SectionCard(title: L.text("discharge.pending")) {
+                // I-38: each pending item removes with a 44 pt icon; adding is a text button, not two full-width buttons per item.
                 ForEach($pending) { $line in
-                    FormField(label: L.text("discharge.pending.description"), text: $line.description)
-                    FormField(label: L.text("discharge.pending.responsible"), text: $line.responsible)
-                    ClimesaButton(title: L.text("discharge.pending.remove"), kind: .secondary) {
-                        pending.removeAll { $0.id == line.id }
+                    if line.id != pending.first?.id { Divider().overlay(Theme.line) }
+                    HStack(alignment: .top, spacing: Spacing.s) {
+                        VStack(alignment: .leading, spacing: Spacing.m) {
+                            FormField(label: L.text("discharge.pending.description"), text: $line.description)
+                            FormField(label: L.text("discharge.pending.responsible"), text: $line.responsible)
+                        }
+                        Button {
+                            let id = line.id
+                            pending.removeAll { $0.id == id }
+                        } label: {
+                            Image(systemName: "minus.circle").font(Typo.heading).frame(width: 44, height: 44).contentShape(Rectangle())
+                        }
+                        .foregroundStyle(Theme.muted)
+                        .accessibilityLabel(Text("discharge.pending.remove"))
                     }
                 }
                 FieldError(text: errors["pending"] ?? submission.fieldErrors["pending"])
-                ClimesaButton(title: L.text("discharge.pending.add"), kind: .secondary) { pending.append(PendingLine()) }
+                Button { pending.append(PendingLine()) } label: {
+                    Label { Text("discharge.pending.add") } icon: { Image(systemName: "plus") }
+                        .font(Typo.label).frame(minHeight: 44).contentShape(Rectangle())
+                }
+                .foregroundStyle(Theme.primaryText)
             }
             WriteNotice(submission: submission, reload: reload)
             ClimesaButton(title: L.text("discharge.sign"), loading: submission.busy) {
@@ -988,8 +1029,14 @@ private struct PrehospitalReportCard: View {
             if let eta = report.estimatedArrival { Text(verbatim: String(format: L.text("arrival.eta"), ClimesaDates.display(eta, .time))).font(Typo.heading).foregroundStyle(Theme.ink) }
             if let reason = report.reason { Text(verbatim: reason).font(Typo.body).foregroundStyle(Theme.ink) }
             if let signs = report.vitalSigns, !signs.isEmpty {
-                ForEach(signs.keys.sorted(), id: \.self) { key in
-                    HStack { Text(verbatim: key).font(Typo.mono).foregroundStyle(Theme.muted); Spacer(); Text(verbatim: signs[key]?.text ?? "").font(Typo.body).foregroundStyle(Theme.ink) }
+                // I-21: Spanish names and units, never the raw API key.
+                ForEach(VitalSignLabels.ordered(Array(signs.keys)), id: \.self) { key in
+                    HStack {
+                        Text(verbatim: VitalSignLabels.label(key)).font(Typo.small).foregroundStyle(Theme.muted)
+                        Spacer()
+                        Text(verbatim: VitalSignLabels.value(key, signs[key]?.text ?? "")).font(Typo.body).monospacedDigit().foregroundStyle(Theme.ink)
+                    }
+                    .accessibilityElement(children: .combine)
                 }
             }
         }
@@ -1009,17 +1056,16 @@ private struct RejectRescheduleSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "day.reschedules.reject.title") {
+            ScreenFrame(title: "day.reschedules.reject.title", onClose: { dismiss() }) {
                 SectionCard {
                     ListRow(title: appointment.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.display(appointment.start),
                             meta: appointment.reschedule.map { "→ \(ClimesaDates.display($0.start))" })
                 }
-                TextField(L.text("day.reschedules.reject.reason"), text: $reason, axis: .vertical).lineLimit(3...6).textFieldStyle(.roundedBorder)
+                MedicoTextArea(label: L.text("day.reschedules.reject.reason"), text: $reason, error: submission.fieldErrors["reason"], lines: 3...6)
                 CharacterCounter(count: trimmed.count, range: 10...500)
                 WriteNotice(submission: submission, reload: reload)
                 ClimesaButton(title: L.text("day.reschedules.reject"), kind: .destructive, loading: submission.busy) { Task { await send() } }
                     .disabled(!(10...500).contains(trimmed.count))
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }

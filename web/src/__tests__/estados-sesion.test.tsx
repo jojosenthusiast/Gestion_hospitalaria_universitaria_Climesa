@@ -55,10 +55,13 @@ describe('en vivo, conflicto y carga', () => {
   const perfil: AccessProfile = { id: 'u', user: { id: 'u' }, email: 'jop@example.test', name: 'Cuenta', roles: ['JOP'], platforms: ['web'], permissions: [{ code: 'personal.ver', context: 'global' }], channels: [], patientId: null, staffId: null };
   const api = { request: vi.fn(async () => ({ lastUpdate: '2026-11-13T16:40:00Z' })), write: vi.fn() } as unknown as Api;
 
-  it('con la conexión al día no muestra el indicador "En vivo" y conserva el reloj del hospital', () => {
+  // R1: the decorative clock widget is gone; the topbar shows the hospital day as plain text.
+  it('con la conexión al día no muestra el indicador "En vivo" y muestra la fecha sin reloj', () => {
     render(<HospitalShell api={api} profile={perfil} connection="live" onLogout={() => undefined} />);
     expect(screen.queryByText(/En vivo/)).toBeNull();
-    expect(screen.getByLabelText(/Hora actual/)).toBeTruthy();
+    expect(screen.queryByLabelText(/Hora actual/)).toBeNull();
+    expect(document.querySelector('.hospital-clock')).toBeNull();
+    expect(document.querySelector('time.topbar-date')?.textContent).toMatch(/de/);
   });
 
   it('sin conexión no dice "En vivo"', () => {

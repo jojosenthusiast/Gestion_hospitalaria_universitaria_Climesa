@@ -24,9 +24,12 @@ describe('W33 · métricas por rango', () => {
     const lab = await screen.findByRole('region', { name: 'Tiempo de laboratorio (orden a completado)' });
     expect(within(lab).getByText(/Minutos entre que se pide el examen/)).toBeTruthy();
     expect(within(lab).getByText(/Menos es mejor/)).toBeTruthy();
-    expect(await within(lab).findByText('Crítico')).toBeTruthy();
+    // R1: an operating reference passed is urgent amber, not critical red (red is only for critical clinical values).
+    expect(await within(lab).findByText('Fuera de la referencia')).toBeTruthy();
     // S13 (T10w): the reading is a shared StatusBadge, so it carries icon and pattern, not only colour.
-    expect(within(lab).getByText('Crítico').closest('.status-badge')!.className).toContain('fam-critico');
+    const reading = within(lab).getByText('Fuera de la referencia').closest('.status-badge')!;
+    expect(reading.className).toContain('priority-urgente');
+    expect(reading.className).not.toContain('fam-critico');
     expect(within(lab).getByRole('img', { name: /Tiempo de laboratorio \(orden a completado\) por día/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Últimos 7 días' }).getAttribute('aria-pressed')).toBe('true');
     await userEvent.click(screen.getByRole('button', { name: 'Últimos 30 días' }));

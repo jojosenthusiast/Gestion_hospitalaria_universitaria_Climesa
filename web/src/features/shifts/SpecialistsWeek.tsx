@@ -27,7 +27,7 @@ export function SpecialistsWeek({ api, version }: { api: Api; version: number })
     }
     return [...out.entries()];
   }, [data.data]);
-  return <section className="data-workbench specialists-week" aria-label="Especialistas de la semana">
+  return <section className="data-workbench" aria-label="Especialistas de la semana">
     <div className="shift-toolbar"><div className="shift-toolbar-row">
       <button type="button" className="secondary-button" onClick={() => move(-1)}>Semana anterior</button>
       <strong>Semana del {dayName(from)}</strong>

@@ -79,8 +79,11 @@ describe('Fila del día (W29)', () => {
 describe('Fila del día · acciones según el servidor (FILA-01, FILA-02)', () => {
   it('"No se presentó" aparece desactivado con el motivo hasta completar los llamados', async () => {
     montar(['fila.ver', 'fila.gestionar'], [ticket('llamado', 7, ['atender'], [{ action: 'no_se_presento', reason: 'Disponible después de 3 llamados (van 1).' }])]);
-    expect((await screen.findByRole('button', { name: 'No se presentó' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/Disponible después de 3 llamados \(van 1\)/)).toBeTruthy();
+    // R1 (S4): aria-disabled keeps it focusable; the reason is its accessible description (a tooltip), not body text.
+    const boton = await screen.findByRole('button', { name: 'No se presentó' });
+    expect(boton.getAttribute('aria-disabled')).toBe('true');
+    expect(document.getElementById(boton.getAttribute('aria-describedby')!)!.textContent).toBe('Disponible después de 3 llamados (van 1).');
+    expect(document.querySelector('.form-hint')?.textContent ?? '').not.toMatch(/Disponible después/);
     expect(screen.getByText(/Llamado 1 de 3 vez/)).toBeTruthy();
   });
 

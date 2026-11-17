@@ -84,11 +84,12 @@ describe('Resultados por revisar (médico)', () => {
     expect(await screen.findByText('Al día: no tienes resultados por revisar.')).toBeTruthy();
   });
 
-  it('un error de carga muestra «Reintentar», no el texto de al día', async () => {
+  // R1: the shared SectionState names the retry «Volver a intentar», as every other section.
+  it('un error de carga muestra «Volver a intentar», no el texto de al día', async () => {
     let falla = true;
     const api = apiCon(async () => { if (falla) throw new ApiError('El servicio no está disponible.', 503, 'no_disponible'); return [critico]; });
     render(<LabResultsInbox api={api} profile={conPermiso} version={0} />);
-    const reintentar = await screen.findByRole('button', { name: 'Reintentar' });
+    const reintentar = await screen.findByRole('button', { name: 'Volver a intentar' });
     expect(screen.queryByText('Al día: no tienes resultados por revisar.')).toBeNull();
     falla = false;
     await userEvent.click(reintentar);

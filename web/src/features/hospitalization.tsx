@@ -57,7 +57,7 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
       <td data-label="Categoría">{categoryNames[row.requestedCategory] ?? row.requestedCategory}{row.authorized && <small>Excepción autorizada</small>}</td>
       <td data-label="Estado"><Tag value={row.state} /><DischargeWait row={row} /></td>
       <td data-label="Cama">{row.bed || 'Sin cama'}</td>
-      <td data-label="Acción"><div className="row-actions">{availableActions(row).map((a, index) => <button key={a.key} className={index === 0 ? 'row-action' : 'row-action admission-secondary-action'} onClick={() => setDialog({ kind: a.key, admission: row })}>{a.label}{index === 0 && <> <Icon name="arrow" size={16} /></>}</button>)}</div></td>
+      <td data-label="Acción"><div className="row-actions">{availableActions(row).map((a, index) => <button key={a.key} className="row-action" onClick={() => setDialog({ kind: a.key, admission: row })}>{a.label}{index === 0 && <> <Icon name="arrow" size={16} /></>}</button>)}</div></td>
     </tr>)}</tbody></table> : <Empty title="No hay admisiones activas" description="Las nuevas admisiones aparecerán aquí cuando Recepción o Jefatura las registren." />}</RemoteState></section>
     {creating && <AdmissionStepper api={api} profile={profile} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); data.refresh(); }} />}
     {dialog?.kind === 'asignar_cama' && <BedSuggestionDialog api={api} admission={dialog.admission} version={version} onClose={close} onSaved={saved} />}

@@ -128,7 +128,7 @@ export function ShiftForm({ api, shift, draft, catalog, shifts, onClose, onSaved
           Carga con este turno: <strong>{load.hours7Days} h</strong> de {LOAD.maxHours7Days} h en 7 días · <strong>{load.daysInRow}</strong> {load.daysInRow === 1 ? 'día seguido' : 'días seguidos'} de {LOAD.maxDaysInRow}
           {overLoad && '. Supera el tope: solo se asigna en una emergencia, con su motivo.'}
         </p>}
-        <Field label="Observación · opcional" value={note} onChange={setNote} maxLength={500} hint="Si la persona supera las 44 h diurnas semanales, la API pide aquí una justificación de al menos 10 caracteres." />
+        <Field label="Observación · opcional" value={note} onChange={setNote} maxLength={500} hint="Si la persona supera las 44 h diurnas semanales, escribe aquí una justificación de al menos 10 caracteres." />
       </fieldset>
 
       {(askEmergency || overLoad) && <fieldset className="shift-step">

@@ -26,20 +26,24 @@ function Counter({ api, item, version }: { api: Api; item: Item; version: number
   const count = data.data ? item.count(data.data) : null;
   // -1: the endpoint does not give this account that list (for example, no dispatch rights).
   if (count === -1) return null;
-  const value = data.error ? '—' : count === null ? '…' : String(count);
-  return <a className="inbox-item" href={item.href}>
-    <strong aria-hidden="true">{value}</strong>
-    <span>{item.label}</span>
+  // S3: no number until the list arrives (a placeholder keeps the size); an error shows a dash, never a fake zero.
+  const value = data.error ? <strong className="inbox-count" aria-hidden="true">—</strong>
+    : count === null ? <span className="inbox-count is-loading" aria-hidden="true" />
+      : <strong className="inbox-count" aria-hidden="true">{count}</strong>;
+  return <li><a className={`inbox-item${count === 0 ? ' is-zero' : ''}`} href={item.href}>
+    {value}
+    <span className="inbox-label">{item.label}</span>
     <span className="sr-only">{data.error ? 'No se pudo cargar' : count === null ? 'Cargando' : `${count} pendientes`}</span>
-    <Icon name="arrow" size={18} />
-  </a>;
+    <Icon name="arrow" size={16} />
+  </a></li>;
 }
 
+/** Bandeja de pendientes del inicio: una fila de contadores (cifra + etiqueta), cada uno lleva a su módulo. */
 export function WorkInbox({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
   const visible = inboxItems(profile);
   if (!visible.length) return null;
   return <section className="work-inbox" aria-labelledby="work-inbox-title">
-    <div><span className="eyebrow">Inicio de trabajo</span><h2 id="work-inbox-title">Pendientes de tu trabajo</h2><p className="muted">Los contadores se actualizan solos cuando algo cambia.</p></div>
-    <div className="inbox-grid">{visible.map(item => <Counter key={item.id} api={api} item={item} version={version} />)}</div>
+    <h2 id="work-inbox-title" className="section-title">Pendientes</h2>
+    <ul className="inbox-grid">{visible.map(item => <Counter key={item.id} api={api} item={item} version={version} />)}</ul>
   </section>;
 }

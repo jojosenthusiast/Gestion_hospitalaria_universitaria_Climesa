@@ -47,6 +47,21 @@ public enum RolePolicy {
     public static func labelKey(_ role: String) -> String { role == "MED" ? "role.MED" : "role.PAC" }
 }
 
+/// Nombre visible de cada código de rol (`docs/arquitectura/datos/roles.csv`). Un texto que no es código (por ejemplo
+/// «Personal del hospital» que ya manda la API) se muestra tal cual.
+public enum RoleNames {
+    private static let names: [String: String] = [
+        "ADM": "Administrador", "JOP": "Jefe de Operaciones", "REC": "Recepcionista", "AST": "Asistente",
+        "ENF": "Enfermero/a", "MED": "Médico", "LAB": "Laboratorista", "PAR": "Paramédico",
+        "DPD": "Delegado de protección de datos", "PAC": "Paciente"
+    ]
+
+    public static func label(_ code: String) -> String { names[code.uppercased()] ?? code }
+
+    /// Lista de roles con sus nombres, separados por coma («Médico, Paciente»).
+    public static func list(_ codes: [String]) -> String { codes.map(label).joined(separator: ", ") }
+}
+
 /// Pestañas de la app (spec 122, escenario 1). Médico: Mi día, Pacientes, Resultados, Turnos, Más (agenda, hospital, ambulancia, perfil).
 /// Paciente: Inicio, Fila, Citas, Exámenes, Más.
 public enum AppTab: String, Equatable, Hashable, Sendable, CaseIterable {

@@ -1,7 +1,7 @@
 import { useEffect, useState, type DragEvent, type FormEvent } from 'react';
 import { ExportMenu } from '../components/export-menu';
 import { SearchPicker, type PickerItem } from '../components/search-picker';
-import { AreaTag, PriorityBadge, type Priority } from '../components/system';
+import { ActionButton, AreaTag, PriorityBadge, type Priority } from '../components/system';
 import { Icon, Notice } from '../components/ui';
 import { can, type AccessProfile, type Api, type Space } from '../lib/api';
 import { MOVE_LABEL, MOVE_PATH, SERVICE_AREA, canRemoveCall, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
@@ -191,13 +191,11 @@ function Lane({ column, tickets, now, busy, call, manage, pendingIds, onTransiti
       <small>{serviceNames[ticket.service] ?? ticket.service} · {stateText(ticket, call)}</small>
       {column === 'cerrado' ? <Tag value={ticket.state} label={finalNames[ticket.state]} /> : null}
       <div className="row-actions">
-        {ACTION_ORDER.map(name => allowed.includes(name)
-          ? <button key={name} className="row-action" disabled={busy} onClick={() => void onTransition(ticket, actionPath[name])}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</button>
-          : blocked.find(item => item.action === name) ? <button key={name} className="row-action" disabled title={blocked.find(item => item.action === name)!.reason}>{actionLabel(ticket, name)}</button> : null)}
+        {/* R1: only allowed actions; «No se presentó» stays visible (disabled, reason as tooltip) because it is the next step after the calls. */}
+        {ACTION_ORDER.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} showBlocked={name === 'no_se_presento'} disabled={busy} onClick={() => void onTransition(ticket, actionPath[name])}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</ActionButton>)}
         {ticket.state === 'en_atencion' && ticket.consultationId && ticket.consultationState === 'abierta' && <a className="row-action" href={`#/consultas?consulta=${ticket.consultationId}`}>Retomar consulta <Icon name="arrow" size={16} /></a>}
         {(moves.length > 0 || changingPriority || (call && canRemoveCall(ticket))) && <CardMenu ticket={ticket} moves={moves} priorities={changingPriority} removeCall={call && canRemoveCall(ticket)} busy={busy} onMove={onMove} onPriority={onPriority} onRemoveCall={() => void onTransition(ticket, 'deshacer-llamado')} />}
       </div>
-      {blocked.map(item => <small key={item.action} className="form-hint">{actionLabel(ticket, item.action)}: {item.reason}</small>)}
       </li>;
     })}</ul> : <p className="muted">Nadie por ahora.</p>}</section>;
 }

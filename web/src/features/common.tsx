@@ -2,7 +2,7 @@ import { useEffect,useId,useMemo,useRef,useState,type ReactNode } from 'react';
 import { ApiError,type Api } from '../lib/api';
 import { liveScope,scopedVersion,useLiveSignal } from './live-scope';
 import { Icon,Notice } from '../components/ui';
-import { Skeleton,StatusBadge } from '../components/system';
+import { SectionState,StatusBadge } from '../components/system';
 import { newIntentKey,withIntentKey } from './intent';
 export type Remote<T>={data:T|null;loading:boolean;error:ApiError|null;refresh:()=>void};
 /**
@@ -53,17 +53,12 @@ export function useAction(api:Api){
 }
 /** Fase 2, S1: la cabecera de cada módulo es `CompactHeader` (components/system.tsx). */
 export { CompactHeader,headerText } from '../components/system';
-export function RemoteState<T>({state,children,skeletonRows=4}:{state:Remote<T>;children:(data:T)=>ReactNode;skeletonRows?:number}){
- // S3: la sección reserva su lugar con un esqueleto; nunca un spinner que tape la pantalla.
- if(state.loading&&!state.data)return <Skeleton rows={skeletonRows}/>;
- // WEB-04 (diseño 04): "sin permiso" y "error de carga" son estados distintos; ambos permiten reintentar (un acceso puede concederse).
- if(state.error?.status===403)return <div className="module-state module-state-error"><strong>No tienes acceso a esta información</strong><Notice kind="error">Tu cuenta no tiene permiso para consultar esta sección.</Notice><p className="muted">Si la necesitas para tu trabajo, pide a un administrador que revise los permisos de tu cuenta y vuelve a intentar.</p><button className="secondary-button" onClick={state.refresh}><Icon name="retry" size={18}/>Volver a intentar</button></div>;
- if(state.error)return <div className="module-state module-state-error"><strong>No pudimos cargar esta información</strong><Notice kind="error">{state.error.message}</Notice><button className="secondary-button" onClick={state.refresh}><Icon name="retry" size={18}/>Volver a intentar</button></div>;
- if(!state.data)return null;
- // Revalidación en segundo plano: una línea fina que no empuja el contenido; el texto queda para lectores de pantalla.
- return <>{state.loading&&<span className="refresh-line" role="status" aria-live="polite"><span className="sr-only">Actualizando información…</span></span>}{children(state.data)}</>;
+/** S3, R1: estado de carga, error y vacío de una sección; es `SectionState` del sistema (components/system.tsx). */
+export function RemoteState<T>({state,children,skeletonRows=4,empty}:{state:Remote<T>;children:(data:T)=>ReactNode;skeletonRows?:number;empty?:(data:T)=>string|null}){
+ return <SectionState state={state} rows={skeletonRows} empty={empty}>{children}</SectionState>;
 }
-export function Empty({title,description}:{title:string;description:string}){return <div className="empty-state" role="status"><span className="empty-state-icon"><Icon name="search" size={28}/></span><h2>{title}</h2><p>{description}</p></div>;}
+/** R1 (S1): an empty list is one quiet line (what is missing, then what to do); no second heading, no decoration. */
+export function Empty({title,description}:{title:string;description?:string}){return <p className="empty-state" role="status"><strong>{title}</strong>{description&&<span>{description}</span>}</p>;}
 /** WEB-04: with `onReload`, a version conflict offers the common "Cerrar y recargar" action (design 04, state "Conflicto"). */
 /** Error de una escritura. Se desplaza a la vista al aparecer: en un formulario largo quedaba arriba, fuera de pantalla, y parecía que el botón no hacía nada. */
 export function WriteError({error,onReload,reloadLabel='Cerrar y recargar'}:{error:ApiError|null;onReload?:()=>void;reloadLabel?:string}){

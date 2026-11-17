@@ -32,5 +32,3 @@ export function groupAgenda<T extends AgendaItem>(items: T[]): AgendaDay<T>[] {
   }
   return [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, doctors]) => ({ day, doctors: [...doctors.values()].sort((a, b) => a.doctorName.localeCompare(b.doctorName, 'es')) }));
 }
-
-export const APPOINTMENT_STATE_TONE: Record<string, string> = { solicitada: 'warning', confirmada: 'info', atendida: 'success', cancelada: 'muted', rechazada: 'danger', no_asistio: 'danger' };

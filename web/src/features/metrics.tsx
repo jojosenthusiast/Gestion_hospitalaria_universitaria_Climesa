@@ -15,7 +15,7 @@ export type Indicator = {
   what: string;
   /** Cómo leerlo: qué es bueno y qué es malo. */
   how: string;
-  /** Referencias de operación (no son metas clínicas): a partir de `warn` es ámbar y de `danger` rojo; menos es mejor. */
+  /** Referencias de operación (no son metas clínicas): a partir de `warn` pide atención y desde `danger` queda fuera de la referencia (ámbar urgente, nunca rojo); menos es mejor. */
   warn: number; danger: number;
   chart: 'line' | 'bar';
 };
@@ -31,11 +31,11 @@ const localDay = (offsetDays = 0) => new Date(Date.now() - 6 * 3600_000 + offset
 const dayLabel = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const presets = [{ days: 7, label: 'Últimos 7 días' }, { days: 14, label: 'Últimos 14 días' }, { days: 30, label: 'Últimos 30 días' }];
 
-const readTone = (value: number | null, spec: Indicator): Tone | 'neutral' => value == null ? 'neutral' : value >= spec.danger ? 'danger' : value >= spec.warn ? 'warn' : 'ok';
-const toneWord = { ok: 'Dentro de lo esperado', warn: 'Requiere atención', danger: 'Crítico', neutral: 'Sin datos' } as const;
-/** S13: the reading uses the shared state families (red only for critical). */
-const toneStatus = { ok: 'normal', warn: 'bajo_minimo', danger: 'critico_alto', neutral: 'sin_rango' } as const;
-const toneKey = (tone: Tone | 'neutral') => (tone === 'ok' || tone === 'warn' || tone === 'danger' ? tone : 'neutral');
+const readTone = (value: number | null, spec: Indicator): Tone | 'neutral' => value == null ? 'neutral' : value >= spec.danger ? 'urgent' : value >= spec.warn ? 'warn' : 'ok';
+const toneWord = { ok: 'Dentro de lo esperado', warn: 'Requiere atención', urgent: 'Fuera de la referencia', neutral: 'Sin datos' } as const;
+/** S13, R1: the reading uses the shared families. These are operating references, not clinical values: never red. */
+const toneStatus = { ok: 'normal', warn: 'requiere_atencion', urgent: 'alto', neutral: 'sin_rango' } as const;
+const toneKey = (tone: Tone | 'neutral') => (tone === 'ok' || tone === 'warn' || tone === 'urgent' ? tone : 'neutral');
 const stats = (series: IndicatorSeries) => {
   const values = series.serie.map(p => p.valor).filter((v): v is number => v != null);
   return values.length ? { avg: Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10, min: Math.min(...values), max: Math.max(...values), last: [...series.serie].reverse().find(p => p.valor != null)!.valor as number } : null;
@@ -67,7 +67,7 @@ function IndicatorCard({ spec, state }: { spec: Indicator; state: Remote<Indicat
         {spec.chart === 'bar'
           ? <BarChart title={`${spec.label} por día`} data={data} unit={unit} threshold={threshold} table="details" empty="Sin datos en este rango." />
           : <LineChart title={`${spec.label} por día`} data={data} unit={unit} threshold={threshold} table="details" empty="Sin datos en este rango." />}
-        <Legend items={[{ label: `Dentro de lo esperado: menos de ${spec.warn} ${unit}`, tone: 'ok' }, { label: `Atención: desde ${spec.warn} ${unit}`, tone: 'warn' }, { label: `Crítico: desde ${spec.danger} ${unit}`, tone: 'danger' }]} />
+        <Legend items={[{ label: `Dentro de lo esperado: menos de ${spec.warn} ${unit}`, tone: 'ok' }, { label: `Atención: desde ${spec.warn} ${unit}`, tone: 'warn' }, { label: `Fuera de la referencia: desde ${spec.danger} ${unit}`, tone: 'urgent' }]} />
       </>;
     }}</RemoteState>
   </section>;

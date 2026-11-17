@@ -56,7 +56,7 @@ export function AuditPage({ api, version }: { api: Api; version: number }) {
   return <>
     <CompactHeader breadcrumb="Protección de datos / Trazabilidad" title="Auditoría" actions={<AuditExport api={api} total={total} subtitle={subtitle} queryFor={(p, s) => pageQuery(applied, sort, p, s, { exportar: 'true' })}/>}/>
     <ChainPanel api={api} onOpen={setDetail} />
-    <section className="data-workbench audit-workbench">
+    <section className="data-workbench">
       <div className="audit-presets segmented-control" role="group" aria-label="Vistas rápidas">
         {presets.map(p => <button key={p.id} type="button" title={p.hint} aria-pressed={activePreset === p.id} onClick={() => applyPreset(p.id)}>{p.label}</button>)}
       </div>

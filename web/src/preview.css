@@ -1,7 +1,7 @@
 .preview-shell { min-height: 100vh; background: var(--bg, #f2f5f9); color: var(--ink, #0e1b33); }
 .preview-toolbar { position: sticky; top: 0; z-index: 10; padding: 14px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; border-bottom: 1px solid var(--line, #d3dbe6); background: color-mix(in srgb, var(--surface, #ffffff) 94%, transparent); box-shadow: 0 6px 20px rgb(14 27 51 / 0.06); backdrop-filter: blur(12px); }
 .preview-toolbar > .brand { margin-right: 4px; }
-.preview-toolbar > span { color: var(--muted, #55617a); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 11px; }
+.preview-toolbar > span { color: var(--muted, #55617a); font-size: 11px; font-variant-numeric: tabular-nums; }
 .preview-toolbar select { min-height: 44px; max-width: 100%; margin-left: auto; padding: 9px 36px 9px 12px; border: 1px solid var(--control-line, #8794aa); border-radius: var(--radius-control, 6px); background: var(--surface, #ffffff); color: var(--ink, #0e1b33); font-size: 14px; }
 .preview-switch { padding: 4px; display: flex; gap: 4px; border-radius: var(--radius-card, 10px); background: var(--soft, #e6eefb); }
 .preview-switch button { min-height: 40px; padding: 8px 12px; border: 1px solid transparent; border-radius: var(--radius-control, 6px); background: transparent; color: var(--muted, #55617a); font-size: 13px; font-weight: 700; }

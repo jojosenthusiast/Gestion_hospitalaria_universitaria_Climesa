@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { PriorityBadge, statusFamily, StatusBadge } from '../components/system';
+import { PriorityBadge, statusFamily, statusPriority, StatusBadge } from '../components/system';
 import { priorityLevel } from '../features/ambulance/types';
 import { AttentionList } from '../features/dashboards/parts';
 import { StatusChip } from '../features/inventory/parts';
@@ -9,9 +9,10 @@ import { StatusChip } from '../features/inventory/parts';
 afterEach(cleanup);
 
 describe('familias de estado de existencias y de verificación (S13)', () => {
+  // R1: agotado moved to urgent priority (amber); bajo_minimo waits for a restock (shared web/iOS/Android mapping).
   it('asigna cada estado de existencias a su familia, sin rojo', () => {
-    expect(statusFamily('agotado')).toBe('cerrado');
-    expect(statusFamily('bajo_minimo')).toBe('llamado');
+    expect(statusPriority('agotado')).toBe('urgente');
+    expect(statusFamily('bajo_minimo')).toBe('espera');
     expect(statusFamily('por_vencer')).toBe('espera');
     expect(statusFamily('ok')).toBe('listo');
   });
@@ -23,10 +24,10 @@ describe('familias de estado de existencias y de verificación (S13)', () => {
 
   it('muestra los estados nuevos con ícono, etiqueta y patrón', () => {
     render(<><StatusBadge value="agotado" /><StatusBadge value="coincide" /><StatusBadge value="revisar" /></>);
-    for (const [label, pattern] of [['Agotado', 'discontinuo'], ['Coincide', 'contorno'], ['Revisar', 'rayado']] as const) {
+    for (const [label, mark] of [['Agotado', 'priority-urgente'], ['Coincide', 'pattern-contorno'], ['Revisar', 'pattern-rayado']] as const) {
       const badge = screen.getByText(label).closest('.status-badge')!;
       expect(badge.querySelector('svg')).toBeTruthy();
-      expect(badge.className).toContain(`pattern-${pattern}`);
+      expect(badge.className).toContain(mark);
     }
   });
 
@@ -48,9 +49,9 @@ describe('prioridad de ambulancia y lista de atención (S13)', () => {
   it('la lista de atención muestra el estado con StatusBadge y el área con AreaTag', () => {
     render(<AttentionList items={[
       { id: '1', title: 'Guantes', tone: 'warn', href: '#/inventario', action: 'Ver', tag: 'Bajo mínimo', status: 'bajo_minimo' },
-      { id: '2', title: 'Caída en casa', tone: 'danger', href: '#/ambulancia', action: 'Despachar', tag: 'Ambulancia', area: 'AMB' },
+      { id: '2', title: 'Caída en casa', tone: 'urgent', href: '#/ambulancia', action: 'Despachar', tag: 'Ambulancia', area: 'AMB' },
     ]} />);
-    expect(screen.getByText('Bajo mínimo').closest('.status-badge')!.className).toContain('fam-llamado');
+    expect(screen.getByText('Bajo mínimo').closest('.status-badge')!.className).toContain('fam-espera');
     expect(document.querySelector('.attention-tag')).toBeNull();
     expect(screen.getByText('AMB')).toBeTruthy();
   });

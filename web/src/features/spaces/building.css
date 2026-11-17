@@ -6,7 +6,7 @@
 .state-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .legend-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--bed-line); background: var(--bed-fill); color: var(--bed-ink); font: inherit; font-weight: 600; cursor: pointer; }
 .legend-chip[aria-pressed="true"] { outline: 3px solid var(--outline); outline-offset: 2px; }
-.legend-chip strong { font-family: "Atkinson Hyperlegible Mono", monospace; }
+.legend-chip strong { font-variant-numeric: tabular-nums; }
 .building-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
 .floor-plan { display: grid; gap: 14px; }
 .plan-area { border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); padding: 12px; display: grid; gap: 10px; }
@@ -46,10 +46,13 @@
 .plan-counts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 .plan-counts div { padding: 6px 10px; border-radius: var(--radius-control); background: var(--bg); }
 .plan-counts dt { font-size: 12px; color: var(--muted); }
-.plan-counts dd { margin: 0; font-family: "Atkinson Hyperlegible Mono", monospace; font-weight: 700; }
+.plan-counts dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 .plan-children { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .plan-children button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); color: var(--ink); font: inherit; cursor: pointer; text-align: left; }
 .plan-children small { display: block; color: var(--muted); }
 .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .space-guide { margin: 0 0 12px; }
 @media (max-width: 900px) { .building-split { grid-template-columns: 1fr; } .plan-side { position: static; } }
+
+/* R1: panel de una cama: estado, ocupante, avisos y acciones, apilados con el espacio del sistema. */
+.bed-panel { display: grid; gap: var(--space-3); }

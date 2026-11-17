@@ -3,12 +3,14 @@ import SwiftUI
 // Pantallas del hospital: ocupación en detalle, médicos de turno, avisos, ubicación, "Mis datos" y "Mi habitación".
 // Las usan el Paciente y el Médico; todo sale de endpoints de contrato/openapi.json.
 
-/// Barra de ocupación con su porcentaje (verde, ámbar o rojo según el nivel).
+/// Barra de ocupación con su porcentaje (verde o ámbar según el nivel). I-41: el rojo queda para lo crítico
+/// clínico; un hospital casi lleno se ve en ámbar y con su porcentaje.
 struct OccupancyBar: View {
     let percent: Int
 
     var body: some View {
-        let colors = Theme.colors(for: OccupancyRules.tone(percent: percent))
+        let tone = OccupancyRules.tone(percent: percent)
+        let colors = Theme.colors(for: tone == .danger ? .warning : tone)
         VStack(alignment: .leading, spacing: Spacing.xs) {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -53,8 +55,8 @@ struct HospitalInfoView: View {
             SectionCard(eyebrow: L.text("hospital.occupancy.total")) {
                 OccupancyBar(percent: OccupancyRules.percent(occupied: totals.occupied, beds: totals.beds))
                 HStack(spacing: Spacing.m) {
-                    StatTile(value: String(totals.free), label: L.text("hospital.free"))
-                    StatTile(value: String(totals.occupied), label: L.text("hospital.occupied"))
+                    StatTile(value: String(totals.free), label: L.text("hospital.free"), plain: true)
+                    StatTile(value: String(totals.occupied), label: L.text("hospital.occupied"), plain: true)
                 }
                 Text(verbatim: String(format: L.text("hospital.updated"), ClimesaDates.display(occupancy.updatedAt, .time))).font(Typo.caption).foregroundStyle(Theme.muted)
             }
@@ -257,7 +259,7 @@ private struct EditMyDataSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "mydata.edit") {
+            ScreenFrame(title: "mydata.edit", onClose: { dismiss() }) {
                 SectionCard {
                     FormField(label: L.text("mydata.phone"), text: $phone, error: error("phone")).keyboardType(.phonePad).textContentType(.telephoneNumber)
                     FormField(label: L.text("mydata.email"), text: $email, error: error("email")).textContentType(.emailAddress)
@@ -272,7 +274,6 @@ private struct EditMyDataSheet: View {
                     SubmissionNotice(submission: submission)
                 }
                 ClimesaButton(title: L.text("mydata.save"), loading: submission.busy) { Task { await save() } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }
