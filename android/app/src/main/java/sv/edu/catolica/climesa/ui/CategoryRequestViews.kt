@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -193,7 +194,12 @@ private fun AssignPanel(state: CategoryRequestsState, model: CategoryRequestsVie
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(stringResource(R.string.cat_asignar_titulo, request.patientName), style = MaterialTheme.typography.titleSmall)
         Text(AppointmentAgenda.dayLabel(state.date.toString()), style = MaterialTheme.typography.bodySmall)
-        state.orderedDoctors.forEach { d ->
+        var doctorQuery by rememberSaveable(request.id) { mutableStateOf("") }
+        var allDoctors by rememberSaveable(request.id) { mutableStateOf(false) }
+        LiveSearchField(doctorQuery, { doctorQuery = it.take(60) }, stringResource(R.string.cat_buscar_medico))
+        val shown = sv.edu.catolica.climesa.domain.DoctorChoices.visible(state.orderedDoctors, doctorQuery, allDoctors, state.doctor?.id)
+        if (shown.isEmpty()) Text(stringResource(R.string.listas_sin_coincidencias), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        shown.forEach { d ->
             TextButton(onClick = { model.pickDoctor(d) }, enabled = d.hasShift, modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Column(Modifier.weight(1f)) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.detail, style = MaterialTheme.typography.bodySmall) }
@@ -205,6 +211,8 @@ private fun AssignPanel(state: CategoryRequestsState, model: CategoryRequestsVie
                 }
             }
         }
+        val more = sv.edu.catolica.climesa.domain.DoctorChoices.hidden(state.orderedDoctors, doctorQuery, allDoctors)
+        if (more > 0) TextButton(onClick = { allDoctors = true }, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.cat_ver_todos_medicos, more)) }
         when {
             state.doctor == null -> Text(stringResource(R.string.rec_agendar_elige_medico), style = MaterialTheme.typography.bodySmall)
             state.loadingSlots -> LoadingState()

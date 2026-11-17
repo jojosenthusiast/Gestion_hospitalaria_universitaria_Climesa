@@ -160,4 +160,15 @@ class AndroidR3ViewModelsTest {
         assertEquals(listOf("soon", "late"), split.upcoming.map { it.id })
         assertEquals(listOf("cancel", "old"), split.past.map { it.id })
     }
+
+    // A-42: the assign panel shows five doctors until reception searches or asks for all; the chosen one stays visible.
+    @Test fun assignPanelSearchesDoctors() {
+        val choices = sv.edu.catolica.climesa.domain.DoctorChoices
+        val doctors = (1..45).map { sv.edu.catolica.climesa.domain.SchedulingDoctor("d$it", "Dr. Médico $it", if (it == 30) "Cardiología" else null, true, null) }
+        assertEquals(5, choices.visible(doctors, "", showAll = false, chosenId = null).size)
+        assertEquals(40, choices.hidden(doctors, "", showAll = false))
+        assertEquals(45, choices.visible(doctors, "", showAll = true, chosenId = null).size)
+        assertEquals(listOf("d30"), choices.visible(doctors, "cardiologia", showAll = false, chosenId = null).map { it.id })
+        assertEquals("d44", choices.visible(doctors, "", showAll = false, chosenId = "d44").first().id)
+    }
 }
