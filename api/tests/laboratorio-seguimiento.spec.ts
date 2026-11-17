@@ -151,6 +151,11 @@ describe('Laboratorio · seguimiento, orden externa y cita propuesta (S10)', () 
       expect((await listed('LAB', o.id)).externalActions).toEqual(['enviar_externo']);
       const short = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/externa`, { version: o.version, place: 'Hospital Ficticio', instructions: 'Ir' });
       expect(short.status).toBe(400);
+      // Auditoría T15: los espacios no cuentan para el largo mínimo (la base revisa length(trim())); el error nombra el campo.
+      const padded = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/externa`, { version: o.version, place: '  ab  ', instructions: 'Presente esta orden en ventanilla.' });
+      expect([padded.status, padded.body.codigo, padded.body.campo]).toEqual([400, 'validacion', 'place']);
+      const paddedInstructions = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/externa`, { version: o.version, place: 'Hospital Ficticio', instructions: '   Ir ya    ' });
+      expect([paddedInstructions.status, paddedInstructions.body.campo]).toEqual([400, 'instructions']);
       const sent = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/externa`, { version: o.version, place: 'Clínica Radiológica Ficticia', instructions: 'Presente esta orden en ventanilla. Sin ayuno. Traiga su DUI.' });
       expect([sent.status, sent.body.external]).toEqual([201, true]);
       const lab = await listed('LAB', o.id);

@@ -10479,7 +10479,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LabCompleteResponse"
+                  "$ref": "#/components/schemas/LabExternalResultResponse"
                 }
               }
             }
@@ -26400,6 +26400,42 @@
           "results"
         ]
       },
+      "LabExternalResultResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoOrdenLaboratorio"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attachmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Adjunto creado con la referencia; su archivo se sube con POST /laboratorio/adjuntos/{id}/archivo"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "version",
+          "completedAt",
+          "attachmentId"
+        ]
+      },
       "LabAttachmentStoredResponse": {
         "type": "object",
         "properties": {
@@ -32304,6 +32340,7 @@
           "adjunto_muy_grande",
           "adjunto_sin_archivo",
           "adjunto_ya_almacenado",
+          "adjunto_no_coincide",
           "ambulancia_ya_despachada",
           "estado_final_invalido",
           "hito_fuera_de_orden",
