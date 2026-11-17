@@ -145,3 +145,7 @@
 .ag-doctor-toggle[aria-expanded='true'] > svg:last-child { transform: rotate(180deg); }
 /* #15: on a phone each lane of the queue shows its first cards and «Ver N más». */
 .qb-more { justify-self: start; }
+
+/* G1: the row just registered stays marked (same soft fill as a selected item) until the next registration. */
+.record-table tbody tr.is-new > * { background: var(--soft); }
+.record-table tbody tr.is-new > :first-child { box-shadow: inset 3px 0 0 var(--primary); }
