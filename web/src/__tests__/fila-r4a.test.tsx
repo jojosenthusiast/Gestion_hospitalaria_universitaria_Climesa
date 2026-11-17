@@ -73,7 +73,7 @@ describe('Fila · tablero (R4a)', () => {
   it('emitir número no tiene párrafos de ayuda', async () => {
     montar(['fila.ver', 'fila.emitir', 'fila.gestionar'], []);
     await userEvent.click(await screen.findByRole('button', { name: /Emitir número/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Emitir número de fila' });
+    const dialogo = await screen.findByRole('dialog', { name: 'Mostrador' });
     expect(within(dialogo).queryByText(/cuenta desde 1|pasan antes que las citas/)).toBeNull();
   });
 });
