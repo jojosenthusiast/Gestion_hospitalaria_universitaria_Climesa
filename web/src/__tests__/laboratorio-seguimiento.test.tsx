@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile, Api } from '../lib/api';
 import { LaboratoryPage } from '../features/laboratory';
-import { EXTERNAL_INSTRUCTIONS_TEMPLATE, attachmentProblem, groupLabOrders, labGroupOf } from '../lib/lab-flow';
+import { EXTERNAL_INSTRUCTIONS_TEMPLATE, attachmentMimeType, attachmentProblem, groupLabOrders, labGroupOf } from '../lib/lab-flow';
 
 // Fase 2, flujo C (S10): lista agrupada, completar por lote, observación relevante y orden externa con su informe.
 beforeEach(() => {
@@ -35,6 +35,17 @@ describe('reglas de la lista agrupada y del adjunto', () => {
     expect(attachmentProblem({ name: 'a.zip', type: 'application/zip', size: 10 })).toMatch(/PDF o una foto/);
     expect(attachmentProblem({ name: 'a.pdf', type: 'application/pdf', size: 11 * 1024 * 1024 })).toMatch(/10 MB/);
     expect(attachmentProblem({ name: 'a.jpg', type: 'image/jpeg', size: 2048 })).toBeNull();
+  });
+  // Auditoría T15: Chrome y Firefox en Windows entregan una foto HEIC sin tipo; cuenta la extensión.
+  it('sin tipo del navegador, el tipo sale de la extensión del archivo', () => {
+    expect(attachmentProblem({ name: 'Foto.HEIC', type: '', size: 2048 })).toBeNull();
+    expect(attachmentProblem({ name: 'foto.heif', type: '', size: 2048 })).toBeNull();
+    expect(attachmentProblem({ name: 'informe', type: '', size: 2048 })).toMatch(/PDF o una foto/);
+    expect(attachmentProblem({ name: 'informe.docx', type: '', size: 2048 })).toMatch(/PDF o una foto/);
+    expect([['a.pdf', 'application/pdf'], ['a.jpg', 'image/jpeg'], ['a.JPEG', 'image/jpeg'], ['a.png', 'image/png'], ['a.heic', 'image/heic'], ['a.heif', 'image/heic'], ['a.webp', 'image/webp']]
+      .map(([name]) => [name, attachmentMimeType({ name, type: '' })])).toEqual([['a.pdf', 'application/pdf'], ['a.jpg', 'image/jpeg'], ['a.JPEG', 'image/jpeg'], ['a.png', 'image/png'], ['a.heic', 'image/heic'], ['a.heif', 'image/heic'], ['a.webp', 'image/webp']]);
+    expect(attachmentMimeType({ name: 'a.zip', type: 'application/zip' })).toBeNull();
+    expect(attachmentMimeType({ name: 'a.bin', type: 'image/png' })).toBe('image/png');
   });
 });
 

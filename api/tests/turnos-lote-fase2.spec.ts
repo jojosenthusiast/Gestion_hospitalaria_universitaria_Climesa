@@ -8,6 +8,7 @@ import { SupabaseService } from '../src/supabase/supabase.service';
 import { Clock } from '../src/platform/clock';
 import { rotationSlots,daysBetween,slotRange } from '../src/operations/rotation.rules';
 import { createDatabase,userId } from './support/database';
+import { recordSql } from './support/sql-recorder';
 
 // Fase 2, flujo F (S12): planificación de turnos en lote. Lunes 16 de noviembre de 2026, 08:00 en El Salvador.
 const current=new Date('2026-11-16T14:00:00Z');
@@ -195,6 +196,23 @@ describe('Turnos · planificación en lote, generador y plantillas (Fase 2, fluj
   // La vista previa se crea tal cual como borradores.
   const ok=items.filter(i=>i.ok).map(({staffId,areaId,start,end,type})=>({staffId,areaId,start,end,type}));
   expect((await call('JOP','POST','/turnos/lote',{items:ok})).status).toBe(201);
+ });
+
+ // Auditoría T15: la vista previa corre hasta 2000 intentos en una transacción que se revierte; con FOR UPDATE sobre la
+ // persona bloquearía el KEY SHARE de la llave foránea de POST /citas y POST /turnos concurrentes hasta terminar.
+ test('validar y generar leen a la persona sin FOR UPDATE; crear el lote y un turno suelto la siguen bloqueando',async()=>{
+  const group=[await person('asistente',emergencyId),await person('asistente',emergencyId)];
+  const reads=(sql:string[])=>sql.filter(q=>/SELECT id,tipo,activo FROM personal\.persona WHERE id=\$1/.test(q));
+  const locks=(sql:string[])=>reads(sql).filter(q=>/FOR UPDATE/.test(q)).length;
+  const db=fixture.db as unknown as DatabaseService;
+  const validate=await recordSql(db,async()=>expect((await call('JOP','POST','/turnos/lote/validar',{items:[item(group[0],'2026-12-28','07:00','15:00')]})).status).toBe(200));
+  expect(reads(validate)).toHaveLength(1);expect(locks(validate)).toBe(0);
+  const generate=await recordSql(db,async()=>expect((await call('JOP','POST','/turnos/generar',{areaId:emergencyId,staffIds:group,pattern:'24x72',from:'2026-12-28',to:'2026-12-30'})).status).toBe(200));
+  expect(reads(generate).length).toBeGreaterThan(0);expect(locks(generate)).toBe(0);
+  const batch=await recordSql(db,async()=>expect((await call('JOP','POST','/turnos/lote',{items:[item(group[0],'2026-12-28','07:00','15:00')]})).status).toBe(201));
+  expect(locks(batch)).toBe(1);
+  const single=await recordSql(db,async()=>expect((await call('JOP','POST','/turnos',item(group[1],'2026-12-29','07:00','15:00'))).status).toBe(201));
+  expect(locks(single)).toBe(1);
  });
 
  test('el generador pide personas o un grupo, valida el patrón y exige permiso de planificar',async()=>{

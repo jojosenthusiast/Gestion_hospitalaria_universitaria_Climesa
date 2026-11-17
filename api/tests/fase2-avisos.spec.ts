@@ -112,6 +112,37 @@ describe('Fase 2 · avisos con nivel, enterado y recordatorio', () => {
     expect((await t.call('MED', 'GET', '/avisos/estadisticas')).status).toBe(403);
   });
 
+  // Auditoría T15: el área de una cuenta es la de su ficha o la de su turno en curso, también al contar destinatarios.
+  test('los destinatarios por área cuentan también a quien tiene un turno en curso en esa área', async () => {
+    const notice = await publish({ titulo: 'Corte de agua en laboratorio', publico: false, areas: ['P1-LAB'], nivel: 'importante' });
+    const recipients = async () => ((await t.call('JOP', 'GET', '/avisos/estadisticas')).body as any[]).find(s => s.avisoId === notice.id).destinatarios as number;
+    const before = await recipients();
+    await t.shift('ENF', new Date(start.valueOf() - HOUR), new Date(start.valueOf() + 3 * HOUR), 'P1-LAB');
+    expect(await recipients()).toBe(before + 1);
+  });
+
+  // Auditoría T15: un aviso que ahora dice otra cosa, o es más urgente, pide un "Enterado" nuevo.
+  test('editar el texto o subir el nivel vuelve a destacar el aviso; cambiar solo la vigencia o bajar el nivel conserva el "Enterado"', async () => {
+    const notice = await publish({ titulo: 'Cambio de turno', publico: false, roles: ['LAB'], nivel: 'importante' });
+    const edit = (version: number, body: Record<string, unknown>) => t.call('JOP', 'PUT', `/avisos/${notice.id}`, { version, titulo: 'Cambio de turno', cuerpo: 'Texto del aviso para el personal.', hasta: at(30), publico: false, roles: ['LAB'], ...body });
+    const acked = async () => { expect((await t.call('LAB', 'POST', `/me/avisos/${notice.id}/enterado`, {})).status).toBe(201); };
+    const enterados = async () => ((await t.call('JOP', 'GET', '/avisos/estadisticas')).body as any[]).find(s => s.avisoId === notice.id).enterados as number;
+    await acked();
+    expect((await edit(1, { hasta: at(20) })).status).toBe(200);
+    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: start.toISOString() });
+    expect((await edit(2, { nivel: 'critico' })).status).toBe(200);
+    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: null, recordarEn: null, destacado: true });
+    expect(await enterados()).toBe(0);
+    await acked();
+    expect((await edit(3, { nivel: 'informativo' })).status).toBe(200);
+    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: start.toISOString() });
+    expect((await edit(4, { cuerpo: 'Texto nuevo: el cambio de turno es a las 18:00.', nivel: 'critico' })).status).toBe(200);
+    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: null, recordarEn: null, destacado: true });
+    await acked();
+    expect((await edit(5, { titulo: 'Cambio de turno (corregido)' })).status).toBe(200);
+    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: null, recordarEn: null, destacado: true });
+  });
+
   test('editar sin nivel ni áreas conserva los del aviso; retirarlo lo saca de la bandeja', async () => {
     const notice = await publish({ titulo: 'Mantenimiento', publico: false, areas: ['P1-LAB'], roles: ['LAB'], nivel: 'critico' });
     const edited = await t.call('JOP', 'PUT', `/avisos/${notice.id}`, { version: 1, titulo: 'Mantenimiento movido', cuerpo: 'Se mueve a mañana.', hasta: at(20), prioridad: 'urgente', publico: false, roles: ['LAB'] });

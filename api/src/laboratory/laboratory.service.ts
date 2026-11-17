@@ -484,12 +484,14 @@ export class LaboratoryService {
     let uploaded: string | undefined;
     try {
       return await this.commands.run(actor, scope, key, { sha256, sizeBytes, mimeType }, async c => {
-        const found = (await c.query(`SELECT a.orden_id AS "orderId",(a.ruta_almacenamiento IS NOT NULL) AS stored,o.paciente_id AS "patientId",o.medico_id AS "doctorId",o.version
+        const found = (await c.query(`SELECT a.orden_id AS "orderId",(a.ruta_almacenamiento IS NOT NULL) AS stored,a.huella_sha256 AS declared,o.paciente_id AS "patientId",o.medico_id AS "doctorId",o.version
           FROM laboratorio.adjunto a JOIN laboratorio.orden o ON o.id=a.orden_id WHERE a.id=$1 FOR UPDATE OF a`, [id])).rows[0] as Row | undefined;
         if (!found) throw new NotFoundException('No se encontró el adjunto.');
         const reviewer = !lab && !!actor.staffId && !!(await c.query('SELECT laboratorio.puede_revisar($1,$2,$3) AS ok', [found.orderId, actor.staffId, this.clock.now()])).rows[0]?.ok;
         if (!lab && !reviewer) throw new ForbiddenException('Solo el laboratorio o un médico que puede revisar la orden suben su archivo.');
         if (found.stored) throw new ProblemException('adjunto_ya_almacenado', 409, 'Este adjunto ya tiene su archivo guardado; no se reemplaza.');
+        // The fingerprint declared with the reference must match the uploaded bytes: a different file is never stored under it.
+        if (found.declared && found.declared !== sha256) throw new ProblemException('adjunto_no_coincide', 409, 'El archivo no coincide con la huella del adjunto declarado; sube el mismo archivo que se adjuntó al resultado.', 'archivo');
         const path = `${found.orderId}/${randomUUID()}`;
         uploaded = path;
         await this.storage.put(path, content, mimeType);

@@ -297,10 +297,13 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
    * (CARGA-01/02) y aviso de 44 h diurnas (RN-14). La usan `saveShift` y los lotes (`validateBatch`, `createBatch`,
    * `generate`), así las reglas son idénticas. `countDrafts`: en un lote los borradores suman carga, porque se van a
    * publicar juntos (al publicar, la base vuelve a revisar el descanso y el tope uno por uno).
+   * `lock`: a save locks the person (`FOR UPDATE`) so two saves for the same person are serialized. A preview
+   * (`validateBatch`, `generate`) always rolls back, so it reads without a row lock: holding `FOR UPDATE` for up to
+   * `GENERATOR_ATTEMPTS` attempts would block the foreign-key `KEY SHARE` of concurrent `POST /citas` and `POST /turnos`.
    */
-  private async checkShift(c:PoolClient,id:string|null,old:any,dto:Pick<ShiftDto,'staffId'|'areaId'|'type'|'justification'|'emergencyReason'>,start:Date,end:Date,countDrafts=false) {
+  private async checkShift(c:PoolClient,id:string|null,old:any,dto:Pick<ShiftDto,'staffId'|'areaId'|'type'|'justification'|'emergencyReason'>,start:Date,end:Date,countDrafts=false,lock=true) {
     const loaded=countDrafts?WORKING:LOADED;
-    const person=(await c.query('SELECT id,tipo,activo FROM personal.persona WHERE id=$1 FOR UPDATE',[dto.staffId])).rows[0];
+    const person=(await c.query(`SELECT id,tipo,activo FROM personal.persona WHERE id=$1${lock?' FOR UPDATE':''}`,[dto.staffId])).rows[0];
     if(!person?.activo)throw new BadRequestException('Selecciona personal activo.');
     await this.area(c,dto.areaId);
     // FR-103-10: medicina y enfermería no se programan sin inscripción vigente en la fecha del turno.
@@ -418,9 +421,10 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   /**
    * Prueba un turno del lote dentro de la transacción `c`: lo valida con `checkShift` (las reglas de un turno suelto,
    * con los borradores sumando carga) y lo inserta como borrador en un punto de guardado, así el siguiente turno del
-   * lote ya lo ve. Si tiene problema, se deshace solo él y su resultado lo explica; los demás siguen.
+   * lote ya lo ve. Si tiene problema, se deshace solo él y su resultado lo explica; los demás siguen. `lock` como en
+   * `checkShift`: solo `createBatch` guarda, así que solo él bloquea a la persona.
    */
-  private async tryItem(c:PoolClient,actor:Actor,item:ShiftBatchItemDto,justification:string|undefined,index:number):Promise<BatchItemResult> {
+  private async tryItem(c:PoolClient,actor:Actor,item:ShiftBatchItemDto,justification:string|undefined,index:number,lock=false):Promise<BatchItemResult> {
     const start=new Date(item.start),end=new Date(item.end);
     const dto={...item,justification:item.justification?.trim()||justification?.trim()||undefined};
     await c.query('SAVEPOINT lote_turno');
@@ -428,7 +432,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       if(!/(Z|[+-]\d\d:\d\d)$/.test(item.start)||!/(Z|[+-]\d\d:\d\d)$/.test(item.end)||!Number.isFinite(start.valueOf())||end<=start)throw new BadRequestException('Indica inicio y fin con zona horaria.');
       // Un lote planifica: un borrador que ya empezó no se podría publicar a tiempo.
       if(start<=this.clock.now())throw new BadRequestException('El turno empezaría antes de ahora; elige un horario futuro.');
-      const {warnings}=await this.checkShift(c,null,null,dto,start,end,true);
+      const {warnings}=await this.checkShift(c,null,null,dto,start,end,true,lock);
       const row=(await dbRule(c.query("INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,justificacion,estado,creado_por) VALUES($1,$2,tstzrange($3,$4,'[)'),$5,$6,'borrador',$7) RETURNING id,version",[dto.staffId,dto.areaId,start,end,dto.type,dto.justification??null,actor.id]))).rows[0];
       await c.query('RELEASE SAVEPOINT lote_turno');
       return {index,ok:true,id:row.id,version:row.version,advertencias:warnings};
@@ -467,7 +471,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     await this.advanceSafely();
     return this.commands.run(actor,'turnos.planificar:lote',key,dto,async c=>{
       const resultados:BatchItemResult[]=[];
-      for(const [index,item] of dto.items.entries())resultados.push(await this.tryItem(c,actor,item,dto.justification,index));
+      for(const [index,item] of dto.items.entries())resultados.push(await this.tryItem(c,actor,item,dto.justification,index,true));
       const failed=resultados.filter(r=>!r.ok).length;
       if(failed)throw new ProblemException('lote_con_conflictos',409,`${failed===1?'Un turno tiene':`${failed} turnos tienen`} conflictos; corrígelos o quítalos de la vista previa. No se creó ningún borrador.`,undefined,{resultados});
       const huecos=await this.batchGaps(c,dto.items);

@@ -41,14 +41,14 @@ describe('Laboratorio · archivo privado del resultado externo (S10, T07b)', () 
   afterAll(async () => { await t?.close(); });
 
   /** External order with its result loaded by the lab: one reference-only attachment, ready to receive its file. */
-  async function referenceOnly() {
+  async function referenceOnly(reference: Record<string, unknown> = REFERENCE) {
     const patientId = await t.patient({ name: `Adj${Math.random().toString(36).slice(2, 8)}`, linkPac: true });
     const consultation = await t.consultation(patientId);
     const created = await t.call('MED', 'POST', '/laboratorio/ordenes', { consultationId: consultation.id, exams: [hb] });
     const id = created.body.id as string;
     const item = (await t.one<{ id: string }>('SELECT id FROM laboratorio.orden_item WHERE orden_id=$1', [id])).id;
     const sent = await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/externa`, { version: created.body.version, place: 'Clínica Ficticia', instructions: 'Instrucciones de prueba suficientes.' });
-    const loaded = await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/resultado-externo`, { version: sent.body.version, attachment: REFERENCE, results: [{ orderItemId: item, value: 12.9 }] });
+    const loaded = await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/resultado-externo`, { version: sent.body.version, attachment: reference, results: [{ orderItemId: item, value: 12.9 }] });
     expect(loaded.status).toBe(201);
     return { orderId: id, patientId, attachmentId: loaded.body.attachmentId as string, version: loaded.body.version as number };
   }
@@ -99,6 +99,24 @@ describe('Laboratorio · archivo privado del resultado externo (S10, T07b)', () 
     // A real PNG declared as PDF is stored as what it is.
     const png = await upload('LAB', a.attachmentId, form(PNG, 'foto.pdf', 'application/pdf'));
     expect([png.status, png.body.mimeType]).toEqual([201, 'image/png']);
+  });
+
+  // Auditoría T15: la huella declarada con la referencia debe ser la de los bytes subidos.
+  test('un archivo distinto del declarado (otra huella) responde 409 adjunto_no_coincide y no se guarda nada', async () => {
+    const a = await referenceOnly({ ...REFERENCE, sha256: sha(PNG) });
+    const before = t.storage.objects.size;
+    const res = await upload('LAB', a.attachmentId);
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ codigo: 'adjunto_no_coincide', campo: 'archivo', detail: expect.stringMatching(/no coincide/) });
+    expect(t.storage.objects.size).toBe(before);
+    expect(await row(a.attachmentId)).toMatchObject({ ruta: null, huella: sha(PNG) });
+  });
+
+  test('un archivo con la misma huella declarada se guarda como siempre', async () => {
+    const a = await referenceOnly({ ...REFERENCE, sha256: sha(PDF) });
+    const res = await upload('LAB', a.attachmentId);
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ stored: true, sha256: sha(PDF) });
   });
 
   test('un archivo de más de 10 MiB se rechaza y no se guarda nada', async () => {

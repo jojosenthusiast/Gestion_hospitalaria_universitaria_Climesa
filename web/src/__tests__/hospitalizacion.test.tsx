@@ -96,7 +96,7 @@ describe('W13 · admisiones con acciones según allowedActions (D-02)', () => {
     const dialog = screen.getByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText(/^Motivo/), 'Paciente decidió no ingresar.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar admisión' }));
-    expect(await within(dialog).findByText(/La admisión cambió de estado; vuelve a cargar\./)).toBeTruthy();
+    expect(await within(dialog).findByText(/El registro cambió de estado; vuelve a cargar\./)).toBeTruthy();
     expect(within(dialog).queryByText(/Invalid state transition/)).toBeNull();
   });
 

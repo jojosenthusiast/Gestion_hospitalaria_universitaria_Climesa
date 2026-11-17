@@ -305,8 +305,11 @@ export class AttentionService {
    * Counts both kinds of request still waiting for reception: with a doctor (future `solicitada`) and by category
    * (`pendiente`, Fase 2 flow A). A category request has no slot to expire with, so it only counts during
    * `CATEGORY_REQUEST_COUNT_DAYS` after it was created (RN-20a); it stays in reception's inbox until resolved.
+   * A per-patient advisory lock, shared by both kinds of request, serializes count-then-insert: two concurrent
+   * requests cannot both pass the limit. It is released when the command transaction ends.
    */
   async assertPendingLimit(c: PoolClient, patientId: string) {
+    await c.query(`SELECT pg_advisory_xact_lock(hashtext('citas.solicitudes:' || $1::text))`, [patientId]);
     const { maximo } = await this.policies.value<{ maximo: number }>(c, 'citas.solicitudes_pendientes_max', this.clock.now());
     const pending = Number((await c.query(`SELECT
         (SELECT count(*) FROM atencion.cita WHERE paciente_id=$1 AND estado='solicitada' AND lower(horario)>$2::timestamptz)

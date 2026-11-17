@@ -1,4 +1,5 @@
 import type { Api } from './api';
+import { attachmentMimeType } from './lab-flow';
 
 /**
  * T07b (S10): the photo or PDF of an external lab result lives in a private bucket. The browser never talks to the
@@ -11,10 +12,14 @@ export type AttachmentLink = { url: string; expiresAt: string; expiresInSeconds:
 export const attachmentFilePath = (attachmentId: string) => `/laboratorio/adjuntos/${attachmentId}/archivo`;
 export const attachmentLinkPath = (attachmentId: string) => `/laboratorio/adjuntos/${attachmentId}/enlace`;
 
-/** POST /laboratorio/adjuntos/{id}/archivo as multipart/form-data with the file in the `archivo` part. */
+/**
+ * POST /laboratorio/adjuntos/{id}/archivo as multipart/form-data with the file in the `archivo` part. The part carries
+ * the type of `attachmentMimeType`, so a HEIC photo without a browser type is not sent as octet-stream.
+ */
 export function uploadAttachment(api: Api, attachmentId: string, file: File) {
   const form = new FormData();
-  form.append('archivo', file, file.name);
+  const type = attachmentMimeType(file) ?? file.type;
+  form.append('archivo', type === file.type ? file : new File([file], file.name, { type }), file.name);
   return api.request<StoredAttachment>(attachmentFilePath(attachmentId), { method: 'POST', body: form, headers: { 'Idempotency-Key': crypto.randomUUID() } });
 }
 

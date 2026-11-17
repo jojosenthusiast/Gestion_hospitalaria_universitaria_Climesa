@@ -88,6 +88,25 @@ describe('archivo privado del resultado externo (T07b)', () => {
     expect(uploads(api)[0][0]).toBe('/laboratorio/adjuntos/att-1/archivo');
   });
 
+  // Auditoría T15: una foto HEIC sin tipo (Windows) se acepta por su extensión y sube con el tipo que le corresponde.
+  it('una foto HEIC sin tipo del navegador sube con su tipo por extensión', async () => {
+    const api = mount({ ...base, state: 'completado', completedAt: new Date().toISOString() }, lab, [attachment(false)]);
+    await userEvent.upload(await screen.findByLabelText('Subir archivo de informe.pdf'), new File(['ftypheic'], 'Foto.HEIC', { type: '' }));
+    await vi.waitFor(() => expect(uploads(api)).toHaveLength(1));
+    const part = (uploads(api)[0][1] as RequestInit).body as FormData;
+    expect([(part.get('archivo') as File).name, (part.get('archivo') as File).type]).toEqual(['Foto.HEIC', 'image/heic']);
+  });
+
+  it('un archivo distinto del declarado se explica en español junto al adjunto', async () => {
+    mount({ ...base, state: 'completado', completedAt: new Date().toISOString() }, lab, [attachment(false)]).request.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/archivo') && init?.method === 'POST') throw new ApiError('x', 409, 'adjunto_no_coincide');
+      if (path.startsWith('/laboratorio/ordenes/')) return { attachments: [attachment(false)] };
+      return [{ ...base, state: 'completado', completedAt: new Date().toISOString() }];
+    });
+    await userEvent.upload(await screen.findByLabelText('Subir archivo de informe.pdf'), new File(['%PDF-1.4'], 'informe.pdf', { type: 'application/pdf' }));
+    expect(await screen.findByText(/no coincide con el que se adjuntó/)).toBeTruthy();
+  });
+
   it('quien no carga resultados no ve la opción de subir', async () => {
     mount({ ...base, state: 'completado', completedAt: new Date().toISOString() }, doctor, [attachment(false)]);
     expect(await screen.findByText(/Solo se guardó la referencia/)).toBeTruthy();

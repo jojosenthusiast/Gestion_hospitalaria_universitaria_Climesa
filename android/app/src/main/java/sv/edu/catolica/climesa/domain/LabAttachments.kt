@@ -87,6 +87,7 @@ object LabAttachmentRules {
         "adjunto_tipo_invalido" -> "El archivo no es un PDF ni una foto JPG, PNG, HEIC o WEBP."
         "adjunto_muy_grande" -> TOO_LARGE
         "adjunto_ya_almacenado" -> "Este adjunto ya tiene su archivo guardado; no se reemplaza."
+        "adjunto_no_coincide" -> "El archivo no coincide con el que se adjuntó al resultado; sube el mismo archivo."
         else -> null
     }
 

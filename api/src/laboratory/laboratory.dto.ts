@@ -1,14 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 
 export enum LabPriority { ROUTINE = 'rutina', URGENT = 'urgente' }
 export enum LabMark { NORMAL = 'normal', HIGH = 'alto', LOW = 'bajo', CRITICAL_HIGH = 'critico_alto', CRITICAL_LOW = 'critico_bajo', NO_RANGE = 'sin_rango' }
 
+/** Trims text before its length is checked, the same `length(trim())` the database checks. */
+const trimmed = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
+
 /** S10: where an external exam is done and what the patient must do (shown to the patient as is). */
 export class LabExternalDto {
-  @ApiProperty({ minLength: 3, maxLength: 200, description: 'Lugar donde se realiza el examen' }) @IsString() @MinLength(3) @MaxLength(200) place!: string;
-  @ApiProperty({ minLength: 10, maxLength: 1000, description: 'Instrucciones claras para el paciente (preparación, qué llevar, cómo traer el resultado)' }) @IsString() @MinLength(10) @MaxLength(1000) instructions!: string;
+  @ApiProperty({ minLength: 3, maxLength: 200, description: 'Lugar donde se realiza el examen' }) @Transform(trimmed) @IsString() @MinLength(3) @MaxLength(200) place!: string;
+  @ApiProperty({ minLength: 10, maxLength: 1000, description: 'Instrucciones claras para el paciente (preparación, qué llevar, cómo traer el resultado)' }) @Transform(trimmed) @IsString() @MinLength(10) @MaxLength(1000) instructions!: string;
 }
 
 export class LabOrderDto {

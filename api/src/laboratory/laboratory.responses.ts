@@ -192,6 +192,11 @@ export class LabCompleteResponse extends LabOrderStateResponse {
   @DateTimeProp() completedAt!: string;
 }
 
+/** POST /laboratorio/ordenes/{id}/resultado-externo: the completed order and the attachment that receives its file next. */
+export class LabExternalResultResponse extends LabCompleteResponse {
+  @UuidProp({ nullable: true, description: 'Adjunto creado con la referencia; su archivo se sube con POST /laboratorio/adjuntos/{id}/archivo' }) attachmentId!: string | null;
+}
+
 export class LabReviewResponse {
   @UuidProp() id!: string;
   @IntProp() version!: number;

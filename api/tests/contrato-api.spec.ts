@@ -67,6 +67,14 @@ describe('contrato OpenAPI', () => {
     expect(query('after', 'GET /api/v1/eventos')?.required).toBe(false);
   });
 
+  // T15 audit: the client needs the attachment id to upload the file of an external lab result.
+  it('declares the attachment id of an external lab result', () => {
+    const op = operations.find(([n]) => n === 'POST /api/v1/laboratorio/ordenes/{id}/resultado-externo')![1];
+    const ref = (op.responses['201'].content!['application/json'].schema as { $ref: string }).$ref.split('/').at(-1)!;
+    expect(contract.components.schemas[ref].properties.attachmentId).toMatchObject({ type: 'string', format: 'uuid', nullable: true });
+    expect(contract.components.schemas[ref].required).toContain('attachmentId');
+  });
+
   // CON-04: endpoints.csv matches the real routes; a catalog row without a route is an explicit pending item.
   // MA-REQ-02 (D-091): push devices, `/recursos/*` and `/me/fila` were retired from the catalog. What stays pending has an
   // open finding of its own: the clinical addendum (MA-CIT-04, D-06).

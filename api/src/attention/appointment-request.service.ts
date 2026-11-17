@@ -103,7 +103,7 @@ export class AppointmentRequestService {
       const request = await this.locked(c, id, dto.version);
       const reason = [request.categoryNames, request.note].filter(Boolean).join(' · ') || null;
       const appointment = await this.attention.insertConfirmed(c, actor, { patientId: request.patientId, doctorId: dto.doctorId, start: dto.start, end: dto.end, reason });
-      const row = (await c.query(`UPDATE atencion.solicitud_cita SET estado='asignada',cita_id=$2,resuelta_por=$3,resuelta_en=now(),version=version+1 WHERE id=$1 RETURNING version`, [id, appointment.id, actor.id])).rows[0];
+      const row = (await c.query(`UPDATE atencion.solicitud_cita SET estado='asignada',cita_id=$2,resuelta_por=$3,resuelta_en=$4,version=version+1 WHERE id=$1 RETURNING version`, [id, appointment.id, actor.id, this.clock.now()])).rows[0];
       await this.commands.audit(c, actor, { action: 'citas.asignar', entity: 'solicitud_cita', entityId: id, patientId: request.patientId, permission: 'citas.agendar',
         detail: { requestId: id, appointmentId: appointment.id, doctorId: dto.doctorId, start: appointment.start.toISOString(), end: appointment.end.toISOString() } });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, request.patientId));
@@ -114,7 +114,7 @@ export class AppointmentRequestService {
   async reject(actor: Actor, id: string, dto: CategoryRequestRejectDto, key?: string) {
     return this.commands.run(actor, `citas.agendar:solicitud_categoria:${id}:rechazar`, key, dto, async c => {
       const request = await this.locked(c, id, dto.version);
-      const row = (await c.query(`UPDATE atencion.solicitud_cita SET estado='rechazada',motivo_rechazo=$2,resuelta_por=$3,resuelta_en=now(),version=version+1 WHERE id=$1 RETURNING version`, [id, dto.rejectionReason.trim(), actor.id])).rows[0];
+      const row = (await c.query(`UPDATE atencion.solicitud_cita SET estado='rechazada',motivo_rechazo=$2,resuelta_por=$3,resuelta_en=$4,version=version+1 WHERE id=$1 RETURNING version`, [id, dto.rejectionReason.trim(), actor.id, this.clock.now()])).rows[0];
       await this.commands.audit(c, actor, { action: 'citas.solicitud_rechazar', entity: 'solicitud_cita', entityId: id, patientId: request.patientId, permission: 'citas.agendar', reason: dto.rejectionReason.trim(), detail: { requestId: id } });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, request.patientId));
       return { id, version: row.version, state: 'rechazada' };
@@ -128,7 +128,7 @@ export class AppointmentRequestService {
       if (!owner) throw new NotFoundException('No se encontró la solicitud de cita.');
       if (!actor.patientId || actor.patientId !== owner.paciente_id) throw new ForbiddenException('Solo puedes retirar tus propias solicitudes; recepción las rechaza con motivo.');
       const request = await this.locked(c, id, dto.version);
-      const row = (await c.query(`UPDATE atencion.solicitud_cita SET estado='cancelada',resuelta_por=$2,resuelta_en=now(),version=version+1 WHERE id=$1 RETURNING version`, [id, actor.id])).rows[0];
+      const row = (await c.query(`UPDATE atencion.solicitud_cita SET estado='cancelada',resuelta_por=$2,resuelta_en=$3,version=version+1 WHERE id=$1 RETURNING version`, [id, actor.id, this.clock.now()])).rows[0];
       await this.commands.audit(c, actor, { action: 'citas.solicitud_cancelar', entity: 'solicitud_cita', entityId: id, patientId: request.patientId, permission: 'citas.cancelar', detail: { requestId: id } });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, request.patientId));
       return { id, version: row.version, state: 'cancelada' };

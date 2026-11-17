@@ -35,12 +35,30 @@ export function groupLabOrders<T extends GroupInput>(orders: T[]): { id: LabGrou
 export const ATTACHMENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/webp'] as const;
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
+/** `accept` of the file pickers: the types plus the extensions, because Windows gives a HEIC photo no type. */
+export const ATTACHMENT_ACCEPT = 'application/pdf,image/jpeg,image/png,image/heic,image/webp,.pdf,.jpg,.jpeg,.png,.heic,.heif,.webp';
+const TYPE_OF_EXTENSION: Record<string, (typeof ATTACHMENT_TYPES)[number]> = {
+  pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic', heif: 'image/heic', webp: 'image/webp',
+};
+
 export type AttachmentMeta = { fileName: string; mimeType: string; sizeBytes: number; sha256?: string };
+
+/**
+ * Type sent for a picked file: the browser's when it is an accepted one; when the browser gives none (Chrome and
+ * Firefox on Windows with a HEIC photo), the one of its extension. Null when neither is accepted. The API reads the
+ * real type from the bytes anyway.
+ */
+export function attachmentMimeType(file: { name: string; type: string }): string | null {
+  if ((ATTACHMENT_TYPES as readonly string[]).includes(file.type)) return file.type;
+  if (file.type) return null;
+  const extension = /\.([a-z0-9]+)$/i.exec(file.name)?.[1].toLowerCase();
+  return (extension && TYPE_OF_EXTENSION[extension]) || null;
+}
 
 /** Human message when a picked file cannot back an external result, or null when it can. */
 export function attachmentProblem(file: { name: string; type: string; size: number } | null): string | null {
   if (!file) return 'Adjunta la foto o el PDF del informe externo.';
-  if (!(ATTACHMENT_TYPES as readonly string[]).includes(file.type)) return 'El informe debe ser PDF o una foto (JPG, PNG, HEIC o WEBP).';
+  if (!attachmentMimeType(file)) return 'El informe debe ser PDF o una foto (JPG, PNG, HEIC o WEBP).';
   if (file.size <= 0) return 'El archivo está vacío.';
   if (file.size > MAX_ATTACHMENT_BYTES) return 'El archivo pasa de 10 MB; toma una foto más liviana o comprime el PDF.';
   return null;
