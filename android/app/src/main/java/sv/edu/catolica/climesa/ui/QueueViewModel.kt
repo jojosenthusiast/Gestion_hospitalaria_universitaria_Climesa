@@ -67,7 +67,9 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
             }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) {
-                mutable.value = mutable.value.copy(nextLoading = false)
+                // Without a proposal the panel would keep saying "Calculando…": it shows why instead.
+                if (nextService != null && mutable.value.next == null) mutable.value = mutable.value.copy(nextLoading = false, nextError = userMessage(e, "No se pudo calcular quién pasa después."))
+                else mutable.value = mutable.value.copy(nextLoading = false)
                 if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e))
             }
         }
@@ -83,12 +85,13 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     /** The proposal of the chosen area; a failure is shown in the panel instead of reading as "nobody waiting". */
     private suspend fun loadNext() {
         val service = nextService ?: return
-        mutable.value = mutable.value.copy(nextLoading = true)
+        // Only the first answer shows "Calculando…"; a refresh keeps the current panel until it arrives.
+        if (mutable.value.next == null) mutable.value = mutable.value.copy(nextLoading = true)
         try {
             val next = QueueRules.parseNext(api.request("/fila/siguiente?service=$service"))
             if (service == nextService) mutable.value = mutable.value.copy(next = next, nextLoading = false, nextError = null)
         } catch (e: CancellationException) { throw e }
-        catch (e: Exception) { if (service == nextService) mutable.value = mutable.value.copy(nextLoading = false, nextError = userMessage(e, "No se pudo calcular quién pasa después.")) }
+        catch (e: Exception) { if (service == nextService) mutable.value = mutable.value.copy(next = null, nextLoading = false, nextError = userMessage(e, "No se pudo calcular quién pasa después.")) }
     }
 
     private var nextService: String? = null
