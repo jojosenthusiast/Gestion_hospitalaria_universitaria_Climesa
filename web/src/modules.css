@@ -685,3 +685,6 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .consult-step { margin: var(--space-4) 0 0; font-size: var(--text-base); scroll-margin-top: var(--space-4); }
 .consult-handoff { margin-bottom: var(--space-4); }
 .dir-invite-note { margin: 0 0 var(--space-3); color: var(--muted); font-size: var(--text-sm, 14px); }
+
+/* R4a: a code (HAB-201, P-000-001, EXP-…) never breaks across lines. */
+.nowrap-code { white-space: nowrap; font-variant-numeric: tabular-nums; }

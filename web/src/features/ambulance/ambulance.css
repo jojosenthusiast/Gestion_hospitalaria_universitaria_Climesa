@@ -52,3 +52,14 @@
 .amb-crew-contact { color: var(--muted, inherit); }
 
 .amb-crew-note{display:block;margin-top:.25rem;color:var(--muted,inherit);}
+
+/* R4a · unit line: plate + state badge, then crew coverage; normal type sizes, wraps cleanly on a phone. */
+.amb-unit { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-6); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line); }
+.amb-unit-id { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.amb-unit-id strong { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.01em; }
+.amb-unit-crew { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); }
+.amb-unit-crew > div { display: grid; gap: 2px; min-width: 0; }
+.amb-unit-crew strong { font-size: var(--text-md); font-weight: 600; }
+.amb-unit-crew span { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
+.amb-service > header .priority-badge + .priority-badge { margin-left: 0; }
+@media (max-width: 520px) { .amb-unit { padding: var(--space-3) var(--space-4); } }

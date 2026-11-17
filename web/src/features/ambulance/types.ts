@@ -38,3 +38,9 @@ export const minutesBetween=(fromIso:string,now=Date.now())=>Math.max(0,Math.rou
 export function waitingLabel(minutes:number){if(minutes<1)return 'Recién recibida';if(minutes<60)return `Espera ${minutes} min`;const h=Math.floor(minutes/60),m=minutes%60;return `Espera ${h} h${m?` ${m} min`:''}`;}
 /** Quién pidió la ambulancia: paciente (nombre o alias), quien llamó, o «Llamada sin identificar». */
 export const requesterLabel=(r:Pick<AmbulanceRequest,'requesterName'|'callerName'|'registeredPatient'>)=>r.requesterName?.trim()||r.callerName?.trim()||(r.registeredPatient?'Paciente registrado':'Llamada sin identificar');
+
+/** R4a: a service still «en curso» 12 h after dispatch was most likely never closed; it gets an amber «Sin cierre» flag. */
+export const UNCLOSED_HOURS=12;
+export const isUnclosed=(dispatchedAt:string,now=Date.now())=>now-new Date(dispatchedAt).getTime()>UNCLOSED_HOURS*3600_000;
+/** OpenStreetMap link for a reported position (no key, no tracking script on our page). */
+export const mapLink=({latitude,longitude}:{latitude:number;longitude:number})=>`https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=17/${latitude}/${longitude}`;

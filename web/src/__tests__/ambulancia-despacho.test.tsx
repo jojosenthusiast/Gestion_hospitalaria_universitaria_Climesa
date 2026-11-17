@@ -184,7 +184,8 @@ describe('W19 bitácora de ambulancia', () => {
     await userEvent.type(screen.getByLabelText('Buscar en la bitácora'), 'Soyapango');
     await waitFor(() => expect(api.request).toHaveBeenLastCalledWith('/ambulancia/bitacora?q=Soyapango', expect.anything()));
     await userEvent.click(screen.getByRole('button', { name: 'Tabla' }));
-    expect(screen.getByRole('cell', { name: 'En curso' })).toBeTruthy();
+    // R4a: the fixture service is days old and still open, so its cell also carries the «Sin cierre» flag.
+    expect(screen.getByRole('cell', { name: /^En curso/ })).toBeTruthy();
     expect(screen.getByRole('cell', { name: 'Sin llegada a escena' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Quitar búsqueda' }));
     await waitFor(() => expect(api.request).toHaveBeenLastCalledWith('/ambulancia/bitacora', expect.anything()));
