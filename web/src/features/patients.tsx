@@ -100,6 +100,20 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  {(creating||editing)&&<PatientForm api={api} patient={editing} receipt={receipt} query={query} onClose={()=>{setCreating(false);setEditing(null);}} onSaved={done}/>}
  {status&&<PatientStateForm api={api} patient={status} onClose={()=>setStatus(null)} onSaved={done}/>}</>;
 }
+/**
+ * R7 U1 (G2, hub): the record is where the front desk starts. Each action opens its module with this patient already
+ * chosen (`&paciente=<id>`); the module decides with the server (allowedActions, the patient's appointment of today).
+ */
+function PatientHubActions({profile,patient}:{profile:AccessProfile;patient:Patient}){
+ if(!patient.active)return null;
+ const links=[
+  can(profile,'fila.emitir')&&{href:`#/fila?accion=emitir&paciente=${patient.id}`,label:'Emitir número o registrar llegada',icon:'megaphone' as const},
+  can(profile,'citas.agendar')&&{href:`#/citas?accion=agendar&paciente=${patient.id}`,label:'Agendar cita',icon:'calendar' as const},
+  can(profile,'admision.crear')&&{href:`#/hospitalizacion?accion=admision&paciente=${patient.id}`,label:'Ingresar',icon:'bed' as const},
+ ].filter(Boolean) as {href:string;label:string;icon:'megaphone'|'calendar'|'bed'}[];
+ if(!links.length)return null;
+ return <nav className="pt-hub" aria-label={`Acciones con ${patient.fullName}`}>{links.map((l,i)=><a key={l.href} className={i===0?'primary-button':'secondary-button'} href={l.href}><Icon name={l.icon} size={18}/>{l.label}</a>)}</nav>;
+}
 type Tab='datos'|'citas'|'consultas'|'laboratorio'|'ingresos'|'cambios';
 const tabNames:Record<Tab,string>={datos:'Datos',citas:'Citas',consultas:'Consultas',laboratorio:'Laboratorio',ingresos:'Ingresos',cambios:'Cambios'};
 /** Ficha del paciente en el panel de detalle: pestañas, estado de carga propio por pestaña y los datos que faltan. */
@@ -110,6 +124,7 @@ function PatientPanel({api,id,profile,version,onClose,onEdit,onState}:{api:Api;i
  return <aside className="cl-detail" aria-label="Ficha de paciente"><button type="button" className="cl-link-button" onClick={onClose}>Cerrar ficha</button><RemoteState state={data}>{p=>{const gaps=profileGaps(p),age='birth'in p?ageFrom(p.birth):null;return <>
   <div className="patient-banner"><span className="mono-label">EXPEDIENTE {p.record}</span><h3>{p.fullName}</h3><Tag value={p.state}/>{age!==null&&<small>{plural(age,'año','años')} · {sexNames[p.sex]}</small>}</div>
   {gaps.length>0&&<Notice kind="info">Faltan datos: {gaps.join(', ')}.</Notice>}
+  <PatientHubActions profile={profile} patient={p}/>
   {can(profile,'pacientes.editar_demograficos')&&<div className="dialog-actions"><button type="button" className="secondary-button" onClick={()=>onEdit(p)}>Editar datos</button>{/* R4a: inactivating is rare and serious: a quiet danger link, apart from the normal action; it confirms in a dialog. */}<button type="button" className={p.active?'danger-link':'cl-link-button'} onClick={()=>onState(p)}>{p.active?'Inactivar paciente':'Reactivar paciente'}</button></div>}
   <div className="cl-tabs" role="tablist" aria-label="Secciones de la ficha">{tabs.map(t=><button key={t} type="button" role="tab" id={`pt-tab-${t}`} aria-selected={tab===t} aria-controls="pt-panel" className="cl-tab" onClick={()=>setTab(t)}>{tabNames[t]}</button>)}</div>
   <div role="tabpanel" id="pt-panel" aria-labelledby={`pt-tab-${tab}`}>

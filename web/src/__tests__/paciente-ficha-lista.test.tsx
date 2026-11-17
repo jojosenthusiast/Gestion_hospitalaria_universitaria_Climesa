@@ -37,6 +37,23 @@ describe('ficha maestro-detalle', () => {
     return api;
   };
 
+  // R7 U1 (G2): the record is the front desk's hub; each action opens its module with this patient chosen.
+  it('ofrece emitir número, agendar e ingresar con el paciente ya elegido, según el permiso', async () => {
+    montar(['pacientes.buscar', 'pacientes.ver_ficha', 'fila.emitir', 'citas.agendar', 'admision.crear']);
+    await userEvent.click(await screen.findByRole('button', { name: /Abrir ficha de Ana Ficticia/ }));
+    const hub = await screen.findByRole('navigation', { name: 'Acciones con Ana Ficticia' });
+    expect(within(hub).getAllByRole('link').map(l => [l.textContent, l.getAttribute('href')])).toEqual([
+      ['Emitir número o registrar llegada', '#/fila?accion=emitir&paciente=p1'],
+      ['Agendar cita', '#/citas?accion=agendar&paciente=p1'],
+      ['Ingresar', '#/hospitalizacion?accion=admision&paciente=p1'],
+    ]);
+    cleanup();
+    montar(['pacientes.buscar', 'pacientes.ver_ficha']);
+    await userEvent.click(await screen.findByRole('button', { name: /Abrir ficha de Ana Ficticia/ }));
+    await screen.findByRole('tablist', { name: 'Secciones de la ficha' });
+    expect(screen.queryByRole('navigation', { name: /Acciones con/ })).toBeNull();
+  });
+
   it('muestra pestañas según el permiso, avisa de los datos faltantes y lista las citas con su rango', async () => {
     montar(['pacientes.buscar', 'pacientes.ver_ficha', 'citas.ver']);
     await userEvent.click(await screen.findByRole('button', { name: /Abrir ficha de Ana Ficticia/ }));
