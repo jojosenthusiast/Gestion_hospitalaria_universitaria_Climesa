@@ -79,6 +79,28 @@ class PlatformParityT16ViewModelsTest {
         assertFalse(vm.state.value.nextLoading)
     }
 
+    // Audit follow-up: when the queue itself cannot be read, the panel leaves "Calculando…" and says why.
+    @Test fun aFailedQueueReadDoesNotLeaveThePanelComputing() = runTest(dispatcher) {
+        val api = FakeGateway()
+        api.failures["/fila"] = AuthRequestException("Sin conexión.", 0)
+        val vm = QueueViewModel(api, ParityBus())
+        vm.chooseArea("consulta_general"); runCurrent()
+        val s = vm.state.value
+        assertEquals(sv.edu.catolica.climesa.domain.NextStatus.ERROR, sv.edu.catolica.climesa.domain.QueueRules.nextStatus(s.next, s.nextLoading, s.nextError))
+    }
+
+    // Audit follow-up: a failed refresh shows the error instead of an old proposal that may no longer hold.
+    @Test fun aFailedRefreshDropsTheOldProposal() = runTest(dispatcher) {
+        val api = FakeGateway()
+        api.responses["/fila/siguiente?service=consulta_general"] = JSONObject().put("proposal", JSONObject().put("id", "t1").put("numero", 1).put("version", 1))
+        val vm = QueueViewModel(api, ParityBus())
+        vm.chooseArea("consulta_general"); runCurrent()
+        api.failures["/fila/siguiente?service=consulta_general"] = AuthRequestException("No se pudo calcular quién sigue.", 500)
+        vm.load(silent = true); runCurrent()
+        assertNull(vm.state.value.next)
+        assertEquals("No se pudo calcular quién sigue.", vm.state.value.nextError)
+    }
+
     private fun doctorQueue(vararg rows: JSONObject) = JSONArray().apply { rows.forEach { put(it) } }
     private fun ticket(id: String, number: Int, state: String) = JSONObject().put("id", id).put("numero", number).put("patientName", "P$number").put("state", state).put("service", "consulta_general")
 
