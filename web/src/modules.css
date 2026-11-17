@@ -16,10 +16,8 @@
 .workspace-role .mono-label { color: #d3dbe6; font-size: 10px; letter-spacing: 0.07em; }
 .workspace-role select { max-width: 260px; padding: 6px 28px 6px 0; border: 0; border-bottom: 1px solid #9aa6ba; background: transparent; color: #ffffff; }
 .workspace-role option { background: var(--navy); }
-.hospital-clock { min-width: 0; margin-left: auto; padding: 9px 14px; display: flex; align-items: center; gap: 11px; flex-shrink: 0; border: 1px solid rgb(0 210 255 / 0.62); border-radius: 14px; background: rgb(0 120 180 / 0.16); color: #a7f5ff; }
-.hospital-clock > svg { flex-shrink: 0; color: #66e6ff; }
-.hospital-clock-time { display: block; color: #66f2ff; font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.08em; line-height: 1; }
-.hospital-clock-date { display: block; margin-top: 4px; color: #d3dbe6; font-size: 13px; text-transform: capitalize; white-space: nowrap; }
+/* R1: the day as plain small text in the topbar (it sits on the navy bar, so it uses the bar's light muted ink). */
+.topbar-date { min-width: 0; margin-left: auto; color: #d3dbe6; font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; text-transform: capitalize; font-variant-numeric: tabular-nums; }
 .nav-toggle { width: 46px; height: 46px; display: none; place-items: center; flex-shrink: 0; border: 1px solid rgb(255 255 255 / 0.3); border-radius: var(--radius-card); background: transparent; color: #ffffff; transition: background var(--motion-fast) ease, transform var(--motion-instant) ease; }
 .nav-toggle:hover { background: rgb(255 255 255 / 0.1); }
 .nav-toggle:active { transform: scale(0.96); }
@@ -34,7 +32,7 @@
 .module-nav.shell-sidebar a[aria-current="page"] { border-color: color-mix(in srgb, var(--primary-text) 24%, transparent); background: var(--soft); color: var(--primary-text); box-shadow: inset 3px 0 0 var(--primary); }
 .module-icon { width: 24px; height: 24px; display: grid; place-items: center; flex-shrink: 0; }
 .module-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.module-future { margin-left: auto; padding: 3px 6px; border-radius: 999px; background: var(--bg); color: var(--muted); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 9px; font-weight: 400; }
+.module-future { margin-left: auto; padding: 3px 6px; border-radius: 999px; background: var(--bg); color: var(--muted); font-size: 9px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .module-future::before { content: "Próximo"; }
 .nav-backdrop { display: none; }
 .connection-band { padding: 11px 22px; display: flex; align-items: center; justify-content: center; gap: 9px; border-bottom: 1px solid currentColor; background: var(--soft); color: var(--primary-text); font-size: 13px; font-weight: 700; line-height: 1.4; }
@@ -121,7 +119,7 @@
 
 /* Tablas adaptativas */
 .record-table { width: 100%; border-collapse: collapse; color: var(--ink); font-size: 14px; text-align: left; }
-.record-table th { position: sticky; top: 76px; z-index: 2; padding: 15px 20px; border-bottom: 1px solid var(--line); background: var(--bg); color: var(--muted); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; line-height: 1.4; text-transform: uppercase; }
+.record-table th { position: sticky; top: 76px; z-index: 2; padding: 15px 20px; border-bottom: 1px solid var(--line); background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; line-height: 1.4; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 .record-table td { max-width: 340px; padding: 18px 20px; border-bottom: 1px solid var(--line); line-height: 1.55; overflow-wrap: anywhere; vertical-align: middle; }
 .record-table tbody tr { transition: background var(--motion-fast) ease; }
 .record-table tbody tr:hover { background: var(--soft); }
@@ -141,7 +139,7 @@
 .number-strip strong > small { margin-left: 4px; color: var(--muted); font-size: 22px; letter-spacing: -0.03em; }
 .number-strip span { display: block; margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.45; }
 .number-strip .status-tag { display: inline-flex; margin-top: 0; font-size: 14px; letter-spacing: 0; }
-.updated-at { margin: -12px 0 32px; color: var(--muted); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 11px; text-align: right; }
+.updated-at { margin: -12px 0 32px; color: var(--muted); font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
 .board-grid { margin: 0 0 24px; display: grid; gap: 16px; }
 .board-grid-main { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .board-grid-detail { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; }
@@ -201,7 +199,7 @@
 .patient-banner h3 { margin: 12px 0 16px; font-size: 32px; line-height: 1.15; }
 .detail-grid, .detail-list { margin: 24px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 22px; }
 .detail-grid > div, .detail-list > div { min-width: 0; padding: 0 0 14px; border-bottom: 1px solid var(--line); }
-.detail-grid dt, .detail-list dt { margin-bottom: 7px; color: var(--muted); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.detail-grid dt, .detail-list dt { margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 .detail-grid dd, .detail-list dd { margin: 0; font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; }
 .change-history { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
 .change-history h3 { margin-bottom: 12px; font-size: 19px; }
@@ -217,13 +215,13 @@
 .space-tree { padding: 8px 24px 22px; }
 .space-row { min-width: 0; padding: 17px 0 17px calc(var(--depth) * 22px); display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); transition: background var(--motion-fast) ease; }
 .space-row:hover { background: var(--soft); }
-.space-node-mark { width: 22px; flex-shrink: 0; color: var(--primary-text); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 18px; }
+.space-node-mark { width: 22px; flex-shrink: 0; color: var(--primary-text); font-size: 18px; font-variant-numeric: tabular-nums; }
 .space-name { min-width: 0; display: grid; gap: 3px; flex: 1; }
 .space-name > .mono-data { color: var(--primary-text); font-size: 11px; }
 .space-name strong { font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
 .space-name small { color: var(--muted); font-size: 12px; }
 .space-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.space-count strong { margin-right: 5px; color: var(--ink); font-family: "Atkinson Hyperlegible Mono", monospace; }
+.space-count strong { margin-right: 5px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .space-inactive { opacity: 0.65; }
 .space-row > .row-action { margin-left: 6px; flex-shrink: 0; }
 .rooms-plan { padding: 18px 22px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; align-items: start; }
@@ -285,9 +283,7 @@
   .workspace-role .mono-label { display: none; }
   .workspace-role > span:first-child { max-width: 132px; font-size: 12px; }
   .account-menu-label { display: none; }
-  .hospital-clock { margin-left: 0; padding: 5px 8px; gap: 6px; }
-  .hospital-clock-time { font-size: 13px; letter-spacing: 0.04em; }
-  .hospital-clock-date { display: none; }
+  .topbar-date { display: none; }
   .hospital-frame { min-height: calc(100svh - 70px); display: block; }
   .hospital-workspace { min-height: calc(100svh - 70px); }
   .module-nav.shell-sidebar { position: fixed; top: 70px; left: 0; z-index: 20; width: min(86vw, 330px); height: calc(100svh - 70px); padding: 18px 12px; transform: translateX(-105%); box-shadow: 24px 0 60px rgb(0 0 0 / 0.3); transition: transform var(--motion-standard) ease; }
@@ -310,7 +306,7 @@
   .record-table tr { padding: 20px 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 18px; border-bottom: 1px solid var(--line); }
   .record-table tr:last-child { border-bottom: 0; }
   .record-table td { max-width: none; min-width: 0; padding: 0; display: block; border: 0; font-size: 13px; white-space: normal; }
-  .record-table td::before { content: attr(data-label); display: block; margin-bottom: 5px; color: var(--muted); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .record-table td::before { content: attr(data-label); display: block; margin-bottom: 5px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
   .record-table td:first-child { grid-column: 1 / -1; }
   .record-table td:first-child strong { font-size: 16px; }
   .record-table td:last-child { white-space: normal; }
@@ -489,7 +485,7 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .kpi-slate { --kpi: var(--status-cerrado); --kpi-soft: var(--status-cerrado-soft); } .kpi-neutral { --kpi: var(--control-line); --kpi-soft: var(--bg); }
 .kpi-icon { grid-row: 1 / 4; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; background: var(--kpi-soft); color: var(--kpi); }
 .kpi-label { color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.3; }
-.kpi-value { font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.kpi-value { font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -0.03em; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .kpi-sub { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
 .quick-actions { margin: 0 0 22px; display: grid; gap: 10px; }
 .quick-actions h2, .dash-panel h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
@@ -516,7 +512,7 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .timeline { margin: 0; padding: 0; display: grid; gap: 6px; list-style: none; }
 .timeline li { padding: 8px 10px; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; border-left: 3px solid var(--line); border-radius: 0 var(--radius-control) var(--radius-control) 0; }
 .timeline li.is-now { border-left-color: var(--primary); background: var(--soft); }
-.timeline time { font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 14px; font-weight: 700; color: var(--primary-text); }
+.timeline time { font-size: 14px; font-weight: 700; color: var(--primary-text); font-variant-numeric: tabular-nums; }
 .timeline li > div { display: grid; min-width: 0; }
 .timeline li > div > span { color: var(--muted); font-size: 12.5px; }
 .timeline-now { padding: 2px 8px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -525,7 +521,7 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .stepper { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
 .stepper li { padding: 8px 12px; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px dashed var(--line); border-radius: var(--radius-control); color: var(--muted); text-transform: capitalize; }
 .stepper li.is-done { border-style: solid; border-color: var(--success); background: var(--success-soft); color: var(--success); }
-.stepper small { font-family: "Atkinson Hyperlegible Mono", monospace; }
+.stepper small { font-variant-numeric: tabular-nums; }
 
 /* ───── Tablero: plantas ───── */
 .floor-occupancy { display: grid; gap: 20px; }
@@ -533,7 +529,7 @@ a.kpi:hover { border-color: var(--kpi); box-shadow: var(--shadow-float); }
 .floor-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .floor-head strong { font-size: 15px; }
 .floor-head span { color: var(--muted); font-size: 13px; }
-.floor-percent { margin-left: auto; font-family: "Atkinson Hyperlegible Mono", monospace; font-weight: 700; }
+.floor-percent { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
 .board-card .chart { margin-top: 12px; }
 
 /* ───── Métricas y exportación ───── */

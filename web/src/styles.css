@@ -210,11 +210,12 @@ select:focus-visible {
 }
 
 ::selection { background: var(--primary); color: var(--on-primary); }
-.mono-label, .eyebrow, .role-label, .section-number, .flow-number { font-family: "Atkinson Hyperlegible Mono", monospace; }
+/* R1 (S5): mono is only for codes (ficha, ticket, DUI, CIE-10, chips). Labels and numbers are sans with tabular figures. */
+.mono-label, .eyebrow, .role-label, .section-number, .flow-number { font-variant-numeric: tabular-nums; }
 .eyebrow { display: block; color: var(--primary-text); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; line-height: 1.4; text-transform: uppercase; }
 .mono-label { font-size: 12px; letter-spacing: 0.03em; line-height: 1.5; }
 /* Fase 2: cifras tabulares en tablas, contadores, horas y códigos, para que las columnas no bailen. */
-table, time, .tabular, .mono-data, .number-strip strong, .hospital-clock-time, .status-badge, .priority-badge, .area-tag { font-variant-numeric: tabular-nums; }
+table, time, .tabular, .mono-data, .number-strip strong, .status-badge, .priority-badge, .area-tag { font-variant-numeric: tabular-nums; }
 
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--ink); white-space: nowrap; }
 .brand-mark { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-card); background: var(--primary); color: var(--on-primary); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16); }
@@ -351,7 +352,7 @@ table, time, .tabular, .mono-data, .number-strip strong, .hospital-clock-time, .
 .section-number { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-control); background: var(--soft); color: var(--primary-text); font-size: 13px; }
 .workbench-heading h2 { margin-bottom: 4px; font-size: 24px; }
 .workbench-heading p { color: var(--muted); line-height: 1.45; }
-.access-tag { margin-left: auto; padding: 8px 10px; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: var(--soft); color: var(--primary-text); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 11px; white-space: nowrap; }
+.access-tag { margin-left: auto; padding: 8px 10px; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: var(--soft); color: var(--primary-text); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .access-tag > span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .invite-form { padding: 28px; }
 .invite-form > .notice { margin-bottom: 24px; }
