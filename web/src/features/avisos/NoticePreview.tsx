@@ -13,8 +13,12 @@ export function NoticeLevelBadge({ level }: { level: Level | undefined }) {
   return <span className={`priority-badge priority-${levelTone[value]} notice-level`}><Icon name={levelIcon[value]} size={14} /><span>{levelLabel(value)}</span></span>;
 }
 
-/** Cómo se ve un aviso: la misma tarjeta sirve para la vista previa y el detalle. Con nivel, el tono sale del nivel. */
-export function NoticeCard({ notice, compact = false, showAudience = true }: { notice: Pick<NoticeAudience, 'titulo' | 'cuerpo' | 'prioridad' | 'publico' | 'roles' | 'nivel' | 'areas'> & { hasta?: string | null }; compact?: boolean; showAudience?: boolean }) {
+/**
+ * Cómo se ve un aviso: la misma tarjeta sirve para la vista previa y el detalle. Con nivel, el tono sale del nivel.
+ * `emptyAudience` es el texto cuando no hay público, roles ni áreas: en la vista previa de quien publica es un aviso sin
+ * audiencia; quien lo recibe en «Para mí» lo tiene por su área (llega por /me/avisos sin códigos), como en iOS.
+ */
+export function NoticeCard({ notice, compact = false, showAudience = true, emptyAudience = 'sin audiencia' }: { notice: Pick<NoticeAudience, 'titulo' | 'cuerpo' | 'prioridad' | 'publico' | 'roles' | 'nivel' | 'areas'> & { hasta?: string | null }; compact?: boolean; showAudience?: boolean; emptyAudience?: string }) {
   const until = notice.hasta ? new Intl.DateTimeFormat('es-SV', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/El_Salvador' }).format(new Date(notice.hasta)) : null;
   const tone = notice.nivel ? cardTone[notice.nivel] : notice.prioridad;
   const label = notice.nivel ? levelLabel(notice.nivel) : priorityLabel(notice.prioridad);
@@ -23,7 +27,7 @@ export function NoticeCard({ notice, compact = false, showAudience = true }: { n
     <div>
       <div className="notice-card-head"><strong>{notice.titulo || 'Título del aviso'}</strong>{notice.nivel ? <NoticeLevelBadge level={notice.nivel} /> : <span className="notice-badge">{label}</span>}</div>
       <p>{notice.cuerpo || 'Aquí aparece el texto que van a leer.'}</p>
-      {(showAudience || until) && <small>{showAudience && <>Para: {audienceText(notice) || 'sin audiencia'}</>}{showAudience && until && ' · '}{until && <>Hasta {until}</>}</small>}
+      {(showAudience || until) && <small>{showAudience && <>Para: {audienceText(notice) || emptyAudience}</>}{showAudience && until && ' · '}{until && <>Hasta {until}</>}</small>}
     </div>
   </article>;
 }
