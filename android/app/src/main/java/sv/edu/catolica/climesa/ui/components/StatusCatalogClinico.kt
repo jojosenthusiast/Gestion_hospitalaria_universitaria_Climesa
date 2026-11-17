@@ -17,7 +17,8 @@ internal object StatusCatalogClinico {
     const val UNDER_REVIEW = "en_revision"
 
     private val tones = mapOf(
-        NOT_STARTED to StatusTone.NEUTRAL,
+        // Not started yet waits (family ESPERA), like a number in the queue.
+        NOT_STARTED to StatusTone.RESERVED,
         URGENT to StatusTone.DANGER,
         ROUTINE to StatusTone.NEUTRAL,
         UNDER_REVIEW to StatusTone.WARNING,

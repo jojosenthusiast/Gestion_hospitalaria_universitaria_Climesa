@@ -365,7 +365,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         val code = (error as? AuthRequestException)?.code
         return when (code) {
             "ambulancia_ya_despachada" -> "La ambulancia ya fue despachada."
-            "sin_paramedico_de_turno" -> "No hay un paramédico con turno en curso."
+            "sin_paramedico_de_turno" -> "No hay paramédico con cuenta en la app con turno en curso."
             "sin_motorista_de_turno" -> "No hay un motorista con turno en curso."
             "sin_tripulacion_de_turno" -> "No hay paramédico ni motorista con turno en curso."
             "cuenta_no_verificada" -> "Tu cuenta aún no está vinculada a tu expediente; recepción debe verificarla."

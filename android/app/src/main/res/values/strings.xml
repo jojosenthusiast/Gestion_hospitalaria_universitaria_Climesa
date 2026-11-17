@@ -269,10 +269,6 @@
     <string name="cat_mis_solicitudes">Mis solicitudes</string>
     <string name="cat_retirar">Retirar solicitud</string>
     <string name="cat_retirar_mensaje">Recepción ya no verá esta solicitud.</string>
-    <string name="cat_estado_pendiente">Por asignar</string>
-    <string name="cat_estado_asignada">Asignada</string>
-    <string name="cat_estado_rechazada">Rechazada</string>
-    <string name="cat_estado_cancelada">Retirada</string>
     <string name="cat_asignada_detalle">Cita con %1$s el %2$s</string>
     <string name="cat_bandeja_titulo">Solicitudes por asignar</string>
     <string name="cat_bandeja_detalle">Pacientes que pidieron cita por motivo. Las más antiguas primero.</string>

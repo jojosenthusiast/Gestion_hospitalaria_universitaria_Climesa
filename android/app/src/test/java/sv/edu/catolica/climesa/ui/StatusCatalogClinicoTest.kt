@@ -8,7 +8,7 @@ class StatusCatalogClinicoTest {
     @Test fun `clinical codes have their own tone`() {
         assertEquals(StatusTone.DANGER, StatusCatalogClinico.tone("urgente"))
         assertEquals(StatusTone.WARNING, StatusCatalogClinico.tone("en_revision"))
-        assertEquals(StatusTone.NEUTRAL, StatusCatalogClinico.tone("sin_iniciar"))
+        assertEquals(StatusTone.RESERVED, StatusCatalogClinico.tone("sin_iniciar"))
     }
 
     @Test fun `codes of the shared catalog are not redefined`() {

@@ -55,7 +55,6 @@
     <string name="rec_vinc_rechazo_titulo">Rechazar vinculación</string>
     <string name="rec_vinc_rechazo_mensaje">Cuenta: %1$s. El paciente verá este motivo.</string>
     <string name="rec_vinc_rechazo_motivo">Motivo del rechazo</string>
-    <string name="rec_cita_vencida">Vencida</string>
     <string name="rec_cita_confirmar_titulo">¿Confirmar la solicitud?</string>
     <string name="rec_cita_rechazar_titulo">Rechazar la solicitud</string>
     <string name="rec_cita_cancelar_titulo">Cancelar la cita</string>

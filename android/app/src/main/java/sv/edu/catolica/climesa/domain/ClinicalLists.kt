@@ -92,6 +92,14 @@ object AppointmentAgenda {
     fun time(iso: String) = runCatching { hm.format(Instant.parse(iso).atZone(zone)) }.getOrDefault(iso)
     fun timeRange(start: String, end: String) = "${time(start)} – ${time(end)}"
     fun dayKey(iso: String) = runCatching { Instant.parse(iso).atZone(zone).toLocalDate().toString() }.getOrDefault("")
+    /**
+     * Cancel or reschedule deadline after "hasta": "las 09:00" on the appointment's own day, else with its day
+     * ("el jueves 19 de noviembre a las 11:00"), so a deadline the day before is never read as the same day.
+     */
+    fun deadline(until: String, appointmentStart: String): String {
+        val day = dayKey(until)
+        return if (day.isEmpty() || day == dayKey(appointmentStart)) "las ${time(until)}" else "el ${dayLabel(day).replaceFirstChar { it.lowercase() }} a las ${time(until)}"
+    }
     fun dayLabel(key: String): String = runCatching {
         val date = LocalDate.parse(key)
         DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", spanish).format(date).replaceFirstChar { it.uppercase() }

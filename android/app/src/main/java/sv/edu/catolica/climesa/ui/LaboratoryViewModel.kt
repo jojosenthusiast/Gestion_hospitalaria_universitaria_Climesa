@@ -278,6 +278,8 @@ class LaboratoryViewModel @Inject constructor(
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
 
     private fun mutate(path: String, body: JSONObject, notice: String) {
+        // A second tap while a write is in flight sends nothing (no double review or sample).
+        if (mutable.value.busy) return
         mutable.value = mutable.value.copy(busy = true, error = null, notice = null)
         viewModelScope.launch {
             try { api.request(path, "POST", body); mutable.value = mutable.value.copy(busy = false, notice = notice); load(silent = true) }
@@ -286,5 +288,6 @@ class LaboratoryViewModel @Inject constructor(
         }
     }
 
-    private fun message(error: Exception) = if (error is AuthRequestException) error.message ?: "No se pudo completar la operación." else error.message ?: "No se pudo completar la operación."
+    /** Spanish text for a failed read; a parser or runtime message never reaches the screen. */
+    private fun message(error: Exception) = userMessage(error, "No se pudo completar la operación.")
 }
