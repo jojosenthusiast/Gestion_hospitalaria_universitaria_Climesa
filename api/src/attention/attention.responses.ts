@@ -376,6 +376,7 @@ export class QueueTicketResponse {
   @DateTimeProp() issuedAt!: string;
   @EnumProp(AREA_FILA, 'AreaFila', { description: 'Código del área del servicio; el número cuenta desde 1 por área y día' }) area!: string;
   @EnumProp(QUEUE_PRIORITIES, 'PrioridadFila') priority!: string;
+  @IntProp({ optional: true, nullable: true, description: 'Números en espera antes de este en su área (mismo cálculo que al emitir); null si ya no espera' }) ahead?: number | null;
   @DateTimeProp({ nullable: true, description: 'Hora de la cita de hoy del paciente (solo consulta general); null si llegó sin cita' }) appointmentAt!: string | null;
   @BoolProp({ description: 'Llegó sin cita' }) walkIn!: boolean;
   @UuidProp({ nullable: true, description: 'Cita del número: la ligada al registrar la llegada (D-1) o, sin enlace, la de hoy del paciente' }) appointmentId!: string | null;

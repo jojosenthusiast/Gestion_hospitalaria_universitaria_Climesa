@@ -24686,6 +24686,11 @@
               }
             ]
           },
+          "ahead": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Números en espera antes de este en su área (mismo cálculo que al emitir); null si ya no espera"
+          },
           "appointmentAt": {
             "type": "string",
             "format": "date-time",
