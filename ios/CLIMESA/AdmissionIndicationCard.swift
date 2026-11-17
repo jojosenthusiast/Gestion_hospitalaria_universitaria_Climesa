@@ -23,7 +23,7 @@ struct AdmissionIndicationCard: View {
                 }
                 Text("admission.done").font(Typo.body).foregroundStyle(Theme.ink)
             } else if !open {
-                Text("admission.intro").font(Typo.small).foregroundStyle(Theme.muted)
+                // I-42: the explanation shows once, with the form.
                 ClimesaButton(title: L.text("admission.submit"), kind: .secondary) { open = true }
             } else {
                 form

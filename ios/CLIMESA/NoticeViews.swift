@@ -94,7 +94,7 @@ struct CriticalNoticeBanner: View {
         if let notice = pending.first {
             let hours = NoticeRules.hoursText(model.inbox?.reminderHours ?? 4)
             HStack(alignment: .top, spacing: Spacing.m) {
-                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 22, weight: .semibold))
+                Image(systemName: "exclamationmark.triangle.fill").font(Typo.heading)
                     .foregroundStyle(Theme.critical).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: Spacing.m) {
                     HStack(spacing: Spacing.s) {
@@ -203,18 +203,19 @@ struct NoticesView: View {
     }
 }
 
-/// Fila de la bandeja: nivel, leído o no, título y fechas.
+/// Fila de la bandeja: nivel, título y fechas. «Sin leer» es un punto y el título en negrita (I-5), no una familia de
+/// estado de la fila: el reloj rayado significa «En espera» y el check «Terminado».
 private struct NoticeRow: View {
     let notice: InboxNotice
 
     var body: some View {
+        let unread = notice.acknowledgedAt == nil
         HStack(alignment: .center, spacing: Spacing.m) {
+            Circle().fill(unread ? Theme.primary : Color.clear).frame(width: 8, height: 8).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Spacing.s) {
-                HStack(spacing: Spacing.s) {
-                    NoticeLevelBadge(level: notice.level)
-                    StatusTag(notice.acknowledgedAt == nil ? "pendiente" : "completado", label: L.text(notice.acknowledgedAt == nil ? "notices.unread" : "notices.read"))
-                }
-                Text(verbatim: notice.title).font(Typo.subheading).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                NoticeLevelBadge(level: notice.level)
+                Text(verbatim: notice.title).font(unread ? Typo.subheading : Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                if unread { Text("notices.unread").font(Typo.caption).foregroundStyle(Theme.primaryText) }
                 if !meta.isEmpty { Text(verbatim: meta).font(Typo.small).foregroundStyle(Theme.muted) }
             }
             Spacer(minLength: Spacing.s)
@@ -256,10 +257,12 @@ struct NoticeDetailView: View {
             if model.failedNotice == notice.id, let error = model.submission.error { PatientNotice(text: error, failure: true) }
             if let done = model.submission.notice { PatientNotice(text: done) }
             if let acknowledged = notice.acknowledgedAt {
-                HStack(spacing: Spacing.s) {
-                    StatusTag("completado", label: L.text("notices.read"))
-                    Text(verbatim: ClimesaDates.display(acknowledged)).font(Typo.small).foregroundStyle(Theme.muted)
+                Label {
+                    Text(verbatim: "\(L.text("notices.read")) · \(ClimesaDates.display(acknowledged))").font(Typo.small)
+                } icon: {
+                    Image(systemName: "envelope.open").accessibilityHidden(true)
                 }
+                .foregroundStyle(Theme.muted)
             } else {
                 ClimesaButton(title: L.text("notices.ack"), loading: model.busy) {
                     Task { await model.send(.enterado, notice) { try account.client() } }
@@ -326,7 +329,7 @@ struct InboxNoticeCard: View {
             }
         }()
         HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: notice.level == .informativo ? "megaphone" : "exclamationmark.triangle.fill")
+            Image(systemName: notice.level == .informativo ? notice.level.symbol : "exclamationmark.triangle.fill")
                 .foregroundStyle(tone.strong).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Spacing.s) {
                 NoticeLevelBadge(level: notice.level)

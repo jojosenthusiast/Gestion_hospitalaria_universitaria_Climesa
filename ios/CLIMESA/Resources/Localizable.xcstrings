@@ -221,35 +221,13 @@
         }
       }
     },
-    "auth.eyebrow.register": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "CUENTA DE PACIENTE / 01"
-          }
-        }
-      }
-    },
-    "auth.eyebrow.login": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ACCESO PERSONAL / 01"
-          }
-        }
-      }
-    },
     "auth.headline.register": {
       "extractionState": "manual",
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tu salud,\nmás cerca"
+            "value": "Crea tu cuenta de paciente"
           }
         }
       }
@@ -260,29 +238,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bienvenido"
-          }
-        }
-      }
-    },
-    "auth.sub.register": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Crea tu cuenta para acceder a tus servicios."
-          }
-        }
-      }
-    },
-    "auth.sub.login": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ingresa con tu cuenta del hospital."
+            "value": "Ingresa con tu cuenta del hospital"
           }
         }
       }
@@ -591,39 +547,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Paciente"
-          }
-        }
-      }
-    },
-    "placeholder.badge": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "PRÓXIMA ENTREGA"
-          }
-        }
-      }
-    },
-    "placeholder.title": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Este módulo todavía no está habilitado."
-          }
-        }
-      }
-    },
-    "placeholder.body": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Su acceso y navegación están definidos para tu rol. Las operaciones estarán disponibles en la siguiente entrega."
           }
         }
       }
@@ -1332,17 +1255,6 @@
         }
       }
     },
-    "consultation.diagnosis.hint": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La API valida el código contra el catálogo CIE-10."
-          }
-        }
-      }
-    },
     "consultation.diagnosis.note": {
       "extractionState": "manual",
       "localizations": {
@@ -1541,17 +1453,6 @@
         }
       }
     },
-    "day.appointments": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "citas hoy"
-          }
-        }
-      }
-    },
     "day.attend": {
       "extractionState": "manual",
       "localizations": {
@@ -1636,17 +1537,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Expediente"
-          }
-        }
-      }
-    },
-    "day.results": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "resultados por revisar"
           }
         }
       }
@@ -2328,7 +2218,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Escribe al menos 2 caracteres y busca."
+            "value": "Escribe al menos 2 letras."
           }
         }
       }
@@ -2340,17 +2230,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Faltan aproximadamente %ld números antes del tuyo"
-          }
-        }
-      }
-    },
-    "queue.ahead.hint": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calculado con los números llamados hoy; puede variar."
           }
         }
       }
@@ -2454,17 +2333,6 @@
         }
       }
     },
-    "results.followUp.count": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%d pendiente(s)"
-          }
-        }
-      }
-    },
     "results.followUp.none": {
       "extractionState": "manual",
       "localizations": {
@@ -2527,17 +2395,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Se realiza en otro sitio"
-          }
-        }
-      }
-    },
-    "results.external.intro": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La orden queda como externa: ya no se toma muestra aquí. El paciente ve el lugar y estas instrucciones en sus exámenes."
           }
         }
       }
@@ -2850,17 +2707,6 @@
         }
       }
     },
-    "ds.medico.stat.waiting": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "en espera"
-          }
-        }
-      }
-    },
     "ds.medico.stat.hospitalized": {
       "extractionState": "manual",
       "localizations": {
@@ -2868,17 +2714,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "hospitalizados"
-          }
-        }
-      }
-    },
-    "ds.medico.search": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Buscar"
           }
         }
       }
@@ -3813,7 +3648,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Elige otra franja libre del mismo médico. Tu cita actual sigue vigente hasta que Recepción o tu médico acepten el cambio."
+            "value": "Tu cita actual sigue vigente hasta que acepten el cambio."
           }
         }
       }
@@ -4111,17 +3946,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancelar orden de laboratorio"
-          }
-        }
-      }
-    },
-    "results.cancel.intro": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La orden deja de avanzar y el laboratorio ya no la procesa. Queda registrado quién la canceló y por qué."
           }
         }
       }
@@ -4456,17 +4280,6 @@
         }
       }
     },
-    "appointments.category.intro": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elige el motivo; recepción te asigna médico y hora."
-          }
-        }
-      }
-    },
     "appointments.category.reason": {
       "extractionState": "manual",
       "localizations": {
@@ -4720,17 +4533,6 @@
         }
       }
     },
-    "consultation.steps": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consulta → procedimientos → receta o exámenes → cerrar"
-          }
-        }
-      }
-    },
     "consultation.step.1": {
       "extractionState": "manual",
       "localizations": {
@@ -4771,17 +4573,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "4. Cerrar consulta"
-          }
-        }
-      }
-    },
-    "consultation.step.4.hint": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Firmar cierra la consulta y el número de fila; luego te proponemos quién pasa después."
           }
         }
       }
@@ -5299,6 +5090,116 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ningún médico con ese nombre."
+          }
+        }
+      }
+    },
+    "auth.resend.wait": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reenviar correo en %lld s"
+          }
+        }
+      }
+    },
+    "consultation.steps.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pasos de la consulta"
+          }
+        }
+      }
+    },
+    "consultation.step.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siguiente: %@"
+          }
+        }
+      }
+    },
+    "lab.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar examen"
+          }
+        }
+      }
+    },
+    "lab.selected": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld seleccionados"
+          }
+        }
+      }
+    },
+    "lab.search.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ningún examen coincide con la búsqueda."
+          }
+        }
+      }
+    },
+    "rx.removeLine": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar línea"
+          }
+        }
+      }
+    },
+    "queue.next.why": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Por qué este número?"
+          }
+        }
+      }
+    },
+    "results.followUp.record": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expediente %@"
+          }
+        }
+      }
+    },
+    "appointments.actions": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acciones de la cita"
           }
         }
       }

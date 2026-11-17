@@ -21,16 +21,17 @@ struct UnsupportedRoleView:View {
     let profile:AccessProfile
     @EnvironmentObject private var account:AccountModel
     var body:some View {
-        VStack(alignment:.leading,spacing:24) {
+        VStack(alignment:.leading,spacing:0) {
             BrandHeader()
-            VStack(alignment:.leading,spacing:24) {
-                Text("unsupported.title").font(Brand.bold(34)).fixedSize(horizontal:false,vertical:true)
+            VStack(alignment:.leading,spacing:Spacing.space4) {
+                Text("unsupported.title").font(Typo.heading).foregroundStyle(Theme.ink).fixedSize(horizontal:false,vertical:true).accessibilityAddTraits(.isHeader)
                 // Dónde sí puede ingresar, según las plataformas de sus roles en /auth/me (no una tabla fija en la app).
-                Text(verbatim:PlatformGate.message(platforms:profile.platforms,current:"ios",webURL:account.webURL)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
-                Button("common.logout",role:.destructive) { Task { await account.logout() } }.disabled(account.busy)
-            }.padding(24)
+                Text(verbatim:PlatformGate.message(platforms:profile.platforms,current:"ios",webURL:account.webURL)).font(Typo.body).foregroundStyle(Theme.muted).fixedSize(horizontal:false,vertical:true)
+                // Rojo solo para lo crítico: salir no lo es.
+                ClimesaButton(title:L.text("common.logout"),kind:.secondary,loading:account.busy) { Task { await account.logout() } }
+            }.padding(Spacing.space6).frame(maxWidth:560,alignment:.leading).frame(maxWidth:.infinity)
             Spacer()
-        }.background(Brand.paper)
+        }.background(Theme.bg)
     }
 }
 
@@ -57,11 +58,11 @@ struct RoleTabsView:View {
                 NavigationStack {
                     ScrollView {
                         // S1: sin título gigante; el título de la pestaña va en línea en la barra de navegación (HIG).
-                        VStack(alignment:.leading,spacing:25) {
+                        VStack(alignment:.leading,spacing:Spacing.space6) {
                             content(for:tab)
-                        }.padding(24).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
+                        }.padding(Spacing.space6).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
                     }.safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
-                        .toolbarBackground(Theme.navy,for:.navigationBar).toolbarBackground(.visible,for:.navigationBar).toolbarColorScheme(.dark,for:.navigationBar)
+                        .climesaNavBar()
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
                         .refreshable { await refresh(tab) }
                 }.tabItem { Label(LocalizedStringKey(tab.titleKey),systemImage:tab.symbol) }.tag(tab)
@@ -117,54 +118,62 @@ struct ConnectionBanner:View {
     }
 }
 
-/// Pestañas que todavía no tienen datos: un aviso claro en lugar de una pantalla vacía.
-struct PlaceholderContent:View {
-    var body:some View {
-        VStack(alignment:.leading,spacing:25) {
-            Divider()
-            Text("placeholder.badge").font(Brand.mono()).foregroundStyle(Brand.blue)
-            Text("placeholder.title").font(Brand.bold(25))
-            Text("placeholder.body").foregroundStyle(.secondary)
-        }
-    }
-}
-
 struct ShiftsContent:View {
     @EnvironmentObject private var account:AccountModel
     @ObservedObject var model:ShiftModel
     let live:LiveViewModel
     let role:String
+    @State private var showPast=false
     var body:some View {
-        VStack(alignment:.leading,spacing:25) {
+        VStack(alignment:.leading,spacing:Spacing.space6) {
             if model.loading && model.shifts.isEmpty { Skeleton(label:L.text("shifts.loading")) }
             else if let error=model.error { ErrorStateView(message:error) { Task { await model.load(api:account.api) } } }
             else if model.shifts.isEmpty { EmptyStateView(title:L.text("shifts.empty"),symbol:"calendar") }
             // Por día asignado (Hoy, Mañana, día y fecha) y por hora de inicio; la entrada se confirma sola (ASIS-01).
-            // Abre en hoy: lo de hoy en adelante primero y los días anteriores debajo, bajo "Turnos anteriores".
+            // Abre en hoy: lo de hoy en adelante primero; los días anteriores quedan plegados abajo (S12, últimos 7 días).
             let days=ShiftAttendanceRules.byDay(model.shifts,start:{ ShiftAttendanceRules.date($0.start) },end:{ ShiftAttendanceRules.date($0.end) },today:Date())
-            ForEach(Array(days.enumerated()),id:\.offset) { index, day in
-                if day.past && (index==0 || !days[index-1].past) { Text(L.text("shifts.past")).font(Typo.small).foregroundStyle(Theme.muted).accessibilityAddTraits(.isHeader) }
-                Text(verbatim:day.title).font(Typo.heading).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
-                ForEach(day.items) { shift in
-                    // Web `displayState`: a published shift whose hours started or ended reads as in progress or done.
-                    let shown=ShiftAttendanceRules.displayState(shift.state,start:ShiftAttendanceRules.date(shift.start),end:ShiftAttendanceRules.date(shift.end),now:Date())
-                    VStack(alignment:.leading,spacing:Spacing.m) {
-                        HStack(spacing:Spacing.s) {
-                            AreaTag(AreaCode.of(name: shift.area).rawValue)
-                            Text(verbatim:shift.area).font(Typo.subheading).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
-                        }
-                        Text(verbatim:ShiftAttendanceRules.hours(start:ShiftAttendanceRules.date(shift.start),end:ShiftAttendanceRules.date(shift.end),type:shift.type)).font(Typo.body).foregroundStyle(Theme.ink)
-                        StatusTag(shown,label:ShiftAttendanceRules.stateLabel(shown))
-                        if let attendance=ShiftAttendanceRules.attendanceLabel(shift.attendance,late:shift.late ?? false) { Text(verbatim:attendance).font(Typo.small).foregroundStyle(Theme.muted) }
-                    }
-                    .padding(Spacing.l)
-                    .frame(maxWidth:.infinity,alignment:.leading)
-                    .areaSurface(AreaCode.of(name: shift.area).rawValue)
-                }
+            let upcoming=days.filter { !$0.past }
+            let past=Array(days.filter { $0.past }.prefix(7))
+            ForEach(Array(upcoming.enumerated()),id:\.offset) { _, day in dayGroup(title:day.title,items:day.items) }
+            if !past.isEmpty {
+                DisclosureGroup(isExpanded:$showPast) {
+                    VStack(alignment:.leading,spacing:Spacing.space6) {
+                        ForEach(Array(past.enumerated()),id:\.offset) { _, day in dayGroup(title:day.title,items:day.items) }
+                    }.padding(.top,Spacing.space3)
+                } label: {
+                    Text(L.text("shifts.past")).font(Typo.label).foregroundStyle(Theme.ink).frame(minHeight:44)
+                }.tint(Theme.primaryText)
             }
         }
         // Se pide al entrar y de nuevo cada vez que un evento de turnos (o una reconexión) sube el contador.
         .task(id:"\(role)-\(live.snapshot.shiftsVersion)") { await model.load(api:account.api) }
+    }
+
+    /// Un día: título y sus turnos como filas separadas por una línea de 1 pt (sin una tarjeta por turno).
+    @ViewBuilder private func dayGroup(title:String,items:[Shift])->some View {
+        SectionCard(title:title) {
+            ForEach(Array(items.enumerated()),id:\.element.id) { index, shift in
+                if index>0 { Divider().overlay(Theme.line) }
+                shiftRow(shift)
+            }
+        }
+    }
+
+    @ViewBuilder private func shiftRow(_ shift:Shift)->some View {
+        // Web `displayState`: a published shift whose hours started or ended reads as in progress or done.
+        let shown=ShiftAttendanceRules.displayState(shift.state,start:ShiftAttendanceRules.date(shift.start),end:ShiftAttendanceRules.date(shift.end),now:Date())
+        HStack(alignment:.center,spacing:Spacing.m) {
+            AreaTag(AreaCode.of(name: shift.area).rawValue)
+            VStack(alignment:.leading,spacing:2) {
+                Text(verbatim:shift.area).font(Typo.subheading).foregroundStyle(Theme.ink)
+                Text(verbatim:ShiftAttendanceRules.hours(start:ShiftAttendanceRules.date(shift.start),end:ShiftAttendanceRules.date(shift.end),type:shift.type)).font(Typo.small).foregroundStyle(Theme.muted)
+                if let attendance=ShiftAttendanceRules.attendanceLabel(shift.attendance,late:shift.late ?? false) { Text(verbatim:attendance).font(Typo.caption).foregroundStyle(Theme.muted) }
+            }
+            Spacer(minLength:Spacing.s)
+            StatusTag(shown,label:ShiftAttendanceRules.stateLabel(shown))
+        }
+        .padding(.vertical,Spacing.s).frame(minHeight:Spacing.control)
+        .accessibilityElement(children:.combine)
     }
 }
 
@@ -172,7 +181,7 @@ struct ProfileContent:View {
     let profile:AccessProfile
     @EnvironmentObject private var account:AccountModel
     var body:some View {
-        VStack(alignment:.leading,spacing:25) {
+        VStack(alignment:.leading,spacing:Spacing.space6) {
             SectionCard {
                 HStack(spacing:Spacing.m) {
                     Text(verbatim:String((profile.name.isEmpty ? profile.email:profile.name).prefix(1)).uppercased()).font(Typo.heading)
@@ -183,14 +192,15 @@ struct ProfileContent:View {
                     }
                 }
                 Divider().overlay(Theme.line)
-                Text(verbatim:String(format:L.text("profile.roles"),profile.roles.joined(separator:", "))).font(Typo.mono).foregroundStyle(Theme.ink)
+                Text(verbatim:String(format:L.text("profile.roles"),RoleNames.list(profile.roles))).font(Typo.small).foregroundStyle(Theme.ink)
                 Text("auth.footer").font(Typo.small).foregroundStyle(Theme.muted)
             }
             if profile.allowedIOSRoles.count>1 {
                 Picker("profile.work_role",selection:$account.role) { ForEach(profile.allowedIOSRoles,id:\.self) { Text(LocalizedStringKey(RolePolicy.labelKey($0))).tag($0) } }.pickerStyle(.segmented)
             }
             ClimesaButton(title:L.text("profile.refresh"),kind:.secondary) { Task { await account.refreshProfile() } }
-            ClimesaButton(title:L.text("common.logout"),kind:.destructive,loading:account.busy) { Task { await account.logout() } }
+            // Rojo solo para lo crítico: cerrar sesión es una acción secundaria.
+            ClimesaButton(title:L.text("common.logout"),kind:.secondary,loading:account.busy) { Task { await account.logout() } }
         }
     }
 }

@@ -178,3 +178,63 @@ public enum DischargeRevocationRules {
         return nil
     }
 }
+
+// MARK: - R2: consulta por pasos, catálogo con búsqueda, signos con nombre
+
+/// Pasos de la consulta, los mismos de la web (`STEPS` de web/src/features/consultations.tsx): consulta →
+/// procedimientos → receta y exámenes → cerrar. La pantalla muestra un paso a la vez con su indicador arriba.
+public enum ConsultationStep: Int, CaseIterable, Sendable {
+    case consulta = 1, procedimientos, recetaExamenes, cierre
+
+    /// Clave de Localizable.xcstrings con el título numerado («1. Consulta»).
+    public var titleKey: String { "consultation.step.\(rawValue)" }
+
+    /// El paso siguiente; el último no tiene.
+    public var next: ConsultationStep? { ConsultationStep(rawValue: rawValue + 1) }
+
+    /// Estado del paso respecto del actual: hecho (antes), actual o pendiente (después).
+    public func state(current: ConsultationStep) -> StepState {
+        if self == current { return .actual }
+        return rawValue < current.rawValue ? .hecho : .pendiente
+    }
+
+    public enum StepState: Sendable { case hecho, actual, pendiente }
+}
+
+/// Búsqueda del catálogo de laboratorio: por nombre o código, sin acentos ni mayúsculas. Lo ya elegido siempre se ve.
+public enum LabCatalogFilter {
+    public static func filter(_ exams: [LabExam], query: String, selected: Set<String>) -> [LabExam] {
+        let text = fold(query)
+        guard !text.isEmpty else { return exams }
+        return exams.filter { selected.contains($0.id) || fold($0.name).contains(text) || fold($0.code).contains(text) }
+    }
+
+    private static func fold(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "es")).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// Nombre y unidad de cada signo vital del reporte prehospital (`VitalSignsDto` de la API), nunca la clave cruda.
+public enum VitalSignLabels {
+    private static let order = ["systolic", "diastolic", "heartRate", "respiratoryRate", "oxygenSaturation", "temperature", "glasgow"]
+    private static let labels: [String: (name: String, unit: String?)] = [
+        "systolic": ("Presión sistólica", "mmHg"), "diastolic": ("Presión diastólica", "mmHg"),
+        "heartRate": ("Frecuencia cardiaca", "lpm"), "respiratoryRate": ("Frecuencia respiratoria", "rpm"),
+        "oxygenSaturation": ("Saturación de oxígeno", "%"), "temperature": ("Temperatura", "°C"), "glasgow": ("Escala de Glasgow", nil)
+    ]
+
+    /// Nombre en español; una clave desconocida se muestra con espacios en lugar de guiones bajos.
+    public static func label(_ key: String) -> String { labels[key]?.name ?? key.replacingOccurrences(of: "_", with: " ") }
+
+    /// Valor con su unidad («98 %», «120 mmHg»).
+    public static func value(_ key: String, _ text: String) -> String {
+        guard let unit = labels[key]?.unit, !text.isEmpty else { return text }
+        return "\(text) \(unit)"
+    }
+
+    /// Claves en orden clínico (presión, frecuencias, saturación, temperatura, Glasgow); las desconocidas al final.
+    public static func ordered(_ keys: [String]) -> [String] {
+        let known = order.filter { keys.contains($0) }
+        return known + keys.filter { !order.contains($0) }.sorted()
+    }
+}

@@ -158,8 +158,9 @@ private struct HomeLabCard: View {
             let pending = PatientLabRules.pendingCount(labs)
             let ready = labs.filter { $0.reviewedAt != nil }.count
             HStack(spacing: Spacing.m) {
-                StatTile(value: String(pending), label: L.text("ds.paciente.home.pending"))
-                StatTile(value: String(ready), label: L.text("ds.paciente.home.ready"))
+                // I-10: figures inside the card are plain, not cards of their own.
+                StatTile(value: String(pending), label: L.text("ds.paciente.home.pending"), plain: true)
+                StatTile(value: String(ready), label: L.text("ds.paciente.home.ready"), plain: true)
             }
         }
     }
@@ -216,8 +217,7 @@ private struct QueueTicketCard: View {
                 }
                 PatientTag(ticket.state.rawValue, label: ticket.state.label)
                 if ticket.state == .enEspera, let board, let ahead = QueueRules.ahead(of: ticket.number, called: board.called) {
-                    StatTile(value: String(ahead), label: String(format: L.text("queue.ahead"), ahead))
-                    Text("queue.ahead.hint").font(Typo.caption).foregroundStyle(Theme.muted)
+                    StatTile(value: String(ahead), label: String(format: L.text("queue.ahead"), ahead), plain: true)
                 }
                 Text(verbatim: String(format: L.text("queue.issued"), ClimesaDates.display(ticket.issuedAt, .time))).font(Typo.small).foregroundStyle(Theme.muted)
             }
@@ -242,9 +242,9 @@ struct PatientAppointmentsView: View {
     @State private var requestSent = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Spacing.space4) {
             // Fase 2, flujo A: se pide por motivo, no eligiendo entre todos los médicos; recepción asigna médico y hora.
-            if account.can("citas.solicitar") { ClimesaButton(title: L.text("appointments.request")) { requestSent = false; requesting = true } }
+            // S1 / I-25: «Pedir cita» is the screen's primary action, in the bar (HIG), not a full-width button.
             if requestSent { PatientNotice(text: L.text("appointments.category.sent")) }
             PatientSubmissionNotice(submission: submission)
             if let message = requests.error {
@@ -257,16 +257,32 @@ struct PatientAppointmentsView: View {
                 // CITA-04: el reloj de interfaz (cada minuto) solo recalcula qué acciones siguen válidas; no pide datos.
                 TimelineView(.everyMinute) { context in
                     let split = AppointmentRules.split(list, now: context.date)
-                    VStack(alignment: .leading, spacing: 16) {
-                        SectionTitle("appointments.upcoming")
-                        if split.upcoming.isEmpty { EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar") }
-                        ForEach(split.upcoming) { item in
-                            AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date, cancel: { cancelling = item }, reschedule: { rescheduling = item })
+                    VStack(alignment: .leading, spacing: Spacing.space4) {
+                        // I-26: one empty state per screen; inside a section, one line.
+                        if split.upcoming.isEmpty && split.past.isEmpty {
+                            EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar")
+                        } else {
+                            if split.upcoming.isEmpty {
+                                SectionCard(title: L.text("appointments.upcoming")) { EmptyNote("appointments.upcoming.none") }
+                            } else {
+                                ListCard(title: L.text("appointments.upcoming"), items: split.upcoming) { item in
+                                    AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date, cancel: { cancelling = item }, reschedule: { rescheduling = item })
+                                }
+                            }
+                            if !split.past.isEmpty {
+                                ListCard(title: L.text("appointments.past"), items: split.past) { item in
+                                    AppointmentRow(appointment: item, option: .hidden, now: context.date, cancel: {}, reschedule: nil)
+                                }
+                            }
                         }
-                        SectionTitle("appointments.past")
-                        if split.past.isEmpty { EmptyStateView(title: L.text("appointments.past.none"), symbol: "clock.arrow.circlepath") }
-                        ForEach(split.past) { item in AppointmentRow(appointment: item, option: .hidden, now: context.date, cancel: {}, reschedule: nil) }
                     }
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if account.can("citas.solicitar") {
+                    Button(L.text("appointments.request")) { requestSent = false; requesting = true }
                 }
             }
         }
@@ -288,47 +304,54 @@ struct PatientAppointmentsView: View {
     }
 }
 
-/// Una cita con solo las acciones válidas para su estado y su hora (CITA-04): el plazo para cancelar se ve antes de
-/// tocar el botón y, dentro del plazo, el botón queda desactivado con el motivo.
+/// Una cita con solo las acciones válidas para su estado y su hora (CITA-04). I-12 / I-13: las acciones van en un menú
+/// compacto de la fila; lo que el servidor bloquea no se muestra ni se explica con su motivo interno. El plazo para
+/// cancelar (regla de la app, no del servidor) queda como una línea corta.
 private struct AppointmentRow: View {
     let appointment: Appointment
     let option: AppointmentRules.CancelOption
     let now: Date
     let cancel: () -> Void
     let reschedule: (() -> Void)?
+
+    private var canCancel: Bool { if case .allowed = option { return true }; return false }
+    private var canReschedule: Bool { reschedule != nil && AppointmentRules.canReschedule(appointment) }
+
     var body: some View {
-        SectionCard {
-            ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName, meta: appointment.reason) {
-                PatientTag(appointment.state.rawValue, label: appointment.state.label)
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(alignment: .center, spacing: Spacing.s) {
+                ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName, meta: appointment.reason) {
+                    PatientTag(appointment.state.rawValue, label: appointment.state.label)
+                }
+                if canCancel || canReschedule {
+                    Menu {
+                        if canReschedule, let reschedule { Button(L.text("appointments.reschedule"), action: reschedule) }
+                        if canCancel { Button(L.text("appointments.cancel"), role: .destructive, action: cancel) }
+                    } label: {
+                        Image(systemName: "ellipsis.circle").font(Typo.heading).foregroundStyle(Theme.primaryText)
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(Text("appointments.actions"))
+                }
             }
             if let rejection = appointment.rejectionReason, !rejection.isEmpty {
                 Text(verbatim: String(format: L.text("appointments.rejected.reason"), rejection)).font(Typo.small).foregroundStyle(Theme.warning)
             }
             switch option {
-            case .hidden: EmptyView()
             case let .allowed(deadline):
                 Label { Text(verbatim: AppointmentRules.cancelDeadlineText(deadline, now: now)) } icon: { Image(systemName: "clock") }
                     .font(Typo.small).foregroundStyle(Theme.muted)
-                ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel)
             case .tooLate:
-                ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel).disabled(true)
                 Text(verbatim: AppointmentRules.cancelTooLateText()).font(Typo.small).foregroundStyle(Theme.muted)
-            case let .blocked(reason):
-                ClimesaButton(title: L.text("appointments.cancel"), kind: .destructive, action: cancel).disabled(true)
-                Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted)
+            case .hidden, .blocked:
+                EmptyView()
             }
-            // CITA-02: reprogramar solo si el servidor lo permite; si no, el motivo.
+            // CITA-02: el estado de una solicitud de cambio de horario (pendiente, rechazada) sí importa al paciente.
             if let text = AppointmentRules.rescheduleText(appointment) {
                 Text(verbatim: text).font(Typo.small).foregroundStyle(appointment.reschedule?.state == .rechazada ? Theme.warning : Theme.muted)
             }
-            if let reschedule {
-                if AppointmentRules.canReschedule(appointment) {
-                    ClimesaButton(title: L.text("appointments.reschedule"), kind: .secondary, action: reschedule)
-                } else if let reason = AppointmentRules.blockedReason(appointment, .reprogramar), appointment.reschedule?.state != .pendiente {
-                    Text(verbatim: "\(L.text("appointments.reschedule")): \(reason)").font(Typo.small).foregroundStyle(Theme.muted)
-                }
-            }
         }
+        .padding(.bottom, Spacing.s)
     }
 }
 
@@ -343,7 +366,7 @@ private struct CancelAppointmentSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "appointments.cancel.title") {
+            ScreenFrame(title: "appointments.cancel.title", onClose: { dismiss() }) {
                 SectionCard {
                     ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName)
                 }
@@ -352,7 +375,6 @@ private struct CancelAppointmentSheet: View {
                 PatientSubmissionNotice(submission: submission)
                 if submission.lastFailure?.code == "version_conflicto" { ConflictBanner { Task { await reload(); dismiss() } } }
                 ClimesaButton(title: L.text("appointments.cancel.confirm"), kind: .destructive, loading: submission.busy) { Task { await send() } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
         }
     }
@@ -382,7 +404,7 @@ private struct RescheduleAppointmentSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "appointments.reschedule.title") {
+            ScreenFrame(title: "appointments.reschedule.title", onClose: { dismiss() }) {
                 SectionCard { ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName) }
                 Text("appointments.reschedule.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 DatePicker("appointments.date", selection: $day, in: Date()..., displayedComponents: .date)
@@ -404,7 +426,6 @@ private struct RescheduleAppointmentSheet: View {
                 }
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.reschedule.submit"), loading: submission.busy) { Task { await send() } }.disabled(slot == nil)
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
             .task(id: ClimesaDates.localDay(day)) { slot = nil; await loadSlots() }
         }
@@ -485,9 +506,8 @@ private struct CategoryRequestSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScreenFrame(title: "appointments.request.title") {
+            ScreenFrame(title: "appointments.request.title", onClose: { dismiss() }) {
                 Group {
-                Text("appointments.category.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 SectionTitle("appointments.category.reason")
                 Text(verbatim: String(format: L.text("appointments.category.count"), picked.count)).font(Typo.caption).foregroundStyle(Theme.muted)
                 searchField(L.text("appointments.category.search"), text: $query)
@@ -509,7 +529,6 @@ private struct CategoryRequestSheet: View {
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.category.submit"), loading: submission.busy) { Task { await send() } }
                     .disabled(!CategoryRequestRules.canSend(picked: picked, note: note))
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
             .task { await loadCategories() }
             .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await loadCatalog() } }
@@ -592,7 +611,7 @@ struct PatientExamsView: View {
     @State private var filter: LabFilter = .all
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.space4) {
             if profile.patientId == nil {
                 EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link")
             } else {
@@ -602,12 +621,14 @@ struct PatientExamsView: View {
                     }.pickerStyle(.segmented)
                     let shown = filter.apply(orders)
                     if shown.isEmpty { EmptyStateView(title: L.text(orders.isEmpty ? "exams.none" : "exams.filter.none"), symbol: "testtube.2") }
-                    ForEach(shown) { order in
-                        NavigationLink {
-                            ScreenFrame(title: "exams.detail") { LabOrderDetail(order: order, showValues: PatientLabRules.showsValues(order)) }
-                        } label: {
-                            LabOrderRow(order: order, status: PatientLabRules.statusText(order), critical: false, showPatient: false)
-                        }.buttonStyle(.plain)
+                    if !shown.isEmpty {
+                        ListCard(items: shown) { order in
+                            NavigationLink {
+                                ScreenFrame(title: "exams.detail") { LabOrderDetail(order: order, showValues: PatientLabRules.showsValues(order)) }
+                            } label: {
+                                LabOrderRow(order: order, status: PatientLabRules.statusText(order), critical: false, showPatient: false)
+                            }.buttonStyle(.plain)
+                        }
                     }
                 }
             }
@@ -624,8 +645,9 @@ struct LabOrderRow: View {
     let critical: Bool
     /// The patient's own list does not repeat their name on every row.
     var showPatient = true
+    /// A row inside a `ListCard`, not a card of its own (I-9).
     var body: some View {
-        SectionCard {
+        VStack(alignment: .leading, spacing: Spacing.s) {
             ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: showPatient ? order.patientName : nil,
                     meta: ClimesaDates.display(order.completedAt ?? order.createdAt)) {
                 Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
@@ -636,7 +658,9 @@ struct LabOrderRow: View {
                 if order.priority == .urgente { PriorityBadge(order.priority.rawValue) }
                 if critical { PatientTag("critico_alto", label: L.text("results.critical")) }
             }
+            .padding(.bottom, Spacing.s)
         }
+        .contentShape(Rectangle())
     }
 }
 
@@ -664,7 +688,7 @@ struct LabOrderDetail: View {
             }
             if !showValues && PatientLabRules.awaitsReview(order) && LabExternalRules.patientNote(order) == nil { PatientNotice(text: L.text(ReviewRules.isAmendedPendingReview(order) ? "exams.amended" : "exams.waiting_review")) }
             ForEach(order.items) { item in
-                SectionCard(title: "\(item.name) (\(item.code))") {
+                SectionCard(title: staffView ? "\(item.name) (\(item.code))" : item.name) {
                     if showValues {
                         HStack {
                             Text(verbatim: PatientLabRules.valueText(item.result)).font(Typo.heading).foregroundStyle(Theme.ink)
@@ -893,7 +917,7 @@ private struct ConsultationRecord: View {
             ForEach(Array(consultation.diagnoses.enumerated()), id: \.offset) { _, diagnosis in
                 SectionCard {
                     ListRow(title: "\(diagnosis.code) · \(diagnosis.description)") {
-                        if diagnosis.principal { PatientTag("activo", label: L.text("consultation.principal")) }
+                        if diagnosis.principal { StatusBadge("principal", label: L.text("consultation.principal")) }
                     }
                 }
             }
@@ -980,11 +1004,10 @@ struct AmbulanceRequestView: View {
 
     private func cancelSheet(_ request: OwnAmbulanceRequest) -> some View {
         NavigationStack {
-            ScreenFrame(title: "ambulance.cancel") {
+            ScreenFrame(title: "ambulance.cancel", onClose: { cancelling = nil }) {
                 Text("ambulance.cancel.detail").font(Typo.body).foregroundStyle(Theme.ink)
                 PatientTextArea(label: L.text("ambulance.cancel.reason"), text: $cancelReason, lines: 2...4, error: nil)
                 ClimesaButton(title: L.text("ambulance.cancel"), kind: .destructive, loading: submission.busy) { Task { await cancel(request) } }
-                ClimesaButton(title: L.text("common.close"), kind: .secondary) { cancelling = nil }
             }
         }
     }
@@ -1052,7 +1075,7 @@ struct MyAccessView: View {
             if rows.isEmpty { EmptyStateView(title: L.text("accesses.none"), symbol: "eye.slash") }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 SectionCard {
-                    ListRow(title: String(format: L.text("accesses.row"), row.role, row.dataType),
+                    ListRow(title: String(format: L.text("accesses.row"), RoleNames.label(row.role), row.dataType),
                             subtitle: String(format: L.text("accesses.reason"), row.reason), meta: ClimesaDates.display(row.date))
                 }
             }
