@@ -72,13 +72,15 @@ describe('Laboratorio · flujo C en pantalla', () => {
 
   it('una observación marcada como relevante viaja con el resultado', async () => {
     const api = montar([order('a', 'Ana Captura', 'en_proceso', { allowedActions: ['capturar'] })]);
-    await userEvent.type(await screen.findByLabelText('Valor'), '13.4');
-    const relevante = screen.getByRole('checkbox', { name: /Es relevante/ }) as HTMLInputElement;
+    await userEvent.type(await screen.findByLabelText('Hemoglobina (g/dL)'), '13.4');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar observación' }));
+    const relevante = screen.getByRole('checkbox', { name: 'Avisar al médico' }) as HTMLInputElement;
     expect(relevante.disabled).toBe(true);
-    await userEvent.type(screen.getByLabelText('Observación (opcional)'), 'Muestra hemolizada');
+    await userEvent.type(screen.getByLabelText('Observación de Hemoglobina'), 'Muestra hemolizada');
     await userEvent.click(relevante);
-    await userEvent.click(screen.getByRole('button', { name: 'Guardar resultado' }));
-    expect(api.write).toHaveBeenCalledWith('/laboratorio/ordenes/a/resultados', { orderItemId: 'i-1', version: 3, value: 13.4, observation: 'Muestra hemolizada', relevant: true }, 'POST');
+    // With laboratorio.validar and every value present, the one primary action also completes the order (R7 C1).
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar y completar (1)' }));
+    expect(api.write).toHaveBeenCalledWith('/laboratorio/ordenes/a/resultados/lote', { version: 3, complete: true, items: [{ orderItemId: 'i-1', value: 13.4, observation: 'Muestra hemolizada', relevant: true }] }, 'POST');
   });
 
   it('envía a externo una orden pendiente con el lugar y las instrucciones para el paciente', async () => {
@@ -88,6 +90,21 @@ describe('Laboratorio · flujo C en pantalla', () => {
     await userEvent.type(within(dialogo).getByLabelText('Dónde se realiza'), 'Clínica Ficticia de Imágenes');
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Enviar a externo' }));
     expect(api.write).toHaveBeenCalledWith('/laboratorio/ordenes/a/externa', { version: 3, place: 'Clínica Ficticia de Imágenes', instructions: EXTERNAL_INSTRUCTIONS_TEMPLATE }, 'POST');
+  });
+
+  it('R7 C-6: al enviar a externo dice si el paciente recibió el aviso; sin app pide entregar las instrucciones impresas', async () => {
+    for (const [notified, text] of [[true, 'Ana Externa recibió el aviso en su app con el lugar y las instrucciones.'], [false, 'Ana Externa no tiene la app: entrégale las instrucciones impresas.']] as const) {
+      const api = montar([order('a', 'Ana Externa', 'pendiente', { allowedActions: ['tomar_muestra'], externalActions: ['enviar_externo'] })]);
+      api.write.mockResolvedValue({ id: 'a', version: 4, patientNotified: notified });
+      await userEvent.click(await screen.findByRole('button', { name: 'Se realiza en otro sitio' }));
+      const dialogo = await screen.findByRole('dialog', { name: 'Examen en otro sitio' });
+      await userEvent.type(within(dialogo).getByLabelText('Dónde se realiza'), 'Clínica Ficticia');
+      await userEvent.click(within(dialogo).getByRole('button', { name: 'Enviar a externo' }));
+      expect(await within(dialogo).findByText(text)).toBeTruthy();
+      expect(!!within(dialogo).queryByRole('button', { name: 'Imprimir instrucciones' })).toBe(!notified);
+      await userEvent.click(within(dialogo).getByRole('button', { name: 'Listo' }));
+      cleanup();
+    }
   });
 
   it('una orden externa dice dónde y qué hacer, y su informe entra con adjunto y valores clave', async () => {

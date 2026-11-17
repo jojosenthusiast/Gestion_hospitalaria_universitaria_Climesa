@@ -58,7 +58,7 @@ describe('Fila del día (W29)', () => {
   it('emite un número para el paciente elegido', async () => {
     const api = montar(['fila.ver', 'fila.emitir', 'fila.gestionar']);
     await userEvent.click(await screen.findByRole('button', { name: /Emitir número/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Emitir número de fila' });
+    const dialogo = await screen.findByRole('dialog', { name: 'Mostrador' });
     await userEvent.type(within(dialogo).getByRole('combobox', { name: 'Paciente' }), 'pac');
     await userEvent.click(await within(dialogo).findByRole('option', { name: /Paciente Ficticio Uno/ }));
     await userEvent.click(within(dialogo).getByRole('button', { name: /Emitir|Guardar/ }));
@@ -98,7 +98,7 @@ describe('Fila del día · acciones según el servidor (FILA-01, FILA-02)', () =
   it('la acción rápida del tablero ?accion=emitir abre el formulario y se consume del hash', async () => {
     location.hash = '#/fila?accion=emitir';
     montar(['fila.ver', 'fila.emitir', 'fila.gestionar', 'fila.llamar']);
-    expect(await screen.findByRole('dialog', { name: 'Emitir número de fila' })).toBeTruthy();
+    expect(await screen.findByRole('dialog', { name: 'Mostrador' })).toBeTruthy();
     expect(location.hash).not.toContain('accion=');
     location.hash = '';
   });

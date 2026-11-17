@@ -8,3 +8,7 @@
 .link-states li { display: flex; align-items: center; gap: 8px; }
 .link-summary { margin: 0 0 12px; color: var(--muted); }
 .link-summary strong { color: var(--ink); }
+.link-match { display: inline-flex; align-items: center; gap: 6px; }
+.link-match > span[aria-hidden] { font-weight: 800; }
+.link-match.is-ok > span[aria-hidden] { color: var(--success); }
+.link-match.is-off > span[aria-hidden] { color: var(--warning); }

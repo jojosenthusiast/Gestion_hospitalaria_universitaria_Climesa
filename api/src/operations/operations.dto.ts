@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsUUID, Matches, Max, Min, ValidateNested } from 'class-validator';
-import { ROTATION_PATTERNS } from './rotation.rules';
+import { COVERAGE_ROLES, ROTATION_PATTERNS } from './rotation.rules';
 import { Text } from '../platform/dto';
 export const staffTypes=['medico','enfermero','asistente','recepcionista','laboratorista','paramedico','motorista','limpieza','administrativo','otro'];
 export class StaffDto {
@@ -15,6 +15,14 @@ export class StaffDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() active?:boolean;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) version?:number;
   @Text(10,500,true) reason?:string;
+}
+/** R7 F-1: the coverage gap to fill (`GET /turnos/candidatos`); `role` is the gap's function as `/turnos/cobertura` returns it. */
+export class ShiftCandidatesQuery {
+  @ApiProperty({format:'uuid'}) @IsUUID() areaId!:string;
+  @ApiProperty({enum:Object.keys(COVERAGE_ROLES),description:'Función del hueco (`role` de /turnos/cobertura)'}) @IsIn(Object.keys(COVERAGE_ROLES)) role!:string;
+  @ApiProperty({format:'date-time'}) @IsISO8601({strict:true}) start!:string;
+  @ApiProperty({format:'date-time'}) @IsISO8601({strict:true}) end!:string;
+  @ApiProperty({enum:['diurno','nocturno','guardia']}) @IsIn(['diurno','nocturno','guardia']) type!:string;
 }
 export const boards=['JVPM','JVPE','JVPL','JVPO','otra'];
 export class RegistrationDto {

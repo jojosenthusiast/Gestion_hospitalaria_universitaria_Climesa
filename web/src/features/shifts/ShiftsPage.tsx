@@ -7,10 +7,12 @@ import { can, type AccessProfile, type Api, type Shift } from '../../lib/api';
 import { exportName, type ExportTable } from '../../lib/export';
 import { CompactHeader, Dialog, Empty, RemoteState, SaveButton, WriteError, formatDateTime, isVersionConflict, useAction, useData } from '../common';
 import { useQuickAction } from '../personal/accion';
+import { readHashParams, writeHashParams } from '../../lib/hash-params';
 import { Field } from '../../components/ui';
 import { ShiftForm, type ShiftDraft } from './ShiftForm';
 import { CrewCoverageAlert } from './CrewCoverageAlert';
 import { AreaCoverageAlert, type CoverageWeek } from './AreaCoverageAlert';
+import { FillGapsDialog, GapCoverDialog, blockLabel, gapBlocks, type GapBlock } from './GapCover';
 import { AttendanceDialog } from './AttendanceDialog';
 import { SpecialistsWeek } from './SpecialistsWeek';
 import { DAY_VIEW_LANES, ShiftWeek, StateLegend, timeRange, type CalendarPlanning } from './ShiftWeek';
@@ -57,6 +59,13 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const [marking, setMarking] = useState<ShiftRow | null>(null), [detail, setDetail] = useState<ShiftRow | null>(null), [draft, setDraft] = useState<ShiftDraft | undefined>(undefined);
   const [view, setView] = useState<View>(initialView);
   const [person, setPerson] = useState<PickerItem | null>(null), [role, setRole] = useState('todos'), [area, setArea] = useState('todos'), [state, setState] = useState('todos');
+  // R7 F3: `#/turnos?persona=yo` («Ver mis turnos» from Inicio) shows only this account's shifts.
+  useEffect(() => {
+    const params = readHashParams();
+    if (params.get('persona') !== 'yo') return;
+    writeHashParams({ persona: null });
+    if (profile.staffId) setPerson({ id: profile.staffId, label: `${profile.name} (yo)` });
+  }, []);
   const [sort, setSort] = useState<Sort>('inicio'), [panel, setPanel] = useState(false), [focusDay, setFocusDay] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [monday, setMonday] = useState(() => mondayOf(Date.now()));
@@ -108,6 +117,9 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const rows = drawn.filter(t => Date.parse(t.start) >= weekStart).sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.person.localeCompare(b.person, 'es'));
   const assigned = inWeek.filter(t => Date.parse(t.start) >= weekStart).length;
   const gaps = (coverage.data?.gaps ?? []).filter(g => area === 'todos' || g.areaId === area);
+  // R7 F2: holes still ahead, joined into shift-sized blocks for «Cubrir hueco» and «Llenar todos los huecos».
+  const openBlocks = useMemo(() => gapBlocks((coverage.data?.gaps ?? []).filter(g => (area === 'todos' || g.areaId === area) && Date.parse(g.start) >= at)), [coverage.data, area, at]);
+  const [covering, setCovering] = useState<GapBlock | null>(null), [filling, setFilling] = useState(false);
 
   const active: { key: string; label: string; clear: () => void }[] = [
     ...(person ? [{ key: 'persona', label: `Persona: ${person.label}`, clear: () => setPerson(null) }] : []),
@@ -139,6 +151,12 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const dayName = (date: string) => { const h = dayHeading(date, today); return `${h.relative ? `${h.relative}, ` : ''}${h.label}`; };
   const drafts = inWeek.filter(t => t.state === 'borrador' && Date.parse(t.start) >= weekStart && (area === 'todos' || t.areaId === area)).length;
   const areaId = area === 'todos' ? undefined : area;
+  // R7 F1: drafts of the week by area, for the publish confirmation.
+  const draftsByArea = useMemo(() => {
+    const groups = new Map<string, { id: string; name: string; count: number }>();
+    for (const t of inWeek) if (t.state === 'borrador' && Date.parse(t.start) >= weekStart) { const g = groups.get(t.areaId) ?? { id: t.areaId, name: t.area, count: 0 }; g.count++; groups.set(t.areaId, g); }
+    return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [inWeek, weekStart]);
   const iso = (ms: number) => new Date(ms).toISOString();
   const openCreate = (date: string, start?: number, end?: number) => {
     const from = start ?? localMs(date, '07:00'), to = end ?? from + 8 * 3600_000;
@@ -225,6 +243,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
         </div>}
         {plan && view === 'semana' && <div className="shift-plan-tools" role="group" aria-label="Planificar la semana">
           <button type="button" className="secondary-button" onClick={() => setTool('rotacion')}>Generar rotación</button>
+          {openBlocks.length > 0 && <button type="button" className="secondary-button" onClick={() => setFilling(true)}>Llenar todos los huecos ({openBlocks.length})</button>}
           <button type="button" className="secondary-button" onClick={() => void copyPrevious()}>Copiar semana anterior</button>
           <button type="button" className="secondary-button" onClick={() => setTool('masiva')}>Asignación masiva</button>
           <button type="button" className="secondary-button" onClick={() => setTool('plantillas')}>Plantillas</button>
@@ -254,6 +273,9 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
         {coverage.error && coverage.error.status !== 403 && <Notice kind="error">No pudimos dibujar los huecos de cobertura de esta semana: {coverage.error.message} <button type="button" className="secondary-button" onClick={coverage.refresh}>Volver a intentar</button></Notice>}
         <ShiftWeek days={visibleDays} today={today} now={at} shifts={drawn} gaps={gaps} onOpen={setDetail} onShowDay={date => { setFocusDay(date); setView('lista'); }}
           planning={planning} highlight={highlight} maxLanes={scale === 'dia' ? DAY_VIEW_LANES : undefined} />
+        {plan && openBlocks.length > 0 && <section className="gap-list" aria-label="Huecos por cubrir"><h3>Huecos por cubrir ({openBlocks.length})</h3><ul>
+          {openBlocks.slice(0, 12).map(b => <li key={b.key}><span>{blockLabel(b)}{b.missing > 1 ? ` · faltan ${b.missing}` : ''}</span><button type="button" className="secondary-button" aria-label={`Cubrir hueco: ${blockLabel(b)}`} onClick={() => setCovering(b)}>Cubrir hueco</button></li>)}
+        </ul>{openBlocks.length > 12 && <p className="muted">Y {openBlocks.length - 12} más; «Llenar todos los huecos» los incluye.</p>}</section>}
         {!drawn.length && <Empty title="Sin turnos en esta semana" description={active.length ? 'Ajusta los filtros o la búsqueda para consultar otros horarios.' : plan ? 'Haz clic en una hora del calendario, usa el botón + de cada día, genera una rotación o copia la semana anterior.' : 'Cambia de semana.'} />}
       </section> : drawn.length ? <ShiftDayList days={days} today={today} now={at} rows={drawn} plan={plan} byPerson={sort === 'persona'} typeOf={typeOf} actions={actions} />
         : <Empty title="Sin turnos en esta vista" description="Ajusta los filtros, la búsqueda o la semana para consultar otros horarios." />}</RemoteState>
@@ -262,13 +284,15 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
     {detail && <ShiftDetail shift={detail} now={at} plan={plan} typeOf={typeOf} actions={actions} onClose={() => setDetail(null)} />}
     {open && <ShiftForm api={api} shift={editing} draft={editing ? undefined : draft} catalog={catalog} shifts={covered ? all : [...all, ...shown.filter(t => !all.some(a => a.id === t.id))]} onClose={() => setOpen(false)} onSaved={id => { setOpen(false); if (id) { setHighlight(id); setAnnounce(editing ? 'Turno guardado; está resaltado en el calendario.' : 'Turno asignado; está resaltado en el calendario.'); } reload(); }} />}
     {moving && <MoveDialog api={api} shift={moving.shift} start={moving.start} end={moving.end} onClose={() => setMoving(null)} onSaved={version => { moved(moving.shift, moving.start, moving.end, version); setMoving(null); }} />}
-    {tool === 'rotacion' && <RotationDialog api={api} catalog={catalog} areaId={areaId} defaultFrom={addWeeks(monday, 1)} defaultTo={localDay(weekDays(addWeeks(monday, 1))[6].start)} onClose={() => setTool(null)} onPreview={(items, initial) => { setTool(null); setBatch({ items, initial }); }} />}
+    {tool === 'rotacion' && <RotationDialog api={api} catalog={catalog} areaId={areaId} defaultFrom={addWeeks(monday, 1)} defaultTo={localDay(weekDays(addWeeks(monday, 1))[6].start)} hidden={!!batch} onClose={() => setTool(null)} onPreview={(items, initial) => setBatch({ items, initial })} />}
     {tool === 'masiva' && <BulkDialog catalog={catalog} areaId={areaId} defaultDate={days.find(d => d.date >= today)?.date ?? monday} onClose={() => setTool(null)} onPreview={items => { setTool(null); setBatch({ items }); }} />}
     {tool === 'plantillas' && <TemplatesDialog api={api} catalog={catalog} days={days} rows={inWeek} version={version} areaId={areaId} onClose={() => setTool(null)} onApply={items => { setTool(null); setBatch({ items }); }} />}
-    {tool === 'publicar' && <PublishWeekDialog api={api} drafts={drafts} label={weekLabel(monday)} from={monday} to={sunday} areaId={areaId} areaName={catalog.areas.find(a => a.id === areaId)?.name} onClose={() => setTool(null)}
+    {tool === 'publicar' && <PublishWeekDialog api={api} drafts={drafts} byArea={draftsByArea} label={weekLabel(monday)} from={monday} to={sunday} areaId={areaId} areaName={catalog.areas.find(a => a.id === areaId)?.name} onClose={() => setTool(null)}
       onPublished={result => { setTool(null); setAnnounce(`${result.published === 1 ? 'Se publicó 1 turno' : `Se publicaron ${result.published} turnos`}. El personal ya los ve en Mis turnos.${result.warnings?.length ? ` Quedan ${result.warnings.length === 1 ? '1 hueco' : `${result.warnings.length} huecos`} de cobertura.` : ''}`); reload(); }} />}
-    {batch && <BatchPreview api={api} catalog={catalog} items={batch.items} initial={batch.initial} onClose={() => setBatch(null)} onCreated={created} />}
+    {batch && <BatchPreview api={api} catalog={catalog} items={batch.items} initial={batch.initial} onClose={() => { setBatch(null); setTool(null); }} onBack={tool === 'rotacion' ? () => setBatch(null) : undefined} onCreated={count => { setTool(null); created(count); }} />}
     {marking && <AttendanceDialog api={api} shift={marking} onClose={() => setMarking(null)} onSaved={() => { setMarking(null); data.refresh(); if (!covered) weekData.refresh(); }} onAssignSubstitute={plan ? id => assignSubstitute(marking, id) : undefined} />}
+    {covering && <GapCoverDialog api={api} block={covering} onClose={() => setCovering(null)} onPick={item => { setCovering(null); setBatch({ items: [item] }); }} />}
+    {filling && <FillGapsDialog api={api} blocks={openBlocks} onClose={() => setFilling(false)} onPreview={items => { setFilling(false); setBatch({ items }); }} />}
     {cancelling && <CancelShiftForm api={api} shift={cancelling} onClose={() => { setCancelling(null); source.refresh(); }} onSaved={() => { setCancelling(null); source.refresh(); }} />}
 
   </>;

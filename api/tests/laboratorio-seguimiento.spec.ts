@@ -236,11 +236,14 @@ describe('Laboratorio · seguimiento, orden externa y cita propuesta (S10)', () 
     async function completed() {
       const o = await order('en_proceso');
       const v = (await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultados`, { orderItemId: o.item, value: 13.1, version: o.version })).body.orderVersion;
-      expect((await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/completar`, { version: v })).status).toBe(201);
+      const done = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/completar`, { version: v });
+      expect(done.status).toBe(201);
+      // D-4: the proposal is born when the doctor reviews (an omitted `followUp` proposes, as before).
+      expect((await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version: done.body.version })).status).toBe(201);
       return o;
     }
 
-    test('al completarse la orden se propone una cita con el médico; recepción la ve sin valores ni exámenes', async () => {
+    test('al revisarse la orden se propone una cita con el médico; recepción la ve sin valores ni exámenes', async () => {
       const o = await completed();
       const found = (await proposals()).filter(p => p.orderId === o.id);
       expect(found).toHaveLength(1);
@@ -275,7 +278,8 @@ describe('Laboratorio · seguimiento, orden externa y cita propuesta (S10)', () 
         const item = (await t.one<{ id: string }>('SELECT id FROM laboratorio.orden_item WHERE orden_id=$1', [id])).id;
         const v1 = (await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/muestra`, { version: created.body.version, expediente: record, nombreCompleto: `${name} Ficticio` })).body.version;
         const v2 = (await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/resultados`, { orderItemId: item, value: 13.1, version: v1 })).body.orderVersion;
-        expect((await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/completar`, { version: v2 })).status).toBe(201);
+        const done = await t.call('LAB', 'POST', `/laboratorio/ordenes/${id}/completar`, { version: v2 });
+        expect((await t.call('MED', 'POST', `/laboratorio/ordenes/${id}/revisar`, { version: done.body.version })).status).toBe(201);
         ids.push(id);
       }
       const [first, second] = await Promise.all(ids.map(async id => (await proposals()).find(p => p.orderId === id)));

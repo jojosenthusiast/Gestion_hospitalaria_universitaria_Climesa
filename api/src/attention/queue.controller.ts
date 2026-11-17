@@ -2,9 +2,9 @@ import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query, Req,
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
-import { QueueCallNextDto, QueueIssueDto, QueuePriorityDto, QueueTransitionDto, QueueUndoDto } from './queue.dto';
+import { QueueCallNextDto, QueueIssueDto, QueuePriorityDto, QueueTransitionDto, QueueUndoDto, QueueVoidDto } from './queue.dto';
 import { QueueService } from './queue.service';
-import { QueueCallNextResponse, QueueCallResponse, QueueIssuedResponse, QueueNextProposalResponse, QueuePriorityResponse, QueueTicketResponse, QueueTransitionResponse } from './attention.responses';
+import { QueueCallNextResponse, QueueCallResponse, QueueIssuedResponse, QueueMyPostResponse, QueueNextProposalResponse, QueuePriorityResponse, QueueTicketResponse, QueueTransitionResponse } from './attention.responses';
 
 @ApiTags('queue') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('fila')
 export class QueueController {
@@ -23,6 +23,12 @@ export class QueueController {
   @Get('siguiente') @RequirePermission('fila.ver') @ApiOperation({ summary: 'Quién pasa después en un servicio (regla RN-FILA-SIGUIENTE)' })
   @ApiQuery({ name: 'service', type: String, required: true }) @ApiOkResponse({ type: QueueNextProposalResponse })
   next(@Req() r: ActorRequest, @Query('service') service?: string) { return this.queue.proposal(r.actor, service); }
+
+  @Get('mi-puesto') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Servicio y consultorio de quien llama, según su turno en curso (B-5): "Llamar siguiente" sin elegir servicio' }) @ApiOkResponse({ type: QueueMyPostResponse })
+  myPost(@Req() r: ActorRequest) { return this.queue.myPost(r.actor); }
+
+  @Post(':id/anular') @RequirePermission('fila.emitir') @ApiOperation({ summary: 'Anular un número recién emitido por error: solo quien lo emitió, mientras espera y dentro de 10 minutos (B-3)' }) @ApiCreatedResponse({ type: QueueTransitionResponse })
+  voidIssued(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: QueueVoidDto, @Headers('idempotency-key') key?: string) { return this.queue.voidIssued(r.actor, id, dto, key); }
 
   @Post(':id/deshacer-llamado') @RequirePermission('fila.llamar') @ApiOperation({ summary: 'Deshacer el último llamado de un número' }) @ApiCreatedResponse({ type: QueueCallResponse })
   undoCall(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: QueueUndoDto, @Headers('idempotency-key') key?: string) { return this.queue.undoCall(r.actor, id, dto, key); }

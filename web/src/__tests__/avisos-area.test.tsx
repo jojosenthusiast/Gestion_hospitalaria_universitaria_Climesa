@@ -121,7 +121,7 @@ describe('S11 · área de Avisos', () => {
     const api = { request: vi.fn(async (path: string) => path === '/avisos' ? published : path === '/avisos/estadisticas' ? [{ avisoId: 'c-1', enterados: 3, destinatarios: 8 }] : path === '/espacios' ? spaces : inbox([])), write: vi.fn(async (..._args: unknown[]) => ({ id: 'n' })) };
     render(<NoticesPage api={api as unknown as Api} profile={profile(['avisos.publicar', 'espacios.ver'])} version={0} />);
     const row = (await screen.findByText('Falla de oxígeno')).closest('tr') as HTMLElement;
-    expect(await within(row).findByText('3 de 8')).toBeTruthy();
+    expect(await within(row).findByText('3/8 enterados')).toBeTruthy();
     expect(row.querySelector('.notice-level')?.textContent).toBe('Crítico');
     await userEvent.type(screen.getByLabelText('Título'), 'Simulacro');
     await userEvent.type(screen.getByLabelText('Texto del aviso'), 'Simulacro a las 10.');
@@ -131,6 +131,8 @@ describe('S11 · área de Avisos', () => {
     expect(screen.queryByRole('checkbox', { name: /Consultorio/ })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Publicar aviso' }));
     await waitFor(() => expect(api.write).toHaveBeenCalledTimes(1));
-    expect(api.write.mock.calls[0][1]).toEqual(expect.objectContaining({ nivel: 'importante', prioridad: 'urgente', publico: false, roles: [], areas: ['P1-EMG'] }));
+    // R7 D-6: one scale; the API derives the old priority from the level.
+    expect(api.write.mock.calls[0][1]).toEqual(expect.objectContaining({ nivel: 'importante', publico: false, roles: [], areas: ['P1-EMG'] }));
+    expect(api.write.mock.calls[0][1]).not.toHaveProperty('prioridad');
   });
 });

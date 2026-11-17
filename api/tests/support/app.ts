@@ -107,7 +107,9 @@ export async function createTestApp(start: Date) {
   /** Opens a consultation as MED through the API. */
   const consultation = async (patientId: string) => {
     // Each consultation uses its own past slot so the doctor's appointments never overlap.
-    const start = new Date(current.valueOf() - (60 + 20 * ++slots) * 60_000);
+    // Near local midnight a past slot falls on the previous business day (cita_fuera_de_dia), so use a later slot today.
+    const n = ++slots, past = new Date(current.valueOf() - (60 + 20 * n) * 60_000);
+    const start = businessDate(past) === businessDate(current) ? past : new Date(current.valueOf() + 20 * n * 60_000);
     const appointmentId = await appointment(patientId, start);
     const started = await call('MED', 'POST', '/consultas', { appointmentId });
     if (started.status !== 201) throw new Error(`consulta: ${started.status} ${JSON.stringify(started.body)}`);

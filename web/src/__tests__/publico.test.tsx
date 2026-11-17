@@ -74,13 +74,14 @@ describe('W25 · avisos generales', () => {
   it('convierte la hora local de El Salvador a UTC', () => {
     expect(localToIso('2026-11-15T08:30')).toBe('2026-11-15T14:30:00.000Z');
   });
-  const lista = [{ id: 'a-1', titulo: 'Simulacro', cuerpo: 'Mañana a las 10.', desde: '2026-11-14T12:00:00.000Z', hasta: '2026-11-20T12:00:00.000Z', prioridad: 'urgente', publico: false, roles: ['MED', 'ENF'], estado: 'vigente', publicadoEn: '2026-11-14T12:00:00.000Z' }];
+  const lista = [{ id: 'a-1', titulo: 'Simulacro', cuerpo: 'Mañana a las 10.', desde: '2026-11-14T12:00:00.000Z', hasta: '2026-11-20T12:00:00.000Z', prioridad: 'urgente', nivel: 'importante', publico: false, roles: ['MED', 'ENF'], estado: 'vigente', publicadoEn: '2026-11-14T12:00:00.000Z' }];
   const apiDe = (rows: unknown[] = []) => ({ request: vi.fn(async () => rows), write: vi.fn() });
 
-  it('lista lo publicado con su prioridad, audiencia y estado', async () => {
+  it('lista lo publicado con su nivel (una sola escala, R7 D-6), audiencia y estado', async () => {
     render(<NoticesPage api={apiDe(lista) as unknown as Api} profile={jop()} version={0} />);
     const row = (await screen.findByText('Simulacro')).closest('tr') as HTMLElement;
-    expect(within(row).getByText('Urgente')).toBeTruthy();
+    expect(within(row).getByText('Importante')).toBeTruthy();
+    expect(within(row).queryByText('Urgente')).toBeNull();
     expect(within(row).getByText('Medicina, Enfermería')).toBeTruthy();
     expect(within(row).getByText('Vigente')).toBeTruthy();
   });
@@ -100,8 +101,10 @@ describe('W25 · avisos generales', () => {
     await userEvent.click(screen.getByLabelText('Enfermería'));
     expect(within(preview).getByText(/Para: Enfermería/)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Publicar aviso' }));
+    // R7 D1: a critical notice confirms with a summary first.
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Publicar aviso' })).getByRole('button', { name: 'Publicar aviso' }));
     await waitFor(() => expect(api.write).toHaveBeenCalledTimes(1));
-    expect(api.write.mock.calls[0][1]).toEqual(expect.objectContaining({ titulo: 'Corte de agua', cuerpo: 'Sin agua una hora.', prioridad: 'critico', publico: false, roles: ['ENF'] }));
+    expect(api.write.mock.calls[0][1]).toEqual(expect.objectContaining({ titulo: 'Corte de agua', cuerpo: 'Sin agua una hora.', nivel: 'critico', publico: false, roles: ['ENF'] }));
     expect(await screen.findByText(/Aviso publicado/)).toBeTruthy();
   });
 
@@ -125,6 +128,8 @@ describe('W25 · avisos generales', () => {
     await userEvent.type(screen.getByLabelText('Texto del aviso'), 'DUI 04512345-6 encontrado');
     expect(screen.getByText(/parece contener un DUI/)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Publicar aviso' }));
+    // Public by default, so it confirms first (R7 D1).
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Publicar aviso' })).getByRole('button', { name: 'Publicar aviso' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Publicar de todos modos' }));
     await waitFor(() => expect(api.write).toHaveBeenCalledTimes(2));
     expect(api.write.mock.calls[1][1]).toEqual(expect.objectContaining({ confirmarDatosPersonales: true }));

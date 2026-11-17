@@ -219,3 +219,16 @@
   .shift-preview-item { grid-template-columns: minmax(0, 1fr); }
   .shift-past > summary { padding: 12px 16px; }
 }
+/* R7 F1: drafts per area in the publish confirmation. */
+.shift-publish-areas { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+.shift-publish-areas li { display: flex; justify-content: space-between; gap: 1rem; font-variant-numeric: tabular-nums; }
+
+/* R7 F2: holes still ahead with «Cubrir hueco», and the candidate picker. */
+.gap-list { margin-top: 16px; }
+.gap-list ul, .gap-fill-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gap-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border: 1px solid var(--border, #d6dbe1); border-radius: 8px; }
+.gap-candidates { display: grid; gap: 8px; border: 0; padding: 0; }
+.gap-candidate { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border, #d6dbe1); border-radius: 8px; cursor: pointer; }
+.gap-candidate small { display: block; }
+.gap-rejected { margin-top: 8px; }
+.gap-rejected ul { margin: 6px 0 0; padding-left: 18px; }

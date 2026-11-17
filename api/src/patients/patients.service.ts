@@ -44,8 +44,30 @@ export class PatientsService {
       const page=rows.slice(0,limit);
       await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query)),count:page.length,offset,patientIds:page.map(p=>p.id)}});
       const showAge=searchShowsBirth(actor);
-      return {items:page.map(p=>({id:p.id,record:p.record,fullName:p.fullName,...(showAge&&p.birth?{age:this.age({nacimiento:p.birth})}:{})})),offset,limit,hasMore:rows.length>limit};
+      const today=await this.todayAtDesk(c,actor,page.map(p=>p.id));
+      return {items:page.map(p=>({id:p.id,record:p.record,fullName:p.fullName,...(showAge&&p.birth?{age:this.age({nacimiento:p.birth})}:{}),...today(p.id)})),offset,limit,hasMore:rows.length>limit};
     });
+  }
+  /**
+   * B-2 (R7 U1, mostrador): what the front desk needs per result to pick the primary action. `appointmentToday` is the
+   * patient's next confirmed appointment of today (only with `citas.ver` beyond `propio`); `ticketToday` is the live
+   * queue number of today (only with `fila.ver` beyond `propio`). Both are null when there is none, absent without
+   * the permission. The selector read itself is already audited with the patient ids.
+   */
+  private async todayAtDesk(c:PoolClient,actor:Actor,ids:string[]){
+   const global=(code:string)=>actor.permissions.some(p=>p.code===code&&p.context!=='propio');
+   const seesAppointments=global('citas.ver'),seesQueue=global('fila.ver');
+   const today=businessDate(this.clock.now());
+   const appointments=new Map<string,Row>(),tickets=new Map<string,Row>();
+   if(ids.length&&seesAppointments)for(const r of (await c.query(`SELECT DISTINCT ON (c.paciente_id) c.paciente_id,c.id,lower(c.horario) AS start,
+     c.medico_id AS "doctorId",concat_ws(' ',m.nombres,m.apellidos) AS "doctorName"
+     FROM atencion.cita c JOIN personal.persona m ON m.id=c.medico_id
+     WHERE c.paciente_id=ANY($1::uuid[]) AND c.estado='confirmada' AND (lower(c.horario) AT TIME ZONE 'America/El_Salvador')::date=$2::date
+     ORDER BY c.paciente_id,lower(c.horario)`,[ids,today])).rows)appointments.set(r.paciente_id,{id:r.id,start:new Date(r.start).toISOString(),doctorId:r.doctorId,doctorName:r.doctorName});
+   if(ids.length&&seesQueue)for(const r of (await c.query(`SELECT DISTINCT ON (t.paciente_id) t.paciente_id,t.id,t.servicio AS service,t.numero,t.estado AS state,t.cita_id AS "appointmentId"
+     FROM atencion.ticket_fila t WHERE t.paciente_id=ANY($1::uuid[]) AND t.fecha=$2::date AND t.estado IN ('en_espera','llamado','en_atencion')
+     ORDER BY t.paciente_id,t.emitido_en DESC`,[ids,today])).rows)tickets.set(r.paciente_id,{id:r.id,service:r.service,numero:r.numero,state:r.state,appointmentId:r.appointmentId});
+   return (id:string)=>({...(seesAppointments?{appointmentToday:appointments.get(id)??null}:{}),...(seesQueue?{ticketToday:tickets.get(id)??null}:{})});
   }
   async recordSearch(actor:Actor, query:string) {
     if(normalize(query).replace(/ /g,'').length<2)throw new BadRequestException('Escribe al menos dos letras o números.');

@@ -265,6 +265,24 @@ export class RotationPreviewResponse {
   @IntProp({ description: 'Pruebas de turno que hizo la solicitud (patrón, reemplazos y relleno)' }) intentos!: number;
   @IntProp({ description: 'Máximo de pruebas de turno por solicitud' }) limiteIntentos!: number;
 }
+/** R7 F-1: a person who could (or could not) take a coverage gap. */
+export class GapCandidateResponse {
+  @UuidProp() staffId!: string;
+  @StrProp() person!: string;
+  @BoolProp({ description: 'La persona está asignada al área del hueco' }) sameArea!: boolean;
+  @NumProp({ description: 'Horas de turnos que trabaja en los 7 días antes del fin del hueco' }) weekHours!: number;
+}
+export class GapCandidateValidResponse extends GapCandidateResponse {
+  @ClassArrayProp(ShiftWarningResponse) advertencias!: ShiftWarningResponse[];
+}
+export class GapCandidateRejectedResponse extends GapCandidateResponse {
+  @StrProp({ description: 'Mismo código que respondería POST /turnos (personal_en_descanso, carga_semanal_excedida, conflicto...)' }) codigo!: string;
+  @StrProp() mensaje!: string;
+}
+export class GapCandidatesResponse {
+  @ClassArrayProp(GapCandidateValidResponse, { description: 'Quienes pueden cubrirlo sin romper ninguna regla; primero los del área y los de menos horas' }) candidatos!: GapCandidateValidResponse[];
+  @ClassArrayProp(GapCandidateRejectedResponse, { description: 'Quienes no pueden y por qué' }) descartados!: GapCandidateRejectedResponse[];
+}
 export class TemplateShiftResponse {
   @IntProp({ description: '0 = lunes' }) day!: number;
   @StrProp({ description: 'Hora local HH:MM' }) startTime!: string;

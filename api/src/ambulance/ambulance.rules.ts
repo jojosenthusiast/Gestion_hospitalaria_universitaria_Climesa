@@ -123,3 +123,18 @@ export const CREW_ROLES_ON_DUTY_SQL = "SELECT bool_or(p.tipo='paramedico') AS pa
  * puede operar en la app. El despachador elige de esta lista; estar de turno no da por sí solo relación de atención.
  */
 export const CREW_ON_DUTY_SQL = "SELECT DISTINCT p.id,p.tipo,p.nombres||' '||p.apellidos AS name,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS \"hasAccount\" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz";
+
+/** R7 G-4: how long the crew can undo its last milestone. */
+export const UNDO_MILESTONE_MS = 15 * 60_000;
+
+/**
+ * R7 G-4: why the crew cannot undo its last milestone, or null when it can. `finalizado` frees the unit and an arrival
+ * already received belongs to the hospital, so neither is undone here (Jefatura closes administratively instead).
+ */
+export function undoMilestoneError(last: { tipo: string; registrado_en: Date } | undefined, received: boolean, now: Date): string | null {
+  if (!last) return 'El servicio no tiene hitos para deshacer.';
+  if (last.tipo === 'finalizado') return 'El servicio ya finalizó; Jefatura puede revisarlo con un cierre administrativo.';
+  if (last.tipo === 'en_hospital' && received) return 'El hospital ya registró la entrega del paciente; la llegada no se puede deshacer.';
+  if (now.getTime() - new Date(last.registrado_en).getTime() > UNDO_MILESTONE_MS) return 'Pasaron más de 15 minutos desde que se registró; ya no se puede deshacer.';
+  return null;
+}

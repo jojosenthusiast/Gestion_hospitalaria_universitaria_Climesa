@@ -112,7 +112,7 @@ describe('turnos · calendario para planificar', () => {
     montar(true);
     await userEvent.click(await screen.findByRole('button', { name: 'Asignar turno el jueves, 12 de noviembre' }));
     const dialogo = await screen.findByRole('dialog', { name: 'Asignar turno' });
-    expect((within(dialogo).getByLabelText('Fecha de inicio') as HTMLInputElement).value).toBe('2026-11-12');
+    expect((within(dialogo).getByLabelText('Fecha de inicio') as HTMLInputElement).value).toBe('12/11/2026');
   });
 
   it('la vista Día muestra un solo día y permite elegir otro de la semana', async () => {
@@ -269,8 +269,8 @@ describe('turnos · lotes como borrador', () => {
     const api = montar(true, () => ({ from: '2026-11-09', to: '2026-11-15', published: 1, publishedBy: 'u-1', publishedAt: NOW.toISOString(), warnings: [] }));
     await userEvent.click(await screen.findByRole('button', { name: 'Publicar semana (1 borrador)' }));
     const dialogo = await screen.findByRole('dialog', { name: 'Publicar semana' });
-    expect(within(dialogo).getByText(/1 borrador/)).toBeTruthy();
-    await userEvent.click(within(dialogo).getByRole('button', { name: 'Publicar' }));
+    expect(within(dialogo).getAllByText(/1 borrador/)[0]).toBeTruthy();
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Publicar (1)' }));
     expect(api.write).toHaveBeenCalledWith('/turnos/publicar', { from: '2026-11-09', to: '2026-11-15' }, 'POST');
     await act(async () => {});
     expect(await screen.findByText(/Se publicó 1 turno/)).toBeTruthy();

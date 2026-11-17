@@ -134,3 +134,18 @@
 .pt-toolbar { justify-content: flex-start; gap: var(--space-2); align-items: flex-end; }
 .pt-toolbar .search-form { flex: 1 1 360px; }
 .pt-toolbar-end { margin-left: auto; }
+/* R7 U1 (G2): the patient record as the hub of the front desk. */
+.pt-hub { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.pt-hub a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; text-decoration: none; }
+@media (max-width: 520px) { .pt-hub a { flex: 1 1 100%; justify-content: center; } }
+/* #15: on a phone the doctor header folds and opens its appointments. */
+.ag-doctor-toggle { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ag-doctor-toggle > small { margin-left: auto; color: var(--muted); }
+.ag-doctor-toggle > svg:last-child { transition: transform var(--motion-fast) var(--ease-out); }
+.ag-doctor-toggle[aria-expanded='true'] > svg:last-child { transform: rotate(180deg); }
+/* #15: on a phone each lane of the queue shows its first cards and «Ver N más». */
+.qb-more { justify-self: start; }
+
+/* G1: the row just registered stays marked (same soft fill as a selected item) until the next registration. */
+.record-table tbody tr.is-new > * { background: var(--soft); }
+.record-table tbody tr.is-new > :first-child { box-shadow: inset 3px 0 0 var(--primary); }

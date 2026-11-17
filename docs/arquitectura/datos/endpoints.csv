@@ -42,6 +42,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 103,POST,/api/v1/turnos/lote/validar,turnos.planificar,"No guarda; un resultado por turno con las reglas de un turno suelto (descanso, tope de 7 días, traslape, inscripción) y huecos de cobertura",R,4,Validar un lote de turnos
 103,POST,/api/v1/turnos/lote,turnos.planificar,"Todo o nada, como borradores; 409 lote_con_conflictos con el resultado de cada turno",R,4,Crear turnos en lote como borrador
 103,POST,/api/v1/turnos/generar,turnos.planificar,"Vista previa sin guardar: rotativo, 12x36, 24x72 o personalizado; llena la cobertura mínima del área y explica los huecos; máximo 31 días",R,4,Generar una rotación de turnos
+103,GET,/api/v1/turnos/candidatos,turnos.planificar,"Sin guardar: cada persona de la función pasa las reglas de un turno suelto; válidas primero (área, menos horas) y las demás con su código",R,4,Cubrir un hueco de cobertura (R7 F-1)
 103,GET,/api/v1/turnos/plantillas,turnos.planificar,,R,4,Plantillas de semana por área
 103,POST,/api/v1/turnos/plantillas,turnos.planificar,Nombre único por área,R,4,Guardar una semana como plantilla
 103,PATCH,/api/v1/turnos/plantillas/{id},turnos.planificar,Versión optimista,R,4,Retirar una plantilla de semana
@@ -104,6 +105,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 109,POST,/api/v1/ambulancia/solicitudes/{id}/cancelar,ambulancia.solicitar,Solo quien pidió y solo por confirmar; motivo opcional; MA-AMB-05,R,6,Cancelar mi solicitud de ambulancia
 109,POST,/api/v1/ambulancia/servicios,ambulancia.despachar,Solo si Disponible; bloqueo de fila,R,4,Despachar: pasa a En Servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/hitos,ambulancia.operar,Orden de hitos,R,4,"Salida, en escena, trasladando, en hospital, finalizado"
+109,POST,/api/v1/ambulancia/servicios/{id}/hitos/deshacer,ambulancia.operar,Solo la tripulación; último hito; 15 minutos; nunca finalizado ni llegada recibida,R,6,Deshacer el último hito (R7 G-4)
 109,POST,/api/v1/ambulancia/servicios/{id}/cerrar,ambulancia.mantenimiento,Solo servicio activo; motivo; estado final cancelado; unidad a Disponible,R,6,Cierre administrativo del servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.reportar_prehospital,Funciona sin conexión con reintento,E,4,Reporte prehospital y hora estimada
 109,GET,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.recibir_prehospital,,E,4,Ver reporte prehospital
@@ -134,6 +136,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 112,POST,/api/v1/me/avisos/{id}/enterado,sesion.perfil,Propio; aviso dirigido a la cuenta,R,3,Dar «Enterado» a un aviso; idempotente y auditado
 112,POST,/api/v1/me/avisos/{id}/posponer,sesion.perfil,Propio; aviso dirigido a la cuenta,R,3,Recordarme después: el crítico vuelve a destacarse tras avisos.recordatorio_horas (4 h)
 112,GET,/api/v1/avisos/estadisticas,avisos.publicar,,R,3,Por aviso: cuántas cuentas dieron «Enterado» y a cuántas va dirigido; sin nombres
+112,GET,/api/v1/avisos/alcance,avisos.publicar,Solo el conteo; misma regla que estadisticas,R,6,A cuántas cuentas llegaría el aviso al redactar (R7 D-2)
 112,PUT,/api/v1/avisos/{id},avisos.publicar,Vigente o programado; exige versión,R,3,Editar aviso: texto prioridad audiencia y vigencia (adelantar el fin lo vence antes); auditado
 112,POST,/api/v1/avisos/{id}/retirar,avisos.publicar,Motivo de 10 caracteres o más (D-13),R,3,Retirar aviso antes de tiempo; deja de verse en todas partes
 113,GET,/api/v1/metricas/tablero,metricas.ver,Agregados sin datos personales,R,2,Tablero inicial
@@ -149,13 +152,16 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/fila/{id}/completar,fila.gestionar,Transición válida,R,3,Marcar número atendido
 105,POST,/api/v1/fila/{id}/no-se-presento,fila.gestionar,Transición válida,R,3,Marcar ausencia
 106,GET,/api/v1/consultas/{id}/detalle,expediente.ver OR consulta.iniciar,Relación clínica y auditoría,R,3,Detalle permitido de consulta
+106,GET,/api/v1/consultas/cie10,consulta.registrar,Al menos 2 caracteres; hasta 20,R,6,Buscar en el catálogo CIE-10 (R7 B-7)
 106,POST,/api/v1/consultas/{id}/receta,recetas.emitir,Inscripción vigente,R,3,Emitir receta
 107,GET,/api/v1/laboratorio/catalogo,laboratorio.ordenar OR catalogo.configurar,Catálogo activo,R,3,Exámenes y paneles
 107,POST,/api/v1/laboratorio/ordenes,laboratorio.ordenar,Consulta propia,R,3,Crear orden desde consulta
 107,POST,/api/v1/laboratorio/ordenes/{id}/resultados,laboratorio.procesar,Marca calculada en servidor,R,3,Capturar o corregir resultado con motivo
+107,POST,/api/v1/laboratorio/ordenes/{id}/resultados/lote,laboratorio.procesar,"Solo En Proceso; todo o nada con una versión; complete=true exige laboratorio.validar",R,4,Guardar la hoja de resultados de una orden (R7 C-1)
 107,POST,/api/v1/laboratorio/ordenes/{id}/enmendar,laboratorio.validar,"Solo Completado; motivo de 10 o más; vuelve a revisión médica",R,4,Enmendar resultado de una orden completada
 107,POST,/api/v1/laboratorio/ordenes/{id}/externa,laboratorio.procesar OR laboratorio.ordenar,"Solo Pendiente; laboratorio o médico que pidió; lugar e instrucciones para el paciente",R,4,Enviar orden a externo (Fase 2 S10)
 107,POST,/api/v1/laboratorio/ordenes/{id}/resultado-externo,laboratorio.procesar OR laboratorio.revisar,"Solo orden externa Pendiente; referencia del adjunto y valor de cada examen; completa la orden",R,4,Cargar resultado externo (Fase 2 S10)
+107,POST,/api/v1/laboratorio/pacientes/{id}/resultado-externo,laboratorio.ordenar,"Médico con relación de atención vigente; exámenes del catálogo uno por uno; crea la orden externa ya completada",R,4,Registrar examen hecho fuera sin orden (R7 C-5)
 107,POST,/api/v1/laboratorio/adjuntos/{id}/archivo,laboratorio.procesar OR laboratorio.revisar,"Adjunto solo con referencia; laboratorio o médico que puede revisar; tipo por contenido, 10 MB, SHA-256 del servidor; bucket privado; no reemplaza",R,4,Subir archivo del resultado externo (Fase 2 S10 T07b)
 107,GET,/api/v1/laboratorio/adjuntos/{id}/enlace,resultados.ver,"Personal que ve los valores de la orden; nunca el paciente (404); enlace firmado de 5 minutos; auditado",R,4,Enlace de descarga del adjunto (Fase 2 S10 T07b)
 107,GET,/api/v1/laboratorio/pendientes,laboratorio.revisar,"Órdenes que pidió quien lee; crítico primero",R,4,Resultados por revisar del médico (Fase 2 S10)
@@ -179,6 +185,8 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,GET,/api/v1/fila/siguiente,fila.ver,"Solo con fila completa; emergencias, urgentes, citas en ventana y llegada",R,4,Quién pasa después en un servicio (RN-FILA-SIGUIENTE)
 105,POST,/api/v1/fila/{id}/deshacer-llamado,fila.llamar,Solo un número llamado,R,4,Deshacer el último llamado
 105,POST,/api/v1/fila/{id}/prioridad,fila.gestionar,Solo antes de la atención,R,4,Cambiar la prioridad del número
+105,POST,/api/v1/fila/{id}/anular,fila.emitir,"Solo quien lo emitió, en espera y dentro de 10 minutos",R,5,Anular un número recién emitido por error
+105,GET,/api/v1/fila/mi-puesto,fila.llamar,Turno en curso de quien llama,R,5,Servicio y consultorio de quien llama
 106,GET,/api/v1/consultas/sin-firmar,consulta.iniciar,Solo propias,R,4,Consultas abiertas de cualquier día para reanudar
 105,GET,/api/v1/citas/categorias,citas.solicitar OR citas.agendar,,R,5,"Catálogo de motivos de cita (categoría, ícono, palabras de búsqueda y especialidades sugeridas)"
 105,GET,/api/v1/citas/solicitudes-categoria,citas.ver,"REC todas las pendientes y las resueltas en 30 días; PAC solo propias",R,5,Bandeja de solicitudes de cita por categoría con allowedActions
@@ -186,3 +194,5 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/citas/solicitudes-categoria/{id}/asignar,citas.agendar,"Crea cita confirmada con las reglas de siempre; auditado",R,5,Recepción asigna médico y hora a una solicitud por categoría
 105,POST,/api/v1/citas/solicitudes-categoria/{id}/rechazar,citas.agendar,Motivo,R,5,Recepción rechaza una solicitud por categoría
 105,POST,/api/v1/citas/solicitudes-categoria/{id}/cancelar,citas.cancelar,PAC solo propias y pendientes,R,5,Paciente retira su solicitud por categoría
+105,GET,/api/v1/citas/solicitudes-categoria/{id}/sugerencia,citas.agendar,Hasta 14 días; médico preferido o de las especialidades sugeridas,R,5,Primer día con hueco en la franja pedida
+101,GET,/api/v1/me/vinculacion,cuenta.vincular,Solo su cuenta,R,5,Estado de la vinculación de la cuenta y su última solicitud

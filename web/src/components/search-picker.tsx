@@ -25,6 +25,10 @@ type Props = {
   emptyText?: string;
   /** Texto con el que se abre el selector por primera vez (por ejemplo lo que se buscó antes). */
   initialQuery?: string;
+  /** Called with each text typed (for example, to hand it to another form). */
+  onQueryChange?: (query: string) => void;
+  /** Takes the focus when it appears (a dialog whose first task is this search). */
+  autoFocus?: boolean;
 };
 
 /**
@@ -32,7 +36,7 @@ type Props = {
  * flechas para moverse, Enter para elegir, Escape para cerrar. Los elementos no disponibles se muestran
  * apagados con su motivo y no se pueden elegir. Sirve para miles de filas porque solo pide páginas cortas.
  */
-export function SearchPicker({ label, value, onChange, search, items, minChars = 2, debounceMs = 250, placeholder, hint, required = false, disabled = false, emptyText = 'Sin coincidencias.', initialQuery = '' }: Props) {
+export function SearchPicker({ label, value, onChange, search, items, minChars = 2, debounceMs = 250, placeholder, hint, required = false, disabled = false, emptyText = 'Sin coincidencias.', initialQuery = '', onQueryChange, autoFocus = false }: Props) {
   const baseId = useId();
   const inputId = `${baseId}-input`;
   const listId = `${baseId}-list`;
@@ -46,6 +50,13 @@ export function SearchPicker({ label, value, onChange, search, items, minChars =
   const wrapper = useRef<HTMLDivElement>(null);
   const requestId = useRef(0);
   const local = items !== undefined;
+  const input = useRef<HTMLInputElement>(null);
+  // A dialog's showModal() runs after its content mounts and focuses its first control; the focus is taken after it.
+  useEffect(() => {
+    if (!autoFocus) return;
+    const timer = setTimeout(() => input.current?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [autoFocus, value]);
 
   const load = useCallback(async (text: string, offset: number) => {
     const mine = ++requestId.current;
@@ -120,6 +131,7 @@ export function SearchPicker({ label, value, onChange, search, items, minChars =
     <div className="field search-picker" ref={wrapper}>
       <label htmlFor={inputId}>{label}</label>
       <input
+        ref={input}
         id={inputId}
         role="combobox"
         aria-expanded={open}
@@ -131,7 +143,7 @@ export function SearchPicker({ label, value, onChange, search, items, minChars =
         placeholder={placeholder ?? (local ? 'Escribe para filtrar' : `Escribe al menos ${minChars} letras`)}
         required={required}
         disabled={disabled}
-        onChange={event => { setQuery(event.target.value); setOpen(true); }}
+        onChange={event => { setQuery(event.target.value); onQueryChange?.(event.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
       />

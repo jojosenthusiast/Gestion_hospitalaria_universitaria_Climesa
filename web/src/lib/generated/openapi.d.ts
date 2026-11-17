@@ -451,6 +451,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/turnos/candidatos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** R7 F-1: quiénes pueden cubrir un hueco de cobertura con las reglas de un turno suelto (descanso, tope de 7 días, días seguidos, traslape, inscripción); no guarda nada */
+        get: operations["OperationsController_gapCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/turnos/especialistas": {
         parameters: {
             query?: never;
@@ -1104,6 +1121,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fila/mi-puesto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Servicio y consultorio de quien llama, según su turno en curso (B-5): "Llamar siguiente" sin elegir servicio */
+        get: operations["QueueController_myPost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fila/{id}/anular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Anular un número recién emitido por error: solo quien lo emitió, mientras espera y dentro de 10 minutos (B-3) */
+        post: operations["QueueController_voidIssued"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fila/{id}/deshacer-llamado": {
         parameters: {
             query?: never;
@@ -1200,6 +1251,23 @@ export interface paths {
         put?: never;
         /** Marcar que el paciente no se presentó */
         post: operations["QueueController_absent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/consultas/cie10": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Buscar en el catálogo CIE-10 por código o por palabras (hasta 20) */
+        get: operations["ClinicalRecordController_cie10"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1344,6 +1412,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/citas/solicitudes-categoria/{id}/sugerencia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Primer día con hueco en la franja pedida (hasta 14 días), con el médico preferido o de las especialidades sugeridas (A-1) */
+        get: operations["AppointmentRequestController_suggestion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/citas/solicitudes-categoria/{id}/asignar": {
         parameters: {
             query?: never;
@@ -1481,6 +1566,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/laboratorio/ordenes/{id}/resultados/lote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** C-1: guardar los resultados de todos los exámenes de una orden en un solo paso (todo o nada, una sola versión); con complete=true también la completa */
+        post: operations["LaboratoryController_resultBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/laboratorio/ordenes/{id}/enmendar": {
         parameters: {
             query?: never;
@@ -1524,7 +1626,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revisar y liberar resultados al paciente */
+        /** Revisar y liberar resultados al paciente; cierra los pendientes de la orden en «Resultados por revisar» (C-2) y, si el médico lo decide, propone la cita de seguimiento (D-4) */
         post: operations["LaboratoryController_review"];
         delete?: never;
         options?: never;
@@ -1577,6 +1679,23 @@ export interface paths {
         put?: never;
         /** Cargar el resultado de una orden externa: referencia del adjunto (foto o PDF) y valor clave de cada examen; completa la orden */
         post: operations["LaboratoryController_externalResult"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/laboratorio/pacientes/{id}/resultado-externo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** R7 C-5 (D-5): registrar un examen hecho en otro sitio sin orden previa; solo el médico con relación de atención vigente */
+        post: operations["LaboratoryController_recordExternal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2381,6 +2500,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/vinculacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de la vinculación de la cuenta: si ya está vinculada y su última solicitud (pendiente, aprobada o rechazada con motivo) */
+        get: operations["MyLinkController_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/publico/ocupacion": {
         parameters: {
             query?: never;
@@ -2493,6 +2629,23 @@ export interface paths {
         };
         /** Por aviso: cuántas cuentas dieron "Enterado" y a cuántas va dirigido (solo conteos, sin nombres) */
         get: operations["NoticesController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avisos/alcance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Al redactar: a cuántas cuentas del personal llegaría el aviso por roles y áreas (solo el conteo) */
+        get: operations["NoticesController_reach"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2773,6 +2926,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ambulancia/servicios/{id}/hitos/deshacer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deshacer el último hito (solo la tripulación, hasta 15 minutos después, nunca finalizado ni una llegada ya recibida) */
+        post: operations["AmbulanceController_undoMilestone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ambulancia/servicios/{id}/cerrar": {
         parameters: {
             query?: never;
@@ -2909,6 +3079,29 @@ export interface components {
             version: number;
             matchReason: string;
         };
+        PatientAppointmentTodayResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: uuid */
+            doctorId: string;
+            doctorName: string;
+        };
+        PatientTicketTodayResponse: {
+            /** Format: uuid */
+            id: string;
+            /** @description Servicio de la fila (consulta_general, emergencia, laboratorio, admisiones) */
+            service: string;
+            numero: number;
+            /** @description en_espera, llamado o en_atencion */
+            state: string;
+            /**
+             * Format: uuid
+             * @description Cita ligada al registrar la llegada
+             */
+            appointmentId: string | null;
+        };
         PatientPickerItemResponse: {
             /** Format: uuid */
             id: string;
@@ -2917,6 +3110,10 @@ export interface components {
             fullName: string;
             /** @description Edad en años; solo si el rol puede ver la fecha de nacimiento */
             age?: number;
+            /** @description Cita confirmada de hoy (B-2); solo con citas.ver global */
+            appointmentToday?: components["schemas"]["PatientAppointmentTodayResponse"] | null;
+            /** @description Número de fila vigente de hoy; solo con fila.ver global */
+            ticketToday?: components["schemas"]["PatientTicketTodayResponse"] | null;
         };
         PatientPickerResponse: {
             items: components["schemas"]["PatientPickerItemResponse"][];
@@ -3411,6 +3608,40 @@ export interface components {
             to: string;
             gaps: components["schemas"]["CoverageGapResponse"][];
         };
+        ShiftWarningResponse: {
+            /** @description Código de la advertencia, por ejemplo horas_semanales_excedidas */
+            codigo: string;
+            horasSemana: number;
+            limite: number;
+        };
+        GapCandidateValidResponse: {
+            /** Format: uuid */
+            staffId: string;
+            person: string;
+            /** @description La persona está asignada al área del hueco */
+            sameArea: boolean;
+            /** @description Horas de turnos que trabaja en los 7 días antes del fin del hueco */
+            weekHours: number;
+            advertencias: components["schemas"]["ShiftWarningResponse"][];
+        };
+        GapCandidateRejectedResponse: {
+            /** Format: uuid */
+            staffId: string;
+            person: string;
+            /** @description La persona está asignada al área del hueco */
+            sameArea: boolean;
+            /** @description Horas de turnos que trabaja en los 7 días antes del fin del hueco */
+            weekHours: number;
+            /** @description Mismo código que respondería POST /turnos (personal_en_descanso, carga_semanal_excedida, conflicto...) */
+            codigo: string;
+            mensaje: string;
+        };
+        GapCandidatesResponse: {
+            /** @description Quienes pueden cubrirlo sin romper ninguna regla; primero los del área y los de menos horas */
+            candidatos: components["schemas"]["GapCandidateValidResponse"][];
+            /** @description Quienes no pueden y por qué */
+            descartados: components["schemas"]["GapCandidateRejectedResponse"][];
+        };
         SpecialistShiftResponse: {
             /**
              * Format: date
@@ -3529,12 +3760,6 @@ export interface components {
         ShiftBatchDto: {
             items: components["schemas"]["ShiftBatchItemDto"][];
             justification?: string;
-        };
-        ShiftWarningResponse: {
-            /** @description Código de la advertencia, por ejemplo horas_semanales_excedidas */
-            codigo: string;
-            horasSemana: number;
-            limite: number;
         };
         BatchItemResultResponse: {
             /** @description Posición del turno en el lote (desde 0) */
@@ -3925,6 +4150,14 @@ export interface components {
             rejectionReason: string | null;
             version: number;
         };
+        /** @enum {string} */
+        EstadoFila: "en_espera" | "llamado" | "en_atencion" | "atendido" | "no_se_presento" | "cerrado";
+        AppointmentArrivalResponse: {
+            /** Format: uuid */
+            id: string;
+            numero: number;
+            state: components["schemas"]["EstadoFila"];
+        };
         /**
          * @description Acciones que el servidor acepta ahora para quien lee
          * @enum {string}
@@ -3970,6 +4203,12 @@ export interface components {
              * @description Hasta cuándo puede cancelar o reprogramar quien lee (RN-21: N h antes para el paciente)
              */
             cancelableUntil: string | null;
+            /** @description Opción rápida con la que el paciente canceló (D-8): ya_no_lo_necesito, no_puedo_a_esa_hora u otro */
+            cancelReasonCode: string | null;
+            /** @description Motivo escrito de la cancelación */
+            cancelReason: string | null;
+            /** @description Número de fila con el que Recepción registró la llegada (D-1) */
+            arrival: components["schemas"]["AppointmentArrivalResponse"] | null;
             /** @description Acciones que el servidor acepta ahora para quien lee */
             allowedActions: components["schemas"]["AccionCita"][];
             /** @description Acciones del rol bloqueadas ahora, con su motivo */
@@ -4007,7 +4246,13 @@ export interface components {
         };
         AppointmentCancelDto: {
             version: number;
-            reason: string;
+            /** @description Obligatorio (10 a 500 caracteres) sin reasonCode; con reasonCode es opcional y «otro» pide al menos 3 caracteres */
+            reason?: string;
+            /**
+             * @description Opción rápida del paciente (D-8)
+             * @enum {string}
+             */
+            reasonCode?: "ya_no_lo_necesito" | "no_puedo_a_esa_hora" | "otro";
         };
         AppointmentRescheduleDto: {
             version: number;
@@ -4141,6 +4386,8 @@ export interface components {
             version: number;
             reason: components["schemas"]["MotivoSiguiente"];
             reasonText: string;
+            /** @description D-2: true si es una cita de quien consulta, dentro de su ventana */
+            ownAppointment: boolean;
         };
         QueueNextProposalResponse: {
             service: components["schemas"]["ServicioFila"];
@@ -4160,8 +4407,6 @@ export interface components {
             /** @description Quién pasa después en el área de la consulta; null sin permiso de ver la fila completa */
             nextProposal: components["schemas"]["QueueNextProposalResponse"] | null;
         };
-        /** @enum {string} */
-        EstadoFila: "en_espera" | "llamado" | "en_atencion" | "atendido" | "no_se_presento" | "cerrado";
         /**
          * @description Acciones reversibles que el servidor acepta ahora
          * @enum {string}
@@ -4208,6 +4453,25 @@ export interface components {
             appointmentAt: string | null;
             /** @description Llegó sin cita */
             walkIn: boolean;
+            /**
+             * Format: uuid
+             * @description Cita del número: la ligada al registrar la llegada (D-1) o, sin enlace, la de hoy del paciente
+             */
+            appointmentId: string | null;
+            /**
+             * Format: uuid
+             * @description Médico de esa cita (B-4)
+             */
+            appointmentDoctorId: string | null;
+            /** @description Nombre del médico de esa cita (B-4) */
+            appointmentDoctorName: string | null;
+            /** @description true si el número se emitió al registrar la llegada de la cita (D-1) */
+            arrivalFromAppointment: boolean;
+            /**
+             * Format: date-time
+             * @description Hasta cuándo quien lo emitió puede anularlo (B-3); null para los demás o si ya no espera
+             */
+            voidableUntil: string | null;
             /** @description Acciones reversibles que el servidor acepta ahora */
             undoActions: components["schemas"]["DeshacerFila"][];
             /**
@@ -4239,6 +4503,11 @@ export interface components {
              * @enum {string}
              */
             priority?: "emergencia" | "urgente" | "rutina";
+            /**
+             * Format: uuid
+             * @description Cita de hoy cuya llegada se registra con este número
+             */
+            appointmentId?: string;
         };
         QueueIssuedResponse: {
             /** Format: uuid */
@@ -4257,6 +4526,20 @@ export interface components {
             priority: components["schemas"]["PrioridadFila"];
             /** Format: uuid */
             patientId: string;
+            /** @description Nombre del paciente, para mostrar el número donde se emitió */
+            patientName: string | null;
+            /**
+             * Format: uuid
+             * @description Cita cuya llegada se registró con este número (D-1)
+             */
+            appointmentId: string | null;
+            /** @description Números en espera antes de este en su área */
+            ahead: number;
+            /**
+             * Format: date-time
+             * @description Hasta cuándo quien lo emitió puede anularlo (B-3)
+             */
+            voidableUntil: string;
         };
         QueueCallNextDto: {
             /** @enum {string} */
@@ -4276,6 +4559,35 @@ export interface components {
             /** @description Por qué la regla eligió este número */
             reason: components["schemas"]["MotivoSiguiente"];
             reasonText: string;
+            /** @description D-2: true si es una cita de quien llama, dentro de su ventana */
+            ownAppointment: boolean;
+        };
+        QueueMyPostResponse: {
+            /** @description Servicio del área del turno en curso; null sin turno o en un área sin fila */
+            service: components["schemas"]["ServicioFila"] | null;
+            area: components["schemas"]["AreaFila"] | null;
+            /** @description Nombre del área del turno en curso */
+            areaName: string | null;
+            /**
+             * Format: uuid
+             * @description Consultorio de la última consulta o el último llamado de hoy
+             */
+            officeId: string | null;
+            officeCode: string | null;
+            /**
+             * Format: date-time
+             * @description Fin del turno en curso
+             */
+            shiftEnd: string | null;
+        };
+        QueueVoidDto: {
+            version: number;
+        };
+        QueueTransitionResponse: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            state: components["schemas"]["EstadoFila"];
         };
         QueueUndoDto: {
             version: number;
@@ -4306,11 +4618,9 @@ export interface components {
             officeId?: string;
             reason?: string;
         };
-        QueueTransitionResponse: {
-            /** Format: uuid */
-            id: string;
-            version: number;
-            state: components["schemas"]["EstadoFila"];
+        Cie10Response: {
+            code: string;
+            description: string;
         };
         ConsultationSummaryResponse: {
             /** Format: uuid */
@@ -4372,11 +4682,29 @@ export interface components {
             issuedAt: string;
             items: components["schemas"]["PrescriptionItemResponse"][];
         };
+        ConsultationLabItemResponse: {
+            code: string;
+            name: string;
+        };
+        ConsultationLabOrderResponse: {
+            /** Format: uuid */
+            id: string;
+            /** @description Estado de la orden (pendiente, en_proceso, completado, cancelado, externo) */
+            state: string;
+            priority: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            reviewedAt: string | null;
+            items: components["schemas"]["ConsultationLabItemResponse"][];
+        };
         ConsultationDetailResponse: {
             consultation: components["schemas"]["ConsultationSummaryResponse"];
             vitalSigns: components["schemas"]["VitalSignsResponse"][];
             diagnoses: components["schemas"]["DiagnosisResponse"][];
             prescriptions: components["schemas"]["PrescriptionResponse"][];
+            /** @description R7 B-6: órdenes de laboratorio de la consulta; solo para el personal clínico (el paciente las ve en Mis resultados) */
+            labOrders?: components["schemas"]["ConsultationLabOrderResponse"][];
         };
         VitalSignsDto: {
             systolic?: number;
@@ -4682,6 +5010,23 @@ export interface components {
              */
             appointmentId?: string;
         };
+        CategoryRequestSuggestionResponse: {
+            /** @description false si ningún médico candidato tiene hueco en la franja en 14 días */
+            found: boolean;
+            /** Format: uuid */
+            doctorId: string | null;
+            doctorName: string | null;
+            specialty: string | null;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            date: string | null;
+            /** Format: date-time */
+            start: string | null;
+            /** Format: date-time */
+            end: string | null;
+        };
         CategoryRequestAssignDto: {
             version: number;
             /** Format: uuid */
@@ -4719,6 +5064,12 @@ export interface components {
             /** @description S10: la observación es relevante (abrió un pendiente para el médico); solo para el personal */
             relevant?: boolean;
         };
+        LabItemRangeResponse: {
+            min: number | null;
+            max: number | null;
+            criticalLow: number | null;
+            criticalHigh: number | null;
+        };
         LabOrderItemResponse: {
             /** Format: uuid */
             id: string;
@@ -4732,6 +5083,8 @@ export interface components {
             resultType: components["schemas"]["TipoResultadoLaboratorio"];
             /** @description null sin resultado o si el actor aún no puede ver valores */
             result: components["schemas"]["LabItemResultResponse"] | null;
+            /** @description C-3: rango de referencia y críticos vigentes para este paciente; solo para quien ve valores */
+            referenceRange?: components["schemas"]["LabItemRangeResponse"] | null;
         };
         /**
          * @description Acciones que el servidor acepta ahora para quien lee
@@ -4787,6 +5140,8 @@ export interface components {
             externalPlace: string | null;
             /** @description S10: instrucciones para el paciente de la orden externa */
             externalInstructions: string | null;
+            /** @description R7 C1: nota del médico para el paciente; solo después de liberar los resultados */
+            patientNote?: string | null;
             /** @description S10: acciones del camino externo que el servidor acepta ahora para quien lee */
             externalActions: components["schemas"]["AccionExternaLaboratorio"][];
         };
@@ -4863,6 +5218,8 @@ export interface components {
             externalPlace: string | null;
             /** @description S10: instrucciones para el paciente de la orden externa */
             externalInstructions: string | null;
+            /** @description R7 C1: nota del médico para el paciente; solo después de liberar los resultados */
+            patientNote?: string | null;
             /** @description S10: acciones del camino externo que el servidor acepta ahora para quien lee */
             externalActions: components["schemas"]["AccionExternaLaboratorio"][];
             cancellationReason: string | null;
@@ -4946,6 +5303,44 @@ export interface components {
             /** @description Versión de la orden después de la captura */
             orderVersion: number;
         };
+        LabResultBatchItemDto: {
+            /** Format: uuid */
+            orderItemId: string;
+            value?: number;
+            text?: string;
+            /** @description Unidad del catálogo; si se envía debe coincidir. */
+            unit?: string;
+            /** @description Obligatorio al corregir un resultado existente. */
+            reason?: string;
+            observation?: string;
+            relevant?: boolean;
+        };
+        LabResultBatchDto: {
+            /** @description Versión vigente de la orden. */
+            version: number;
+            items: components["schemas"]["LabResultBatchItemDto"][];
+            /** @description Completar la orden después de guardar (requiere laboratorio.validar) */
+            complete?: boolean;
+        };
+        LabBatchResultItemResponse: {
+            /** Format: uuid */
+            orderItemId: string;
+            mark: components["schemas"]["MarcaResultado"];
+            /** @description Versión del resultado */
+            version: number;
+        };
+        LabResultBatchResponse: {
+            /** Format: uuid */
+            id: string;
+            state: components["schemas"]["EstadoOrdenLaboratorio"];
+            /** @description Versión de la orden después del lote */
+            orderVersion: number;
+            results: components["schemas"]["LabBatchResultItemResponse"][];
+            /** @description Valores críticos del lote (avisan al médico que pidió la orden) */
+            criticalCount: number;
+            /** Format: date-time */
+            completedAt: string | null;
+        };
         LabAmendDto: {
             /** Format: uuid */
             orderItemId: string;
@@ -4970,12 +5365,29 @@ export interface components {
             /** Format: date-time */
             completedAt: string;
         };
+        LabReviewDto: {
+            version: number;
+            reason?: string;
+            /** @description D-4: proponer a recepción una cita de seguimiento con el médico que pidió la orden. Si no se envía, se propone (comportamiento anterior). */
+            followUp?: boolean;
+            /** @description R7 C1: nota para el paciente, que la ve junto a los resultados liberados */
+            patientNote?: string;
+        };
         LabReviewResponse: {
             /** Format: uuid */
             id: string;
             version: number;
             /** Format: date-time */
             reviewedAt: string;
+            /** @description C-2: pendientes de «Resultados por revisar» que se cerraron con la revisión */
+            followUpsClosed?: number;
+            /**
+             * Format: uuid
+             * @description D-4: propuesta de cita de seguimiento creada para recepción, o null
+             */
+            followUpProposalId?: string | null;
+            /** @description A5: por qué no se propuso cita: no_pedida, hospitalizado, ya_propuesta o sin_consulta */
+            followUpSkipped?: string;
         };
         LabCancelDto: {
             version: number;
@@ -5000,6 +5412,8 @@ export interface components {
             state: components["schemas"]["EstadoOrdenLaboratorio"];
             version: number;
             external: boolean;
+            /** @description R7 C-6: el paciente tiene cuenta y ve «Examen en otro sitio» con las instrucciones en su app; si es false, entrégaselas impresas */
+            patientNotified?: boolean;
         };
         LabAttachmentDto: {
             fileName: string;
@@ -5034,6 +5448,38 @@ export interface components {
              */
             attachmentId: string | null;
         };
+        LabExternalRecordValueDto: {
+            /**
+             * Format: uuid
+             * @description Examen del catálogo (no un panel)
+             */
+            examId: string;
+            value?: number;
+            text?: string;
+        };
+        LabExternalRecordDto: {
+            /** @description Dónde se hizo el examen */
+            place: string;
+            attachment: components["schemas"]["LabAttachmentDto"];
+            results: components["schemas"]["LabExternalRecordValueDto"][];
+            /** @description Nota sobre el informe externo */
+            note?: string;
+        };
+        LabExternalRecordResponse: {
+            /** Format: uuid */
+            id: string;
+            state: components["schemas"]["EstadoOrdenLaboratorio"];
+            version: number;
+            /** Format: date-time */
+            completedAt: string;
+            /**
+             * Format: uuid
+             * @description Adjunto creado con la referencia; su archivo se sube con POST /laboratorio/adjuntos/{id}/archivo
+             */
+            attachmentId: string | null;
+            /** Format: uuid */
+            consultationId: string;
+        };
         LabAttachmentStoredResponse: {
             /** Format: uuid */
             id: string;
@@ -5058,6 +5504,14 @@ export interface components {
         MotivoPendienteLaboratorio: "critico" | "observacion";
         /** @enum {string} */
         EstadoPendienteLaboratorio: "pendiente" | "revisado";
+        LabFollowUpValueResponse: {
+            code: string;
+            name: string;
+            unit: string | null;
+            value: number | null;
+            text: string | null;
+            mark: components["schemas"]["MarcaResultado"];
+        };
         LabFollowUpResponse: {
             /** Format: uuid */
             id: string;
@@ -5079,6 +5533,12 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             version: number;
+            /** @description C-4: versión vigente de la orden, para revisarla desde la bandeja */
+            orderVersion?: number;
+            /** @description C-4: acciones sobre la orden que el servidor acepta ahora para quien lee */
+            orderActions?: components["schemas"]["AccionOrdenLaboratorio"][];
+            /** @description C-4: valores capturados de la orden, críticos primero */
+            values?: components["schemas"]["LabFollowUpValueResponse"][];
         };
         LabFollowUpReviewDto: {
             version: number;
@@ -5908,6 +6368,24 @@ export interface components {
              * @description Día local, yyyy-MM-dd
              */
             birth: string | null;
+            /** @description DUI del expediente con guion (G-2), para compararlo con el declarado */
+            dui: string | null;
+            /** @description Siempre true: candidate solo es la coincidencia exacta de DUI y nacimiento */
+            exact?: boolean;
+        };
+        LinkClosestResponse: {
+            /** Format: uuid */
+            id: string;
+            /** @description Número de expediente */
+            record: string;
+            fullName: string | null;
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            birth: string | null;
+            /** @description DUI del expediente con guion */
+            dui: string | null;
         };
         PendingLinkResponse: {
             /** Format: uuid */
@@ -5921,6 +6399,8 @@ export interface components {
             candidate: components["schemas"]["LinkCandidateResponse"] | null;
             /** @description Cuántos expedientes coinciden */
             candidates: number;
+            /** @description Sin coincidencia exacta: el expediente más parecido (mismo nacimiento, DUI distinto en un dígito). No se puede aprobar. */
+            closest?: components["schemas"]["LinkClosestResponse"] | null;
         };
         LinkApproveDto: {
             version: number;
@@ -5928,6 +6408,14 @@ export interface components {
         LinkRejectDto: {
             version: number;
             reason: string;
+        };
+        MyLinkResponse: {
+            /** @description La cuenta ya está vinculada a un expediente */
+            linked: boolean;
+            /** @description Última solicitud de vinculación; null si nunca pidió */
+            request: components["schemas"]["LinkRequestResponse"] | null;
+            /** @description Lo que la cuenta declaró en esa solicitud, para volver a pedir con el formulario prellenado. Ausente si nunca pidió. */
+            declared?: components["schemas"]["LinkDeclaredResponse"];
         };
         PublicOccupancyRowResponse: {
             planta: number | null;
@@ -6045,6 +6533,10 @@ export interface components {
             /** @description Cuentas que dieron "Enterado" */
             enterados: number;
             /** @description Cuentas activas del personal a las que va dirigido por rol o por el área de su ficha; 0 si solo es público */
+            destinatarios: number;
+        };
+        NoticeReachResponse: {
+            /** @description Cuentas activas del personal a las que llegaría por rol o por área (misma regla que `destinatarios` en las estadísticas) */
             destinatarios: number;
         };
         NoticeDto: {
@@ -6581,6 +7073,16 @@ export interface components {
             unitVersion: number;
             nextMilestones: components["schemas"]["HitoServicio"][];
         };
+        UndoMilestoneDto: {
+            version: number;
+        };
+        UndoMilestoneResponse: {
+            /** Format: uuid */
+            id: string;
+            undoneType: components["schemas"]["HitoServicio"];
+            version: number;
+            nextMilestones: components["schemas"]["HitoServicio"][];
+        };
         CloseServiceDto: {
             version: number;
             reason: string;
@@ -6691,6 +7193,10 @@ export interface components {
             /** Format: date-time */
             receivedAt: string;
             receivedByName: string | null;
+            /** @description R7 D-7: true cuando la recepción cerró el servicio (hito `finalizado`, estado `completado`) y la unidad volvió a Disponible. */
+            serviceClosed?: boolean;
+            /** @description R7 D-7: estado de la unidad después de la recepción. */
+            unitState?: components["schemas"]["EstadoAmbulancia"];
         };
         LocationDto: {
             latitude: number;
@@ -6735,7 +7241,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "lote_con_conflictos" | "plantilla_duplicada" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "solicitud_cita_resuelta" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "orden_no_externa" | "cita_no_coincide" | "propuesta_resuelta" | "adjunto_tipo_invalido" | "adjunto_muy_grande" | "adjunto_sin_archivo" | "adjunto_ya_almacenado" | "adjunto_no_coincide" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "lote_con_conflictos" | "plantilla_duplicada" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "solicitud_cita_resuelta" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "orden_no_externa" | "cita_no_coincide" | "propuesta_resuelta" | "adjunto_tipo_invalido" | "adjunto_muy_grande" | "adjunto_sin_archivo" | "adjunto_ya_almacenado" | "adjunto_no_coincide" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "hito_no_deshacible" | "sin_consulta" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -8801,6 +9307,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoverageResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_gapCandidates: {
+        parameters: {
+            query: {
+                areaId: string;
+                /** @description Función del hueco (`role` de /turnos/cobertura) */
+                role: "MED" | "ENF" | "REC" | "LAB";
+                start: string;
+                end: string;
+                type: "diurno" | "nocturno" | "guardia";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GapCandidatesResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
@@ -11864,6 +12432,143 @@ export interface operations {
             };
         };
     };
+    QueueController_myPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueMyPostResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    QueueController_voidIssued: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueVoidDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueTransitionResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     QueueController_undoCall: {
         parameters: {
             query?: never;
@@ -12338,6 +13043,64 @@ export interface operations {
             };
             /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ClinicalRecordController_cie10: {
+        parameters: {
+            query: {
+                /** @description Al menos 2 caracteres */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cie10Response"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13065,6 +13828,72 @@ export interface operations {
             };
         };
     };
+    AppointmentRequestController_suggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRequestSuggestionResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     AppointmentRequestController_assign: {
         parameters: {
             query?: never;
@@ -13722,6 +14551,88 @@ export interface operations {
             };
         };
     };
+    LaboratoryController_resultBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabResultBatchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabResultBatchResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     LaboratoryController_amend: {
         parameters: {
             query?: never;
@@ -13900,7 +14811,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LabVersionDto"];
+                "application/json": components["schemas"]["LabReviewDto"];
             };
         };
         responses: {
@@ -14156,6 +15067,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LabExternalResultResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    LaboratoryController_recordExternal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabExternalRecordDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabExternalRecordResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
@@ -17959,6 +18952,61 @@ export interface operations {
             };
         };
     };
+    MyLinkController_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyLinkResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     PublicController_occupancy: {
         parameters: {
             query?: never;
@@ -18296,6 +19344,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NoticeStatsResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    NoticesController_reach: {
+        parameters: {
+            query?: {
+                /** @description Códigos de rol separados por coma, por ejemplo ENF,MED */
+                roles?: string;
+                /** @description Códigos de espacio separados por coma, por ejemplo P1-HOS */
+                areas?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeReachResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
@@ -19403,6 +20511,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MilestoneResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No encontrado (`no_encontrado`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AmbulanceController_undoMilestone: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UndoMilestoneDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UndoMilestoneResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */

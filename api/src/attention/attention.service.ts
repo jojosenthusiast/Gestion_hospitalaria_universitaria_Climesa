@@ -232,6 +232,9 @@ export class AttentionService {
     return this.db.transaction(async c => { const rows = (await c.query(`SELECT c.id,c.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       c.medico_id AS "doctorId",concat_ws(' ',m.nombres,m.apellidos) AS "doctorName",lower(c.horario) AS start,upper(c.horario) AS "end",
       c.motivo AS reason,c.estado AS state,c.origen AS origin,c.motivo_rechazo AS "rejectionReason",c.version,
+      c.cancelacion_codigo AS "cancelReasonCode",c.cancelacion_motivo AS "cancelReason",
+      (SELECT json_build_object('id',t.id,'numero',t.numero,'state',t.estado) FROM atencion.ticket_fila t
+        WHERE t.cita_id=c.id AND t.estado IN ('en_espera','llamado','en_atencion','atendido') LIMIT 1) AS arrival,
       c.reprogramada_de AS "rescheduledFromId",c.reprogramaciones AS reschedules,
       (SELECT n.id FROM atencion.cita n WHERE n.reprogramada_de=c.id) AS "rescheduledToId",
       atencion.cita_tiene_consulta(c.id) AS "hasConsultation",
@@ -365,7 +368,20 @@ export class AttentionService {
     await c.query(`UPDATE atencion.reprogramacion SET estado='vencida',version=version+1 WHERE cita_id=$1 AND estado='pendiente'`, [id]);
   }
 
+  /** D-8: without `reasonCode` the DTO keeps the pre-R7 rule (10+ characters); the patient's quick reason needs no text, `otro` 3+. */
+  private cancelReason(actor: Actor, dto: AppointmentCancelDto) {
+    if (!dto.reasonCode) return { code: null, text: dto.reason?.trim() || null, audit: dto.reason };
+    const patientOnly = !contextsOf(actor, 'citas.cancelar').some(context => context !== 'propio');
+    if (!patientOnly) throw new ProblemException('validacion', 400, 'Recepción escribe el motivo de la cancelación.', 'reasonCode');
+    const raw: unknown = dto.reason;
+    if (raw !== undefined && raw !== null && (typeof raw !== 'string' || raw.length > 500)) throw new ProblemException('validacion', 400, 'El motivo admite hasta 500 caracteres.', 'reason');
+    const text = typeof raw === 'string' ? raw.trim() : '';
+    if (dto.reasonCode === 'otro' && text.length < 3) throw new ProblemException('validacion', 400, 'Escribe brevemente el motivo.', 'reason');
+    return { code: dto.reasonCode, text: text || null, audit: text || undefined };
+  }
+
   async cancel(actor: Actor, id: string, dto: AppointmentCancelDto, key?: string) {
+    const reason = this.cancelReason(actor, dto);
     return this.commands.run(actor, `citas.cancelar:${id}`, key, dto, async c => {
       const old = (await c.query('SELECT paciente_id,estado,version,lower(horario) AS start FROM atencion.cita WHERE id=$1 FOR UPDATE', [id])).rows[0] as AppointmentRow | undefined;
       // F-06/H-09: ownership comes first, and a foreign or missing appointment answers the same, so neither
@@ -388,9 +404,9 @@ export class AttentionService {
         const { horas } = await this.policies.value<{ horas: number }>(c, 'citas.cancelacion_horas', now);
         if (start.valueOf() - now.valueOf() < horas * 3_600_000) throw new ProblemException('cancelacion_fuera_de_plazo', 409, `Solo puedes cancelar tu cita hasta ${horas} h antes; comunícate con recepción.`);
       }
-      const row = (await c.query("UPDATE atencion.cita SET estado='cancelada',version=version+1 WHERE id=$1 RETURNING version", [id])).rows[0];
+      const row = (await c.query("UPDATE atencion.cita SET estado='cancelada',cancelacion_codigo=$2,cancelacion_motivo=$3,version=version+1 WHERE id=$1 RETURNING version", [id, reason.code, reason.text])).rows[0];
       await this.expirePendingReschedules(c, id);
-      await this.commands.audit(c, actor, { action: 'citas.cancelar', entity: 'cita', entityId: id, permission: 'citas.cancelar', reason: dto.reason });
+      await this.commands.audit(c, actor, { action: 'citas.cancelar', entity: 'cita', entityId: id, permission: 'citas.cancelar', reason: reason.audit, detail: reason.code ? { reasonCode: reason.code } : undefined });
       await this.commands.event(c, 'cita.actualizada', 'cita', id, row.version, await this.channels(c, old.paciente_id));
       return { id, version: row.version, state: 'cancelada' };
     });

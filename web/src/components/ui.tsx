@@ -1,7 +1,7 @@
-import { useId, useState, type InputHTMLAttributes, type ReactNode, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode, type FormEvent } from 'react';
 import type { DemoAccount } from '../lib/demoLogin';
 
-export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry' | 'download' | 'clock' | 'alert' | 'chart' | 'userPlus' | 'megaphone' | 'steth' | 'drop' | 'pulse' | 'chevronsUp' | 'minus' | 'filter';
+export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry' | 'download' | 'clock' | 'alert' | 'chart' | 'userPlus' | 'megaphone' | 'steth' | 'drop' | 'pulse' | 'chevronsUp' | 'minus' | 'filter' | 'clipboard';
 const paths: Record<IconName, ReactNode> = {
   arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
   back: <><path d="M19 12H5M11 6l-6 6 6 6" /></>,
@@ -26,6 +26,7 @@ const paths: Record<IconName, ReactNode> = {
   building: <><path d="M4 21V5l8-3 8 3v16" /><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M9 16h.01M15 16h.01M2 21h20" /></>,
   bed: <><path d="M3 19V7M21 19v-6a3 3 0 0 0-3-3H9v6h12M3 16h18M6 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" /></>,
   ambulance: <><path d="M3 6h11v13H3zM14 10h4l3 4v5h-7z" /><path d="M7 9v6M4 12h6M6 19a2 2 0 1 0 4 0M16 19a2 2 0 1 0 4 0" /></>,
+  clipboard: <><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 4v2h6V4M8.5 11h7M8.5 15h5" /></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></>,
   audit: <><path d="M9 4H5a2 2 0 0 0-2 2v14h12v-4" /><path d="M9 2h6v4H9zM8 11h4M8 15h3" /><circle cx="17" cy="11" r="4" /><path d="m20 14 2 2" /></>,
   lab: <><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3M8 15h8" /></>,
@@ -62,18 +63,43 @@ export function Notice({ kind, children }: { kind: 'success' | 'error' | 'info';
   return <div className={`notice ${kind}`} role={kind === 'error' ? 'alert' : 'status'} aria-live={kind === 'error' ? 'assertive' : 'polite'} aria-atomic="true"><span className="notice-icon"><Icon name={kind === 'success' ? 'check' : 'info'} /></span><span>{children}</span></div>;
 }
 
+/** dd/mm/aaaa (or an ISO date) to ISO; '' clears; null while the text is not a whole, real date. */
+export function isoFromDateText(text: string): string | null {
+  const t = text.trim();
+  if (t === '') return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(t) ?? /^(\d{2})(\d{2})(\d{4})$/.exec(t);
+  if (!m) return null;
+  const [day, month, year] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+const dateText = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : iso);
+
 /** WEB-11: `error` marks the input `aria-invalid` and links the message with `aria-describedby`, so it is read with the field. */
 export function Field({ label, value, onChange, hint, error, ...props }: { label: string; value: string; onChange: (value: string) => void; hint?: string; error?: string } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   const [visible, setVisible] = useState(false);
   const hintId = useId(), errorId = useId(), ownId = useId(), inputId = props.id ?? ownId;
-  const password = props.type === 'password';
+  const password = props.type === 'password', date = props.type === 'date';
+  // Sweep 2026-11-17: a native date input follows the browser language (11/18/2026 in an English browser). Dates are
+  // typed and shown as dd/mm/aaaa (es-SV); the native calendar stays one click away on the button.
+  const [text, setText] = useState(() => dateText(value));
+  const picker = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (date && isoFromDateText(text) !== value) setText(dateText(value)); }, [value]);
   const describedBy = [props['aria-describedby'], hint ? hintId : undefined, error ? errorId : undefined].filter(Boolean).join(' ') || undefined;
   // The hint and the error sit outside the <label>: they describe the field, they are not its name.
   return (
     <div className="field">
       <label htmlFor={inputId}>{label}</label>
       <span className="input-wrap">
-        <input {...props} id={inputId} aria-invalid={error ? true : props['aria-invalid']} aria-describedby={describedBy} type={password && visible ? 'text' : props.type} value={value} onChange={e => onChange(e.target.value)} />
+        {date ? <>
+          <input {...props} min={undefined} max={undefined} id={inputId} aria-invalid={error ? true : props['aria-invalid']} aria-describedby={describedBy} type="text" inputMode="numeric" autoComplete="off" maxLength={10} placeholder={props.placeholder ?? 'dd/mm/aaaa'} value={text}
+            onChange={e => { setText(e.target.value); const iso = isoFromDateText(e.target.value); if (iso !== null) onChange(iso); }} />
+          <input ref={picker} className="date-native" type="date" tabIndex={-1} aria-hidden="true" value={value} min={props.min} max={props.max} disabled={props.disabled} onChange={e => { setText(dateText(e.target.value)); onChange(e.target.value); }} />
+          <button type="button" className="password-toggle" aria-label={`Elegir ${label.toLowerCase()} en el calendario`} disabled={props.disabled} onClick={() => { try { picker.current?.showPicker?.(); } catch { picker.current?.focus(); } }}><Icon name="calendar" /></button>
+        </>
+          : <input {...props} id={inputId} aria-invalid={error ? true : props['aria-invalid']} aria-describedby={describedBy} type={password && visible ? 'text' : props.type} value={value} onChange={e => onChange(e.target.value)} />}
         {password && <button type="button" className="password-toggle" aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={visible} onClick={() => setVisible(!visible)}><Icon name={visible ? 'eyeOff' : 'eye'} /></button>}
       </span>
       {hint && <small id={hintId}>{hint}</small>}

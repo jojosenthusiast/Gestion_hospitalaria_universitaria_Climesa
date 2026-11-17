@@ -99,9 +99,13 @@ export function followUpReason(mark: string, relevant: boolean): FollowUpReason 
   return relevant ? 'observacion' : null;
 }
 
-/** S10: an appointment confirms a follow-up proposal only if it is for the same patient and doctor and still active. */
-export function appointmentMatchesProposal(appointment: { patientId: string; doctorId: string; state: string }, proposal: { patientId: string; doctorId: string }) {
-  return appointment.patientId === proposal.patientId && appointment.doctorId === proposal.doctorId && ['solicitada', 'confirmada'].includes(appointment.state);
+/**
+ * S10: an appointment confirms a follow-up proposal only if it is for the same patient and doctor and still active.
+ * R7 C1: `sameSpecialty` (the appointment's doctor shares the ordering doctor's specialty) also counts, so reception can
+ * book another doctor when the one who ordered has no free slot.
+ */
+export function appointmentMatchesProposal(appointment: { patientId: string; doctorId: string; state: string }, proposal: { patientId: string; doctorId: string }, sameSpecialty = false) {
+  return appointment.patientId === proposal.patientId && (appointment.doctorId === proposal.doctorId || sameSpecialty) && ['solicitada', 'confirmada'].includes(appointment.state);
 }
 
 const HEIF_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);

@@ -148,6 +148,6 @@ describe('inicio de Recepción · solicitudes por asignar', () => {
     const attention = await screen.findByRole('region', { name: 'Solicitudes de cita' });
     expect(await within(attention).findByText('Paciente Ficticio Uno')).toBeTruthy();
     expect(within(attention).getByText(/Piel · Mancha en el brazo/)).toBeTruthy();
-    expect(within(attention).getByRole('link', { name: /Asignar/ }).getAttribute('href')).toBe('#/citas');
+    expect(within(attention).getByRole('link', { name: /Asignar/ }).getAttribute('href')).toBe('#/citas?asignar=s-1');
   });
 });

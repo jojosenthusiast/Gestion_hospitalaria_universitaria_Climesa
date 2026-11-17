@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiExtension, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiCreatedResponse, ApiExtension, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { NoticeDto, NoticeEditDto, NoticeWithdrawDto } from './public.dto';
 import { PublicRateLimitGuard } from './rate-limit.guard';
 import { PublicService } from './public.service';
+import { NoticeReachResponse } from './public.responses';
 import { DoctorsOnDutyResponse, HospitalLocationResponse, MyInboxResponse, MyNoticesResponse, NoticeAckResponse, NoticeStatsResponse, NoticeListItemResponse, NoticePublishedResponse, NoticesResponse, PublicOccupancyResponse, PublicQueueResponse } from './public.responses';
 
 /** Spec 112 sin sesión: sin guardas de identidad, con límite por IP. Solo agregados y campos públicos. */
@@ -30,6 +31,10 @@ export class NoticesController {
   list() { return this.service.listNotices(); }
   @Get('estadisticas') @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Por aviso: cuántas cuentas dieron "Enterado" y a cuántas va dirigido (solo conteos, sin nombres)' }) @ApiOkResponse({ type: [NoticeStatsResponse] })
   stats() { return this.service.noticeStats(); }
+  @Get('alcance') @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Al redactar: a cuántas cuentas del personal llegaría el aviso por roles y áreas (solo el conteo)' })
+  @ApiQuery({ name: 'roles', required: false, description: 'Códigos de rol separados por coma, por ejemplo ENF,MED' }) @ApiQuery({ name: 'areas', required: false, description: 'Códigos de espacio separados por coma, por ejemplo P1-HOS' })
+  @ApiOkResponse({ type: NoticeReachResponse })
+  reach(@Query('roles') roles?: string, @Query('areas') areas?: string) { return this.service.noticeReach(roles, areas); }
   @Post() @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Publicar un aviso general con vigencia; advierte si parece llevar datos personales' }) @ApiCreatedResponse({ type: NoticePublishedResponse })
   publish(@Req() r: ActorRequest, @Body() d: NoticeDto, @Headers('idempotency-key') k?: string) { return this.service.publish(r.actor, d, k); }
   @Put(':id') @RequirePermission('avisos.publicar') @ApiOperation({ summary: 'Editar un aviso vigente o programado: texto, prioridad, audiencia y vigencia (adelantar el fin lo vence antes); auditado' }) @ApiOkResponse({ type: NoticeListItemResponse })

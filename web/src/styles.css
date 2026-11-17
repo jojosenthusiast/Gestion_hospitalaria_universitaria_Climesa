@@ -57,6 +57,8 @@
   /* Tipografía: una familia en web, Android e iOS; cifras tabulares en tablas y contadores. */
   --font-sans: "Atkinson Hyperlegible Next", Arial, sans-serif;
   --font-mono: "Atkinson Hyperlegible Mono", monospace;
+  /* Times and durations: Atkinson draws a slashed zero in every style, so "1 h 02 min" read as "1 h 62 min". */
+  --font-figures: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
   --text-xs: 12px;
   --text-sm: 13px;
   --text-md: 14px;

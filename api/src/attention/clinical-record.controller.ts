@@ -1,14 +1,17 @@
-import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { DiagnosisDto, PrescriptionDto, VitalSignsDto } from './clinical-record.dto';
 import { ClinicalRecordService } from './clinical-record.service';
-import { ConsultationDetailResponse, DiagnosisCreatedResponse, PrescriptionResponse, VitalSignsCreatedResponse } from './attention.responses';
+import { Cie10Response, ConsultationDetailResponse, DiagnosisCreatedResponse, PrescriptionResponse, VitalSignsCreatedResponse } from './attention.responses';
 
 @ApiTags('clinical-record') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('consultas')
 export class ClinicalRecordController {
   constructor(private readonly clinical: ClinicalRecordService) {}
+
+  @Get('cie10') @RequirePermission('consulta.registrar') @ApiOperation({ summary: 'Buscar en el catálogo CIE-10 por código o por palabras (hasta 20)' }) @ApiQuery({ name: 'q', required: true, description: 'Al menos 2 caracteres' }) @ApiOkResponse({ type: [Cie10Response] })
+  cie10(@Query('q') q?: string) { return this.clinical.searchCie10(q); }
 
   @Get(':id/detalle') @RequirePermission('expediente.ver', 'consulta.iniciar') @ApiOperation({ summary: 'Consultar el detalle clínico permitido' }) @ApiOkResponse({ type: ConsultationDetailResponse })
   detail(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string) { return this.clinical.detail(r.actor, id); }

@@ -55,6 +55,23 @@ export class LabExternalResultDto {
   @ApiPropertyOptional({ maxLength: 1000, description: 'Nota sobre el informe externo' }) @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }
 
+export class LabExternalRecordValueDto {
+  @ApiProperty({ format: 'uuid', description: 'Examen del catálogo (no un panel)' }) @IsUUID() examId!: string;
+  @ApiPropertyOptional() @ValidateIf(value => value.text === undefined) @IsNumber() value?: number;
+  @ApiPropertyOptional() @ValidateIf(value => value.value === undefined) @IsString() @IsNotEmpty() @MaxLength(5000) text?: string;
+}
+
+/**
+ * POST /laboratorio/pacientes/{id}/resultado-externo (R7 C-5, D-5): an exam the patient had done elsewhere without an
+ * order. A new request body; LabOrderDto keeps `consultationId` required.
+ */
+export class LabExternalRecordDto {
+  @ApiProperty({ minLength: 3, maxLength: 200, description: 'Dónde se hizo el examen' }) @Transform(trimmed) @IsString() @MinLength(3) @MaxLength(200) place!: string;
+  @ApiProperty({ type: LabAttachmentDto }) @ValidateNested() @Type(() => LabAttachmentDto) attachment!: LabAttachmentDto;
+  @ApiProperty({ type: [LabExternalRecordValueDto], minItems: 1, maxItems: 50 }) @IsArray() @ArrayMinSize(1) @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => LabExternalRecordValueDto) results!: LabExternalRecordValueDto[];
+  @ApiPropertyOptional({ maxLength: 1000, description: 'Nota sobre el informe externo' }) @IsOptional() @IsString() @MaxLength(1000) note?: string;
+}
+
 /** POST /laboratorio/pendientes/{id}/revisar. */
 export class LabFollowUpReviewDto {
   @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
@@ -93,6 +110,36 @@ export class LabResultDto {
   @ApiPropertyOptional({ enum: LabMark, deprecated: true, description: 'Ignorado: la marca se calcula en el servidor.' }) @IsOptional() @IsEnum(LabMark) mark?: LabMark;
   @ApiPropertyOptional({ maxLength: 1000, description: 'S10: observación del laboratorio sobre este resultado' }) @IsOptional() @IsString() @MaxLength(1000) observation?: string;
   @ApiPropertyOptional({ description: 'S10: la observación es relevante y abre un pendiente para el médico (exige observación)' }) @IsOptional() @IsBoolean() relevant?: boolean;
+}
+
+/** C-1: one exam of a batch capture; same rules as POST /resultados for that exam, without its own order version. */
+export class LabResultBatchItemDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() orderItemId!: string;
+  @ApiPropertyOptional() @ValidateIf(value => value.text === undefined) @IsNumber() value?: number;
+  @ApiPropertyOptional() @ValidateIf(value => value.value === undefined) @IsString() @IsNotEmpty() @MaxLength(5000) text?: string;
+  @ApiPropertyOptional({ description: 'Unidad del catálogo; si se envía debe coincidir.' }) @IsOptional() @IsString() @MaxLength(80) unit?: string;
+  @ApiPropertyOptional({ description: 'Obligatorio al corregir un resultado existente.' }) @IsOptional() @IsString() @MaxLength(500) reason?: string;
+  @ApiPropertyOptional({ maxLength: 1000 }) @IsOptional() @IsString() @MaxLength(1000) observation?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() relevant?: boolean;
+}
+
+/**
+ * POST /laboratorio/ordenes/{id}/resultados/lote (C-1): every exam of the order in one sheet. All or nothing, one order
+ * version for the whole batch. With `complete`, the order is also completed in the same transaction (needs
+ * laboratorio.validar and every exam with its value).
+ */
+export class LabResultBatchDto {
+  @ApiProperty({ minimum: 1, description: 'Versión vigente de la orden.' }) @IsInt() @Min(1) version!: number;
+  @ApiProperty({ type: [LabResultBatchItemDto], minItems: 1, maxItems: 50 }) @IsArray() @ArrayMinSize(1) @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => LabResultBatchItemDto) items!: LabResultBatchItemDto[];
+  @ApiPropertyOptional({ description: 'Completar la orden después de guardar (requiere laboratorio.validar)' }) @IsOptional() @IsBoolean() complete?: boolean;
+}
+
+/** POST /laboratorio/ordenes/{id}/revisar. D-4: the doctor decides the follow-up appointment when releasing. */
+export class LabReviewDto {
+  @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) reason?: string;
+  @ApiPropertyOptional({ description: 'D-4: proponer a recepción una cita de seguimiento con el médico que pidió la orden. Si no se envía, se propone (comportamiento anterior).' }) @IsOptional() @IsBoolean() followUp?: boolean;
+  @ApiPropertyOptional({ maxLength: 500, description: 'R7 C1: nota para el paciente, que la ve junto a los resultados liberados' }) @IsOptional() @IsString() @MaxLength(500) patientNote?: string;
 }
 
 /** MA-LAB-02 (D-13): amend a result of a completed order; the order goes back to the doctor's review (D-040). */

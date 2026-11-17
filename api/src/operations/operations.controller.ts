@@ -7,8 +7,8 @@ import { ActorRequest } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
-import { AttendanceDto, BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, RotationDto, ShiftBatchDto, ShiftDto, SpaceDto, StaffDto, WeekTemplateDto, WeekTemplateRetireDto } from './operations.dto';
-import { BatchCreatedResponse, BatchValidationResponse, RotationPreviewResponse, WeekTemplateResponse, BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftAttendanceResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpecialistWeekResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
+import { AttendanceDto, BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, RotationDto, ShiftBatchDto, ShiftCandidatesQuery, ShiftDto, SpaceDto, StaffDto, WeekTemplateDto, WeekTemplateRetireDto } from './operations.dto';
+import { BatchCreatedResponse, BatchValidationResponse, RotationPreviewResponse, WeekTemplateResponse, BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, GapCandidatesResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftAttendanceResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpecialistWeekResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
 import { IdVersionResponse } from '../platform/responses';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
 export class OperationsController {
@@ -33,6 +33,8 @@ export class OperationsController {
   myShifts(@Req() r:ActorRequest){return this.people.shifts(r.actor,true);}
   @Get('turnos/cobertura') @RequirePermission('turnos.ver') @ApiOperation({summary:'Huecos de cobertura por área y hora frente al mínimo vigente'}) @ApiQuery({name:'from',type:String,description:'Primer día local, yyyy-MM-dd'}) @ApiQuery({name:'to',type:String,description:'Último día local, yyyy-MM-dd'}) @ApiQuery({name:'areaId',type:String,format:'uuid',required:false}) @ApiOkResponse({ type: CoverageResponse })
   coverage(@Query('from') from='',@Query('to') to='',@Query('areaId') areaId?:string){return this.people.coverage(from,to,areaId);}
+  @Get('turnos/candidatos') @RequirePermission('turnos.planificar') @ApiOperation({summary:'R7 F-1: quiénes pueden cubrir un hueco de cobertura con las reglas de un turno suelto (descanso, tope de 7 días, días seguidos, traslape, inscripción); no guarda nada'}) @ApiOkResponse({ type: GapCandidatesResponse })
+  gapCandidates(@Req() r:ActorRequest,@Query() q:ShiftCandidatesQuery){return this.people.gapCandidates(r.actor,q);}
   @Get('turnos/especialistas') @RequirePermission('turnos.ver') @ApiOperation({summary:'Médicos de turno por día y especialidad durante 7 días (CARGA-04)'}) @ApiQuery({name:'from',type:String,description:'Primer día local, yyyy-MM-dd'}) @ApiOkResponse({ type: SpecialistWeekResponse })
   specialists(@Query('from') from=''){return this.people.specialists(from);}
   // TODO(retirar en la próxima versión): compatibilidad para apps instaladas que todavía marcan la entrada a mano.

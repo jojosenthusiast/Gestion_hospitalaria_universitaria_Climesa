@@ -58,7 +58,7 @@ describe('Fila del día · tablero (S9)', () => {
     fireEvent.dragStart(card, { dataTransfer: transfer });
     fireEvent.dragOver(screen.getByRole('region', { name: 'En atención' }), { dataTransfer: transfer });
     fireEvent.drop(screen.getByRole('region', { name: 'En atención' }), { dataTransfer: transfer });
-    expect(await screen.findByText(/CON 7: Ese cambio no existe en la fila/)).toBeTruthy();
+    expect(await within(card).findByRole('alert')).toHaveProperty('textContent', expect.stringMatching(/Ese cambio no existe en la fila/));
     expect(api.write).not.toHaveBeenCalled();
     fireEvent.drop(screen.getByRole('region', { name: 'Llamados' }), { dataTransfer: transfer });
     await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/fila/t-7/llamar', { version: 2 }, 'POST'));
@@ -101,7 +101,7 @@ describe('Fila del día · tablero (S9)', () => {
   it('emitir con prioridad urgente la envía; rutina deja el cuerpo como antes', async () => {
     const api = montar(['fila.ver', 'fila.emitir', 'fila.gestionar'], []);
     await userEvent.click(await screen.findByRole('button', { name: /Emitir número/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Emitir número de fila' });
+    const dialogo = await screen.findByRole('dialog', { name: 'Mostrador' });
     await userEvent.type(within(dialogo).getByRole('combobox', { name: 'Paciente' }), 'pac');
     await userEvent.click(await within(dialogo).findByRole('option', { name: /Paciente Ficticio Uno/ }));
     await userEvent.click(within(dialogo).getByRole('radio', { name: 'Urgente' }));

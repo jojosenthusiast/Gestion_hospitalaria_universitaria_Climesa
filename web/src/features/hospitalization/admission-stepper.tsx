@@ -18,8 +18,9 @@ const originKinds: OriginKind[] = ['cita', 'emergencia', 'ambulancia', 'consulta
  * W14 · ingreso guiado: seis pasos (cinco sin cama), cada uno se valida antes de avanzar y la API vuelve a comprobar todo al confirmar.
  * S13: category, requirements and visitors share the «Habitación» step; the bed step only appears when a bed is assigned now.
  */
-export function AdmissionStepper({ api, profile, onClose, onSaved }: { api: Api; profile: AccessProfile; onClose: () => void; onSaved: () => void }) {
-  const [index, setIndex] = useState(0), [form, setForm] = useState<AdmissionForm>(() => initialForm(salvadorNow()));
+export function AdmissionStepper({ api, profile, patient, onClose, onSaved }: { api: Api; profile: AccessProfile; patient?: { id: string; label: string } | null; onClose: () => void; onSaved: () => void }) {
+  // R7 U1 (G2): opened from the patient record, the patient comes chosen; the steps after it are unchanged.
+  const [index, setIndex] = useState(0), [form, setForm] = useState<AdmissionForm>(() => ({ ...initialForm(salvadorNow()), patient: patient ?? null }));
   const canAssignBed = can(profile, 'camas.asignar'), action = useAction(api);
   const update = (patch: Partial<AdmissionForm>) => setForm(current => ({ ...current, ...patch }));
   // The list can shrink when the date moves to later (no bed step): keep the position inside it.

@@ -7,7 +7,9 @@ import { can, type AccessProfile, type Api, type Space } from '../lib/api';
 import { MOVE_LABEL, MOVE_PATH, SERVICE_AREA, canRemoveCall, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
 import { patientPicker } from './appointments';
 import { useQuickAction } from './personal/accion';
-import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, WriteError, formatDateTime, useAction, useData } from './common';
+import { FrontDeskDialog } from './front-desk';
+import { readHashParams, writeHashParams } from '../lib/hash-params';
+import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, WriteError, formatDateTime, isVersionConflict, useAction, useData } from './common';
 import { LiveSearch, matches } from './listas/chips';
 import { Segmented } from '../components/segmented';
 import { formatDuration, formatTime, plural } from '../lib/format';
@@ -18,10 +20,14 @@ type QueueAction = 'llamar' | 'atender' | 'completar' | 'no_se_presento';
 /** FILA-01/CITA-04: the server says which actions the reader may take now (`allowedActions`) and why the others are blocked. */
 type QueueTicket = BoardTicket & { fecha: string; patientId?: string | null; officeId?: string | null; officeCode?: string | null; version: number; consultationId?: string | null; consultationState?: string | null;
   area?: string; priority?: Priority; appointmentAt?: string | null; walkIn?: boolean;
+  /** R7 U1 (D-1, B-4): the appointment whose arrival issued this number, its doctor, and until when the issuer may void it. */
+  appointmentId?: string | null; appointmentDoctorName?: string | null; arrivalFromAppointment?: boolean; voidableUntil?: string | null;
   maxCalls?: number; callsForAbsence?: number; allowedActions?: QueueAction[]; blockedActions?: { action: QueueAction; reason: string }[]; undoActions?: string[] };
 /** `GET /fila/siguiente`: who goes next in one area by the documented rule (RN-FILA-SIGUIENTE). */
 export type NextProposal = { service: string; area: string; rule: string; proposal: { id: string; numero: number; area: string; patientName?: string | null; priority: Priority; appointmentAt?: string | null; version: number; reason: string; reasonText: string } | null };
-type CallResult = { id: string; version: number; state: string; llamados: number; numero?: number };
+type CallResult = { id: string; version: number; state: string; llamados: number; numero?: number; ownAppointment?: boolean; appointmentAt?: string | null };
+/** B-5: the caller's service and consulting room from the shift in progress (`GET /fila/mi-puesto`). */
+type MyPost = { service: string | null; area: string | null; areaName: string | null; officeId: string | null; officeCode: string | null };
 /** Last reversible move, offered as "Deshacer" where it happened (S4: undo for what is reversible). */
 type Undo = { ticketId: string; label: string; version: number };
 
@@ -43,33 +49,59 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const action = useAction(api);
   // Optimistic column while a move is in flight; cleared on success (the refresh brings the real state) and on error (reverts).
   const [pending, setPending] = useState<Record<string, BoardColumn>>({});
-  const [undo, setUndo] = useState<Undo | null>(null), [moveError, setMoveError] = useState<string | null>(null), [tick, setTick] = useState(0);
+  // R7 U1: each called card keeps its own «Deshacer» (several numbers can be called in a row); the line on top says the last one.
+  const [undos, setUndos] = useState<Record<string, Undo>>({}), [lastUndo, setLastUndo] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<{ ticketId: string | null; text: string } | null>(null), [failedId, setFailedId] = useState<string | null>(null), [tick, setTick] = useState(0);
+  const [closing, setClosing] = useState<QueueTicket | null>(null);
+  const undo = lastUndo ? undos[lastUndo] ?? null : null;
+  const remember = (item: Undo) => { setUndos(current => ({ ...current, [item.ticketId]: item })); setLastUndo(item.ticketId); };
+  const forget = (ticketId: string) => { setUndos(current => { const next = { ...current }; delete next[ticketId]; return next; }); setLastUndo(current => current === ticketId ? null : current); };
   const refresh = () => { data.refresh(); setTick(value => value + 1); };
-  // Quick actions from the dashboards: `emitir` opens the issue form; `llamar` lands here, where the service is chosen.
+  // Quick actions: `emitir` opens the front desk (with `paciente=<id>` from the patient record, already chosen);
+  // `llamar` preselects the caller's service and consulting room from the shift in progress (B-5).
   const [quick, consumeQuick] = useQuickAction();
-  useEffect(() => { if (quick === 'emitir' && issue) setIssueOpen(true); if (quick) consumeQuick(); }, [quick, issue, consumeQuick]);
+  const [deskPatient, setDeskPatient] = useState<string | null>(null), [postOffice, setPostOffice] = useState('');
+  const post = useData<MyPost>(api, '/fila/mi-puesto', 0, call && quick === 'llamar');
+  useEffect(() => {
+    if (quick === 'emitir' && issue) { setDeskPatient(readHashParams().get('paciente')); writeHashParams({ paciente: null }); setIssueOpen(true); }
+    if (quick && quick !== 'llamar') consumeQuick();
+  }, [quick, issue, consumeQuick]);
+  useEffect(() => {
+    if (quick !== 'llamar' || post.loading) return;
+    if (post.data?.service) setService(post.data.service);
+    if (post.data?.officeId) setPostOffice(post.data.officeId);
+    consumeQuick();
+  }, [quick, post.loading, post.data, consumeQuick]);
 
   async function transition(ticket: QueueTicket, path: string, method = 'POST', extra: Record<string, unknown> = {}) {
-    setMoveError(null); setUndo(null);
+    setMoveError(null); setFailedId(null);
     const result = await action.run<CallResult>(`/fila/${ticket.id}/${path}`, { version: ticket.version, ...extra }, method);
     if (result) {
-      if (path === 'llamar' && result.version) setUndo({ ticketId: ticket.id, label: `Llamaste ${ticketCode(ticket)}.`, version: result.version });
+      if (path === 'llamar' && result.version) remember({ ticketId: ticket.id, label: `Llamaste ${ticketCode(ticket)}.`, version: result.version });
+      else forget(ticket.id);
       refresh();
-    }
+    } else setFailedId(ticket.id);
     return !!result;
   }
   /** Drag, keyboard and the card menu end here: the server decides, the card shows where it goes meanwhile. */
-  async function move(ticket: QueueTicket, to: BoardColumn) {
+  async function move(ticket: QueueTicket, to: BoardColumn, confirmed = false) {
     const check = moveFor(ticket, to);
-    if (!check.allowed) { setMoveError(`${ticketCode(ticket)}: ${check.reason}`); return; }
+    if (!check.allowed) { setMoveError({ ticketId: ticket.id, text: check.reason }); return; }
+    // R7 U1: closing a number (no-show or finished) is not undoable: it asks first, naming the patient.
+    if (to === 'cerrado' && !confirmed) { setClosing(ticket); return; }
     setPending(current => ({ ...current, [ticket.id]: to }));
     await transition(ticket, MOVE_PATH[check.action]);
     setPending(current => { const next = { ...current }; delete next[ticket.id]; return next; });
   }
-  async function undoLast() {
-    if (!undo) return;
-    const done = await action.run(`/fila/${undo.ticketId}/deshacer-llamado`, { version: undo.version });
-    if (done) { setUndo(null); refresh(); }
+  async function undoCall(item: Undo | null) {
+    if (!item) return;
+    const done = await action.run(`/fila/${item.ticketId}/deshacer-llamado`, { version: item.version });
+    if (done) { forget(item.ticketId); refresh(); } else setFailedId(item.ticketId);
+  }
+  /** B-3: the issuer voids a number issued by mistake, while the server allows it. */
+  async function voidTicket(ticket: QueueTicket) {
+    setMoveError(null); setFailedId(null);
+    if (await action.run(`/fila/${ticket.id}/anular`, { version: ticket.version })) refresh(); else setFailedId(ticket.id);
   }
   async function changePriority(ticket: QueueTicket, priority: Priority) {
     setMoveError(null);
@@ -77,10 +109,12 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   }
   /** FILA-02 + RN-FILA-SIGUIENTE: the server calls the number its rule proposes for the area. */
   async function callNext(serviceCode: string, officeId: string) {
-    setMoveError(null); setUndo(null);
+    setMoveError(null); setFailedId(null);
     const result = await action.run<CallResult>('/fila/llamar-siguiente', officeId ? { service: serviceCode, officeId } : { service: serviceCode });
     if (result) {
-      if (result.version && result.numero) setUndo({ ticketId: result.id, label: `Llamaste ${SERVICE_AREA[serviceCode] ?? ''} ${result.numero}.`, version: result.version });
+      // D-2: a doctor's own booked patient goes first; the line says so.
+      const own = result.ownAppointment && result.appointmentAt ? ` Tu cita de las ${localTime(result.appointmentAt)}.` : '';
+      if (result.version && result.numero) remember({ ticketId: result.id, label: `Llamaste ${SERVICE_AREA[serviceCode] ?? ''} ${result.numero}.${own}`, version: result.version });
       refresh();
     }
   }
@@ -99,7 +133,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
         // someone waiting (in the order of the service list), and the line says which service that is.
         const nextService = service !== 'todos' ? service : services.find(([value]) => all.some(t => t.service === value && t.state === 'en_espera'))?.[0] ?? null;
         const exportTable = () => ({ filename: 'fila-del-dia', title: 'Fila del día', subtitle: `${visible.length} números`, columns: ['Número', 'Servicio', 'Paciente', 'Prioridad', 'Cita', 'Estado', 'Llamados', 'Emitido', 'Espera'], rows: visible.map(t => [ticketCode(t), serviceNames[t.service] ?? t.service, t.patientName ?? 'Paciente no identificado', PRIORITY_LABEL[t.priority ?? 'rutina'], t.appointmentAt ? localTime(t.appointmentAt) : 'Sin cita', COLUMN_LABEL[columnOf(t)], t.llamados, formatDateTime(t.issuedAt), minutesText(waitMinutes(t, now))]) });
-        const waitingHere = all.some(t => t.service === nextService && t.state === 'en_espera');
+        const waitingHere = all.filter(t => t.service === nextService && t.state === 'en_espera').length;
         return <>
           <div className="cl-toolbar qb-toolbar">
             <LiveSearch label="Buscar en la fila" placeholder="Número o paciente" value={query} onChange={setQuery} />
@@ -107,17 +141,26 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
             <span className="qb-toolbar-end">{query.trim() && <button type="button" className="cl-link-button" onClick={() => setQuery('')}>Quitar filtros</button>}<ExportMenu table={exportTable} disabled={!visible.length} /></span>
           </div>
           {nextService && wholeQueue && !readOnly
-            && <NextPanel api={api} profile={profile} service={nextService} named={service === 'todos'} version={version + tick} busy={action.busy} canCall={call} waiting={waitingHere} onCallNext={callNext} />}
-          <WriteError error={action.error} onReload={refresh} reloadLabel="Recargar la fila" />
-          {moveError && <Notice kind="info">{moveError}</Notice>}
-          {undo && !action.error && <div className="qb-undo" role="status"><span>{undo.label}</span><button className="row-action" disabled={action.busy} onClick={() => void undoLast()}><Icon name="retry" size={16} />Deshacer</button></div>}
-          {visible.length ? <div className="qb-board">{COLUMNS.map(column => <Lane key={column} column={column} tickets={sortColumn(shown.filter(t => t.column === column), column)} now={now} busy={action.busy} call={call} manage={manage}
-              pendingIds={pending} averageWait={column === 'espera' ? summary.averageWait : 0} onTransition={transition} onMove={move} onPriority={changePriority} />)}</div>
+            && <NextPanel api={api} profile={profile} service={nextService} named={service === 'todos'} version={version + tick} busy={action.busy} canCall={call} waiting={waitingHere} initialOffice={postOffice} onCallNext={callNext} />}
+          {/* A failed card action shows on its card; the line here stays for version conflicts (reload) and the panel. */}
+          {(!failedId || isVersionConflict(action.error)) && <WriteError error={action.error} onReload={refresh} reloadLabel="Recargar la fila" />}
+          {moveError && !moveError.ticketId && <Notice kind="info">{moveError.text}</Notice>}
+          {undo && !action.error && <div className="qb-undo" role="status"><span>{undo.label}</span><button className="row-action" disabled={action.busy} onClick={() => void undoCall(undo)}><Icon name="retry" size={16} />Deshacer</button></div>}
+          {visible.length ? <div className="qb-board">{COLUMNS.map(column => <Lane key={column} column={column} tickets={sortColumn(shown.filter(t => t.column === column), column)} now={now} busy={action.busy} call={call} manage={manage} issue={issue}
+              pendingIds={pending} averageWait={column === 'espera' ? summary.averageWait : 0} current={id => all.find(t => t.id === id) ?? null} undos={undos}
+              cardError={id => failedId === id && action.error && !isVersionConflict(action.error) ? action.error.message : moveError?.ticketId === id ? moveError.text : null}
+              onTransition={transition} onMove={move} onPriority={changePriority} onUndo={item => void undoCall(item)} onVoid={ticket => void voidTicket(ticket)} />)}</div>
             : <Empty title={all.length ? 'Ningún número coincide con los filtros' : 'La fila está vacía'} description={all.length ? 'Quita algún filtro para ver todos los números del día.' : 'Los números emitidos para este día aparecerán aquí.'} />}
         </>;
       }}</RemoteState>
     </section>
-    {issueOpen && <IssueDialog api={api} profile={profile} onClose={() => setIssueOpen(false)} onSaved={() => { setIssueOpen(false); refresh(); }} />}
+    {issueOpen && (profile.patientId && !manage
+      ? <IssueDialog api={api} profile={profile} onClose={() => setIssueOpen(false)} onSaved={() => { setIssueOpen(false); refresh(); }} />
+      : <FrontDeskDialog api={api} patientId={deskPatient} onClose={() => { setIssueOpen(false); setDeskPatient(null); }} onIssued={refresh} />)}
+    {closing && <Dialog title="Cerrar número" onClose={() => setClosing(null)} busy={action.busy}><div className="module-form">
+      <p>{closing.state === 'en_atencion' ? 'Completar' : 'Marcar «No se presentó» a'} <strong>{ticketCode(closing)} · {closing.patientName || 'Paciente no identificado'}</strong>. El número sale de la fila y no se puede deshacer.</p>
+      <div className="dialog-actions"><button type="button" className="secondary-button" onClick={() => setClosing(null)} disabled={action.busy}>Volver</button>
+        <button type="button" className="primary-button" disabled={action.busy} onClick={() => { const ticket = (data.data ?? []).find(t => t.id === closing.id) ?? closing; setClosing(null); void move(ticket, 'cerrado', true); }}>{closing.state === 'en_atencion' ? 'Completar' : 'No se presentó'}</button></div></div></Dialog>}
   </>;
 }
 
@@ -125,10 +168,11 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
  * R4a: one line on top of the board. «Quién sigue» names the number the server rule proposes (the rule itself is the
  * tooltip, not printed text), with the consulting room picker and «Llamar siguiente» inline next to it.
  */
-function NextPanel({ api, profile, service, named, version, busy, canCall, waiting, onCallNext }: { api: Api; profile: AccessProfile; service: string; named: boolean; version: number; busy: boolean; canCall: boolean; waiting: boolean; onCallNext: (service: string, officeId: string) => Promise<void> }) {
+function NextPanel({ api, profile, service, named, version, busy, canCall, waiting, initialOffice = '', onCallNext }: { api: Api; profile: AccessProfile; service: string; named: boolean; version: number; busy: boolean; canCall: boolean; waiting: number; initialOffice?: string; onCallNext: (service: string, officeId: string) => Promise<void> }) {
   const next = useData<NextProposal>(api, `/fila/siguiente?service=${service}`, version);
   const rooms = useData<Space[]>(api, '/espacios', 0, canCall && can(profile, 'espacios.ver'));
-  const [office, setOffice] = useState('');
+  const [office, setOffice] = useState(initialOffice);
+  useEffect(() => { if (initialOffice) setOffice(initialOffice); }, [initialOffice]);
   const offices = Array.isArray(rooms.data) ? rooms.data.filter(space => space.type === 'consultorio' && space.active) : [];
   const result = next.data && !Array.isArray(next.data) ? next.data : null;
   const proposal = result?.proposal ?? null;
@@ -140,11 +184,12 @@ function NextPanel({ api, profile, service, named, version, busy, canCall, waiti
             <div className="qb-next-who"><span>{proposal.patientName || 'Paciente no identificado'}</span><small>{proposal.reasonText}</small></div>
             {proposal.priority !== 'rutina' && <PriorityBadge value={proposal.priority} />}</div>
         : next.error ? <Notice kind="error">{next.error.message}</Notice>
-        : <p className="muted">{next.loading || !result ? 'Calculando…' : 'Nadie espera en este servicio.'}</p>}
+                // The server proposes only whom this account may call (a doctor sees their own patients): others may still wait.
+        : <p className="muted">{next.loading || !result ? 'Calculando…' : waiting > 0 ? `Esperan ${waiting} ${waiting === 1 ? 'paciente' : 'pacientes'} de otros médicos.` : 'Nadie espera en este servicio.'}</p>}
     </div>
     {canCall && <div className="qb-next-actions">
       {offices.length > 0 && <label className="qb-office"><span className="sr-only">Consultorio</span><select aria-label="Consultorio" value={office} onChange={event => setOffice(event.target.value)}><option value="">Sin consultorio</option>{offices.map(room => <option key={room.id} value={room.id}>{room.code} · {room.name}</option>)}</select></label>}
-      <button className="primary-button" disabled={busy || !waiting} onClick={() => void onCallNext(service, office)}><Icon name="megaphone" size={18} />Llamar siguiente</button>
+      <button className="primary-button" disabled={busy || waiting === 0} onClick={() => void onCallNext(service, office)}><Icon name="megaphone" size={18} />Llamar siguiente</button>
     </div>}
   </section>;
 }
@@ -163,23 +208,32 @@ function stateText(ticket: QueueTicket, call: boolean) {
 }
 
 const DRAG_TYPE = 'application/x-climesa-ticket';
-type LaneProps = { column: Column; tickets: (QueueTicket & { column: Column })[]; now: number; busy: boolean; call: boolean; manage: boolean; pendingIds: Record<string, BoardColumn>; averageWait: number;
-  onTransition: (ticket: QueueTicket, path: string) => Promise<boolean>; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void> };
+type LaneProps = { column: Column; tickets: (QueueTicket & { column: Column })[]; now: number; busy: boolean; call: boolean; manage: boolean; issue: boolean; pendingIds: Record<string, BoardColumn>; averageWait: number;
+  current: (id: string) => QueueTicket | null; undos: Record<string, Undo>; cardError: (id: string) => string | null;
+  onTransition: (ticket: QueueTicket, path: string) => Promise<boolean>; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void>;
+  onUndo: (item: Undo) => void; onVoid: (ticket: QueueTicket) => void };
 
-function Lane({ column, tickets, now, busy, call, manage, pendingIds, averageWait, onTransition, onMove, onPriority }: LaneProps) {
+const LANE_FOLD = 4;
+function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, averageWait, current, undos, cardError, onTransition, onMove, onPriority, onUndo, onVoid }: LaneProps) {
   const [over, setOver] = useState(false);
+  // #15: on a phone a long lane shows its first cards; the rest open on «Ver N más» (the page was 6,800 px tall).
+  const [phone] = useState(() => typeof globalThis.matchMedia === 'function' && globalThis.matchMedia('(max-width: 767px)').matches);
+  const [unfolded, setUnfolded] = useState(false);
+  const shownTickets = phone && !unfolded && tickets.length > LANE_FOLD ? tickets.slice(0, LANE_FOLD) : tickets;
   const dropped = (event: DragEvent) => {
     event.preventDefault(); setOver(false);
     const raw = event.dataTransfer.getData(DRAG_TYPE);
     if (!raw) return;
-    try { void onMove(JSON.parse(raw) as QueueTicket, column as BoardColumn); } catch { /* foreign drag data */ }
+    // R7 U1: the drag carries only the id; the version is read from the live board at drop time (a live event may have
+    // changed the number while it was being dragged).
+    try { const ticket = current((JSON.parse(raw) as { id: string }).id); if (ticket) void onMove(ticket, column as BoardColumn); } catch { /* foreign drag data */ }
   };
   return <section className={`qb-column${over ? ' is-drop-target' : ''}`} aria-label={COLUMN_LABEL[column]}
     onDragOver={event => { if (Array.from(event.dataTransfer.types ?? []).includes(DRAG_TYPE)) { event.preventDefault(); setOver(true); } }}
     onDragLeave={() => setOver(false)} onDrop={dropped}>
     <h3><span>{COLUMN_LABEL[column]}</span><span className={`cl-stage tone-${COLUMN_TONE[column]}`} aria-label={plural(tickets.length, 'número', 'números')}>{tickets.length}</span>
       {averageWait > 0 && <small className="qb-avg" title="Espera promedio de quienes esperan">prom. {formatDuration(averageWait)}</small>}</h3>
-    {tickets.length ? <ul>{tickets.map(ticket => {
+    {tickets.length ? <><ul>{shownTickets.map(ticket => {
       const allowed = ticket.allowedActions ?? [];
       const blocked = ticket.blockedActions ?? [];
       const moves = destinations(ticket);
@@ -187,14 +241,16 @@ function Lane({ column, tickets, now, busy, call, manage, pendingIds, averageWai
       const area = areaOfTicket(ticket);
       return <li key={ticket.id} className={`qb-ticket area-surface area-${area.toLowerCase()}${pendingIds[ticket.id] ? ' is-pending' : ''}`}
         draggable={moves.length > 0 && !busy} aria-busy={pendingIds[ticket.id] ? true : undefined}
-        onDragStart={event => { event.dataTransfer.setData(DRAG_TYPE, JSON.stringify(ticket)); event.dataTransfer.effectAllowed = 'move'; }}>
+        onDragStart={event => { event.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ id: ticket.id })); event.dataTransfer.effectAllowed = 'move'; }}>
       <div className="qb-ticket-head"><span className="qb-code"><AreaTag code={area} /><strong className="qb-number mono-data">{ticket.numero}</strong></span>{waitLevel(ticket, now) !== 'none' ? <span className={`qb-wait sla-${waitLevel(ticket, now)}`}>Espera {formatDuration(waitMinutes(ticket, now))}</span> : <span className="qb-wait sla-none" title="Hora de emisión">{formatTime(ticket.issuedAt)}</span>}</div>
       <span>{ticket.patientName || 'Paciente no identificado'}</span>
       {/* R4a: booked or walk-in is on every card, so the order of the column reads at a glance. */}
       <div className="qb-marks">
         {ticket.priority && ticket.priority !== 'rutina' && <PriorityBadge value={ticket.priority} />}
-        {ticket.appointmentAt ? <span className="qb-cita"><Icon name="clock" size={14} />Cita {localTime(ticket.appointmentAt)}</span> : <span className="qb-walkin">Sin cita</span>}
+        {ticket.appointmentAt ? <span className="qb-cita"><Icon name="clock" size={14} />Cita {localTime(ticket.appointmentAt)}{ticket.appointmentDoctorName ? ` con ${ticket.appointmentDoctorName}` : ''}</span> : <span className="qb-walkin">Sin cita</span>}
+        {ticket.arrivalFromAppointment && <span className="qb-walkin">Llegada registrada</span>}
       </div>
+      {cardError(ticket.id) && <p className="qb-card-error" role="alert">{cardError(ticket.id)}</p>}
       {/* R4a: a finished number shows its state once, as a badge; the others say it in the line. */}
       {column === 'cerrado'
         ? <span className="qb-final"><small>{serviceNames[ticket.service] ?? ticket.service}</small><StatusBadge value={ticket.state} /></span>
@@ -203,16 +259,21 @@ function Lane({ column, tickets, now, busy, call, manage, pendingIds, averageWai
         {/* R1: only allowed actions; «No se presentó» stays visible (disabled, reason as tooltip) because it is the next step after the calls. */}
         {ACTION_ORDER.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} showBlocked={name === 'no_se_presento'} disabled={busy} onClick={() => void onTransition(ticket, actionPath[name])}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</ActionButton>)}
         {ticket.state === 'en_atencion' && ticket.consultationId && ticket.consultationState === 'abierta' && <a className="row-action" href={`#/consultas?consulta=${ticket.consultationId}`}>Retomar consulta <Icon name="arrow" size={16} /></a>}
-        {(moves.length > 0 || changingPriority || (call && canRemoveCall(ticket))) && <CardMenu ticket={ticket} moves={moves} priorities={changingPriority} removeCall={call && canRemoveCall(ticket)} busy={busy} onMove={onMove} onPriority={onPriority} onRemoveCall={() => void onTransition(ticket, 'deshacer-llamado')} />}
+        {undos[ticket.id] && ticket.state === 'llamado' && <button type="button" className="row-action" disabled={busy} onClick={() => onUndo(undos[ticket.id])}><Icon name="retry" size={16} />Deshacer llamado</button>}
+        {(moves.length > 0 || changingPriority || (call && canRemoveCall(ticket)) || voidable(ticket, issue, now)) && <CardMenu ticket={ticket} moves={moves} priorities={changingPriority} removeCall={call && canRemoveCall(ticket)} canVoid={voidable(ticket, issue, now)} busy={busy} onMove={onMove} onPriority={onPriority} onRemoveCall={() => void onTransition(ticket, 'deshacer-llamado')} onVoid={() => onVoid(ticket)} />}
       </div>
       </li>;
-    })}</ul> : <p className="muted">Nadie por ahora.</p>}</section>;
+    })}</ul>{shownTickets.length < tickets.length && <button type="button" className="cl-link-button qb-more" onClick={() => setUnfolded(true)}>Ver {tickets.length - shownTickets.length} más</button>}</> : <p className="muted">Nadie por ahora.</p>}</section>;
 }
 
 /** Keyboard and touch alternative to dragging: a native menu with the moves the server accepts and the priority. */
-function CardMenu({ ticket, moves, priorities, removeCall, busy, onMove, onPriority, onRemoveCall }: { ticket: QueueTicket; moves: { to: BoardColumn; action: QueueMoveAction }[]; priorities: boolean; removeCall: boolean; busy: boolean; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void>; onRemoveCall: () => void }) {
+/** B-3: «Anular» while the server says this reader issued it and the 10 minutes have not passed. */
+const voidable = (ticket: QueueTicket, issue: boolean, now: number) => issue && ticket.state === 'en_espera' && !!ticket.voidableUntil && Date.parse(ticket.voidableUntil) > now;
+
+function CardMenu({ ticket, moves, priorities, removeCall, canVoid, busy, onMove, onPriority, onRemoveCall, onVoid }: { ticket: QueueTicket; moves: { to: BoardColumn; action: QueueMoveAction }[]; priorities: boolean; removeCall: boolean; canVoid: boolean; busy: boolean; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void>; onRemoveCall: () => void; onVoid: () => void }) {
   function choose(value: string) {
     if (value === 'quitar-llamado') { onRemoveCall(); return; }
+    if (value === 'anular') { onVoid(); return; }
     const [kind, target] = value.split(':');
     if (kind === 'mover') void onMove(ticket, target as BoardColumn);
     if (kind === 'prioridad') void onPriority(ticket, target as Priority);
@@ -220,6 +281,7 @@ function CardMenu({ ticket, moves, priorities, removeCall, busy, onMove, onPrior
   return <select className="qb-menu" value="" disabled={busy} onChange={event => choose(event.target.value)} aria-label={`Mover o cambiar prioridad de ${ticketCode(ticket)}`}>
     <option value="">Mover…</option>
     {removeCall && <option value="quitar-llamado">Quitar un llamado (van {ticket.llamados})</option>}
+    {canVoid && <option value="anular">Anular número (emitido por error)</option>}
     {moves.length > 0 && <optgroup label="Mover a">{moves.map(item => <option key={item.to} value={`mover:${item.to}`}>{COLUMN_LABEL[item.to as Column]} ({MOVE_LABEL[item.action].toLowerCase()})</option>)}</optgroup>}
     {priorities && <optgroup label="Prioridad">{(['emergencia', 'urgente', 'rutina'] as Priority[]).filter(p => p !== (ticket.priority ?? 'rutina')).map(p => <option key={p} value={`prioridad:${p}`}>{PRIORITY_LABEL[p]}</option>)}</optgroup>}
   </select>;
