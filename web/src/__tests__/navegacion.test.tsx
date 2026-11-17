@@ -236,7 +236,8 @@ describe('pantallas de solo lectura según el permiso', () => {
     await entrar(perfil('JOP'), { '/pacientes': () => json([]) }, '#/pacientes');
     expect(await screen.findByText('No hay coincidencias')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Registrar paciente/ })).toBeNull();
-    expect(screen.getByText('Consulta de solo lectura.')).toBeTruthy();
+    // R4a: the read-only sentence became a short «Solo lectura» mark in the header (as in Fila).
+    expect(screen.getByText('Solo lectura')).toBeTruthy();
   });
 
   it('Pacientes para LAB abre y muestra la lista sin acciones de escritura', async () => {
