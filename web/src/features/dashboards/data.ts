@@ -13,7 +13,7 @@ export type LabOrderRow = { id: string; patientName?: string; priority: string; 
 export type StockRow = { articulo_id: string; codigo: string; nombre: string; tipo: string; unidad: string; minimo: number; disponible: number; vencido: number; bajo_minimo: boolean };
 /** Fase 2, flujo A: solicitud de cita por motivo, sin médico, que Recepción asigna. */
 export type AppointmentRequestRow = { id: string; patientName: string | null; categories: { code: string; name: string }[]; franja: string; note: string | null; state: string; createdAt: string };
-export type AdmissionRow = { id: string; patientName: string; state: string; requestedCategory: string; isolation: boolean; bed: string };
+export type AdmissionRow = { id: string; patientName: string; state: string; requestedCategory: string; isolation: boolean; bed: string; origin?: string; motive?: string | null; attendingDoctorName?: string | null; createdAt?: string; allowedActions?: string[] };
 
 /** Cada fuente es un listado o agregado existente de la API; la cuenta la pide solo si tiene alguno de sus permisos. */
 export const sources = {

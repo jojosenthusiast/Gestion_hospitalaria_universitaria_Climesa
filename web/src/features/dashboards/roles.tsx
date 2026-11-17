@@ -7,7 +7,7 @@ import type { Remote } from '../common';
 import { milestoneNames, priorityLevel, priorityNames, stateNames as unitStateNames } from '../ambulance/types';
 import { isPendingCategoryRequest } from '../listas/requests';
 import { shownState } from '../listas/schedule';
-import type { DashboardData, LabOrderRow, QueueTicket, Source } from './data';
+import type { AdmissionRow, DashboardData, LabOrderRow, QueueTicket, Source } from './data';
 import { auditActionLabel } from './labels';
 import { AttentionList, Panel, PanelState, isToday, localDay, minutesBetween, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
@@ -67,9 +67,15 @@ const pendingAmbulance = (d: DashboardData): TrayGroupSpec => ({
   id: 'ambulancia', title: 'Ambulancia por confirmar', href: '#/ambulancia', state: asRemote(d.ambulance),
   items: (d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: `${r.address} · ${formatRelative(r.createdAt)}`, tone: 'urgent' as Tone, href: '#/ambulancia', action: 'Despachar', area: 'AMB' as const })),
 });
+/** R7 G3: an admission the doctor indicated in the consultation; Recepción only picks the bed. */
+const indicated = (a: AdmissionRow) => a.state === 'pendiente_cama' && a.origin === 'consulta';
+const indicatedAdmissions = (d: DashboardData): TrayGroupSpec => ({
+  id: 'ingresos-indicados', title: 'Ingresos indicados', href: '#/hospitalizacion', state: asRemote(d.admissions),
+  items: (d.admissions.data ?? []).filter(indicated).map(a => ({ id: `i-${a.id}`, title: a.patientName, detail: [a.attendingDoctorName, a.isolation ? 'Aislamiento' : null, a.motive].filter(Boolean).join(' · ') || undefined, tone: 'warn' as Tone, href: `#/hospitalizacion?ingresar=${a.id}`, action: 'Ingresar', tag: 'Indicado', status: 'pendiente_cama' })),
+});
 const noBed = (d: DashboardData): TrayGroupSpec => ({
   id: 'sin-cama', title: 'Admisiones sin cama', href: '#/hospitalizacion', state: asRemote(d.admissions),
-  items: (d.admissions.data ?? []).filter(a => a.state === 'pendiente_cama').map(a => ({ id: `a-${a.id}`, title: a.patientName, tone: 'warn' as Tone, href: '#/hospitalizacion', action: 'Asignar cama', tag: 'Sin cama', status: 'pendiente_cama' })),
+  items: (d.admissions.data ?? []).filter(a => a.state === 'pendiente_cama' && !indicated(a)).map(a => ({ id: `a-${a.id}`, title: a.patientName, tone: 'warn' as Tone, href: `#/hospitalizacion?ingresar=${a.id}`, action: 'Asignar cama', tag: 'Sin cama', status: 'pendiente_cama' })),
 });
 
 const labCount = (rows: LabOrderRow[], state: string) => rows.filter(o => o.state === state).length;
@@ -127,7 +133,7 @@ const jop: RoleDashboard = {
   tray: ({ d }) => [
     { id: 'huecos', title: 'Huecos de cobertura', href: '#/turnos', masculine: true, state: asRemote(d.board),
       items: (d.board.data?.cobertura.detalle ?? []).map((g, i) => ({ id: `gap-${i}`, title: `${g.area} · ${roleNames[g.rol] ?? g.rol}`, detail: `${timeLabel(g.inicio)}–${timeLabel(g.fin)} · ${g.actuales} de ${plural(g.requeridos, 'persona', 'personas')}`, tone: 'warn' as Tone, href: '#/turnos?accion=planificar', action: 'Planificar' })) },
-    noBed(d), pendingAmbulance(d), lowStock(d),
+    indicatedAdmissions(d), noBed(d), pendingAmbulance(d), lowStock(d),
   ],
   figures: ({ d }) => [
     fig('camas-libres', 'Camas libres', d.board, b => b.camas.libres, { href: '#/camas', of: d.board.data ? `de ${d.board.data.camas.total}` : undefined }),
@@ -193,7 +199,7 @@ const rec: RoleDashboard = {
       ] },
     { id: 'vinculaciones', title: 'Vinculaciones por verificar', href: '#/vinculaciones', state: asRemote(d.links),
       items: (d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name, detail: l.candidate ? `Expediente ${l.candidate.record}` : 'Sin expediente sugerido', tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar' })) },
-    noBed(d), pendingAmbulance(d),
+    indicatedAdmissions(d), noBed(d), pendingAmbulance(d),
   ],
   figures: ({ d }) => [
     fig('espera', 'En espera', d.queue, r => tickets(r, 'en_espera').length, { href: '#/fila' }),
