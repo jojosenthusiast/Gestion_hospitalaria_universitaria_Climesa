@@ -42,6 +42,12 @@ describe('R7 U1 · mostrador: llegada con cita y fila', () => {
       const row = await ticketOf('REC', r.body.id);
       expect(row).toMatchObject({ appointmentId: appointment, appointmentAt: at(120).toISOString(), appointmentDoctorName: 'MED Prueba', arrivalFromAppointment: true, walkIn: false });
       expect(row.appointmentDoctorId).toBe(await t.staffOf('MED'));
+      // The queue row carries the same count, so the patient's "Mi turno" reads it from the server.
+      expect(row.ahead).toBe(1);
+      expect((await ticketOf('REC', walkIn.body.id)).ahead).toBe(0);
+      await t.pg.query(`UPDATE atencion.ticket_fila SET estado='cerrado' WHERE id=$1`, [walkIn.body.id]);
+      expect((await ticketOf('REC', r.body.id)).ahead).toBe(0);
+      expect((await ticketOf('REC', walkIn.body.id)).ahead).toBeNull();
     });
 
     test('a second arrival for the same appointment is refused with the number already given', async () => {

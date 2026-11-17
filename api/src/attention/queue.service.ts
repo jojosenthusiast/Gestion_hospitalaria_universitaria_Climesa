@@ -101,7 +101,9 @@ export class QueueService {
     return this.db.transaction(async c => { const rows = (await c.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       t.estado AS state,t.consultorio_id AS "officeId",e.codigo AS "officeCode",t.llamados,t.version,t.emitido_en AS "issuedAt",
-      t.prioridad AS priority,ap.start AS "appointmentAt",ap.id AS "appointmentId",ap.doctor_id AS "appointmentDoctorId",ap.doctor_name AS "appointmentDoctorName",
+      t.prioridad AS priority,
+      CASE WHEN t.estado='en_espera' THEN (SELECT count(*) FROM atencion.ticket_fila w WHERE w.servicio=t.servicio AND w.fecha=t.fecha AND w.estado='en_espera' AND w.numero<t.numero)::int END AS ahead,
+      ap.start AS "appointmentAt",ap.id AS "appointmentId",ap.doctor_id AS "appointmentDoctorId",ap.doctor_name AS "appointmentDoctorName",
       (t.cita_id IS NOT NULL) AS "arrivalFromAppointment",(t.emitido_por IS NOT DISTINCT FROM $6::uuid) AS "issuedByMe",
       k.id AS "consultationId",k.estado AS "consultationState",coalesce(t.llamado_por=$4::uuid,false) AS "calledByMe",
       (t.llamado_por IS NOT NULL AND t.llamado_por IS DISTINCT FROM $4::uuid AND EXISTS(SELECT 1 FROM acceso.usuario u

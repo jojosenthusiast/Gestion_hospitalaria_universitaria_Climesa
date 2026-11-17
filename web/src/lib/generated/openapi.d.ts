@@ -4446,6 +4446,8 @@ export interface components {
             /** @description Código del área del servicio; el número cuenta desde 1 por área y día */
             area: components["schemas"]["AreaFila"];
             priority: components["schemas"]["PrioridadFila"];
+            /** @description Números en espera antes de este en su área (mismo cálculo que al emitir); null si ya no espera */
+            ahead?: number | null;
             /**
              * Format: date-time
              * @description Hora de la cita de hoy del paciente (solo consulta general); null si llegó sin cita
