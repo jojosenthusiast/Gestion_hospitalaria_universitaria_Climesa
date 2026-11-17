@@ -11,10 +11,12 @@ afterEach(cleanup);
 const profile = (codes: string[]): AccessProfile => ({ id: 'rec', user: { id: 'rec' }, email: 'rec@example.test', name: 'Recepción', roles: ['REC'], platforms: ['web'], permissions: codes.map(code => ({ code, context: 'x' })), channels: [], patientId: null, staffId: null });
 const rec = () => profile(['citas.ver', 'citas.agendar', 'citas.cancelar', 'citas.solicitar']);
 const future = (h: number) => new Date(Date.now() + h * 3600_000).toISOString();
+// A local day and hour, so a run near midnight does not split one day's appointments across two days.
+const dayAt = (days: number, hour: number) => { const d = new Date(); d.setDate(d.getDate() + days); d.setHours(0, 0, 0, 0); return new Date(d.getTime() + hour * 3600_000).toISOString(); };
 const cita = (id: string, state: string, start: string, doctor = 'd-1', allowedActions: string[] = []) => ({ id, patientId: `p-${id}`, patientName: `Paciente ${id}`, doctorId: doctor, doctorName: doctor === 'd-1' ? 'Médica Uno' : 'Médico Dos', start, end: new Date(Date.parse(start) + 20 * 60_000).toISOString(), state, origin: 'app', version: 1, allowedActions, blockedActions: [] });
 const rows = [
-  cita('s1', 'solicitada', future(30), 'd-1', ['confirmar', 'rechazar']), cita('s2', 'solicitada', future(30.5), 'd-2', ['confirmar', 'rechazar']),
-  cita('c1', 'confirmada', future(48), 'd-1'), cita('c2', 'confirmada', future(48.4), 'd-1'), cita('c3', 'confirmada', future(48.8), 'd-1'), cita('c4', 'confirmada', future(49), 'd-2'),
+  cita('s1', 'solicitada', dayAt(1, 10), 'd-1', ['confirmar', 'rechazar']), cita('s2', 'solicitada', dayAt(1, 10.5), 'd-2', ['confirmar', 'rechazar']),
+  cita('c1', 'confirmada', dayAt(2, 10), 'd-1'), cita('c2', 'confirmada', dayAt(2, 10.4), 'd-1'), cita('c3', 'confirmada', dayAt(2, 10.8), 'd-1'), cita('c4', 'confirmada', dayAt(2, 11), 'd-2'),
   // Two days ago and still «confirmada»: the server has no state for it.
   cita('old', 'confirmada', future(-50), 'd-1', ['no_asistio']),
 ];
