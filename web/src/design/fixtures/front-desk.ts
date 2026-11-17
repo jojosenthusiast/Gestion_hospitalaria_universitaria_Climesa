@@ -1,24 +1,16 @@
 /**
- * R7 U1: design data for the front desk journeys (/fila, /citas, /pacientes, /vinculaciones) at realistic volume:
- * 45 doctors, 300 patients, about 60 appointments today and long names. Fictitious, in memory, used only by
+ * R7 U1: design data for the front desk journeys (/fila, /citas, /pacientes/selector, /vinculaciones) at realistic
+ * volume: 45 doctors, the shared 330 patients of people.ts (the Pacientes module reads the same set), about 60
+ * appointments today and long names. Fictitious, in memory, used only by
  * work-preview.html; it never touches the network. `request` and `write` return `undefined` for paths they do not
  * serve, so FixtureApi falls back to its own data.
  */
 import { ApiError } from '../../lib/api';
+import { addDays, buildPatients, fold, localDay, localInstant, MIN, patientUuid as uuid, personName, type FixturePatient } from './people';
 
-const GIVEN = ['María José', 'Ana Lucía', 'José Roberto', 'Carlos Alberto', 'Rosa Elena', 'Juan Francisco', 'Karla Beatriz', 'Luis Enrique', 'Marta Alicia', 'Óscar Mauricio', 'Gabriela Alejandra', 'Fernando José', 'Claudia Marisol', 'Ricardo Antonio', 'Sofía Valentina'];
-const SURNAME = ['Hernández', 'Martínez Ejemplo', 'López', 'Rodríguez Prueba', 'Flores', 'Ramírez de la Cruz', 'Guevara', 'Castillo Ficticio', 'Rivas', 'Mejía', 'Alvarado', 'Portillo Escobar', 'Menjívar', 'Quintanilla Ejemplo', 'Ayala'];
 const SPECIALTY = ['Medicina general', 'Medicina general', 'Medicina interna', 'Pediatría', 'Ginecología', 'Dermatología', 'Cardiología', 'Traumatología', 'Oftalmología'];
-const uuid = (n: number) => `00000000-0000-4000-9000-${String(n).padStart(12, '0')}`;
-const MIN = 60_000;
-/** Today in El Salvador (UTC-6), as the agenda groups it. */
-const localDay = (at = Date.now()) => new Date(at - 6 * 3_600_000).toISOString().slice(0, 10);
-const localInstant = (day: string, hour: number, minute = 0) => new Date(`${day}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00-06:00`).toISOString();
-const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
-const fold = (v: string) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 type Doctor = { id: string; givenNames: string; surnames: string; specialty: string; active: boolean };
-type DeskPatient = { id: string; record: string; fullName: string; birth: string; dui: string };
 type Cita = { id: string; patientId: string; patientName: string; doctorId: string; doctorName: string; start: string; end: string; state: string; origin: string; version: number; reason: string | null; cancelReasonCode?: string | null; cancelReason?: string | null };
 type Ticket = { id: string; service: string; area: string; fecha: string; numero: number; patientId: string; patientName: string; state: string; llamados: number; version: number; issuedAt: string; priority: string; appointmentId: string | null; officeCode: string | null };
 
@@ -27,13 +19,13 @@ const AREA: Record<string, string> = { consulta_general: 'CON', emergencia: 'EMG
 export class FrontDeskFixtures {
   private seq = 900000;
   private readonly today = localDay();
-  readonly doctors: Doctor[] = Array.from({ length: 45 }, (_, i) => ({ id: uuid(100 + i), givenNames: GIVEN[(i * 7) % GIVEN.length], surnames: `${SURNAME[i % SURNAME.length]} ${SURNAME[(i * 5 + 3) % SURNAME.length]}`, specialty: SPECIALTY[i % SPECIALTY.length], active: true }));
-  readonly patients: DeskPatient[] = Array.from({ length: 300 }, (_, i) => ({ id: uuid(1000 + i), record: `${String(2000 + i).padStart(7, '0')}-${i % 10}`, fullName: `${GIVEN[i % GIVEN.length]} ${SURNAME[(i * 3) % SURNAME.length]} ${SURNAME[(i * 7 + 1) % SURNAME.length]}`, birth: `${1950 + (i % 60)}-${String(1 + (i % 12)).padStart(2, '0')}-${String(1 + (i % 27)).padStart(2, '0')}`, dui: `0${String(4000000 + i * 37).slice(0, 7)}-${i % 10}` }));
+  readonly doctors: Doctor[] = Array.from({ length: 45 }, (_, i) => { const { givenNames, surnames } = personName(400 + i * 7); return { id: uuid(100 + i), givenNames, surnames, specialty: SPECIALTY[i % SPECIALTY.length], active: true }; });
   private citas: Cita[] = [];
   private tickets: Ticket[] = [];
   private requests: Record<string, unknown>[] = [];
 
-  constructor() {
+  /** The shared patient set: FixtureApi passes the same array the Pacientes module reads and edits. */
+  constructor(readonly patients: FixturePatient[] = buildPatients()) {
     const name = (d: Doctor) => `${d.givenNames} ${d.surnames}`;
     // ~60 appointments today across 12 doctors, 08:00-12:00, plus a few on the next days.
     for (let i = 0; i < 60; i++) {
@@ -101,14 +93,13 @@ export class FrontDeskFixtures {
       const hits = this.patients.filter(x => words.every(w => fold(`${x.fullName} ${x.record} ${x.dui}`).includes(w)));
       return { items: hits.slice(offset, offset + limit).map(x => ({ id: x.id, record: x.record, fullName: x.fullName, age: 2026 - Number(x.birth.slice(0, 4)), appointmentToday: this.appointmentToday(x.id), ticketToday: this.ticketToday(x.id) })), offset, limit, hasMore: hits.length > offset + limit };
     }
-    if (p.startsWith('/pacientes/')) { const x = this.patientById(p.split('/')[2]); return x ? { id: x.id, record: x.record, fullName: x.fullName, givenNames: x.fullName.split(' ').slice(0, 2).join(' '), surnames: x.fullName.split(' ').slice(2).join(' '), state: 'activo', active: true, sex: 'femenino', birth: x.birth, dui: x.dui, version: 1, history: [] } : undefined; }
     if (p === '/fila') return this.tickets.map(t => this.ticketView(t));
     if (p === '/fila/mi-puesto') return { service: null, area: null, areaName: null, officeId: null, officeCode: null, shiftEnd: null };
     if (p === '/fila/siguiente') {
       const service = q.get('service') ?? 'consulta_general', next = this.tickets.filter(t => t.service === service && t.state === 'en_espera').sort((a, b) => a.numero - b.numero)[0];
       return { service, area: AREA[service], rule: 'Emergencias primero; luego citas dentro de su ventana; luego por orden de llegada.', proposal: next ? { id: next.id, numero: next.numero, area: next.area, patientName: next.patientName, priority: next.priority, appointmentAt: this.ticketView(next).appointmentAt, version: next.version, reason: 'llegada', reasonText: 'El que más tiempo lleva esperando.' } : null };
     }
-    if (p === '/citas') return this.citas.map(c => this.citaView(c));
+    if (p === '/citas') { const patientId = q.get('patientId'); return this.citas.filter(c => !patientId || c.patientId === patientId).map(c => this.citaView(c)); }
     if (p === '/citas/solicitudes-categoria') return this.requests;
     if (/^\/citas\/solicitudes-categoria\/[^/]+\/sugerencia$/.test(p)) {
       const doctor = this.doctors[3], day = addDays(this.today, 1), slot = this.franjas(doctor.id, day).find(f => f.estado === 'libre')!;
