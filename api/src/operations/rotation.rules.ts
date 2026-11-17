@@ -7,6 +7,8 @@
  * 12x36, the day or night slot), so that every slot of every day has someone as long as the group is large enough.
  */
 export const ROTATION_PATTERNS = ['rotativo', '12x36', '24x72', 'personalizado'] as const;
+/** RN-15 / CARGA-03: coverage function of a gap (`role` of /turnos/cobertura) and the staff type that fills it. */
+export const COVERAGE_ROLES: Record<string, string> = { MED: 'medico', ENF: 'enfermero', REC: 'recepcionista', LAB: 'laboratorista' };
 export type RotationPattern = typeof ROTATION_PATTERNS[number];
 export type ShiftKind = 'diurno' | 'nocturno' | 'guardia';
 export type RotationOptions = { pattern: RotationPattern; startTime: string; hours?: number; workDays?: number; restDays?: number };

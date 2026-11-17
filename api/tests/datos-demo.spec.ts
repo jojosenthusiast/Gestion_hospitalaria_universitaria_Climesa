@@ -77,7 +77,9 @@ const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acc
   // Fase 2, flujo F: las plantillas de semana nacen de Jefatura; la demo no las siembra.
   'personal.plantilla_semana',
   // Fase 2, flujo D (S11): el «Enterado» y los recordatorios nacen solo de cada cuenta.
-  'publico.aviso_enterado'];
+  'publico.aviso_enterado',
+  // R7 G-4: un hito anulado nace solo cuando la tripulación deshace un hito real.
+  'ambulancia.hito_anulado'];
 
 const MINIMOS: Record<string, number> = {
   'pacientes.paciente': 300, 'pacientes.identificador': 280, 'atencion.cita': 400, 'atencion.ticket_fila': 60, 'personal.persona': 100,

@@ -6,7 +6,7 @@ import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
 import { Clock,businessDate,businessDayRange } from '../platform/clock';
 import { StaffDto, ShiftDto, RegistrationDto, PublishDto, AttendanceDto, ShiftBatchDto, ShiftBatchItemDto, ShiftCandidatesQuery, RotationDto, WeekTemplateDto, WeekTemplateRetireDto } from './operations.dto';
-import { RotationOptions, RotationPattern, daysBetween, rotationShapes, rotationSlots, slotRange } from './rotation.rules';
+import { COVERAGE_ROLES, RotationOptions, RotationPattern, daysBetween, rotationShapes, rotationSlots, slotRange } from './rotation.rules';
 import { AttendancePolicy, LoadPolicy, allowedActions, attendanceOf, consecutiveDays, isLate, stateByClock, windowLoad } from './shift.rules';
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
@@ -20,7 +20,6 @@ export const daytimeHours=(a:number,b:number)=>{let total=0;for(let day=Math.flo
 // RN-15 / CARGA-03: la política turnos.cobertura_minima se evalúa por área. Emergencia las 24 h; Recepción y Laboratorio
 // en su horario (política turnos.horario_servicios); cada área de hospitalización con camas ocupadas, las 24 h.
 const COVERAGE_AREAS:Record<string,string>={'P1-EMG':'emergencia','P1-REC':'recepcion_horario','P1-LAB':'laboratorio_horario'};
-const COVERAGE_ROLES:Record<string,string>={MED:'medico',ENF:'enfermero',REC:'recepcionista',LAB:'laboratorista'};
 const STAFF_TYPE_NAMES:Record<string,string>={medico:'Médico',enfermero:'Enfermería',asistente:'Asistencia',recepcionista:'Recepción',laboratorista:'Laboratorio',paramedico:'Paramédico',motorista:'Motorista',limpieza:'Limpieza',administrativo:'Administración',otro:'Otro'};
 export type CoverageGap={areaId:string;area:string;role:string;start:string;end:string;required:number;actual:number};
 /** Turnos que trabajan: los cancelados y los ausentes no cuentan como cobertura, descanso ni carga (ASIS-01). */
