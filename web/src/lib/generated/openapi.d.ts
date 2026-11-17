@@ -1240,6 +1240,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/consultas/cie10": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Buscar en el catálogo CIE-10 por código o por palabras (hasta 20) */
+        get: operations["ClinicalRecordController_cie10"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/consultas/{id}/detalle": {
         parameters: {
             query?: never;
@@ -4539,6 +4556,10 @@ export interface components {
             officeId?: string;
             reason?: string;
         };
+        Cie10Response: {
+            code: string;
+            description: string;
+        };
         ConsultationSummaryResponse: {
             /** Format: uuid */
             id: string;
@@ -4599,11 +4620,29 @@ export interface components {
             issuedAt: string;
             items: components["schemas"]["PrescriptionItemResponse"][];
         };
+        ConsultationLabItemResponse: {
+            code: string;
+            name: string;
+        };
+        ConsultationLabOrderResponse: {
+            /** Format: uuid */
+            id: string;
+            /** @description Estado de la orden (pendiente, en_proceso, completado, cancelado, externo) */
+            state: string;
+            priority: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            reviewedAt: string | null;
+            items: components["schemas"]["ConsultationLabItemResponse"][];
+        };
         ConsultationDetailResponse: {
             consultation: components["schemas"]["ConsultationSummaryResponse"];
             vitalSigns: components["schemas"]["VitalSignsResponse"][];
             diagnoses: components["schemas"]["DiagnosisResponse"][];
             prescriptions: components["schemas"]["PrescriptionResponse"][];
+            /** @description R7 B-6: órdenes de laboratorio de la consulta; solo para el personal clínico (el paciente las ve en Mis resultados) */
+            labOrders?: components["schemas"]["ConsultationLabOrderResponse"][];
         };
         VitalSignsDto: {
             systolic?: number;
@@ -12836,6 +12875,64 @@ export interface operations {
             };
             /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ClinicalRecordController_cie10: {
+        parameters: {
+            query: {
+                /** @description Al menos 2 caracteres */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cie10Response"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

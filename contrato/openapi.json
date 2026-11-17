@@ -8120,6 +8120,87 @@
         "x-permiso": "fila.gestionar"
       }
     },
+    "/api/v1/consultas/cie10": {
+      "get": {
+        "operationId": "ClinicalRecordController_cie10",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Al menos 2 caracteres",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Cie10Response"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar en el catálogo CIE-10 por código o por palabras (hasta 20)",
+        "tags": [
+          "clinical-record"
+        ],
+        "x-permiso": "consulta.registrar"
+      }
+    },
     "/api/v1/consultas/{id}/detalle": {
       "get": {
         "operationId": "ClinicalRecordController_detail",
@@ -24809,6 +24890,21 @@
           "version"
         ]
       },
+      "Cie10Response": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "description"
+        ]
+      },
       "ConsultationSummaryResponse": {
         "type": "object",
         "properties": {
@@ -25021,6 +25117,60 @@
           "items"
         ]
       },
+      "ConsultationLabItemResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "ConsultationLabOrderResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "description": "Estado de la orden (pendiente, en_proceso, completado, cancelado, externo)"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsultationLabItemResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "priority",
+          "createdAt",
+          "reviewedAt",
+          "items"
+        ]
+      },
       "ConsultationDetailResponse": {
         "type": "object",
         "properties": {
@@ -25043,6 +25193,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PrescriptionResponse"
+            }
+          },
+          "labOrders": {
+            "description": "R7 B-6: órdenes de laboratorio de la consulta; solo para el personal clínico (el paciente las ve en Mis resultados)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsultationLabOrderResponse"
             }
           }
         },

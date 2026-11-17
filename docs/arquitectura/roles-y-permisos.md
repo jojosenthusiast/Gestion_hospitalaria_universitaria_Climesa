@@ -256,6 +256,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/consultas/agenda` | `consulta.iniciar` | Solo agenda propia | R | 3 | · | · | · | · | · | ✔ | · | · | · | · |
 | PATCH | `/api/v1/consultas/{id}` | `consulta.registrar` | Versión y autor | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | GET | `/api/v1/consultas/{id}/detalle` | `expediente.ver` o `consulta.iniciar` | Relación clínica y auditoría | R | 3 | · | · | · | · | relación | relación / ✔ | · | · | · | propio revisado |
+| GET | `/api/v1/consultas/cie10` | `consulta.registrar` | Al menos 2 caracteres; hasta 20 | R | 6 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/receta` | `recetas.emitir` | Inscripción vigente | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | GET | `/api/v1/consultas/sin-firmar` | `consulta.iniciar` | Solo propias | R | 4 | · | · | · | · | · | ✔ | · | · | · | · |
 

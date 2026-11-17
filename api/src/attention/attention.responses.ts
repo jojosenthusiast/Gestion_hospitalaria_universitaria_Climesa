@@ -242,11 +242,32 @@ export class PrescriptionResponse {
   @ClassArrayProp(PrescriptionItemResponse) items!: PrescriptionItemResponse[];
 }
 
+/** R7 B-6: an exam of a lab order shown in the consultation. */
+export class ConsultationLabItemResponse {
+  @StrProp() code!: string;
+  @StrProp() name!: string;
+}
+/** R7 B-6: lab orders requested in this consultation, for the clinical staff that reads it. */
+export class ConsultationLabOrderResponse {
+  @UuidProp() id!: string;
+  @StrProp({ description: 'Estado de la orden (pendiente, en_proceso, completado, cancelado, externo)' }) state!: string;
+  @StrProp() priority!: string;
+  @DateTimeProp() createdAt!: string;
+  @DateTimeProp({ nullable: true }) reviewedAt!: string | null;
+  @ClassArrayProp(ConsultationLabItemResponse) items!: ConsultationLabItemResponse[];
+}
 export class ConsultationDetailResponse {
   @ClassProp(ConsultationSummaryResponse) consultation!: ConsultationSummaryResponse;
   @ClassArrayProp(VitalSignsResponse) vitalSigns!: VitalSignsResponse[];
   @ClassArrayProp(DiagnosisResponse) diagnoses!: DiagnosisResponse[];
   @ClassArrayProp(PrescriptionResponse) prescriptions!: PrescriptionResponse[];
+  @ClassArrayProp(ConsultationLabOrderResponse, { optional: true, description: 'R7 B-6: órdenes de laboratorio de la consulta; solo para el personal clínico (el paciente las ve en Mis resultados)' }) labOrders?: ConsultationLabOrderResponse[];
+}
+
+/** R7 B-7: an entry of the CIE-10 catalog. */
+export class Cie10Response {
+  @StrProp() code!: string;
+  @StrProp() description!: string;
 }
 
 // ---- Historial clínico (clinical-history.controller.ts) ----

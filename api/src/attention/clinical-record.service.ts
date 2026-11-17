@@ -46,8 +46,22 @@ export class ClinicalRecordService {
         c.query(`SELECT id,cie10 AS code,principal,nota AS note FROM atencion.diagnostico WHERE consulta_id=$1 ORDER BY principal DESC,id`, [id]),
         c.query(`SELECT r.id,r.emitida_en AS "issuedAt",coalesce(json_agg(json_build_object('id',i.id,'medication',i.medicamento,'dose',i.dosis,'route',i.via,'frequency',i.frecuencia,'duration',i.duracion,'instructions',i.indicaciones) ORDER BY i.id) FILTER (WHERE i.id IS NOT NULL),'[]'::json) AS items FROM atencion.receta r LEFT JOIN atencion.receta_item i ON i.receta_id=r.id WHERE r.consulta_id=$1 GROUP BY r.id ORDER BY r.emitida_en DESC`, [id]),
       ]);
-      return { consultation, vitalSigns: vitals.rows, diagnoses: diagnoses.rows, prescriptions: prescriptions.rows };
+      // R7 B-6: the doctor sees in the note what was ordered; a patient reading their own note does not get this list.
+      if (!actor.staffId) return { consultation, vitalSigns: vitals.rows, diagnoses: diagnoses.rows, prescriptions: prescriptions.rows };
+      const labOrders = (await c.query(`SELECT o.id,o.estado AS state,o.prioridad AS priority,o.creada_en AS "createdAt",o.revisada_en AS "reviewedAt",
+          coalesce((SELECT json_agg(json_build_object('code',e.codigo,'name',e.nombre) ORDER BY e.nombre) FROM laboratorio.orden_item oi JOIN laboratorio.examen e ON e.id=oi.examen_id WHERE oi.orden_id=o.id),'[]'::json) AS items
+        FROM laboratorio.orden o WHERE o.consulta_id=$1 ORDER BY o.creada_en`, [id])).rows;
+      return { consultation, vitalSigns: vitals.rows, diagnoses: diagnoses.rows, prescriptions: prescriptions.rows, labOrders };
     });
+  }
+
+  /** R7 B-7: CIE-10 search by code prefix or words of the description (accents ignored), at most 20. */
+  async searchCie10(q?: string) {
+    const text = (q ?? '').trim();
+    if (text.length < 2) throw new ProblemException('validacion', 400, 'Escribe al menos 2 letras o el inicio del código.', 'q');
+    return (await this.db.query<{ code: string; description: string }>(`SELECT codigo AS code,descripcion AS description FROM atencion.cie10
+       WHERE upper(codigo) LIKE upper($1)||'%' OR translate(lower(descripcion),'áéíóúü','aeiouu') LIKE '%'||translate(lower($1),'áéíóúü','aeiouu')||'%'
+       ORDER BY (upper(codigo) LIKE upper($1)||'%') DESC,codigo LIMIT 20`, [text.slice(0, 60)]));
   }
 
   async addVitalSigns(actor: Actor, id: string, dto: VitalSignsDto, key?: string) {

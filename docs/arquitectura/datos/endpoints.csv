@@ -151,6 +151,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/fila/{id}/completar,fila.gestionar,Transición válida,R,3,Marcar número atendido
 105,POST,/api/v1/fila/{id}/no-se-presento,fila.gestionar,Transición válida,R,3,Marcar ausencia
 106,GET,/api/v1/consultas/{id}/detalle,expediente.ver OR consulta.iniciar,Relación clínica y auditoría,R,3,Detalle permitido de consulta
+106,GET,/api/v1/consultas/cie10,consulta.registrar,Al menos 2 caracteres; hasta 20,R,6,Buscar en el catálogo CIE-10 (R7 B-7)
 106,POST,/api/v1/consultas/{id}/receta,recetas.emitir,Inscripción vigente,R,3,Emitir receta
 107,GET,/api/v1/laboratorio/catalogo,laboratorio.ordenar OR catalogo.configurar,Catálogo activo,R,3,Exámenes y paneles
 107,POST,/api/v1/laboratorio/ordenes,laboratorio.ordenar,Consulta propia,R,3,Crear orden desde consulta
