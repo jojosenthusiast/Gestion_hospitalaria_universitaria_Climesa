@@ -89,7 +89,8 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
     }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     PageList(modifier) {
-        state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
+        // G4: the request form and the dispatch dialogs show their own error next to their button.
+        if (section != AndroidSection.AMBULANCE_REQUEST && section != AndroidSection.DISPATCH) state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         if (state.loading) item { LoadingState() }
         else if (state.error != null) item { ErrorState(state.error, onRetry = { model.open(modeOf(section), readsStatus) }) }
@@ -117,8 +118,11 @@ private fun LazyListScope.requestContent(state: AmbulanceUiState, model: Ambulan
     item { NoticeBanner(NoticeKind.WARNING, AmbulanceRules.NOTICE_911) }
     val requests = state.ownRequests ?: return
     val active = AmbulanceRules.activeRequest(requests)
-    if (active == null) item { RequestForm(state.busy, state.requestPrefill, model) }
-    else item { OwnRequestCard(active, state.busy, model) }
+    if (active == null) item { RequestForm(state.busy, state.requestPrefill, model, state.formError) }
+    else {
+        state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
+        item { OwnRequestCard(active, state.busy, model) }
+    }
 }
 
 @Composable
@@ -152,7 +156,7 @@ private fun OwnRequestCard(request: sv.edu.catolica.climesa.domain.OwnAmbulanceR
 }
 
 @Composable
-private fun RequestForm(busy: Boolean, prefill: AmbulancePrefill?, model: AmbulanceViewModel) {
+private fun RequestForm(busy: Boolean, prefill: AmbulancePrefill?, model: AmbulanceViewModel, error: String?) {
     var address by rememberSaveable { mutableStateOf("") }
     var municipality by rememberSaveable { mutableStateOf("") }
     var reason by rememberSaveable { mutableStateOf("") }
@@ -172,7 +176,10 @@ private fun RequestForm(busy: Boolean, prefill: AmbulancePrefill?, model: Ambula
         FormField(stringResource(R.string.amb_direccion), address, { address = it.take(300) }, singleLine = false)
         FormField(stringResource(R.string.amb_municipio), municipality, { municipality = it.take(80) })
         FormField(stringResource(R.string.amb_telefono), phone, { phone = it.take(20) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
-        PrimaryButton(stringResource(R.string.amb_enviar_solicitud), { model.submitRequest(address, municipality, reason, phone) }, icon = Icons.Default.Send, loading = busy)
+        error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        // G4: "Enviar" only once the reason says something; what is still missing is said next to the button.
+        if (reason.trim().length < AmbulanceRules.REASON_MIN) Text(stringResource(R.string.rec7_amb_falta_motivo), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        PrimaryButton(stringResource(R.string.amb_enviar_solicitud), { model.submitRequest(address, municipality, reason, phone) }, icon = Icons.Default.Send, loading = busy, enabled = reason.trim().length >= AmbulanceRules.REASON_MIN && !busy)
     }
 }
 
@@ -206,15 +213,17 @@ private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: Ambula
     if (status.pendingRequests.isEmpty()) item { EmptyState(stringResource(R.string.amb_sin_solicitudes)) }
     // One primary per screen: only the oldest request (the one the unit serves next) gets the filled "Despachar".
     val first = status.pendingRequests.firstOrNull()?.id
-    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, status.dispatchBlock != null, state.busy, model, status.availableCrew, primary = request.id == first) }
+    state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
+    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, status.dispatchBlock != null, state.busy, model, status.availableCrew, primary = request.id == first, error = state.formError) }
 }
 
 @Composable
-private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, hasBlock: Boolean, busy: Boolean, model: AmbulanceViewModel, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, primary: Boolean) {
+private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, hasBlock: Boolean, busy: Boolean, model: AmbulanceViewModel, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, primary: Boolean, error: String?) {
     var dispatching by rememberSaveable(request.id) { mutableStateOf(false) }
     var discarding by rememberSaveable(request.id) { mutableStateOf(false) }
     val sent = remember(request.id) { mutableStateOf(false) }
-    CloseWhenDone(busy, sent) { dispatching = false; discarding = false }
+    // G4: a failed dispatch keeps the dialog open with the crew, type and destination chosen, and says why inside it.
+    CloseWhenDone(busy, sent, error) { dispatching = false; discarding = false }
     val waiting = remember(request.createdAt) { runCatching { java.time.Duration.between(java.time.Instant.parse(request.createdAt), java.time.Instant.now()).toMinutes().coerceAtLeast(0) }.getOrDefault(0L) }
     SectionCard(AmbulanceRules.requesterLabel(request), eyebrow = AmbulanceRules.waiting(waiting), action = { FamilyBadge(stringResource(R.string.amb_por_confirmar), StatusFamily.ESPERA) }) {
         Text(request.reason, style = MaterialTheme.typography.bodyMedium)
@@ -226,19 +235,19 @@ private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean,
         SecondaryButton(stringResource(R.string.amb_descartar), { discarding = true }, enabled = !busy)
         if (!available && !hasBlock) NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_unidad_no_disponible))
     }
-    if (dispatching) DispatchDialog(busy, crewPool, onClose = { dispatching = false }) { type, priority, destination, crew -> sent.value = true; model.dispatch(request, type, priority, destination, crew) }
-    if (discarding) ReasonDialog(stringResource(R.string.amb_descartar), busy, onClose = { discarding = false }) { reason -> sent.value = true; model.discard(request, reason) }
+    if (dispatching) DispatchDialog(busy, crewPool, error, onClose = { dispatching = false }) { type, priority, destination, crew -> sent.value = true; model.dispatch(request, type, priority, destination, crew) }
+    if (discarding) ReasonDialog(stringResource(R.string.amb_descartar), busy, error, onClose = { discarding = false }) { reason -> sent.value = true; model.discard(request, reason) }
 }
 
 @Composable
-private fun DispatchDialog(busy: Boolean, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, onClose: () -> Unit, onConfirm: (String, String, String, List<String>) -> Unit) {
+private fun DispatchDialog(busy: Boolean, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, error: String?, onClose: () -> Unit, onConfirm: (String, String, String, List<String>) -> Unit) {
     // MA-AMB-02: the dispatcher picks the crew among the staff on duty; it comes proposed (paramedic with account + driver).
     var crew by rememberSaveable { mutableStateOf(AmbulanceRules.defaultCrew(crewPool)) }
     var type by rememberSaveable { mutableStateOf(AmbulanceLabels.types.first().first) }
     var priority by rememberSaveable { mutableStateOf("naranja") }
     var destination by rememberSaveable { mutableStateOf("Hospital CLIMESA, emergencia") }
     ConfirmDialog(
-        title = stringResource(R.string.amb_despachar), confirmLabel = stringResource(R.string.amb_despachar), onConfirm = { onConfirm(type, priority, destination, crew) }, onDismiss = onClose, busy = busy,
+        title = stringResource(R.string.amb_despachar), confirmLabel = stringResource(R.string.amb_despachar), onConfirm = { onConfirm(type, priority, destination, crew) }, onDismiss = onClose, busy = busy, error = error,
         confirmEnabled = AmbulanceRules.crewProblem(crewPool, crew) == null,
         message = stringResource(R.string.amb_confirmado_telefono),
         body = {
@@ -259,10 +268,10 @@ private fun DispatchDialog(busy: Boolean, crewPool: List<sv.edu.catolica.climesa
 }
 
 @Composable
-private fun ReasonDialog(title: String, busy: Boolean, onClose: () -> Unit, onConfirm: (String) -> Unit) {
+private fun ReasonDialog(title: String, busy: Boolean, error: String?, onClose: () -> Unit, onConfirm: (String) -> Unit) {
     var reason by rememberSaveable { mutableStateOf("") }
     ConfirmDialog(
-        title = title, confirmLabel = title, onConfirm = { onConfirm(reason) }, onDismiss = onClose, busy = busy, destructive = true,
+        title = title, confirmLabel = title, onConfirm = { onConfirm(reason) }, onDismiss = onClose, busy = busy, destructive = true, error = error,
         body = { FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, singleLine = false) },
     )
 }
@@ -362,7 +371,7 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
     }
     val view = state.arrival
     if (view == null) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
-    item { HandoverCard(view, state.busy, model) }
+    item { HandoverCard(view, state.busy, model, state.formError) }
     if (view.reports.isEmpty()) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
     if (!view.clinical) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_sin_relacion)) }
     items(view.reports, key = { it.id }) { report ->
@@ -371,7 +380,18 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
             report.reason?.let { LabeledValue(stringResource(R.string.amb_motivo), it) }
             if (report.vitalSigns.isNotEmpty()) {
                 HorizontalDivider()
-                report.vitalSigns.forEach { (code, value) -> LabeledValue(AmbulanceLabels.sign(code), value) }
+                // G4: two signs per row, the value large with its unit, pressure as one reading.
+                AmbulanceLabels.readableSigns(report.vitalSigns).chunked(2).forEach { pair ->
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        pair.forEach { (label, value) ->
+                            Column(Modifier.weight(1f)) {
+                                Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(value, style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"))
+                            }
+                        }
+                        if (pair.size == 1) androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                    }
+                }
             }
         }
     }
@@ -379,8 +399,10 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
 
 /** MA-AMB-04: who received the patient, or the single "Marcar recibido" action when the API allows it. */
 @Composable
-private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, busy: Boolean, model: AmbulanceViewModel) {
+private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, busy: Boolean, model: AmbulanceViewModel, error: String?) {
     var confirming by rememberSaveable(view.serviceId) { mutableStateOf(false) }
+    val sent = remember(view.serviceId) { mutableStateOf(false) }
+    CloseWhenDone(busy, sent, error) { confirming = false }
     val handover = view.handover
     SectionCard(stringResource(R.string.amb_entrega_titulo), action = { if (handover != null) FamilyBadge(stringResource(R.string.amb_recibido), StatusFamily.LISTO) }) {
         when {
@@ -391,9 +413,9 @@ private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, b
         }
     }
     if (confirming) ConfirmDialog(
-        title = stringResource(R.string.amb_marcar_recibido), confirmLabel = stringResource(R.string.amb_marcar_recibido), busy = busy,
+        title = stringResource(R.string.amb_marcar_recibido), confirmLabel = stringResource(R.string.amb_marcar_recibido), busy = busy, error = error,
         message = stringResource(R.string.amb_marcar_recibido_detalle),
-        onConfirm = { confirming = false; model.receivePatient() }, onDismiss = { confirming = false },
+        onConfirm = { sent.value = true; model.receivePatient() }, onDismiss = { confirming = false },
     )
 }
 

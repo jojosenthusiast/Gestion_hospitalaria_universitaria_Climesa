@@ -61,6 +61,8 @@ data class AmbulanceUiState(
     val error: String? = null,
     val formError: String? = null,
     val notice: String? = null,
+    /** G4: the milestone just tapped, held 10 s with "Deshacer" before it joins the queue (no inverse endpoint exists). */
+    val pendingMilestone: PendingUndo? = null,
 )
 
 enum class AmbulanceMode { STATUS, LOG, ARRIVAL, REQUEST, PARAMEDIC }
@@ -229,15 +231,31 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
      * MA-AMB-06: every milestone goes through the ordered queue: without signal it stays on the phone (with its key and
      * time) and is resent on reconnect or with "Reintentar", so the paramedic keeps working offline.
      */
-    fun advance(service: AmbulanceService, type: String, finalState: String? = null, reason: String = "", notice: String = "Hito registrado.", at: Instant = Instant.now()) {
+    fun advance(service: AmbulanceService, type: String, finalState: String? = null, reason: String = "", notice: String = "Hito registrado.", at: Instant = Instant.now(), undoable: Boolean = false) {
         val current = projected(service)
         if (type == "finalizado" && AmbulanceRules.finishNeedsReason(current) && (finalState == null || reason.trim().length < 5)) {
             mutable.value = mutable.value.copy(formError = "Para terminar sin llegar al hospital elige cómo terminó y escribe el motivo."); return
         }
+        // The phone time is the tap, not the end of the undo window.
         val item = QueuedMilestone(service.id, type, AmbulanceRules.milestoneBody(type, finalState, reason, at).toString(), java.util.UUID.randomUUID().toString())
-        saveMilestones(mutable.value.queuedMilestones + item)
-        flushMilestones(notice)
+        val enqueue = { saveMilestones(mutable.value.queuedMilestones + item); flushMilestones(notice) }
+        if (undoable) {
+            mutable.value = mutable.value.copy(formError = null, notice = null)
+            milestoneUndo.start(PendingUndo(service.id, "Registrando «${AmbulanceLabels.milestone(type)}» a las ${localClock(at)}…")) { enqueue() }
+            return
+        }
+        // A milestone still in its window goes first, so the queue keeps the order the paramedic tapped.
+        if (milestoneUndo.pending != null) { milestoneUndo.flush(); viewModelScope.launch { enqueue() } } else enqueue()
     }
+
+    /** G4: "Deshacer" inside the window: the milestone never reaches the queue nor the API. */
+    fun undoMilestone() {
+        if (milestoneUndo.undo()) mutable.value = mutable.value.copy(notice = "Hito anulado; no se registró.")
+    }
+
+    private val milestoneUndo = UndoWindow(viewModelScope, MILESTONE_UNDO_MS) { pending -> mutable.value = mutable.value.copy(pendingMilestone = pending) }
+
+    private fun localClock(at: Instant) = java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(at.atZone(java.time.ZoneId.of("America/El_Salvador")))
 
     fun retryMilestones() = flushMilestones()
 
@@ -382,4 +400,6 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
             else -> userMessage(error, "No se pudo completar la operación.")
         }
     }
+
+    companion object { const val MILESTONE_UNDO_MS = 10_000L }
 }

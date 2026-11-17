@@ -33,4 +33,6 @@
     <string name="rec7_buscando_dia">Buscando el primer día con hueco…</string>
     <!-- G2 vinculación -->
     <string name="rec7_vinculo_desde">En revisión desde el %1$s</string>
+    <!-- G4 ambulancia -->
+    <string name="rec7_amb_falta_motivo">Escribe el motivo (qué pasa) para poder enviar.</string>
 </resources>
