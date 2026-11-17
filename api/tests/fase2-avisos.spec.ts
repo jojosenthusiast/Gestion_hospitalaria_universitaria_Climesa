@@ -131,16 +131,16 @@ describe('Fase 2 · avisos con nivel, enterado y recordatorio', () => {
     expect((await edit(1, { hasta: at(20) })).status).toBe(200);
     expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: start.toISOString() });
     expect((await edit(2, { nivel: 'critico' })).status).toBe(200);
-    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: null, destacado: true });
+    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: null, recordarEn: null, destacado: true });
     expect(await enterados()).toBe(0);
     await acked();
     expect((await edit(3, { nivel: 'informativo' })).status).toBe(200);
     expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: start.toISOString() });
     expect((await edit(4, { cuerpo: 'Texto nuevo: el cambio de turno es a las 18:00.', nivel: 'critico' })).status).toBe(200);
-    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: null, destacado: true });
+    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: null, recordarEn: null, destacado: true });
     await acked();
     expect((await edit(5, { titulo: 'Cambio de turno (corregido)' })).status).toBe(200);
-    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: null, destacado: true });
+    expect(await item('LAB', notice.id)).toMatchObject({ enteradoEn: null, recordarEn: null, destacado: true });
   });
 
   test('editar sin nivel ni áreas conserva los del aviso; retirarlo lo saca de la bandeja', async () => {

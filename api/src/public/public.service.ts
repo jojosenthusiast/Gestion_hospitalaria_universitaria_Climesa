@@ -339,8 +339,8 @@ export class PublicService {
         [id, dto.titulo.trim(), dto.cuerpo.trim(), from, to, priority, isPublic, roles, now, actor.id, level, areas])).rows[0];
       const before = noticeOf(current), after = noticeOf(row);
       // S11: a notice that now says something else, or is more urgent, is highlighted again until a new "Enterado".
-      // The row keeps a due reminder (`recordar_en` = now) because the table needs one of both dates.
-      if (editNeedsNewAck(current, row)) await c.query('UPDATE publico.aviso_enterado SET enterado_en=NULL,recordar_en=$2,actualizado_en=$2 WHERE aviso_id=$1', [id, now]);
+      // Deleting the acknowledgement (and any reminder) shows the notice as new, without a reminder nobody asked for.
+      if (editNeedsNewAck(current, row)) await c.query('DELETE FROM publico.aviso_enterado WHERE aviso_id=$1', [id]);
       await this.commands.audit(c, actor, { action: 'avisos.editar', entity: 'aviso', entityId: id, permission: 'avisos.publicar', detail: { antes: before, despues: after, datosPersonalesConfirmados: found } });
       await this.commands.event(c, 'aviso.actualizado', 'aviso', id, row.version, [...new Set([...noticeChannels(current.publico, current.roles), ...noticeChannels(isPublic, roles), ...(await areaChannels(c, [...new Set([...current.areas, ...areas])], now))])]);
       return listItemOf(row, now);
