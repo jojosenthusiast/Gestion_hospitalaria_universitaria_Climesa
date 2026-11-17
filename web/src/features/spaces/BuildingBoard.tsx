@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactElement } from 'react';
 import './building.css';
 import { Field, Icon, Notice, type IconName } from '../../components/ui';
+import { AreaTag, areaOf, type AreaCode } from '../../components/system';
 import { can, type AccessProfile, type Api, type Bed, type BedBlockInput, type BedTransitionInput, type Space } from '../../lib/api';
 import { Empty, SaveButton, Select, Tag, WriteError, useAction, useData } from '../common';
 import { BED_STATES, bedsOf, categoryName, countBeds, floorsOf, plain, spaceTypeNames, stateLabel, type Floor, type SpaceNode } from './building';
@@ -70,6 +71,11 @@ export function BuildingBoard({ api, profile, version, spaces, beds, focus, onRe
   const rooms = visibleTop.filter(node => node.space.type === 'habitacion');
   const others = visibleTop.filter(node => node.children.length === 0 && node.space.type !== 'habitacion');
 
+  /** R4a: a room takes the area of the nearest ancestor with an area code (`P1-EMG`), else its own code (`HAB-201`). */
+  const areaFor = (space: Space): AreaCode => {
+    for (let s: Space | undefined = space; s; s = s.parentId ? byId.get(s.parentId) : undefined) { const area = areaOf(s.code); if (area !== 'GEN') return area; }
+    return 'GEN';
+  };
   const bedGlyph = (node: SpaceNode, room: SpaceNode) => {
     const state = stateOf(node.space), short = node.space.code.startsWith(`${room.space.code}-`) ? node.space.code.slice(room.space.code.length + 1) : node.space.code;
     return <button type="button" key={node.space.id} className={`bed-glyph bed-state-${state ?? 'desconocida'} ${selectedId === node.space.id ? 'is-selected' : ''}`} aria-pressed={selectedId === node.space.id} aria-label={`Cama ${node.space.code}${state ? `, ${stateLabel(state)}` : ''}`} title={`${node.space.code}${state ? ` · ${stateLabel(state)}` : ''}`} onClick={() => select(node.space.id)}><span className="bed-glyph-mark" aria-hidden="true" /><strong>{short}</strong>{state && <small>{stateLabel(state)}</small>}</button>;
@@ -78,8 +84,9 @@ export function BuildingBoard({ api, profile, version, spaces, beds, focus, onRe
     const roomBeds = room.children.filter(child => child.space.type === 'cama' && shown(child, ancestor || textOk(room)));
     const allBeds = bedsOf(room), counts = countBeds(allBeds, bedMap);
     const free = bedMap ? counts.byState.libre : room.space.freeBeds;
-    return <article className={`plan-room ${selectedId === room.space.id ? 'is-selected' : ''} ${room.space.active ? '' : 'is-inactive'}`} key={room.space.id} aria-label={`Habitación ${room.space.code}`}>
-      <header><h3><button type="button" className="plan-room-title" aria-pressed={selectedId === room.space.id} aria-label={`Ver habitación ${room.space.code}`} onClick={() => select(room.space.id)}><strong>{room.space.code}</strong>{categoryName(room.space.category) && <span>{categoryName(room.space.category)}</span>}{!room.space.active && <span>Inactiva</span>}</button></h3><span className="mono-data">{free}/{allBeds.length} libres</span></header>
+    const area = areaFor(room.space);
+    return <article className={`plan-room area-surface area-${area.toLowerCase()} ${selectedId === room.space.id ? 'is-selected' : ''} ${room.space.active ? '' : 'is-inactive'}`} key={room.space.id} aria-label={`Habitación ${room.space.code}`}>
+      <header><h3><button type="button" className="plan-room-title" aria-pressed={selectedId === room.space.id} aria-label={`Ver habitación ${room.space.code}`} onClick={() => select(room.space.id)}><AreaTag code={area} /><strong className="nowrap-code">{room.space.code}</strong>{categoryName(room.space.category) && <span>{categoryName(room.space.category)}</span>}{!room.space.active && <span>Inactiva</span>}</button></h3><span className="plan-free">{free}/{allBeds.length} libres</span></header>
       <div className="plan-beds">{roomBeds.map(bed => bedGlyph(bed, room))}{!roomBeds.length && <small className="muted">Sin camas con este filtro</small>}</div>
     </article>;
   };
@@ -87,7 +94,7 @@ export function BuildingBoard({ api, profile, version, spaces, beds, focus, onRe
   const group = (node: SpaceNode, ancestor: boolean): ReactElement => {
     const kids = visibleChildren(node, ancestor), counts = countBeds(bedsOf(node), bedMap), typeName = spaceTypeNames[node.space.type] ?? 'Espacio';
     return <section className={`plan-area ${selectedId === node.space.id ? 'is-selected' : ''}`} key={node.space.id} aria-label={`${typeName} ${node.space.name}`}>
-      <header><h3><button type="button" className="plan-area-title" aria-pressed={selectedId === node.space.id} aria-label={`Ver ${typeName.toLowerCase()} ${node.space.name}`} onClick={() => select(node.space.id)}><strong>{node.space.name}</strong><span>{node.space.code}</span></button></h3>{counts.total > 0 && <span className="mono-data">{bedMap ? counts.byState.libre : node.space.freeBeds}/{counts.total} libres</span>}</header>
+      <header><h3><button type="button" className="plan-area-title" aria-pressed={selectedId === node.space.id} aria-label={`Ver ${typeName.toLowerCase()} ${node.space.name}`} onClick={() => select(node.space.id)}><strong>{node.space.name}</strong><span className="nowrap-code">{node.space.code}</span></button></h3>{counts.total > 0 && <span className="plan-free">{bedMap ? counts.byState.libre : node.space.freeBeds}/{counts.total} libres</span>}</header>
       <div className="plan-grid">{kids.map(kid => kid.space.type === 'habitacion' ? roomTile(kid, ancestor || textOk(node)) : kid.children.length ? group(kid, ancestor || textOk(node)) : leafTile(kid))}</div>
     </section>;
   };
@@ -102,17 +109,17 @@ export function BuildingBoard({ api, profile, version, spaces, beds, focus, onRe
     {bedMap && current && <ul className="state-legend" aria-label="Leyenda y conteo de camas de la planta">{BED_STATES.map(s => <li key={s.key}><button type="button" className={`legend-chip bed-state-${s.key}`} aria-pressed={filter === s.key} title={s.hint} onClick={() => setFilter(filter === s.key ? 'todos' : s.key)}><span className="bed-glyph-mark" aria-hidden="true" /><span>{s.label}</span><strong>{current.counts.byState[s.key]}</strong></button></li>)}</ul>}
     {!bedMap && <p className="refresh-hint">{focus === 'estructura' ? 'Tu cuenta ve la estructura y la disponibilidad por planta; el estado cama por cama lo consulta Operaciones.' : 'Sin acceso al estado individual de las camas.'}</p>}
     {feedback && <Notice kind="success">{feedback}</Notice>}
-    <div className="building-split">
+    <div className={`building-split${sel ? '' : ' is-collapsed'}`}>
       <div className="floor-plan" aria-label={`Plano de ${floor?.label ?? 'la planta'}`}>
         {areas.map(node => group(node, false))}
         {rooms.length > 0 && <section className="plan-area" aria-label="Habitaciones"><header><h3><span className="plan-area-title"><strong>Habitaciones</strong></span></h3></header><div className="plan-grid">{rooms.map(room => roomTile(room, false))}</div></section>}
         {others.length > 0 && <section className="plan-area" aria-label="Otros espacios"><header><h3><span className="plan-area-title"><strong>Otros espacios</strong></span></h3></header><div className="plan-grid">{others.map(leafTile)}</div></section>}
         {!visibleTop.length && <Empty title="No hay espacios con este filtro" description="Cambia el estado, la búsqueda o la planta para ver otros espacios." />}
       </div>
-      <aside className="plan-side" aria-label="Detalle del espacio">
-        {sel ? <SpaceDetail key={sel.id} api={api} profile={profile} version={version} space={sel} bed={bedMap?.get(sel.id) ?? null} parent={sel.parentId ? byId.get(sel.parentId) : undefined} spaces={spaces} bedMap={bedMap} onEdit={canConfigure ? onEdit : undefined} onSelect={select} onChanged={message => { setFeedback(message); onRefresh(); }} />
-          : <div className="plan-side-empty"><Icon name="building" size={28} /><h3>Selecciona una cama o un espacio</h3><p>{focus === 'estructura' ? `Toca una habitación, un consultorio o una cama del plano para ver su detalle${canConfigure ? ', editarlo o agregar espacios dentro de él.' : '.'}` : 'Toca una cama del plano para ver quién la ocupa y qué acciones puedes hacer.'}</p></div>}
-      </aside>
+      {/* R4a: the detail column only exists while something is selected; the plan takes the full width otherwise. */}
+      {sel && <aside className="plan-side" aria-label="Detalle del espacio">
+        <SpaceDetail key={sel.id} api={api} profile={profile} version={version} space={sel} bed={bedMap?.get(sel.id) ?? null} parent={sel.parentId ? byId.get(sel.parentId) : undefined} spaces={spaces} bedMap={bedMap} onEdit={canConfigure ? onEdit : undefined} onSelect={select} onChanged={message => { setFeedback(message); onRefresh(); }} />
+      </aside>}
     </div>
   </div>;
 }
