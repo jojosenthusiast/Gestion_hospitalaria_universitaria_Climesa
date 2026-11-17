@@ -49,7 +49,6 @@ fun ClinicalHistoryScreen(profile: AccessProfile, own: Boolean, modifier: Modifi
     LaunchedEffect(patientId) { if (patientId != null) model.open(patientId) else model.close() }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.historial_eyebrow), stringResource(if (own) R.string.historial_titulo_propio else R.string.historial_titulo_expediente), stringResource(if (own) R.string.historial_detalle_propio else R.string.historial_detalle_expediente)) }
         if (own && profile.patientId == null) {
             item { EmptyState(stringResource(R.string.historial_sin_vinculo), icon = Icons.Default.Lock) }
             return@PageList

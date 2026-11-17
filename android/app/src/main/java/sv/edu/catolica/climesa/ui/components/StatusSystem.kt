@@ -44,7 +44,7 @@ internal enum class StatusPattern { STRIPED, DOTTED, SOLID, OUTLINE, DASHED, DOU
 
 internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pattern: StatusPattern) {
     ESPERA("En espera", StatusIcon.SCHEDULE, StatusPattern.STRIPED),
-    LLAMADO("Llamado o en proceso", StatusIcon.CAMPAIGN, StatusPattern.DOTTED),
+    LLAMADO("Llamado", StatusIcon.CAMPAIGN, StatusPattern.DOTTED),
     ATENCION("En atención o en uso", StatusIcon.MONITOR_HEART, StatusPattern.SOLID),
     LISTO("Terminado o disponible", StatusIcon.CHECK, StatusPattern.OUTLINE),
     CERRADO("Cancelado o fuera de servicio", StatusIcon.CLOSE, StatusPattern.DASHED),
@@ -52,22 +52,35 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
 
     companion object {
         private val byValue: Map<String, StatusFamily> = buildMap {
-            listOf("en_espera", "solicitada", "pendiente", "pendiente_cama", "borrador", "publicado", "reservada", "provisional").forEach { put(it, ESPERA) }
-            listOf("llamado", "confirmada", "en_proceso", "limpieza", "reprogramada").forEach { put(it, LLAMADO) }
-            listOf("en_atencion", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta").forEach { put(it, ATENCION) }
+            // A confirmed or rescheduled appointment waits for its time: it is not "Llamado" (megaphone). Same table as the
+            // web `familyOfValue` and iOS `StatusFamily.byValue`.
+            listOf(
+                "en_espera", "solicitada", "pendiente", "pendiente_cama", "borrador", "publicado", "reservada", "provisional",
+                "confirmada", "reprogramada",
+            ).forEach { put(it, ESPERA) }
+            // Only a called number uses the megaphone; work in progress (`en_proceso`) is in attention, like the web.
+            put("llamado", LLAMADO)
+            listOf("en_atencion", "en_proceso", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta", "limpieza", "requiere_atencion").forEach { put(it, ATENCION) }
             listOf("atendida", "atendido", "ok", "completado", "firmada", "alta_firmada", "egresado", "libre", "disponible", "activo", "exito", "normal", "aprobada").forEach { put(it, LISTO) }
             listOf(
-                "cancelado", "cancelada", "no_asistio", "no_se_presento", "cerrado", "rechazada", "vencida", "vencido", "bloqueada",
+                "cancelado", "cancelada", "no_asistio", "no_se_presento", "cerrado", "rechazada", "vencida", "bloqueada",
                 "inactivo", "desactivado", "denegado", "fallido", "en_mantenimiento",
             ).forEach { put(it, CERRADO) }
             listOf("critico_alto", "critico_bajo").forEach { put(it, CRITICO) }
             // Stock (inventory) and link checks (account linking). Never critical: red stays for clinical values.
-            put("agotado", CERRADO)
-            put("bajo_minimo", LLAMADO)
+            put("bajo_minimo", ESPERA)
             put("por_vencer", ESPERA)
             put("coincide", LISTO)
             put("revisar", ESPERA)
         }
+
+        /**
+         * Out of range but not critical (lab `alto`/`bajo`) and stock that cannot be used (`agotado`, lot `vencido`): drawn
+         * as the urgent priority (amber, double chevron), never red and never neutral. Same rule as the web.
+         */
+        private val urgentValues = setOf("alto", "bajo", "agotado", "vencido")
+
+        fun urgent(value: String): Boolean = value in urgentValues
 
         /** Family of an API state value, or null when the value has none (`alto`, `bajo`, `sin_rango`). */
         fun of(value: String): StatusFamily? = byValue[value]
@@ -89,7 +102,7 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
          * The API value decides first, so every platform shows the same family. A value the shared table does not know
          * (`atendido`, `sin_traslado`) keeps the family of its catalog tone; with no tone it is neutral.
          */
-        fun resolve(value: String, fallback: StatusTone?): StatusFamily? = of(value) ?: fallback?.let(::fromTone)
+        fun resolve(value: String, fallback: StatusTone?): StatusFamily? = if (urgent(value)) null else of(value) ?: fallback?.let(::fromTone)
     }
 }
 

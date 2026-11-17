@@ -10,9 +10,11 @@ internal fun businessMessage(error: Throwable, fallback: String): String =
 
 /** Parser, runtime or English text that must never be shown to the person. */
 private val technical = Regex(
-    """(JSON|BEGIN_|Exception|java\.|kotlin\.|[\[\]{}<>]|\b(expected|unexpected|cannot|failed|index|null|value|timeout|refused)\b)""",
+    """(JSON|BEGIN_|Exception|java\.|kotlin\.|[\[\]{}<>]|\b(expected|unexpected|cannot|failed|index|null|value|timeout|refused|unable|resolve|host|hostname|socket|connection|associated|the|of|was|with|but)\b)""",
     RegexOption.IGNORE_CASE,
 )
+
+private fun shown(text: String?) = text != null && ApiProblems.readable(text) && !technical.containsMatchIn(text)
 
 /**
  * Spanish text for any failure on a screen (S13: "every server error mapped to a meaningful Spanish message"). An API error
@@ -20,7 +22,6 @@ private val technical = Regex(
  * sentence; a parser or runtime error (English, a stack fragment) becomes [fallback].
  */
 internal fun userMessage(error: Throwable, fallback: String): String {
-    if (error is AuthRequestException) return businessMessage(error, fallback).takeIf(ApiProblems::readable) ?: fallback
-    val text = error.message ?: return fallback
-    return text.takeIf { ApiProblems.readable(it) && !technical.containsMatchIn(it) } ?: fallback
+    val text = if (error is AuthRequestException) businessMessage(error, fallback) else error.message
+    return text.takeIf(::shown) ?: fallback
 }

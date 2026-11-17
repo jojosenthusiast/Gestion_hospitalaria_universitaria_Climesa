@@ -120,7 +120,6 @@ fun VitalSignsScreen(profile: AccessProfile, modifier: Modifier = Modifier, read
     BackHandler(enabled = state.patientId != null) { model.close() }
     PageList(modifier) {
         if (state.patientId == null) {
-            item { SectionIntro(stringResource(R.string.signos_eyebrow), stringResource(R.string.signos_titulo_elegir), stringResource(R.string.signos_detalle_elegir)) }
             pickerItems(state, profile, model)
         } else {
             patientItems(state, readOnly, model)

@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -138,12 +139,12 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
 
 /** The patient's own requests with their state; "Retirar solicitud" only when the server allows it. */
 @Composable
-internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, onWithdraw: (CategoryRequest) -> Unit) {
+internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, onWithdraw: (CategoryRequest) -> Unit, error: String? = null) {
     var confirm by rememberSaveable { mutableStateOf<String?>(null) }
     SectionCard(stringResource(R.string.cat_mis_solicitudes)) {
         requests.forEach { r ->
             Column {
-                DataRow(r.categoryNames, subtitle = listOfNotNull(r.franja.label, r.note).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) })
+                DataRow(r.categoryNames, subtitle = listOfNotNull(r.franja.label, r.note).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) }, container = false)
                 r.appointment?.let { Text(stringResource(R.string.cat_asignada_detalle, it.doctorName, formatShort(it.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
                 r.rejectionReason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (r.allows(CategoryRequestRules.CANCEL)) TextButton(onClick = { confirm = r.id }, enabled = !busy) { Text(stringResource(R.string.cat_retirar)) }
@@ -151,8 +152,8 @@ internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, 
         }
     }
     requests.firstOrNull { it.id == confirm }?.let { r ->
-        ConfirmDialog(stringResource(R.string.cat_retirar), stringResource(R.string.cat_retirar), { onWithdraw(r); confirm = null }, { confirm = null },
-            message = stringResource(R.string.cat_retirar_mensaje), destructive = true, busy = busy)
+        ConfirmDialog(stringResource(R.string.cat_retirar), stringResource(R.string.cat_retirar), { onWithdraw(r) }, { confirm = null },
+            message = stringResource(R.string.cat_retirar_mensaje), destructive = true, busy = busy, error = error, onDone = { confirm = null })
     }
 }
 
@@ -167,21 +168,22 @@ internal fun CategoryRequestInbox(state: CategoryRequestsState, model: CategoryR
         val now = System.currentTimeMillis()
         state.inbox.forEach { r ->
             Column {
-                DataRow(r.patientName, subtitle = listOfNotNull(r.record, r.categoryNames, r.franja.label, CategoryRequestRules.waitingFor(r.createdAt, now)).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) })
+                DataRow(r.patientName, subtitle = listOfNotNull(r.record, r.categoryNames, r.franja.label, CategoryRequestRules.waitingFor(r.createdAt, now)).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) }, container = false)
                 r.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 r.preferredDoctorName?.let { Text(stringResource(R.string.cat_prefiere, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (state.assigning?.id == r.id) AssignPanel(state, model)
                 else ClimesaActionGroup {
-                    if (r.allows(CategoryRequestRules.ASSIGN)) PrimaryButton(stringResource(R.string.cat_asignar), { model.clearMessages(); model.openAssign(r) }, icon = Icons.Default.Check, enabled = !state.saving)
-                    if (r.allows(CategoryRequestRules.REJECT)) SecondaryButton(stringResource(R.string.cat_rechazar), { model.clearMessages(); rejecting = r.id }, icon = Icons.Default.Close, enabled = !state.saving)
+                    // R3 A-15: row actions are compact; the screen keeps its one primary action.
+                    if (r.allows(CategoryRequestRules.ASSIGN)) RowAction(stringResource(R.string.cat_asignar), { model.clearMessages(); model.openAssign(r) }, enabled = !state.saving)
+                    if (r.allows(CategoryRequestRules.REJECT)) RowAction(stringResource(R.string.cat_rechazar), { model.clearMessages(); rejecting = r.id }, enabled = !state.saving)
                 }
             }
         }
     }
     state.inbox.firstOrNull { it.id == rejecting }?.let { r ->
         var reason by rememberSaveable(r.id) { mutableStateOf("") }
-        ConfirmDialog(stringResource(R.string.cat_rechazar_titulo), stringResource(R.string.cat_rechazar_titulo), { model.reject(r, reason); rejecting = null }, { rejecting = null },
-            message = "${r.patientName} · ${r.categoryNames}", destructive = true, busy = state.saving,
+        ConfirmDialog(stringResource(R.string.cat_rechazar_titulo), stringResource(R.string.cat_rechazar_titulo), { model.reject(r, reason) }, { rejecting = null },
+            message = "${r.patientName} · ${r.categoryNames}", destructive = true, busy = state.saving, error = state.error, onDone = { rejecting = null },
             confirmEnabled = CategoryRequestRules.rejectError(reason) == null,
             body = { FormField(stringResource(R.string.cat_rechazar_motivo), reason, { reason = it.take(500) }, singleLine = false) })
     }
@@ -193,18 +195,25 @@ private fun AssignPanel(state: CategoryRequestsState, model: CategoryRequestsVie
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(stringResource(R.string.cat_asignar_titulo, request.patientName), style = MaterialTheme.typography.titleSmall)
         Text(AppointmentAgenda.dayLabel(state.date.toString()), style = MaterialTheme.typography.bodySmall)
-        state.orderedDoctors.forEach { d ->
+        var doctorQuery by rememberSaveable(request.id) { mutableStateOf("") }
+        var allDoctors by rememberSaveable(request.id) { mutableStateOf(false) }
+        LiveSearchField(doctorQuery, { doctorQuery = it.take(60) }, stringResource(R.string.cat_buscar_medico))
+        val shown = sv.edu.catolica.climesa.domain.DoctorChoices.visible(state.orderedDoctors, doctorQuery, allDoctors, state.doctor?.id)
+        if (shown.isEmpty()) Text(stringResource(R.string.listas_sin_coincidencias), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        shown.forEach { d ->
             TextButton(onClick = { model.pickDoctor(d) }, enabled = d.hasShift, modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Column(Modifier.weight(1f)) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.detail, style = MaterialTheme.typography.bodySmall) }
                     when {
                         !d.hasShift -> FamilyBadge(d.reason ?: stringResource(R.string.rec_agendar_sin_turno), StatusFamily.CERRADO)
-                        state.doctor?.id == d.id -> FamilyBadge(stringResource(R.string.rec_leyenda_libre), StatusFamily.LISTO)
-                        CategoryRequestRules.isSuggested(request, d) -> FamilyBadge(stringResource(R.string.cat_sugerido), StatusFamily.ATENCION)
+                        state.doctor?.id == d.id -> FamilyBadge(stringResource(R.string.cat_elegido), StatusFamily.LISTO)
+                        CategoryRequestRules.isSuggested(request, d) -> FamilyBadge(stringResource(R.string.cat_sugerido), null)
                     }
                 }
             }
         }
+        val more = sv.edu.catolica.climesa.domain.DoctorChoices.hidden(state.orderedDoctors, doctorQuery, allDoctors)
+        if (more > 0) TextButton(onClick = { allDoctors = true }, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.cat_ver_todos_medicos, more)) }
         when {
             state.doctor == null -> Text(stringResource(R.string.rec_agendar_elige_medico), style = MaterialTheme.typography.bodySmall)
             state.loadingSlots -> LoadingState()

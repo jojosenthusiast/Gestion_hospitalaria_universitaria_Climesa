@@ -97,31 +97,13 @@ import java.time.format.DateTimeFormatter
     if(discard) AlertDialog(onDismissRequest={discard=false},title={Text(stringResource(R.string.rec_salir_titulo))},text={Text(stringResource(R.string.rec_salir_detalle))},
         confirmButton={TextButton(onClick={discard=false;model.closeForm()}) {Text(stringResource(R.string.rec_salir))}},dismissButton={TextButton(onClick={discard=false}) {Text(stringResource(R.string.rec_seguir_editando))}})
 }
-@Composable private fun Home(state:ReceptionState,patients:()->Unit,select:(String)->Unit) {
-    PageList {
-        item { SectionCard(stringResource(R.string.recepcion_home_titulo),eyebrow=stringResource(R.string.recepcion_home_eyebrow)) {
-            Text(stringResource(R.string.recepcion_home_detalle),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(Spacing.sm)) {
-                StatTile((state.registry.totalActive ?: state.registry.patients.count {it.active}).toString(),stringResource(R.string.recepcion_stat_activos),Modifier.weight(1f))
-                StatTile((state.registry.totalInactive ?: state.registry.patients.count {!it.active}).toString(),stringResource(R.string.recepcion_stat_inactivos),Modifier.weight(1f))
-            }
-        } }
-        item { PrimaryButton(stringResource(R.string.recepcion_buscar_paciente),patients,icon=Icons.Default.Search) }
-        item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            Text(stringResource(R.string.recepcion_pacientes_recientes),style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
-            TextButton(onClick=patients) {Text(stringResource(R.string.recepcion_ver_todos))}
-        } }
-        items(state.registry.patients.take(3),key={it.id}) { p -> PatientRow(p) {select(p.id)} }
-        item { Text(stringResource(R.string.recepcion_home_ayuda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
-}
 @Composable private fun Patients(state:ReceptionState,model:ReceptionViewModel) {
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item { SectionIntro("", stringResource(R.string.rec_pacientes_titulo)) }
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(Spacing.page),verticalArrangement=Arrangement.spacedBy(Spacing.md)) {
         item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text(stringResource(R.string.rec_buscar_label))},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,stringResource(R.string.rec_limpiar_busqueda))}}) }
         item { Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
             if(PatientAction.SEARCH in state.actions) ClimesaButton(stringResource(if(state.searching) R.string.rec_buscando else R.string.rec_buscar),Icons.Default.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)
-            if(PatientAction.REGISTER in state.actions) ClimesaButton(stringResource(if(state.searching) R.string.rec_buscando else R.string.rec_form_registrar),Icons.Default.Add,model::newPatient,enabled=!state.searching,outlined=true)
+            // R3 A-18: registering is secondary with a fixed label; only the search button shows that it is searching.
+            if(PatientAction.REGISTER in state.actions) SecondaryButton(stringResource(R.string.rec_form_registrar),model::newPatient,icon=Icons.Default.Add,enabled=!state.searching)
             if(PatientAction.REGISTER in state.actions && state.searchedQuery==null && PatientRules.normalize(state.query).replace(" ","").length<2) Text(stringResource(R.string.rec_registrar_sin_busqueda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         } }
         item { LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(3) {i->val label=stringResource(listOf(R.string.rec_filtro_activos,R.string.rec_filtro_inactivos,R.string.rec_filtro_todos)[i]);FilterChip(selected=state.filter==i,onClick={model.filter(i)},label={Text(label)})}} }
@@ -131,7 +113,8 @@ import java.time.format.DateTimeFormatter
     }
 }
 @Composable private fun PatientRow(p:Patient,click:()->Unit) {
-    DataRow(p.fullName,meta=stringResource(R.string.rec_exp_corto,p.record),status={StatusTag(if(p.active) "activo" else "inactivo")},onClick=click)
+    // R3 A-39: "Activo" is the normal case and gets no badge; only an inactive record is marked.
+    DataRow(p.fullName,meta=stringResource(R.string.rec_exp_corto,p.record),status=if(p.active) null else ({StatusTag("inactivo")}),onClick=click)
 }
 @Composable private fun PatientDetail(p:Patient,state:ReceptionState,model:ReceptionViewModel) {
     var dialog by remember(p.id) {mutableStateOf(false)}

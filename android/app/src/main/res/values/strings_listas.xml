@@ -17,6 +17,10 @@
     <string name="fila_buscar">Número o paciente</string>
     <string name="fila_solo_lectura">Vista de solo lectura: aquí sigues la fila; llamar y atender corresponde a Recepción, Asistencia y Medicina.</string>
     <string name="fila_todos">Todos</string>
+    <string name="fila_paciente_sin_numero">Hoy no tienes número en la fila.</string>
+    <string name="fila_paciente_sin_numero_detalle">Recepción te da uno cuando llegas.</string>
+    <string name="fila_paciente_pasa">Pasa al consultorio %1$s</string>
+    <string name="fila_paciente_otros">Tus otros números de hoy</string>
     <string name="fila_espera_promedio">Espera promedio: %1$s · máxima %2$s</string>
     <string name="fila_espera">Espera %1$s</string>
     <!-- Citas -->
@@ -27,6 +31,10 @@
     <string name="pac_ficha_faltan">Faltan datos: %1$s.</string>
     <string name="pac_ficha_completa">Ficha completa para los datos que tu rol puede ver.</string>
     <string name="lab_revisar">Revisar</string>
+    <string name="lab_revisar_titulo">Revisar y liberar resultados</string>
+    <string name="lab_revisar_efecto">%1$s verá estos valores en su portal en cuanto confirmes.</string>
+    <string name="lab_revisar_confirmar">Liberar al paciente</string>
+    <string name="lab_revisar_critico">Incluye un valor crítico: confirma que ya lo atendiste o avisaste.</string>
     <string name="lab_cancelar_orden">Cancelar orden</string>
     <string name="lab_cancelar_titulo">Cancelar orden de laboratorio</string>
     <string name="lab_cancelar_efecto">La orden de %1$s deja de avanzar y el laboratorio ya no la procesa. Queda registrado quién la canceló y por qué.</string>

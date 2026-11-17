@@ -47,7 +47,6 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
 @Composable fun MyAccessScreen(modifier: Modifier = Modifier, model: MyAccessViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle(); LaunchedEffect(Unit) { model.load() }
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.mis_accesos_eyebrow), stringResource(R.string.mis_accesos_titulo), stringResource(R.string.mis_accesos_descripcion)) }
         when {
             state.loading -> item { LoadingState() }
             state.error != null -> item { ErrorState(state.error, onRetry = { model.load() }) }

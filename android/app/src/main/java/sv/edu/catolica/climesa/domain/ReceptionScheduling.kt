@@ -25,6 +25,25 @@ data class DaySlot(val start: String, val end: String, val status: SlotStatus, v
 data class SchedulingDoctor(val id: String, val name: String, val specialty: String?, val hasShift: Boolean, val reason: String?) {
     val detail get() = specialty ?: "Medicina general"
 }
+
+/**
+ * R3 A-42: doctors shown in the assign panel. With 45+ doctors the panel shows the first [LIMIT] of the already ordered
+ * list (suggested first) until reception searches or asks for all; a search matches name or specialty, accent-insensitive.
+ * The chosen doctor always stays visible.
+ */
+object DoctorChoices {
+    const val LIMIT = 5
+    private fun fold(text: String) = java.text.Normalizer.normalize(text.lowercase(), java.text.Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
+    fun visible(ordered: List<SchedulingDoctor>, query: String, showAll: Boolean, chosenId: String?): List<SchedulingDoctor> {
+        val q = fold(query.trim())
+        val matching = if (q.isEmpty()) ordered else ordered.filter { fold(it.name).contains(q) || fold(it.detail).contains(q) }
+        val shown = if (showAll || q.isNotEmpty()) matching else matching.take(LIMIT)
+        val chosen = ordered.firstOrNull { it.id == chosenId }
+        return if (chosen != null && chosen !in shown) listOf(chosen) + shown else shown
+    }
+    fun hidden(ordered: List<SchedulingDoctor>, query: String, showAll: Boolean): Int =
+        if (showAll || query.isNotBlank()) 0 else (ordered.size - LIMIT).coerceAtLeast(0)
+}
 /** Cita de `GET /citas` tal como la ve Recepción (o el médico, sus propias citas). Las acciones vienen del servidor. */
 data class ReceptionAppointment(
     val id: String, val patientName: String, val doctorName: String, val start: String, val end: String, val state: String, val version: Int,

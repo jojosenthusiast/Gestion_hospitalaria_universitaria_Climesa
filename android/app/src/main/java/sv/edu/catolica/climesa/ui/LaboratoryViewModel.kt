@@ -28,10 +28,27 @@ import sv.edu.catolica.climesa.domain.LaboratoryEvents
 import sv.edu.catolica.climesa.domain.LaboratoryOrder
 import sv.edu.catolica.climesa.domain.LaboratoryParser
 import sv.edu.catolica.climesa.domain.RealtimeSignal
+import sv.edu.catolica.climesa.domain.LaboratoryLabels
+
+/**
+ * What the "Revisar" confirmation says (R3 A-16): one line per exam with its value and mark, the same text the patient will
+ * read once the result is released. An exam without a result says so.
+ */
+internal object LabReviewSummary {
+    fun lines(order: LaboratoryOrder): List<String> = order.items.map { item ->
+        val value = item.result?.let { LaboratoryLabels.valueAndMark(it, item.unit) } ?: "Sin resultado"
+        "${item.name}: $value"
+    }
+    fun critical(order: LaboratoryOrder): Boolean = order.items.any { it.result?.mark?.startsWith("critico") == true }
+}
 
 /** [cancelOrderId] is the order whose cancel dialog is open; the reason lives here so a rotation keeps it. */
 data class LaboratoryState(
-    val loading: Boolean = true, val orders: List<LaboratoryOrder> = emptyList(), val busy: Boolean = false, val error: String? = null, val notice: String? = null,
+    val loading: Boolean = true, val orders: List<LaboratoryOrder> = emptyList(), val error: String? = null, val notice: String? = null,
+    /** R3 A-16: orders with a write in flight. Only those rows show progress; the others stay usable. */
+    val busyIds: Set<String> = emptySet(),
+    /** R3 A-16: order whose "Revisar" confirmation is open (releasing a result to the patient is confirmed with a summary). */
+    val reviewOrderId: String? = null,
     val cancelOrderId: String? = null, val cancelReason: String = "", val cancelError: String? = null, val cancelling: Boolean = false,
     /** S10: the doctor's "Resultados por revisar" (`GET /laboratorio/pendientes`). */
     val followUps: List<LabFollowUp> = emptyList(), val followUpBusy: String? = null,
@@ -250,7 +267,13 @@ class LaboratoryViewModel @Inject constructor(
         setAttachments(orderId, change(current))
     }
 
-    fun review(order: LaboratoryOrder) = mutate("/laboratorio/ordenes/${order.id}/revisar", JSONObject().put("version", order.version), "Resultados revisados y liberados.")
+    /** Opens the confirmation that says what the patient will see; nothing is sent until [review]. */
+    fun openReview(orderId: String) { mutable.value = mutable.value.copy(reviewOrderId = orderId, error = null, notice = null) }
+    fun dismissReview() { val s = mutable.value; if (s.reviewOrderId !in s.busyIds) mutable.value = s.copy(reviewOrderId = null) }
+
+    fun review(order: LaboratoryOrder) = mutate(order.id, "/laboratorio/ordenes/${order.id}/revisar", JSONObject().put("version", order.version), "Resultados revisados y liberados.") {
+        it.copy(reviewOrderId = it.reviewOrderId.takeIf { id -> id != order.id })
+    }
 
     fun openCancel(orderId: String) { mutable.value = mutable.value.copy(cancelOrderId = orderId, cancelReason = "", cancelError = null, notice = null) }
 
@@ -277,14 +300,18 @@ class LaboratoryViewModel @Inject constructor(
 
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
 
-    private fun mutate(path: String, body: JSONObject, notice: String) {
-        // A second tap while a write is in flight sends nothing (no double review or sample).
-        if (mutable.value.busy) return
-        mutable.value = mutable.value.copy(busy = true, error = null, notice = null)
+    private fun mutate(orderId: String, path: String, body: JSONObject, notice: String, onSuccess: (LaboratoryState) -> LaboratoryState = { it }) {
+        // A second tap on the same order while its write is in flight sends nothing (no double review or sample).
+        if (orderId in mutable.value.busyIds) return
+        mutable.value = mutable.value.copy(busyIds = mutable.value.busyIds + orderId, error = null, notice = null)
         viewModelScope.launch {
-            try { api.request(path, "POST", body); mutable.value = mutable.value.copy(busy = false, notice = notice); load(silent = true) }
+            try {
+                api.request(path, "POST", body)
+                mutable.value = onSuccess(mutable.value.copy(busyIds = mutable.value.busyIds - orderId, notice = notice))
+                load(silent = true)
+            }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { mutable.value = mutable.value.copy(busy = false, error = businessMessage(e, "No se pudo completar la operación.")) }
+            catch (e: Exception) { mutable.value = mutable.value.copy(busyIds = mutable.value.busyIds - orderId, error = userMessage(e, "No se pudo completar la operación.")) }
         }
     }
 

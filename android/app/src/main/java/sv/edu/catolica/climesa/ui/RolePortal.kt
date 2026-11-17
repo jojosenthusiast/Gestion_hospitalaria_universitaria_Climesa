@@ -1,5 +1,6 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -64,10 +65,24 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
             try{source.post("/ambulancia/mantenimiento",MaintenanceRules.body(version,inMaintenance,reason));maintenanceMutable.value=MaintenanceState(saved=true);load(current,silent=true)}
             catch(e:Exception){if(e is CancellationException)throw e
                 val conflict=(e as? sv.edu.catolica.climesa.data.AuthRequestException)?.let{it.statusCode==409||it.code=="version_conflicto"}==true
-                maintenanceMutable.value=MaintenanceState(conflict=conflict,error=if(conflict)"La unidad cambió. Cierra y vuelve a abrir para ver su estado actual; el cambio no se guardó." else e.message?:"No se pudo guardar. Intenta de nuevo.")}
+                maintenanceMutable.value=MaintenanceState(conflict=conflict,error=if(conflict)"La unidad cambió. Cierra y vuelve a abrir para ver su estado actual; el cambio no se guardó." else userMessage(e, "No se pudo guardar. Intenta de nuevo."))}
         }
     }
-    fun load(path:String?,silent:Boolean=false){current=path;job?.cancel();job=viewModelScope.launch{if(!silent||path==null)mutable.value=RoleData(loading=path!=null);if(path!=null)try{mutable.value=RoleData(data=source.get(path))}catch(e:Exception){if(e is CancellationException)throw e;if(silent&&mutable.value.data!=null)return@launch;mutable.value=RoleData(error=e.message?:"No se pudo cargar la información.")}}}
+    /**
+     * Reads [path]. R3 A-23: reloading the same section keeps its data on screen (stale-while-revalidate) and a failed reload
+     * keeps it too, with the error beside it; only a different section starts empty.
+     */
+    fun load(path:String?,silent:Boolean=false){
+        val same=path!=null&&path==current&&mutable.value.data!=null
+        current=path;job?.cancel()
+        job=viewModelScope.launch{
+            if(same){if(!silent)mutable.value=mutable.value.copy(loading=true,error=null)}
+            else if(!silent||path==null)mutable.value=RoleData(loading=path!=null)
+            if(path!=null)try{mutable.value=RoleData(data=source.get(path))}catch(e:Exception){if(e is CancellationException)throw e
+                if(silent&&mutable.value.data!=null)return@launch
+                mutable.value=if(same)mutable.value.copy(loading=false,error=userMessage(e, "No se pudo cargar la información.")) else RoleData(error=userMessage(e, "No se pudo cargar la información."))}
+        }
+    }
     /**
      * RN-25: llegó un valor crítico y la API deja a esta cuenta revisar una orden crítica (`allowedActions` incluye `revisar`,
      * como en iOS); sigue visible hasta que se cierra o se abre la revisión.
@@ -95,9 +110,9 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
 @Composable fun HospitalClock(){
     var now by remember { mutableStateOf(Instant.now()) }
     val zone=remember { ZoneId.of("America/El_Salvador") }
-    val timeFormatter=remember { DateTimeFormatter.ofPattern("HH:mm:ss",Locale("es","SV")).withZone(zone) }
+    val timeFormatter=remember { DateTimeFormatter.ofPattern("HH:mm",Locale("es","SV")).withZone(zone) }
     val dateFormatter=remember { DateTimeFormatter.ofPattern("EEE d 'de' MMM",Locale("es","SV")).withZone(zone) }
-    LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(1000)}}
+    LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(60_000L-now.toEpochMilli()%60_000L)}}
     Column(horizontalAlignment=Alignment.End){
         Text(timeFormatter.format(now),style=MaterialTheme.typography.labelLarge.copy(fontFeatureSettings="tnum"),color=MaterialTheme.colorScheme.onPrimary)
         Text(dateFormatter.format(now).replaceFirstChar{it.uppercase(Locale("es","SV"))},style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),maxLines=1)
@@ -107,6 +122,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     val model:RoleViewModel=viewModel(key="role-${account.session.userId}")
     val data by model.state.collectAsStateWithLifecycle()
     var selectedName by rememberSaveable(role){mutableStateOf(AndroidSection.HOME.name)};var query by rememberSaveable{mutableStateOf("")}
+    var pastShiftsOpen by rememberSaveable{mutableStateOf(false)}
     val sections=AndroidSections.visible(role,account.profile.permissions)
     val page=sections.firstOrNull{it.name==selectedName}?:sections.firstOrNull()?:return
     val path=sectionPath(page)
@@ -114,6 +130,9 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     LaunchedEffect(role,sections){if(sections.none{it.name==selectedName})selectedName=sections.firstOrNull{it==AndroidSection.HOME}?.name?:sections.firstOrNull{it==AndroidSection.PROFILE}?.name?:sections.first().name}
     val inbox=rememberQuickActionInbox()
     LaunchedEffect(page){inbox.dropUnless(page)}
+    // R3 A-2: back from any section returns to Inicio before leaving the app. Screens compose their own BackHandler later,
+    // so an open form or detail closes first.
+    BackHandler(enabled=page!=AndroidSection.HOME&&AndroidSection.HOME in sections){selectedName=AndroidSection.HOME.name}
     val handled={inbox.consume(page)}
     val onDashboardAction:(QuickActionRequest)->Unit={request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}}
     LaunchedEffect(role,page){model.load(path)}
@@ -147,8 +166,8 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
             if(page==AndroidSection.PROFILE){
                 profileItems(account,dark,setDark,{if(!signingOut)logout()},myData=if("pacientes.editar_propios" in account.profile.permissions){{MyDataCard()}}else null)
             }
-            else if(data.loading)item{LoadingState()}
-            else if(data.error!=null)item{ErrorState(data.error,{model.load(path)})}
+            else if(data.loading&&data.data==null)item{LoadingState()}
+            else if(data.error!=null&&data.data==null)item{ErrorState(data.error,{model.load(path)})}
             else if(page==AndroidSection.PATIENTS){
                 item{ClimesaActionGroup {FormField("Nombre, DUI o expediente",query,{query=it.take(100)});PrimaryButton("Buscar paciente",{model.load("/pacientes?query="+URLEncoder.encode(query,"UTF-8")+"&limit=50")},icon=Icons.Default.Search,enabled=query.trim().length>=2)}}
                 val rows=PortalParsers.patients(data.data)
@@ -168,7 +187,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
             }else if(page==AndroidSection.SHIFTS){
                 val shifts=MyShifts.parse(data.data)
                 if(shifts.isEmpty())item{EmptyState("No tienes turnos publicados.")}
-                else myShiftDays(shifts)
+                else myShiftDays(shifts,pastShiftsOpen){pastShiftsOpen=!pastShiftsOpen}
             }else item{EmptyState(stringResource(R.string.portal_seccion_no_disponible))}
         }
         }}
@@ -191,13 +210,14 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     val data by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit){model.load("/turnos/mios")}
     LaunchedEffect(account.profile.channels){model.start(account.profile.channels)}
+    var pastOpen by rememberSaveable{mutableStateOf(false)}
     PageList(modifier){
-        if(data.loading)item{LoadingState()}
-        else if(data.error!=null)item{ErrorState(data.error,{model.load("/turnos/mios")})}
+        if(data.loading&&data.data==null)item{LoadingState()}
+        else if(data.error!=null&&data.data==null)item{ErrorState(data.error,{model.load("/turnos/mios")})}
         else{
             val shifts=MyShifts.parse(data.data)
             if(shifts.isEmpty())item{EmptyState(stringResource(R.string.turnos_vacio))}
-            else myShiftDays(shifts)
+            else myShiftDays(shifts,pastOpen){pastOpen=!pastOpen}
         }
     }
 }
@@ -205,10 +225,15 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
  * A26 "Mis turnos" por día asignado (Hoy, Mañana, día y fecha), cada día en orden de hora de inicio. Abre en hoy: los
  * días de hoy en adelante van primero y los anteriores debajo, bajo "Turnos anteriores".
  */
-private fun androidx.compose.foundation.lazy.LazyListScope.myShiftDays(shifts:List<MyShift>){
+private fun androidx.compose.foundation.lazy.LazyListScope.myShiftDays(shifts:List<MyShift>,pastOpen:Boolean,togglePast:()->Unit){
     val days=MyShifts.byDay(shifts)
+    // R3 A-8: past days fold under one closed heading with their count, like the web list (#122).
+    val pastCount=days.filter{it.past}.sumOf{it.shifts.size}
     for((index,day) in days.withIndex()){
-        if(day.past&&days.getOrNull(index-1)?.past!=true)item(key="turnos-anteriores"){Text(stringResource(R.string.turnos_anteriores),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=Spacing.md))}
+        if(day.past&&days.getOrNull(index-1)?.past!=true)item(key="turnos-anteriores"){
+            TextButton(onClick=togglePast,modifier=Modifier.padding(top=Spacing.sm).heightIn(min=Spacing.touch)){Text(stringResource(if(pastOpen)R.string.turnos_ocultar_anteriores else R.string.turnos_ver_anteriores,pastCount))}
+        }
+        if(day.past&&!pastOpen)continue
         item(key="dia-${day.title}"){Text(day.title,style=MaterialTheme.typography.titleSmall,modifier=Modifier.padding(top=Spacing.sm))}
         items(day.shifts,key={it.id.ifBlank{it.period}}){shift->MyShiftCard(shift)}
     }

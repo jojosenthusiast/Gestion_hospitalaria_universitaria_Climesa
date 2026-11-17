@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,12 +74,12 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
         if (quickAction == QuickAction.REVIEW_REQUESTS) model.showRequests(true)
         onQuickActionHandled()
     }
+    BackHandler(enabled = state.scheduling) { model.leaveScheduling() }
     if (state.scheduling) { SchedulingForm(state, model, modifier); return }
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.rec_citas_eyebrow), stringResource(R.string.rec_citas_titulo), stringResource(R.string.rec_citas_detalle)) }
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
         (actionState.done ?: state.notice)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
-        if (canSchedule) item { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = Icons.Default.Add) }
+        if (canSchedule) item { CompactHeader("", actions = { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = Icons.Default.Add, fill = false) }) }
         if (canSchedule) {
             requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
             requestState.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
@@ -118,21 +120,16 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
 @Composable internal fun AppointmentStateTag(state: String) = StatusTag(state)
 
 /** Allowed actions as buttons, two per line; blocked ones disabled with the server's reason under them. */
-@Composable internal fun AppointmentActionButtons(allowed: List<AppointmentAction>, blocked: List<Pair<AppointmentAction, String>>, onAction: (AppointmentAction) -> Unit) {
-    val buttons = allowed.map { it to null as String? } + blocked.map { (a, r) -> a to r }
-    buttons.chunked(2).forEach { pair ->
-        Row(Modifier.fillMaxWidth().padding(bottom = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            pair.forEach { (action, reason) ->
-                Column(Modifier.weight(1f)) {
-                    val positive = action == AppointmentAction.CONFIRM || action == AppointmentAction.ACCEPT_RESCHEDULE
-                    if (positive) androidx.compose.material3.Button(onClick = { onAction(action) }, enabled = reason == null, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(action.label) }
-                    else OutlinedButton(onClick = { onAction(action) }, enabled = reason == null, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                        colors = if (action.needsReason || action == AppointmentAction.CANCEL) androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error) else androidx.compose.material3.ButtonDefaults.outlinedButtonColors()) { Text(action.label) }
-                    reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                }
-            }
-            if (pair.size == 1) Spacer(Modifier.weight(1f))
-        }
+/**
+ * Row actions of an appointment (R3 A-15, A-31, A-38): only what the server allows, as compact text actions in one line,
+ * never a full-width filled button per row nor a red one. A blocked action is hidden instead of printing the server reason;
+ * destructive ones confirm in their dialog, where the red belongs.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable internal fun AppointmentActionButtons(allowed: List<AppointmentAction>, @Suppress("UNUSED_PARAMETER") blocked: List<Pair<AppointmentAction, String>>, onAction: (AppointmentAction) -> Unit) {
+    if (allowed.isEmpty()) return
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        allowed.forEach { action -> RowAction(action.label, { onAction(action) }) }
     }
 }
 

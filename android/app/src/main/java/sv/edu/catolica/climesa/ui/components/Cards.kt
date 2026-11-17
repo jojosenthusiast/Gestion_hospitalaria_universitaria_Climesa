@@ -2,6 +2,8 @@ package sv.edu.catolica.climesa.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -88,6 +90,8 @@ internal fun DataRow(
     status: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     divider: Boolean = false,
+    /** R3 A-40: false draws a plain list row (inside a SectionCard or a dialog), never a card inside a card. */
+    container: Boolean = true,
 ) {
     val body: @Composable () -> Unit = {
         Column {
@@ -104,7 +108,7 @@ internal fun DataRow(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis) }
-                    meta?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    meta?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                 }
                 status?.invoke()
                 if (onClick != null) Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.climesa.primaryText)
@@ -112,7 +116,11 @@ internal fun DataRow(
             if (divider) HorizontalDivider(color = MaterialTheme.climesa.line)
         }
     }
-    if (onClick != null) ClimesaClickableCard(onClick, modifier) { body() } else ClimesaCard(modifier) { body() }
+    when {
+        !container -> Box(if (onClick != null) modifier.fillMaxWidth().clickable(onClick = onClick) else modifier.fillMaxWidth()) { body() }
+        onClick != null -> ClimesaClickableCard(onClick, modifier) { body() }
+        else -> ClimesaCard(modifier) { body() }
+    }
 }
 
 /** Label above a value, for detail sheets (ficha). */

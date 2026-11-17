@@ -30,7 +30,6 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
     PageList(modifier) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                SectionIntro("", stringResource(R.string.camas_titulo))
                 if (state.connection != ConnectionState.LIVE) NoticeBanner(NoticeKind.WARNING, stringResource(if (state.connection == ConnectionState.RECONNECTING) R.string.camas_reconectando else R.string.camas_sin_conexion))
                 if (state.partialLive) NoticeBanner(NoticeKind.WARNING, stringResource(R.string.tiempo_real_parcial))
             }

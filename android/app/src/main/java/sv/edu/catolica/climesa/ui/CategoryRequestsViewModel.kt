@@ -48,6 +48,8 @@ data class CategoryRequestsState(
     val loadingSlots: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
+    /** The patient left "Pedir cita" with the back gesture; reopening resumes this draft. */
+    val draftKept: Boolean = false,
     val notice: String? = null,
 ) {
     val visibleCategories get() = CategoryRequestRules.filter(categories, query, picked)
@@ -101,11 +103,16 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
 
     // --- Patient ---
 
+    /** Opens "Pedir cita"; after a system back ([leaveForm]) it resumes the same draft instead of starting over. */
     fun openForm() {
+        if (mutable.value.draftKept) { mutable.update { it.copy(formOpen = true, draftKept = false, error = null, notice = null) }; return }
         createIntent.reset()
         mutable.update { it.copy(formOpen = true, query = "", picked = emptyList(), franja = RequestFranja.ANY, note = "", preferredDoctorId = null, error = null, notice = null) }
     }
-    fun closeForm() { if (!mutable.value.saving) mutable.update { it.copy(formOpen = false, error = null) } }
+    fun closeForm() { if (!mutable.value.saving) mutable.update { it.copy(formOpen = false, draftKept = false, error = null) } }
+
+    /** R3 A-1: the system back leaves the form for the list and keeps what was typed; "Cancelar" ([closeForm]) discards it. */
+    fun leaveForm() { if (!mutable.value.saving) mutable.update { it.copy(formOpen = false, draftKept = true, error = null) } }
     fun search(text: String) { mutable.update { it.copy(query = text.take(80)) } }
     fun toggle(code: String) { mutable.update { it.copy(picked = CategoryRequestRules.toggle(it.picked, code)) } }
     fun franja(value: RequestFranja) { mutable.update { it.copy(franja = value) } }

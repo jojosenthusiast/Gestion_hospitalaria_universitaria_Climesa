@@ -19,6 +19,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -55,6 +59,7 @@ import sv.edu.catolica.climesa.ui.NoticeBanner
 import sv.edu.catolica.climesa.ui.NoticeKind
 import sv.edu.catolica.climesa.ui.PageList
 import sv.edu.catolica.climesa.ui.PrimaryButton
+import sv.edu.catolica.climesa.ui.RowAction
 import sv.edu.catolica.climesa.ui.SecondaryButton
 import sv.edu.catolica.climesa.ui.SectionCard
 import sv.edu.catolica.climesa.ui.Spacing
@@ -108,43 +113,47 @@ fun RoleDashboardScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 private fun LazyListScope.dashboardContent(dashboard: DashboardModel, onAction: (QuickActionRequest) -> Unit) {
     if (dashboard.unavailable.isNotEmpty()) item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.dash_datos_parciales)) }
     if (dashboard.kpis.isEmpty() && dashboard.actions.isEmpty() && dashboard.attention.isEmpty()) {
         item { EmptyState(stringResource(R.string.dash_vacio), detail = stringResource(R.string.dash_vacio_detalle)) }
         return
     }
+    // R3 A-28: Inicio is a pending inbox first. Each pending row carries its count and its one action; the tiles below only
+    // show what no row already says.
+    item { SectionLabel(stringResource(R.string.dash_atencion)) }
+    if (dashboard.attention.isEmpty()) item {
+        Text(stringResource(R.string.dash_atencion_ok), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else item { AttentionList(dashboard.attention, onAction) }
     if (dashboard.kpis.isNotEmpty()) {
-        item { Text(stringResource(R.string.dash_resumen), style = MaterialTheme.typography.titleLarge) }
+        item { SectionLabel(stringResource(R.string.dash_resumen)) }
         items(dashboard.kpis.chunked(2)) { pair ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                pair.forEach { kpi -> KpiTile(kpi, Modifier.weight(1f).heightIn(min = 112.dp)) { kpi.target?.let { onAction(QuickActionRequest(it, kpi.action)) } } }
+                pair.forEach { kpi -> KpiTile(kpi, Modifier.weight(1f)) { kpi.target?.let { onAction(QuickActionRequest(it, kpi.action)) } } }
                 if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
-    item { Text(stringResource(R.string.dash_atencion), style = MaterialTheme.typography.titleLarge) }
-    if (dashboard.attention.isEmpty()) item { NoticeBanner(NoticeKind.SUCCESS, stringResource(R.string.dash_atencion_ok)) }
-    items(dashboard.attention) { entry -> AttentionCard(entry) { onAction(entry.request) } }
     if (dashboard.actions.isNotEmpty()) {
+        item { SectionLabel(stringResource(R.string.dash_acciones)) }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(stringResource(R.string.dash_acciones), style = MaterialTheme.typography.titleLarge)
-                Text(stringResource(R.string.dash_acciones_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        items(dashboard.actions.chunked(2)) { pair ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                pair.forEach { action -> ActionTile(action, Modifier.weight(1f)) { onAction(action.request) } }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                dashboard.actions.forEach { action -> ActionChip(action) { onAction(action.request) } }
             }
         }
     }
     if (dashboard.charts.isNotEmpty()) {
-        item { Text(stringResource(R.string.dash_graficos), style = MaterialTheme.typography.titleLarge) }
+        item { SectionLabel(stringResource(R.string.dash_graficos)) }
         items(dashboard.charts) { chart -> SectionCard(chart.title) { ChartContent(chart) } }
     }
 }
+
+@Composable
+private fun SectionLabel(text: String) = Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.sm))
+
+/** Only attention and critical tones take colour (R3 A-37); a plain count stays neutral. */
+private val DashboardTone.signals: Boolean get() = this == DashboardTone.WARNING || this == DashboardTone.DANGER
 
 /** S1: compact header instead of the blue welcome banner; the role help text is no longer drawn. */
 @Composable
@@ -157,17 +166,17 @@ private fun KpiTile(kpi: DashboardKpi, modifier: Modifier, onClick: () -> Unit) 
     val (fg, soft) = kpi.tone.colors()
     val content: @Composable () -> Unit = {
         Column {
-            Box(Modifier.fillMaxWidth().height(4.dp).background(fg))
+            if (kpi.tone.signals) Box(Modifier.fillMaxWidth().height(3.dp).background(fg))
             Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Box(Modifier.size(26.dp).background(soft, CircleShape), contentAlignment = Alignment.Center) { Icon(kpi.tone.icon(), null, Modifier.size(16.dp), tint = fg) }
+                    if (kpi.tone.signals) Box(Modifier.size(26.dp).background(soft, CircleShape), contentAlignment = Alignment.Center) { Icon(kpi.tone.icon(), null, Modifier.size(16.dp), tint = fg) }
                     Text(kpi.label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(kpi.value, style = (if (kpi.value.length > 7) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge).copy(fontFeatureSettings = "tnum"), maxLines = 2)
                     kpi.suffix?.let { Text(" $it", Modifier.padding(bottom = 4.dp), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
-                kpi.hint?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = fg) }
+                kpi.hint?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = if (kpi.tone.signals) fg else MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }
@@ -175,30 +184,45 @@ private fun KpiTile(kpi: DashboardKpi, modifier: Modifier, onClick: () -> Unit) 
     else Surface(modifier, color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium, border = cardBorder(), shadowElevation = 1.dp, content = content)
 }
 
+/** Pending rows in one surface split by 1px lines (no card per item, no side stripe). The critical row gets the primary action. */
 @Composable
-private fun AttentionCard(item: DashboardAttention, onClick: () -> Unit) {
-    val (fg, soft) = item.tone.colors()
-    ClimesaCard {
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(Modifier.fillMaxHeight().width(5.dp).background(fg))
-            Column(Modifier.fillMaxWidth().padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Box(Modifier.size(28.dp).background(soft, CircleShape), contentAlignment = Alignment.Center) { Icon(item.tone.icon(), null, Modifier.size(18.dp), tint = fg) }
-                    Text(item.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                }
-                Text(item.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (item.tone == DashboardTone.DANGER) PrimaryButton(item.actionLabel, onClick) else SecondaryButton(item.actionLabel, onClick)
+private fun AttentionList(items: List<DashboardAttention>, onAction: (QuickActionRequest) -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium, border = cardBorder()) {
+        Column {
+            items.forEachIndexed { index, item ->
+                if (index > 0) HorizontalDivider(color = MaterialTheme.climesa.line)
+                AttentionRow(item) { onAction(item.request) }
             }
         }
     }
 }
 
 @Composable
-private fun ActionTile(action: DashboardAction, modifier: Modifier, onClick: () -> Unit) {
-    Surface(onClick, modifier.heightIn(min = 72.dp), color = MaterialTheme.climesa.soft, shape = MaterialTheme.shapes.medium, border = cardBorder()) {
-        Row(Modifier.padding(Spacing.md), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Icon(iconFor(action.request.section), null, Modifier.size(22.dp), tint = MaterialTheme.climesa.primaryText)
-            Text(action.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.primaryText, maxLines = 2, overflow = TextOverflow.Ellipsis)
+private fun AttentionRow(item: DashboardAttention, onClick: () -> Unit) {
+    val (fg, soft) = item.tone.colors()
+    Row(
+        Modifier.fillMaxWidth().padding(start = Spacing.md, end = Spacing.sm, top = Spacing.sm, bottom = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Box(Modifier.size(28.dp).background(if (item.tone.signals) soft else MaterialTheme.climesa.soft, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(item.tone.icon(), null, Modifier.size(18.dp), tint = if (item.tone.signals) fg else MaterialTheme.climesa.primaryText)
         }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(item.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        if (item.tone == DashboardTone.DANGER) PrimaryButton(item.actionLabel, onClick, fill = false) else RowAction(item.actionLabel, onClick)
     }
+}
+
+/** Shortcut that opens a section with the verb ready (Registrar paciente, Emitir número). No help text under the group. */
+@Composable
+private fun ActionChip(action: DashboardAction, onClick: () -> Unit) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text(action.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        leadingIcon = { Icon(iconFor(action.request.section), null, Modifier.size(18.dp), tint = MaterialTheme.climesa.primaryText) },
+        modifier = Modifier.heightIn(min = Spacing.touch),
+    )
 }

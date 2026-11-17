@@ -10,6 +10,16 @@ import kotlin.coroutines.coroutineContext
 internal fun apiErrorMessage(body:String,status:Int?=null):String=ApiProblems.parse(body,status).message
 /** Código estable (`codigo`) del problem+json, por ejemplo `version_conflicto`. */
 internal fun apiErrorCode(body:String):String?=runCatching{JSONObject(body).optString("codigo").takeIf{it.isNotBlank()}}.getOrNull()
+/**
+ * What the person reads when the network fails (R3 A-21). A read has no form to keep, so it only says the list did not load;
+ * a write keeps the typed form and says so. A missing API address is a build problem, never shown as such (A-22).
+ */
+internal object NetworkMessages {
+    const val READ = "No se pudo cargar. Revisa tu conexión."
+    const val WRITE = "Sin conexión. Conservamos el formulario; vuelve a intentar."
+    const val UNAVAILABLE = "CLIMESA no está disponible en este momento. Intenta más tarde."
+    fun forMethod(method: String) = if (method.equals("GET", ignoreCase = true)) READ else WRITE
+}
 /** Port to the REST API, so ViewModels can be tested on the JVM with a fake. [ApiClient] is the real adapter. */
 interface ApiGateway {
     suspend fun request(path:String,method:String="GET",body:JSONObject?=null):Any
@@ -28,7 +38,7 @@ class ApiClient(
     private val keys:IdempotencyKeys=IdempotencyKeys(),
 ):ApiGateway {
     override suspend fun request(path:String,method:String,body:JSONObject?):Any=withContext(Dispatchers.IO) {
-        if(baseUrl.isBlank())throw AuthRequestException("Configura la dirección de la API de CLIMESA.")
+        if(baseUrl.isBlank())throw AuthRequestException(NetworkMessages.UNAVAILABLE)
         val signature=method+path+(body?.toString()?:"")
         val intent=coroutineContext[RequestIntent]?.idempotencyKey
         val key=if(method!="GET")intent?:keys.keyFor(signature) else null
@@ -43,7 +53,7 @@ class ApiClient(
     }
     /** Same session renewal and idempotency as [request]; a write is never repeated on its own (the person retries). */
     override suspend fun upload(path:String,field:String,fileName:String,mimeType:String,bytes:ByteArray):Any=withContext(Dispatchers.IO) {
-        if(baseUrl.isBlank())throw AuthRequestException("Configura la dirección de la API de CLIMESA.")
+        if(baseUrl.isBlank())throw AuthRequestException(NetworkMessages.UNAVAILABLE)
         val signature="POST"+path+fileName+bytes.size
         val intent=coroutineContext[RequestIntent]?.idempotencyKey
         val key=intent?:keys.keyFor(signature)
@@ -71,6 +81,6 @@ class ApiClient(
             val text=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}.orEmpty()
             if(status !in 200..299)throw AuthRequestException(apiErrorMessage(text,status),status,apiErrorCode(text),text)
             return if(text.isBlank())JSONObject()else JSONTokener(text).nextValue()
-        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("Sin conexión. Conservamos el formulario; vuelve a intentar.")} finally {c.disconnect()}
+        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException(NetworkMessages.forMethod(method))} finally {c.disconnect()}
     }
 }

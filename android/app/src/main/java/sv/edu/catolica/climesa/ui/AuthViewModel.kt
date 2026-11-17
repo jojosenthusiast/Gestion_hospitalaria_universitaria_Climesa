@@ -62,16 +62,17 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
         accessJob=viewModelScope.launch {
         if(!silent)mutableState.update{it.copy(checkingSession=true,error=null)}
         try {val session=auth.restoreSession();pending=session;val account=session?.let{AuthenticatedAccount(it,backend.profile(it))};mutableState.update{it.copy(checkingSession=false,account=account,accessPending=false)};track(account)}
-        catch(e:Exception){if(e is CancellationException)throw e;if(e is AuthRequestException&&(e.statusCode==400||e.statusCode==401)){expireSession(SessionExpiry.MESSAGE);return@launch};if(silent&&mutableState.value.account!=null)return@launch;mutableState.update{it.copy(checkingSession=false,account=null,accessPending=pending!=null,error=e.message?:"No se pudo verificar la sesión.")}}
+        catch(e:Exception){if(e is CancellationException)throw e;if(e is AuthRequestException&&(e.statusCode==400||e.statusCode==401)){expireSession(SessionExpiry.MESSAGE);return@launch};if(silent&&mutableState.value.account!=null)return@launch;mutableState.update{it.copy(checkingSession=false,account=null,accessPending=pending!=null,error=userMessage(e, "No se pudo verificar la sesión."))}}
     }}
     fun signIn(email:String,password:String){val errors=AuthRules.validate(email,password);if(errors.isNotEmpty()){mutableState.update{it.copy(fieldErrors=errors,error=null)};return}
         viewModelScope.launch{mutableState.update{it.copy(signingIn=true,error=null,fieldErrors=emptyMap(),unconfirmedEmail=null,emailNotice=null)};try {val session=ColdStart.retrying{auth.signIn(email,password)};pending=session;val account=AuthenticatedAccount(session,backend.profile(session));draft.password="";mutableState.update{it.copy(signingIn=false,account=account,accessPending=false)};track(account)}catch(e:Exception){if(e is CancellationException)throw e
             val unconfirmed=(e as? AuthRequestException)?.code==AuthErrors.EMAIL_NOT_CONFIRMED
-            mutableState.update{it.copy(signingIn=false,error=e.message?:"No se pudo iniciar sesión.",accessPending=pending!=null,unconfirmedEmail=if(unconfirmed)email.trim() else null)}}}
+            mutableState.update{it.copy(signingIn=false,error=userMessage(e, "No se pudo iniciar sesión."),accessPending=pending!=null,unconfirmedEmail=if(unconfirmed)email.trim() else null)}}}
     }
     fun register(name:String,email:String,password:String,confirmation:String){val errors=RegistrationRules.validate(name,email,password,confirmation);if(errors.isNotEmpty()){mutableState.update{it.copy(fieldErrors=errors,error=null)};return}
         viewModelScope.launch{mutableState.update{it.copy(signingIn=true,error=null,fieldErrors=emptyMap(),emailNotice=null)};try{val session=auth.signUp(name,email,password);pending=session;if(session!=null){val profile=backend.profile(session);val account=AuthenticatedAccount(session,profile);mutableState.update{it.copy(signingIn=false,account=account)};track(account)}else mutableState.update{it.copy(signingIn=false,confirmationEmail=email.trim(),resendAvailableAt=ResendCooldown.availableAt(System.currentTimeMillis()))}}catch(e:Exception){if(e is CancellationException)throw e
-            val message=if(e is AuthRequestException&&e.code!=null)e.message else "No se pudo crear la cuenta. Revisa los datos o intenta iniciar sesión."
+            val fallback="No se pudo crear la cuenta. Revisa los datos o intenta iniciar sesión."
+            val message=if(e is AuthRequestException&&e.code!=null)userMessage(e,fallback) else fallback
             mutableState.update{it.copy(signingIn=false,error=message,accessPending=pending!=null)}}}
     }
     /** Resends the sign-up confirmation email to [email], at most once per [ResendCooldown.SECONDS]. */
@@ -82,7 +83,7 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
             try{auth.resendSignupConfirmation(email);mutableState.update{it.copy(sendingEmail=false,resendAvailableAt=ResendCooldown.availableAt(System.currentTimeMillis()),emailNotice="Te enviamos un nuevo correo de confirmación a ${email.trim()}.")}}
             catch(e:Exception){if(e is CancellationException)throw e
                 val limited=(e as? AuthRequestException)?.code=="over_email_send_rate_limit"
-                mutableState.update{it.copy(sendingEmail=false,error=e.message?:"No se pudo reenviar el correo.",resendAvailableAt=if(limited)ResendCooldown.availableAt(System.currentTimeMillis()) else it.resendAvailableAt)}}}
+                mutableState.update{it.copy(sendingEmail=false,error=userMessage(e, "No se pudo reenviar el correo."),resendAvailableAt=if(limited)ResendCooldown.availableAt(System.currentTimeMillis()) else it.resendAvailableAt)}}}
     }
     /** "¿Olvidaste tu contraseña?": Supabase emails a link to the web page `/restablecer`. Same answer whether the account exists or not. */
     fun requestPasswordReset(email:String){
@@ -91,7 +92,7 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
         if(mutableState.value.sendingEmail)return
         viewModelScope.launch{mutableState.update{it.copy(sendingEmail=true,error=null,fieldErrors=emptyMap(),emailNotice=null)}
             try{auth.requestPasswordReset(email);mutableState.update{it.copy(sendingEmail=false,emailNotice="Si hay una cuenta con ${email.trim()}, te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam.")}}
-            catch(e:Exception){if(e is CancellationException)throw e;mutableState.update{it.copy(sendingEmail=false,error=e.message?:"No se pudo enviar el correo.")}}}
+            catch(e:Exception){if(e is CancellationException)throw e;mutableState.update{it.copy(sendingEmail=false,error=userMessage(e, "No se pudo enviar el correo."))}}}
     }
     /** "Ya confirmé, iniciar sesión": back to the login with the address already typed. */
     fun confirmedSignIn(email:String){draft.email=email.trim();draft.password="";clearRegistration()}

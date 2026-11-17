@@ -29,9 +29,10 @@ class RoleDashboardTest {
         assertTrue(RoleDashboard.sources("LAB", setOf("sesion.perfil")).isEmpty())
     }
 
-    @Test fun sinCamasLibresLaTarjetaSePintaDePeligro() {
+    // R3 A-36: zero free beds asks for attention (amber); red stays for critical values and emergencies.
+    @Test fun sinCamasLibresLaTarjetaPideAtencionSinRojo() {
         val model = RoleDashboard.build("REC", everything, mapOf(DashboardSource.BEDS to beds("ocupada", "ocupada")), now = now)
-        assertEquals(DashboardTone.DANGER, model.kpis.first { it.label == "Camas libres" }.tone)
+        assertEquals(DashboardTone.WARNING, model.kpis.first { it.label == "Camas libres" }.tone)
     }
 
     @Test fun laFuenteQueFallaNoDejaUnCeroInventado() {
@@ -45,8 +46,9 @@ class RoleDashboardTest {
         val critical = row("state" to "completado", "reviewedAt" to null, "items" to rows(row("result" to row("mark" to "critico_alto"))))
         val normal = row("state" to "completado", "reviewedAt" to null, "items" to rows(row("result" to row("mark" to "normal"))))
         val model = RoleDashboard.build("MED", everything, mapOf(DashboardSource.LAB to rows(critical, normal)), now = now)
-        assertEquals("2", model.kpis.first { it.label == "Resultados por revisar" }.value)
-        assertEquals(DashboardTone.DANGER, model.kpis.first { it.label == "Resultados por revisar" }.tone)
+        // R3 A-28: the pending rows carry the count, so the KPI tile with the same number is gone.
+        assertTrue(model.kpis.none { it.label == "Resultados por revisar" })
+        assertEquals(listOf("1 resultado con valor crítico", "1 resultado por revisar"), model.attention.map { it.title })
         assertEquals(listOf(DashboardTone.DANGER, DashboardTone.WARNING), model.attention.map { it.tone })
         assertTrue(model.attention.all { it.request.section == AndroidSection.RESULT_REVIEW })
     }
@@ -73,13 +75,12 @@ class RoleDashboardTest {
             ),
             now = now,
         )
-        val pending = model.kpis.first { it.label == "Citas por confirmar" }
-        assertEquals("1", pending.value)
-        assertEquals(AndroidSection.APPOINTMENTS, pending.target)
-        assertEquals(QuickAction.REVIEW_REQUESTS, pending.action)
+        // R3 A-28: "1 solicitud de cita" replaces the "Citas por confirmar 1" tile; one row, one action.
+        assertTrue(model.kpis.none { it.label == "Citas por confirmar" || it.label == "Vinculaciones por verificar" })
+        assertEquals("1 solicitud de cita", model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.title)
         assertEquals(QuickAction.REVIEW_REQUESTS, model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.request.action)
         assertTrue(model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.detail.contains("reprograma"))
-        assertEquals("2", model.kpis.first { it.label == "Vinculaciones por verificar" }.value)
+        assertEquals("2 vinculaciones por verificar", model.attention.first { it.request.section == AndroidSection.LINKING }.title)
         assertTrue(model.attention.any { it.request.section == AndroidSection.LINKING })
         assertTrue(model.attention.any { it.request.section == AndroidSection.APPOINTMENTS })
     }
@@ -96,7 +97,9 @@ class RoleDashboardTest {
         val ambulance = JSONObject("""{"unit":{"id":"u","plate":"P-123","state":"en_servicio","version":1},"activeService":{"id":"s","origin":"Calle 1","destination":"Hospital","hasPrehospital":false},"paramedicOnDuty":true,"pendingRequests":[]}""")
         val model = RoleDashboard.build("PAR", everything, mapOf(DashboardSource.AMBULANCE to ambulance), now = now)
         assertEquals("En servicio", model.kpis.first().value)
-        assertEquals(DashboardTone.DANGER, model.kpis.first().tone)
+        // R3 A-36: a service in progress is normal work for the paramedic, never red.
+        assertEquals(DashboardTone.PROCESS, model.kpis.first().tone)
+        assertEquals(DashboardTone.PROCESS, model.attention.single().tone)
         assertEquals(AndroidSection.SERVICE, model.attention.single().request.section)
     }
 
@@ -121,7 +124,8 @@ class RoleDashboardTest {
         )
         assertTrue(model.kpis.first { it.label == "Próxima cita" }.value.contains("Dra. Ejemplo"))
         assertEquals("N.º 12", model.kpis.first { it.label == "Mi turno en fila" }.value)
-        assertEquals("1", model.kpis.first { it.label == "Exámenes listos" }.value)
+        assertTrue(model.attention.any { it.title == "1 examen con resultado" })
+        assertTrue(model.kpis.none { it.label == "Exámenes listos" })
         assertEquals("Es tu turno", model.attention.first().title)
     }
 
@@ -137,5 +141,28 @@ class RoleDashboardTest {
         )
         assertTrue(RoleDashboard.nextShift(shifts, now)!!.startsWith("Consulta"))
         assertNull(RoleDashboard.nextShift(rows(), now))
+    }
+
+    // R3 A-36: outside critical lab values no dashboard item is red, for any role.
+    @Test fun ningunRolPintaDeRojoLoQueNoEsCritico() {
+        val ambulance = JSONObject("""{"unit":{"id":"u","plate":"P-1","state":"en_servicio","version":1},"activeService":{"id":"s","origin":"A","destination":"B","hasPrehospital":true},"paramedicOnDuty":true,"pendingRequests":[{"id":"r1","origin":"X","reason":"Caída","createdAt":"2026-11-14T10:00:00Z"}]}""")
+        val stock = rows(row("bajo_minimo" to true, "expiresAt" to "2026-10-01"))
+        val data = mapOf(DashboardSource.BEDS to beds("ocupada"), DashboardSource.AMBULANCE to ambulance, DashboardSource.STOCK to stock)
+        listOf("REC", "ENF", "PAR").forEach { role ->
+            val model = RoleDashboard.build(role, everything, data, now = now)
+            assertTrue(role, model.kpis.none { it.tone == DashboardTone.DANGER })
+            assertTrue(role, model.attention.none { it.tone == DashboardTone.DANGER })
+        }
+        assertEquals(DashboardTone.PROCESS, RoleDashboard.unitTone("en_servicio"))
+    }
+
+    // R3 A-48: counts read as Spanish, never "número(s)".
+    @Test fun losConteosNoUsanParentesisDePlural() {
+        val queue = rows(row("state" to "en_espera"))
+        val one = RoleDashboard.build("AST", everything, mapOf(DashboardSource.QUEUE to queue), now = now)
+        assertEquals("1 número esperando", one.attention.single().title)
+        val two = RoleDashboard.build("AST", everything, mapOf(DashboardSource.QUEUE to rows(row("state" to "en_espera"), row("state" to "en_espera"))), now = now)
+        assertEquals("2 números esperando", two.attention.single().title)
+        assertTrue(two.kpis.none { it.label == "En espera" })
     }
 }

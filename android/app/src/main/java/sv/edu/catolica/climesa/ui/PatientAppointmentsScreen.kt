@@ -1,7 +1,12 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import sv.edu.catolica.climesa.domain.PatientAppointmentRules
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -57,6 +62,7 @@ fun PatientAppointmentsScreen(
     val state by model.state.collectAsStateWithLifecycle()
     val requestState by requests.state.collectAsStateWithLifecycle()
     var cancelTarget by rememberSaveable { mutableStateOf<String?>(null) }
+    var pastOpen by rememberSaveable { mutableStateOf(false) }
     val canRequest = "citas.solicitar" in permissions
     LaunchedEffect(Unit) { model.load(); model.startLive(channels); requests.load(withCategories = canRequest); requests.startLive(channels) }
     LaunchedEffect(quickAction) {
@@ -65,16 +71,16 @@ fun PatientAppointmentsScreen(
         onQuickActionHandled()
     }
     // Fase 2, flow A: the patient asks by reason instead of picking one of every doctor; reception assigns doctor and time.
+    BackHandler(enabled = requestState.formOpen) { requests.leaveForm() }
     if (requestState.formOpen) { CategoryRequestForm(requestState, requests, state.doctors, modifier); return }
     val cancelAppointment = state.appointments.firstOrNull { it.id == cancelTarget }
 
     if (cancelAppointment != null) {
-        CancelAppointmentDialog(cancelAppointment, state.saving, model, onClose = { cancelTarget = null })
+        CancelAppointmentDialog(cancelAppointment, state.saving, state.error, model, onClose = { cancelTarget = null })
     }
     state.rescheduleTarget?.let { RescheduleRequestDialog(it, state, model) }
 
     PageList(modifier) {
-        item { SectionIntro("Paciente / Atención", "Mis citas", "Consulta tus citas y pide una nueva por motivo; recepción te asigna médico y hora.") }
         state.error?.let { error ->
             item {
                 ClimesaActionGroup {
@@ -86,16 +92,30 @@ fun PatientAppointmentsScreen(
         state.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.Send) } }
         requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
         requestState.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.Send) } }
-        if (canRequest) {
-            item { PrimaryButton(stringResource(R.string.cat_pedir_cita), { model.clearMessages(); requests.openForm() }, icon = Icons.Default.CalendarMonth) }
+        if (canRequest) item {
+            CompactHeader("", actions = { PrimaryButton(stringResource(R.string.cat_pedir_cita), { model.clearMessages(); requests.openForm() }, icon = Icons.Default.CalendarMonth, fill = false) })
         }
-        if (requestState.requests.isNotEmpty()) item { MyCategoryRequests(requestState.requests, requestState.saving, requests::withdraw) }
-        if (state.loading) {
+        if (requestState.requests.isNotEmpty()) item { MyCategoryRequests(requestState.requests, requestState.saving, requests::withdraw, requestState.error) }
+        // R3 A-23: the skeleton only stands in for an empty list; a reload keeps the appointments on screen.
+        if (state.loading && state.appointments.isEmpty()) {
             item { LoadingState() }
         } else if (state.appointments.isEmpty()) {
             item { EmptyState("Todavía no tienes citas registradas.") }
         } else {
-            items(state.appointments, key = { it.id }) { appointment ->
+            if (state.loading) item { RefreshHint() }
+            // R3 A-7: upcoming first (soonest on top); past and closed ones folded below with their count.
+            val split = PatientAppointmentRules.split(state.appointments, java.time.Instant.now())
+            if (split.upcoming.isEmpty()) item { Text(stringResource(R.string.cita_sin_proximas), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            else item { Text(stringResource(R.string.cita_proximas), style = MaterialTheme.typography.titleSmall) }
+            items(split.upcoming, key = { it.id }) { appointment ->
+                AppointmentCard(appointment, onCancel = { cancelTarget = appointment.id }, onReschedule = { model.clearMessages(); model.openReschedule(appointment) })
+            }
+            if (split.past.isNotEmpty()) item(key = "pasadas") {
+                TextButton(onClick = { pastOpen = !pastOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+                    Text(stringResource(if (pastOpen) R.string.cita_ocultar_anteriores else R.string.cita_ver_anteriores, split.past.size))
+                }
+            }
+            if (pastOpen) items(split.past, key = { it.id }) { appointment ->
                 AppointmentCard(appointment, onCancel = { cancelTarget = appointment.id }, onReschedule = { model.clearMessages(); model.openReschedule(appointment) })
             }
         }
@@ -104,10 +124,10 @@ fun PatientAppointmentsScreen(
 
 @Composable
 private fun AppointmentCard(appointment: PatientAppointment, onCancel: () -> Unit, onReschedule: () -> Unit) {
-    SectionCard(appointment.doctorName.ifBlank { "Médico asignado" }) {
-        PatientAppointmentTag(appointment.state)
-        LabeledValue("Horario", "${sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start))} · ${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end)}")
-        appointment.reason?.let { LabeledValue("Motivo", it) }
+    // R3 A-41: one compact block per appointment (when, who, why) with its state on the right; no labels in capitals.
+    SectionCard(appointment.doctorName.ifBlank { "Médico asignado" }, action = { PatientAppointmentTag(appointment.state) }) {
+        Text("${sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start))} · ${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end)}", style = MaterialTheme.typography.bodyLarge)
+        appointment.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
         // CITA-01: the deadline the API gives for cancelling or rescheduling.
         if (appointment.allows(AppointmentAction.CANCEL) || appointment.allows(AppointmentAction.RESCHEDULE)) appointment.cancelableUntil?.let {
             Text(stringResource(R.string.cita_plazo, sv.edu.catolica.climesa.domain.AppointmentAgenda.deadline(it, appointment.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -120,18 +140,17 @@ private fun AppointmentCard(appointment: PatientAppointment, onCancel: () -> Uni
             }
         }
         if (appointment.state == AppointmentActions.RESCHEDULED) Text(stringResource(R.string.cita_reprogramada_a), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        PatientActionButton(appointment, AppointmentAction.RESCHEDULE, stringResource(R.string.cita_paciente_reprogramar), onReschedule)
-        PatientActionButton(appointment, AppointmentAction.CANCEL, "Cancelar", onCancel)
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            PatientActionButton(appointment, AppointmentAction.RESCHEDULE, stringResource(R.string.cita_paciente_reprogramar), onReschedule)
+            PatientActionButton(appointment, AppointmentAction.CANCEL, "Cancelar", onCancel)
+        }
     }
 }
 
-/** An allowed action is a button; a blocked one is a disabled button with the server's reason; otherwise nothing. */
+/** R3 A-31: only an action the server allows is shown, as a compact row action; a blocked one is hidden. */
 @Composable
 private fun PatientActionButton(appointment: PatientAppointment, action: AppointmentAction, label: String, onClick: () -> Unit) {
-    val blocked = appointment.blockedReason(action)
-    if (!appointment.allows(action) && blocked == null) return
-    SecondaryButton(label, onClick, icon = if (action == AppointmentAction.CANCEL) Icons.Default.Cancel else Icons.Default.CalendarMonth, enabled = appointment.allows(action))
-    if (!appointment.allows(action)) blocked?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    if (appointment.allows(action)) RowAction(label, onClick)
 }
 
 /** CITA-01: the patient asks for another free slot of the same doctor; Recepción or the doctor decides. */
@@ -165,13 +184,15 @@ private fun RescheduleRequestDialog(appointment: PatientAppointment, state: Pati
 }
 
 @Composable
-private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boolean, model: PatientAppointmentsViewModel, onClose: () -> Unit) {
+private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boolean, error: String?, model: PatientAppointmentsViewModel, onClose: () -> Unit) {
     var reason by rememberSaveable(appointment.id) { mutableStateOf("") }
     ConfirmDialog(
         title = "Cancelar cita",
         confirmLabel = "Confirmar",
-        onConfirm = { model.cancel(appointment, reason); onClose() },
+        onConfirm = { model.cancel(appointment, reason) },
         onDismiss = onClose,
+        error = error,
+        onDone = onClose,
         message = "${appointment.doctorName} · ${formatAppointmentDateTime(appointment.start)}",
         destructive = true,
         busy = busy,
@@ -180,4 +201,4 @@ private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boole
     )
 }
 
-private fun formatAppointmentDateTime(value: String) = runCatching { appointmentTimeFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
+private fun formatAppointmentDateTime(value: String) = runCatching { appointmentTimeFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault("—")

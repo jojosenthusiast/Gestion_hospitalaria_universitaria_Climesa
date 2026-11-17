@@ -35,7 +35,7 @@ class MyDataViewModel @Inject constructor(private val api: ApiGateway) : ViewMod
                 val json = api.request("/me/paciente") as? JSONObject
                 mutable.value = MyDataState(data = json?.let(::parse))
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { mutable.value = mutable.value.copy(loading = false, error = e.message ?: "No se pudieron cargar tus datos.") }
+            catch (e: Exception) { mutable.value = mutable.value.copy(loading = false, error = userMessage(e, "No se pudieron cargar tus datos.")) }
         }
     }
 
@@ -54,7 +54,7 @@ class MyDataViewModel @Inject constructor(private val api: ApiGateway) : ViewMod
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 val stale = (e as? AuthRequestException)?.statusCode == 409
-                mutable.value = mutable.value.copy(saving = false, error = if (stale) "Tu ficha cambió. Se cargaron los datos actuales; revisa y guarda de nuevo." else e.message ?: "No se pudo guardar.")
+                mutable.value = mutable.value.copy(saving = false, error = if (stale) "Tu ficha cambió. Se cargaron los datos actuales; revisa y guarda de nuevo." else userMessage(e, "No se pudo guardar."))
                 if (stale) load()
             }
         }

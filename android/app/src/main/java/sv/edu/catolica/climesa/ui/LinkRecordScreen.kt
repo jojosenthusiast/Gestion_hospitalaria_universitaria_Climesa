@@ -30,7 +30,6 @@ fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, mode
     LaunchedEffect(profile.patientId) { model.init(profile.patientId) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.vinculo_eyebrow), stringResource(R.string.vinculo_titulo), stringResource(R.string.vinculo_detalle)) }
         when (state.status) {
             LinkStatus.APPROVED -> item {
                 SectionCard(stringResource(R.string.vinculo_aprobada), action = { StatusTag("aprobada") }) {

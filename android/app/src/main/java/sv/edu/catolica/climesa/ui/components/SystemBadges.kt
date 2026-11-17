@@ -124,7 +124,7 @@ internal fun FamilyBadge(text: String, family: StatusFamily?, modifier: Modifier
         return
     }
     val (fam, soft) = MaterialTheme.system.status(family)
-    val fg = if (family.pattern == StatusPattern.SOLID) MaterialTheme.system.onStatus else fam
+    val fg = MaterialTheme.system.badge(family, MaterialTheme.colorScheme.surface).first
     Row(
         modifier.statusPattern(family.pattern, fam, soft, MaterialTheme.colorScheme.surface).padding(horizontal = Space2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -141,7 +141,8 @@ internal fun FamilyBadge(text: String, family: StatusFamily?, modifier: Modifier
  */
 @Composable
 internal fun StatusBadge(value: String, modifier: Modifier = Modifier, label: String? = null, fallback: StatusTone? = StatusCatalog.tone(value)) =
-    FamilyBadge(label ?: StatusCatalog.label(value), StatusFamily.resolve(value, fallback), modifier)
+    if (StatusFamily.urgent(value)) PriorityBadge(Priority.URGENTE, modifier, label ?: StatusCatalog.label(value))
+    else FamilyBadge(label ?: StatusCatalog.label(value), StatusFamily.resolve(value, fallback), modifier)
 
 /** Priority (S7): emergency solid critical red, urgent amber tint, routine gray. */
 @Composable

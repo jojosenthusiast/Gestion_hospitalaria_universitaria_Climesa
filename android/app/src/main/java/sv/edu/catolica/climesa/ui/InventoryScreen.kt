@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -56,9 +57,11 @@ private fun categoryIcon(category: ArticleCategory): ImageVector = when (categor
     ArticleCategory.MINOR_EQUIPMENT -> Icons.Default.MedicalServices
 }
 /** Stock state on the shared family table (`agotado` closed, `bajo_minimo` called, `por_vencer` waiting); `ok` is done. Never red. */
-internal fun stockFamily(status: StockStatus): StatusFamily = StatusFamily.of(status.code) ?: StatusFamily.LISTO
-@Composable private fun statusColor(status: StockStatus): Color = MaterialTheme.system.status(stockFamily(status)).first
-@Composable private fun StockBadge(status: StockStatus) = FamilyBadge(status.label, stockFamily(status))
+/** Family of a stock state; null for `agotado`, which is drawn as the urgent priority ([StatusFamily.urgent]). */
+internal fun stockFamily(status: StockStatus): StatusFamily? = if (StatusFamily.urgent(status.code)) null else StatusFamily.of(status.code) ?: StatusFamily.LISTO
+@Composable private fun statusColor(status: StockStatus): Color =
+    stockFamily(status)?.let { MaterialTheme.system.status(it).first } ?: MaterialTheme.system.priority(Priority.URGENTE).first
+@Composable private fun StockBadge(status: StockStatus) = StatusBadge(status.code, label = status.label)
 
 /** Inventory as master-detail: the article list (search, filters, status) and, once one is chosen, its lots, warehouses and history. */
 @Composable fun InventoryScreen(modifier: Modifier = Modifier, profile: AccessProfile? = null, model: InventoryViewModel = viewModel()) {
@@ -78,7 +81,6 @@ internal fun stockFamily(status: StockStatus): StatusFamily = StatusFamily.of(st
         )
     } }
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.inv_eyebrow), stringResource(R.string.inv_titulo), stringResource(R.string.inv_descripcion)) }
         if (state.error != null && state.articles.isNotEmpty()) item { NoticeBanner(NoticeKind.ERROR, state.error!!) }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         val detail = state.detail
@@ -169,7 +171,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
         SectionCard(stringResource(R.string.inv_lotes_titulo)) {
             if (detail.lots.isEmpty()) Text(stringResource(R.string.inv_sin_lotes), style = MaterialTheme.typography.bodySmall)
             detail.lots.forEach { lot ->
-                Column(Modifier.fillMaxWidth().clickable(enabled = configure) { model.openLot(lot) }.padding(vertical = Spacing.xs)) {
+                Column(Modifier.fillMaxWidth().heightIn(min = Spacing.touch).clickable(enabled = configure) { model.openLot(lot) }.padding(vertical = Spacing.xs)) {
                     Text(stringResource(R.string.inv_lote_n, lot.number) + if (lot.active) "" else " · " + stringResource(R.string.inv_dado_baja), style = MaterialTheme.typography.titleSmall)
                     Text(
                         (lot.expiresAt?.let { stringResource(R.string.inv_lote_vence, it) + if (lot.expired) " " + stringResource(R.string.inv_lote_vencido) else "" } ?: stringResource(R.string.inv_no_vence)) + " · ${trimNumber(lot.total)} ${article.unit}" + (if (lot.warehouses.isEmpty()) "" else " · " + lot.warehouses.joinToString(" · ") { "${it.code}: ${trimNumber(it.quantity)}" }),

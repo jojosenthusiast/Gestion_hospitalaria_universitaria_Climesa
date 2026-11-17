@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -105,6 +106,7 @@ fun LaboratoryScreen(
     var urgentOnly by rememberSaveable { mutableStateOf(false) }
     // S10: the reviewing doctor also gets "Resultados por revisar" (critical values and relevant lab observations).
     val reviewer = !ownResults && "laboratorio.revisar" in profile.permissions
+    val inboxOnly = !ownResults && section == AndroidSection.RESULT_REVIEW
     var openGroups by rememberSaveable { mutableStateOf(listOf<String>()) }
     LaunchedEffect(ownResults, reviewer) {
         model.path = if (ownResults) "/me/laboratorio" else "/laboratorio/ordenes"; model.followUpsEnabled = reviewer
@@ -115,11 +117,9 @@ fun LaboratoryScreen(
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     val retry = { model.clearMessages(); model.load() }
     PageList(modifier) {
-        item { SectionIntro("Atención / Diagnóstico", "Laboratorio", stringResource(if (ownResults) R.string.lab_ayuda_paciente else R.string.lab_ayuda)) }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
-        // RN-25: critical values waiting for this doctor's review stay visible at the top of the list.
-        val critical = if (ownResults) 0 else LabCritical.pendingReview(state.orders)
-        if (critical > 0) item { NoticeBanner(NoticeKind.ERROR, stringResource(R.string.lab_criticos_por_revisar, critical)) }
+        // RN-25 / R3 A-29: critical values stay first in the inbox (with their critical pill); the portal keeps the one
+        // persistent notice, so no second red banner here.
         if (reviewer) item { FollowUpInbox(state.followUps, state.followUpBusy, model) }
         when {
             state.loading && state.orders.isEmpty() -> item { LoadingState() }
@@ -128,16 +128,21 @@ fun LaboratoryScreen(
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                if (!ownResults) {
+                if (!ownResults && !inboxOnly) {
                     item { LiveSearchField(query, { query = it }, stringResource(R.string.lab_buscar)) }
                     item { ChipRow(LabFilter.entries.map { Triple(it, it.label, state.orders.count(it::matches)) }, filter) { filterName = it.name } }
-                    item { ChipRow(listOf(Triple(false, "Todas las prioridades", null), Triple(true, stringResource(R.string.lab_solo_urgentes), state.orders.count(LabWorklist::isUrgent))), urgentOnly) { urgentOnly = it } }
+                    // R3 A-49: one toggle instead of a second row of priority chips.
+                    item {
+                        FilterChip(urgentOnly, { urgentOnly = !urgentOnly }, { Text(stringResource(R.string.lab_solo_urgentes) + " (${state.orders.count(LabWorklist::isUrgent)})") }, Modifier.heightIn(min = Spacing.touch))
+                    }
                 }
                 // The clock is read when the list is drawn: each realtime event redraws it, no timers.
                 val now = System.currentTimeMillis()
                 val visible = LabWorklist.sorted(state.orders.filter { filter.matches(it) && (!urgentOnly || LabWorklist.isUrgent(it)) && LabWorklist.matches(it, query) })
-                if (visible.isEmpty()) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
-                if (ownResults) items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, true, state.busy, model, now) }
+                if (visible.isEmpty() && !inboxOnly) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
+                if (ownResults) items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, true, order.id in state.busyIds, model, now) }
+                // R3 A-9: "Resultados por revisar" is an inbox: only the orders this doctor can review, no queue filters.
+                else if (inboxOnly) items(state.orders.filter { it.allows(LabOrderAction.REVIEW) }, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now) }
                 else {
                     // S10: grouped by what comes next; closed groups start folded unless the person filters or searches.
                     val foldable = filter == LabFilter.ALL && query.isBlank()
@@ -148,13 +153,14 @@ fun LaboratoryScreen(
                                 openGroups = if (group.name in openGroups) openGroups - group.name else openGroups + group.name
                             }
                         }
-                        if (open) items(orders, key = { it.id }) { order -> LaboratoryOrderCard(order, false, state.busy, model, now) }
+                        if (open) items(orders, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now) }
                     }
                 }
             }
         }
     }
     state.cancelOrderId?.let { id -> CancelOrderDialog(state, state.orders.firstOrNull { it.id == id }, model) }
+    state.reviewOrderId?.let { id -> state.orders.firstOrNull { it.id == id }?.let { ReviewOrderDialog(it, state, model) } }
     state.external?.let { draft -> SendExternalDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
     state.externalLoad?.let { draft -> ExternalResultDialog(draft, state.orders.firstOrNull { it.id == draft.orderId }, model) }
     state.uploadFailure?.let { message -> UploadFailureDialog(message, model::dismissUploadFailure) }
@@ -204,12 +210,12 @@ private fun FollowUpInbox(items: List<LabFollowUp>, busy: String?, model: Labora
         items.forEach { item ->
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(item.patientName, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                    if (item.critical) CriticalPill(stringResource(R.string.lab_critico)) else FamilyBadge(stringResource(R.string.lab_pendiente_observacion), StatusFamily.ATENCION)
+                    Text(item.patientName, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    if (item.critical) CriticalPill(stringResource(R.string.lab_critico)) else FamilyBadge(stringResource(R.string.lab_pendiente_observacion), StatusFamily.ESPERA)
                 }
                 item.record?.let { Text(stringResource(R.string.lab_expediente, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 Text(item.detail, style = MaterialTheme.typography.bodyMedium)
-                SecondaryButton(stringResource(R.string.lab_pendiente_revisado), { model.reviewFollowUp(item) }, enabled = busy == null)
+                RowAction(stringResource(R.string.lab_pendiente_revisado), { model.reviewFollowUp(item) }, enabled = busy == null, loading = busy == item.id)
             }
         }
     }
@@ -292,6 +298,27 @@ private fun describe(context: android.content.Context, uri: Uri): LabAttachment?
 }.getOrNull()
 
 /** Cancel with a reason (D-13: at least 10 characters). The reason and the open dialog live in the ViewModel, so a rotation keeps them. */
+/** R3 A-16: releasing a result to the patient is confirmed with what they will see; it closes only once the API accepts it. */
+@Composable
+private fun ReviewOrderDialog(order: LaboratoryOrder, state: LaboratoryState, model: LaboratoryViewModel) {
+    ConfirmDialog(
+        title = stringResource(R.string.lab_revisar_titulo),
+        message = stringResource(R.string.lab_revisar_efecto, order.patientName),
+        confirmLabel = stringResource(R.string.lab_revisar_confirmar),
+        onConfirm = { model.review(order) },
+        onDismiss = model::dismissReview,
+        busy = order.id in state.busyIds,
+        error = state.error,
+        onDone = model::dismissReview,
+        body = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                LabReviewSummary.lines(order).forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                if (LabReviewSummary.critical(order)) Text(stringResource(R.string.lab_revisar_critico), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+    )
+}
+
 @Composable
 private fun CancelOrderDialog(state: LaboratoryState, order: LaboratoryOrder?, model: LaboratoryViewModel) {
     // The order left the list or no longer allows cancelling (realtime update): the dialog closes on its own.
@@ -325,7 +352,8 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
     var expanded by rememberSaveable(order.id) { mutableStateOf(ownView || canReview || canLoadExternal || canSendExternal) }
     SectionCard(
         title = order.patientName,
-        eyebrow = stringResource(if (order.priority == "urgente") R.string.lab_prioridad_urgente else R.string.lab_prioridad_rutina),
+        // R3 A-33: routine is the default and gets no label; only an urgent order says so.
+        eyebrow = if (order.priority == "urgente") stringResource(R.string.lab_prioridad_urgente) else null,
         action = { LabStagePill(LabWorklist.stage(order)) },
     ) {
         if (!ownView) LabWorkSummary(order, now)
@@ -348,7 +376,7 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
         // T07c: the report file of a completed external order. Never in the patient's own view.
         if (!ownView && order.external && order.state == "completado") ExternalReport(order, model)
         if (canLoadExternal) PrimaryButton(stringResource(R.string.lab_cargar_externo), { model.openExternalLoad(order.id) }, enabled = !busy)
-        if (canReview) PrimaryButton(stringResource(R.string.lab_revisar), { model.review(order) }, enabled = !busy, loading = busy)
+        if (canReview) PrimaryButton(stringResource(R.string.lab_revisar), { model.openReview(order.id) }, enabled = !busy, loading = busy)
         if (canSendExternal) SecondaryButton(stringResource(R.string.lab_externo_titulo), { model.openExternal(order.id) }, enabled = !busy)
         if (canCancel) SecondaryButton(stringResource(R.string.lab_cancelar_orden), { model.openCancel(order.id) }, enabled = !busy)
         if (!ownView && !(canReview || canLoadExternal || canSendExternal)) TextButton(onClick = { expanded = false }) { Text(stringResource(R.string.lab_ocultar_detalle)) }
@@ -466,7 +494,7 @@ private fun LabStagePill(stage: LabStage) = FamilyBadge(stage.label, labStageFam
 
 internal fun labStageFamily(stage: LabStage): StatusFamily = when (stage) {
     LabStage.PENDING, LabStage.TO_REVIEW -> StatusFamily.ESPERA
-    LabStage.IN_PROCESS -> StatusFamily.LLAMADO
+    LabStage.IN_PROCESS -> StatusFamily.ATENCION
     LabStage.RELEASED -> StatusFamily.LISTO
     LabStage.CANCELLED -> StatusFamily.CERRADO
 }
