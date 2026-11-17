@@ -129,7 +129,7 @@ describe('B2-B3 · tablero', () => {
   });
 
   it('each called card keeps its own «Deshacer llamado»', async () => {
-    const rows = [ticket({ allowedActions: ['llamar'] }), ticket({ id: 't-8', numero: 8, allowedActions: ['llamar'] })];
+    const rows: Record<string, unknown>[] = [ticket({ allowedActions: ['llamar'] }), ticket({ id: 't-8', numero: 8, allowedActions: ['llamar'] })];
     const write = vi.fn(async (path: string) => {
       const id = path.split('/')[2], index = rows.findIndex(r => r.id === id);
       if (index >= 0 && path.endsWith('/llamar')) rows[index] = { ...rows[index], state: 'llamado', llamados: 1, version: 3, allowedActions: ['atender'] };

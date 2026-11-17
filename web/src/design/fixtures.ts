@@ -1,6 +1,7 @@
 /** Datos ficticios, utilizados exclusivamente por work-preview.html. No accede a la red. */
 import permissions from './permissions.json';
 import { ApiError,type AccessProfile,type Api,type Bed,type Patient,type Space,type Staff,type Shift,type UserAccount } from '../lib/api';
+import { FrontDeskFixtures } from './fixtures/front-desk';
 const clone=<T>(v:T):T=>structuredClone(v);
 let fixtureSequence=100000;
 const newFixtureId=()=>uuid(++fixtureSequence);
@@ -24,11 +25,14 @@ export class FixtureApi implements Api {
  private patients:Patient[]=[{id:uuid(41),record:'0000001-X',fullName:'Ana Lucía Ejemplo Hernández',givenNames:'Ana Lucía',surnames:'Ejemplo Hernández',state:'activo',active:true,sex:'femenino',birth:'1990-02-03',phone:'7000-0000',dui:'01234567-8',version:1,history:[]},{id:uuid(42),record:'0000002-8',fullName:'José Manuel Prueba Vásquez',givenNames:'José Manuel',surnames:'Prueba Vásquez',state:'activo',active:true,sex:'masculino',birth:null,version:1,history:[]},{id:uuid(43),record:'0000003-6',fullName:'María Elena Ejemplo Rivas',givenNames:'María Elena',surnames:'Ejemplo Rivas',state:'inactivo',active:false,sex:'femenino',birth:'1985-08-16',version:1,history:[]}];
  private users:UserAccount[]=[{id:uuid(1),name:'Andrea Ejemplo',email:'administracion@example.test',roles:['ADM'],state:'activo',version:1},{id:uuid(2),name:'Carlos Prueba',email:'operaciones@example.test',roles:['JOP'],state:'activo',version:1},{id:uuid(3),name:'Lucía Ejemplo',email:'recepcion@example.test',roles:['REC'],state:'activo',staffId:uuid(33),version:1},{id:uuid(4),name:'Elena Prueba',email:'laboratorio@example.test',roles:['LAB'],state:'activo',staffId:uuid(34),version:1}];
  private shifts:Shift[]=[{id:uuid(51),staffId:uuid(31),person:'Ana Isabel Ejemplo López',areaId:uuid(20),area:'Consulta general',start:'2026-10-24T13:00:00Z',end:'2026-10-24T21:00:00Z',type:'diurno',state:'publicado',version:1},{id:uuid(52),staffId:uuid(32),person:'Luis Fernando Prueba Rivas',areaId:uuid(12),area:'Planta 2',start:'2026-10-25T13:00:00Z',end:'2026-10-25T21:00:00Z',type:'diurno',state:'borrador',version:1}];
+ /** R7 U1: /fila, /citas, /pacientes/selector and /cuentas/vinculaciones at realistic volume (fixtures/front-desk.ts). */
+ private readonly desk=new FrontDeskFixtures();
  constructor(private role:string){}
  async request<T>(path:string):Promise<T>{
   const url=new URL(path,'https://fixture.invalid'),p=url.pathname;
-  let result:unknown;
-  if(p==='/auth/me')result=fixtureProfile(this.role);
+  let result:unknown=this.desk.request(path);
+  if(result!==undefined){}
+  else if(p==='/auth/me')result=fixtureProfile(this.role);
   else if(p==='/pacientes')result=this.patients;
   else if(p.startsWith('/pacientes/'))result=this.patients.find(r=>r.id===p.split('/')[2]);
   else if(p==='/personal')result=this.people;
@@ -43,7 +47,9 @@ export class FixtureApi implements Api {
  }
  async write<T>(path:string,raw:unknown,method='POST'):Promise<T>{
   const d=raw as Record<string,any>,id=path.split('/')[2];let result:unknown={ok:true};
-  if(path==='/pacientes/busquedas'){const q=d.query.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();result={token:newFixtureId(),expiresAt:new Date(Date.now()+600000).toISOString(),candidates:this.patients.filter(p=>(p.fullName+' '+p.record+' '+(p.dui??'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(q))};}
+  const desk=this.desk.write(path,d);
+  if(desk!==undefined)result=desk;
+  else if(path==='/pacientes/busquedas'){const q=d.query.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();result={token:newFixtureId(),expiresAt:new Date(Date.now()+600000).toISOString(),candidates:this.patients.filter(p=>(p.fullName+' '+p.record+' '+(p.dui??'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(q))};}
   else if(path==='/pacientes'){const p={givenNames:d.givenNames as string,surnames:d.surnames as string,sex:d.sex as string,...d,id:newFixtureId(),record:'0000004-4',fullName:d.givenNames+' '+d.surnames,active:true,state:'activo',version:1,history:[]} as Patient;this.patients.push(p);result={id:p.id,record:p.record,version:1};}
   else if(path.startsWith('/pacientes/')){const p=this.patients.find(p=>p.id===id);if(!p)throw new ApiError('No se encontró.',404);if(p.version!==d.version)throw new ApiError('La ficha cambió.',409);if(path.endsWith('/estado')){p.active=d.active;p.state=d.active?'activo':'inactivo';}else Object.assign(p,d,{fullName:d.givenNames+' '+d.surnames});p.version++;result={id,version:p.version};}
   else if(path==='/usuarios/invitaciones'){const u={id:newFixtureId(),name:d.displayName,email:d.email,roles:d.roles,state:'activo',version:1} as UserAccount;this.users.push(u);result={userId:u.id,email:u.email,roles:u.roles,status:'sent'};}

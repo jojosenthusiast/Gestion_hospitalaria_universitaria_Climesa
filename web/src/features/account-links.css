@@ -11,4 +11,4 @@
 .link-match { display: inline-flex; align-items: center; gap: 6px; }
 .link-match > span[aria-hidden] { font-weight: 800; }
 .link-match.is-ok > span[aria-hidden] { color: var(--success); }
-.link-match.is-off > span[aria-hidden] { color: var(--danger); }
+.link-match.is-off > span[aria-hidden] { color: var(--warning); }
