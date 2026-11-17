@@ -98,5 +98,5 @@
 .ag-summary dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
 .ag-fixed-patient { margin: 0; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .rq-days { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: 2px; }
-.rq-days .cl-chip { flex: 0 0 auto; text-transform: capitalize; }
+.rq-days .cl-chip { flex: 0 0 auto; }
 .rq-days .cl-chip[aria-pressed="true"] { border-color: var(--primary); background: var(--soft); color: var(--primary-strong); }

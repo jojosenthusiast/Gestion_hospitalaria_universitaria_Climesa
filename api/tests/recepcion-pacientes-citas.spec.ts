@@ -67,13 +67,14 @@ describe('Recepción · registrar pacientes y agendar con selectores', () => {
       }
     });
 
-    test('"maria" encuentra con y sin tilde y devuelve solo id, expediente, nombre y edad', async () => {
+    test('"maria" encuentra con y sin tilde y devuelve solo id, expediente, nombre, edad y lo de hoy en el mostrador', async () => {
       const r = await t.call('REC', 'GET', '/pacientes/selector?query=maria&limit=10');
       expect(r.status).toBe(200);
       const names = r.body.items.map((p: any) => p.fullName);
       expect(names).toEqual(expect.arrayContaining(['María Alejandra Pérez Lopez', 'María Valeria Pérez Soto', 'José María Gómez Díaz']));
       expect(names).not.toContain('Mario Ramos Cruz');
-      expect(Object.keys(r.body.items[0]).sort()).toEqual(['age', 'fullName', 'id', 'record']);
+      // R7 U1 (B-2): reception also gets the appointment and the queue number of today (null when there is none).
+      expect(Object.keys(r.body.items[0]).sort()).toEqual(['age', 'appointmentToday', 'fullName', 'id', 'record', 'ticketToday']);
       expect(typeof r.body.items[0].age).toBe('number');
     });
 
