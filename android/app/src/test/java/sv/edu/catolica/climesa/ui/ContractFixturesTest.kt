@@ -153,6 +153,13 @@ class ContractFixturesTest {
             sv.edu.catolica.climesa.domain.LabFollowUpRules.reviewBody(1), followUp)
     }
 
+    @Test fun laboratoryFollowUpProposalWrites() {
+        val proposal = "88888888-8888-4888-8888-888888888888"
+        val rules = sv.edu.catolica.climesa.domain.LabProposalRules
+        assertContract("laboratorio-seguimiento-confirmar", "POST", rules.confirmPath(proposal), rules.confirmBody(2, "22222222-2222-4222-8222-222222222222"), proposal)
+        assertContract("laboratorio-seguimiento-descartar", "POST", rules.discardPath(proposal), rules.discardBody(2, "  El paciente ya tiene control agendado "), proposal)
+    }
+
     @Test fun queueCallNext() {
         assertContract("fila-llamar-siguiente", "POST", "/fila/llamar-siguiente", sv.edu.catolica.climesa.domain.QueueRules.callNextBody("consulta_general"))
     }
@@ -160,7 +167,7 @@ class ContractFixturesTest {
     @Test fun queueFase2Bodies() {
         val ticket = "77777777-7777-4777-8777-777777777777"
         val rules = sv.edu.catolica.climesa.domain.QueueRules
-        assertContract("fila-emitir-prioridad", "POST", "/fila", rules.issueBody("emergencia", "urgente"))
+        assertContract("fila-emitir-prioridad", "POST", "/fila", rules.issueBody("emergencia", "urgente", "11111111-1111-4111-8111-111111111111"))
         assertContract("fila-deshacer-llamado", "POST", "/fila/$ticket/deshacer-llamado", rules.undoBody(3), ticket)
         assertContract("fila-prioridad", "POST", "/fila/$ticket/prioridad", rules.priorityBody(2, "emergencia"), ticket)
         assertContract("fila-llamar-siguiente-consultorio", "POST", "/fila/llamar-siguiente", rules.callNextBody("consulta_general", "99999999-9999-4999-8999-999999999999"))

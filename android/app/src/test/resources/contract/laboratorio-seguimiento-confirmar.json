@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/api/v1/laboratorio/seguimientos/{id}/confirmar",
+  "body": {
+    "version": 2,
+    "appointmentId": "22222222-2222-4222-8222-222222222222"
+  }
+}

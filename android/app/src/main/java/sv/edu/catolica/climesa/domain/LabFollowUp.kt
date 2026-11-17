@@ -87,6 +87,56 @@ object LabFollowUpRules {
     fun reviewBody(version: Int): JSONObject = JSONObject().put("version", version)
 }
 
+/**
+ * S10 «Citas de seguimiento por confirmar» (`GET /laboratorio/seguimientos`): when an order's results arrive, the system
+ * proposes an appointment with the doctor who asked for them. Reception never sees exams or values.
+ */
+data class LabProposal(
+    val id: String, val orderId: String, val patientId: String, val patientName: String, val patientRecord: String?,
+    val doctorId: String, val doctorName: String?, val priority: String, val resultsAt: String, val createdAt: String, val version: Int,
+) {
+    val urgent get() = priority == "urgente"
+    /** "Exp. EXP-1 · Con Dra. Prueba · Resultados del 16/11/2026 09:00", the same line as the web row. */
+    val detail get() = listOfNotNull(patientRecord?.let { "Exp. $it" }, doctorName?.let { "Con $it" }, "Resultados del ${LabProposalRules.dateTime(resultsAt)}").joinToString(" · ")
+}
+
+object LabProposalRules {
+    const val PATH = "/laboratorio/seguimientos"
+    /** Reason of the follow-up appointment, the same text the web sends. */
+    const val REASON = "Seguimiento de resultados de laboratorio"
+    const val DISCARD_MIN = 10
+    const val DISCARD_MAX = 500
+    private val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+    private val zone = java.time.ZoneId.of("America/El_Salvador")
+
+    fun dateTime(iso: String) = runCatching { formatter.format(java.time.Instant.parse(iso).atZone(zone)) }.getOrDefault(iso)
+
+    private fun JSONObject.text(key: String) = if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
+
+    fun parse(value: Any?): List<LabProposal> {
+        val rows = value as? JSONArray ?: return emptyList()
+        return (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }.mapNotNull { row ->
+            val id = row.text("id") ?: return@mapNotNull null
+            LabProposal(id, row.optString("orderId"), row.optString("patientId"), row.text("patientName") ?: "Paciente", row.text("patientRecord"),
+                row.optString("doctorId"), row.text("doctorName"), row.text("priority") ?: "rutina", row.optString("resultsAt"), row.optString("createdAt"), row.optInt("version", 1))
+        }
+    }
+
+    fun confirmPath(id: String) = "$PATH/$id/confirmar"
+    fun discardPath(id: String) = "$PATH/$id/descartar"
+    fun confirmBody(version: Int, appointmentId: String): JSONObject = JSONObject().put("version", version).put("appointmentId", appointmentId)
+    fun discardBody(version: Int, reason: String): JSONObject = JSONObject().put("version", version).put("reason", reason.trim())
+    fun discardError(reason: String): String? = when {
+        reason.trim().length < DISCARD_MIN -> "Escribe el motivo, de al menos $DISCARD_MIN caracteres."
+        reason.trim().length > DISCARD_MAX -> "El motivo no puede pasar de $DISCARD_MAX caracteres."
+        else -> null
+    }
+
+    /** `POST /citas` for the proposal: same patient and doctor, the chosen free slot and the follow-up reason. */
+    fun appointmentBody(proposal: LabProposal, slot: DaySlot): JSONObject =
+        JSONObject().put("patientId", proposal.patientId).put("doctorId", proposal.doctorId).put("start", slot.start).put("end", slot.end).put("reason", REASON)
+}
+
 /** Worklist groups in the order work happens; what is closed starts folded. Same groups as the web list. */
 enum class LabGroup(val label: String, val folded: Boolean) {
     IN_PROCESS("En proceso", false), SAMPLE("Por tomar muestra", false), EXTERNAL("Externas: esperan el informe", false),

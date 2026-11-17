@@ -98,13 +98,13 @@ Consulta de los servicios y de la planificación de turnos.
 
 ### Secciones
 
-Inicio, Avisos, Emitir número, Pacientes, Citas, Vinculaciones, Admisión y cama, Tablero de camas, Despacho, Mis turnos, Hospital y Perfil. La barra inferior muestra Inicio y tres tareas; el resto está en **Más**. **Avisos** funciona igual que en la web; un aviso crítico para Recepción sale arriba en Inicio hasta que das **Enterado** (ver `README.md`, "Avisos").
+Inicio, Avisos, Fila del día, Pacientes, Citas, Vinculaciones, Admisión y cama, Tablero de camas, Despacho, Mis turnos, Hospital y Perfil. La barra inferior muestra Inicio y tres tareas; el resto está en **Más**. **Avisos** funciona igual que en la web; un aviso crítico para Recepción sale arriba en Inicio hasta que das **Enterado** (ver `README.md`, "Avisos").
 
 | Sección | Qué haces |
 |---|---|
-| Emitir número | **Emitir número** → eliges el servicio y la **Prioridad** → **Emitir**. Debajo está la fila; al elegir un servicio aparece **Quién pasa después** con **Llamar siguiente**. Después de llamar aparece **Deshacer**. En cada número, **Mover o cambiar prioridad** ofrece solo los cambios que acepta el servidor. Cada número muestra su área (**CON 7**), su prioridad, **Cita** o **Sin cita** y la espera |
+| Fila del día | **Emitir número** → eliges el servicio, buscas y eliges al **paciente** (obligatorio) y la **Prioridad** → **Emitir**. Debajo está la fila; al elegir un servicio aparece **Quién pasa después** (Calculando…, el número propuesto o "Nadie espera") con **Llamar siguiente**, donde puedes elegir el **Consultorio** (opcional) para que el paciente vea a dónde pasar. Después de llamar aparece **Deshacer**. En cada número, **Mover o cambiar prioridad** ofrece solo los cambios que acepta el servidor. Cada número muestra su área (**CON 7**), su prioridad, **Cita** o **Sin cita** y la espera |
 | Pacientes | **Buscar paciente** y registrar después de buscar |
-| Citas | **Solicitudes por asignar**: **Asignar** (médico y franja ya prellenados; **Ver todo el día** si no hay libres en la franja pedida) → **Confirmar cita**, o **Rechazar** con motivo. **Agendar cita** → **Confirmar cita**. En cada cita: **Confirmar**, **Rechazar**, **Reprogramar**, **Cancelar cita**, **No asistió**, **Aceptar nuevo horario**, **Rechazar nuevo horario**, según lo que permita el servidor |
+| Citas | **Solicitudes por asignar**: **Asignar** (médico y franja ya prellenados; **Ver todo el día** si no hay libres en la franja pedida) → **Confirmar cita**, o **Rechazar** con motivo. **Agendar cita** → **Confirmar cita**. **Citas de seguimiento por confirmar**: **Agendar cita** (eliges día y hora libre del médico que pidió los exámenes) → **Confirmar cita**, o **Descartar** con motivo de al menos 10 caracteres. En cada cita: **Confirmar**, **Rechazar**, **Reprogramar**, **Cancelar cita**, **No asistió**, **Aceptar nuevo horario**, **Rechazar nuevo horario**, según lo que permita el servidor |
 | Vinculaciones | **Aprobar**, **Rechazar con motivo** |
 | Admisión y cama | **Ingresar paciente**, **Asignar cama** → **Confirmar cama**, **Cancelar admisión**. Si el origen, el médico tratante o la categoría tienen una sola opción, la app la elige y lo dice ("Elegimos por ti … porque solo había una opción") |
 | Tablero de camas | Estado de las camas |
