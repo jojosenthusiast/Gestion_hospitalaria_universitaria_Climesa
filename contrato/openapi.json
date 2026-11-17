@@ -27078,6 +27078,11 @@
             "nullable": true,
             "description": "S10: instrucciones para el paciente de la orden externa"
           },
+          "patientNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "R7 C1: nota del médico para el paciente; solo después de liberar los resultados"
+          },
           "externalActions": {
             "type": "array",
             "description": "S10: acciones del camino externo que el servidor acepta ahora para quien lee",
@@ -27340,6 +27345,11 @@
             "type": "string",
             "nullable": true,
             "description": "S10: instrucciones para el paciente de la orden externa"
+          },
+          "patientNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "R7 C1: nota del médico para el paciente; solo después de liberar los resultados"
           },
           "externalActions": {
             "type": "array",
@@ -27856,6 +27866,11 @@
           "followUp": {
             "type": "boolean",
             "description": "D-4: proponer a recepción una cita de seguimiento con el médico que pidió la orden. Si no se envía, se propone (comportamiento anterior)."
+          },
+          "patientNote": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "R7 C1: nota para el paciente, que la ve junto a los resultados liberados"
           }
         },
         "required": [

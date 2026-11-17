@@ -139,6 +139,7 @@ export class LabReviewDto {
   @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) reason?: string;
   @ApiPropertyOptional({ description: 'D-4: proponer a recepción una cita de seguimiento con el médico que pidió la orden. Si no se envía, se propone (comportamiento anterior).' }) @IsOptional() @IsBoolean() followUp?: boolean;
+  @ApiPropertyOptional({ maxLength: 500, description: 'R7 C1: nota para el paciente, que la ve junto a los resultados liberados' }) @IsOptional() @IsString() @MaxLength(500) patientNote?: string;
 }
 
 /** MA-LAB-02 (D-13): amend a result of a completed order; the order goes back to the doctor's review (D-040). */

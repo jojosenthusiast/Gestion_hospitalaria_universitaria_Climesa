@@ -5140,6 +5140,8 @@ export interface components {
             externalPlace: string | null;
             /** @description S10: instrucciones para el paciente de la orden externa */
             externalInstructions: string | null;
+            /** @description R7 C1: nota del médico para el paciente; solo después de liberar los resultados */
+            patientNote?: string | null;
             /** @description S10: acciones del camino externo que el servidor acepta ahora para quien lee */
             externalActions: components["schemas"]["AccionExternaLaboratorio"][];
         };
@@ -5216,6 +5218,8 @@ export interface components {
             externalPlace: string | null;
             /** @description S10: instrucciones para el paciente de la orden externa */
             externalInstructions: string | null;
+            /** @description R7 C1: nota del médico para el paciente; solo después de liberar los resultados */
+            patientNote?: string | null;
             /** @description S10: acciones del camino externo que el servidor acepta ahora para quien lee */
             externalActions: components["schemas"]["AccionExternaLaboratorio"][];
             cancellationReason: string | null;
@@ -5366,6 +5370,8 @@ export interface components {
             reason?: string;
             /** @description D-4: proponer a recepción una cita de seguimiento con el médico que pidió la orden. Si no se envía, se propone (comportamiento anterior). */
             followUp?: boolean;
+            /** @description R7 C1: nota para el paciente, que la ve junto a los resultados liberados */
+            patientNote?: string;
         };
         LabReviewResponse: {
             /** Format: uuid */

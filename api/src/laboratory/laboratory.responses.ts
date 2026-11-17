@@ -66,6 +66,7 @@ export class LabOrderResponse {
   @BoolProp({ description: 'S10: el examen se realiza en otro sitio' }) external!: boolean;
   @StrProp({ nullable: true, description: 'S10: dónde se realiza la orden externa' }) externalPlace!: string | null;
   @StrProp({ nullable: true, description: 'S10: instrucciones para el paciente de la orden externa' }) externalInstructions!: string | null;
+  @StrProp({ optional: true, nullable: true, description: 'R7 C1: nota del médico para el paciente; solo después de liberar los resultados' }) patientNote?: string | null;
   @EnumArrayProp(LAB_EXTERNAL_ACTIONS, 'AccionExternaLaboratorio', { description: 'S10: acciones del camino externo que el servidor acepta ahora para quien lee' }) externalActions!: string[];
 }
 

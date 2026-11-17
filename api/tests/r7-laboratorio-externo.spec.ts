@@ -86,4 +86,18 @@ describe('R7 · laboratorio: resultado externo sin orden, aviso al paciente y pe
     const again = await t.call('MED', 'POST', `/laboratorio/pendientes/${pending.id}/revisar`, { version: old.body.version });
     expect(again.status).toBe(201);
   });
+
+  test('A5: la nota opcional para el paciente se guarda al liberar y solo él la ve después de liberar', async () => {
+    const patientId = await t.patient({ linkPac: true });
+    await t.consultation(patientId);
+    const saved = await record(patientId, { place: 'Laboratorio Ejemplo', results: [{ examId: glu, value: 95 }], attachment });
+    const before = ((await t.call('PAC', 'GET', '/me/laboratorio')).body as any[]).find(o => o.id === saved.body.id);
+    expect(before.patientNote ?? null).toBeNull();
+    const released = await t.call('MED', 'POST', `/laboratorio/ordenes/${saved.body.id}/revisar`, { version: saved.body.version, followUp: false, patientNote: '  Repetir en ayunas el lunes.  ' });
+    expect(released.status).toBe(201);
+    const mine = ((await t.call('PAC', 'GET', '/me/laboratorio')).body as any[]).find(o => o.id === saved.body.id);
+    expect(mine.patientNote).toBe('Repetir en ayunas el lunes.');
+    const long = await t.call('MED', 'POST', `/laboratorio/ordenes/${saved.body.id}/revisar`, { version: released.body.version, patientNote: 'x'.repeat(501) });
+    expect(long.status).toBe(400);
+  });
 });
