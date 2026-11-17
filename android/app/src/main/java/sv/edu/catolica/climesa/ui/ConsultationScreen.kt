@@ -1,7 +1,14 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
@@ -67,7 +74,8 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     LaunchedEffect(selected) { selected?.takeIf { it.startsWith("consulta:") }?.split(':')?.let { parts -> model.open(parts[1], parts.getOrNull(2)?.toIntOrNull()) } }
     LaunchedEffect(state.resumed?.key) { state.resumed?.let { selected = it.key } }
     val selectedItem = state.appointments.firstOrNull { it.key == selected } ?: state.resumed?.takeIf { it.key == selected }
-    selectedItem?.let { item -> ConsultationDialog(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, onClose = { selected = null; model.closeResumed() }) }
+    // R3 A-3: the consultation is its own full screen (web `consultations.tsx`), not a dialog; system back leaves it.
+    selectedItem?.let { item -> ConsultationPage(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, modifier, onClose = { selected = null; model.closeResumed() }); return }
     val retry = { model.clearMessages(); model.load() }
     // S13: one primary action for the whole screen (call next, resume own patient, resume unsigned, or start a called number).
     val canCall = "fila.llamar" in permissions
@@ -159,7 +167,7 @@ private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, p
 }
 
 @Composable
-private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, onClose: () -> Unit) {
+private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, onClose: () -> Unit) {
     val draftId = item.consultationId?.takeIf { item.consultationState != "firmada" }
     val stored = remember(draftId) { draftId?.let(model::draft) }
     fun text(field: String, fallback: String) = DraftRules.text(stored, field, fallback)
@@ -198,16 +206,24 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
     val leave: () -> Unit = { if (draftId != null && DraftRules.mustConfirmLeave(dirty, draftStatus)) { confirmLeave = true } else { onClose() } }
     var confirmSign by remember(item.key) { mutableStateOf(false) }
     val signSent = remember(item.key) { mutableStateOf(false) }
-    CloseWhenDone(busy, signSent) { confirmSign = false }
+    CloseWhenDone(busy, signSent, error) { confirmSign = false }
     // Signing is clinical and irreversible: confirm with what happens. The notes are saved first, then signed; `busy`
     // spans both writes so the button cannot send twice.
     if (confirmSign) ConfirmDialog(
         title = stringResource(R.string.consulta_firmar_titulo), confirmLabel = stringResource(R.string.consulta_firmar), busy = busy,
         message = stringResource(R.string.consulta_firmar_detalle), dismissLabel = stringResource(R.string.borrador_seguir),
         onConfirm = { signSent.value = true; model.sign(item, reason, physicalExam, plan, onClose) }, onDismiss = { confirmSign = false },
+        body = if (error != null) ({ NoticeBanner(NoticeKind.ERROR, error) }) else null,
     )
     if (confirmLeave) ConfirmDialog(title = stringResource(R.string.borrador_salir_titulo), confirmLabel = stringResource(R.string.borrador_salir), onConfirm = { confirmLeave = false; onClose() }, onDismiss = { confirmLeave = false }, message = stringResource(R.string.borrador_salir_mensaje), dismissLabel = stringResource(R.string.borrador_seguir), destructive = true)
-    AlertDialog(onDismissRequest = { if (!busy) leave() }, shape = MaterialTheme.shapes.large, title = { Text(stringResource(if (signed) R.string.consulta_t_firmada else if (item.consultationId == null) R.string.consulta_t_iniciar else R.string.consulta_t_continuar), style = MaterialTheme.typography.titleLarge) }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
+    BackHandler(enabled = !busy) { leave() }
+    Column(modifier.fillMaxSize()) {
+    Row(Modifier.fillMaxWidth().padding(end = Spacing.md), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        IconButton(onClick = leave, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.consulta_cerrar)) }
+        Text(stringResource(if (signed) R.string.consulta_t_firmada else if (item.consultationId == null) R.string.consulta_t_iniciar else R.string.consulta_t_continuar), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+    HorizontalDivider(color = MaterialTheme.climesa.line)
+    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) { LabeledValue(stringResource(R.string.consulta_paciente), item.patientName, Modifier.weight(1f)); if (item.ticketNumber != null) LabeledValue(stringResource(R.string.consulta_numero), stringResource(R.string.clin_fila_numero, item.ticketNumber), Modifier.weight(1f)) else if (item.appointmentId.isNotBlank()) LabeledValue(stringResource(R.string.consulta_cita), formatDateTime(item.start), Modifier.weight(1f)) }
         error?.let { NoticeBanner(NoticeKind.ERROR, it) }
         if (item.consultationId == null && !item.canStart) NoticeBanner(NoticeKind.INFO, item.startBlockedReason ?: stringResource(R.string.consulta_no_iniciable))
@@ -218,8 +234,7 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             DraftStatus.NONE -> Unit
         }
         if (signed) NoticeBanner(NoticeKind.INFO, stringResource(R.string.clin_consulta_firmada_aviso))
-        // S9: consultation → procedures → prescription and/or exams → close, in that order.
-        Text(stringResource(R.string.consulta_pasos), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // S9: consultation → procedures → prescription and/or exams → close, in that order (numbered step headings, no prose).
         Text(stringResource(R.string.consulta_paso1), style = MaterialTheme.typography.titleSmall)
         FormField(stringResource(R.string.consulta_motivo), reason, { reason = it.take(2000) }, enabled = !signed, singleLine = false)
         FormField(stringResource(R.string.consulta_examen), physicalExam, { physicalExam = it.take(10000) }, enabled = !signed, singleLine = false)
@@ -257,26 +272,27 @@ private fun ConsultationDialog(item: MedicalAppointment, profile: AccessProfile?
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(labUrgent, { labUrgent = it }, enabled = !busy); Text(stringResource(R.string.lab_orden_urgente)) }
             SecondaryButton(stringResource(R.string.lab_orden_emitir), { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty())
         }
-        if (item.consultationId != null && !signed) {
-            Text(stringResource(R.string.consulta_paso4), style = MaterialTheme.typography.titleSmall)
-            Text(stringResource(R.string.consulta_paso4_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    } }, confirmButton = {
-        // One primary: "Iniciar consulta" before it exists, then "Firmar". Saving the draft is secondary.
-        if (!signed && item.consultationId == null && item.canStart) androidx.compose.material3.Button(onClick = { model.start(item, reason) }, enabled = !busy && reason.trim().isNotBlank()) {
-            Text(stringResource(if (busy) R.string.ui_un_momento else R.string.consulta_t_iniciar), style = MaterialTheme.typography.labelLarge)
-        } else if (!signed && item.consultationId != null) androidx.compose.material3.Button(onClick = { confirmSign = true }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank()) {
-            Text(stringResource(if (busy) R.string.ui_un_momento else R.string.consulta_firmar), style = MaterialTheme.typography.labelLarge)
-        }
-    }, dismissButton = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (!signed && item.consultationId != null) TextButton(onClick = { model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank()) { Text(stringResource(R.string.consulta_guardar_borrador), style = MaterialTheme.typography.labelLarge) }
-        TextButton(onClick = leave, enabled = !busy) { Text(stringResource(R.string.consulta_cerrar), style = MaterialTheme.typography.labelLarge) }
-    } })
+        if (item.consultationId != null && !signed) Text(stringResource(R.string.consulta_paso4), style = MaterialTheme.typography.titleSmall)
+    }
+    // Fixed action bar: always reachable at the bottom of a long consultation. One primary: "Iniciar consulta" before it
+    // exists, then "Firmar". Saving the draft is secondary.
+    HorizontalDivider(color = MaterialTheme.climesa.line)
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm, androidx.compose.ui.Alignment.End),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        if (!signed && item.consultationId != null) RowAction(stringResource(R.string.consulta_guardar_borrador), { model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank())
+        if (!signed && item.consultationId == null && item.canStart) PrimaryButton(stringResource(R.string.consulta_t_iniciar), { model.start(item, reason) }, enabled = reason.trim().isNotBlank(), loading = busy, fill = false)
+        else if (!signed && item.consultationId != null) PrimaryButton(stringResource(R.string.consulta_firmar), { confirmSign = true }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank(), fill = false)
+        else RowAction(stringResource(R.string.consulta_cerrar), leave, enabled = !busy)
+    }
+    }
 }
 
 private fun appointmentState(value: String) = StatusCatalog.label(value)
-private fun formatDateTime(value: String) = runCatching { appointmentFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
-private fun formatTime(value: String) = runCatching { DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault(value)
+private fun formatDateTime(value: String) = runCatching { appointmentFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault("—")
+private fun formatTime(value: String) = runCatching { DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault("—")
 
 /** After closing a consultation: who goes next in its area by the server rule, with the call one tap away (S9). */
 @Composable
@@ -293,7 +309,6 @@ private fun NextPatientHandoff(handoff: sv.edu.catolica.climesa.domain.NextPropo
             Text(proposal.patientName, style = MaterialTheme.typography.bodyLarge)
             Text(proposal.reasonText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else Text(stringResource(R.string.fila_nadie_espera), style = MaterialTheme.typography.bodyMedium)
-        if (handoff.rule.isNotBlank()) Text(stringResource(R.string.fila_regla, handoff.rule), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (proposal != null && canCall) PrimaryButton(stringResource(R.string.consulta_llamar_a, proposal.code), onCall, enabled = !busy)
         SecondaryButton(stringResource(R.string.consulta_ahora_no), onDismiss, enabled = !busy)
     }

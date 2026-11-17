@@ -172,7 +172,6 @@ private fun NextCard(state: QueueState, service: String, canCall: Boolean, waiti
             Text(proposal.patientName, style = MaterialTheme.typography.bodyLarge)
             Text(proposal.reasonText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else if (status == NextStatus.NONE) Text(stringResource(R.string.fila_nadie_espera), style = MaterialTheme.typography.bodyMedium)
-        next?.rule?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.fila_regla, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (canCall) {
             OfficePicker(state.offices, office, busy, onOffice)
             PrimaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, icon = Icons.Default.Phone, enabled = !busy && waiting)
