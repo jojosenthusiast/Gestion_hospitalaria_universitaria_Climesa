@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Cada parte se pide por separado: la que falla muestra su error con «Reintentar» (CH-02), nunca un cero falso.
 struct DoctorDay: Sendable {
-    var agenda: [AgendaEntry]?
+    var agenda: Part<[AgendaEntry]>?
     var tickets: Part<[QueueTicket]>?
     /// S9: who goes next in consulta general by the server rule (`GET /fila/siguiente`); nil when unreadable.
     var next: QueueNextProposal?
@@ -29,10 +29,9 @@ struct DoctorDayView: View {
     @State private var loader = Loader<DoctorDay>()
     @State private var calling = Submission()
     @State private var deciding = Submission()
-    /// Last call made here, undoable while it is still "llamado" (S9): ticket id, returned version and "CON 7".
+    /// Last call made here, undoable while it is still "llamado" and the server accepts undoing it (S9): ticket id,
+    /// returned version and "CON 7".
     @State private var undo: (id: String, version: Int, code: String)?
-    /// Ticket this doctor called; only that called number may be the day's primary (`/fila` lists every office's calls).
-    @State private var calledByMe: String?
     @State private var rejecting: Appointment?
 
     var body: some View {
@@ -49,7 +48,7 @@ struct DoctorDayView: View {
                 if let open = day.unsigned?.value, !open.isEmpty { unsignedSection(open) }
                 if let pending = day.reschedules?.value, !pending.isEmpty { rescheduleSection(pending) }
                 if let tickets = day.tickets?.value { queueSection(tickets, next: day.next) }
-                if let agenda = day.agenda { agendaSection(agenda) }
+                if let agenda = day.agenda?.value { agendaSection(agenda) }
                 moreSection(day)
             }
         }
@@ -87,7 +86,7 @@ struct DoctorDayView: View {
     private func accept(_ item: Appointment) async {
         guard let request = item.reschedule else { return }
         let body = RescheduleDecisionBody(version: request.version)
-        await deciding.run(request.id, body: body, success: L.text("day.reschedules.accept")) { key in
+        await deciding.run(request.id, body: body, success: L.text("day.reschedules.accepted")) { key in
             _ = try await account.client().send("POST", "/citas/reprogramaciones/\(request.id)/aceptar", body: body, key: key, as: AppointmentCommandResult.self)
         }
         await load()
@@ -98,7 +97,7 @@ struct DoctorDayView: View {
             if let pending = day.pendingResults?.value {
                 Button { go(.resultados) } label: { StatTile(value: "\(pending)", label: L.text("day.results")) }.buttonStyle(.plain)
             }
-            if let agenda = day.agenda { StatTile(value: "\(agenda.count)", label: L.text("day.appointments")) }
+            if let agenda = day.agenda?.value { StatTile(value: "\(agenda.count)", label: L.text("day.appointments")) }
             if let tickets = day.tickets?.value {
                 StatTile(value: "\(tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count)", label: L.text("ds.medico.stat.waiting"))
             }
@@ -109,6 +108,7 @@ struct DoctorDayView: View {
     /// Partes del día que no se pudieron leer, cada una con su título y «Reintentar».
     @ViewBuilder private func partErrors(_ day: DoctorDay) -> some View {
         let failed = [
+            PartFailure(title: L.text("day.agenda"), message: day.agenda?.error),
             PartFailure(title: L.text("day.queue"), message: day.tickets?.error),
             PartFailure(title: L.text("day.results.title"), message: day.pendingResults?.error),
             PartFailure(title: L.text("ds.medico.stat.hospitalized"), message: day.hospitalized?.error)
@@ -121,7 +121,7 @@ struct DoctorDayView: View {
     @ViewBuilder private func queueSection(_ tickets: [QueueTicket], next: QueueNextProposal?) -> some View {
         let waiting = tickets.filter { $0.service == .consultaGeneral && $0.state == .enEspera }.count
         // S13: one primary on the day: attend the number already called, otherwise call the next one.
-        let primary = DoctorDayActionRules.primary(tickets: tickets, canAttend: account.can("consulta.iniciar"), canCallNext: account.can("fila.llamar"), calledByMe: calledByMe)
+        let primary = DoctorDayActionRules.primary(tickets: tickets, canAttend: account.can("consulta.iniciar"), canCallNext: account.can("fila.llamar"))
         SectionCard(title: L.text("day.queue")) {
             Text(verbatim: String(format: L.text("day.queue.waiting"), waiting)).font(Typo.body).foregroundStyle(Theme.ink)
             // S9 / RN-FILA-SIGUIENTE: the server proposes who goes next and says why; "Llamar siguiente" calls that number.
@@ -129,7 +129,7 @@ struct DoctorDayView: View {
             if account.can("fila.llamar"), QueueRules.nextToCall(tickets) != nil {
                 ClimesaButton(title: L.text("day.queue.callNext"), kind: primary == .callNext ? .primary : .secondary, loading: calling.busy) { Task { await callNext() } }
             }
-            if let undo {
+            if let undo, DoctorDayActionRules.canUndoCall(undo.id, tickets: tickets) {
                 HStack(spacing: Spacing.m) {
                     Text(verbatim: String(format: L.text("queue.called.undoable"), undo.code)).font(Typo.body).foregroundStyle(Theme.ink)
                     Spacer()
@@ -144,7 +144,7 @@ struct DoctorDayView: View {
                 HStack(spacing: Spacing.s) {
                     AreaTag(QueueBoardRules.area(ticket))
                     // The per-area number, large, as it is called out ("CON 7").
-                    Text(verbatim: "\(ticket.number)").font(.title2.bold()).foregroundStyle(Theme.ink).accessibilityLabel(QueueBoardRules.code(ticket))
+                    Text(verbatim: "\(ticket.number)").font(Typo.number(22)).foregroundStyle(Theme.ink).accessibilityLabel(QueueBoardRules.code(ticket))
                     Spacer()
                     MedicoTag(ticket.state.rawValue, label: ticket.state.label)
                 }
@@ -165,7 +165,10 @@ struct DoctorDayView: View {
                     Text(verbatim: "\(item.action.label): \(item.reason)").font(Typo.small).foregroundStyle(Theme.muted)
                 }
                 cardMenu(ticket)
-                if account.can("consulta.iniciar") {
+                if DoctorDayActionRules.calledElsewhere(ticket) {
+                    // Another clinician called this number: it is theirs to attend (web `calledElsewhere`).
+                    Text("day.queue.calledElsewhere").font(Typo.small).foregroundStyle(Theme.muted)
+                } else if account.can("consulta.iniciar") {
                     // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
                     NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
                         .buttonStyle(ClimesaButtonStyle(kind: primary == .attend(ticket.id) ? .primary : .secondary))
@@ -180,7 +183,7 @@ struct DoctorDayView: View {
             if let proposal = next.proposal {
                 HStack(spacing: Spacing.s) {
                     AreaTag(proposal.area)
-                    Text(verbatim: "\(proposal.number)").font(.title.bold()).foregroundStyle(Theme.ink).accessibilityLabel(proposal.code)
+                    Text(verbatim: "\(proposal.number)").font(Typo.number(28)).foregroundStyle(Theme.ink).accessibilityLabel(proposal.code)
                     if proposal.priority != "rutina" { PriorityBadge(proposal.priority) }
                 }
                 Text(verbatim: proposal.patientName ?? "").font(Typo.body).foregroundStyle(Theme.ink)
@@ -283,8 +286,10 @@ struct DoctorDayView: View {
             var day = DoctorDay()
             let today = ClimesaDates.localDay(Date())
             if profile.hasPermission("consulta.iniciar") {
-                let entries = try await api.get("/consultas/agenda", as: [AgendaEntry].self)
-                day.agenda = entries.filter { ClimesaDates.parse($0.start).map(ClimesaDates.localDay) == today }.sorted { $0.start < $1.start }
+                day.agenda = try await Part<[AgendaEntry]>.load {
+                    let entries = try await api.get("/consultas/agenda", as: [AgendaEntry].self)
+                    return entries.filter { ClimesaDates.parse($0.start).map(ClimesaDates.localDay) == today }.sorted { $0.start < $1.start }
+                }
             }
             if profile.hasPermission("consulta.iniciar") {
                 day.unsigned = try await Part<[UnsignedConsultation]>.load { try await api.get("/consultas/sin-firmar", as: [UnsignedConsultation].self) }
@@ -317,6 +322,8 @@ struct DoctorDayView: View {
             }
             return day
         }
+        // The undo line outlives neither the call nor the server's undo window.
+        if let last = undo, let tickets = loader.value?.tickets?.value, !DoctorDayActionRules.canUndoCall(last.id, tickets: tickets) { undo = nil }
     }
 
     private func callNext() async {
@@ -326,9 +333,9 @@ struct DoctorDayView: View {
             called = try await account.client().send("POST", "/fila/llamar-siguiente", body: body, key: key, as: QueueCallNextResult.self)
         }
         if let called {
-            calling.notice = String(format: L.text("day.queue.called"), called.number)
-            undo = (called.id, called.version, "\(QueueBoardRules.area(of: .consultaGeneral)) \(called.number)")
-            calledByMe = called.id
+            let code = "\(QueueBoardRules.area(of: .consultaGeneral)) \(called.number)"
+            calling.notice = QueueBoardRules.moveDone(code, .llamar)
+            undo = (called.id, called.version, code)
         }
         await load()
     }
@@ -339,17 +346,17 @@ struct DoctorDayView: View {
         let ok = await calling.run(last.id, body: body, success: String(format: L.text("queue.undone"), last.code)) { key in
             _ = try await account.client().send("POST", "/fila/\(last.id)/deshacer-llamado", body: body, key: key, as: QueueTransitionResult.self)
         }
-        if ok { if calledByMe == last.id { calledByMe = nil }; undo = nil }
+        if ok { undo = nil }
         await load()
     }
 
     private func move(_ ticket: QueueTicket, _ move: QueueMove) async {
         let body = VersionBody(version: ticket.version)
         var result: QueueTransitionResult?
-        await calling.run(ticket.id, body: body, success: "\(QueueBoardRules.code(ticket)): \(move.label)") { key in
+        await calling.run(ticket.id, body: body, success: QueueBoardRules.moveDone(QueueBoardRules.code(ticket), move)) { key in
             result = try await account.client().send("POST", QueueBoardRules.path(ticket, move), body: body, key: key, as: QueueTransitionResult.self)
         }
-        if move == .llamar, let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)); calledByMe = ticket.id } else if result != nil { undo = nil }
+        if move == .llamar, let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)) } else if result != nil { undo = nil }
         await load()
     }
 
@@ -363,7 +370,7 @@ struct DoctorDayView: View {
 
     private func absent(_ ticket: QueueTicket) async {
         let body = VersionBody(version: ticket.version)
-        await calling.run(ticket.id, body: body, success: QueueState.noSePresento.label) { key in
+        await calling.run(ticket.id, body: body, success: QueueBoardRules.moveDone(QueueBoardRules.code(ticket), .noSePresento)) { key in
             _ = try await account.client().send("POST", "/fila/\(ticket.id)/no-se-presento", body: body, key: key, as: QueueTransitionResult.self)
         }
         await load()
@@ -372,10 +379,10 @@ struct DoctorDayView: View {
     private func call(_ ticket: QueueTicket) async {
         let body = VersionBody(version: ticket.version)
         var result: QueueCallResult?
-        await calling.run(ticket.id, body: body, success: String(format: L.text("day.queue.called"), ticket.number)) { key in
+        await calling.run(ticket.id, body: body, success: QueueBoardRules.moveDone(QueueBoardRules.code(ticket), .llamar)) { key in
             result = try await account.client().send("POST", "/fila/\(ticket.id)/llamar", body: body, key: key, as: QueueCallResult.self)
         }
-        if let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)); calledByMe = ticket.id }
+        if let result { undo = (ticket.id, result.version, QueueBoardRules.code(ticket)) }
         await load()
     }
 }
@@ -428,13 +435,20 @@ struct ResultsReviewView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<[LabOrder]>()
-    @State private var followUps: [LabFollowUp] = []
+    /// Nil before the first read or without `laboratorio.revisar`; a failed read shows its error, never an empty inbox.
+    @State private var followUps: Part<[LabFollowUp]>?
     @State private var followUpSubmission = Submission()
 
     var body: some View {
         LoadState(loader: loader, retry: load) { orders in
             // S10: valores críticos y observaciones relevantes del laboratorio, hasta que el médico los marca revisados.
-            if account.can("laboratorio.revisar") { LabFollowUpInbox(items: followUps, submission: followUpSubmission, review: review) }
+            if account.can("laboratorio.revisar") {
+                if let message = followUps?.error {
+                    SectionCard(title: L.text("results.followUp.title")) { PartError(message: message, retry: loadFollowUps) }
+                } else if let items = followUps?.value {
+                    LabFollowUpInbox(items: items, submission: followUpSubmission, review: review)
+                }
+            }
             let pending = ReviewRules.pending(orders)
             let critical = ReviewRules.criticalToReview(orders)
             let inProgress = ReviewRules.cancellable(orders)
@@ -442,8 +456,7 @@ struct ResultsReviewView: View {
             if pending.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
             ForEach(pending) { order in
                 NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
-                    LabOrderRow(order: order, status: L.text(ReviewRules.isAmendedPendingReview(order) ? "results.amended" : "results.toReview"),
-                                critical: ReviewRules.isCritical(order))
+                    LabOrderRow(order: order, status: L.text(ReviewRules.rowStatusKey(order)), critical: ReviewRules.isCritical(order))
                 }.buttonStyle(.plain)
             }
             if !inProgress.isEmpty {
@@ -465,7 +478,13 @@ struct ResultsReviewView: View {
 
     private func loadFollowUps() async {
         guard account.can("laboratorio.revisar") else { return }
-        if let rows = try? await account.client().get("/laboratorio/pendientes", as: [LabFollowUp].self) { followUps = LabFollowUpRules.sorted(rows) }
+        do {
+            let rows = try await account.client().get("/laboratorio/pendientes", as: [LabFollowUp].self)
+            followUps = .loaded(LabFollowUpRules.sorted(rows))
+        } catch is CancellationError {
+        } catch {
+            followUps = .failed(error.userMessage)
+        }
     }
 
     private func review(_ item: LabFollowUp) async {
@@ -491,11 +510,13 @@ private struct LabFollowUpInbox: View {
                     HStack(spacing: Spacing.s) {
                         Text(verbatim: item.patientName ?? L.text("results.followUp.patient")).font(Typo.label).foregroundStyle(Theme.ink)
                         Spacer()
-                        PatientTag(item.critical ? "critico_alto" : "en_proceso", label: L.text(item.critical ? "results.critical" : "results.followUp.observation"))
+                        // A relevant observation is not a process state: neutral tag; red only for the critical value.
+                        PatientTag(item.critical ? "critico_alto" : "observacion", label: L.text(item.critical ? "results.critical" : "results.followUp.observation"))
                     }
                     if let record = item.patientRecord { Text(verbatim: "Exp. \(record)").font(Typo.small).foregroundStyle(Theme.muted) }
                     Text(verbatim: item.detail).font(Typo.small).foregroundStyle(Theme.ink)
-                    ClimesaButton(title: L.text("results.followUp.review"), kind: .secondary, loading: submission.busy) { Task { await review(item) } }
+                    ClimesaButton(title: L.text("results.followUp.review"), kind: .secondary, loading: submission.busyId == item.id) { Task { await review(item) } }
+                        .disabled(submission.busy)
                 }
             }
             WriteNotice(submission: submission, reload: {})
@@ -1006,7 +1027,7 @@ private struct RejectRescheduleSheet: View {
     private func send() async {
         guard let request = appointment.reschedule else { return }
         let body = RescheduleDecisionBody(version: request.version, rejectionReason: trimmed)
-        let ok = await submission.run(request.id, body: body, success: L.text("day.reschedules.reject")) { key in
+        let ok = await submission.run(request.id, body: body, success: L.text("day.reschedules.rejected")) { key in
             _ = try await account.client().send("POST", "/citas/reprogramaciones/\(request.id)/rechazar", body: body, key: key, as: AppointmentCommandResult.self)
         }
         await reload()

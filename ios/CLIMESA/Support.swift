@@ -31,6 +31,8 @@ final class Loader<Value: Sendable> {
 @MainActor @Observable
 final class Submission {
     private(set) var busy = false
+    /// The record (`id`) whose write is in flight, so a list shows the spinner only on that row.
+    private(set) var busyId: String?
     var error: String?
     var notice: String?
     private(set) var lastFailure: APIFailure?
@@ -43,8 +45,8 @@ final class Submission {
     @discardableResult
     func run<Body: Encodable>(_ id: String = "form", body: Body, success: String? = nil, _ send: (String) async throws -> Void) async -> Bool {
         guard !busy else { return false }
-        busy = true; error = nil; notice = nil; lastFailure = nil
-        defer { busy = false }
+        busy = true; busyId = id; error = nil; notice = nil; lastFailure = nil
+        defer { busy = false; busyId = nil }
         let fingerprint = JSONBody.fingerprint(body)
         let key = intents.key(id, fingerprint: fingerprint)
         do {
@@ -65,6 +67,9 @@ final class Submission {
 }
 
 extension Submission {
+    /// Clears the last rejection and its texts, so a conflict banner goes away once the screen reloads.
+    func clearFailure() { lastFailure = nil; error = nil; notice = nil }
+
     /// MOV-03: mensajes en español por campo del último rechazo (`errors[]` del problem+json), para mostrarlos junto al campo.
     var fieldErrors: [String: String] { lastFailure?.fieldErrors ?? [:] }
 }

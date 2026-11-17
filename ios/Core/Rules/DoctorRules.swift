@@ -25,6 +25,13 @@ public enum ReviewRules {
         orders.filter { $0.allows(.cancelar) }.sorted { $0.createdAt < $1.createdAt }
     }
 
+    /// Label key of a completed order waiting for review (web `stageLabel`): "Por revisar" only when this doctor can
+    /// review it (`allowedActions` has `revisar`); otherwise "Completada · falta revisión médica".
+    public static func rowStatusKey(_ order: LabOrder) -> String {
+        guard order.allows(.revisar) else { return "results.awaitingReview" }
+        return isAmendedPendingReview(order) ? "results.amended" : "results.toReview"
+    }
+
     /// Un laboratorista corrigió un resultado y el médico todavía no lo vuelve a revisar.
     public static func isAmendedPendingReview(_ order: LabOrder) -> Bool {
         order.amendedAt != nil && order.state == .completado && order.reviewedAt == nil

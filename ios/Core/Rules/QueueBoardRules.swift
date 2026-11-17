@@ -89,6 +89,18 @@ public enum QueueBoardRules {
     /// "CON 7": area code next to the per-area number.
     public static func code(_ ticket: QueueTicket) -> String { "\(area(ticket)) \(ticket.number)" }
 
+    /// The confirmation after a move, in the past tense: "CON 7 llamado", "CON 7 devuelto a espera".
+    public static func moveDone(_ code: String, _ move: QueueMove) -> String {
+        switch move {
+        case .llamar: return "\(code) llamado"
+        case .atender: return "\(code) en atención"
+        case .completar: return "\(code) completado"
+        case .noSePresento: return "\(code) marcado como no se presentó"
+        case .deshacerLlamado: return "\(code) devuelto a espera"
+        case .quitarLlamado: return "\(code) con un llamado menos"
+        }
+    }
+
     public static func priority(_ ticket: QueueTicket) -> String { ticket.priority ?? "rutina" }
 
     public static func priorityLabel(_ code: String) -> String {

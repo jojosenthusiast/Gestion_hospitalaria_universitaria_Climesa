@@ -66,6 +66,9 @@ struct ConsultationView: View {
     /// S9: after signing, who goes next in the consultation's area (`nextProposal`), with the call one tap away.
     @State private var handoff: QueueNextProposal?
     @State private var handoffCall = Submission()
+    /// S9: the number called from the handoff, undoable from here like on Mi día ("Llamaste CON 4 · Deshacer").
+    @State private var lastCall: (id: String, version: Int, code: String)?
+    @State private var undoing = Submission()
     @State private var prefilledVersion: Int?
     @State private var reason = ""
     @State private var exam = ""
@@ -192,6 +195,14 @@ struct ConsultationView: View {
         let editable = ConsultationRules.isEditable(value.consultation.state) && profile.hasPermission("consulta.registrar")
         MedicoTag(value.consultation.state.rawValue, label: value.consultation.state.label)
         if let handoff { nextPatient(handoff, editable: editable) }
+        if let lastCall {
+            HStack(spacing: Spacing.m) {
+                Text(verbatim: String(format: L.text("queue.called.undoable"), lastCall.code)).font(Typo.body).foregroundStyle(Theme.ink)
+                Spacer()
+                Button(L.text("queue.undo")) { Task { await undoCall() } }.disabled(undoing.busy)
+            }
+        }
+        WriteNotice(submission: undoing, reload: loadDetail)
         if editable {
             // S9: consultation → procedures → prescription and/or exams → close, in that order.
             Text("consultation.steps").font(Typo.small).foregroundStyle(Theme.muted)
@@ -404,6 +415,8 @@ struct ConsultationView: View {
             saved = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
         }
         if ok {
+            // The notes are saved, so an earlier "not saved" error next to «Firmar» no longer applies.
+            signSaveFailed = false
             // Las notas ya están en la API: el borrador local solo conserva el diagnóstico o la receta pendientes.
             savedNotes = ConsultationDraft(reason: reason, exam: exam, plan: plan)
             draftRecovered = false
@@ -478,7 +491,7 @@ struct ConsultationView: View {
             if let proposal = next.proposal {
                 HStack(spacing: Spacing.s) {
                     AreaTag(proposal.area)
-                    Text(verbatim: "\(proposal.number)").font(.title.bold()).foregroundStyle(Theme.ink).accessibilityLabel(proposal.code)
+                    Text(verbatim: "\(proposal.number)").font(Typo.number(28)).foregroundStyle(Theme.ink).accessibilityLabel(proposal.code)
                     if proposal.priority != "rutina" { PriorityBadge(proposal.priority) }
                 }
                 Text(verbatim: proposal.patientName ?? "").font(Typo.body).foregroundStyle(Theme.ink)
@@ -500,9 +513,23 @@ struct ConsultationView: View {
 
     private func callProposed(_ proposal: QueueProposedTicket) async {
         let body = VersionBody(version: proposal.version)
-        let ok = await handoffCall.run(proposal.id, body: body, success: String(format: L.text("queue.called.undoable"), proposal.code)) { key in
-            _ = try await account.client().send("POST", "/fila/\(proposal.id)/llamar", body: body, key: key, as: QueueCallResult.self)
+        var result: QueueCallResult?
+        let ok = await handoffCall.run(proposal.id, body: body) { key in
+            result = try await account.client().send("POST", "/fila/\(proposal.id)/llamar", body: body, key: key, as: QueueCallResult.self)
         }
-        if ok { handoff = nil }
+        if ok {
+            handoff = nil
+            undoing.clearFailure()
+            if let result { lastCall = (result.id, result.version, proposal.code) }
+        }
+    }
+
+    private func undoCall() async {
+        guard let last = lastCall else { return }
+        let body = VersionBody(version: last.version)
+        let ok = await undoing.run(last.id, body: body, success: String(format: L.text("queue.undone"), last.code)) { key in
+            _ = try await account.client().send("POST", "/fila/\(last.id)/deshacer-llamado", body: body, key: key, as: QueueTransitionResult.self)
+        }
+        if ok { lastCall = nil }
     }
 }

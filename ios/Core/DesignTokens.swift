@@ -191,15 +191,16 @@ public enum StatusFamily: String, CaseIterable, Sendable {
 
     private static let byValue: [String: StatusFamily] = [
         "en_espera": .espera, "solicitada": .espera, "pendiente": .espera, "pendiente_cama": .espera, "borrador": .espera,
-        "publicado": .espera, "reservada": .espera, "provisional": .espera,
+        "publicado": .espera, "reservada": .espera, "provisional": .espera, "por_vencer": .espera, "revisar": .espera,
         "llamado": .llamado, "confirmada": .llamado, "en_proceso": .llamado, "limpieza": .llamado, "reprogramada": .llamado,
+        "bajo_minimo": .llamado,
         "en_atencion": .atencion, "en_curso": .atencion, "ocupada": .atencion, "hospitalizado": .atencion,
         "en_servicio": .atencion, "abierta": .atencion,
         "atendida": .listo, "atendido": .listo, "completado": .listo, "firmada": .listo, "alta_firmada": .listo, "egresado": .listo, "libre": .listo,
-        "disponible": .listo, "activo": .listo, "exito": .listo, "normal": .listo, "aprobada": .listo,
+        "disponible": .listo, "activo": .listo, "exito": .listo, "normal": .listo, "aprobada": .listo, "ok": .listo, "coincide": .listo,
         "cancelado": .cerrado, "cancelada": .cerrado, "no_asistio": .cerrado, "no_se_presento": .cerrado, "cerrado": .cerrado,
         "rechazada": .cerrado, "vencida": .cerrado, "vencido": .cerrado, "bloqueada": .cerrado, "inactivo": .cerrado,
-        "desactivado": .cerrado, "denegado": .cerrado, "fallido": .cerrado, "en_mantenimiento": .cerrado,
+        "desactivado": .cerrado, "denegado": .cerrado, "fallido": .cerrado, "en_mantenimiento": .cerrado, "agotado": .cerrado,
         "critico_alto": .critico, "critico_bajo": .critico
     ]
 

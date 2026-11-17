@@ -4,9 +4,14 @@ import XCTest
 /// Fase 2, S13 (iOS): one primary action per screen, prefilled forms and filters that apply on change.
 final class RoleFlowRulesTests: XCTestCase {
     /// `consultation` is the doctor's own consultation id: `/fila` returns it only for the reader's own consultation.
-    private func ticket(_ id: String, state: String, number: Int, service: String = "consulta_general", consultation: String? = nil) -> QueueTicket {
+    /// `byMe` / `byColleague` are the API's `calledByMe` / `calledByColleague`; nil leaves the field out (older server).
+    private func ticket(_ id: String, state: String, number: Int, service: String = "consulta_general", consultation: String? = nil,
+                        byMe: Bool? = nil, byColleague: Bool? = nil, undo: String? = nil) -> QueueTicket {
         let own = consultation.map { #","consultationId":"\#($0)""# } ?? ""
-        let json = #"{"id":"\#(id)","service":"\#(service)","fecha":"2026-11-20","numero":\#(number),"patientId":null,"patientName":"Paciente Ficticio","state":"\#(state)","officeId":null,"llamados":1,"version":3,"issuedAt":"2026-11-20T14:00:00Z"\#(own)}"#
+        let me = byMe.map { #","calledByMe":\#($0)"# } ?? ""
+        let colleague = byColleague.map { #","calledByColleague":\#($0)"# } ?? ""
+        let undoable = undo.map { #","undoActions":["\#($0)"]"# } ?? ""
+        let json = #"{"id":"\#(id)","service":"\#(service)","fecha":"2026-11-20","numero":\#(number),"patientId":null,"patientName":"Paciente Ficticio","state":"\#(state)","officeId":null,"llamados":1,"version":3,"issuedAt":"2026-11-20T14:00:00Z"\#(own)\#(me)\#(colleague)\#(undoable)}"#
         return try! JSONDecoder().decode(QueueTicket.self, from: Data(json.utf8))
     }
 
@@ -43,15 +48,39 @@ final class RoleFlowRulesTests: XCTestCase {
     // MARK: - I20 doctor's day
 
     func testMiDiaAtenderAlQueYoLlameGanaALlamarSiguiente() {
-        let tickets = [ticket("a", state: "en_espera", number: 3), ticket("b", state: "llamado", number: 5), ticket("c", state: "llamado", number: 4)]
-        XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true, calledByMe: "b"), .attend("b"))
+        let tickets = [ticket("a", state: "en_espera", number: 3), ticket("b", state: "llamado", number: 5, byMe: true, byColleague: false),
+                       ticket("c", state: "llamado", number: 4, byMe: false, byColleague: true)]
+        XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true), .attend("b"))
     }
 
     func testMiDiaUnLlamadoDeOtroMedicoNoEsMiAtender() {
         // /fila lists the called numbers of every office: a number a colleague called is never this doctor's primary.
-        let tickets = [ticket("a", state: "en_espera", number: 3), ticket("c", state: "llamado", number: 4)]
+        let tickets = [ticket("a", state: "en_espera", number: 3), ticket("c", state: "llamado", number: 4, byMe: false, byColleague: true)]
         XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true), .callNext)
-        XCTAssertEqual(DoctorDayActionRules.primary(tickets: tickets, canAttend: true, canCallNext: true, calledByMe: "z"), .callNext)
+        // An older server without the fields: a call nobody claims is never this doctor's primary either.
+        let old = [ticket("a", state: "en_espera", number: 3), ticket("c", state: "llamado", number: 4)]
+        XCTAssertEqual(DoctorDayActionRules.primary(tickets: old, canAttend: true, canCallNext: true), .callNext)
+    }
+
+    func testUnLlamadoDeColegaNoSePuedeAtender() {
+        XCTAssertTrue(DoctorDayActionRules.calledElsewhere(ticket("c", state: "llamado", number: 4, byMe: false, byColleague: true)))
+        // Reception, an assistant or no recorded caller: still actionable (web `calledElsewhere`).
+        XCTAssertFalse(DoctorDayActionRules.calledElsewhere(ticket("r", state: "llamado", number: 5, byMe: false, byColleague: false)))
+        XCTAssertFalse(DoctorDayActionRules.calledElsewhere(ticket("o", state: "llamado", number: 6)))
+        XCTAssertFalse(DoctorDayActionRules.calledElsewhere(ticket("m", state: "llamado", number: 7, byMe: true, byColleague: false)))
+        // An own consultation already started from that number is resumed, and a number in attention is not "called".
+        XCTAssertFalse(DoctorDayActionRules.calledElsewhere(ticket("k", state: "llamado", number: 8, consultation: "c-k", byColleague: true)))
+        XCTAssertFalse(DoctorDayActionRules.calledElsewhere(ticket("e", state: "en_atencion", number: 9, byColleague: true)))
+    }
+
+    func testDeshacerSoloMientrasSigueLlamadoYElServidorLoAcepta() {
+        let tickets = [ticket("b", state: "llamado", number: 5, byMe: true, undo: "deshacer_llamado"),
+                       ticket("c", state: "llamado", number: 6, byMe: true),
+                       ticket("d", state: "en_atencion", number: 7, byMe: true, undo: "deshacer_llamado")]
+        XCTAssertTrue(DoctorDayActionRules.canUndoCall("b", tickets: tickets))
+        XCTAssertFalse(DoctorDayActionRules.canUndoCall("c", tickets: tickets), "the undo window closed")
+        XCTAssertFalse(DoctorDayActionRules.canUndoCall("d", tickets: tickets), "already in attention")
+        XCTAssertFalse(DoctorDayActionRules.canUndoCall("z", tickets: tickets), "no longer listed")
     }
 
     func testMiDiaEnAtencionVaAntesQueUnLlamado() {

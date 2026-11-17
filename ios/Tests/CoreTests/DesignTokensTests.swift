@@ -47,7 +47,7 @@ final class DesignTokensTests: XCTestCase {
         let unknown = StatusBadgeStyle.of("en_revision")
         XCTAssertEqual(unknown, StatusBadgeStyle(label: "en revision", family: nil))
         XCTAssertTrue(unknown.isNeutral)
-        for value in ["alto", "bajo", "sin_rango", "bajo_minimo", ""] {
+        for value in ["alto", "bajo", "sin_rango", ""] {
             XCTAssertNil(StatusFamily.of(value), value)
             XCTAssertTrue(StatusBadgeStyle.of(value).isNeutral, value)
         }

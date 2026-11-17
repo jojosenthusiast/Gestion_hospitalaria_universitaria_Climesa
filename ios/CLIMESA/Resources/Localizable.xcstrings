@@ -4385,7 +4385,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Asignada"
+            "value": "Cita asignada"
           }
         }
       }
@@ -4594,7 +4594,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Solicitud enviada. Recepción te asignará médico y hora."
+            "value": "Solicitud enviada. Recepción te asignará médico y hora; te avisaremos aquí."
           }
         }
       }
@@ -5244,6 +5244,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "Solo hay la referencia del archivo: no se guardó en el sistema."
+          }
+        }
+      }
+    },
+    "day.reschedules.accepted": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuevo horario aceptado."
+          }
+        }
+      }
+    },
+    "day.reschedules.rejected": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambio rechazado; la cita sigue en su horario."
+          }
+        }
+      }
+    },
+    "day.queue.calledElsewhere": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Llamado desde otro consultorio"
+          }
+        }
+      }
+    },
+    "results.awaitingReview": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completada · falta revisión médica"
+          }
+        }
+      }
+    },
+    "appointments.category.doctor.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ningún médico con ese nombre."
           }
         }
       }
