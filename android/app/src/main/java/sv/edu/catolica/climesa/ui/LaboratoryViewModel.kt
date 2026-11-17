@@ -22,6 +22,7 @@ import sv.edu.catolica.climesa.domain.LabExternalAction
 import sv.edu.catolica.climesa.domain.LabExternalRules
 import sv.edu.catolica.climesa.domain.LabFollowUp
 import sv.edu.catolica.climesa.domain.LabFollowUpRules
+import sv.edu.catolica.climesa.domain.LabInbox
 import sv.edu.catolica.climesa.domain.LabOrderAction
 import sv.edu.catolica.climesa.domain.LabOrderRules
 import sv.edu.catolica.climesa.domain.LaboratoryEvents
@@ -42,6 +43,9 @@ internal object LabReviewSummary {
     fun critical(order: LaboratoryOrder): Boolean = order.items.any { it.result?.mark?.startsWith("critico") == true }
 }
 
+/** C1: the order a release confirmation summarizes; [lines] are what the patient will read. */
+data class LabReviewTarget(val orderId: String, val patientName: String, val version: Int, val lines: List<String>, val critical: Boolean)
+
 /** [cancelOrderId] is the order whose cancel dialog is open; the reason lives here so a rotation keeps it. */
 data class LaboratoryState(
     val loading: Boolean = true, val orders: List<LaboratoryOrder> = emptyList(), val error: String? = null, val notice: String? = null,
@@ -52,6 +56,10 @@ data class LaboratoryState(
     val cancelOrderId: String? = null, val cancelReason: String = "", val cancelError: String? = null, val cancelling: Boolean = false,
     /** S10: the doctor's "Resultados por revisar" (`GET /laboratorio/pendientes`). */
     val followUps: List<LabFollowUp> = emptyList(), val followUpBusy: String? = null,
+    /** C1: a failed inbox read, shown above the inbox (the list itself keeps what it had). */
+    val followUpsError: String? = null,
+    /** C1: the release confirmation's choices: propose the follow-up appointment (default on) and an optional note for the patient. */
+    val reviewFollowUp: Boolean = true, val reviewNote: String = "",
     /** S10: dialogs of the external path; their drafts live here so a rotation keeps them. */
     val external: ExternalDraft? = null, val externalLoad: ExternalLoadDraft? = null,
     /** T07c: the values were saved but the file did not upload; the dialog says so until the person closes it. */
@@ -96,7 +104,24 @@ class LaboratoryViewModel @Inject constructor(
     private val drafts: sv.edu.catolica.climesa.data.DraftStore = sv.edu.catolica.climesa.data.NoDraftStore,
 ) : ViewModel() {
     /** The patient opened "Mis exámenes": what is released until now is no longer "nuevo" on Inicio. */
-    fun markResultsSeen(userId: String) = sv.edu.catolica.climesa.data.ResultsSeen.mark(drafts, userId)
+    fun markResultsSeen(userId: String, at: java.time.Instant = java.time.Instant.now()) {
+        seenUser = userId
+        // The phone clock may run behind the server: the mark never stays before a release the patient already has on screen.
+        val mark = listOfNotNull(at, latestReleased).max()
+        sv.edu.catolica.climesa.data.ResultsSeen.mark(drafts, userId, mark)
+    }
+    private var seenUser: String? = null
+    private var latestReleased: java.time.Instant? = null
+
+    private fun noteReleased(raw: Any?) {
+        val rows = raw as? org.json.JSONArray ?: return
+        latestReleased = (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
+            .mapNotNull { o -> if (o.isNull("reviewedAt")) null else runCatching { java.time.Instant.parse(o.optString("reviewedAt")) }.getOrNull() }.maxOrNull()
+        val user = seenUser ?: return
+        val released = latestReleased ?: return
+        val seen = sv.edu.catolica.climesa.data.ResultsSeen.load(drafts, user)
+        if (seen == null || seen.isBefore(released)) sv.edu.catolica.climesa.data.ResultsSeen.mark(drafts, user, released)
+    }
 
     private val mutable = MutableStateFlow(LaboratoryState())
     val state = mutable.asStateFlow()
@@ -114,7 +139,12 @@ class LaboratoryViewModel @Inject constructor(
         if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            try { val orders = LaboratoryParser.orders(api.request(path)); mutable.value = mutable.value.copy(loading = false, orders = orders) }
+            try {
+                val raw = api.request(path)
+                val orders = LaboratoryParser.orders(raw)
+                mutable.value = mutable.value.copy(loading = false, orders = orders)
+                if (path == "/me/laboratorio") noteReleased(raw)
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) }
         }
@@ -130,9 +160,10 @@ class LaboratoryViewModel @Inject constructor(
     /** Loads the doctor's inbox; only called for readers with `laboratorio.revisar` (the API answers 403 otherwise). */
     fun loadFollowUps() {
         viewModelScope.launch {
-            try { mutable.value = mutable.value.copy(followUps = LabFollowUpRules.parse(api.request("/laboratorio/pendientes"))) }
+            try { mutable.value = mutable.value.copy(followUps = LabFollowUpRules.parse(api.request("/laboratorio/pendientes")), followUpsError = null) }
             catch (e: CancellationException) { throw e }
-            catch (_: Exception) { /* The list below still works; the inbox reloads on the next event. */ }
+            // The list below still works and the inbox keeps what it showed, but the failure is said, never swallowed.
+            catch (e: Exception) { mutable.value = mutable.value.copy(followUpsError = userMessage(e, "No se pudieron cargar los resultados por revisar.")) }
         }
     }
 
@@ -272,11 +303,30 @@ class LaboratoryViewModel @Inject constructor(
     }
 
     /** Opens the confirmation that says what the patient will see; nothing is sent until [review]. */
-    fun openReview(orderId: String) { mutable.value = mutable.value.copy(reviewOrderId = orderId, error = null, notice = null) }
+    fun openReview(orderId: String) { mutable.value = mutable.value.copy(reviewOrderId = orderId, reviewFollowUp = true, reviewNote = "", error = null, notice = null) }
     fun dismissReview() { val s = mutable.value; if (s.reviewOrderId !in s.busyIds) mutable.value = s.copy(reviewOrderId = null) }
+    fun setReviewFollowUp(on: Boolean) { mutable.value = mutable.value.copy(reviewFollowUp = on) }
+    fun setReviewNote(note: String) { mutable.value = mutable.value.copy(reviewNote = note.take(LabInbox.NOTE_MAX)) }
 
-    fun review(order: LaboratoryOrder) = mutate(order.id, "/laboratorio/ordenes/${order.id}/revisar", JSONObject().put("version", order.version), "Resultados revisados y liberados.") {
-        it.copy(reviewOrderId = it.reviewOrderId.takeIf { id -> id != order.id })
+    /** C1: what the release confirmation summarizes: the loaded order when there is one, otherwise the inbox row. */
+    fun reviewTarget(): LabReviewTarget? {
+        val s = mutable.value
+        val id = s.reviewOrderId ?: return null
+        s.orders.firstOrNull { it.id == id }?.let { return LabReviewTarget(it.id, it.patientName, it.version, LabReviewSummary.lines(it), LabReviewSummary.critical(it)) }
+        val row = LabInbox.rows(s.followUps).firstOrNull { it.orderId == id && it.canRelease } ?: return null
+        return LabReviewTarget(row.orderId, row.patientName, row.orderVersion!!, row.keyValues.ifEmpty { row.details }, row.critical)
+    }
+
+    /** "Revisar y liberar" from the confirmation; the dialog stays open with the error when the API refuses. */
+    fun release() { reviewTarget()?.let(::send) }
+
+    fun review(order: LaboratoryOrder) = send(LabReviewTarget(order.id, order.patientName, order.version, LabReviewSummary.lines(order), LabReviewSummary.critical(order)))
+
+    private fun send(target: LabReviewTarget) {
+        val s = mutable.value
+        mutate(target.orderId, LabInbox.releasePath(target.orderId), LabInbox.releaseBody(target.version, s.reviewFollowUp, s.reviewNote), { answer -> LabInbox.releasedNotice(target.patientName, answer) }) {
+            it.copy(reviewOrderId = it.reviewOrderId.takeIf { id -> id != target.orderId }, followUps = it.followUps.filterNot { f -> f.orderId == target.orderId }, reviewFollowUp = true, reviewNote = "")
+        }
     }
 
     fun openCancel(orderId: String) { mutable.value = mutable.value.copy(cancelOrderId = orderId, cancelReason = "", cancelError = null, notice = null) }
@@ -304,15 +354,17 @@ class LaboratoryViewModel @Inject constructor(
 
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
 
-    private fun mutate(orderId: String, path: String, body: JSONObject, notice: String, onSuccess: (LaboratoryState) -> LaboratoryState = { it }) {
+    private fun mutate(orderId: String, path: String, body: JSONObject, notice: (Any?) -> String, onSuccess: (LaboratoryState) -> LaboratoryState = { it }) {
         // A second tap on the same order while its write is in flight sends nothing (no double review or sample).
         if (orderId in mutable.value.busyIds) return
         mutable.value = mutable.value.copy(busyIds = mutable.value.busyIds + orderId, error = null, notice = null)
         viewModelScope.launch {
             try {
-                api.request(path, "POST", body)
-                mutable.value = onSuccess(mutable.value.copy(busyIds = mutable.value.busyIds - orderId, notice = notice))
+                val answer = api.request(path, "POST", body)
+                val hadInbox = mutable.value.followUps.any { it.orderId == orderId }
+                mutable.value = onSuccess(mutable.value.copy(busyIds = mutable.value.busyIds - orderId, notice = notice(answer)))
                 load(silent = true)
+                if (followUpsEnabled || hadInbox) loadFollowUps()
             }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(busyIds = mutable.value.busyIds - orderId, error = userMessage(e, "No se pudo completar la operación.")) }

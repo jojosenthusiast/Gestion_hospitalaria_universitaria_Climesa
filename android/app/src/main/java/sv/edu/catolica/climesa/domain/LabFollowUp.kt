@@ -66,7 +66,13 @@ object LabExternalRules {
 }
 
 /** One open item of the doctor's "Resultados por revisar" (`GET /laboratorio/pendientes`). */
-data class LabFollowUp(val id: String, val orderId: String, val patientName: String, val record: String?, val critical: Boolean, val detail: String, val version: Int, val createdAtMillis: Long?)
+data class LabFollowUp(
+    val id: String, val orderId: String, val patientName: String, val record: String?, val critical: Boolean, val detail: String, val version: Int, val createdAtMillis: Long?,
+    /** C1: the order's version and actions, so the inbox can release it without reading the order list first. */
+    val orderVersion: Int? = null, val orderActions: List<String> = emptyList(),
+    /** C1: key values of the order, already worded ("Hemoglobina 7.1 g/dL · Crítico bajo"). */
+    val values: List<String> = emptyList(),
+)
 
 object LabFollowUpRules {
     /** Critical values first, then the oldest; the API already sorts, the app keeps it if a live reload reorders. */
@@ -74,10 +80,23 @@ object LabFollowUpRules {
         val rows = value as? JSONArray ?: return emptyList()
         return (0 until rows.length()).mapNotNull { index ->
             rows.optJSONObject(index)?.let { row ->
+                val actions = row.optJSONArray("orderActions")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+                val values = row.optJSONArray("values")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(::valueLine) } }.orEmpty()
                 LabFollowUp(row.optString("id"), row.optString("orderId"), row.optString("patientName").ifBlank { "Paciente" }, row.optString("patientRecord").ifBlank { null },
-                    row.optString("reason") == "critico", row.optString("detail"), row.optInt("version", 1), parseMillis(row.optString("createdAt")))
+                    row.optString("reason") == "critico", row.optString("detail"), row.optInt("version", 1), parseMillis(row.optString("createdAt")),
+                    if (row.has("orderVersion") && !row.isNull("orderVersion")) row.optInt("orderVersion") else null, actions, values)
             }
         }.filter { it.id.isNotBlank() }.sortedWith(compareBy<LabFollowUp>({ if (it.critical) 0 else 1 }, { it.createdAtMillis ?: Long.MAX_VALUE }))
+    }
+
+    /** "Glucosa 130 mg/dL · Alto"; a text result shows as typed. */
+    private fun valueLine(v: JSONObject): String? {
+        val name = v.optString("name").ifBlank { v.optString("code") }.ifBlank { return null }
+        val text = if (v.isNull("text")) null else v.optString("text").ifBlank { null }
+        val number = if (!v.has("value") || v.isNull("value")) null else v.optDouble("value").takeIf { !it.isNaN() }
+        val shown = text ?: number?.let { n -> (if (n == Math.floor(n) && !n.isInfinite()) n.toLong().toString() else n.toString()) + (if (v.isNull("unit")) "" else v.optString("unit").takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()) }
+        val mark = if (v.isNull("mark")) null else v.optString("mark").ifBlank { null }?.let(LaboratoryLabels::mark)
+        return listOfNotNull("$name${shown?.let { " $it" }.orEmpty()}", mark).joinToString(" · ")
     }
 
     /** The lab observation is a note from the lab to the doctor: never shown in the patient's own view. */
@@ -85,6 +104,52 @@ object LabFollowUpRules {
 
     fun reviewPath(id: String) = "/laboratorio/pendientes/$id/revisar"
     fun reviewBody(version: Int): JSONObject = JSONObject().put("version", version)
+}
+
+/** C1: one inbox row per order, with every open item of that order (a critical value and an observation become one row). */
+data class LabInboxRow(
+    val orderId: String, val patientName: String, val record: String?, val critical: Boolean, val orderVersion: Int?, val orderActions: List<String>,
+    val keyValues: List<String>, val details: List<String>, val followUpIds: List<String>,
+) {
+    /** "Revisar y liberar" needs the order version and the API's `revisar` action; an older API sends neither. */
+    val canRelease get() = orderVersion != null && "revisar" in orderActions
+}
+
+/**
+ * C1 (sweep #12): the doctor's results inbox. Releasing goes through `POST /laboratorio/ordenes/{id}/revisar`; the released
+ * body is `{version}` and the API proposes the follow-up appointment when `followUp` is left out, so the body only grows when
+ * the doctor turns the follow-up off or leaves a note for the patient.
+ */
+object LabInbox {
+    const val NOTE_MAX = 500
+
+    fun rows(items: List<LabFollowUp>): List<LabInboxRow> = items.groupBy { it.orderId }.map { (orderId, group) ->
+        val first = group.first()
+        LabInboxRow(orderId, first.patientName, first.record, group.any { it.critical }, group.firstNotNullOfOrNull { it.orderVersion },
+            group.flatMap { it.orderActions }.distinct(), group.flatMap { it.values }.distinct(), group.map { it.detail }.filter { it.isNotBlank() }.distinct(), group.map { it.id })
+    }.sortedWith(compareBy<LabInboxRow>({ if (it.critical) 0 else 1 }, { row -> items.indexOfFirst { it.orderId == row.orderId } }))
+
+    fun releasePath(orderId: String) = "/laboratorio/ordenes/$orderId/revisar"
+
+    fun releaseBody(version: Int, followUp: Boolean, note: String): JSONObject = JSONObject().put("version", version).apply {
+        if (!followUp) put("followUp", false)
+        note.trim().takeIf { it.isNotEmpty() }?.let { put("patientNote", it.take(NOTE_MAX)) }
+    }
+
+    /** What happened with the follow-up appointment; null when the doctor did not ask for one. */
+    fun followUpOutcome(proposalId: String?, skipped: String?): String? = when {
+        proposalId != null -> "Se propuso a Recepción una cita de seguimiento."
+        skipped == "hospitalizado" -> "Sin cita de seguimiento: el paciente está hospitalizado."
+        skipped == "ya_propuesta" -> "Ya había una cita de seguimiento propuesta."
+        skipped == "sin_consulta" -> "Sin cita de seguimiento: la orden no viene de una consulta."
+        else -> null
+    }
+
+    fun releasedNotice(patientName: String, answer: Any?): String {
+        val body = answer as? JSONObject
+        fun text(key: String) = body?.takeIf { it.has(key) && !it.isNull(key) }?.optString(key)?.ifBlank { null }
+        return listOfNotNull("Resultados de $patientName liberados.", followUpOutcome(text("followUpProposalId"), text("followUpSkipped"))).joinToString(" ")
+    }
 }
 
 /**
