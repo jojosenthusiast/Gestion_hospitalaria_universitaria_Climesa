@@ -77,6 +77,11 @@ public enum ConsultationRules {
         return (1...20).contains(size) ? nil : "Escribe el código CIE-10 (por ejemplo J06.9)."
     }
 
+    /// Fase 2R: the code comes from a result of the CIE-10 search, never typed by hand.
+    public static func diagnosisSelectionError(_ entry: Cie10Entry?) -> String? {
+        entry == nil ? "Busca y elige el diagnóstico CIE-10." : nil
+    }
+
     public static func prescriptionError(_ item: PrescriptionItemBody) -> String? {
         let required = [item.medication, item.dose, item.route, item.frequency, item.duration]
         return required.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -101,6 +106,47 @@ public enum AdmissionRules {
         if size > motiveRange.upperBound { return "El motivo admite hasta 500 caracteres (llevas \(size))." }
         return nil
     }
+}
+
+/// Fase 2R: whether the patient of this consultation already has an admission, read from `GET /admisiones`, so an
+/// indication already made shows as done after leaving the screen and cannot be sent twice. The API refuses a second
+/// active admission too ("El paciente ya tiene una admisión activa.").
+public enum AdmissionIndicationRules {
+    /// The states the API counts as active when it refuses another admission.
+    public static let activeStates: Set<AdmissionState> = [.pendienteCama, .hospitalizado, .altaFirmada]
+
+    /// The patient's active admission, preferring the one indicated from this consultation; nil when there is none.
+    public static func existing(_ admissions: [Admission], patientId: String, consultationId: String) -> Admission? {
+        let active = admissions.filter { $0.patientId == patientId && activeStates.contains($0.state) }
+        return active.first { fromThisConsultation($0, consultationId: consultationId) } ?? active.first
+    }
+
+    public static func fromThisConsultation(_ admission: Admission, consultationId: String) -> Bool {
+        admission.origin == "consulta" && admission.originId == consultationId
+    }
+}
+
+/// Fase 2R: CIE-10 search of the diagnosis step (`GET /consultas/cie10?q=`, up to 20 rows).
+public enum Cie10SearchRules {
+    public static let minimum = 2
+    /// Pause after the last key before searching (the user's typing, not a refresh timer).
+    public static let debounceNanoseconds: UInt64 = 350_000_000
+    public static let shortQuery = "Escribe al menos 2 letras o el inicio del código."
+
+    /// The trimmed text to search, or nil below 2 characters (the API refuses it).
+    public static func query(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count >= minimum ? trimmed : nil
+    }
+
+    public static func path(_ query: String) -> String {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+?#")
+        return "/consultas/cie10?q=" + (query.addingPercentEncoding(withAllowedCharacters: allowed) ?? "")
+    }
+
+    /// «J45.9 · Asma no especificada».
+    public static func title(_ entry: Cie10Entry) -> String { "\(entry.code) · \(entry.description)" }
 }
 
 /// I24: alta (`DischargeDto`).

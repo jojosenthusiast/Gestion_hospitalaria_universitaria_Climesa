@@ -11,6 +11,8 @@ public enum ColdStartPolicy {
     public static let coldTimeout: TimeInterval = 90
     /// Tiempo de espera con el servidor ya despierto.
     public static let warmTimeout: TimeInterval = 30
+    /// A file upload (up to 10 MB on a phone network) gets more time than a JSON call.
+    public static let uploadTimeout: TimeInterval = 120
     /// Sin respuestas durante este tiempo, se asume que el servidor volvió a dormirse.
     public static let idleUntilCold: TimeInterval = 14 * 60
     /// Esperas antes de cada reintento de una lectura (en segundos); su largo es el número de reintentos.

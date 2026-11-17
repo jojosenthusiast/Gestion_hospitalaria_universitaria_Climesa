@@ -184,6 +184,11 @@ public struct LabOrderItem: Decodable, Sendable, Identifiable, Equatable {
     public let result: LabItemResult?
     /// Unidad del examen (`mg/dL`); nula si el examen no la tiene o el servidor es anterior.
     public let unit: String?
+    /// `numerico` o `texto` (`TipoResultadoLaboratorio`); nulo en un servidor anterior.
+    public let resultType: String?
+
+    /// The exam takes a number. Without `resultType` (older server) an exam with a unit is numeric, as on Android.
+    public var numeric: Bool { resultType.map { $0 == "numerico" } ?? (unit != nil) }
 }
 
 /// Acciones que la API permite al lector sobre una orden (`LabOrderResponse.allowedActions`, `AccionOrdenLaboratorio`).

@@ -1453,17 +1453,6 @@
         }
       }
     },
-    "consultation.diagnosis.code": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Código CIE-10 (por ejemplo J06.9)"
-          }
-        }
-      }
-    },
     "consultation.diagnosis.note": {
       "extractionState": "manual",
       "localizations": {
@@ -5409,6 +5398,281 @@
           "stringUnit": {
             "state": "translated",
             "value": "Acciones de la cita"
+          }
+        }
+      }
+    },
+    "results.externalLoad.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargar resultado externo"
+          }
+        }
+      }
+    },
+    "results.externalLoad.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultado externo"
+          }
+        }
+      }
+    },
+    "results.externalLoad.place": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Examen hecho en %@."
+          }
+        }
+      }
+    },
+    "results.externalLoad.file": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Informe (foto o PDF)"
+          }
+        }
+      }
+    },
+    "results.externalLoad.values": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valores clave"
+          }
+        }
+      }
+    },
+    "results.externalLoad.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nota sobre el informe (opcional)"
+          }
+        }
+      }
+    },
+    "results.externalLoad.pickFile": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir PDF o foto"
+          }
+        }
+      }
+    },
+    "results.externalLoad.changeFile": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar archivo"
+          }
+        }
+      }
+    },
+    "results.externalLoad.pickPhoto": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir de Fotos"
+          }
+        }
+      }
+    },
+    "results.externalLoad.saving": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardando los valores…"
+          }
+        }
+      }
+    },
+    "results.externalLoad.uploading": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subiendo archivo… %d %%"
+          }
+        }
+      }
+    },
+    "results.externalLoad.filePending": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivo pendiente: los valores ya se guardaron"
+          }
+        }
+      }
+    },
+    "results.externalLoad.retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar"
+          }
+        }
+      }
+    },
+    "results.externalLoad.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar resultado"
+          }
+        }
+      }
+    },
+    "results.externalLoad.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo guardar el resultado externo. Vuelve a intentar."
+          }
+        }
+      }
+    },
+    "results.externalLoad.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultado externo guardado con su archivo; la orden espera tu revisión."
+          }
+        }
+      }
+    },
+    "results.externalLoad.doneNoFile": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultado externo guardado; la orden espera tu revisión."
+          }
+        }
+      }
+    },
+    "lab.attachments.upload": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subir archivo"
+          }
+        }
+      }
+    },
+    "admission.active": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El paciente ya tiene una admisión activa; no se puede indicar otra."
+          }
+        }
+      }
+    },
+    "consultation.diagnosis.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar diagnóstico CIE-10 (código o palabras)"
+          }
+        }
+      }
+    },
+    "consultation.diagnosis.chosen": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnóstico CIE-10"
+          }
+        }
+      }
+    },
+    "consultation.diagnosis.change": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar"
+          }
+        }
+      }
+    },
+    "consultation.diagnosis.noMatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin coincidencias en el catálogo CIE-10."
+          }
+        }
+      }
+    },
+    "arrival.receive.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Marcar al paciente como recibido?"
+          }
+        }
+      }
+    },
+    "arrival.receive.confirm.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queda registrado con tu nombre y la hora de recepción."
           }
         }
       }

@@ -74,7 +74,10 @@ struct ConsultationView: View {
     @State private var exam = ""
     @State private var plan = ""
     @State private var draftErrors: [String: String] = [:]
-    @State private var code = ""
+    /// Fase 2R: the diagnosis comes from the CIE-10 search (`GET /consultas/cie10`), never a typed code.
+    @State private var cieQuery = ""
+    @State private var cieResults = Loader<[Cie10Entry]>()
+    @State private var cieChoice: Cie10Entry?
     @State private var principal = true
     @State private var note = ""
     @State private var codeError: String?
@@ -151,7 +154,7 @@ struct ConsultationView: View {
     private var draftKey: String? { consultationId.map { "consulta-\($0)" } }
 
     private var currentDraft: ConsultationDraft {
-        ConsultationDraft(reason: reason, exam: exam, plan: plan, code: code, note: note, principal: principal,
+        ConsultationDraft(reason: reason, exam: exam, plan: plan, code: cieChoice?.code ?? "", note: note, principal: principal,
                           lines: lines.map { ConsultationDraft.Line(medication: $0.medication, dose: $0.dose, route: $0.route, frequency: $0.frequency, duration: $0.duration, instructions: $0.instructions) })
     }
 
@@ -170,7 +173,8 @@ struct ConsultationView: View {
 
     private func applyDraft(_ draft: ConsultationDraft) {
         reason = draft.reason; exam = draft.exam; plan = draft.plan
-        code = draft.code; note = draft.note; principal = draft.principal
+        // The draft keeps only the code: it goes back to the search, so the doctor picks the row again with its description.
+        cieQuery = draft.code; note = draft.note; principal = draft.principal
         let restored = draft.lines.map { line -> PrescriptionDraft in
             var item = PrescriptionDraft()
             item.medication = line.medication; item.dose = line.dose; item.route = line.route
@@ -187,7 +191,7 @@ struct ConsultationView: View {
 
     /// A diagnosis, prescription line or lab selection started and not sent.
     private var unsentWork: Bool {
-        !code.trimmingCharacters(in: .whitespaces).isEmpty || currentDraft.lines.contains { !$0.isBlank } || !selectedExams.isEmpty
+        cieChoice != nil || currentDraft.lines.contains { !$0.isBlank } || !selectedExams.isEmpty
     }
 
     private var canCallProposed: Bool { handoff?.proposal != nil && profile.hasPermission("fila.llamar") }
@@ -384,14 +388,83 @@ struct ConsultationView: View {
                 }
             }
             if editable {
-                FormField(label: L.text("consultation.diagnosis.code"), text: $code, error: codeError)
-                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                cieSearch
                 Toggle("consultation.principal", isOn: $principal).font(Typo.body).tint(Theme.primary)
                 FormField(label: L.text("consultation.diagnosis.note"), text: $note)
                 WriteNotice(submission: diagnosing, reload: loadDetail)
                 ClimesaButton(title: L.text("consultation.diagnosis.add"), kind: kind(.addDiagnosis, editable: editable), loading: diagnosing.busy) { Task { await addDiagnosis() } }
             }
         }
+    }
+
+    /// Search by code or words: from 2 characters, a short pause after the last key, up to 20 rows from the API. Tapping a
+    /// row fills the code and its description; «Cambiar» goes back to the search.
+    @ViewBuilder private var cieSearch: some View {
+        if let choice = cieChoice {
+            VStack(alignment: .leading, spacing: Spacing.s) {
+                Text("consultation.diagnosis.chosen").font(Typo.label).foregroundStyle(Theme.ink)
+                HStack(alignment: .top, spacing: Spacing.m) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: choice.code).font(Typo.mono).foregroundStyle(Theme.ink)
+                        Text(verbatim: choice.description).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: Spacing.s)
+                    Button(L.text("consultation.diagnosis.change")) { cieChoice = nil; codeError = nil }
+                        .font(Typo.label).foregroundStyle(Theme.primaryText).frame(minHeight: 44).disabled(diagnosing.busy)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: Spacing.s) {
+                FormField(label: L.text("consultation.diagnosis.search"), text: $cieQuery, error: codeError)
+                    .autocorrectionDisabled().submitLabel(.search)
+                    .onSubmit { Task { await searchCie() } }
+                let trimmed = cieQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty && Cie10SearchRules.query(cieQuery) == nil {
+                    Text(verbatim: Cie10SearchRules.shortQuery).font(Typo.small).foregroundStyle(Theme.muted)
+                }
+                if let error = cieResults.error {
+                    PartError(message: error, retry: searchCie)
+                } else if cieResults.loading && cieResults.value == nil {
+                    Skeleton(rows: 2)
+                } else if let rows = cieResults.value {
+                    if rows.isEmpty {
+                        Text("consultation.diagnosis.noMatch").font(Typo.small).foregroundStyle(Theme.muted)
+                    } else {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(rows.enumerated()), id: \.element.id) { index, entry in
+                                if index > 0 { Divider().overlay(Theme.line) }
+                                Button {
+                                    cieChoice = entry
+                                    codeError = nil
+                                } label: {
+                                    HStack(alignment: .firstTextBaseline, spacing: Spacing.m) {
+                                        Text(verbatim: entry.code).font(Typo.mono).foregroundStyle(Theme.ink).frame(minWidth: 56, alignment: .leading)
+                                        Text(verbatim: entry.description).font(Typo.body).foregroundStyle(Theme.ink).multilineTextAlignment(.leading)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .frame(minHeight: 44).contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(Text(verbatim: Cie10SearchRules.title(entry)))
+                            }
+                        }
+                    }
+                }
+            }
+            // Debounce of the user's typing (not a refresh timer): the search runs a moment after the last key.
+            .task(id: cieQuery) {
+                guard Cie10SearchRules.query(cieQuery) != nil else { cieResults.clear(); return }
+                try? await Task.sleep(nanoseconds: Cie10SearchRules.debounceNanoseconds)
+                if !Task.isCancelled { await searchCie() }
+            }
+        }
+    }
+
+    private func searchCie() async {
+        guard let query = Cie10SearchRules.query(cieQuery) else { cieResults.clear(); return }
+        await cieResults.load { try await account.client().get(Cie10SearchRules.path(query), as: [Cie10Entry].self) }
     }
 
     @ViewBuilder private func prescriptionSection(_ value: ConsultationDetail, editable: Bool) -> some View {
@@ -552,16 +625,17 @@ struct ConsultationView: View {
     }
 
     private func addDiagnosis() async {
-        codeError = ConsultationRules.diagnosisCodeError(code)
-        guard codeError == nil, let id = consultationId else { return }
+        codeError = ConsultationRules.diagnosisSelectionError(cieChoice)
+        guard codeError == nil, let choice = cieChoice, let id = consultationId else { return }
         let text = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        let body = DiagnosisBody(code: code.trimmingCharacters(in: .whitespaces).uppercased(), principal: principal, note: text.isEmpty ? nil : text)
+        let body = DiagnosisBody(code: choice.code, principal: principal, note: text.isEmpty ? nil : text)
         var created: DiagnosisCreated?
         let ok = await diagnosing.run(body: body) { key in
             created = try await account.client().send("POST", "/consultas/\(id)/diagnosticos", body: body, key: key, as: DiagnosisCreated.self)
         }
+        if ok { diagnosisNames[choice.code] = choice.description }
         if ok, let created { diagnosisNames[created.code] = created.description }
-        if ok { code = ""; note = ""; principal = false }
+        if ok { cieChoice = nil; cieQuery = ""; cieResults.clear(); note = ""; principal = false }
         await loadDetail()
     }
 
