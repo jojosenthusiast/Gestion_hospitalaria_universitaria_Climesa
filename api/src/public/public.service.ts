@@ -6,7 +6,7 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { HeadCache } from '../platform/head-cache';
 import { ProblemException, VersionConflictException } from '../platform/problem';
-import { DEFAULT_REMINDER_HOURS, inboxOrder, isHighlighted, NoticeLevel, personalDataIn, priorityOfLevel } from './notice.rules';
+import { DEFAULT_REMINDER_HOURS, editNeedsNewAck, inboxOrder, isHighlighted, NoticeLevel, personalDataIn, priorityOfLevel } from './notice.rules';
 import { NoticeDto, NoticeEditDto, NoticeWithdrawDto } from './public.dto';
 
 /** Plan 112: caché de 5 s invalidada por cualquier evento confirmado. */
@@ -227,7 +227,8 @@ export class PublicService {
 
   /**
    * S11 · Para quien publica: por aviso, cuántas cuentas dieron "Enterado" y a cuántas cuentas activas del personal va
-   * dirigido por rol o por el área de su ficha (0 si solo es público). Solo conteos, nunca nombres.
+   * dirigido por rol o por área (0 si solo es público). El área es la de su ficha o la de su turno en curso, la misma
+   * regla de `areasOf` y `areaChannels`. Solo conteos, nunca nombres.
    */
   async noticeStats() {
     return this.db.query<{ avisoId: string; enterados: number; destinatarios: number }>(
@@ -235,8 +236,11 @@ export class PublicService {
          (SELECT count(*)::int FROM publico.aviso_enterado e WHERE e.aviso_id=a.id AND e.enterado_en IS NOT NULL) AS enterados,
          (SELECT count(*)::int FROM acceso.usuario u WHERE u.estado='activo' AND (
             EXISTS (SELECT 1 FROM acceso.asignacion_rol r WHERE r.usuario_id=u.id AND r.rol_codigo=ANY(a.roles))
-            OR (cardinality(a.areas) > 0 AND EXISTS (SELECT 1 FROM personal.persona p JOIN infra.espacio s ON s.id=p.area_id WHERE p.id=u.persona_personal_id AND s.codigo=ANY(a.areas))))) AS destinatarios
-       FROM publico.aviso a ORDER BY lower(a.vigencia) DESC,a.creado_en DESC LIMIT 100`);
+            OR (cardinality(a.areas) > 0 AND u.persona_personal_id IS NOT NULL AND (
+              EXISTS (SELECT 1 FROM personal.persona p JOIN infra.espacio s ON s.id=p.area_id WHERE p.id=u.persona_personal_id AND s.codigo=ANY(a.areas))
+              OR EXISTS (SELECT 1 FROM personal.turno t JOIN infra.espacio s ON s.id=t.area_id WHERE t.persona_id=u.persona_personal_id AND s.codigo=ANY(a.areas)
+                AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz))))) AS destinatarios
+       FROM publico.aviso a ORDER BY lower(a.vigencia) DESC,a.creado_en DESC LIMIT 100`, [this.clock.now()]);
   }
 
   /** Para quien redacta: todos los avisos recientes con su audiencia, estado (vigente, programado, vencido, retirado) y acciones. */
@@ -334,6 +338,9 @@ export class PublicService {
          WHERE id=$1 RETURNING ${NOTICE_COLUMNS}`,
         [id, dto.titulo.trim(), dto.cuerpo.trim(), from, to, priority, isPublic, roles, now, actor.id, level, areas])).rows[0];
       const before = noticeOf(current), after = noticeOf(row);
+      // S11: a notice that now says something else, or is more urgent, is highlighted again until a new "Enterado".
+      // The row keeps a due reminder (`recordar_en` = now) because the table needs one of both dates.
+      if (editNeedsNewAck(current, row)) await c.query('UPDATE publico.aviso_enterado SET enterado_en=NULL,recordar_en=$2,actualizado_en=$2 WHERE aviso_id=$1', [id, now]);
       await this.commands.audit(c, actor, { action: 'avisos.editar', entity: 'aviso', entityId: id, permission: 'avisos.publicar', detail: { antes: before, despues: after, datosPersonalesConfirmados: found } });
       await this.commands.event(c, 'aviso.actualizado', 'aviso', id, row.version, [...new Set([...noticeChannels(current.publico, current.roles), ...noticeChannels(isPublic, roles), ...(await areaChannels(c, [...new Set([...current.areas, ...areas])], now))])]);
       return listItemOf(row, now);

@@ -20,6 +20,13 @@ const LEVEL_RANK: Record<string, number> = { critico: 0, importante: 1, informat
 /** Prioridad visual (D-071) que corresponde a un nivel cuando quien publica no la indica. */
 const PRIORITY_OF_LEVEL: Record<NoticeLevel, string> = { informativo: 'atencion', importante: 'urgente', critico: 'critico' };
 export const priorityOfLevel = (level: NoticeLevel) => PRIORITY_OF_LEVEL[level];
+type NoticeText = { titulo: string; cuerpo: string; nivel: string };
+/**
+ * An edit asks for a new "Enterado" when it changes what the notice says (title or body) or raises its level
+ * (informativo → importante → critico). Lowering the level or changing dates, priority or audience keeps the acks.
+ */
+export const editNeedsNewAck = (before: NoticeText, after: NoticeText) =>
+  before.titulo !== after.titulo || before.cuerpo !== after.cuerpo || (LEVEL_RANK[after.nivel] ?? 3) < (LEVEL_RANK[before.nivel] ?? 3);
 /** Horas que tarda en volver un aviso crítico pospuesto sin "Enterado" si falta la política `avisos.recordatorio_horas`. */
 export const DEFAULT_REMINDER_HOURS = 4;
 
