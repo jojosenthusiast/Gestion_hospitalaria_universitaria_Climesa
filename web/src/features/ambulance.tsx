@@ -1,6 +1,8 @@
 import { useEffect,useRef,useState } from 'react';
 import { Notice } from '../components/ui';
-import { Dialog,CompactHeader,RemoteState,Tag,formatDateTime,useData } from './common';
+import { Dialog,CompactHeader,RemoteState,formatDateTime,useData } from './common';
+import { PriorityBadge,StatusBadge } from '../components/system';
+import { formatRelative,formatTime } from '../lib/format';
 import { can,type AccessProfile,type Api } from '../lib/api';
 import { DiscardForm,DispatchForm,PhoneRequestForm } from './ambulance/dialogs';
 import { MaintenancePanel } from './ambulance/maintenance';
@@ -8,7 +10,7 @@ import { RequestsBoard } from './ambulance/requests';
 import { CrewAction,CrewCoverage,missingCrew } from './ambulance/crew';
 import { AdminCloseAction } from './ambulance/admin-close';
 import { useQuickAction } from './personal/accion';
-import { milestoneNames,minutesBetween,priorityNames,roleNames,stateNames,typeNames,type AmbulanceRequest,type AmbulanceStatus,type PrehospitalView } from './ambulance/types';
+import { isUnclosed,mapLink,milestoneNames,priorityLevel,priorityNames,roleNames,stateNames,typeNames,type AmbulanceRequest,type AmbulanceStatus,type PrehospitalView } from './ambulance/types';
 import './ambulance/ambulance.css';
 export * from './ambulance/types';
 const signNames:Record<string,string>={heartRate:'Frecuencia cardiaca',systolic:'Presión sistólica',diastolic:'Presión diastólica',respiratoryRate:'Frecuencia respiratoria',oxygenSaturation:'Saturación de oxígeno',temperature:'Temperatura',glasgow:'Glasgow'};
@@ -26,7 +28,8 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  const [quick,consumeQuick]=useQuickAction();
  useEffect(()=>{if(quick==='solicitud'&&phoneDesk)setCalling(true);if(quick)consumeQuick();},[quick,phoneDesk,consumeQuick]);
  return <><CompactHeader breadcrumb="Operaciones / Ambulancia" title="Centro de despacho" actions={phoneDesk?<button type="button" className="secondary-button" onClick={()=>setCalling(true)}>Registrar llamada</button>:undefined}/><RemoteState state={data}>{s=><section className="data-workbench" aria-label="Estado de la unidad">
-  <div className="number-strip"><div><strong className="mono-data">{s.unit.plate}</strong><span>Unidad única</span></div><div><strong><Tag value={s.unit.state} label={stateNames[s.unit.state]}/></strong><span>Estado actual</span></div><CrewCoverage status={s}/></div>
+  {/* R4a: one readable line for the unit (normal type, code on one line, state as a badge), not a strip of giant numbers. */}
+  <div className="amb-unit"><div className="amb-unit-id"><span className="sr-only">Unidad</span><strong className="nowrap-code">{s.unit.plate}</strong><StatusBadge value={s.unit.state} label={stateNames[s.unit.state]}/></div><div className="amb-unit-crew"><CrewCoverage status={s}/></div></div>
   {dispatcher&&s.dispatchBlock&&<section aria-label="Despacho bloqueado"><Notice kind="info"><strong>No se puede despachar ahora.</strong> {s.dispatchBlock.message} {s.dispatchBlock.action}</Notice>{missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}
   {s.activeService?<ActiveService api={api} onSaved={data.refresh} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:<p className="muted">Sin servicio activo</p>}
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
@@ -42,11 +45,12 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
 function ActiveService({api,service,onReport,onSaved}:{api:Api;service:NonNullable<AmbulanceStatus['activeService']>;onReport?:()=>void;onSaved:()=>void}){
  const milestones=service.milestones??[],withoutAccount=service.crew.some(c=>c.hasAccount===false);
  return <section aria-label="Servicio activo"><h2>Servicio activo</h2><dl className="detail-grid">
-  <div><dt>Tipo</dt><dd>{typeNames[service.type]??service.type}</dd></div><div><dt>Prioridad</dt><dd>{priorityNames[service.priority]??service.priority}</dd></div>
+  <div><dt>Tipo</dt><dd>{typeNames[service.type]??service.type}</dd></div><div><dt>Prioridad</dt><dd><PriorityBadge value={priorityLevel(service.priority)} label={priorityNames[service.priority]??service.priority}/></dd></div>
   <div><dt>Origen</dt><dd>{service.origin}</dd></div><div><dt>Destino</dt><dd>{service.destination}</dd></div>
-  <div><dt>Despachado</dt><dd>{formatDateTime(service.dispatchedAt)} · hace {minutesBetween(service.dispatchedAt)} min</dd></div>
-  <div><dt>Tripulación</dt><dd>{service.crew.length?service.crew.map(c=>`${c.name} (${roleNames[c.role]??c.role})${c.hasAccount===false?' · sin cuenta en la app':''}`).join(' · '):'Sin tripulación registrada'}{withoutAccount&&<small className="amb-crew-note">Quien no tiene cuenta no puede registrar hitos desde la app; si nadie de la tripulación puede terminar el servicio, Jefatura lo cierra con cierre administrativo.</small>}</dd></div>
-  {service.lastLocation&&<div><dt>Última ubicación</dt><dd className="mono-data">{service.lastLocation.latitude.toFixed(5)}, {service.lastLocation.longitude.toFixed(5)} · {formatDateTime(service.lastLocation.capturedAt)}</dd></div>}
+  <div><dt>Despachado</dt><dd>{formatTime(service.dispatchedAt)} · {formatRelative(service.dispatchedAt)}{isUnclosed(service.dispatchedAt)&&<> <PriorityBadge value="urgente" label="Sin cierre"/></>}</dd></div>
+  <div><dt>Tripulación</dt><dd>{service.crew.length?service.crew.map(c=>`${c.name} (${roleNames[c.role]??c.role})${c.hasAccount===false?' · sin cuenta en la app':''}`).join(' · '):'Sin asignar'}{withoutAccount&&<small className="amb-crew-note">Sin cuenta no puede registrar hitos desde la app; si nadie puede terminar el servicio, Jefatura usa el cierre administrativo.</small>}</dd></div>
+  {/* R4a: coordinates are for a map, not for reading: one link that opens it. */}
+  {service.lastLocation&&<div><dt>Última ubicación</dt><dd><a className="row-action" href={mapLink(service.lastLocation)} target="_blank" rel="noopener noreferrer">Ver en el mapa</a> <small className="muted">{formatRelative(service.lastLocation.capturedAt)}</small></dd></div>}
  </dl>
  <ol className="milestone-list" aria-label="Hitos del servicio">{['salida','en_escena','trasladando','en_hospital','finalizado'].map(type=>{const m=milestones.find(x=>x.type===type);return <li key={type} className={m?'done':''}><strong>{milestoneNames[type]}</strong> <span>{m?formatDateTime(m.occurredAt):'Pendiente'}</span></li>;})}</ol>
  {onReport&&<button type="button" className="row-action" onClick={onReport}>Ver reporte prehospital</button>}

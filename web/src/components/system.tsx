@@ -118,7 +118,7 @@ export type StatusFamilyId = 'espera' | 'llamado' | 'atencion' | 'listo' | 'cerr
 /** Cada familia: un ícono y un patrón propios, distinguibles en escala de grises (rayas, puntos, sólido, contorno, discontinuo, doble). */
 export const STATUS_FAMILIES: { id: StatusFamilyId; label: string; icon: IconName; pattern: string }[] = [
   { id: 'espera', label: 'En espera', icon: 'clock', pattern: 'rayado' },
-  { id: 'llamado', label: 'Llamado o en proceso', icon: 'megaphone', pattern: 'punteado' },
+  { id: 'llamado', label: 'Llamado', icon: 'megaphone', pattern: 'punteado' },
   { id: 'atencion', label: 'En atención o en uso', icon: 'pulse', pattern: 'solido' },
   { id: 'listo', label: 'Terminado o disponible', icon: 'check', pattern: 'contorno' },
   { id: 'cerrado', label: 'Cancelado o fuera de servicio', icon: 'close', pattern: 'discontinuo' },
@@ -128,9 +128,10 @@ const familyOfValue: Record<string, StatusFamilyId> = {
   // R1 (shared with iOS and Android): a confirmed or rescheduled appointment waits for its time, and stock below the
   // minimum waits for a restock; none of them is being called.
   en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera', por_vencer: 'espera', revisar: 'espera', confirmada: 'espera', reprogramada: 'espera', bajo_minimo: 'espera',
-  llamado: 'llamado', en_proceso: 'llamado',
+  // R4a (coordinator): only a call is «llamado»; a lab order in process is being worked on (atención).
+  llamado: 'llamado',
   // R1: a bed being cleaned is in use; a metric that asks for attention (metrics.tsx) is an attention state.
-  en_atencion: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion', limpieza: 'atencion', requiere_atencion: 'atencion',
+  en_atencion: 'atencion', en_proceso: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion', limpieza: 'atencion', requiere_atencion: 'atencion',
   atendida: 'listo', atendido: 'listo', completado: 'listo', firmada: 'listo', alta_firmada: 'listo', egresado: 'listo', libre: 'listo', disponible: 'listo', activo: 'listo', exito: 'listo', normal: 'listo', aprobada: 'listo', ok: 'listo', coincide: 'listo',
   cancelado: 'cerrado', cancelada: 'cerrado', no_asistio: 'cerrado', no_se_presento: 'cerrado', cerrado: 'cerrado', rechazada: 'cerrado', vencida: 'cerrado', bloqueada: 'cerrado', inactivo: 'cerrado', desactivado: 'cerrado', denegado: 'cerrado', fallido: 'cerrado', en_mantenimiento: 'cerrado',
   critico_alto: 'critico', critico_bajo: 'critico',

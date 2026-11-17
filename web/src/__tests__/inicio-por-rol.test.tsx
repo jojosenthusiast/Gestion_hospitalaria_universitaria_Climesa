@@ -48,11 +48,12 @@ describe('inicio por rol', () => {
     expect(within(acciones).getByRole('link', { name: /Registrar paciente/ }).getAttribute('href')).toBe('#/pacientes?accion=registrar');
     expect(within(acciones).getByRole('link', { name: /Agendar cita/ }).getAttribute('href')).toBe('#/citas?accion=agendar');
     expect(within(acciones).getByRole('link', { name: /Solicitar ambulancia/ }).getAttribute('href')).toBe('#/ambulancia?accion=solicitud');
-    const atencion = await screen.findByRole('region', { name: 'Requiere tu atención' });
+    // R4a: «Requiere tu atención» and «Fila del día por estado» became the ONE pending tray and the day's figures.
+    const atencion = await screen.findByRole('region', { name: 'Pendientes' });
     expect(await within(atencion).findByText('Cuenta Ficticia')).toBeTruthy();
     expect(within(atencion).getByText('Luis Ficticio')).toBeTruthy();
     expect(within(atencion).getByRole('link', { name: /Verificar/ }).getAttribute('href')).toBe('#/vinculaciones');
-    expect(await screen.findByRole('region', { name: 'Fila del día por estado' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Cifras del día' })).toBeTruthy();
     expect(screen.queryByText('Accesos directos')).toBeNull();
   });
 
@@ -62,7 +63,8 @@ describe('inicio por rol', () => {
     expect(within(acciones).getByRole('link', { name: /Planificar turno/ }).getAttribute('href')).toBe('#/turnos?accion=planificar');
     expect(within(acciones).queryByRole('link', { name: /Registrar paciente/ })).toBeNull();
     expect(within(acciones).queryByRole('link', { name: /Invitar persona/ })).toBeNull();
-    expect(await screen.findByText('1 hueco de cobertura')).toBeTruthy();
+    // R4a: coverage gaps are a tray group; its count is the only place the number shows.
+    expect(await screen.findByRole('region', { name: 'Huecos de cobertura' })).toBeTruthy();
   });
 
   it('ADM: invitar y agregar espacio, sin contenido clínico', async () => {
@@ -70,13 +72,15 @@ describe('inicio por rol', () => {
     const acciones = screen.getByRole('region', { name: 'Acciones rápidas' });
     expect(within(acciones).getByRole('link', { name: /Invitar persona/ }).getAttribute('href')).toBe('#/personal?accion=invitar');
     expect(within(acciones).getByRole('link', { name: /Agregar espacio/ }).getAttribute('href')).toBe('#/espacios?accion=crear');
-    expect(await screen.findByRole('region', { name: 'Cuentas por estado' })).toBeTruthy();
+    // R4a: the «Cuentas por estado» donut repeated the account figures; the breakdown by role stays.
+    expect(await screen.findByRole('region', { name: 'Cuentas activas por rol' })).toBeTruthy();
     expect(screen.queryByText(/Hemograma|Paciente Ficticio/)).toBeNull();
   });
 
   it('LAB: cola, tiempo promedio y muestra pendiente con su acción', async () => {
     montar(perfil('LAB'));
-    const atencion = await screen.findByRole('region', { name: 'Requiere tu atención' });
+    // R4a: pending samples and low stock are groups of the one pending tray.
+    const atencion = await screen.findByRole('region', { name: 'Muestras por tomar' });
     expect(await within(atencion).findByText('Marta Ficticia')).toBeTruthy();
     expect(within(atencion).getByRole('link', { name: /Tomar muestra/ }).getAttribute('href')).toBe('#/laboratorio?accion=muestra');
     expect(await screen.findByRole('region', { name: 'Inventario bajo el mínimo' })).toBeTruthy();
@@ -86,11 +90,13 @@ describe('inicio por rol', () => {
   it('DPD: denegados en rojo y acción de verificar la cadena', async () => {
     montar(perfil('DPD'));
     expect(screen.getByRole('link', { name: /Verificar la cadena/ }).getAttribute('href')).toBe('#/auditoria?accion=verificar');
-    expect((await screen.findAllByText('consulta.leer')).length).toBeGreaterThan(0);
+    // R4a (W-DPD-2): the action reads as a label, never the permission code.
+    expect((await screen.findAllByText('Consulta · consulta')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('consulta.leer')).toBeNull();
   });
 
   it('ENF, MED, AST, PAR y PAC también tienen su tablero', async () => {
-    for (const [rol, titulo] of [['ENF', 'Camas por estado'], ['MED', 'Mi agenda de hoy'], ['AST', 'Quién sigue'], ['PAR', 'Servicio en curso'], ['PAC', 'Mis próximas citas']] as const) {
+    for (const [rol, titulo] of [['ENF', 'Limpiezas por registrar o verificar'], ['MED', 'Mi agenda de hoy'], ['AST', 'Quién sigue'], ['PAR', 'Servicio en curso'], ['PAC', 'Mis próximas citas']] as const) {
       montar(perfil(rol));
       expect(await screen.findByRole('region', { name: titulo }), rol).toBeTruthy();
       cleanup();
@@ -108,13 +114,16 @@ describe('inicio por rol', () => {
   it('estado vacío: sin datos dice qué falta', async () => {
     const api = { request: vi.fn(async () => []), write: vi.fn() } as unknown as Api;
     render(<Dashboard api={api} profile={perfil('LAB')} version={0} />);
-    expect(await screen.findByText('No hay órdenes esperando muestra.')).toBeTruthy();
+    // R4a: an empty tray is one line for the whole tray, not one per panel.
+    expect(await screen.findByText('Al día: nada pendiente.')).toBeTruthy();
   });
 
   it('con dos roles muestra ambos tableros sin selector de rol y sin pedir fuentes que nadie usa', async () => {
     const api = montar(perfil('ADM', ['ADM', 'LAB']));
-    expect(await screen.findByRole('region', { name: 'Cuentas por estado' })).toBeTruthy();
-    expect(await screen.findByRole('region', { name: 'Cola por estado' })).toBeTruthy();
+    // R4a: one tray and one figure strip for both roles; each role keeps its own panels.
+    expect(await screen.findByRole('region', { name: 'Cuentas activas por rol' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Tiempo de entrega (7 días)' })).toBeTruthy();
+    expect(screen.getAllByRole('region', { name: 'Pendientes' })).toHaveLength(1);
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(api.request.mock.calls.some(([p]) => String(p).startsWith('/consultas/agenda'))).toBe(false);
     expect(hrefs().length).toBeGreaterThan(0);
@@ -126,7 +135,7 @@ describe('inicio por rol', () => {
   });
   it('ADM: cada enlace del tablero abre un módulo que existe (antes «#/usuarios» daba «Página no encontrada»)', async () => {
     montar(perfil('ADM'));
-    await screen.findAllByText('Cuentas por estado');
+    await screen.findAllByText('Cuentas activas por rol');
     const routes = hrefs().filter((h): h is string => !!h && h.startsWith('#/')).map(h => h.slice(2).split('?')[0]);
     expect(routes.length).toBeGreaterThan(0);
     expect(routes.filter(r => !modules.some(m => m.id === r))).toEqual([]);

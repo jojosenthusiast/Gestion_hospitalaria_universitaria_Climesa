@@ -1,9 +1,12 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Field, Icon, Notice } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
-import { ActionButton } from '../components/system';
-import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
-import { addDays, dayKey, dayLabel, groupAgenda, minutesBetween, timeRange, weekOf } from './listas/schedule';
+import { ActionButton, StatusBadge, statusNames } from '../components/system';
+import { Segmented } from '../components/segmented';
+import { formatDate, formatDayHeading, formatRelative, plural } from '../lib/format';
+import { isPendingCategoryRequest } from './listas/requests';
+import { ChipGroup, LiveSearch, matches } from './listas/chips';
+import { addDays, dayKey, groupAgenda, minutesBetween, shownState, timeRange, weekOf } from './listas/schedule';
 import './listas/lists.css';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
 import { useQuickAction } from './personal/accion';
@@ -33,8 +36,17 @@ const timeOnly = (value: string) => new Intl.DateTimeFormat('es-SV', { hour: '2-
 
 type Range = 'todas' | 'hoy' | 'semana' | 'dia';
 const todayKey = () => dayKey(new Date().toISOString());
-const STATE_FILTERS = [['activas', 'Activas'], ['solicitada', 'Solicitadas'], ['confirmada', 'Confirmadas'], ['atendida', 'Atendidas'], ['no_asistio', 'No asistió'], ['vencida', 'Vencidas'], ['reprogramada', 'Reprogramadas'], ['cancelada', 'Canceladas'], ['todas', 'Todas']] as const;
+type StateFilter = 'proximas' | 'vencida' | 'atendida' | 'todas' | 'solicitada' | 'no_asistio' | 'reprogramada' | 'cancelada' | 'rechazada';
+/** R4a: four visible states; the rest in «Más». «Próximas» are live appointments whose time has not passed yet. */
+const VISIBLE_STATES: [StateFilter, string][] = [['proximas', 'Próximas'], ['vencida', 'Vencidas'], ['atendida', 'Atendidas'], ['todas', 'Todas']];
+const MORE_STATES: [StateFilter, string][] = [['solicitada', 'Solicitadas'], ['no_asistio', 'No asistió'], ['reprogramada', 'Reprogramadas'], ['cancelada', 'Canceladas'], ['rechazada', 'Rechazadas']];
+const STATE_FILTERS = [...VISIBLE_STATES, ...MORE_STATES];
+const RANGES: [Range, string][] = [['todas', 'Todas las fechas'], ['hoy', 'Hoy'], ['semana', 'Semana'], ['dia', 'Un día']];
 const isLive = (state: string) => state === 'solicitada' || state === 'confirmada';
+const inState = (a: { state: string; end: string }, filter: StateFilter, now: number) => {
+  const shown = shownState(a, now);
+  return filter === 'todas' || (filter === 'proximas' ? isLive(shown) : shown === filter);
+};
 
 export function AppointmentsPage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
   const data = useData<Appointment[]>(api, '/citas', version);
@@ -53,50 +65,53 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
     const body = name === 'aceptar_reprogramacion' ? { version: row.reschedule!.version } : { version: row.version };
     if (await direct.run(path, body)) data.refresh();
   }
-  const [query, setQuery] = useState(''), [state, setState] = useState<string>('activas'), [range, setRange] = useState<Range>('todas'), [day, setDay] = useState(todayKey()), [doctor, setDoctor] = useState<PickerItem | null>(null);
+  const [query, setQuery] = useState(''), [state, setState] = useState<StateFilter>('proximas'), [range, setRange] = useState<Range>('todas'), [day, setDay] = useState(todayKey()), [doctor, setDoctor] = useState<PickerItem | null>(null);
   const reload = () => { setCreate(false); setSelected(null); data.refresh(); };
   const all = data.data ?? [];
+  const now = Date.now();
   const window = range === 'hoy' ? { from: todayKey(), to: todayKey() } : range === 'semana' ? weekOf(day) : range === 'dia' ? { from: day, to: day } : null;
-  const rows = all.filter(a => (state === 'todas' || (state === 'activas' ? isLive(a.state) : a.state === state)) && (!doctor || a.doctorId === doctor.id)
+  const rows = all.filter(a => inState(a, state, now) && (!doctor || a.doctorId === doctor.id)
     && (!window || (dayKey(a.start) >= window.from && dayKey(a.start) <= window.to)) && matches(query, a.patientName, a.doctorName, a.reason));
   const doctorItems: PickerItem[] = [...new Map(all.map(a => [a.doctorId, a.doctorName])).entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label, 'es'));
-  const stateName = (value: string) => STATE_FILTERS.find(([key]) => key === value)?.[1] ?? value;
-  const filters = [
-    ...(state !== 'activas' ? [{ key: 'estado', label: stateName(state), remove: () => setState('activas') }] : []),
-    ...(range !== 'todas' ? [{ key: 'rango', label: range === 'hoy' ? 'Hoy' : range === 'semana' ? `Semana del ${window?.from}` : `Día ${day}`, remove: () => setRange('todas') }] : []),
-    ...(doctor ? [{ key: 'medico', label: doctor.label, remove: () => setDoctor(null) }] : []),
-    ...(query.trim() ? [{ key: 'texto', label: `«${query.trim()}»`, remove: () => setQuery('') }] : []),
-  ];
-  const clear = () => { setState('activas'); setRange('todas'); setDoctor(null); setQuery(''); };
-  const agenda = groupAgenda(rows);
-  const exportTable = () => ({ filename: 'citas', title: 'Citas', subtitle: `${rows.length} citas`, columns: ['Fecha', 'Horario', 'Paciente', 'Médico', 'Estado', 'Motivo'], rows: rows.map(a => [dayLabel(dayKey(a.start)), timeRange(a.start, a.end), a.patientName, a.doctorName, stateName(a.state), a.reason ?? '']) });
+  const stateName = (value: string) => STATE_FILTERS.find(([key]) => key === value)?.[1] ?? statusNames[value] ?? 'Otro estado';
+  // S8: «Solicitadas» counts what waits on Recepción, the same number as the requests tray (asked + by category).
+  const pendingRequests = (requests.data ?? []).filter(isPendingCategoryRequest);
+  const countOf = (filter: StateFilter) => all.filter(a => inState(a, filter, now)).length + (filter === 'solicitada' && canSchedule ? pendingRequests.length : 0);
+  const filtered = state !== 'proximas' || range !== 'todas' || !!doctor || !!query.trim();
+  const clear = () => { setState('proximas'); setRange('todas'); setDoctor(null); setQuery(''); };
+  // Today and what comes next first; past days fold at the bottom (W-REC-14).
+  const agenda = groupAgenda(rows), today = todayKey();
+  const ahead = agenda.filter(g => g.day >= today), past = agenda.filter(g => g.day < today).reverse();
+  const exportTable = () => ({ filename: 'citas', title: 'Citas', subtitle: plural(rows.length, 'cita', 'citas'), columns: ['Fecha', 'Horario', 'Paciente', 'Médico', 'Estado', 'Motivo'], rows: rows.map(a => [formatDate(a.start), timeRange(a.start, a.end), a.patientName, a.doctorName, stateName(shownState(a, now)), a.reason ?? '']) });
+  const dayGroup = (group: typeof agenda[number]) => <section className="ag-day" key={group.day} aria-label={formatDayHeading(group.day)}><h3>{formatDayHeading(group.day)}{group.day === today && <small> · hoy</small>}</h3>
+    {group.doctors.map(d => <div className="ag-doctor" key={d.doctorId}><header><strong><Icon name="steth" size={16} /> {d.doctorName}</strong><small>{plural(d.items.length, 'cita', 'citas')}</small></header>
+      {d.items.map(row => { const shown = shownState(row, now); return <div className={`ag-slot${shown !== row.state ? ' is-overdue' : ''}`} key={row.id}>
+        <span className="ag-time">{timeRange(row.start, row.end)}<small>{minutesBetween(row.start, row.end)} min</small></span>
+        <span className="ag-who"><strong>{row.patientName}</strong>{row.reason && <small>{row.reason}</small>}</span>
+        <StatusBadge value={shown} />
+        <AppointmentRowActions row={row} busy={direct.busy} onDirect={name => void runDirect(row, name)} onDialog={name => setSelected({ appointment: row, action: name })} /></div>; })}</div>)}</section>;
   return <>
     <CompactHeader breadcrumb="Atención / Agenda" title="Citas" actions={<>
       {canSchedule && <button className="primary-button" onClick={() => setCreate(true)}><Icon name="plus" size={18}/>Agendar cita</button>}
-      {canRequest && <button className="primary-button" onClick={() => setAsking(true)}><Icon name="plus" size={18}/>Pedir una cita</button>}</>}/>
-    {canSchedule && <RequestInbox api={api} version={version} requests={requests} onAssigned={data.refresh} />}
+      {canRequest && <button className={canSchedule ? 'secondary-button' : 'primary-button'} onClick={() => setAsking(true)}><Icon name="plus" size={18}/>Pedir una cita</button>}</>}/>
+    {canSchedule && <RequestInbox api={api} version={version} requests={requests} asked={all.filter(a => a.state === 'solicitada')} busy={direct.busy} onDirect={(row, name) => void runDirect(row, name)} onDialog={(row, name) => setSelected({ appointment: row, action: name })} onAssigned={data.refresh} />}
     {canRequest && <MyRequests api={api} requests={requests} sent={sent} />}
     <section className="data-workbench" aria-label="Agenda de citas">
       <RemoteState state={data}>{() => <>
-        <ListToolbar trailing={<ExportMenu table={exportTable} disabled={!rows.length} />}>
+        <div className="cl-toolbar ag-toolbar">
           <LiveSearch label="Buscar citas" placeholder="Paciente, médico o motivo" value={query} onChange={setQuery} />
+          <Segmented label="Estado de la cita" value={state} onChange={setState}
+            options={VISIBLE_STATES.map(([value, label]) => ({ value, label, count: countOf(value) }))}
+            more={MORE_STATES.map(([value, label]) => ({ value, label, count: countOf(value) }))} />
+          <label className="ag-range"><span className="sr-only">Fechas</span><select value={range} onChange={event => setRange(event.target.value as Range)}>{RANGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          {(range === 'dia' || range === 'semana') && <span className="cl-day-nav"><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana anterior' : 'Día anterior'} onClick={() => setDay(addDays(day, range === 'semana' ? -7 : -1))}>‹</button><label><span className="sr-only">Fecha de referencia</span><input type="date" value={day} onChange={event => event.target.value && setDay(event.target.value)} /></label><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana siguiente' : 'Día siguiente'} onClick={() => setDay(addDays(day, range === 'semana' ? 7 : 1))}>›</button></span>}
           <div className="cl-doctor-filter"><SearchPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} minChars={0} placeholder="Todos los médicos" emptyText="Ningún médico con citas coincide." /></div>
-        </ListToolbar>
-        <div className="cl-filter-row"><span className="cl-filter-label">Estado</span><ChipGroup label="Estado de la cita" value={state} onChange={setState} options={STATE_FILTERS.map(([value, label]) => ({ value, label, count: all.filter(a => value === 'todas' || (value === 'activas' ? isLive(a.state) : a.state === value)).length }))} />
-          <span className="cl-filter-label">Cuándo</span><ChipGroup label="Rango de fechas" value={range} onChange={setRange} options={[{ value: 'todas', label: 'Todas' }, { value: 'hoy', label: 'Hoy' }, { value: 'semana', label: 'Semana' }, { value: 'dia', label: 'Un día' }]} />
-          {(range === 'dia' || range === 'semana') && <span className="cl-day-nav"><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana anterior' : 'Día anterior'} onClick={() => setDay(addDays(day, range === 'semana' ? -7 : -1))}>‹</button><Field label="Fecha de referencia" type="date" value={day} onChange={value => value && setDay(value)} /><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana siguiente' : 'Día siguiente'} onClick={() => setDay(addDays(day, range === 'semana' ? 7 : 1))}>›</button></span>}
+          <span className="ag-toolbar-end">{filtered && <button type="button" className="cl-link-button" onClick={clear}>Quitar filtros</button>}<ExportMenu table={exportTable} disabled={!rows.length} /></span>
         </div>
-        <ActiveFilters filters={filters} onClear={clear} />
         <WriteError error={direct.error} onReload={data.refresh} reloadLabel="Recargar las citas" />
         {rows.length ? <>
-          <p className="cl-count" aria-live="polite">{rows.length} de {all.length} citas, agrupadas por día y por médico.</p>
-          {agenda.map(group => <section className="ag-day" key={group.day} aria-label={dayLabel(group.day)}><h3>{dayLabel(group.day)}</h3>
-            {group.doctors.map(d => <div className="ag-doctor" key={d.doctorId}><header><strong><Icon name="steth" size={16} /> {d.doctorName}</strong><small>{d.items.length} cita(s)</small></header>
-              {d.items.map(row => <div className="ag-slot" key={row.id}>
-                <span className="ag-time">{timeRange(row.start, row.end)}<small>{minutesBetween(row.start, row.end)} min</small></span>
-                <span><strong>{row.patientName}</strong>{row.reason && <small className="muted"> · {row.reason}</small>}</span>
-                <Tag value={row.state} />
-                <AppointmentRowActions row={row} busy={direct.busy} onDirect={name => void runDirect(row, name)} onDialog={name => setSelected({ appointment: row, action: name })} /></div>)}</div>)}</section>)}</>
+          {ahead.map(dayGroup)}
+          {past.length > 0 && (ahead.length ? <details className="ag-past"><summary>Días anteriores · {plural(past.reduce((n, g) => n + g.doctors.reduce((m, d) => m + d.items.length, 0), 0), 'cita', 'citas')}</summary>{past.map(dayGroup)}</details> : past.map(dayGroup))}</>
           : <Empty title={all.length ? 'Ninguna cita coincide con los filtros' : 'No hay citas en el rango actual'} description={all.length ? 'Quita algún filtro o cambia el rango.' : 'Las solicitudes o citas agendadas aparecerán aquí.'} />}
       </>}</RemoteState>
     </section>
@@ -243,10 +258,6 @@ const REQUEST_STATE: Record<CategoryRequest['state'], { value: string; label: st
   pendiente: { value: 'en_espera', label: 'Por asignar' }, asignada: { value: 'confirmada', label: 'Cita asignada' },
   rechazada: { value: 'rechazada', label: 'Rechazada' }, cancelada: { value: 'cancelada', label: 'Retirada' },
 };
-const waitingFor = (iso: string) => {
-  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).valueOf()) / 60_000));
-  return minutes < 60 ? `hace ${minutes} min` : minutes < 1440 ? `hace ${Math.floor(minutes / 60)} h` : `hace ${Math.floor(minutes / 1440)} d`;
-};
 
 /** Ícono de cada motivo (clave estable de la API); mismo trazo que `Icon`. Las claves desconocidas usan el estetoscopio. */
 const GLYPHS: Record<string, ReactNode> = {
@@ -270,17 +281,22 @@ function CategoryGlyph({ icon, size = 20 }: { icon: string; size?: number }) {
 }
 const CategoryList = ({ categories }: { categories: CategoryRef[] }) => <ul className="rq-cats">{categories.map(c => <li key={c.code}><CategoryGlyph icon={c.icon} size={16} />{c.name}</li>)}</ul>;
 
-/** Bandeja de pendientes de Recepción: lo más antiguo arriba; asignar se hace en la misma fila, ya prellenado. */
-function RequestInbox({ api, version, requests, onAssigned }: { api: Api; version: number; requests: Remote<CategoryRequest[]>; onAssigned: () => void }) {
+/**
+ * Bandeja de pendientes de Recepción (R4a, S8): everything that waits on Recepción in one list and one count, the
+ * same count as «Solicitadas»: requests by category (assign doctor and time, prefilled) and appointments the patient
+ * asked with a doctor and time (confirm or reject, server actions). Oldest first.
+ */
+function RequestInbox({ api, version, requests, asked, busy, onDirect, onDialog, onAssigned }: { api: Api; version: number; requests: Remote<CategoryRequest[]>; asked: Appointment[]; busy: boolean; onDirect: (row: Appointment, name: AppointmentAction) => void; onDialog: (row: Appointment, name: Dialogued) => void; onAssigned: () => void }) {
   const [open, setOpen] = useState<string | null>(null), [rejecting, setRejecting] = useState<CategoryRequest | null>(null), [done, setDone] = useState<string | null>(null);
-  const pending = (requests.data ?? []).filter(r => r.state === 'pendiente');
+  const pending = (requests.data ?? []).filter(isPendingCategoryRequest);
+  const total = pending.length + asked.length;
   const finish = (message: string) => { setOpen(null); setRejecting(null); setDone(message); requests.refresh(); onAssigned(); };
   return <section className="rq-inbox" aria-label="Solicitudes por asignar">
-    <header className="rq-head"><h2>Solicitudes por asignar</h2>{requests.data && <span className="rq-count" aria-label={`${pending.length} pendientes`}>{pending.length}</span>}</header>
+    <header className="rq-head"><h2>Solicitudes por asignar</h2>{requests.data && <span className="rq-count" aria-label={`${total} pendientes`}>{total}</span>}</header>
     {done && <Notice kind="success">{done}</Notice>}
-    <RemoteState state={requests} skeletonRows={2}>{() => pending.length ? <ol className="rq-list">{pending.map(r => <li key={r.id} className="rq-row">
+    <RemoteState state={requests} skeletonRows={2}>{() => total ? <ol className="rq-list">{pending.map(r => <li key={r.id} className="rq-row">
       <div className="rq-main">
-        <p className="rq-who"><strong>{r.patientName ?? 'Paciente'}</strong>{r.record && <code>{r.record}</code>}<small className="muted">{waitingFor(r.createdAt)}</small></p>
+        <p className="rq-who"><strong>{r.patientName ?? 'Paciente'}</strong>{r.record && <code>{r.record}</code>}<small className="muted">{formatRelative(r.createdAt)}</small></p>
         <CategoryList categories={r.categories} />
         {r.note && <p className="rq-note">{r.note}</p>}
         <p className="rq-meta">Prefiere: <strong>{FRANJA_LABEL[r.franja]}</strong>{r.preferredDoctorName && <> · con {r.preferredDoctorName}</>}</p>
@@ -290,6 +306,15 @@ function RequestInbox({ api, version, requests, onAssigned }: { api: Api; versio
         {r.allowedActions.includes('rechazar') && <button type="button" className="row-action" aria-label={`Rechazar · ${r.patientName ?? 'Paciente'}`} onClick={() => setRejecting(r)}>Rechazar</button>}
       </div>
       {open === r.id && <AssignPanel api={api} version={version} request={r} onCancel={() => setOpen(null)} onSaved={message => finish(message)} />}
+    </li>)}
+    {asked.map(a => <li key={a.id} className="rq-row">
+      <div className="rq-main">
+        <p className="rq-who"><strong>{a.patientName}</strong><small className="muted">{formatDate(a.start, { withYear: false })}, {timeOnly(a.start)}</small></p>
+        <p className="rq-meta">Con <strong>{a.doctorName}</strong>{a.reason && <> · {a.reason}</>}</p>
+      </div>
+      <div className="row-actions">
+        {(['confirmar', 'rechazar'] as const).map(name => <ActionButton key={name} action={name} allowed={a.allowedActions ?? []} blocked={a.blockedActions ?? []} disabled={busy} className={name === 'confirmar' ? 'row-action rq-primary' : 'row-action'} aria-label={`${ACTION_LABEL[name]} · ${a.patientName}`} onClick={() => name === 'confirmar' ? onDirect(a, name) : onDialog(a, name)}>{ACTION_LABEL[name]}</ActionButton>)}
+      </div>
     </li>)}</ol> : <p className="rq-empty" role="status"><Icon name="check" size={18} />Al día: no hay solicitudes por asignar.</p>}</RemoteState>
     {rejecting && <RejectRequestDialog api={api} request={rejecting} onClose={() => setRejecting(null)} onSaved={() => finish('Solicitud rechazada; el paciente verá el motivo.')} />}
   </section>;

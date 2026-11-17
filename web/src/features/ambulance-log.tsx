@@ -5,7 +5,7 @@ import { exportName,type ExportTable } from '../lib/export';
 import { Empty,CompactHeader,RemoteState,Select,Tag,formatDateTime,useData } from './common';
 import { PriorityBadge } from '../components/system';
 import { type Api } from '../lib/api';
-import { finalStateNames,priorityLevel,priorityNames,roleNames,typeNames } from './ambulance/types';
+import { finalStateNames,isUnclosed,priorityLevel,priorityNames,roleNames,typeNames } from './ambulance/types';
 import { activeFilters,emptyFilters,logPath,narrate,timeline,type AmbulanceLogRow,type LogFilters } from './ambulance/narrative';
 import './ambulance/ambulance.css';
 export { logPath };
@@ -15,6 +15,8 @@ const rowsOf=(rows:AmbulanceLogRow[]):ExportTable=>({filename:exportName('bitaco
  columns:['Despachado','Tipo','Prioridad','Origen','Municipio','Destino','Tripulación','Paciente (expediente)','Respuesta (min)','Estado final'],
  rows:rows.map(r=>[formatDateTime(r.dispatchedAt),typeNames[r.type]??r.type,priorityNames[r.priority]??r.priority,r.origin,r.municipality??'',r.destination,r.crew.map(c=>`${c.name} (${roleNames[c.role]??c.role})`).join('; '),r.patientRef??'',r.responseMinutes,finalLabel(r)])});
 /** BL-05: un servicio que Jefatura cerró se marca como "Cierre administrativo", no como cancelación de la tripulación. */
+/** R4a: still open 12 h after dispatch (no final state, no administrative close). */
+const unclosed=(r:AmbulanceLogRow)=>!r.finalState&&!r.administrativeClose&&isUnclosed(r.dispatchedAt);
 const finalLabel=(r:AmbulanceLogRow)=>r.administrativeClose?'Cierre administrativo':r.finalState?finalStateNames[r.finalState]??r.finalState:'En curso';
 
 /**
@@ -47,14 +49,14 @@ export function AmbulanceLogPage({api,version}:{api:Api;version:number}){
   {anyActive&&<div className="amb-chips" aria-label="Filtros activos">{filters.q&&<span className="amb-chip">Búsqueda: {filters.q}<button type="button" aria-label="Quitar búsqueda" onClick={()=>{setText('');setFilters(f=>({...f,q:''}));}}>×</button></span>}
    {chips.map(c=><span className="amb-chip" key={c.key}>{c.label}: {c.value}<button type="button" aria-label={`Quitar filtro ${c.label}`} onClick={()=>setFilters(f=>({...f,[c.key]:''}))}>×</button></span>)}
    <button type="button" className="row-action" onClick={clear}>Quitar filtros</button></div>}
-  <RemoteState state={data}>{rows=>rows.length?<><p className="amb-count" role="status">{rows.length} {rows.length===1?'servicio':'servicios'}{rows.length>=500?' (se muestran los 500 más recientes)':''}</p>{view==='cards'?<ol className="amb-service-list" aria-label="Servicios de ambulancia">{rows.map(r=><li key={r.id} className={`amb-service amb-prio-${r.priority}`}>
-    <header><PriorityBadge value={priorityLevel(r.priority)} label={priorityNames[r.priority]??r.priority}/><strong>{typeNames[r.type]??r.type}</strong><time dateTime={r.dispatchedAt}>{formatDateTime(r.dispatchedAt)}</time><Tag value={r.administrativeClose?'cerrado':r.finalState??'en_curso'} label={finalLabel(r)}/></header>
+  <RemoteState state={data}>{rows=>rows.length?<><p className="amb-count" role="status">{rows.length} {rows.length===1?'servicio':'servicios'}{rows.length>=500?' (se muestran los 500 más recientes)':''}</p>{view==='cards'?<ol className="amb-service-list" aria-label="Servicios de ambulancia">{rows.map(r=><li key={r.id} className={`amb-service amb-prio-${r.priority}`} aria-label={`Servicio ${typeNames[r.type]??r.type}, ${formatDateTime(r.dispatchedAt)}`}>
+    <header><PriorityBadge value={priorityLevel(r.priority)} label={priorityNames[r.priority]??r.priority}/><strong>{typeNames[r.type]??r.type}</strong><time dateTime={r.dispatchedAt}>{formatDateTime(r.dispatchedAt)}</time><Tag value={r.administrativeClose?'cerrado':r.finalState??'en_curso'} label={finalLabel(r)}/>{unclosed(r)&&<PriorityBadge value="urgente" label="Sin cierre"/>}</header>
     <p className="amb-narrative">{narrate(r)}</p>
     {timeline(r).length>0&&<ol className="amb-timeline" aria-label="Hitos del servicio">{timeline(r).map(m=><li key={m.type}><span>{m.label}</span><time>{m.time}</time></li>)}</ol>}
     <p className="muted amb-response">{r.responseMinutes===null?'Sin llegada a escena':`Llegó a la escena en ${r.responseMinutes} min`}</p></li>)}</ol>
    :<table className="record-table"><caption className="sr-only">Servicios de ambulancia</caption><thead><tr><th>Fecha</th><th>Tipo</th><th>Prioridad</th><th>Origen</th><th>Destino</th><th>Tripulación</th><th>Respuesta</th><th>Estado final</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}>
     <td data-label="Fecha">{formatDateTime(r.dispatchedAt)}</td><td data-label="Tipo">{typeNames[r.type]??r.type}</td><td data-label="Prioridad">{priorityNames[r.priority]??r.priority}</td>
-    <td data-label="Origen">{r.origin}{r.municipality?` · ${r.municipality}`:''}</td><td data-label="Destino">{r.destination}</td><td data-label="Tripulación">{r.crew.map(c=>c.name).join(', ')||'Sin registrar'}</td>
-    <td data-label="Respuesta">{r.responseMinutes===null?'Sin llegada a escena':`${r.responseMinutes} min`}</td><td data-label="Estado final">{finalLabel(r)}</td></tr>)}</tbody></table>}</>:<Empty title="Sin servicios con esos filtros" description="Quita algún filtro o cambia la búsqueda para ver otros servicios."/>}</RemoteState>
+    <td data-label="Origen">{r.origin}{r.municipality?` · ${r.municipality}`:''}</td><td data-label="Destino">{r.destination}</td><td data-label="Tripulación">{r.crew.map(c=>c.name).join(', ')||'Sin asignar'}</td>
+    <td data-label="Respuesta">{r.responseMinutes===null?'Sin llegada a escena':`${r.responseMinutes} min`}</td><td data-label="Estado final">{finalLabel(r)}{unclosed(r)&&<> <PriorityBadge value="urgente" label="Sin cierre"/></>}</td></tr>)}</tbody></table>}</>:<Empty title="Sin servicios con esos filtros" description="Quita algún filtro o cambia la búsqueda para ver otros servicios."/>}</RemoteState>
  </section></>;
 }

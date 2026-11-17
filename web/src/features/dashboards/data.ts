@@ -4,6 +4,8 @@ import type { LinkRequest } from '../account-links';
 import { useData, type Remote } from '../common';
 import type { Consultation } from '../consultations';
 import type { MetricsBoard } from '../tablero';
+import type { LabProposal } from './lab-follow-up';
+import type { LabFollowUp } from './lab-results-inbox';
 
 // Tipos mínimos de los listados que ya consumen los módulos: el inicio solo lee, nunca escribe.
 export type QueueTicket = { id: string; service: string; numero: number; patientName?: string | null; state: string; issuedAt: string; officeId?: string | null };
@@ -33,6 +35,9 @@ export const sources = {
   users: { path: '/usuarios', any: ['usuarios.ver'] },
   staff: { path: '/personal', any: ['personal.ver'] },
   audit: { path: '/auditoria?limite=200', any: ['auditoria.ver'] },
+  // S10 groups of the pending tray: read once here and handed to their components.
+  followUps: { path: '/laboratorio/seguimientos', any: ['citas.agendar'] },
+  labPending: { path: '/laboratorio/pendientes', any: ['laboratorio.revisar'] },
 } as const;
 export type Source = keyof typeof sources;
 
@@ -41,6 +46,7 @@ export type DashboardData = {
   lab: Remote<LabOrderRow[]>; myLab: Remote<LabOrderRow[]>; beds: Remote<Bed[]>; admissions: Remote<AdmissionRow[]>; stock: Remote<StockRow[]>;
   ambulance: Remote<AmbulanceStatus>; shifts: Remote<Shift[]>; myShifts: Remote<Shift[]>; agenda: Remote<Consultation[]>;
   links: Remote<LinkRequest[]>; users: Remote<UserAccount[]>; staff: Remote<Staff[]>; audit: Remote<AuditRow[]>;
+  followUps: Remote<LabProposal[]>; labPending: Remote<LabFollowUp[]>;
 };
 
 function useSource<T>(api: Api, profile: AccessProfile, version: number, needed: ReadonlySet<Source>, key: Source) {
@@ -57,5 +63,6 @@ export function useDashboardData(api: Api, profile: AccessProfile, version: numb
     lab: useSource<LabOrderRow[]>(api, profile, version, needed, 'lab'), myLab: useSource<LabOrderRow[]>(api, profile, version, needed, 'myLab'), beds: useSource<Bed[]>(api, profile, version, needed, 'beds'), admissions: useSource<AdmissionRow[]>(api, profile, version, needed, 'admissions'), stock: useSource<StockRow[]>(api, profile, version, needed, 'stock'),
     ambulance: useSource<AmbulanceStatus>(api, profile, version, needed, 'ambulance'), shifts: useSource<Shift[]>(api, profile, version, needed, 'shifts'), myShifts: useSource<Shift[]>(api, profile, version, needed, 'myShifts'), agenda: useSource<Consultation[]>(api, profile, version, needed, 'agenda'),
     links: useSource<LinkRequest[]>(api, profile, version, needed, 'links'), users: useSource<UserAccount[]>(api, profile, version, needed, 'users'), staff: useSource<Staff[]>(api, profile, version, needed, 'staff'), audit: useSource<AuditRow[]>(api, profile, version, needed, 'audit'),
+    followUps: useSource<LabProposal[]>(api, profile, version, needed, 'followUps'), labPending: useSource<LabFollowUp[]>(api, profile, version, needed, 'labPending'),
   };
 }

@@ -32,3 +32,11 @@ export function groupAgenda<T extends AgendaItem>(items: T[]): AgendaDay<T>[] {
   }
   return [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, doctors]) => ({ day, doctors: [...doctors.values()].sort((a, b) => a.doctorName.localeCompare(b.doctorName, 'es')) }));
 }
+
+/**
+ * R4a (W-REC-7, W-REC-14): the server has no state for a confirmed appointment whose time already passed, so it stays
+ * «confirmada» forever. The client shows it as «Vencida» (same family as the server's expired requests) and groups it
+ * with them; the server's actions (for example «No asistió») stay as they are.
+ */
+export const isOverdue = (a: { state: string; end: string }, now = Date.now()) => (a.state === 'confirmada' || a.state === 'solicitada') && Date.parse(a.end) < now;
+export const shownState = (a: { state: string; end: string }, now = Date.now()) => isOverdue(a, now) ? 'vencida' : a.state;

@@ -31,6 +31,8 @@ describe('Pacientes · filtros del servidor', () => {
     const api = pacientes(jop);
     await screen.findByText('Rosa Ficticia');
     expect(listCalls(api).at(-1)).toBe('/pacientes?limit=50&estado=vigente');
+    // R4a: the filters moved into the «Filtros» popover; open it first.
+    await userEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Hospitalizados' }));
     await waitFor(() => expect(listCalls(api).at(-1)).toBe('/pacientes?limit=50&estado=vigente&situacion=hospitalizado'));
     expect(readHashParams().get('situacion')).toBe('hospitalizado');
@@ -42,6 +44,7 @@ describe('Pacientes · filtros del servidor', () => {
   it('área y médico tratante salen del catálogo y se combinan; «Quitar filtros» vuelve a la vista inicial', async () => {
     const api = pacientes(jop);
     await screen.findByText('Rosa Ficticia');
+    await userEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
     await screen.findByRole('option', { name: 'Hospitalización planta 2' });
     await userEvent.selectOptions(screen.getByLabelText('Área de la cama'), '00000000-0000-4000-8000-0000000000a1');
     await userEvent.selectOptions(screen.getByLabelText('Médico tratante'), '00000000-0000-4000-8000-0000000000d1');
@@ -80,6 +83,7 @@ describe('Pacientes · filtros del servidor', () => {
   it('sin alcance global de admisiones no ofrece filtros de atención (el servidor los rechazaría)', async () => {
     const api = pacientes(enfermeria);
     await screen.findByText('Rosa Ficticia');
+    await userEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
     expect(screen.queryByRole('group', { name: 'Situación de hoy' })).toBeNull();
     expect(screen.queryByLabelText('Área de la cama')).toBeNull();
     expect(api.request.mock.calls.some(([p]) => p === '/turnos/catalogo')).toBe(false);

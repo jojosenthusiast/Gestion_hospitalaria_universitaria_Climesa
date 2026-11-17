@@ -192,6 +192,8 @@ describe('edición y estado', () => {
     const inactivo = { ...paciente, active: false, state: 'inactivo' };
     const api2 = { request: vi.fn(async (path: string) => (path === '/pacientes/p1' ? inactivo : [inactivo])), write: vi.fn(async () => ({})) };
     render(<PatientsPage api={api2 as unknown as Api} profile={perfil} version={0} />);
+    // R4a: the state filter moved into the «Filtros» popover.
+    await userEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
     await userEvent.click(screen.getByRole('button', { name: /^Todos/ }));
     await userEvent.click(await screen.findByRole('button', { name: /Abrir ficha de Ana Ficticia/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Reactivar paciente' }));

@@ -1,0 +1,40 @@
+import { describe, expect, it } from 'vitest';
+import { formatDate, formatDateTime, formatDayHeading, formatDuration, formatNumber, formatPercent, formatRelative, formatTime, plural } from '../lib/format';
+
+// R4a (S5, §4.8): one es-SV formatter. Hospital time is El Salvador (UTC-6).
+describe('formateador es-SV', () => {
+  it('números con coma decimal y porcentaje que no se parte', () => {
+    expect(formatNumber(35.7, 1)).toBe('35,7');
+    expect(formatPercent(35.71, 1)).toBe('35,7 %');
+    expect(formatPercent(50)).toBe('50 %');
+    expect(formatNumber(12500)).toBe('12.500');
+  });
+
+  it('fechas cortas sin «de» ni mayúsculas, en hora de El Salvador', () => {
+    expect(formatDate('2026-11-16T22:13:00Z')).toBe('16 nov 2026');
+    // 03:00 UTC del 17 es todavía el 16 en El Salvador.
+    expect(formatDate('2026-11-17T03:00:00Z')).toBe('16 nov 2026');
+    expect(formatDate('2028-05-31')).toBe('31 may 2028');
+    expect(formatDate('2026-11-16T22:13:00Z', { withYear: false })).toBe('16 nov');
+    expect(formatTime('2026-11-16T15:33:00Z')).toBe('09:33');
+    expect(formatDateTime('2026-11-14T07:33:00Z')).toBe('14 nov 2026, 01:33');
+    expect(formatDayHeading('2026-11-14T18:00:00Z')).toBe('sábado 14 de noviembre');
+  });
+
+  it('tiempos relativos con tope: nunca miles de minutos', () => {
+    const now = Date.parse('2026-11-16T22:00:00Z');
+    expect(formatRelative(new Date(now - 4123 * 60_000), now)).toBe('hace 2 d');
+    expect(formatRelative(new Date(now - 5 * 60_000), now)).toBe('hace 5 min');
+    expect(formatRelative(new Date(now - 190 * 60_000), now)).toBe('hace 3 h');
+    expect(formatDuration(4123)).toBe('2 d 20 h');
+    expect(formatDuration(125)).toBe('2 h 05 min');
+    expect(formatDuration(45)).toBe('45 min');
+  });
+
+  it('plurales correctos', () => {
+    expect(plural(1, 'cita', 'citas')).toBe('1 cita');
+    expect(plural(3, 'cita', 'citas')).toBe('3 citas');
+    expect(plural(0, 'cita', 'citas')).toBe('0 citas');
+    expect(plural(1, 'año', 'años')).toBe('1 año');
+  });
+});
