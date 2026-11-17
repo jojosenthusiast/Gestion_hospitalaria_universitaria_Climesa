@@ -115,10 +115,11 @@ describe('agenda de citas (obs. 12)', () => {
     expect(within(dia).getByText('20 min')).toBeTruthy();
   });
 
-  it('los chips de estado cuentan y filtran; «Quitar filtros» vuelve a las activas', async () => {
+  // R4a: «Canceladas» moved into the «Más» select of the state control (4 visible states, the rest in «Más»).
+  it('el control de estado filtra; «Quitar filtros» vuelve a las próximas', async () => {
     mount();
     await screen.findByText('09:00 – 09:20');
-    await userEvent.click(screen.getByRole('button', { name: /^Canceladas/ }));
+    await userEvent.selectOptions(within(screen.getByRole('group', { name: 'Estado de la cita' })).getByRole('combobox'), 'cancelada');
     expect(await screen.findByText('Ninguna cita coincide con los filtros')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
     expect(await screen.findByText('09:00 – 09:20')).toBeTruthy();

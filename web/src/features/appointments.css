@@ -57,3 +57,33 @@
   .rq-cat-grid { grid-template-columns: 1fr; max-height: none; }
 }
 @media (prefers-reduced-motion: reduce) { .rq-cat { transition: none; } }
+
+/* R4a · Citas filter bar: one line of equal-height controls (44 px); the doctor label is for screen readers only, so
+   the picker lines up with the search field (coordinator: «Médico» floated above a taller select). */
+.ag-toolbar { justify-content: flex-start; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-5) 0; }
+.ag-toolbar .live-search, .ag-toolbar .cl-search { flex: 1 1 240px; min-width: 200px; }
+.ag-toolbar .search-picker > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ag-toolbar .search-picker input, .ag-range select, .cl-day-nav input { min-height: 44px; }
+.ag-toolbar .cl-day-nav { align-items: center; }
+.ag-range select { padding: 0 var(--space-6) 0 var(--space-3); border: 1px solid var(--control-line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-sm); font-weight: 600; }
+.ag-toolbar-end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); }
+.ag-toolbar .export-trigger { min-height: 44px; }
+.data-workbench > .ag-day, .data-workbench > .ag-past, .data-workbench > .empty-state { margin-inline: var(--space-5); }
+.data-workbench > .ag-day:last-child, .data-workbench > .ag-past { margin-bottom: var(--space-5); }
+.ag-who { display: grid; gap: 2px; min-width: 0; }
+.ag-who strong { font-size: var(--text-md); overflow-wrap: anywhere; }
+/* The reason is a hint, not a paragraph: two lines at most. */
+.ag-who small { color: var(--muted); font-size: var(--text-sm); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ag-slot.is-overdue { background: color-mix(in srgb, var(--status-cerrado-soft) 70%, var(--bg)); }
+.ag-day h3 small { color: var(--muted); font-weight: 600; }
+.ag-past > summary { min-height: 44px; display: flex; align-items: center; color: var(--muted); font-size: var(--text-sm); font-weight: 700; cursor: pointer; }
+/* One rule under the tray head, not a short rule then a full-width one. */
+.rq-inbox { padding: var(--space-4) var(--space-5); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.rq-inbox .rq-list { border-top: 0; }
+.rq-inbox .rq-row:last-child { border-bottom: 0; }
+.rq-inbox .rq-empty { border-top: 0; padding: 0; }
+@media (max-width: 720px) {
+  .ag-toolbar { padding: var(--space-3) var(--space-4) 0; }
+  .ag-toolbar-end { margin-left: 0; }
+  .data-workbench > .ag-day, .data-workbench > .ag-past, .data-workbench > .empty-state { margin-inline: var(--space-4); }
+}
