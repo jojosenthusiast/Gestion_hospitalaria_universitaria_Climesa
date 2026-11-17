@@ -135,6 +135,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 112,POST,/api/v1/me/avisos/{id}/enterado,sesion.perfil,Propio; aviso dirigido a la cuenta,R,3,Dar «Enterado» a un aviso; idempotente y auditado
 112,POST,/api/v1/me/avisos/{id}/posponer,sesion.perfil,Propio; aviso dirigido a la cuenta,R,3,Recordarme después: el crítico vuelve a destacarse tras avisos.recordatorio_horas (4 h)
 112,GET,/api/v1/avisos/estadisticas,avisos.publicar,,R,3,Por aviso: cuántas cuentas dieron «Enterado» y a cuántas va dirigido; sin nombres
+112,GET,/api/v1/avisos/alcance,avisos.publicar,Solo el conteo; misma regla que estadisticas,R,6,A cuántas cuentas llegaría el aviso al redactar (R7 D-2)
 112,PUT,/api/v1/avisos/{id},avisos.publicar,Vigente o programado; exige versión,R,3,Editar aviso: texto prioridad audiencia y vigencia (adelantar el fin lo vence antes); auditado
 112,POST,/api/v1/avisos/{id}/retirar,avisos.publicar,Motivo de 10 caracteres o más (D-13),R,3,Retirar aviso antes de tiempo; deja de verse en todas partes
 113,GET,/api/v1/metricas/tablero,metricas.ver,Agregados sin datos personales,R,2,Tablero inicial

@@ -97,6 +97,11 @@ export class NoticeAckResponse {
   @DateTimeProp({ nullable: true }) recordarEn!: string | null;
 }
 
+/** R7 D-2: a cuántas cuentas llegaría un aviso mientras se redacta (solo el conteo). */
+export class NoticeReachResponse {
+  @IntProp({ description: 'Cuentas activas del personal a las que llegaría por rol o por área (misma regla que `destinatarios` en las estadísticas)' }) destinatarios!: number;
+}
+
 export class NoticeStatsResponse {
   @UuidProp() avisoId!: string;
   @IntProp({ description: 'Cuentas que dieron "Enterado"' }) enterados!: number;

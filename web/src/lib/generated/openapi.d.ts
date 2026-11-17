@@ -2586,6 +2586,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/avisos/alcance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Al redactar: a cuántas cuentas del personal llegaría el aviso por roles y áreas (solo el conteo) */
+        get: operations["NoticesController_reach"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/avisos/{id}": {
         parameters: {
             query?: never;
@@ -6371,6 +6388,10 @@ export interface components {
             /** @description Cuentas que dieron "Enterado" */
             enterados: number;
             /** @description Cuentas activas del personal a las que va dirigido por rol o por el área de su ficha; 0 si solo es público */
+            destinatarios: number;
+        };
+        NoticeReachResponse: {
+            /** @description Cuentas activas del personal a las que llegaría por rol o por área (misma regla que `destinatarios` en las estadísticas) */
             destinatarios: number;
         };
         NoticeDto: {
@@ -18976,6 +18997,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NoticeStatsResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    NoticesController_reach: {
+        parameters: {
+            query?: {
+                /** @description Códigos de rol separados por coma, por ejemplo ENF,MED */
+                roles?: string;
+                /** @description Códigos de espacio separados por coma, por ejemplo P1-HOS */
+                areas?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeReachResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */

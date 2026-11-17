@@ -17039,6 +17039,93 @@
         "x-permiso": "avisos.publicar"
       }
     },
+    "/api/v1/avisos/alcance": {
+      "get": {
+        "operationId": "NoticesController_reach",
+        "parameters": [
+          {
+            "name": "roles",
+            "required": false,
+            "in": "query",
+            "description": "Códigos de rol separados por coma, por ejemplo ENF,MED",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "areas",
+            "required": false,
+            "in": "query",
+            "description": "Códigos de espacio separados por coma, por ejemplo P1-HOS",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeReachResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Al redactar: a cuántas cuentas del personal llegaría el aviso por roles y áreas (solo el conteo)",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "avisos.publicar"
+      }
+    },
     "/api/v1/avisos/{id}": {
       "put": {
         "operationId": "NoticesController_edit",
@@ -31178,6 +31265,18 @@
         "required": [
           "avisoId",
           "enterados",
+          "destinatarios"
+        ]
+      },
+      "NoticeReachResponse": {
+        "type": "object",
+        "properties": {
+          "destinatarios": {
+            "type": "integer",
+            "description": "Cuentas activas del personal a las que llegaría por rol o por área (misma regla que `destinatarios` en las estadísticas)"
+          }
+        },
+        "required": [
           "destinatarios"
         ]
       },

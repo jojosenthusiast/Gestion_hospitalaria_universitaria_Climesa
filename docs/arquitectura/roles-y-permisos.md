@@ -366,6 +366,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/me/avisos/{id}/enterado` | `sesion.perfil` | Propio; aviso dirigido a la cuenta | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | POST | `/api/v1/me/avisos/{id}/posponer` | `sesion.perfil` | Propio; aviso dirigido a la cuenta | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | GET | `/api/v1/avisos/estadisticas` | `avisos.publicar` |  | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/avisos/alcance` | `avisos.publicar` | Solo el conteo; misma regla que estadisticas | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
 | PUT | `/api/v1/avisos/{id}` | `avisos.publicar` | Vigente o programado; exige versión | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/avisos/{id}/retirar` | `avisos.publicar` | Motivo de 10 caracteres o más (D-13) | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 
