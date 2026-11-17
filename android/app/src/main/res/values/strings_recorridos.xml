@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- R7 U2: textos de los recorridos rediseñados (fila, consulta, citas, vinculación, inicio del paciente, ambulancia, planta). -->
+<resources>
+    <!-- B1 mostrador -->
+    <string name="rec7_emitir_numero">Emitir número</string>
+    <string name="rec7_emitir_para">Emitir número para %1$s</string>
+    <string name="rec7_numero_emitido">Número emitido</string>
+    <string name="rec7_servicio">Servicio</string>
+    <plurals name="rec7_antes">
+        <item quantity="one">%1$d antes</item>
+        <item quantity="other">%1$d antes</item>
+    </plurals>
+    <!-- B5 Mi turno -->
+    <plurals name="rec7_turno_antes">
+        <item quantity="one">%1$d persona antes de ti</item>
+        <item quantity="other">%1$d personas antes de ti</item>
+    </plurals>
+    <string name="rec7_turno_eres_siguiente">Eres el siguiente</string>
+    <string name="rec7_turno_sin_llamados">Aún no han llamado a nadie en tu área</string>
+    <string name="rec7_turno_te_llamaran">Te llamarán en la pantalla de la sala y aquí.</string>
+    <string name="rec7_turno_pasa_a">Pasa a %1$s</string>
+    <string name="rec7_turno_pasa">Te están llamando</string>
+    <string name="rec7_turno_llamado_detalle">Acércate al área indicada con tu número.</string>
+</resources>
