@@ -27,9 +27,10 @@ class ReceptionLinkingViewModel @Inject constructor(private val api: ApiGateway,
     val state = mutable.asStateFlow()
     private val live = LiveSubscription(realtime)
 
-    fun load() {
+    /** [keepError] keeps a failed write's error while the list refreshes, so the open dialog still says what went wrong. */
+    fun load(keepError: Boolean = false) {
         viewModelScope.launch {
-            mutable.update { it.copy(loading = true, error = null) }
+            mutable.update { it.copy(loading = true, error = if (keepError) it.error else null) }
             try {
                 val rows = ReceptionLinking.parse(api.request("/cuentas/vinculaciones") as? JSONArray ?: JSONArray())
                 mutable.update { it.copy(loading = false, rows = rows) }
@@ -66,7 +67,7 @@ class ReceptionLinkingViewModel @Inject constructor(private val api: ApiGateway,
                 load()
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 mutable.update { it.copy(busyId = null, error = userMessage(e, "No se pudo resolver la vinculación.")) }
-                load()
+                load(keepError = true)
             }
         }
     }

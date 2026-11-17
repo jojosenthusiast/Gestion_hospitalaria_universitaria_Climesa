@@ -149,6 +149,8 @@ data class LinkRequestRow(
     val id: String, val version: Int, val createdAt: String, val email: String, val accountName: String,
     val declaredDui: String, val declaredBirth: String,
     val candidateRecord: String?, val candidateName: String?, val candidateBirth: String?, val candidates: Int,
+    /** G2: the nearest record when nothing matches exactly (one digit off, for example); shown to compare, never approvable. */
+    val closestRecord: String? = null, val closestName: String? = null, val closestBirth: String? = null, val closestDui: String? = null,
 ) {
     val hasCandidate get() = candidateRecord != null
     /** Regla de la pantalla: aprobar solo si un expediente coincide en DUI y nacimiento; la API lo vuelve a validar. */
@@ -157,16 +159,20 @@ data class LinkRequestRow(
     val guidance get() = when {
         hasCandidate -> "DUI y fecha de nacimiento coinciden con el expediente $candidateRecord. Verifica la identidad antes de aprobar."
         candidates > 1 -> "Más de un expediente coincide: resuelve el posible duplicado antes de aprobar."
+        closestRecord != null -> "No coincide exacto, pero el expediente $closestRecord se parece. Compara los datos con el paciente y corrige el que esté mal antes de aprobar."
         else -> "No hay expediente con ese DUI y esa fecha: búscalo en Pacientes y regístralo si no existe; después aprueba."
     }
 }
 object ReceptionLinking {
     fun parse(array: JSONArray) = (0 until array.length()).mapNotNull { array.optJSONObject(it) }.map { row ->
         val account = row.optJSONObject("account"); val declared = row.optJSONObject("declared"); val candidate = row.optJSONObject("candidate")
+        val closest = row.optJSONObject("closest")
+        fun JSONObject.text(key: String) = if (isNull(key)) null else optString(key).ifBlank { null }
         LinkRequestRow(
             row.optString("id"), row.optInt("version", 1), row.optString("createdAt"), account?.optString("email").orEmpty(), account?.optString("name").orEmpty(),
             declared?.optString("dui").orEmpty(), declared?.optString("birth").orEmpty(),
             candidate?.optString("record"), candidate?.optString("fullName"), candidate?.let { if (it.isNull("birth")) null else it.optString("birth") }, row.optInt("candidates"),
+            closest?.text("record"), closest?.text("fullName"), closest?.text("birth"), closest?.text("dui"),
         )
     }
     fun rejectError(reason: String) = if (reason.trim().length < 10) "El motivo debe tener al menos 10 caracteres." else null

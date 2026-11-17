@@ -79,6 +79,8 @@ private fun LinkCard(row: LinkRequestRow, canVerify: Boolean, primary: Boolean, 
         if (row.accountName.isNotBlank()) Text(row.accountName, style = MaterialTheme.typography.bodyMedium)
         Text(stringResource(R.string.rec_vinc_declarado, row.declaredDui, row.declaredBirth), style = MaterialTheme.typography.bodySmall)
         if (row.hasCandidate) Text(stringResource(R.string.rec_vinc_candidato, row.candidateRecord.orEmpty(), row.candidateName.orEmpty()), style = MaterialTheme.typography.bodySmall)
+        // G2: the nearest record, side by side with what the account declared; it only helps compare, it is never approvable.
+        else if (row.closestRecord != null) Text(stringResource(R.string.u5_vinc_parecido, row.closestRecord, row.closestName.orEmpty(), row.closestDui ?: "—", row.closestBirth ?: "—"), style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (row.hasCandidate) StatusTag(LinkCheck.MATCH, label = stringResource(R.string.rec_vinc_coincide)) else StatusTag(LinkCheck.REVIEW, label = stringResource(R.string.rec_vinc_revisar))
         }

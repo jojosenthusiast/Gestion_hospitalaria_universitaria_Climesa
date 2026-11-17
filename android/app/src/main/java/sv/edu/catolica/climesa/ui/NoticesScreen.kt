@@ -56,6 +56,14 @@ internal fun noticeInboxModel(account: AuthenticatedAccount): NoticeInboxViewMod
     return model
 }
 
+/** D1: the unread count on the "Avisos" entry, from the same shared inbox; nothing when the role has no "Avisos". */
+@Composable
+internal fun noticeBadges(account: AuthenticatedAccount, sections: List<sv.edu.catolica.climesa.domain.AndroidSection>): Map<sv.edu.catolica.climesa.domain.AndroidSection, Int> {
+    if (sv.edu.catolica.climesa.domain.AndroidSection.NOTICES !in sections) return emptyMap()
+    val state by noticeInboxModel(account).state.collectAsStateWithLifecycle()
+    return mapOf(sv.edu.catolica.climesa.domain.AndroidSection.NOTICES to NoticeInboxRules.badge(state.inbox, state.hidden))
+}
+
 /**
  * The one re-read at `proximoCambio` (a notice expires or starts, or a snoozed reminder comes back). It belongs to the
  * screen that shows the inbox and is cancelled with it; a new `proximoCambio` replaces it. No polling.
