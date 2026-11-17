@@ -7,12 +7,14 @@ import UIKit
 /// Cada tarjeta se pide por separado: la que falla muestra su error con «Reintentar» (CH-02); nil es "sin permiso".
 struct PatientHome: Sendable {
     var ticket: Part<QueueTicket?>?
-    var nextAppointment: Part<Appointment?>?
+    /// Every upcoming appointment, so Inicio can split today's from the next one (G6).
+    var upcoming: Part<[Appointment]>?
     var labs: Part<[LabOrder]>?
     var room: Part<Admission?>?
 }
 
 /// I04 · Inicio del paciente. S11: los avisos viven en Avisos (Más); aquí solo sale el crítico destacado.
+/// G6: Vincular (while not linked), then today's number, «Hoy tienes cita», the next step, new results and shortcuts.
 struct PatientHomeView: View {
     let profile: AccessProfile
     let go: (AppTab) -> Void
@@ -20,47 +22,110 @@ struct PatientHomeView: View {
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<PatientHome>()
     @State private var notices = NoticeInboxModel()
+    /// G-7 (no "seen" in the API): the last visit to «Mis exámenes», read again each time Inicio shows.
+    @State private var seenAt: Date?
+    @State private var requesting = false
+    @State private var requestSent = false
+
+    private var linked: Bool { profile.patientId != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty { CriticalNoticeBanner(model: notices) }
-            if profile.patientId == nil {
-                // S13: while the account is not linked, linking is the one thing to do: open the form in one tap.
-                SectionCard {
-                    Text("home.unlinked.title").font(Typo.subheading).foregroundStyle(Theme.ink)
-                    Text("home.unlinked.body").font(Typo.small).foregroundStyle(Theme.muted)
-                    if profile.hasPermission(AppSection.vinculacion.requiredPermission ?? "") {
-                        NavigationLink { PatientSectionView(section: .vinculacion, profile: profile) } label: { Text("home.unlinked.action") }
-                            .buttonStyle(ClimesaButtonStyle())
-                    } else {
-                        ClimesaButton(title: L.text("home.unlinked.action"), kind: .secondary) { go(.mas) }
-                    }
-                }
-            }
+            if !linked { linkCard }
+            if requestSent { PatientNotice(text: L.text("appointments.category.sent")) }
             LoadState(loader: loader, retry: load) { home in
-                if let ticket = home.ticket {
-                    if let error = ticket.error { failedCard("home.queue", error) } else { HomeQueueCard(ticket: ticket.value ?? nil) { go(.fila) } }
-                }
-                if let next = home.nextAppointment {
-                    if let error = next.error { failedCard("home.appointment", error) } else { HomeAppointmentCard(appointment: next.value ?? nil) { go(.citas) } }
-                }
-                if let labs = home.labs {
-                    if let error = labs.error { failedCard("home.labs", error) } else if let list = labs.value { HomeLabCard(labs: list) { go(.examenes) } }
-                }
-                if let room = home.room {
-                    if let error = room.error { failedCard("room.eyebrow", error) } else if let current = room.value ?? nil { RoomCard(admission: current) }
+                let upcoming = home.upcoming?.value ?? []
+                let today = PatientHomeRules.appointmentToday(upcoming, now: Date())
+                let hasTicket = home.ticket.map { $0.error != nil || ($0.value ?? nil) != nil } ?? false
+                ForEach(PatientHomeRules.blocks(linked: linked, hasTicket: hasTicket, appointmentToday: today != nil), id: \.self) { block in
+                    switch block {
+                    case .link:
+                        EmptyView()
+                    case .ticket:
+                        if let ticket = home.ticket {
+                            if let error = ticket.error { failedCard("home.queue", error) } else { HomeQueueCard(ticket: ticket.value ?? nil) { go(.fila) } }
+                        }
+                    case .today:
+                        if let today { HomeAppointmentCard(eyebrow: L.text("home.appointment.today"), appointment: today) { go(.citas) } }
+                    case .next:
+                        if let part = home.upcoming {
+                            if let error = part.error { failedCard("home.appointment", error) }
+                            else { HomeAppointmentCard(eyebrow: L.text("home.appointment"), appointment: PatientHomeRules.nextAppointment(upcoming, now: Date())) { go(.citas) } }
+                        }
+                    case .results:
+                        if let labs = home.labs {
+                            if let error = labs.error { failedCard("home.labs", error) }
+                            else if let list = labs.value { HomeLabCard(labs: list, fresh: PatientResultsRules.newCount(list, seenAt: seenAt, now: Date())) { go(.examenes) } }
+                        }
+                        if let room = home.room {
+                            if let error = room.error { failedCard("room.eyebrow", error) } else if let current = room.value ?? nil { RoomCard(admission: current) }
+                        }
+                    case .shortcuts:
+                        shortcuts
+                    }
                 }
             }
         }
         .task(id: live.snapshot.version([.queue, .appointments, .laboratory, .hospitalInfo, .admissions])) { await load() }
+        .onAppear { readSeen() }
         .loadsNoticeInbox(notices, account: account, live: live)
+        .sheet(isPresented: $requesting) {
+            CategoryRequestSheet(reload: load) { requestSent = true }
+        }
+        .task(id: requestSent) {
+            // The confirmation stays a few seconds, then gives the space back.
+            guard requestSent else { return }
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            if !Task.isCancelled { requestSent = false }
+        }
+    }
+
+    /// S13: while the account is not linked, linking is the one thing to do: open the form in one tap.
+    @ViewBuilder private var linkCard: some View {
+        SectionCard {
+            Text("home.unlinked.title").font(Typo.subheading).foregroundStyle(Theme.ink)
+            Text("home.unlinked.body").font(Typo.small).foregroundStyle(Theme.muted)
+            if profile.hasPermission(AppSection.vinculacion.requiredPermission ?? "") {
+                NavigationLink { PatientSectionView(section: .vinculacion, profile: profile) } label: { Text("home.unlinked.action") }
+                    .buttonStyle(ClimesaButtonStyle())
+            } else {
+                ClimesaButton(title: L.text("home.unlinked.action"), kind: .secondary) { go(.mas) }
+            }
+        }
+    }
+
+    /// G6 shortcuts: two columns of 44 pt+ tiles, each only with its permission.
+    @ViewBuilder private var shortcuts: some View {
+        let items = PatientHomeRules.shortcuts(linked: linked, can: profile.hasPermission)
+        if !items.isEmpty {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: Spacing.m), GridItem(.flexible(), spacing: Spacing.m)], spacing: Spacing.m) {
+                ForEach(items, id: \.self) { item in
+                    switch item {
+                    case .requestAppointment:
+                        Button { requesting = true } label: { ShortcutTile(item: item) }.buttonStyle(.plain)
+                    case .ambulance:
+                        NavigationLink { PatientSectionView(section: .ambulancia, profile: profile) } label: { ShortcutTile(item: item) }.buttonStyle(.plain)
+                    case .exams:
+                        Button { go(.examenes) } label: { ShortcutTile(item: item) }.buttonStyle(.plain)
+                    case .hospital:
+                        NavigationLink { PatientSectionView(section: .hospital, profile: profile) } label: { ShortcutTile(item: item) }.buttonStyle(.plain)
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder private func failedCard(_ eyebrow: String, _ message: String) -> some View {
         SectionCard(eyebrow: L.text(eyebrow)) { PartError(message: message, retry: load) }
     }
 
+    private func readSeen() {
+        seenAt = DraftStore.shared.load(PatientResultsRules.Seen.self, user: profile.id, key: PatientResultsRules.seenKey)?.date
+    }
+
     private func load() async {
+        readSeen()
         await loader.load {
             let api = try account.client()
             let patientId = profile.patientId
@@ -72,9 +137,9 @@ struct PatientHomeView: View {
                 }
             }
             if profile.hasPermission("citas.ver") {
-                home.nextAppointment = try await Part<Appointment?>.load {
+                home.upcoming = try await Part<[Appointment]>.load {
                     let list = try await api.get("/citas", as: [Appointment].self)
-                    return AppointmentRules.split(list, now: Date()).upcoming.first
+                    return AppointmentRules.split(list, now: Date()).upcoming
                 }
             }
             if patientId != nil, profile.hasPermission("resultados.ver") {
@@ -88,6 +153,24 @@ struct PatientHomeView: View {
             }
             return home
         }
+    }
+}
+
+/// One shortcut of Inicio: symbol and title, the whole tile tappable.
+private struct ShortcutTile: View {
+    let item: PatientHomeRules.Shortcut
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            Image(systemName: item.symbol).font(Typo.heading).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
+            Text(verbatim: item.title).font(Typo.label).foregroundStyle(Theme.ink).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Theme.line, lineWidth: 1))
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -135,10 +218,11 @@ private struct HomeQueueCard: View {
 }
 
 private struct HomeAppointmentCard: View {
+    let eyebrow: String
     let appointment: Appointment?
     let open: () -> Void
     var body: some View {
-        HomeCardLink(eyebrow: L.text("home.appointment"), open: open) {
+        HomeCardLink(eyebrow: eyebrow, open: open) {
             if let appointment {
                 ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName) {
                     PatientTag(appointment.state.rawValue, label: appointment.state.label)
@@ -152,27 +236,33 @@ private struct HomeAppointmentCard: View {
 
 private struct HomeLabCard: View {
     let labs: [LabOrder]
+    /// G6: released after the last visit to «Mis exámenes» (and in the last 7 days); 0 once seen.
+    let fresh: Int
     let open: () -> Void
     var body: some View {
-        HomeCardLink(eyebrow: L.text("home.labs"), open: open) {
+        HomeCardLink(eyebrow: fresh > 0 ? PatientResultsRules.title(fresh) : L.text("home.labs"), open: open) {
             let pending = PatientLabRules.pendingCount(labs)
-            let ready = labs.filter { $0.reviewedAt != nil }.count
             HStack(spacing: Spacing.m) {
                 // I-10: figures inside the card are plain, not cards of their own.
                 StatTile(value: String(pending), label: L.text("ds.paciente.home.pending"), plain: true)
-                StatTile(value: String(ready), label: L.text("ds.paciente.home.ready"), plain: true)
+                StatTile(value: String(fresh), label: L.text("home.labs.new"), plain: true)
             }
         }
     }
 }
 
 /// I05 · Mi turno en fila: número grande, cuántos faltan y consultorio al ser llamado. Vibra al pasar a "Llamado".
+/// B5: "N personas antes de ti" while waiting; when called, a full-screen «Pasa al consultorio N», once per call.
 struct PatientQueueView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var tickets = Loader<[QueueTicket]>()
     @State private var board = Loader<PublicQueue>()
     @State private var lastState: QueueState?
+    /// The call the patient already closed with «Entendido» ("id#calls"); a new call shows the notice again.
+    @State private var dismissedCall: String?
+
+    private var active: QueueTicket? { tickets.value.flatMap { QueueRules.activeTicket($0) } }
 
     var body: some View {
         LoadState(loader: tickets, retry: load) { list in
@@ -183,16 +273,57 @@ struct PatientQueueView: View {
             }
         }
         .task(id: live.snapshot.version(.queue)) { await load() }
+        .fullScreenCover(isPresented: Binding(
+            get: { PatientTurnRules.shouldPresent(active, dismissed: dismissedCall) },
+            set: { shown in if !shown { dismissedCall = PatientTurnRules.callKey(active) } }
+        )) {
+            if let ticket = active {
+                CalledCover(ticket: ticket, office: board.value.flatMap { QueueRules.office(for: ticket.number, called: $0.called) }) {
+                    dismissedCall = PatientTurnRules.callKey(ticket)
+                }
+            }
+        }
     }
 
     private func load() async {
         await tickets.load { try await account.client().get("/fila", as: [QueueTicket].self) }
-        guard let ticket = tickets.value.flatMap({ QueueRules.activeTicket($0) }) else { lastState = nil; return }
+        guard let ticket = active else { lastState = nil; return }
         await board.load { try await account.client().get("/publico/fila/\(ticket.service.rawValue)", as: PublicQueue.self) }
         if ticket.state == .llamado, let previous = lastState, previous != .llamado {
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
         }
         lastState = ticket.state
+    }
+}
+
+/// B5: the call fills the screen with where to go, large enough to read across the waiting room, and vibrates.
+private struct CalledCover: View {
+    let ticket: QueueTicket
+    let office: String?
+    let close: () -> Void
+
+    var body: some View {
+        VStack(spacing: Spacing.space6) {
+            Spacer()
+            Image(systemName: "bell.badge.fill").font(.system(size: 56, weight: .semibold)).foregroundStyle(Theme.onPrimary).accessibilityHidden(true)
+            Text(verbatim: PatientTurnRules.calledTitle(office: office))
+                .font(Typo.number(40)).foregroundStyle(Theme.onPrimary).multilineTextAlignment(.center).minimumScaleFactor(0.5)
+                .accessibilityAddTraits(.isHeader)
+            Text(verbatim: "\(L.text("ds.paciente.queue.number")) \(ticket.number)")
+                .font(Typo.subheading).foregroundStyle(Theme.onPrimary.opacity(0.85))
+            Spacer()
+            Button(action: close) {
+                Text("queue.called.ok").font(Typo.label).frame(maxWidth: .infinity, minHeight: 52)
+                    .foregroundStyle(Theme.primary)
+                    .background(Theme.onPrimary, in: RoundedRectangle(cornerRadius: Radius.control))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(Spacing.space6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.primary.ignoresSafeArea())
+        .accessibilityElement(children: .contain)
+        .onAppear { UINotificationFeedbackGenerator().notificationOccurred(.success) }
     }
 }
 
@@ -203,7 +334,7 @@ private struct QueueTicketCard: View {
         VStack(alignment: .leading, spacing: 16) {
             if ticket.state == .llamado {
                 let office = board.flatMap { QueueRules.office(for: ticket.number, called: $0.called) }
-                PatientNotice(text: office.map { String(format: L.text("queue.called.office"), $0) } ?? L.text("queue.called"))
+                PatientNotice(text: PatientTurnRules.calledTitle(office: office))
             }
             // S9: the ticket wears its area (code chip and tinted surface), like the web board.
             VStack(alignment: .leading, spacing: Spacing.m) {
@@ -217,7 +348,8 @@ private struct QueueTicketCard: View {
                 }
                 PatientTag(ticket.state.rawValue, label: ticket.state.label)
                 if ticket.state == .enEspera, let board, let ahead = QueueRules.ahead(of: ticket.number, called: board.called) {
-                    StatTile(value: String(ahead), label: String(format: L.text("queue.ahead"), ahead), plain: true)
+                    // B5: one sentence, not a bare figure ("3 personas antes de ti", "Eres el siguiente").
+                    Text(verbatim: PatientTurnRules.aheadText(ahead)).font(Typo.subheading).foregroundStyle(Theme.ink)
                 }
                 Text(verbatim: String(format: L.text("queue.issued"), ClimesaDates.display(ticket.issuedAt, .time))).font(Typo.small).foregroundStyle(Theme.muted)
             }
@@ -636,7 +768,13 @@ struct PatientExamsView: View {
         .task(id: live.snapshot.version(.laboratory)) { if profile.patientId != nil { await load() } }
     }
 
-    private func load() async { await loader.load { try await account.client().get("/me/laboratorio", as: [LabOrder].self) } }
+    private func load() async {
+        await loader.load { try await account.client().get("/me/laboratorio", as: [LabOrder].self) }
+        // G6: the results on screen are seen, so «Resultados nuevos» on Inicio goes back to 0 (stored on the device, G-7).
+        if loader.value != nil {
+            _ = DraftStore.shared.save(PatientResultsRules.Seen(at: Date()), user: profile.id, key: PatientResultsRules.seenKey)
+        }
+    }
 }
 
 struct LabOrderRow: View {

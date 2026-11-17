@@ -535,7 +535,7 @@ final class DeferredAbsences {
     func discard(_ id: String) { queue?.discard(id) }
 }
 
-// Pestaña Pacientes: buscar y abrir el expediente (I22). I-27: busca mientras se escribe (con una pausa breve tras la
+/// Pestaña Pacientes: buscar y abrir el expediente (I22). I-27: busca mientras se escribe (con una pausa breve tras la
 /// última tecla), sin botón ni frases de ayuda; la nota de privacidad va solo en el estado vacío.
 struct DoctorPatientsView: View {
     @EnvironmentObject private var account: AccountModel

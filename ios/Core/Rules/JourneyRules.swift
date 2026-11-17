@@ -158,10 +158,10 @@ public enum DayChipRules {
 
 public extension AppointmentRules {
     /// A5: "Anteriores (3)", folded under the upcoming ones.
-    public static func pastTitle(_ count: Int) -> String { "Anteriores (\(count))" }
+    static func pastTitle(_ count: Int) -> String { "Anteriores (\(count))" }
 
     /// Free slots of the chosen day, without the slot the appointment already has.
-    public static func freeSlots(_ availability: Availability, excluding start: String) -> [Period] {
+    static func freeSlots(_ availability: Availability, excluding start: String) -> [Period] {
         availability.slots.filter { $0.start != start }
     }
 }
@@ -212,23 +212,23 @@ public enum NextRuleText {
 public extension DoctorDayActionRules {
     /// B3: every number this doctor called keeps its own «Deshacer» while it is still called and the server accepts
     /// undoing the call (`undoActions`). `calledHere` covers a server without `calledByMe`.
-    public static func canUndo(_ ticket: QueueTicket, calledHere: Set<String>) -> Bool {
+    static func canUndo(_ ticket: QueueTicket, calledHere: Set<String>) -> Bool {
         guard ticket.state == .llamado, (ticket.undoActions ?? []).contains(QueueMove.deshacerLlamado.rawValue) else { return false }
         return ticket.calledByMe == true || calledHere.contains(ticket.id)
     }
 
     /// What «Deshacer» did: with 2+ calls the number stays called with one call less.
-    public static func undoDone(_ ticket: QueueTicket) -> String {
+    static func undoDone(_ ticket: QueueTicket) -> String {
         QueueBoardRules.moveDone(QueueBoardRules.code(ticket), ticket.calls > 1 ? .quitarLlamado : .deshacerLlamado)
     }
 
     /// D-3 on Mi día: "No se presentó" waits 8 s with «Deshacer» before it is sent.
-    public static func absencePending(_ ticket: QueueTicket) -> String {
+    static func absencePending(_ ticket: QueueTicket) -> String {
         "\(QueueBoardRules.code(ticket)) se marcará como no se presentó"
     }
 
     /// The deferred "No se presentó" may still go: the number is still called and the server still offers it.
-    public static func absenceStillApplies(_ ticket: QueueTicket?) -> Bool {
+    static func absenceStillApplies(_ ticket: QueueTicket?) -> Bool {
         guard let ticket else { return false }
         return ticket.state == .llamado && (ticket.allowedActions ?? []).contains(.noSePresento)
     }
@@ -331,7 +331,7 @@ public enum ReleaseRules {
 
 public extension DischargeConfirmRules {
     /// The confirmation of the signature with who and what: "Alta de Ana Pérez · Médica, sin pendientes. …".
-    public static func signRecap(patient: String?, type: DischargeType, pendingCount: Int, summary: String) -> String {
+    static func signRecap(patient: String?, type: DischargeType, pendingCount: Int, summary: String) -> String {
         let pending: String
         switch pendingCount {
         case 0: pending = "sin pendientes"
@@ -343,5 +343,5 @@ public extension DischargeConfirmRules {
         return "Alta de \(patient ?? "este paciente") · \(type.label), \(pending). \(note) Se puede revocar mientras no haya salido."
     }
 
-    public static let signedNotice = "Alta firmada. Recepción registrará la salida."
+    static let signedNotice = "Alta firmada. Recepción registrará la salida."
 }

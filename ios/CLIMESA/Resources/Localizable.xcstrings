@@ -1,6 +1,39 @@
 {
   "sourceLanguage": "es",
   "strings": {
+    "queue.called.ok": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entendido"
+          }
+        }
+      }
+    },
+    "home.appointment.today": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy tienes cita"
+          }
+        }
+      }
+    },
+    "home.labs.new": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuevos"
+          }
+        }
+      }
+    },
     "consultation.sign.record": {
       "extractionState": "manual",
       "localizations": {
