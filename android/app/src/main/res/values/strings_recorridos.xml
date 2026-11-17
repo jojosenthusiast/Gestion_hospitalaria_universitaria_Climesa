@@ -35,4 +35,6 @@
     <string name="rec7_vinculo_desde">En revisión desde el %1$s</string>
     <!-- G4 ambulancia -->
     <string name="rec7_amb_falta_motivo">Escribe el motivo (qué pasa) para poder enviar.</string>
+    <!-- G5 planta -->
+    <string name="rec7_hosp_signos">Tomar signos</string>
 </resources>

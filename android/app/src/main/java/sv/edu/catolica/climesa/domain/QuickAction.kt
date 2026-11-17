@@ -26,7 +26,10 @@ enum class QuickAction(val verb: String) {
  * "Go to [section] and open [action]". The dashboard posts it; the section screen takes it once (see [QuickActionInbox])
  * and opens its own form or dialog, only if the account still holds the permission for that action.
  */
-data class QuickActionRequest(val section: AndroidSection, val action: QuickAction? = null)
+data class QuickActionRequest(val section: AndroidSection, val action: QuickAction? = null, val subject: QuickSubject? = null)
+
+/** G5: who the target section opens on (a ward patient opens "Signos vitales" already chosen). */
+data class QuickSubject(val id: String, val name: String, val detail: String? = null)
 
 /** A button of the dashboard: it exists only when the role has the target section and the permission of the action. */
 data class DashboardAction(val label: String, val request: QuickActionRequest, val permission: String)
