@@ -87,3 +87,16 @@
   .ag-toolbar-end { margin-left: 0; }
   .data-workbench > .ag-day, .data-workbench > .ag-past, .data-workbench > .empty-state { margin-inline: var(--space-4); }
 }
+/* R7 U1 (A2-A4, D-1, D-3): arrival from the agenda, held no-show, cancel summary, assign day chips. */
+.ag-row-end { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.ag-arrive { font-weight: 800; color: var(--primary-text); }
+.ag-held { justify-content: flex-end; }
+.ag-held small { color: var(--warning); font-weight: 700; }
+.ag-slot > .notice, .ag-slot > [class*="notice"] { grid-column: 1 / -1; }
+.ag-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2) var(--space-4); margin: 0; }
+.ag-summary dt { font-size: var(--text-xs); color: var(--muted); font-weight: 700; }
+.ag-summary dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.ag-fixed-patient { margin: 0; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rq-days { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: 2px; }
+.rq-days .cl-chip { flex: 0 0 auto; text-transform: capitalize; }
+.rq-days .cl-chip[aria-pressed="true"] { border-color: var(--primary); background: var(--soft); color: var(--primary-strong); }
