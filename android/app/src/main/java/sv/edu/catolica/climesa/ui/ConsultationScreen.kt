@@ -77,7 +77,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     LaunchedEffect(state.resumed?.key) { state.resumed?.let { selected = it.key } }
     val selectedItem = state.appointments.firstOrNull { it.key == selected } ?: state.resumed?.takeIf { it.key == selected }
     // R3 A-3: the consultation is its own full screen (web `consultations.tsx`), not a dialog; system back leaves it.
-    selectedItem?.let { item -> ConsultationPage(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, modifier, record = state.record?.takeIf { it.consultationId == item.consultationId }, stepNotice = state.stepNotice, onClose = { selected = null; model.closeResumed() }); return }
+    selectedItem?.let { item -> ConsultationPage(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, modifier, record = state.record?.takeIf { it.consultationId == item.consultationId }, stepNotice = state.stepNotice, recordError = state.recordError, onClose = { selected = null; model.closeResumed() }); return }
     val retry = { model.clearMessages(); model.load() }
     // S13: one primary action for the whole screen (call next, resume own patient, resume unsigned, or start a called number).
     val canCall = "fila.llamar" in permissions
@@ -168,7 +168,7 @@ private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, p
 }
 
 @Composable
-private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, record: ConsultationRecord?, stepNotice: Pair<RecordSection, String>?, onClose: () -> Unit) {
+private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, record: ConsultationRecord?, stepNotice: Pair<RecordSection, String>?, recordError: String? = null, onClose: () -> Unit) {
     // B4: what this consultation already has is listed under each step, so nothing is registered twice.
     LaunchedEffect(item.consultationId) { item.consultationId?.let { model.loadRecord(it, withLabOrders = "resultados.ver" in profile?.permissions.orEmpty()) } }
     val draftId = item.consultationId?.takeIf { item.consultationState != "firmada" }
@@ -248,6 +248,8 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
             SecondaryButton(stringResource(R.string.consulta_registrar_signos), { model.signs(item, systolic, diastolic, heartRate, temperature, oxygenSaturation) { systolic = ""; diastolic = ""; heartRate = ""; temperature = ""; oxygenSaturation = "" } }, enabled = !busy && listOf(systolic, diastolic, heartRate, temperature, oxygenSaturation).any { it.isNotBlank() })
             StepNotice(stepNotice, RecordSection.SIGNS)
         }
+        // #6: the record could not be read: said at the top of what it lists, with the retry, never as empty lists.
+        if (item.consultationId != null && record == null && recordError != null) RecordLoadError(recordError) { model.loadRecord(item.consultationId) }
         if (item.consultationId != null && (record?.diagnoses?.isNotEmpty() == true || (!signed && "consulta.registrar" in permissions))) {
             Text(stringResource(R.string.rec7_consulta_diagnosticos, record?.diagnoses?.size ?: 0), style = MaterialTheme.typography.titleSmall)
             record?.diagnoses?.forEach { d -> RecordLine(listOfNotNull(d.code, d.note).joinToString(" · "), if (d.principal) stringResource(R.string.consulta_principal) else null) }
@@ -279,6 +281,7 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
             val chosen = labExams.split(',').filter { it.isNotBlank() }.toSet()
             val orders = record?.labOrders.orEmpty().filter { it.state != "cancelado" }
             Text(stringResource(R.string.rec7_consulta_examenes, orders.sumOf { it.exams.size }), style = MaterialTheme.typography.titleSmall)
+            if (record != null && !record.labOrdersKnown && recordError != null) RecordLoadError(recordError) { model.loadRecord(item.consultationId) }
             orders.forEach { o -> RecordLine(o.exams.joinToString(), StatusCatalog.label(o.state)) }
             StepNotice(stepNotice, RecordSection.LAB)
             if (signed) return@Column
@@ -293,7 +296,9 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
                 }
             }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(labUrgent, { labUrgent = it }, enabled = !busy); Text(stringResource(R.string.lab_orden_urgente)) }
-            SecondaryButton(stringResource(R.string.lab_orden_emitir), { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty())
+            val blocked = model.labOrderBlocker(item.consultationId)
+            blocked?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            SecondaryButton(stringResource(R.string.lab_orden_emitir), { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty() && blocked == null)
         }
         if (item.consultationId != null && !signed) Text(stringResource(R.string.consulta_paso4), style = MaterialTheme.typography.titleSmall)
     }
@@ -330,6 +335,15 @@ private fun RecordLine(title: String, detail: String?) {
 }
 
 /** B4: the success of a step, right under it. */
+/** #6: a read that failed, in place, with "Volver a cargar". */
+@Composable
+private fun RecordLoadError(message: String, onRetry: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        NoticeBanner(NoticeKind.ERROR, message)
+        RowAction(stringResource(R.string.rec7_volver_a_cargar), onRetry)
+    }
+}
+
 @Composable
 private fun StepNotice(notice: Pair<RecordSection, String>?, section: RecordSection) {
     notice?.takeIf { it.first == section }?.let { NoticeBanner(NoticeKind.SUCCESS, it.second) }

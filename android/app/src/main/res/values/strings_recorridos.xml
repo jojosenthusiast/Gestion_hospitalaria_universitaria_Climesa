@@ -38,4 +38,5 @@
     <!-- G5 planta -->
     <string name="rec7_hosp_signos">Tomar signos</string>
     <string name="rec7_descartar">Descartar</string>
+    <string name="rec7_volver_a_cargar">Volver a cargar</string>
 </resources>

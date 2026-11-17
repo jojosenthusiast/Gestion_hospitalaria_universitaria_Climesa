@@ -124,6 +124,8 @@ class SweepFixesTest {
         vm.loadRecord("c1", withLabOrders = true); vm.loadLabCatalog(); runCurrent()
         assertNotNull(vm.state.value.recordError)
         assertFalse(vm.state.value.record!!.labOrdersKnown)
+        // The reason the screen prints next to the disabled "Emitir orden".
+        assertEquals("No se pudieron leer las órdenes de esta consulta; vuelve a cargarlas antes de ordenar.", vm.labOrderBlocker("c1"))
         api.failures.remove("/laboratorio/ordenes")
         vm.orderLab(item, listOf("e1"), urgent = false); runCurrent()
         assertTrue(api.calls.none { it.second == "POST" })
@@ -131,6 +133,7 @@ class SweepFixesTest {
         vm.loadRecord("c1"); runCurrent()
         assertTrue(vm.state.value.record!!.labOrdersKnown)
         assertNull(vm.state.value.recordError)
+        assertNull(vm.labOrderBlocker("c1"))
     }
 
     // "Resultados nuevos" reaches 0 once the patient opened them.

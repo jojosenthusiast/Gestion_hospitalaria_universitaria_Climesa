@@ -339,7 +339,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         if (mutable.value.saving) return
         // B4: an exam already ordered in this consultation is never sent twice.
         val record = mutable.value.record?.takeIf { it.consultationId == consultationId }
-        if (withLabOrders && record?.labOrdersKnown != true) { mutable.value = mutable.value.copy(error = "No se pudieron leer las órdenes de esta consulta; vuelve a cargarlas antes de ordenar."); return }
+        labOrderBlocker(consultationId)?.let { reason -> mutable.value = mutable.value.copy(error = reason); return }
         val repeated = record?.let { r -> mutable.value.labCatalog.filter { it.id in exams && r.alreadyOrdered(it) } }.orEmpty()
         if (repeated.isNotEmpty()) { mutable.value = mutable.value.copy(error = "Ya ordenaste ${repeated.joinToString { it.name }} en esta consulta."); return }
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null, stepNotice = null)
@@ -359,6 +359,12 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
+    }
+
+    /** #6: why "Emitir orden" is off for [consultationId] (its order list is not known), said next to the button; null when it can order. */
+    fun labOrderBlocker(consultationId: String): String? {
+        val record = mutable.value.record?.takeIf { it.consultationId == consultationId }
+        return if (withLabOrders && record?.labOrdersKnown != true) "No se pudieron leer las órdenes de esta consulta; vuelve a cargarlas antes de ordenar." else null
     }
 
     /** Exams ordered from this device for [consultationId], kept for the session so leaving and coming back still blocks a repeat. */
