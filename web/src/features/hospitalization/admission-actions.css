@@ -9,7 +9,7 @@
 .admission-done { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.75rem; color: var(--success); font-weight: 600; }
 .admission-indicated { border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); padding: 0.75rem 1rem; margin-bottom: 1rem; }
 .admission-indicated h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; margin: 0 0 0.5rem; }
-.admission-indicated .count-chip { min-width: 1.5rem; padding: 0 0.4rem; border-radius: 999px; background: var(--primary); color: var(--primary-text); font-size: var(--text-xs); text-align: center; font-variant-numeric: tabular-nums; }
+.admission-indicated .count-chip { min-width: 1.5rem; padding: 0 0.4rem; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: var(--text-xs); text-align: center; font-variant-numeric: tabular-nums; }
 .admission-indicated ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .admission-indicated li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-top: 1px solid var(--line); }
 .admission-indicated li:first-child { border-top: 0; }
