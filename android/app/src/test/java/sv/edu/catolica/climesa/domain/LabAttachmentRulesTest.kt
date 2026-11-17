@@ -78,6 +78,7 @@ class LabAttachmentRulesTest {
         assertEquals("El archivo no es un PDF ni una foto JPG, PNG, HEIC o WEBP.", LabAttachmentRules.uploadMessage("adjunto_tipo_invalido"))
         assertEquals("El archivo pasa de 10 MB; toma una foto más liviana o comprime el PDF.", LabAttachmentRules.uploadMessage("adjunto_muy_grande"))
         assertEquals("Este adjunto ya tiene su archivo guardado; no se reemplaza.", LabAttachmentRules.uploadMessage("adjunto_ya_almacenado"))
+        assertEquals("El archivo no coincide con el que se adjuntó al resultado; sube el mismo archivo.", LabAttachmentRules.uploadMessage("adjunto_no_coincide"))
         assertNull(LabAttachmentRules.uploadMessage("validacion"))
     }
 
