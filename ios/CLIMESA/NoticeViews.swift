@@ -155,7 +155,8 @@ private struct CriticalBorder: View {
 struct NoticesView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
-    @State private var model = NoticeInboxModel()
+    /// D1: the session's inbox, shared with Inicio and the badge; opening Avisos reads it again.
+    @Environment(NoticeInboxModel.self) private var model
     @State private var filter: NoticeFilter
 
     init(initialFilter: NoticeFilter = .todos) { _filter = State(initialValue: initialFilter) }

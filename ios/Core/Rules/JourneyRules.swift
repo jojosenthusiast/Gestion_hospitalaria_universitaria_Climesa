@@ -436,10 +436,46 @@ public enum ConsultationRecordRules {
 // MARK: - C1 · Revisar y liberar (#12)
 
 public enum ReleaseRules {
-    /// What the patient will see once released: "Ana Pérez verá: Hemoglobina 7.1 g/dL (crítico bajo), Glucosa 90 mg/dL."
+    public static let noteMaximum = 500
+
+    /// C1: critical marks first, then high or low, then normal, then the rest (no result, no range); the order of the
+    /// order is kept inside each group (Android `LabReviewSummary`).
+    public static func orderedItems(_ order: LabOrder) -> [LabOrderItem] {
+        func rank(_ mark: ResultMark?) -> Int {
+            switch mark {
+            case .criticoAlto?, .criticoBajo?: return 0
+            case .alto?, .bajo?: return 1
+            case .normal?: return 2
+            default: return 3
+            }
+        }
+        // `sorted` is not stable: the original index breaks ties.
+        return order.items.enumerated()
+            .sorted { (rank($0.element.result?.mark), $0.offset) < (rank($1.element.result?.mark), $1.offset) }
+            .map(\.element)
+    }
+
+    /// The release body: `{version}` unless the doctor turned the follow-up off or wrote a note for the patient.
+    public static func body(version: Int, followUp: Bool, note: String) -> LabReviewBody {
+        let text = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return LabReviewBody(version: version, followUp: followUp ? nil : false, patientNote: text.isEmpty ? nil : String(text.prefix(noteMaximum)))
+    }
+
+    /// What happened with the follow-up appointment (D-4); nil when nothing needs saying (or the doctor turned it off).
+    public static func followUpOutcome(proposalId: String?, skipped: String?) -> String? {
+        if let proposalId, !proposalId.isEmpty { return "Se propuso a Recepción una cita de seguimiento." }
+        switch skipped {
+        case "hospitalizado": return "Sin cita de seguimiento: el paciente está hospitalizado."
+        case "ya_propuesta": return "Ya había una cita de seguimiento propuesta."
+        case "sin_consulta": return "Sin cita de seguimiento: la orden no viene de una consulta."
+        default: return nil
+        }
+    }
+
+    /// What the patient will see once released, critical values first: "Ana Pérez verá: Hemoglobina 7.1 g/dL (crítico bajo), Glucosa 90 mg/dL."
     public static func summary(_ order: LabOrder) -> String {
         let who = order.patientName ?? "El paciente"
-        let values = order.items.map { item -> String in
+        let values = orderedItems(order).map { item -> String in
             var text = "\(item.name) \(PatientLabRules.valueText(item.result))"
             if let unit = item.unit, !unit.isEmpty, item.result?.value != nil { text += " \(unit)" }
             if let mark = item.result?.mark, mark != .normal, mark != .desconocido { text += " (\(mark.label.lowercased()))" }
@@ -451,6 +487,68 @@ public enum ReleaseRules {
 
     public static func done(_ order: LabOrder) -> String {
         "Resultados revisados y liberados. \(order.patientName ?? "El paciente") ya puede verlos."
+    }
+
+    /// `done` plus what happened with the follow-up appointment, from the API's answer.
+    public static func done(_ order: LabOrder, result: LabReviewResult?) -> String {
+        guard let outcome = followUpOutcome(proposalId: result?.followUpProposalId, skipped: result?.followUpSkipped) else { return done(order) }
+        return "\(done(order)) \(outcome)"
+    }
+}
+
+// MARK: - G2 · Vincular expediente
+
+/// G2: the link screen opens in the real state of the request (`GET /me/vinculacion`), so a patient who comes back never
+/// sees an empty form and never asks twice.
+public enum LinkStatusRules {
+    public enum Screen: Equatable, Sendable {
+        /// No request yet.
+        case form(prefill: MyLink.Declared?)
+        /// Waiting for reception, since `createdAt`.
+        case pending(since: String)
+        case approved
+        /// With the reason, and «Volver a pedir» with what was declared.
+        case rejected(reason: String?, prefill: MyLink.Declared?)
+    }
+
+    /// `sent` is the request this screen just created: until a read returns it, the screen stays pending instead of
+    /// showing the older state (no form, so it is never sent twice).
+    public static func screen(_ link: MyLink, profileLinked: Bool, sent: LinkRequestResult? = nil) -> Screen {
+        if profileLinked || link.linked { return .approved }
+        if let sent, link.request?.id != sent.id { return .pending(since: sent.createdAt) }
+        guard let request = link.request else { return .form(prefill: nil) }
+        switch request.state {
+        case .aprobada: return .approved
+        case .rechazada: return .rejected(reason: request.rejectionReason, prefill: link.declared)
+        // An unknown state is still a request: never the form, so it is not asked twice.
+        case .pendiente, .desconocido: return .pending(since: request.createdAt)
+        }
+    }
+
+    /// "En revisión desde 16/11" (day and month in El Salvador).
+    public static func pendingText(_ createdAt: String) -> String {
+        guard let date = ClimesaDates.parse(createdAt) else { return "En revisión" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "es_SV")
+        formatter.timeZone = ClimesaDates.zone
+        formatter.dateFormat = "dd/MM"
+        return "En revisión desde \(formatter.string(from: date))"
+    }
+
+    public static func rejectedText(_ reason: String?) -> String {
+        let text = reason?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return text.isEmpty ? "Tu solicitud fue rechazada. Revisa tus datos o acude a recepción." : "Tu solicitud fue rechazada. Motivo: \(text)"
+    }
+
+    /// The declared birth day (`yyyy-MM-dd`) as a date for the picker, at noon in `zone` so it never slips a day.
+    public static func birthDate(_ day: String?, zone: TimeZone = .current) -> Date? {
+        guard let day, day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = zone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.date(from: "\(day) 12:00")
     }
 }
 

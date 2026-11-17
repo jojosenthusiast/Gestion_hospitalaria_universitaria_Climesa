@@ -357,6 +357,22 @@ public struct LinkRequestResult: Decodable, Sendable, Equatable {
     public let version: Int
 }
 
+/// `MyLinkResponse` of `GET /me/vinculacion` (G2): the account's last link request, so the screen opens in its real state.
+public struct MyLink: Decodable, Sendable, Equatable {
+    /// `LinkDeclaredResponse`: what the account declared, to ask again with the form filled in.
+    public struct Declared: Decodable, Sendable, Equatable {
+        public let dui: String
+        /// Local day `yyyy-MM-dd`.
+        public let birth: String?
+        public init(dui: String, birth: String?) { self.dui = dui; self.birth = birth }
+    }
+    public let linked: Bool
+    /// nil when the account never asked.
+    public let request: LinkRequestResult?
+    /// Absent when the account never asked, and on a server before R7.
+    public let declared: Declared?
+}
+
 /// `MyAccessResponse` de `GET /me/accesos`: quién vio mi expediente, sin nombres de personas.
 public struct MyAccess: Decodable, Sendable, Equatable {
     public let date: String

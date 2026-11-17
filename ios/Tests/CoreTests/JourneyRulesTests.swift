@@ -233,6 +233,89 @@ final class JourneyRulesTests: XCTestCase {
         XCTAssertEqual(ReleaseRules.done(released), "Resultados revisados y liberados. Ana Pérez ya puede verlos.")
     }
 
+    func testResumenConCriticosPrimeroYOrdenEstableDentroDeCadaGrupo() {
+        let mixed = order("o1", items: [("e1", "GLU", "Glucosa", 90, "normal", "mg/dL"), ("e2", "SOD", "Sodio", 150, "alto", "mmol/L"),
+                                         ("e3", "HB", "Hemoglobina", 7.1, "critico_bajo", "g/dL"), ("e4", "TXT", "Cultivo", nil, nil, nil),
+                                         ("e5", "POT", "Potasio", 3.0, "bajo", "mmol/L"), ("e6", "K2", "Plaquetas", 900, "critico_alto", "x10³/µL"),
+                                         ("e7", "UR", "Urea", 20, "normal", "mg/dL")])
+        XCTAssertEqual(ReleaseRules.orderedItems(mixed).map(\.name), ["Hemoglobina", "Plaquetas", "Sodio", "Potasio", "Glucosa", "Urea", "Cultivo"])
+        XCTAssertTrue(ReleaseRules.summary(mixed).hasPrefix("Ana Pérez verá: Hemoglobina 7.1 g/dL (crítico bajo), Plaquetas 900 x10³/µL (crítico alto), Sodio"), ReleaseRules.summary(mixed))
+    }
+
+    func testLiberarSinCambiosEnviaSoloLaVersion() {
+        // Follow-up on (the default) and no note: the released body {version}.
+        XCTAssertEqual(JSONBody.fingerprint(ReleaseRules.body(version: 3, followUp: true, note: "  ")), #"{"version":3}"#)
+        XCTAssertEqual(JSONBody.fingerprint(ReleaseRules.body(version: 3, followUp: false, note: " Repetir en ayunas. ")), #"{"followUp":false,"patientNote":"Repetir en ayunas.","version":3}"#)
+        XCTAssertEqual(ReleaseRules.body(version: 3, followUp: true, note: String(repeating: "x", count: 600)).patientNote?.count, 500)
+    }
+
+    func testLiberarDiceQuePasoConElSeguimiento() throws {
+        let released = order("o1", items: [])
+        let proposed = try JSONDecoder().decode(LabReviewResult.self, from: Data(#"{"id":"o1","version":3,"reviewedAt":"2026-11-20T15:00:00Z","followUpsClosed":1,"followUpProposalId":"p1"}"#.utf8))
+        XCTAssertEqual(ReleaseRules.done(released, result: proposed), "Resultados revisados y liberados. Ana Pérez ya puede verlos. Se propuso a Recepción una cita de seguimiento.")
+        let hospitalized = try JSONDecoder().decode(LabReviewResult.self, from: Data(#"{"id":"o1","version":3,"reviewedAt":"2026-11-20T15:00:00Z","followUpProposalId":null,"followUpSkipped":"hospitalizado"}"#.utf8))
+        XCTAssertEqual(ReleaseRules.done(released, result: hospitalized), "Resultados revisados y liberados. Ana Pérez ya puede verlos. Sin cita de seguimiento: el paciente está hospitalizado.")
+        // An older API answers only {id, version, reviewedAt}; the doctor turning it off ("no_pedida") adds nothing.
+        let old = try JSONDecoder().decode(LabReviewResult.self, from: Data(#"{"id":"o1","version":3,"reviewedAt":"2026-11-20T15:00:00Z"}"#.utf8))
+        XCTAssertEqual(ReleaseRules.done(released, result: old), ReleaseRules.done(released))
+        XCTAssertNil(ReleaseRules.followUpOutcome(proposalId: nil, skipped: "no_pedida"))
+    }
+
+    // MARK: - G2 Vincular expediente
+
+    private func link(_ json: String) throws -> MyLink { try JSONDecoder().decode(MyLink.self, from: Data(json.utf8)) }
+
+    func testVinculacionAbreEnElEstadoRealDeLaSolicitud() throws {
+        let none = try link(#"{"linked":false,"request":null}"#)
+        XCTAssertEqual(LinkStatusRules.screen(none, profileLinked: false), .form(prefill: nil))
+
+        let pending = try link(#"{"linked":false,"request":{"id":"v1","state":"pendiente","createdAt":"2026-11-16T15:00:00.000Z","resolvedAt":null,"rejectionReason":null,"version":1},"declared":{"dui":"00000000-0","birth":"1990-01-31"}}"#)
+        XCTAssertEqual(LinkStatusRules.screen(pending, profileLinked: false), .pending(since: "2026-11-16T15:00:00.000Z"))
+        XCTAssertEqual(LinkStatusRules.pendingText("2026-11-16T15:00:00.000Z"), "En revisión desde 16/11")
+
+        let approved = try link(#"{"linked":true,"request":{"id":"v1","state":"aprobada","createdAt":"2026-11-16T15:00:00.000Z","resolvedAt":"2026-11-16T16:00:00.000Z","rejectionReason":null,"version":2}}"#)
+        XCTAssertEqual(LinkStatusRules.screen(approved, profileLinked: false), .approved)
+        // The profile already has the record: approved whatever the request says.
+        XCTAssertEqual(LinkStatusRules.screen(none, profileLinked: true), .approved)
+
+        let rejected = try link(#"{"linked":false,"request":{"id":"v1","state":"rechazada","createdAt":"2026-11-16T15:00:00.000Z","resolvedAt":"2026-11-16T16:00:00.000Z","rejectionReason":"El DUI no coincide con el expediente.","version":2},"declared":{"dui":"00000000-0","birth":"1990-01-31"}}"#)
+        let declared = MyLink.Declared(dui: "00000000-0", birth: "1990-01-31")
+        XCTAssertEqual(LinkStatusRules.screen(rejected, profileLinked: false), .rejected(reason: "El DUI no coincide con el expediente.", prefill: declared))
+        XCTAssertEqual(LinkStatusRules.rejectedText("El DUI no coincide con el expediente."), "Tu solicitud fue rechazada. Motivo: El DUI no coincide con el expediente.")
+        XCTAssertEqual(LinkStatusRules.rejectedText(" "), "Tu solicitud fue rechazada. Revisa tus datos o acude a recepción.")
+
+        // Just sent: an older read (no request, or the rejected one) never brings the form back.
+        let sent = try JSONDecoder().decode(LinkRequestResult.self, from: Data(#"{"id":"v2","state":"pendiente","createdAt":"2026-11-17T15:00:00.000Z","resolvedAt":null,"rejectionReason":null,"version":1}"#.utf8))
+        XCTAssertEqual(LinkStatusRules.screen(none, profileLinked: false, sent: sent), .pending(since: "2026-11-17T15:00:00.000Z"))
+        XCTAssertEqual(LinkStatusRules.screen(rejected, profileLinked: false, sent: sent), .pending(since: "2026-11-17T15:00:00.000Z"))
+        XCTAssertEqual(LinkStatusRules.screen(approved, profileLinked: false, sent: sent), .approved)
+    }
+
+    func testVolverAPedirPrellenaLaFechaDeclarada() throws {
+        let zone = TimeZone(identifier: "America/El_Salvador")!
+        let date = try XCTUnwrap(LinkStatusRules.birthDate("1990-01-31", zone: zone))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        XCTAssertEqual([parts.year, parts.month, parts.day], [1990, 1, 31])
+        XCTAssertNil(LinkStatusRules.birthDate(nil, zone: zone))
+        XCTAssertNil(LinkStatusRules.birthDate("31/01/1990", zone: zone))
+        // A server without `declared` decodes too (no prefill).
+        XCTAssertNil(try link(#"{"linked":false,"request":null}"#).declared)
+    }
+
+    // MARK: - D1 Avisos
+
+    func testInsigniaDeAvisosSaleDeNoLeidos() throws {
+        let inbox = try JSONDecoder().decode(NoticeInbox.self, from: Data(#"{"actualizadoEn":"2026-11-14T12:00:00.000Z","avisos":[],"noLeidos":3,"criticos":1,"recordatorioHoras":4,"proximoCambio":null}"#.utf8))
+        XCTAssertEqual(NoticeRules.badge(inbox), 3)
+        XCTAssertEqual(NoticeRules.badgeLabel(3), "3 avisos sin leer")
+        XCTAssertEqual(NoticeRules.badgeLabel(1), "1 aviso sin leer")
+        let read = try JSONDecoder().decode(NoticeInbox.self, from: Data(#"{"actualizadoEn":"2026-11-14T12:00:00.000Z","avisos":[],"noLeidos":0,"criticos":0,"recordatorioHoras":4,"proximoCambio":null}"#.utf8))
+        XCTAssertNil(NoticeRules.badge(read))
+        XCTAssertNil(NoticeRules.badge(nil))
+    }
+
     // MARK: - G3 Alta
 
     func testAltaConfirmaConResumen() {

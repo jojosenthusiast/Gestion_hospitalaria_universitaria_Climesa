@@ -26,7 +26,8 @@ struct DoctorDayView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     /// S11: only the highlighted critical notice shows here; every notice lives in Avisos (Más).
-    @State private var notices = NoticeInboxModel()
+    /// D1: the session's inbox (RoleTabsView loads it), so the banner and Avisos agree.
+    @Environment(NoticeInboxModel.self) private var notices
     @State private var loader = Loader<DoctorDay>()
     /// «Llamar siguiente» only; every called number has its own write state in `rows` (B3: no global spinner).
     @State private var calling = Submission()
@@ -61,7 +62,6 @@ struct DoctorDayView: View {
             await absences.bind(user: profile.id, account: account) { await load() }
             await load()
         }
-        .loadsNoticeInbox(notices, account: account, live: live)
         .sheet(item: $rejecting) { item in RejectRescheduleSheet(appointment: item, submission: deciding) { await load() } }
     }
 
@@ -720,12 +720,7 @@ private struct ReviewDetailView: View {
             } else {
                 // Los botones salen de `allowedActions` de la API para este médico, nunca del rol ni del estado.
                 if order.allows(.revisar) {
-                    ClimesaButton(title: L.text("results.release"), loading: submission.busy) { confirmingRelease = true }
-                        .confirmationDialog(L.text("results.release.confirm"), isPresented: $confirmingRelease, titleVisibility: .visible) {
-                            Button(L.text("results.release")) { Task { await review() } }
-                        } message: {
-                            Text(verbatim: ReleaseRules.summary(order))
-                        }
+                    ClimesaButton(title: L.text("results.release"), loading: submission.busy) { submission.clearFailure(); confirmingRelease = true }
                 }
                 if order.allowsExternal(.enviarExterno) {
                     ClimesaButton(title: L.text("results.external.send"), kind: .secondary) { sendingExternal = true }
@@ -747,15 +742,61 @@ private struct ReviewDetailView: View {
         .sheet(isPresented: $sendingExternal) {
             SendExternalSheet(order: order, submission: externalSubmission, reload: reload)
         }
+        .sheet(isPresented: $confirmingRelease) {
+            ReleaseResultsSheet(order: order, submission: submission) { followUp, note in await review(followUp: followUp, note: note) }
+        }
     }
 
-    private func review() async {
-        let body = VersionBody(version: order.version)
+    /// The body stays `{version}` unless the doctor turned the follow-up off or wrote a note; true when the API accepted it.
+    private func review(followUp: Bool, note: String) async -> Bool {
+        let body = ReleaseRules.body(version: order.version, followUp: followUp, note: note)
+        var answer: LabReviewResult?
         let ok = await submission.run(order.id, body: body) { key in
-            _ = try await account.client().send("POST", "/laboratorio/ordenes/\(order.id)/revisar", body: body, key: key, as: LabReviewResult.self)
+            answer = try await account.client().send("POST", "/laboratorio/ordenes/\(order.id)/revisar", body: body, key: key, as: LabReviewResult.self)
         }
-        if ok { released = ReleaseRules.done(order) }
+        if ok { released = ReleaseRules.done(order, result: answer) }
         await reload()
+        return ok
+    }
+}
+
+/// C1 (#12, §4.7) · «Revisar y liberar» asks first: what the patient will see (critical values first), the follow-up
+/// proposal to reception (on by default, D-4) and an optional note the patient reads with the results. Nothing is sent
+/// until the doctor confirms; a refusal keeps the sheet open with its message.
+private struct ReleaseResultsSheet: View {
+    let order: LabOrder
+    let submission: Submission
+    let release: @MainActor (_ followUp: Bool, _ note: String) async -> Bool
+    @Environment(\.dismiss) private var dismiss
+    @State private var followUp = true
+    @State private var note = ""
+
+    var body: some View {
+        NavigationStack {
+            ScreenFrame(title: "results.release.confirm", onClose: { dismiss() }) {
+                if ReviewRules.isCritical(order) { MedicoAlert(text: L.text("results.critical.notice")) }
+                Text(verbatim: ReleaseRules.summary(order)).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                SectionCard {
+                    Toggle(isOn: $followUp) {
+                        VStack(alignment: .leading, spacing: Spacing.xs) {
+                            Text("results.release.followUp").font(Typo.label).foregroundStyle(Theme.ink)
+                            Text("results.release.followUp.hint").font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .tint(Theme.primary)
+                    .frame(minHeight: Spacing.control)
+                }
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    MedicoTextArea(label: L.text("results.release.note"), text: $note, error: submission.fieldErrors["patientNote"], lines: 2...5)
+                    CharacterCounter(count: note.trimmingCharacters(in: .whitespacesAndNewlines).count, range: 0...ReleaseRules.noteMaximum)
+                }
+                SubmissionNotice(submission: submission)
+                ClimesaButton(title: L.text("results.release"), loading: submission.busy) {
+                    Task { if await release(followUp, note) { dismiss() } }
+                }
+                .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).count > ReleaseRules.noteMaximum)
+            }
+        }
     }
 }
 
