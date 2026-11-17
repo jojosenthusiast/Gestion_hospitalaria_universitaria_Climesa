@@ -89,7 +89,7 @@ export function FillGapsDialog({ api, blocks: given, onClose, onPreview }: { api
   return <Dialog title="Llenar todos los huecos" onClose={onClose}><div className="module-form">
     {error ? <Notice kind="error">{error}</Notice> : !plan ? <p className="muted" role="status">Buscando quién puede cubrir {blocks.length === 1 ? '1 hueco' : `${blocks.length} huecos`}…</p> : <>
       <p className="form-intro" role="status">{plan.items.length ? `Se propondrán ${plan.items.length === 1 ? '1 turno' : `${plan.items.length} turnos`} con ${people === 1 ? '1 persona' : `${people} personas`} para ${blocks.length - plan.uncovered.length} de ${blocks.length} huecos.` : 'Ningún hueco se puede cubrir sin romper una regla.'} Nada se guarda hasta que confirmes en el resumen.</p>
-      {plan.items.length > 0 && <ul className="gap-fill-list">{plan.items.map(i => <li key={i.key}><strong>{i.person}</strong> · {blockLabel(blocks.find(b => b.start === i.start && b.areaId === i.areaId)!)}</li>)}</ul>}
+      {plan.items.length > 0 && <ul className="gap-fill-list">{plan.items.map(i => <li key={i.key}><strong>{i.person}</strong> · {blockLabel(blocks.find(b => i.key.startsWith(`hueco-${b.key}-`))!)}</li>)}</ul>}
       {plan.uncovered.length > 0 && <><h4>Sin cubrir ({plan.uncovered.length})</h4><ul className="gap-fill-list">{plan.uncovered.map(u => <li key={u.block.key}>{blockLabel(u.block)}: {u.reason}</li>)}</ul></>}
       <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose}>Volver</button>
         <button type="button" className="primary-button" disabled={!plan.items.length} onClick={() => onPreview(plan.items)}>Revisar {plan.items.length === 1 ? '1 turno' : `${plan.items.length} turnos`}</button></div>

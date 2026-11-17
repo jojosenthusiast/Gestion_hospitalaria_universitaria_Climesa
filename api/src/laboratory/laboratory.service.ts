@@ -521,9 +521,10 @@ export class LaboratoryService {
           EXISTS (SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=$1 AND r.profesional_id=$2 AND r.vigencia @> $3::timestamptz)
           OR EXISTS (SELECT 1 FROM hospitalizacion.admision a WHERE a.paciente_id=$1 AND a.medico_tratante_id=$2 AND a.estado IN ${ACTIVE_ADMISSION}))`, [patientId, actor.staffId, now])).rowCount;
       if (!related) throw new ForbiddenException('Solo el médico con relación de atención vigente con el paciente registra un resultado externo sin orden.');
-      const consultation = (await c.query(`SELECT id FROM atencion.consulta WHERE paciente_id=$1 AND estado IN ('abierta','firmada')
-        ORDER BY (medico_id=$2) DESC,iniciada_en DESC LIMIT 1`, [patientId, actor.staffId])).rows[0] as Row | undefined;
-      if (!consultation) throw new ProblemException('sin_consulta', 409, 'El paciente no tiene consultas registradas; registra el resultado desde su primera consulta.');
+      // Only a consultation of this doctor: ordering on another doctor's consultation is 403 in POST /laboratorio/ordenes.
+      const consultation = (await c.query(`SELECT id FROM atencion.consulta WHERE paciente_id=$1 AND medico_id=$2 AND estado IN ('abierta','firmada')
+        ORDER BY iniciada_en DESC LIMIT 1`, [patientId, actor.staffId])).rows[0] as Row | undefined;
+      if (!consultation) throw new ProblemException('sin_consulta', 409, 'Para registrar un resultado externo necesitas una consulta tuya con este paciente.');
       const examIds = dto.results.map(r => r.examId);
       if (new Set(examIds).size !== examIds.length) throw new ProblemException('validacion', 400, 'Cada examen va una sola vez.', 'results');
       for (const examId of examIds) {

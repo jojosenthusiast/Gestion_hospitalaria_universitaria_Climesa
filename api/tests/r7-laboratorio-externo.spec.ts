@@ -53,6 +53,20 @@ describe('R7 · laboratorio: resultado externo sin orden, aviso al paciente y pe
     expect((await t.call('LAB', 'POST', `/laboratorio/pacientes/${patientId}/resultado-externo`, { place: 'Laboratorio Ejemplo', results: [{ examId: glu, value: 1 }], attachment })).status).toBe(403);
   });
 
+  test('Fuga D-5: con relación de atención pero la única consulta es de otro médico responde 409 sin_consulta y no crea nada', async () => {
+    const patientId = await t.patient({});
+    const consultation = await t.consultation(patientId);
+    // The care relationship from that visit stays; the consultation itself now belongs to another doctor.
+    const other = (await t.one<{ id: string }>(`INSERT INTO personal.persona(nombres,apellidos,tipo,area_id) SELECT 'Otra','Médica Prueba','medico',id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id`)).id;
+    await t.pg.query('UPDATE atencion.consulta SET medico_id=$2 WHERE id=$1', [consultation.id, other]);
+    // MED keeps an active care relationship (for example from an ambulance service), valid at the test clock.
+    await t.pg.query(`INSERT INTO atencion.relacion_atencion(paciente_id,profesional_id,origen,origen_id,vigencia) VALUES($1,$2,'ambulancia',gen_random_uuid(),tstzrange($3::timestamptz - interval '1 day',$3::timestamptz + interval '30 days'))`, [patientId, await t.staffOf('MED'), NOW]);
+    const before = (await t.one<{ n: number }>('SELECT count(*)::int AS n FROM laboratorio.orden WHERE paciente_id=$1', [patientId])).n;
+    const answer = await record(patientId, { place: 'Laboratorio Ejemplo', results: [{ examId: glu, value: 90 }], attachment });
+    expect([answer.status, answer.body.codigo]).toEqual([409, 'sin_consulta']);
+    expect((await t.one<{ n: number }>('SELECT count(*)::int AS n FROM laboratorio.orden WHERE paciente_id=$1', [patientId])).n).toBe(before);
+  });
+
   test('C-6: enviar a externo dice si el paciente recibe el aviso en su app', async () => {
     const linked = await t.patient({ linkPac: true });
     const order = (await t.call('MED', 'POST', '/laboratorio/ordenes', { consultationId: (await t.consultation(linked)).id, exams: [glu] })).body;

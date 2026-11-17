@@ -50,6 +50,21 @@ describe('R7 C-5 · registrar resultado externo sin orden', () => {
     expect(onSaved).toHaveBeenCalledWith('Resultado externo de Ana Pérez Ficticia registrado: queda en «Resultados por revisar» para liberarlo.');
   });
 
+  it('409 sin_consulta dice qué hacer: hace falta una consulta propia con el paciente', async () => {
+    const { write } = mount();
+    write.mockRejectedValueOnce(new ApiError('x', 409, 'sin_consulta'));
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar resultado externo' });
+    const exam = within(dialog).getByLabelText('Examen') as HTMLSelectElement;
+    await vi.waitFor(() => expect(exam.options.length).toBe(3));
+    await userEvent.type(within(dialog).getByLabelText('Dónde se hizo'), 'Laboratorio Ejemplo');
+    await userEvent.selectOptions(exam, 'e-glu');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Agregar examen' }));
+    await userEvent.type(within(dialog).getByLabelText('Glucosa (mg/dL)'), '90');
+    await userEvent.upload(within(dialog).getByLabelText(/Informe \(PDF o foto/), new File(['%PDF-1.4'], 'informe.pdf', { type: 'application/pdf' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar resultado' }));
+    expect(await within(dialog).findByText(/Para registrar un resultado externo necesitas una consulta tuya con este paciente/)).toBeTruthy();
+  });
+
   it('sin lugar, sin examen, sin valor o sin informe no deja registrar', async () => {
     const { write } = mount();
     const dialog = await screen.findByRole('dialog', { name: 'Registrar resultado externo' });

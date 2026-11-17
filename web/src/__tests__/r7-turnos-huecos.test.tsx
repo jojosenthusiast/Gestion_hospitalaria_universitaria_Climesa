@@ -56,6 +56,29 @@ describe('R7 F2 · Llenar todos los huecos', () => {
     expect(await within(dialog).findByText(/Se propondrán 2 turnos con 1 persona para 2 de 3 huecos\. Nada se guarda hasta que confirmes/)).toBeTruthy();
     expect(within(dialog).getByText(/Laboratorio · Laboratorio .*Supera el tope de horas de la semana\./)).toBeTruthy();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Revisar 2 turnos' }));
+    expect(onPreview).toHaveBeenCalledTimes(1);
+    onPreview.mockClear();
+    cleanup();
+  });
+
+  it('dos funciones con hueco a la misma hora en la misma área: cada propuesta muestra su propia función', async () => {
+    const blocks = gapBlocks([...hourly('a-emg', 'Emergencia', 'MED', '2026-12-08', 7, 19), ...hourly('a-emg', 'Emergencia', 'ENF', '2026-12-08', 7, 19)]);
+    const request = vi.fn(async (path: string) => ({ candidatos: [path.includes('role=MED') ? { ...ana, staffId: 's-med', person: 'Médica Ejemplo' } : { ...beto, staffId: 's-enf', person: 'Enfermero Ejemplo' }], descartados: [] }));
+    render(<FillGapsDialog api={{ request } as unknown as Api} blocks={blocks} onClose={vi.fn()} onPreview={vi.fn()} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Llenar todos los huecos' });
+    expect((await within(dialog).findByText('Médica Ejemplo')).closest('li')!.textContent).toMatch(/Emergencia · Medicina/);
+    expect(within(dialog).getByText('Enfermero Ejemplo').closest('li')!.textContent).toMatch(/Emergencia · Enfermería/);
+  });
+
+  it('el resumen se aplica solo al confirmar', async () => {
+    const blocks = gapBlocks([...hourly('a-rec', 'Recepción', 'REC', '2026-12-08', 7, 19), ...hourly('a-lab', 'Laboratorio', 'LAB', '2026-12-08', 7, 19), ...hourly('a-rec', 'Recepción', 'REC', '2026-12-09', 7, 19)]);
+    const request = vi.fn(async (path: string) => path.includes('role=LAB') ? { candidatos: [], descartados: [{ staffId: 's-x', person: 'X', codigo: 'carga_semanal_excedida', mensaje: 'Supera el tope de horas de la semana.' }] } : { candidatos: [ana], descartados: [] });
+    const onPreview = vi.fn();
+    render(<FillGapsDialog api={{ request } as unknown as Api} blocks={blocks} onClose={vi.fn()} onPreview={onPreview} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Llenar todos los huecos' });
+    await within(dialog).findByText(/Se propondrán 2 turnos/);
+    expect(onPreview).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Revisar 2 turnos' }));
     expect((onPreview.mock.calls[0][0] as { staffId: string; start: string }[]).map(i => [i.staffId, i.start])).toEqual([['s-ana', local('2026-12-08', '07:00')], ['s-ana', local('2026-12-09', '07:00')]]);
   });
 });

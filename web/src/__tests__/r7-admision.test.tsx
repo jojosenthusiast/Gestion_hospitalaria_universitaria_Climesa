@@ -16,8 +16,8 @@ afterEach(() => { cleanup(); vi.useRealTimers(); location.hash = ''; });
 const profile: AccessProfile = { id: 'u-1', user: { id: 'u-1' }, email: 'rec@example.test', name: 'Recepción Ficticia', roles: ['REC'], platforms: ['web'], permissions: ['admision.ver', 'admision.crear', 'camas.asignar'].map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId: 's-1' };
 const indicated = { id: 'adm-1', patientId: 'p-1', patientName: 'Ana Pérez Ficticia', origin: 'consulta', requestedCategory: 'semiprivada', state: 'pendiente_cama', isolation: true, bed: '', version: 1, motive: 'Neumonía con hipoxemia', attendingDoctorName: 'Dra. Ana Isabel Ejemplo López', allowedActions: ['asignar_cama', 'cancelar'] };
 
-function mount(beds: unknown[]) {
-  let rows: unknown[] = [indicated];
+function mount(beds: unknown[], origin = 'consulta') {
+  let rows: unknown[] = [{ ...indicated, origin }];
   const request = vi.fn(async (path: string) => path.includes('/sugerencias-cama') ? beds : rows);
   const write = vi.fn(async () => { rows = []; return { id: 'adm-1', version: 2 }; });
   render(<HospitalizationPage api={{ request, write } as unknown as Api} profile={profile} version={0} />);
@@ -52,6 +52,16 @@ describe('R7 G3 · ingresos indicados', () => {
     expect(await screen.findByText('Ana Pérez Ficticia queda pendiente de cama en «Ingresos indicados»; asígnale una desde ahí cuando se libere.')).toBeTruthy();
     expect(screen.queryByText(/Admisiones sin cama/)).toBeNull();
     expect(within(await screen.findByRole('region', { name: 'Ingresos indicados' })).getByText('Ana Pérez Ficticia')).toBeTruthy();
+  });
+
+  // Blocker 4 by origin: only an indicated admission (origin consulta) stays in «Ingresos indicados».
+  it.each(['emergencia', 'ambulancia'])('origen %s sin camas: el mensaje dice que queda en «Admisiones sin cama»', async origin => {
+    location.hash = '#/hospitalizacion?ingresar=adm-1';
+    mount([], origin);
+    const dialog = await screen.findByRole('dialog', { name: 'Asignar cama' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ingresar sin cama' }));
+    expect(await screen.findByText('Ana Pérez Ficticia queda ingresada sin cama; aparece en «Admisiones sin cama» de Inicio.')).toBeTruthy();
+    expect(screen.queryByText(/«Ingresos indicados»/)).toBeNull();
   });
 
   it('?ingresar=<id> desde Inicio abre directo la elección de cama', async () => {
