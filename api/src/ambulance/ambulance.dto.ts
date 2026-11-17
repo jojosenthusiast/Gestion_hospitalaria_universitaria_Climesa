@@ -72,6 +72,10 @@ export class CloseServiceDto {
   /** Trimmed before validation: the stored reason is the trimmed text, so padding cannot pass the minimum length. */
   @Transform(({value}:{value:unknown})=>typeof value==='string'?value.trim():value) @Text(10,500) reason!:string;
 }
+/** R7 G-4: la tripulación deshace su último hito; `version` es la del servicio. */
+export class UndoMilestoneDto {
+  @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;
+}
 /** MA-AMB-05: quien pidió cancela su solicitud por confirmar; `version` es la de la solicitud. */
 export class CancelRequestDto {
   @ApiProperty({minimum:1}) @IsInt() @Min(1) version!:number;

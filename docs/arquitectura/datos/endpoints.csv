@@ -104,6 +104,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 109,POST,/api/v1/ambulancia/solicitudes/{id}/cancelar,ambulancia.solicitar,Solo quien pidió y solo por confirmar; motivo opcional; MA-AMB-05,R,6,Cancelar mi solicitud de ambulancia
 109,POST,/api/v1/ambulancia/servicios,ambulancia.despachar,Solo si Disponible; bloqueo de fila,R,4,Despachar: pasa a En Servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/hitos,ambulancia.operar,Orden de hitos,R,4,"Salida, en escena, trasladando, en hospital, finalizado"
+109,POST,/api/v1/ambulancia/servicios/{id}/hitos/deshacer,ambulancia.operar,Solo la tripulación; último hito; 15 minutos; nunca finalizado ni llegada recibida,R,6,Deshacer el último hito (R7 G-4)
 109,POST,/api/v1/ambulancia/servicios/{id}/cerrar,ambulancia.mantenimiento,Solo servicio activo; motivo; estado final cancelado; unidad a Disponible,R,6,Cierre administrativo del servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.reportar_prehospital,Funciona sin conexión con reintento,E,4,Reporte prehospital y hora estimada
 109,GET,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.recibir_prehospital,,E,4,Ver reporte prehospital

@@ -323,6 +323,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/ambulancia/solicitudes/{id}/cancelar` | `ambulancia.solicitar` | Solo quien pidió y solo por confirmar; motivo opcional; MA-AMB-05 | R | 6 | · | · | ✔ | · | · | · | · | · | · | propio |
 | POST | `/api/v1/ambulancia/servicios` | `ambulancia.despachar` | Solo si Disponible; bloqueo de fila | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/hitos` | `ambulancia.operar` | Orden de hitos | R | 4 | · | · | · | · | · | · | · | ✔ | · | · |
+| POST | `/api/v1/ambulancia/servicios/{id}/hitos/deshacer` | `ambulancia.operar` | Solo la tripulación; último hito; 15 minutos; nunca finalizado ni llegada recibida | R | 6 | · | · | · | · | · | · | · | ✔ | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/cerrar` | `ambulancia.mantenimiento` | Solo servicio activo; motivo; estado final cancelado; unidad a Disponible | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.reportar_prehospital` | Funciona sin conexión con reintento | E | 4 | · | · | · | · | · | · | · | ✔ | · | · |
 | GET | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.recibir_prehospital` |  | E | 4 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |

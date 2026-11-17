@@ -194,6 +194,16 @@ export class HandoverResponse {
   @IntProp() version!: number;
   @DateTimeProp() receivedAt!: string;
   @StrProp({ nullable: true }) receivedByName!: string | null;
+  @BoolProp({ optional: true, description: 'R7 D-7: true cuando la recepción cerró el servicio (hito `finalizado`, estado `completado`) y la unidad volvió a Disponible.' }) serviceClosed?: boolean;
+  @EnumProp(ESTADO_AMBULANCIA, 'EstadoAmbulancia', { optional: true, description: 'R7 D-7: estado de la unidad después de la recepción.' }) unitState?: string;
+}
+
+/** R7 G-4: hito deshecho y lo que la tripulación puede registrar ahora. */
+export class UndoMilestoneResponse {
+  @UuidProp() id!: string;
+  @EnumProp(HITO_SERVICIO, 'HitoServicio') undoneType!: string;
+  @IntProp() version!: number;
+  @EnumArrayProp(HITO_SERVICIO, 'HitoServicio') nextMilestones!: string[];
 }
 
 /** MA-AMB-05: avance del servicio que atiende la solicitud, sin tripulación ni ubicación. */

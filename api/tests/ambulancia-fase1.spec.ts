@@ -123,7 +123,10 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
     expect(again.body.codigo).toBe('entrega_registrada');
     expect(await t.events('ambulancia.prehospital', service.id)).toHaveLength(3);
     await expect(t.pg.query('UPDATE ambulancia.servicio SET recibido_por=$2,recibido_en=now() WHERE id=$1', [service.id, userId('MED')])).rejects.toThrow(/entrega_registrada/);
-    expect((await milestone(service.id, { type: 'finalizado' })).status).toBe(201);
+    // R7 D-7 (owner): the reception already closed the service, so the crew's late «Finalizar» is the existing 409.
+    expect(received.body).toMatchObject({ serviceClosed: true, unitState: 'disponible' });
+    const late = await milestone(service.id, { type: 'finalizado' });
+    expect([late.status, late.body.codigo]).toEqual([409, 'servicio_finalizado']);
   });
 
   test('MA-AMB-04: Enfermería encuentra la llegada sin reporte prehospital y la recibe después de que la tripulación finalizó', async () => {
@@ -190,7 +193,8 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
     expect(view).toMatchObject({ clinical: true, allowedActions: ['recibir'] });
     expect(view.reports[0].reason).toBe('Fractura de cadera probable');
     expect((await t.call('MED', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {})).status).toBe(201);
-    await advance(service.id, 'finalizado');
+    // R7 D-7: the reception closed the service; the unit is free for the next test.
+    expect((await unit()).estado).toBe('disponible');
   });
 
   test('re-revisión #117: sin `crew` (clientes anteriores) se despacha con la tripulación propuesta y la auditoría lo marca; los hitos no retroceden', async () => {

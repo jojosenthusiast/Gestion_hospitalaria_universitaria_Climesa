@@ -37,7 +37,7 @@ export const PROBLEM_CODES = [
   'adjunto_tipo_invalido', 'adjunto_muy_grande', 'adjunto_sin_archivo', 'adjunto_ya_almacenado', 'adjunto_no_coincide',
   // Ambulance.
   'ambulancia_ya_despachada', 'estado_final_invalido', 'hito_fuera_de_orden', 'servicio_cerrado', 'servicio_finalizado', 'sin_paramedico_de_turno',
-  'sin_motorista_de_turno', 'sin_tripulacion_de_turno', 'tripulante_sin_turno', 'hito_hora_invalida', 'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio',
+  'sin_motorista_de_turno', 'sin_tripulacion_de_turno', 'tripulante_sin_turno', 'hito_hora_invalida', 'hito_no_deshacible', 'sin_servicio_activo', 'solicitud_resuelta', 'unidad_en_mantenimiento', 'unidad_en_servicio',
   // Ambulance phase 1 (20261121002000): hospital handover (MA-AMB-04).
   'sin_llegada_hospital', 'entrega_registrada',
 ] as const;

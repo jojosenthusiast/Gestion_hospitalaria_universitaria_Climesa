@@ -18603,6 +18603,125 @@
         "x-permiso": "ambulancia.operar"
       }
     },
+    "/api/v1/ambulancia/servicios/{id}/hitos/deshacer": {
+      "post": {
+        "operationId": "AmbulanceController_undoMilestone",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UndoMilestoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UndoMilestoneResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deshacer el último hito (solo la tripulación, hasta 15 minutos después, nunca finalizado ni una llegada ya recibida)",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.operar"
+      }
+    },
     "/api/v1/ambulancia/servicios/{id}/cerrar": {
       "post": {
         "operationId": "AmbulanceController_close",
@@ -32870,6 +32989,49 @@
           "nextMilestones"
         ]
       },
+      "UndoMilestoneDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "UndoMilestoneResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "undoneType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HitoServicio"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "nextMilestones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HitoServicio"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "undoneType",
+          "version",
+          "nextMilestones"
+        ]
+      },
       "CloseServiceDto": {
         "type": "object",
         "properties": {
@@ -33198,6 +33360,18 @@
           "receivedByName": {
             "type": "string",
             "nullable": true
+          },
+          "serviceClosed": {
+            "type": "boolean",
+            "description": "R7 D-7: true cuando la recepción cerró el servicio (hito `finalizado`, estado `completado`) y la unidad volvió a Disponible."
+          },
+          "unitState": {
+            "description": "R7 D-7: estado de la unidad después de la recepción.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoAmbulancia"
+              }
+            ]
           }
         },
         "required": [
@@ -33455,6 +33629,7 @@
           "sin_tripulacion_de_turno",
           "tripulante_sin_turno",
           "hito_hora_invalida",
+          "hito_no_deshacible",
           "sin_servicio_activo",
           "solicitud_resuelta",
           "unidad_en_mantenimiento",
