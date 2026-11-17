@@ -42,6 +42,16 @@ class FrontDeskU5Test {
 
     private val appointment = JSONObject().put("id", "c1").put("start", "2026-11-17T15:00:00Z").put("doctorId", "d1").put("doctorName", "Marta Médica")
 
+    // Sweep U6 defect 10: «Cita 09:00», never «Cita 09:00 con ».
+    @Test fun aBlankDoctorNameLeavesOnlyTheTimeInTheChip() {
+        for (name in listOf<Any>("", "   ", JSONObject.NULL)) {
+            val row = JSONObject(appointment.toString()).put("doctorName", name)
+            assertEquals("Cita 09:00", ReceptionScheduling.pickerPage(pickerRow(row)).items.single().appointmentToday?.chip)
+        }
+        val missing = JSONObject(appointment.toString()).apply { remove("doctorName") }
+        assertEquals("Cita 09:00", ReceptionScheduling.pickerPage(pickerRow(missing)).items.single().appointmentToday?.chip)
+    }
+
     @Test fun selectorRowsCarryTodaysAppointmentWithTheDoctorInTheChip() {
         val patient = ReceptionScheduling.pickerPage(pickerRow(appointment)).items.single()
         assertEquals("c1", patient.appointmentToday?.id)

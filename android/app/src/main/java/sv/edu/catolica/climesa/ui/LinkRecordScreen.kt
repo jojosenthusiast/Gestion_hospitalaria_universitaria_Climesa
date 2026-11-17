@@ -21,16 +21,25 @@ import androidx.compose.ui.text.input.KeyboardType
 import sv.edu.catolica.climesa.domain.AccessProfile
 import sv.edu.catolica.climesa.domain.LinkStatus
 
-/** A03 · Vincular expediente (spec 101). The typed DUI and date survive rotation (`rememberSaveable`). */
+/** A03 · Vincular expediente (spec 101). Opens on the real state of the request (G2, `GET /me/vinculacion`).
+ * The typed DUI and date survive rotation (`rememberSaveable`); "Volver a pedir" fills them once with what was declared.
+ */
 @Composable
-fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, userId: String? = null, model: LinkRecordViewModel = viewModel()) {
+fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: LinkRecordViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     var dui by rememberSaveable { mutableStateOf("") }
     var birth by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(profile.patientId, userId) { model.init(profile.patientId, userId) }
+    LaunchedEffect(profile.patientId) { model.init(profile.patientId) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
+    LaunchedEffect(state.prefill) { state.prefill?.let { dui = it.dui; birth = it.birth.orEmpty(); model.prefillApplied() } }
     PageList(modifier) {
+        // A refresh that failed over a known state: said above it, with the retry; the state stays.
+        state.readError?.takeIf { state.status != LinkStatus.UNAVAILABLE }?.let { message -> item {
+            ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, message); RowAction(stringResource(R.string.camas_reintentar), { model.reload() }) }
+        } }
         when (state.status) {
+            LinkStatus.LOADING -> item { LoadingState(title = stringResource(R.string.u9_vinculo_cargando)) }
+            LinkStatus.UNAVAILABLE -> item { ErrorState(state.readError, { model.reload() }, title = stringResource(R.string.u9_vinculo_sin_estado)) }
             LinkStatus.APPROVED -> item {
                 SectionCard(stringResource(R.string.vinculo_aprobada), action = { StatusTag("aprobada") }) {
                     Text(stringResource(R.string.vinculo_aprobada_detalle), style = MaterialTheme.typography.bodyMedium)
@@ -45,7 +54,7 @@ fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, user
             }
             LinkStatus.REJECTED -> item {
                 SectionCard(stringResource(R.string.vinculo_rechazada), action = { StatusTag("rechazada") }) {
-                    NoticeBanner(NoticeKind.ERROR, stringResource(R.string.vinculo_rechazada_detalle))
+                    NoticeBanner(NoticeKind.ERROR, state.rejectionReason?.let { stringResource(R.string.u9_vinculo_motivo, it) } ?: stringResource(R.string.vinculo_rechazada_detalle))
                     PrimaryButton(stringResource(R.string.vinculo_volver_a_pedir), { model.retry() }, icon = Icons.Default.Refresh)
                 }
             }

@@ -110,6 +110,22 @@ class DraftStoreTest {
         assertNull(drafts.load("par-2", "prehospital:cola"))
     }
 
+    /** Sweep U6 defect 2: the "results seen" marker is not clinical data; it never expires and still survives sign-out. */
+    @Test fun theResultsSeenMarkerNeverExpiresAndSurvivesSignOut() {
+        val root = Files.createTempDirectory("borradores").toFile()
+        val drafts = FileDraftStore(root)
+        var clock = 0L
+        val session = SessionDrafts(drafts) { clock }
+        ResultsSeen.mark(drafts, "pac-1", java.time.Instant.parse("2026-11-10T08:00:00Z"))
+        root.walkTopDown().filter { it.isFile }.forEach { it.setLastModified(1_000_000L) }
+        clock = 1_000_000L + 7 * SessionDrafts.PENDING_WRITES_TTL_MS
+        session.appStarted()
+        session.signedIn("pac-1")
+        session.ended()
+        session.signedIn("enf-1")
+        assertEquals(java.time.Instant.parse("2026-11-10T08:00:00Z"), ResultsSeen.load(drafts, "pac-1"))
+    }
+
     @Test fun signingInKeepsOnlyTheDraftsOfThatAccount() {
         val drafts = store()
         val session = SessionDrafts(drafts)

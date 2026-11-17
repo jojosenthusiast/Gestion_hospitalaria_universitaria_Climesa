@@ -331,4 +331,18 @@
     </plurals>
     <!-- U5: vinculaciones, expediente parecido (G2) -->
     <string name="u5_vinc_parecido">Parecido: %1$s · %2$s · DUI %3$s · nac. %4$s</string>
+    <!-- U9: vinculación desde GET /me/vinculacion (G2) -->
+    <string name="u9_vinculo_cargando">Consultando tu solicitud</string>
+    <string name="u9_vinculo_sin_estado">No pudimos consultar tu solicitud</string>
+    <string name="u9_vinculo_motivo">Recepción rechazó tu solicitud. Motivo: %1$s</string>
+    <!-- U9: búsqueda CIE-10 en el paso de diagnóstico -->
+    <string name="u9_cie10_buscar">Diagnóstico CIE-10</string>
+    <string name="u9_cie10_ayuda">Código o palabras, al menos 2 caracteres</string>
+    <string name="u9_cie10_buscando">Buscando en CIE-10…</string>
+    <string name="u9_cie10_sin_resultados">Sin resultados para «%1$s».</string>
+    <string name="u9_cie10_cambiar">Cambiar</string>
+    <string name="u9_cie10_sin_descripcion">Código escrito a mano</string>
+    <string name="u9_cie10_manual_ayuda">Mientras la búsqueda no responda, escribe el código exacto.</string>
+    <string name="u9_cie10_manual">Código CIE-10</string>
+    <string name="u9_cie10_usar">Usar código</string>
 </resources>

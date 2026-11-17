@@ -184,6 +184,37 @@ class DeferredActionsTest {
         assertEquals("Ya ordenaste Perfil químico en esta consulta.", reopened.state.value.error)
     }
 
+    // Sweep U6 defect 9: the «No asistió» failure row survives another dialog action (open, success, close).
+    @Test fun theFailedNoShowRowSurvivesAnotherDialogAction() = runTest(dispatcher) {
+        val drafts = MemoryDrafts()
+        val api = FakeGateway(); api.failures["/citas/a1/no-asistio"] = AuthRequestException("Servidor despertando", 503, null)
+        val vm = AppointmentActionViewModel(api, drafts)
+        vm.bindUser("rec-1"); runCurrent()
+        vm.markNoShow(appointment("a1", "Ana"))
+        advanceTimeBy(8_001); runCurrent()
+        val failure = vm.state.value.error
+        assertNotNull(failure)
+        val failed = vm.state.value.failedNoShow
+        assertNotNull(failed)
+        vm.open(appointment("a2", "Beto"), sv.edu.catolica.climesa.domain.AppointmentAction.CONFIRM)
+        assertEquals(failed, vm.state.value.failedNoShow)
+        assertNull("the dialog does not show the no-show error", vm.state.value.error)
+        vm.submit(); runCurrent()
+        assertNotNull(vm.state.value.done)
+        assertEquals(failed, vm.state.value.failedNoShow)
+        assertEquals(failure, vm.state.value.error)
+        vm.open(appointment("a2", "Beto"), sv.edu.catolica.climesa.domain.AppointmentAction.CONFIRM)
+        vm.close()
+        assertEquals(failed, vm.state.value.failedNoShow)
+        assertEquals(failure, vm.state.value.error)
+        // The retry still goes through and the row leaves.
+        api.failures.clear()
+        vm.resume(); runCurrent()
+        assertNull(vm.state.value.failedNoShow)
+        assertNull(vm.state.value.error)
+        assertNull(drafts.load("rec-1", FormDrafts.DEFERRED_NO_SHOW))
+    }
+
     // B1: a definitive 4xx is final: dropped from the store, said once, never resent.
     @Test fun aDefinitiveRejectionIsDroppedAndSaidOnce() = runTest(dispatcher) {
         val drafts = MemoryDrafts()
