@@ -1453,17 +1453,6 @@
         }
       }
     },
-    "day.appointments": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "citas hoy"
-          }
-        }
-      }
-    },
     "day.attend": {
       "extractionState": "manual",
       "localizations": {
@@ -1548,17 +1537,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Expediente"
-          }
-        }
-      }
-    },
-    "day.results": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "resultados por revisar"
           }
         }
       }
@@ -2240,7 +2218,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Escribe al menos 2 caracteres y busca."
+            "value": "Escribe al menos 2 letras."
           }
         }
       }
@@ -2362,17 +2340,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Resultados por revisar"
-          }
-        }
-      }
-    },
-    "results.followUp.count": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%d pendiente(s)"
           }
         }
       }
@@ -2762,17 +2729,6 @@
         }
       }
     },
-    "ds.medico.stat.waiting": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "en espera"
-          }
-        }
-      }
-    },
     "ds.medico.stat.hospitalized": {
       "extractionState": "manual",
       "localizations": {
@@ -2780,17 +2736,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "hospitalizados"
-          }
-        }
-      }
-    },
-    "ds.medico.search": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Buscar"
           }
         }
       }
@@ -5277,6 +5222,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "¿Por qué este número?"
+          }
+        }
+      }
+    },
+    "results.followUp.record": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expediente %@"
           }
         }
       }

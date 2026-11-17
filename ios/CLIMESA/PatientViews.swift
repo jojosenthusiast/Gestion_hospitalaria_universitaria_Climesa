@@ -589,7 +589,7 @@ struct PatientExamsView: View {
     @State private var filter: LabFilter = .all
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.space4) {
             if profile.patientId == nil {
                 EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link")
             } else {
@@ -599,12 +599,14 @@ struct PatientExamsView: View {
                     }.pickerStyle(.segmented)
                     let shown = filter.apply(orders)
                     if shown.isEmpty { EmptyStateView(title: L.text(orders.isEmpty ? "exams.none" : "exams.filter.none"), symbol: "testtube.2") }
-                    ForEach(shown) { order in
-                        NavigationLink {
-                            ScreenFrame(title: "exams.detail") { LabOrderDetail(order: order, showValues: PatientLabRules.showsValues(order)) }
-                        } label: {
-                            LabOrderRow(order: order, status: PatientLabRules.statusText(order), critical: false, showPatient: false)
-                        }.buttonStyle(.plain)
+                    if !shown.isEmpty {
+                        ListCard(items: shown) { order in
+                            NavigationLink {
+                                ScreenFrame(title: "exams.detail") { LabOrderDetail(order: order, showValues: PatientLabRules.showsValues(order)) }
+                            } label: {
+                                LabOrderRow(order: order, status: PatientLabRules.statusText(order), critical: false, showPatient: false)
+                            }.buttonStyle(.plain)
+                        }
                     }
                 }
             }
@@ -621,8 +623,9 @@ struct LabOrderRow: View {
     let critical: Bool
     /// The patient's own list does not repeat their name on every row.
     var showPatient = true
+    /// A row inside a `ListCard`, not a card of its own (I-9).
     var body: some View {
-        SectionCard {
+        VStack(alignment: .leading, spacing: Spacing.s) {
             ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: showPatient ? order.patientName : nil,
                     meta: ClimesaDates.display(order.completedAt ?? order.createdAt)) {
                 Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
@@ -633,7 +636,9 @@ struct LabOrderRow: View {
                 if order.priority == .urgente { PriorityBadge(order.priority.rawValue) }
                 if critical { PatientTag("critico_alto", label: L.text("results.critical")) }
             }
+            .padding(.bottom, Spacing.s)
         }
+        .contentShape(Rectangle())
     }
 }
 
