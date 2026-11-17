@@ -10,6 +10,16 @@ export class QueueIssueDto {
   @ApiProperty({ enum: QUEUE_SERVICES }) @IsIn(QUEUE_SERVICES) service!: QueueService;
   @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() patientId?: string;
   @ApiPropertyOptional({ enum: QUEUE_PRIORITIES, description: 'Prioridad clínica; por omisión rutina' }) @IsOptional() @IsIn(QUEUE_PRIORITIES) priority?: QueuePriority;
+  /**
+   * D-1 (R7 U1): registra la llegada de una cita confirmada de hoy. El número queda ligado a la cita (servicio
+   * consulta_general); el paciente sale de la cita si no se indica, y firmar la consulta cierra la cita y el número.
+   */
+  @ApiPropertyOptional({ format: 'uuid', description: 'Cita de hoy cuya llegada se registra con este número' }) @IsOptional() @IsUUID() appointmentId?: string;
+}
+
+/** B-3: version of the number being voided right after it was issued by mistake. */
+export class QueueVoidDto {
+  @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
 }
 
 export class QueueTransitionDto {

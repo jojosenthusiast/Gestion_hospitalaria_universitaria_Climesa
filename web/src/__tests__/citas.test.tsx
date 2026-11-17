@@ -70,7 +70,7 @@ describe('W28 · agendar cita como Recepción (W-01)', () => {
     const today = new Date(Date.now() - 6 * 3_600_000).toISOString().slice(0, 10);
     await userEvent.click(await screen.findByRole('button', { name: /Agendar cita/ }));
     const dialog = screen.getByRole('dialog');
-    expect((within(dialog).getByLabelText(/^Fecha/) as HTMLInputElement).value).toBe(today);
+    expect((within(dialog).getByLabelText(/^Fecha/) as HTMLInputElement).value).toBe(today.split('-').reverse().join('/'));
     await userEvent.click(within(dialog).getByRole('combobox', { name: 'Médico' }));
     await userEvent.click(await within(dialog).findByRole('option', { name: /Médica Ficticia/ }));
     await within(dialog).findByRole('button', { name: /no disponible: Ocupado/ });

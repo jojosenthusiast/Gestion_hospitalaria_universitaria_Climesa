@@ -21,7 +21,7 @@ export function localDay(from: Date, days = 0) {
   const shifted = new Date(from.valueOf() + days * 86_400_000);
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/El_Salvador', year: 'numeric', month: '2-digit', day: '2-digit' }).format(shifted);
 }
-const slotLabel = (slot: Slot) => new Intl.DateTimeFormat('es-SV', { timeStyle: 'short', timeZone: 'America/El_Salvador' }).format(new Date(slot.start));
+const slotLabel = (slot: Slot) => new Intl.DateTimeFormat('es-SV', { timeStyle: 'short', hourCycle: 'h23', timeZone: 'America/El_Salvador' }).format(new Date(slot.start));
 export const FOLLOW_UP_REASON = 'Seguimiento de resultados de laboratorio';
 
 /** `state` comes from Inicio, which already reads the list for its pending tray (`inTray`: a tray group, hidden when empty). */

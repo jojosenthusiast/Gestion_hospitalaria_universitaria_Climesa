@@ -96,7 +96,7 @@ export const modules:Module[]=[
  {id:'metricas',label:'Métricas',permission:'metricas.ver'},
  {id:'perfil',label:'Perfil'},
 ];
-const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',vinculaciones:'shield',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'ambulance',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'bed',fila:'queue',citas:'calendar',consultas:'calendar',perfil:'user',avisos:'info',metricas:'grid'};
+export const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',vinculaciones:'shield',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'clipboard',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'pulse',fila:'queue',citas:'calendar',consultas:'calendar',perfil:'user',avisos:'info',metricas:'grid'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
 export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */

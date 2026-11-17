@@ -68,6 +68,18 @@ describe('Inicio · panel del día', () => {
     const grupo = await screen.findByRole('region', { name: 'Solicitudes de cita' });
     expect((await within(grupo).findByText('3')).className).toContain('tray-count');
     expect(within(grupo).getByText('Paciente Por Motivo')).toBeTruthy();
+    // #9: «Asignar» opens the assign panel of that request, not just the agenda.
+    const row = within(grupo).getByText('Paciente Por Motivo').closest('li') as HTMLElement;
+    expect(within(row).getByRole('link', { name: /Asignar/ }).getAttribute('href')).toBe('#/citas?asignar=q1');
+  });
+
+  it('REC: exactly one primary quick action («Emitir número»); the rest are secondary', async () => {
+    montar('REC');
+    const actions = await screen.findByRole('region', { name: 'Acciones rápidas' });
+    const primary = actions.querySelectorAll('a.is-primary');
+    expect(primary).toHaveLength(1);
+    expect(primary[0].textContent).toContain('Emitir número');
+    expect(within(actions).getAllByRole('link').length).toBeGreaterThan(1);
   });
 
   it('REC: ningún dato aparece dos veces', async () => {

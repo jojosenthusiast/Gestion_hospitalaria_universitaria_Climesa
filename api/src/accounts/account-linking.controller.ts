@@ -4,7 +4,7 @@ import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { LinkApproveDto, LinkRejectDto, LinkRequestDto } from './account-linking.dto';
 import { AccountLinkingService } from './account-linking.service';
-import { LinkRequestResponse, PendingLinkResponse } from './accounts.responses';
+import { LinkRequestResponse, MyLinkResponse, PendingLinkResponse } from './accounts.responses';
 
 @ApiTags('accounts') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('cuentas')
 export class AccountLinkingController {
@@ -21,4 +21,13 @@ export class AccountLinkingController {
 
   @Post('vinculaciones/:id/rechazar') @RequirePermission('cuentas.verificar') @ApiOperation({ summary: 'Rechazar vinculación con motivo obligatorio' }) @ApiCreatedResponse({ type: LinkRequestResponse })
   reject(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LinkRejectDto, @Headers('idempotency-key') key?: string) { return this.linking.reject(r.actor, id, dto, key); }
+}
+
+/** G-1 (R7 U1): the patient's app opens on the real state of its link request instead of an empty form. */
+@ApiTags('accounts') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard, PermissionGuard) @Controller('me')
+export class MyLinkController {
+  constructor(private readonly linking: AccountLinkingService) {}
+
+  @Get('vinculacion') @RequirePermission('cuenta.vincular') @ApiOperation({ summary: 'Estado de la vinculación de la cuenta: si ya está vinculada y su última solicitud (pendiente, aprobada o rechazada con motivo)' }) @ApiOkResponse({ type: MyLinkResponse })
+  mine(@Req() r: ActorRequest) { return this.linking.mine(r.actor); }
 }

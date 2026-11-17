@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsISO8601, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsIn, IsISO8601, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 import { Text } from '../platform/dto';
 
 export class AppointmentCreateDto {
@@ -30,9 +30,20 @@ export class AppointmentDecisionDto {
   @Text(0, 500, true) rejectionReason?: string;
 }
 
+/** D-8 (R7 U1): quick reasons the patient taps to cancel; `otro` asks for a short text. */
+export const CANCEL_REASON_CODES = ['ya_no_lo_necesito', 'no_puedo_a_esa_hora', 'otro'] as const;
+
+/**
+ * Reception writes the reason (10 or more characters). The patient sends `reasonCode` with no text, or `otro` with a
+ * short text (3 or more); a request without `reasonCode` keeps the 10-character rule (clients before D-8).
+ */
 export class AppointmentCancelDto {
   @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
-  @Text(10, 500) reason!: string;
+  // Without `reasonCode` the pre-R7 rules apply unchanged (same validators, same 400 body) for released apps;
+  // with `reasonCode` the text is optional and the service checks it (`otro` asks for 3+ characters).
+  @ApiPropertyOptional({ type: String, minLength: 10, maxLength: 500, description: 'Obligatorio (10 a 500 caracteres) sin reasonCode; con reasonCode es opcional y «otro» pide al menos 3 caracteres' })
+  @ValidateIf((o: AppointmentCancelDto) => !o.reasonCode) @IsString() @MinLength(10) @MaxLength(500) reason?: string;
+  @ApiPropertyOptional({ enum: CANCEL_REASON_CODES, description: 'Opción rápida del paciente (D-8)' }) @IsOptional() @IsIn(CANCEL_REASON_CODES) reasonCode?: typeof CANCEL_REASON_CODES[number];
 }
 
 /** CITA-02: new slot of the same doctor (20 minutes); reception applies it, the patient files a request. */

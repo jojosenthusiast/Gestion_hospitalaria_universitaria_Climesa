@@ -195,10 +195,11 @@
 .publish-result .secondary-button { justify-self: start; }
 
 /* Fichas y detalle */
-.patient-banner { position: relative; overflow: hidden; padding: 26px; border-radius: var(--radius-card); background: linear-gradient(135deg, var(--primary), var(--primary-strong)); color: var(--on-primary); }
-.patient-banner::after { content: ""; position: absolute; width: 180px; height: 180px; right: -55px; top: -80px; border: 1px solid rgb(255 255 255 / 0.2); border-radius: 50%; }
-.patient-banner > .mono-label { color: #e6eefb; }
-.patient-banner h3 { margin: 12px 0 16px; font-size: 32px; line-height: 1.15; }
+/* Sweep 2026-11-17: a calm header in the surface tokens (no gradient hero, no decorative circle). */
+.patient-banner { padding: var(--space-5) var(--space-5) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); color: var(--ink); }
+.patient-banner > .mono-label { color: var(--muted); }
+.patient-banner h3 { margin: 6px 0 10px; font-size: 28px; line-height: 1.15; }
+.patient-banner-meta { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); color: var(--muted); font-size: var(--text-sm); }
 .detail-grid, .detail-list { margin: 24px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 22px; }
 .detail-grid > div, .detail-list > div { min-width: 0; padding: 0 0 14px; border-bottom: 1px solid var(--line); }
 .detail-grid dt, .detail-list dt { margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
@@ -330,8 +331,8 @@
   .dialog-actions { align-items: stretch; flex-direction: column-reverse; }
   .dialog-actions > .primary-button, .dialog-actions > .secondary-button { width: 100%; min-width: 0; }
   .role-checks { grid-template-columns: 1fr; }
-  .patient-banner { padding: 22px 18px; }
-  .patient-banner h3 { font-size: 28px; }
+  .patient-banner { padding: var(--space-4); }
+  .patient-banner h3 { font-size: 24px; }
   .change-history dl > div { display: block; }
   .change-history dt { margin-bottom: 5px; }
   .segmented-control, .floor-switch { width: 100%; }
@@ -552,6 +553,8 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .metric-figure.tone-neutral { color: var(--control-line); }
 .export-menu { position: relative; display: inline-block; }
 .export-trigger { min-height: 42px; padding-block: 8px; }
+/* Sweep 2026-11-17: on a phone «Exportar» is an icon button at the end of the toolbar, not a full row. */
+@media (max-width: 767px) { .export-trigger .export-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } .export-trigger { min-width: 44px; padding-inline: 10px; justify-content: center; } .export-popover { right: 0; left: auto; } }
 .export-popover { position: absolute; z-index: 20; right: 0; top: calc(100% + 6px); min-width: 250px; padding: 6px; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-float); }
 .export-popover button { padding: 9px 12px; display: grid; gap: 1px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--ink); text-align: left; }
 .export-popover button:hover:not(:disabled) { background: var(--soft); }
@@ -672,7 +675,8 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .qb-column { transition: box-shadow var(--motion-fast) var(--ease-out); }
 .qb-column.is-drop-target { box-shadow: inset 0 0 0 2px var(--primary); }
 .qb-menu { min-height: 40px; max-width: 100%; padding: 0 var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font: inherit; font-size: var(--text-sm); }
-.qb-undo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); }
+/* #10: the undo floats over the page (a toast), so showing it never pushes the board down. */
+.qb-undo { position: fixed; z-index: 40; left: 50%; bottom: var(--space-5); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); box-shadow: var(--shadow-float); }
 .qb-priority-choice { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .qb-next-proposal { margin: 0 0 var(--space-4); }
 @media (pointer: coarse) { .qb-menu { min-height: 44px; } }
@@ -688,3 +692,11 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 
 /* R4a: a code (HAB-201, P-000-001, EXP-…) never breaks across lines. */
 .nowrap-code { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Sweep 2026-11-17: the role's one main quick action. */
+.quick-actions a.is-primary, .compact-header .quick-actions a.is-primary { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+.quick-actions a.is-primary .quick-icon, .compact-header .quick-actions a.is-primary .quick-icon { color: var(--on-primary); }
+@media (hover: hover) and (pointer: fine) { .compact-header .quick-actions a.is-primary:hover, .quick-actions a.is-primary:hover { border-color: var(--primary-strong); background: var(--primary-strong); } }
+/* The native date input only opens the calendar; the visible field is dd/mm/aaaa text. */
+.date-native { position: absolute; right: 4px; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+/* Sweep 2026-11-17: times and durations use plain-zero tabular figures (see --font-figures). */
+.slot strong, .qb-wait, .qb-avg, .ag-time, .lw-elapsed, .shift-block-time, .lab-slot, .figure-value { font-family: var(--font-figures); font-variant-numeric: tabular-nums; }

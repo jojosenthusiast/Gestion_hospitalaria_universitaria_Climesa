@@ -6,6 +6,7 @@ import { AdmissionStepper } from './hospitalization/admission-stepper';
 import { ExitDialog, ReasonDialog, ReassignDoctorDialog, RequestDischargeDialog, categoryNames, relativeTime, type Admission } from './hospitalization/admission-actions';
 import { spanishProblem } from './problems';
 import { useQuickAction } from './personal/accion';
+import { readHashParams, writeHashParams } from '../lib/hash-params';
 import './hospitalization/admission-actions.css';
 
 type Suggestion = { id: string; version: number; code: string; room: string; category: string; reason: string };
@@ -46,7 +47,17 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
   const [dialog, setDialog] = useState<{ kind: RowAction; admission: Admission } | null>(null), [creating, setCreating] = useState(false);
   const [quick, consumeQuick] = useQuickAction();
   // `?accion=admision` (tableros): abre el ingreso guiado si el rol puede crearlo.
-  useEffect(() => { if (quick === 'admision') { if (can(profile, 'admision.crear')) setCreating(true); consumeQuick(); } }, [quick]); // eslint-disable-line react-hooks/exhaustive-deps
+  // R7 U1: from the patient record, `&paciente=<id>` opens it with that patient chosen.
+  const [prefill, setPrefill] = useState<{ id: string; label: string } | null>(null);
+  useEffect(() => {
+    if (quick !== 'admision') return;
+    const id = readHashParams().get('paciente'); writeHashParams({ paciente: null });
+    if (can(profile, 'admision.crear')) {
+      if (id) void api.request<{ id: string; fullName: string }>(`/pacientes/${id}`).then(p => setPrefill({ id: p.id, label: p.fullName })).catch(() => undefined).finally(() => setCreating(true));
+      else setCreating(true);
+    }
+    consumeQuick();
+  }, [quick]); // eslint-disable-line react-hooks/exhaustive-deps
   const close = () => setDialog(null), saved = () => { setDialog(null); data.refresh(); };
   const props = dialog && { api, admission: dialog.admission, onClose: close, onSaved: saved };
   return <>
@@ -59,7 +70,7 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
       <td data-label="Cama">{row.bed ? <span className="nowrap-code">{row.bed}</span> : 'Sin cama'}</td>
       <td data-label="Acción"><div className="row-actions">{availableActions(row).map((a, index) => <button key={a.key} className="row-action" onClick={() => setDialog({ kind: a.key, admission: row })}>{a.label}{index === 0 && <> <Icon name="arrow" size={16} /></>}</button>)}</div></td>
     </tr>)}</tbody></table> : <Empty title="No hay admisiones activas" description="Las nuevas admisiones aparecerán aquí cuando Recepción o Jefatura las registren." />}</RemoteState></section>
-    {creating && <AdmissionStepper api={api} profile={profile} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); data.refresh(); }} />}
+    {creating && <AdmissionStepper api={api} profile={profile} patient={prefill} onClose={() => { setCreating(false); setPrefill(null); }} onSaved={() => { setCreating(false); setPrefill(null); data.refresh(); }} />}
     {dialog?.kind === 'asignar_cama' && <BedSuggestionDialog api={api} admission={dialog.admission} version={version} onClose={close} onSaved={saved} />}
     {dialog?.kind === 'trasladar' && <TransferDialog api={api} admission={dialog.admission} version={version} onClose={close} onSaved={saved} />}
     {dialog?.kind === 'registrar_salida' && props && <ExitDialog {...props} />}

@@ -76,7 +76,9 @@ describe('MOV-04 cuerpos móviles contra contrato/openapi.json', () => {
     const cancel = { method: 'POST', path: '/api/v1/citas/{id}/cancelar' };
     const body = { version: 2, reason: 'No podré asistir ese día' };
     expect(problems({ ...cancel, body })).toEqual([]);
-    expect(problems({ ...cancel, body: { version: 2 } })).toEqual(["/ must have required property 'reason'"]);
+    // R7 U1 (D-8): `reason` became optional in the schema (the patient may send `reasonCode`); the API still requires
+    // 10+ characters when no `reasonCode` comes, so current mobile clients keep working. `version` stays required.
+    expect(problems({ ...cancel, body: { reason: 'No podré asistir ese día' } })).toEqual(["/ must have required property 'version'"]);
     expect(problems({ ...cancel, body: { ...body, motivo: 'x' } })).toEqual(['/ must NOT have additional properties: motivo']);
     expect(problems({ ...cancel, body: { ...body, version: '2' } })).toEqual(['/version must be number']);
     expect(problems({ method: 'POST', path: '/api/v1/consultas', body: { appointmentId: 'no-uuid' } })).toEqual(['/appointmentId must match format "uuid"']);

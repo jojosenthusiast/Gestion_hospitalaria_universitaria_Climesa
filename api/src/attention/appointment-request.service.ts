@@ -7,7 +7,8 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
 import { CategoryRequestAssignDto, CategoryRequestCancelDto, CategoryRequestCreateDto, CategoryRequestRejectDto } from './appointment-request.dto';
-import { categoryRequestActions } from './appointment-request.rules';
+import { Franja, SUGGESTION_DAYS, categoryRequestActions, firstSuggestion, freeSlots } from './appointment-request.rules';
+import { businessDate } from '../platform/clock';
 import { AttentionService } from './attention.service';
 
 type RequestRow = Record<string, any>;
@@ -96,6 +97,40 @@ export class AppointmentRequestService {
     if (row.version !== version) throw new VersionConflictException(row.version, 'La solicitud cambió; vuelve a abrirla.');
     if (row.state !== 'pendiente') throw new ProblemException('solicitud_cita_resuelta', 409, 'La solicitud ya fue atendida; actualiza la bandeja.');
     return row;
+  }
+
+  /**
+   * A-1 (R7 U1): the doctor and slot the assign panel opens with: the first day, within SUGGESTION_DAYS, with a free slot
+   * in the preferred time of day, among the preferred doctor and the doctors of the suggested specialties (all active
+   * doctors when none matches). `found` is false when nobody has a slot in that time.
+   */
+  async suggestion(_actor: Actor, id: string) {
+    return this.db.transaction(async c => {
+      const request = (await c.query(`SELECT s.id,s.paciente_id,s.estado,s.franja,s.medico_preferido_id AS preferred,
+          (SELECT array_agg(e ORDER BY array_position(s.categorias,k.codigo), o) FROM atencion.categoria_cita k, unnest(k.especialidades) WITH ORDINALITY u(e,o) WHERE k.codigo = ANY(s.categorias)) AS specialties
+        FROM atencion.solicitud_cita s WHERE s.id=$1`, [id])).rows[0] as RequestRow | undefined;
+      if (!request) throw new NotFoundException('No se encontró la solicitud.');
+      if (request.estado !== 'pendiente') throw new ProblemException('solicitud_cita_resuelta', 409, 'La solicitud ya fue resuelta.');
+      const specialties: string[] = [...new Set<string>(request.specialties ?? [])];
+      const doctors = (await c.query(`SELECT id,concat_ws(' ',nombres,apellidos) AS name,coalesce(especialidad,'Medicina general') AS specialty FROM personal.persona
+        WHERE tipo='medico' AND activo ORDER BY apellidos,nombres,id`)).rows as { id: string; name: string; specialty: string }[];
+      const matching = doctors.filter(d => specialties.includes(d.specialty)).sort((a, b) => specialties.indexOf(a.specialty) - specialties.indexOf(b.specialty));
+      const preferred = doctors.find(d => d.id === request.preferred);
+      const candidates = [...new Map([...(preferred ? [preferred] : []), ...(matching.length ? matching : doctors)].map(d => [d.id, d])).values()];
+      const now = this.clock.now().valueOf();
+      const from = new Date(`${this.clock.today()}T00:00:00-06:00`), to = new Date(from.valueOf() + SUGGESTION_DAYS * 86_400_000);
+      const ids = candidates.map(d => d.id);
+      const [shifts, appointments] = await Promise.all([
+        c.query(`SELECT persona_id AS id,lower(periodo) AS start,upper(periodo) AS "end" FROM personal.turno
+          WHERE persona_id=ANY($1::uuid[]) AND estado IN ('publicado','en_curso') AND periodo && tstzrange($2::timestamptz,$3::timestamptz,'[)')`, [ids, from, to]),
+        c.query(`SELECT medico_id AS id,lower(horario) AS start,upper(horario) AS "end" FROM atencion.cita
+          WHERE medico_id=ANY($1::uuid[]) AND estado IN ('solicitada','confirmada') AND horario && tstzrange($2::timestamptz,$3::timestamptz,'[)')`, [ids, from, to]),
+      ]);
+      const by = (rows: any[], doctorId: string) => rows.filter(r => r.id === doctorId).map(r => ({ start: new Date(r.start).valueOf(), end: Math.min(new Date(r.end).valueOf(), to.valueOf()) }));
+      const best = firstSuggestion(candidates, doctorId => freeSlots(by(shifts.rows, doctorId), by(appointments.rows, doctorId), now), request.franja as Franja, at => businessDate(new Date(at)));
+      if (!best) return { found: false, doctorId: null, doctorName: null, specialty: null, date: null, start: null, end: null };
+      return { found: true, doctorId: best.doctor.id, doctorName: best.doctor.name, specialty: best.doctor.specialty, date: best.date, start: new Date(best.slot.start).toISOString(), end: new Date(best.slot.end).toISOString() };
+    });
   }
 
   async assign(actor: Actor, id: string, dto: CategoryRequestAssignDto, key?: string) {

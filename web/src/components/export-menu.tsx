@@ -33,7 +33,7 @@ export function ExportMenu({ table, label = 'Exportar', disabled = false }: { ta
     finally { setBusy(null); }
   }
   return <div className="export-menu" ref={root}>
-    <button ref={trigger} type="button" className="secondary-button export-trigger" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(value => !value)}><Icon name="download" size={18} />{label}</button>
+    <button ref={trigger} type="button" className="secondary-button export-trigger" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(value => !value)}><Icon name="download" size={18} /><span className="export-label">{label}</span></button>
     {open && <div className="export-popover" role="menu" aria-label="Formato de exportación">
       {options.map(option => <button key={option.format} type="button" role="menuitem" disabled={busy !== null} onClick={() => void run(option.format)}><strong>{busy === option.format ? 'Generando…' : option.label}</strong><span>{option.hint}</span></button>)}
       {error && <p className="export-error" role="alert">{error}</p>}

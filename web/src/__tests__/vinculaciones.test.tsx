@@ -35,6 +35,11 @@ describe('W27 · vinculaciones por verificar (FR-101-08 a FR-101-11)', () => {
     expect(within(card).getAllByText('Coincide')).toHaveLength(3);
     expect(within(card).getAllByText(/000412-7/).length).toBeGreaterThan(0);
     await userEvent.click(within(card).getByRole('button', { name: 'Aprobar' }));
+    // R7 U1 (G2): approving gives the account the whole record, so it confirms first, naming the record.
+    const confirm = await screen.findByRole('dialog', { name: 'Aprobar vinculación' });
+    expect(within(confirm).getByText(/000412-7 · Paola Ficticia Rivas/)).toBeTruthy();
+    expect(api.write).not.toHaveBeenCalled();
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Aprobar vinculación' }));
     expect(api.write).toHaveBeenCalledWith('/cuentas/vinculaciones/v-1/aprobar', { version: 1 }, 'POST');
     expect(api.request).toHaveBeenCalledTimes(2);
   });
@@ -52,11 +57,11 @@ describe('W27 · vinculaciones por verificar (FR-101-08 a FR-101-11)', () => {
     expect(await screen.findByText(/Estás al día/)).toBeTruthy();
   });
 
-  it('sin expediente no ofrece aprobar y lleva a buscar antes de crear', async () => {
+  it('sin expediente no ofrece aprobar y lleva a registrar al paciente', async () => {
     mount(['cuentas.verificar']);
     const card = await screen.findByRole('listitem', { name: 'Solicitud de josue@example.test' });
     expect(within(card).queryByRole('button', { name: 'Aprobar' })).toBeNull();
-    expect(within(card).getByRole('link', { name: 'Buscar antes de crear' }).getAttribute('href')).toBe('#/pacientes');
+    expect(within(card).getByRole('link', { name: 'Registrar paciente' }).getAttribute('href')).toBe('#/pacientes?accion=registrar');
     expect(within(card).getByText(/No hay expediente con ese DUI/)).toBeTruthy();
   });
 
@@ -77,7 +82,22 @@ describe('W27 · vinculaciones por verificar (FR-101-08 a FR-101-11)', () => {
     mount(['cuentas.verificar'], requests, async () => { throw new ApiError('Esta solicitud ya fue resuelta.', 409); });
     const card = await screen.findByRole('listitem', { name: 'Solicitud de paola@example.test' });
     await userEvent.click(within(card).getByRole('button', { name: 'Aprobar' }));
-    expect(await within(card).findByText('Esta solicitud ya fue resuelta.')).toBeTruthy();
+    await userEvent.click(await screen.findByRole('button', { name: 'Aprobar vinculación' }));
+    expect(await screen.findByText('Esta solicitud ya fue resuelta.')).toBeTruthy();
+  });
+
+  it('G2: compares the record DUI (not the declared one); the closest record is marked ✗ and cannot be approved', async () => {
+    const near: LinkRequest = { id: 'v-3', createdAt: '2026-11-13T17:00:00Z', version: 1, account: { email: 'ana@example.test', name: 'Ana Ficticia' }, declared: { dui: '04567892-9', birth: '1990-01-01' },
+      candidate: null, candidates: 0, closest: { id: 'pac-3', record: '000500-1', fullName: 'Ana Ficticia', birth: '1990-01-01', dui: '04567891-1' } };
+    mount(['cuentas.verificar'], [near]);
+    const card = await screen.findByRole('listitem', { name: 'Solicitud de ana@example.test' });
+    const dui = within(card).getByRole('row', { name: /DUI/ });
+    expect(within(dui).getByText('04567892-9')).toBeTruthy();
+    expect(within(dui).getByText('04567891-1')).toBeTruthy();
+    expect(within(dui).getByText('✗')).toBeTruthy();
+    expect(within(within(card).getByRole('row', { name: /Nacimiento/ })).getByText('✓')).toBeTruthy();
+    expect(within(card).getByText(/El más parecido es 000500-1/)).toBeTruthy();
+    expect(within(card).queryByRole('button', { name: 'Aprobar' })).toBeNull();
   });
 
   it('lista vacía y error de carga tienen su estado', async () => {

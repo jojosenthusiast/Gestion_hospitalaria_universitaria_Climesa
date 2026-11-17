@@ -1,6 +1,7 @@
 import { useEffect,useRef,useState,type FormEvent } from 'react';
 import { Field,Icon,Notice } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
+import { takePatientSearch } from './patient-handoff';
 import { ActiveFilters,ChipGroup } from './listas/chips';
 import { FilterPopover } from '../components/filter-popover';
 import { plural } from '../lib/format';
@@ -65,8 +66,11 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  const register=can(profile,'pacientes.registrar'),viewFicha=can(profile,'pacientes.ver_ficha');
  const expired=useExpired(receipt?.expiresAt),validReceipt=!!receipt&&!expired&&Date.parse(receipt.expiresAt)>Date.now();
  const [quick,consumeQuick]=useQuickAction();
- useEffect(()=>{if(quick==='registrar'&&register)setCreating(true);if(quick)consumeQuick();},[quick,register,consumeQuick]);
- const done=()=>{setCreating(false);setEditing(null);setStatus(null);setReceipt(null);initial.refresh();};
+ // B1: from the front desk the register arrives with what was searched (in memory) and, once saved, offers the number.
+ const [deskQuery,setDeskQuery]=useState<string|null>(null),[registered,setRegistered]=useState<{id:string;record?:string}|null>(null);
+ useEffect(()=>{if(quick==='registrar'&&register){setDeskQuery(takePatientSearch());setRegistered(null);setCreating(true);}if(quick)consumeQuick();},[quick,register,consumeQuick]);
+ const done=()=>{setCreating(false);setEditing(null);setStatus(null);setReceipt(null);setDeskQuery(null);initial.refresh();};
+ const saved=(created?:{id:string;record?:string})=>{if(created&&creating&&!editing&&deskQuery!==null&&can(profile,'fila.emitir'))setRegistered(created);done();};
  async function find(e:FormEvent){e.preventDefault();const text=query.trim();setTyped(text);const result=await search.run<SearchReceipt>('/pacientes/busquedas',{query:text});if(result)setReceipt(result);}
  const clearQuery=()=>{setQuery('');setTyped('');setReceipt(null);};
  const filtered=filters.estado!=='vigente'||!!filters.situacion||!!filters.area||!!filters.medico;
@@ -94,11 +98,26 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  <ActiveFilters filters={active} onClear={()=>{clearQuery();setFilters({estado:'vigente',situacion:'',area:'',medico:''});}}/>
  <WriteError error={search.error}/><p className="table-caption">{receipt?`${rows.length} coincidencias · ${query}`:typed?`${rows.length} resultados mientras escribes · ${typed}`:filtered?`${plural(rows.length,'expediente','expedientes')} con estos filtros · por nombre`:'Pacientes por nombre (A–Z)'}{register&&receipt&&<span>{validReceipt?'Puedes registrar después de revisar las coincidencias.':expiredText}</span>}</p>
  {register&&validReceipt&&receipt.candidates.length>0&&<Notice kind="info">Posibles coincidencias: revisa cada ficha y su motivo antes de registrar a alguien nuevo.</Notice>}
- <RemoteState state={initial}>{()=>rows.length?<div className={`cl-master-detail${selected?'':' is-collapsed'}`}><ul className="cl-master" aria-label="Pacientes encontrados">{rows.map(p=><li key={p.id}><button type="button" className="pt-row" aria-current={p.id===selected} aria-label={viewFicha?`Abrir ficha de ${p.fullName}`:`Paciente ${p.fullName}`} disabled={!viewFicha} onClick={()=>setSelected(p.id)}><span className="pt-name"><strong>{p.fullName}</strong>{reasonOf(p)&&<small>{reasonOf(p)}</small>}</span><span className="mono-data">{p.record}</span><span className="pt-meta">{p.birth?`${formatDate(p.birth)}${ageFrom(p.birth)!==null?` · ${yearsText(ageFrom(p.birth)!)}`:''}`:p.ageRange?`${p.ageRange} años`:'Sin fecha'} · {sexNames[p.sex]}</span><Tag value={p.state}/></button></li>)}</ul>
+ <RemoteState state={initial}>{()=>rows.length?<div className={`cl-master-detail${selected?'':' is-collapsed'}`}><ul className="cl-master" aria-label="Pacientes encontrados">{rows.map(p=><li key={p.id}><button type="button" className="pt-row" aria-current={p.id===selected} aria-label={viewFicha?`Abrir ficha de ${p.fullName}`:`Paciente ${p.fullName}`} disabled={!viewFicha} onClick={()=>setSelected(p.id)}><span className="pt-name"><strong>{p.fullName}</strong>{reasonOf(p)&&<small>{reasonOf(p)}</small>}</span><span className="mono-data">{p.record}</span><span className="pt-meta">{p.birth?`${formatDate(p.birth)}${ageFrom(p.birth)!==null?` · ${yearsText(ageFrom(p.birth)!)}`:''}`:p.ageRange?`${p.ageRange} años`:'Sin fecha'} · {sexNames[p.sex]}</span>{p.state!=='activo'&&<Tag value={p.state}/>}</button></li>)}</ul>
   {selected?<PatientPanel key={selected} api={api} id={selected} profile={profile} version={version} onClose={()=>setSelected(null)} onEdit={p=>setEditing(p)} onState={p=>setStatus(p)}/>:null}</div>:<Empty title={empty.title} description={empty.description}/>}</RemoteState>
  {rows.length>=50&&<p className="table-footnote">Se muestran los primeros 50. Afina la búsqueda o los filtros.</p>}</section>
- {(creating||editing)&&<PatientForm api={api} patient={editing} receipt={receipt} query={query} onClose={()=>{setCreating(false);setEditing(null);}} onSaved={done}/>}
+ {registered&&<Notice kind="success">Paciente registrado{registered.record?` con expediente ${registered.record}`:''}. <a className="cl-link-button" href={`#/fila?accion=emitir&paciente=${registered.id}`}>Emitir número</a></Notice>}
+ {(creating||editing)&&<PatientForm api={api} patient={editing} receipt={editing?receipt:deskQuery!==null?null:receipt} query={!editing&&deskQuery!==null?deskQuery:query} prefill={!editing&&deskQuery!==null} onClose={()=>{setCreating(false);setEditing(null);setDeskQuery(null);}} onSaved={saved}/>}
  {status&&<PatientStateForm api={api} patient={status} onClose={()=>setStatus(null)} onSaved={done}/>}</>;
+}
+/**
+ * R7 U1 (G2, hub): the record is where the front desk starts. Each action opens its module with this patient already
+ * chosen (`&paciente=<id>`); the module decides with the server (allowedActions, the patient's appointment of today).
+ */
+function PatientHubActions({profile,patient}:{profile:AccessProfile;patient:Patient}){
+ if(!patient.active)return null;
+ const links=[
+  can(profile,'fila.emitir')&&{href:`#/fila?accion=emitir&paciente=${patient.id}`,label:'Emitir número o registrar llegada',icon:'megaphone' as const},
+  can(profile,'citas.agendar')&&{href:`#/citas?accion=agendar&paciente=${patient.id}`,label:'Agendar cita',icon:'calendar' as const},
+  can(profile,'admision.crear')&&{href:`#/hospitalizacion?accion=admision&paciente=${patient.id}`,label:'Ingresar',icon:'bed' as const},
+ ].filter(Boolean) as {href:string;label:string;icon:'megaphone'|'calendar'|'bed'}[];
+ if(!links.length)return null;
+ return <nav className="pt-hub" aria-label={`Acciones con ${patient.fullName}`}>{links.map((l,i)=><a key={l.href} className={i===0?'primary-button':'secondary-button'} href={l.href}><Icon name={l.icon} size={18}/>{l.label}</a>)}</nav>;
 }
 type Tab='datos'|'citas'|'consultas'|'laboratorio'|'ingresos'|'cambios';
 const tabNames:Record<Tab,string>={datos:'Datos',citas:'Citas',consultas:'Consultas',laboratorio:'Laboratorio',ingresos:'Ingresos',cambios:'Cambios'};
@@ -108,8 +127,9 @@ function PatientPanel({api,id,profile,version,onClose,onEdit,onState}:{api:Api;i
  const seesAppointments=can(profile,'citas.ver'),seesClinical=can(profile,'expediente.ver');
  const tabs:Tab[]=['datos',...(seesAppointments?['citas' as Tab]:[]),...(seesClinical?['consultas','laboratorio','ingresos'] as Tab[]:[]),'cambios'];
  return <aside className="cl-detail" aria-label="Ficha de paciente"><button type="button" className="cl-link-button" onClick={onClose}>Cerrar ficha</button><RemoteState state={data}>{p=>{const gaps=profileGaps(p),age='birth'in p?ageFrom(p.birth):null;return <>
-  <div className="patient-banner"><span className="mono-label">EXPEDIENTE {p.record}</span><h3>{p.fullName}</h3><Tag value={p.state}/>{age!==null&&<small>{plural(age,'año','años')} · {sexNames[p.sex]}</small>}</div>
+  <div className="patient-banner"><span className="mono-label">EXPEDIENTE {p.record}</span><h3>{p.fullName}</h3><p className="patient-banner-meta"><Tag value={p.state}/>{age!==null&&<span>{plural(age,'año','años')} · {sexNames[p.sex]}</span>}</p></div>
   {gaps.length>0&&<Notice kind="info">Faltan datos: {gaps.join(', ')}.</Notice>}
+  <PatientHubActions profile={profile} patient={p}/>
   {can(profile,'pacientes.editar_demograficos')&&<div className="dialog-actions"><button type="button" className="secondary-button" onClick={()=>onEdit(p)}>Editar datos</button>{/* R4a: inactivating is rare and serious: a quiet danger link, apart from the normal action; it confirms in a dialog. */}<button type="button" className={p.active?'danger-link':'cl-link-button'} onClick={()=>onState(p)}>{p.active?'Inactivar paciente':'Reactivar paciente'}</button></div>}
   <div className="cl-tabs" role="tablist" aria-label="Secciones de la ficha">{tabs.map(t=><button key={t} type="button" role="tab" id={`pt-tab-${t}`} aria-selected={tab===t} aria-controls="pt-panel" className="cl-tab" onClick={()=>setTab(t)}>{tabNames[t]}</button>)}</div>
   <div role="tabpanel" id="pt-panel" aria-labelledby={`pt-tab-${tab}`}>
@@ -144,8 +164,8 @@ export const autoQuery=(form:Pick<PatientInput,'givenNames'|'surnames'|'dui'>,qu
  * has not touched and names them. «Registrar paciente» runs the search itself when there is no valid one, stops if it finds
  * candidates (so they are reviewed), and registers on the next press. One busy flag covers the whole search-then-register run.
  */
-function PatientForm({api,patient,receipt:initialReceipt,query:initialQuery,onClose,onSaved}:{api:Api;patient:Patient|null;receipt:SearchReceipt|null;query:string;onClose:()=>void;onSaved:()=>void}){
- const initialPrefill=patient||!initialReceipt?{}:prefillFromQuery(initialQuery);
+function PatientForm({api,patient,receipt:initialReceipt,query:initialQuery,prefill=false,onClose,onSaved}:{api:Api;patient:Patient|null;receipt:SearchReceipt|null;query:string;prefill?:boolean;onClose:()=>void;onSaved:(created?:{id:string;record?:string})=>void}){
+ const initialPrefill=patient||!(initialReceipt||prefill)?{}:prefillFromQuery(initialQuery);
  const [form,setForm]=useState<PatientInput>({givenNames:patient?.givenNames??'',surnames:patient?.surnames??'',sex:(patient?.sex??'no_registrado') as PatientInput['sex'],dui:patient?.dui??'',birth:patient?.birth?.slice(0,10)??'',phone:patient?.phone??'',email:patient?.email??'',address:patient?.address??'',...initialPrefill});
  const [reason,setReason]=useState(''),[reasonError,setReasonError]=useState(false);const action=useAction(api),lookup=useAction(api);
  const [tried,setTried]=useState(false),[touched,setTouched]=useState<Record<string,boolean>>({}),errors=validatePatientDraft(form);
@@ -191,7 +211,7 @@ function PatientForm({api,patient,receipt:initialReceipt,query:initialQuery,onCl
     if(current.candidates.length)return;
    }
    const result=patient?await action.run(`/pacientes/${patient.id}`,{...values,version:patient.version,reason},'PATCH'):await action.run('/pacientes',{...values,searchToken:current?.token,searchQuery:text,...(confirmNew?{confirmarNuevo:true}:{})});
-   if(result)onSaved();
+   if(result)onSaved(patient?undefined:result as {id:string;record?:string});
   }finally{running.current=false;setPending(false);}
  }
  const save=(e:FormEvent)=>{e.preventDefault();void submit(false);};

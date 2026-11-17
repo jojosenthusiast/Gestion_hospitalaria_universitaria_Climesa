@@ -1,0 +1,29 @@
+/* R7 U1, journey B1: the front desk dialog (front-desk.tsx). Tokens from styles.css; no new colors. */
+.fd-desk { display: grid; gap: var(--space-3); min-width: min(560px, 100%); }
+.fd-arrival, .fd-walkin { display: grid; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--bg); }
+.fd-arrival p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
+.fd-primary { justify-self: start; min-height: 48px; font-size: var(--text-md, 16px); }
+.fd-primary:active:not(:disabled) { scale: 0.96; }
+@media (prefers-reduced-motion: no-preference) { .fd-primary { transition: scale 150ms ease-out; } }
+.fd-other summary { cursor: pointer; color: var(--primary-text); font-weight: 700; font-size: var(--text-sm); min-height: 44px; display: flex; align-items: center; }
+.fd-other[open] { display: grid; gap: var(--space-3); }
+.fd-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
+.fd-chips legend { width: 100%; margin-bottom: 6px; font-size: var(--text-sm); font-weight: 700; color: var(--ink); }
+.fd-chip { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 4px 14px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: var(--text-sm); font-weight: 700; cursor: pointer; }
+.fd-chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.fd-chip.is-on { border-color: var(--primary); background: var(--soft); color: var(--primary-strong); }
+.fd-chip:has(input:focus-visible) { outline: 2px solid var(--outline); outline-offset: 2px; }
+.fd-issued { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2) var(--space-4); align-items: center; padding: var(--space-4); border: 1px solid transparent; border-radius: var(--radius-card); background: var(--success-soft); box-shadow: 0 0 0 1px color-mix(in oklch, var(--success) 35%, transparent); }
+.fd-issued-number { display: flex; align-items: center; gap: var(--space-2); }
+.fd-issued-number strong { font-size: 56px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
+.fd-issued-who { display: grid; gap: 4px; min-width: 0; }
+.fd-issued-who strong { font-size: 18px; overflow-wrap: anywhere; }
+.fd-issued-who span { color: var(--muted); }
+.fd-issued .danger-link { grid-column: 1 / -1; justify-self: start; margin-left: 0; }
+@media (max-width: 520px) {
+  .fd-desk { min-width: 0; }
+  .fd-issued { grid-template-columns: 1fr; }
+  .fd-issued-number strong { font-size: 44px; }
+  .fd-primary { justify-self: stretch; justify-content: center; }
+}
+.qb-card-error { margin: 0; padding: 6px 8px; border-radius: var(--radius-control); background: var(--danger-soft); color: var(--danger); font-size: var(--text-xs); font-weight: 700; }

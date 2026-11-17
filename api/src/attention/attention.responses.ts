@@ -70,6 +70,13 @@ export class AppointmentRescheduleResponse {
   @IntProp() version!: number;
 }
 
+/** D-1: the queue number reception issued when the patient arrived for this appointment. */
+export class AppointmentArrivalResponse {
+  @UuidProp() id!: string;
+  @IntProp() numero!: number;
+  @EnumProp(ESTADO_FILA, 'EstadoFila') state!: string;
+}
+
 export class AppointmentResponse {
   @UuidProp() id!: string;
   @UuidProp() patientId!: string;
@@ -87,6 +94,9 @@ export class AppointmentResponse {
   @UuidProp({ nullable: true, description: 'Cita nueva cuando esta quedó reprogramada' }) rescheduledToId!: string | null;
   @ClassProp(AppointmentRescheduleResponse, { nullable: true, description: 'Última solicitud de reprogramación de la cita' }) reschedule!: AppointmentRescheduleResponse | null;
   @DateTimeProp({ nullable: true, description: 'Hasta cuándo puede cancelar o reprogramar quien lee (RN-21: N h antes para el paciente)' }) cancelableUntil!: string | null;
+  @StrProp({ nullable: true, description: 'Opción rápida con la que el paciente canceló (D-8): ya_no_lo_necesito, no_puedo_a_esa_hora u otro' }) cancelReasonCode!: string | null;
+  @StrProp({ nullable: true, description: 'Motivo escrito de la cancelación' }) cancelReason!: string | null;
+  @ClassProp(AppointmentArrivalResponse, { nullable: true, description: 'Número de fila con el que Recepción registró la llegada (D-1)' }) arrival!: AppointmentArrivalResponse | null;
   @EnumArrayProp(APPOINTMENT_ACTIONS, 'AccionCita', { description: 'Acciones que el servidor acepta ahora para quien lee' }) allowedActions!: string[];
   @ClassArrayProp(BlockedAppointmentActionResponse, { description: 'Acciones del rol bloqueadas ahora, con su motivo' }) blockedActions!: BlockedAppointmentActionResponse[];
 }
@@ -347,6 +357,11 @@ export class QueueTicketResponse {
   @EnumProp(QUEUE_PRIORITIES, 'PrioridadFila') priority!: string;
   @DateTimeProp({ nullable: true, description: 'Hora de la cita de hoy del paciente (solo consulta general); null si llegó sin cita' }) appointmentAt!: string | null;
   @BoolProp({ description: 'Llegó sin cita' }) walkIn!: boolean;
+  @UuidProp({ nullable: true, description: 'Cita del número: la ligada al registrar la llegada (D-1) o, sin enlace, la de hoy del paciente' }) appointmentId!: string | null;
+  @UuidProp({ nullable: true, description: 'Médico de esa cita (B-4)' }) appointmentDoctorId!: string | null;
+  @StrProp({ nullable: true, description: 'Nombre del médico de esa cita (B-4)' }) appointmentDoctorName!: string | null;
+  @BoolProp({ description: 'true si el número se emitió al registrar la llegada de la cita (D-1)' }) arrivalFromAppointment!: boolean;
+  @DateTimeProp({ nullable: true, description: 'Hasta cuándo quien lo emitió puede anularlo (B-3); null para los demás o si ya no espera' }) voidableUntil!: string | null;
   @EnumArrayProp(QUEUE_UNDO_ACTIONS, 'DeshacerFila', { description: 'Acciones reversibles que el servidor acepta ahora' }) undoActions!: string[];
   @UuidProp({ nullable: true, description: 'Consulta iniciada desde este número por quien consulta la fila; null si no hay o es de otro profesional' }) consultationId!: string | null;
   @EnumProp(ESTADO_CONSULTA, 'EstadoConsulta', { nullable: true }) consultationState!: string | null;
@@ -369,6 +384,20 @@ export class QueueIssuedResponse {
   @EnumProp(AREA_FILA, 'AreaFila') area!: string;
   @EnumProp(QUEUE_PRIORITIES, 'PrioridadFila') priority!: string;
   @UuidProp() patientId!: string;
+  @StrProp({ nullable: true, description: 'Nombre del paciente, para mostrar el número donde se emitió' }) patientName!: string | null;
+  @UuidProp({ nullable: true, description: 'Cita cuya llegada se registró con este número (D-1)' }) appointmentId!: string | null;
+  @IntProp({ description: 'Números en espera antes de este en su área' }) ahead!: number;
+  @DateTimeProp({ description: 'Hasta cuándo quien lo emitió puede anularlo (B-3)' }) voidableUntil!: string;
+}
+
+/** B-5: where the caller works now (shift in progress). */
+export class QueueMyPostResponse {
+  @EnumProp(QUEUE_SERVICES, 'ServicioFila', { nullable: true, description: 'Servicio del área del turno en curso; null sin turno o en un área sin fila' }) service!: string | null;
+  @EnumProp(AREA_FILA, 'AreaFila', { nullable: true }) area!: string | null;
+  @StrProp({ nullable: true, description: 'Nombre del área del turno en curso' }) areaName!: string | null;
+  @UuidProp({ nullable: true, description: 'Consultorio de la última consulta o el último llamado de hoy' }) officeId!: string | null;
+  @StrProp({ nullable: true }) officeCode!: string | null;
+  @DateTimeProp({ nullable: true, description: 'Fin del turno en curso' }) shiftEnd!: string | null;
 }
 
 export class QueueTransitionResponse {
@@ -387,6 +416,7 @@ export class QueueCallNextResponse extends QueueCallResponse {
   @EnumProp(AREA_FILA, 'AreaFila') area!: string;
   @EnumProp(MOTIVO_SIGUIENTE, 'MotivoSiguiente', { description: 'Por qué la regla eligió este número' }) reason!: string;
   @StrProp() reasonText!: string;
+  @BoolProp({ description: 'D-2: true si es una cita de quien llama, dentro de su ventana' }) ownAppointment!: boolean;
 }
 
 export class QueuePriorityResponse extends QueueTransitionResponse {
@@ -404,6 +434,7 @@ export class QueueProposalResponse {
   @IntProp() version!: number;
   @EnumProp(MOTIVO_SIGUIENTE, 'MotivoSiguiente') reason!: string;
   @StrProp() reasonText!: string;
+  @BoolProp({ description: 'D-2: true si es una cita de quien consulta, dentro de su ventana' }) ownAppointment!: boolean;
 }
 
 export class QueueNextProposalResponse {
