@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Field, Icon } from '../../components/ui';
+import { Field, Icon, Notice } from '../../components/ui';
 import { can, roleNames, staffTypeNames, type AccessProfile, type Api, type Space, type Staff, type UserAccount, type AccountAction } from '../../lib/api';
 import { CompactHeader, Empty, RemoteState, Select, Tag, useData, type Remote } from '../common';
 import { StaffFicha } from '../personnel-ficha';
@@ -9,7 +9,7 @@ import { accountOptions, activeStaffFilters, matchesAccount, shiftLabel, shiftOp
 import { ActiveFilters, ChipGroup } from '../listas/chips';
 import '../listas/lists.css';
 import { useHashFilters } from '../../lib/hash-params';
-import { StaffForm, type Specialty } from './StaffForm';
+import { StaffForm, type Specialty, type StaffSaved } from './StaffForm';
 
 type Row = { key: string; staff: Staff | null; account: UserAccount | null };
 /** The server lists what this actor may do on each account (MA-CTA-01/03); an older API without the list falls back to the permission. */
@@ -30,6 +30,9 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   const [edit, setEdit] = useState<Staff | null>(null), [staffOpen, setStaffOpen] = useState(false), [ficha, setFicha] = useState<string | null>(null);
   const [invite, setInvite] = useState<{ person: Staff | null } | null>(null), [roles, setRoles] = useState<UserAccount | null>(null), [accountState, setAccountState] = useState<UserAccount | null>(null), [invitation, setInvitation] = useState<{ user: UserAccount; mode: 'resend' | 'cancel' } | null>(null);
   const [quick, consumeQuick] = useQuickAction();
+  // G1: what the last registration did (notice) and its row (highlighted); addresses typed while registering, by staff id,
+  // so a later "Invitar" from the row starts with the address already known.
+  const [saved, setSaved] = useState<{ id: string; text: string; ok: boolean } | null>(null), [knownEmails, setKnownEmails] = useState<Record<string, string>>({});
   const manage = can(profile, 'personal.gestionar'), canInvite = can(profile, 'usuarios.invitar');
   // Sin `personal.ver` (Protección de datos) el módulo es la lista de cuentas en solo lectura: sin columna de área ni función, que no tienen dato.
   const accountsOnly = !canStaff;
@@ -72,6 +75,17 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   const fichaPerson = staff.find(p => p.id === ficha) ?? null;
   const done = () => { setInvite(null); setRoles(null); setAccountState(null); setInvitation(null); users.refresh(); };
   const primary: Remote<unknown> = canStaff ? staffData : users;
+  function staffSaved(result?: StaffSaved) {
+    const editing = !!edit;
+    setStaffOpen(false); staffData.refresh(); users.refresh();
+    if (!result) return;
+    if (result.email) setKnownEmails(known => ({ ...known, [result.id]: result.email! }));
+    const text = editing ? `Cambios guardados en la ficha de ${result.name}`
+      : result.invited === true ? `${result.name} registrada · Invitación enviada`
+      : result.invited === false ? `${result.name} registrada · La invitación no se envió: usa “Invitar” en su fila`
+      : `${result.name} registrada`;
+    setSaved({ id: result.id, text, ok: result.invited !== false });
+  }
   const nameOf = (row: Row) => row.staff ? `${row.staff.givenNames} ${row.staff.surnames}` : row.account?.name || 'Sin nombre registrado';
 
   return <>
@@ -79,6 +93,7 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
       actions={manage ? <button className="primary-button" onClick={() => { setEdit(null); setStaffOpen(true); }}><Icon name="plus" size={18} />Registrar personal</button> : canInvite && <button className="primary-button" onClick={() => setInvite({ person: null })}><Icon name="mail" size={18} />Invitar persona</button>} />
     {/* R1 (S3): figures only once both lists arrived; never zeros while loading or after an error. */}
     {canStaff && canAccounts && staffData.data && users.data && !staffData.error && !users.error && <div className="number-strip"><div><strong>{rows.filter(r => r.staff && r.staff.active).length}</strong><span>Personal activo</span></div><div><strong>{withAccount}</strong><span>Con cuenta de acceso</span></div><div><strong>{withoutAccount}</strong><span>Sin cuenta todavía</span></div></div>}
+    {saved && <Notice kind={saved.ok ? 'success' : 'info'}>{saved.text}</Notice>}
     <section className="data-workbench">
       <div className="table-toolbar">
         <Field label="Buscar en el directorio" value={query} onChange={setQuery} placeholder={accountsOnly ? 'Nombre, correo o rol' : 'Nombre, correo, especialidad o rol'} />
@@ -95,7 +110,7 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
       <RemoteState state={primary}>{() => filtered.length
         ? <table className="record-table"><caption className="sr-only">Directorio de personal y cuentas</caption>
           <thead><tr><th>Persona</th><th>{accountsOnly ? 'Roles' : 'Función y roles'}</th>{!accountsOnly && <th>Área</th>}<th>Cuenta</th>{!accountsOnly && <th>Estado</th>}<th>Acción</th></tr></thead>
-          <tbody>{filtered.map(row => <tr key={row.key}>
+          <tbody>{filtered.map(row => <tr key={row.key} className={saved && row.staff?.id === saved.id ? 'is-new' : undefined}>
             <td data-label="Persona"><strong>{nameOf(row)}{row.account?.id === profile.id && <span className="own-account">Tu cuenta</span>}</strong><small>{row.staff ? row.staff.specialty || 'Sin especialidad registrada' : row.account?.email}</small></td>
             <td data-label={accountsOnly ? 'Roles' : 'Función y roles'}>{row.staff ? staffTypeNames[row.staff.type] ?? row.staff.type : accountsOnly ? null : 'Solo cuenta'}{row.account && <div className="role-tags">{row.account.roles.map(r => <span key={r} title={roleNames[r]}>{r}</span>)}</div>}</td>
             {!accountsOnly && <td data-label="Área">{row.staff ? row.staff.area || 'Sin asignar' : '—'}</td>}
@@ -115,8 +130,8 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
         : <Empty title={empty.title} description={empty.description} />}</RemoteState>
     </section>
     {fichaPerson && <StaffFicha api={api} profile={profile} person={fichaPerson} version={version} onClose={() => setFicha(null)} onEdit={() => { setFicha(null); setEdit(fichaPerson); setStaffOpen(true); }} onChanged={staffData.refresh} />}
-    {staffOpen && <StaffForm api={api} staff={edit} spaces={areas.data ?? []} specialties={specialties.data ?? []} onClose={() => setStaffOpen(false)} onSaved={() => { setStaffOpen(false); staffData.refresh(); }} />}
-    {invite && <InviteForm api={api} staff={staff} person={invite.person} canInviteAdmin={!!profile.canInviteAdmin} onClose={() => setInvite(null)} onSaved={done} />}
+    {staffOpen && <StaffForm api={api} staff={edit} spaces={areas.data ?? []} specialties={specialties.data ?? []} invite={canInvite && canAccounts ? { allowAdmin: !!profile.canInviteAdmin } : undefined} onClose={() => setStaffOpen(false)} onSaved={staffSaved} />}
+    {invite && <InviteForm api={api} staff={staff} person={invite.person} email={invite.person ? knownEmails[invite.person.id] : undefined} canInviteAdmin={!!profile.canInviteAdmin} onClose={() => setInvite(null)} onSaved={done} />}
     {roles && <RolesForm api={api} user={roles} staff={staff} canInviteAdmin={!!profile.canInviteAdmin} onClose={() => setRoles(null)} onSaved={done} />}
     {accountState && <StateForm api={api} user={accountState} onClose={() => setAccountState(null)} onSaved={done} />}
     {invitation && <InvitationActionForm api={api} user={invitation.user} mode={invitation.mode} onClose={() => setInvitation(null)} onSaved={done} />}

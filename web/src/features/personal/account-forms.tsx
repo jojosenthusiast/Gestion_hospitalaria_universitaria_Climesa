@@ -4,12 +4,16 @@ import { roleNames, type Api, type Staff, type UserAccount } from '../../lib/api
 import { Dialog, SaveButton, Select, WriteError, useAction } from '../common';
 
 /** Rol de trabajo que corresponde a cada función del directorio; se sugiere al invitar a alguien ya registrado. */
-const roleForType: Record<string, string> = { medico: 'MED', enfermero: 'ENF', asistente: 'AST', recepcionista: 'REC', laboratorista: 'LAB', paramedico: 'PAR' };
+export const roleForType: Record<string, string> = { medico: 'MED', enfermero: 'ENF', asistente: 'AST', recepcionista: 'REC', laboratorista: 'LAB', paramedico: 'PAR' };
 export const workingRoles = ['REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR'];
 const working = (roles: string[]) => roles.some(r => workingRoles.includes(r));
 
 /** The patient role is never invited (MA-CTA-02, `rol_no_invitable`): patients create their account in the mobile apps. */
 const PATIENT_ROLE = 'PAC';
+/** Roles an invitation may name: never the patient role, and Administración only for who may invite it. */
+export const invitableRoles = (allowAdmin: boolean) => Object.keys(roleNames).filter(key => key !== PATIENT_ROLE && (key !== 'ADM' || allowAdmin));
+/** A plain address check before sending; the API still decides. */
+export const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 function RoleChecks({ selected, onChange, allowAdmin, invitation = false }: { selected: string[]; onChange: (roles: string[]) => void; allowAdmin: boolean; invitation?: boolean }) {
   return <fieldset className="role-checks"><legend>Roles de la cuenta</legend>{Object.entries(roleNames).filter(([key]) => (key !== 'ADM' || allowAdmin || selected.includes(key)) && (!invitation || key !== PATIENT_ROLE)).map(([key, label]) => <label key={key}><input type="checkbox" checked={selected.includes(key)} onChange={e => onChange(e.target.checked ? [...selected, key] : selected.filter(r => r !== key))} /><span><strong>{label}</strong><small>{key}</small></span></label>)}</fieldset>;
 }
@@ -17,9 +21,12 @@ function StaffBinding({ staff, value, onChange, required }: { staff: Staff[]; va
   return <Select label="Persona del directorio" value={value} onChange={onChange} required={required}><option value="">Sin vínculo de personal</option>{staff.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.givenNames} {p.surnames}</option>)}</Select>;
 }
 
-/** Invita por correo; con `person` la invitación ya trae el nombre, el vínculo con el directorio y el rol sugerido. */
-export function InviteForm({ api, staff, person, canInviteAdmin, onClose, onSaved }: { api: Api; staff: Staff[]; person?: Staff | null; canInviteAdmin: boolean; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState(person ? `${person.givenNames} ${person.surnames}` : ''), [email, setEmail] = useState(''), [roles, setRoles] = useState<string[]>(person ? (roleForType[person.type] ? [roleForType[person.type]] : []) : []), [staffId, setStaff] = useState(person?.id ?? ''), [sent, setSent] = useState(false);
+/**
+ * Invita por correo; con `person` la invitación ya trae el nombre, el vínculo con el directorio y el rol sugerido.
+ * G1: `email` prefills the address when it is already known (typed while registering the person).
+ */
+export function InviteForm({ api, staff, person, email: knownEmail, canInviteAdmin, onClose, onSaved }: { api: Api; staff: Staff[]; person?: Staff | null; email?: string; canInviteAdmin: boolean; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(person ? `${person.givenNames} ${person.surnames}` : ''), [email, setEmail] = useState(knownEmail ?? ''), [roles, setRoles] = useState<string[]>(person ? (roleForType[person.type] ? [roleForType[person.type]] : []) : []), [staffId, setStaff] = useState(person?.id ?? ''), [sent, setSent] = useState(false);
   const action = useAction(api);
   async function save(e: FormEvent) { e.preventDefault(); if (await action.run('/usuarios/invitaciones', { email, displayName: name, roles, staffId: staffId || undefined })) setSent(true); }
   return <Dialog title="Invitar persona" onClose={onClose} busy={action.busy}>{sent

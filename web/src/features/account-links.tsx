@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { Field, Notice } from '../components/ui';
-import { can, type AccessProfile, type Api } from '../lib/api';
+import { can, type AccessProfile, type Api, type PatientInput } from '../lib/api';
 import './account-links.css';
 import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDate, formatDateTime, useAction, useData } from './common';
+import { PatientForm, prefillFromQuery } from './patients';
 
 /** Row of `GET /cuentas/vinculaciones` (spec 101, W27). */
 export type LinkRequest = {
@@ -23,17 +24,24 @@ export type LinkRequest = {
 export function AccountLinksPage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
   const data = useData<LinkRequest[]>(api, '/cuentas/vinculaciones', version);
   const [rejecting, setRejecting] = useState<LinkRequest | null>(null);
+  // G2: the notice after approving, and the request whose record was just registered (its card says it is ready).
+  const [done, setDone] = useState<string | null>(null), [registering, setRegistering] = useState<LinkRequest | null>(null), [ready, setReady] = useState<{ id: string; record?: string } | null>(null);
   const reload = () => { setRejecting(null); data.refresh(); };
-  const allowed = can(profile, 'cuentas.verificar');
+  const allowed = can(profile, 'cuentas.verificar'), canRegister = can(profile, 'pacientes.registrar');
   return <>
     <CompactHeader breadcrumb="Pacientes / Cuentas" title="Vinculaciones por verificar"/>
+    {done && <Notice kind="success">{done}</Notice>}
     <LinkingGuide />
     <section className="data-workbench" aria-label="Solicitudes de vinculación">
       <RemoteState state={data}>{rows => rows.length
-        ? <><p className="link-summary" role="status"><strong>{rows.length}</strong> {rows.length === 1 ? 'solicitud espera' : 'solicitudes esperan'} tu revisión · <span>{rows.filter(exactMatch).length} con expediente que coincide</span> · <span>{rows.filter(r => !exactMatch(r)).length} por revisar a mano</span></p><ul className="history-list">{rows.map(row => <LinkRequestCard key={row.id} api={api} row={row} allowed={allowed} onReject={() => setRejecting(row)} onSaved={reload} />)}</ul></>
+        ? <><p className="link-summary" role="status"><strong>{rows.length}</strong> {rows.length === 1 ? 'solicitud espera' : 'solicitudes esperan'} tu revisión · <span>{rows.filter(exactMatch).length} con expediente que coincide</span> · <span>{rows.filter(r => !exactMatch(r)).length} por revisar a mano</span></p><ul className="history-list">{rows.map(row => <LinkRequestCard key={row.id} api={api} row={row} allowed={allowed} canRegister={canRegister} ready={ready?.id === row.id ? ready.record ?? '' : null}
+          onReject={() => setRejecting(row)} onRegister={() => setRegistering(row)}
+          onApproved={record => { setReady(null); setDone(`${row.account.email} quedó vinculada con el expediente ${record}.`); reload(); }} />)}</ul></>
         : <Empty title="No hay vinculaciones pendientes" description="Estás al día. Cuando un paciente cree su cuenta en la app y pida unirla a su expediente, la solicitud aparecerá aquí sola, sin recargar." />}</RemoteState>
     </section>
     {rejecting && <RejectDialog api={api} row={rejecting} onClose={() => setRejecting(null)} onSaved={reload} />}
+    {registering && <PatientForm api={api} patient={null} receipt={null} query={registering.declared.dui} initial={declaredPatient(registering)} initialSource="la solicitud"
+      onClose={() => setRegistering(null)} onSaved={created => { setReady({ id: registering.id, record: created?.record }); setRegistering(null); data.refresh(); }} />}
   </>;
 }
 
@@ -59,24 +67,37 @@ function LinkingGuide() {
 /** The record can be approved only when DUI and birth match exactly: `candidate` carries only that match. */
 const exactMatch = (row: LinkRequest) => !!row.candidate;
 const digits = (value: string | null | undefined) => (value ?? '').replace(/\D/g, '');
+const plain = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('es');
 
-function LinkRequestCard({ api, row, allowed, onReject, onSaved }: { api: Api; row: LinkRequest; allowed: boolean; onReject: () => void; onSaved: () => void }) {
+/** G2: the declared data a new record starts from (the account's name split as a search would split it). */
+function declaredPatient(row: LinkRequest): Partial<PatientInput> {
+  return { ...(row.account.name ? prefillFromQuery(row.account.name) : {}), dui: row.declared.dui, birth: row.declared.birth ?? '', email: row.account.email };
+}
+
+type Compared = { id: string; record: string; fullName: string; birth: string | null; dui?: string | null };
+/** Field-by-field comparison of the declared data with the record (✓/✗). The DUI is always the record's own DUI. */
+function compare(row: LinkRequest, candidate: Compared | null) {
+  const recordDui = candidate?.dui ?? null;
+  return [
+    { label: 'Nombre', declared: row.account.name || 'Sin nombre en la cuenta', record: candidate ? `${candidate.fullName} · ${candidate.record}` : '—', ok: !!candidate && !!row.account.name && plain(candidate.fullName) === plain(row.account.name) },
+    { label: 'DUI', declared: <span className="mono-data">{row.declared.dui}</span>, record: recordDui ? <span className="mono-data">{recordDui}</span> : candidate ? 'Sin DUI en el expediente' : '—', ok: !!recordDui && digits(recordDui) === digits(row.declared.dui) },
+    { label: 'Nacimiento', declared: formatDate(row.declared.birth), record: candidate ? formatDate(candidate.birth) : '—', ok: !!candidate && candidate.birth === row.declared.birth },
+  ];
+}
+
+function LinkRequestCard({ api, row, allowed, canRegister, ready, onReject, onRegister, onApproved }: { api: Api; row: LinkRequest; allowed: boolean; canRegister: boolean; ready: string | null; onReject: () => void; onRegister: () => void; onApproved: (record: string) => void }) {
   const action = useAction(api);
   const exact = exactMatch(row), candidate = row.candidate ?? row.closest ?? null;
   const [confirming, setConfirming] = useState(false);
-  async function approve() { if (await action.run(`/cuentas/vinculaciones/${row.id}/aprobar`, { version: row.version })) { setConfirming(false); onSaved(); } }
-  // G-2: each row compares the declared value with the record's own value (the DUI shown is the record's, not the declared one).
+  const fields = compare(row, candidate), off = fields.filter(f => !f.ok).map(f => f.label.toLocaleLowerCase('es'));
+  async function approve() { if (candidate && await action.run(`/cuentas/vinculaciones/${row.id}/aprobar`, { version: row.version })) { setConfirming(false); onApproved(candidate.record); } }
   const match = (ok: boolean) => <span className={`link-match ${ok ? 'is-ok' : 'is-off'}`}><span aria-hidden="true">{ok ? '✓' : '✗'}</span><Tag value={ok ? 'coincide' : 'revisar'} /></span>;
-  const recordDui = candidate ? candidate.dui ?? (exact ? row.declared.dui : null) : null;
   return <li aria-label={`Solicitud de ${row.account.email}`}>
     <div className="history-item-head"><div><strong>{row.account.email}</strong><small>{formatDateTime(row.createdAt)}</small></div></div>
+    {ready !== null && exact && <Notice kind="success">Expediente {ready || candidate?.record} registrado con los datos de la solicitud. Revisa la comparación y aprueba.</Notice>}
     <table className="record-table"><caption className="sr-only">Datos declarados frente al expediente candidato</caption>
       <thead><tr><th>Dato</th><th>Lo que dio el paciente</th><th>Expediente candidato</th><th>Resultado</th></tr></thead>
-      <tbody>
-        <tr><td data-label="Dato">Nombre</td><td data-label="Lo que dio el paciente">{row.account.name || 'Sin nombre en la cuenta'}</td><td data-label="Expediente candidato">{candidate ? `${candidate.fullName} · ${candidate.record}` : '—'}</td><td data-label="Resultado">{match(!!candidate && !!row.account.name && candidate.fullName.toLowerCase() === row.account.name.toLowerCase())}</td></tr>
-        <tr><td data-label="Dato">DUI</td><td data-label="Lo que dio el paciente"><span className="mono-data">{row.declared.dui}</span></td><td data-label="Expediente candidato">{recordDui ? <span className="mono-data">{recordDui}</span> : candidate ? 'Sin DUI en el expediente' : '—'}</td><td data-label="Resultado">{match(!!recordDui && digits(recordDui) === digits(row.declared.dui))}</td></tr>
-        <tr><td data-label="Dato">Nacimiento</td><td data-label="Lo que dio el paciente">{formatDate(row.declared.birth)}</td><td data-label="Expediente candidato">{candidate ? formatDate(candidate.birth) : '—'}</td><td data-label="Resultado">{match(!!candidate && candidate.birth === row.declared.birth)}</td></tr>
-      </tbody>
+      <tbody>{fields.map(f => <tr key={f.label}><td data-label="Dato">{f.label}</td><td data-label="Lo que dio el paciente">{f.declared}</td><td data-label="Expediente candidato">{f.record}</td><td data-label="Resultado">{match(f.ok)}</td></tr>)}</tbody>
     </table>
     {candidate && exact
       ? <Notice kind="success">DUI y fecha de nacimiento coinciden con el expediente {candidate.record}. Verifica la identidad antes de aprobar.</Notice>
@@ -87,10 +108,12 @@ function LinkRequestCard({ api, row, allowed, onReject, onSaved }: { api: Api; r
     {allowed && <div className="dialog-actions">
       <button type="button" className="secondary-button" onClick={onReject} disabled={action.busy}>Rechazar con motivo</button>
       {exact ? <button type="button" className="primary-button" onClick={() => setConfirming(true)} disabled={action.busy}>Aprobar</button>
-        : !candidate && row.candidates <= 1 && <a className="row-action" href="#/pacientes?accion=registrar">Registrar paciente</a>}
+        : !candidate && row.candidates <= 1 && canRegister && <button type="button" className="secondary-button" onClick={onRegister} disabled={action.busy}>Registrar paciente</button>}
     </div>}
     {confirming && exact && candidate && <Dialog title="Aprobar vinculación" onClose={() => setConfirming(false)} busy={action.busy}><div className="module-form">
-      <p>La cuenta <strong>{row.account.email}</strong> verá el expediente <strong>{candidate.record} · {candidate.fullName}</strong>: citas, resultados e historial.</p>
+      <p><strong>Vincular {row.account.email} con expediente {candidate.record}</strong></p>
+      <p>La cuenta verá el expediente {candidate.record} · {candidate.fullName}: citas, resultados e historial.</p>
+      {off.length > 0 && <Notice kind="error">No coincide: {off.join(', ')}. Confirma la identidad con un documento antes de aprobar.</Notice>}
       <p>Apruébala solo si verificaste la identidad de la persona.</p>
       <WriteError error={action.error} />
       <div className="dialog-actions"><button type="button" className="secondary-button" onClick={() => setConfirming(false)} disabled={action.busy}>Volver</button>

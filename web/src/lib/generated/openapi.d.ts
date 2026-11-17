@@ -6414,6 +6414,8 @@ export interface components {
             linked: boolean;
             /** @description Última solicitud de vinculación; null si nunca pidió */
             request: components["schemas"]["LinkRequestResponse"] | null;
+            /** @description Lo que la cuenta declaró en esa solicitud, para volver a pedir con el formulario prellenado. Ausente si nunca pidió. */
+            declared?: components["schemas"]["LinkDeclaredResponse"];
         };
         PublicOccupancyRowResponse: {
             planta: number | null;

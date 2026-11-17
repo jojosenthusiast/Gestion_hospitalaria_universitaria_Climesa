@@ -15,7 +15,7 @@ const profile = (permissions: string[]): AccessProfile => ({
   permissions: permissions.map(code => ({ code, context: 'x' })), channels: [], patientId: null, staffId: 'staff-rec-1',
 });
 const requests: LinkRequest[] = [
-  { id: 'v-1', createdAt: '2026-11-13T15:12:00Z', version: 1, account: { email: 'paola@example.test', name: 'Paola Ficticia Rivas' }, declared: { dui: '06612345-2', birth: '1999-05-30' }, candidate: { id: 'pac-1', record: '000412-7', fullName: 'Paola Ficticia Rivas', birth: '1999-05-30' }, candidates: 1 },
+  { id: 'v-1', createdAt: '2026-11-13T15:12:00Z', version: 1, account: { email: 'paola@example.test', name: 'Paola Ficticia Rivas' }, declared: { dui: '06612345-2', birth: '1999-05-30' }, candidate: { id: 'pac-1', record: '000412-7', fullName: 'Paola Ficticia Rivas', birth: '1999-05-30', dui: '06612345-2', exact: true }, candidates: 1 },
   { id: 'v-2', createdAt: '2026-11-13T16:05:00Z', version: 3, account: { email: 'josue@example.test', name: 'Josué Ficticio' }, declared: { dui: '07788990-1', birth: '1988-02-14' }, candidate: null, candidates: 0 },
 ];
 
@@ -58,10 +58,11 @@ describe('W27 · vinculaciones por verificar (FR-101-08 a FR-101-11)', () => {
   });
 
   it('sin expediente no ofrece aprobar y lleva a registrar al paciente', async () => {
-    mount(['cuentas.verificar']);
+    mount(['cuentas.verificar', 'pacientes.registrar']);
     const card = await screen.findByRole('listitem', { name: 'Solicitud de josue@example.test' });
     expect(within(card).queryByRole('button', { name: 'Aprobar' })).toBeNull();
-    expect(within(card).getByRole('link', { name: 'Registrar paciente' }).getAttribute('href')).toBe('#/pacientes?accion=registrar');
+    // U7 (G2): the form opens here, prefilled from the request (tests in u7-cuentas.test.tsx).
+    expect(within(card).getByRole('button', { name: 'Registrar paciente' })).toBeTruthy();
     expect(within(card).getByText(/No hay expediente con ese DUI/)).toBeTruthy();
   });
 
