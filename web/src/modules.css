@@ -629,6 +629,10 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .status-badge.pattern-rayado { border-color: var(--fam); background: repeating-linear-gradient(135deg, var(--fam-soft) 0 4px, color-mix(in srgb, var(--fam) 18%, var(--fam-soft)) 4px 7px); color: var(--fam); }
 .status-badge.pattern-punteado { border: 1px dotted var(--fam); background-color: var(--fam-soft); background-image: radial-gradient(color-mix(in srgb, var(--fam) 32%, transparent) 1px, transparent 1.4px); background-size: 5px 5px; color: var(--fam); }
 .status-badge.pattern-solido { border-color: var(--fam); background: var(--fam); color: var(--on-status); }
+/* R4a: the label and icon always take the badge colour; a card rule such as `.x span { color }` never reaches them
+   (it made «En servicio» and «Requiere atención» dark text on solid blue). */
+.status-badge.status-tag > * { color: inherit; }
+.status-badge.pattern-solido > * { color: var(--on-status); }
 .status-badge.pattern-contorno { border: 1.5px solid var(--fam); background: var(--surface); color: var(--fam); }
 .status-badge.pattern-discontinuo { border: 1.5px dashed var(--fam); background: transparent; color: var(--fam); }
 .status-badge.pattern-doble { padding: 1px 7px; border: 3px double var(--fam); background: var(--fam-soft); color: var(--fam); }

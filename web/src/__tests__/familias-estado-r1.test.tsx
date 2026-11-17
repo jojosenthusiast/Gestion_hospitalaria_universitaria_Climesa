@@ -32,9 +32,10 @@ describe('familias de estado corregidas (R1, WC-9, WC-10, WC-11)', () => {
     expect(badge('bajo_minimo').className).toContain('fam-espera');
   });
 
-  it('llamado y en proceso son los únicos valores de la familia llamado', () => {
+  // R4a (coordinator): the R1 mapping was wrong; a lab order in process is atención (pulse), only a call is llamado.
+  it('llamado es el único valor de la familia llamado; en proceso es atención', () => {
     expect(statusFamily('llamado')).toBe('llamado');
-    expect(statusFamily('en_proceso')).toBe('llamado');
+    expect(statusFamily('en_proceso')).toBe('atencion');
   });
 
   it('una métrica que requiere atención es un estado de atención', () => {
