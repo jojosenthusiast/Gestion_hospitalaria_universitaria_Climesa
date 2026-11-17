@@ -110,9 +110,9 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
 @Composable fun HospitalClock(){
     var now by remember { mutableStateOf(Instant.now()) }
     val zone=remember { ZoneId.of("America/El_Salvador") }
-    val timeFormatter=remember { DateTimeFormatter.ofPattern("HH:mm:ss",Locale("es","SV")).withZone(zone) }
+    val timeFormatter=remember { DateTimeFormatter.ofPattern("HH:mm",Locale("es","SV")).withZone(zone) }
     val dateFormatter=remember { DateTimeFormatter.ofPattern("EEE d 'de' MMM",Locale("es","SV")).withZone(zone) }
-    LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(1000)}}
+    LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(60_000L-now.toEpochMilli()%60_000L)}}
     Column(horizontalAlignment=Alignment.End){
         Text(timeFormatter.format(now),style=MaterialTheme.typography.labelLarge.copy(fontFeatureSettings="tnum"),color=MaterialTheme.colorScheme.onPrimary)
         Text(dateFormatter.format(now).replaceFirstChar{it.uppercase(Locale("es","SV"))},style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),maxLines=1)

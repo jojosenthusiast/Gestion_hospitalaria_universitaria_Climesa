@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -170,7 +171,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
         SectionCard(stringResource(R.string.inv_lotes_titulo)) {
             if (detail.lots.isEmpty()) Text(stringResource(R.string.inv_sin_lotes), style = MaterialTheme.typography.bodySmall)
             detail.lots.forEach { lot ->
-                Column(Modifier.fillMaxWidth().clickable(enabled = configure) { model.openLot(lot) }.padding(vertical = Spacing.xs)) {
+                Column(Modifier.fillMaxWidth().heightIn(min = Spacing.touch).clickable(enabled = configure) { model.openLot(lot) }.padding(vertical = Spacing.xs)) {
                     Text(stringResource(R.string.inv_lote_n, lot.number) + if (lot.active) "" else " · " + stringResource(R.string.inv_dado_baja), style = MaterialTheme.typography.titleSmall)
                     Text(
                         (lot.expiresAt?.let { stringResource(R.string.inv_lote_vence, it) + if (lot.expired) " " + stringResource(R.string.inv_lote_vencido) else "" } ?: stringResource(R.string.inv_no_vence)) + " · ${trimNumber(lot.total)} ${article.unit}" + (if (lot.warehouses.isEmpty()) "" else " · " + lot.warehouses.joinToString(" · ") { "${it.code}: ${trimNumber(it.quantity)}" }),
