@@ -689,9 +689,12 @@ private struct LabFollowUpInbox: View {
 }
 
 private struct ReviewDetailView: View {
-    let order: LabOrder
+    /// C2: the order is state, read again after «Enviar a externo» and on each live lab event, so the screen never acts
+    /// on a stale version (a second send would hit `version_conflicto`).
+    @State private var order: LabOrder
     let reload: () async -> Void
     @EnvironmentObject private var account: AccountModel
+    @Environment(LiveViewModel.self) private var live
     @Environment(\.dismiss) private var dismiss
     @State private var submission = Submission()
     @State private var cancelSubmission = Submission()
@@ -699,10 +702,22 @@ private struct ReviewDetailView: View {
     @State private var cancelled = false
     @State private var sendingExternal = false
     @State private var externalSubmission = Submission()
+    /// The API accepted «Enviar a externo» from this screen: the action is gone even before the order is read again.
+    @State private var sentExternal = false
+    @State private var loadingExternal = false
+    /// What the last external step did («La orden quedó como externa», «Resultado externo guardado»), kept on screen.
+    @State private var externalNotice: String?
+    /// A failed read of the order; the last copy stays visible with «Reintentar».
+    @State private var refreshError: String?
     /// #12 / §4.7: releasing results to the patient is clinical and cannot be undone, so it asks first with a summary.
     @State private var confirmingRelease = false
     /// Set once the API accepted the release: the result stays on this screen instead of closing it in silence.
     @State private var released: String?
+
+    init(order: LabOrder, reload: @escaping () async -> Void) {
+        _order = State(initialValue: order)
+        self.reload = reload
+    }
 
     var body: some View {
         ScreenFrame(title: "results.detail") {
@@ -711,10 +726,12 @@ private struct ReviewDetailView: View {
             if ReviewRules.isAmendedPendingReview(order) {
                 Text("results.amended").font(Typo.label).foregroundStyle(Theme.warning)
             }
+            if let refreshError { PartError(message: refreshError, retry: refreshOrder) }
             LabOrderDetail(order: order, showValues: true, staffView: true)
             // T07c: the external report's photo or PDF, opened through a 5-minute signed link (same rule as the web).
             if order.external && order.state == .completado { LabAttachmentsSection(order: order) }
-            WriteNotice(submission: submission, reload: reload)
+            if let externalNotice { PatientNotice(text: externalNotice) }
+            WriteNotice(submission: submission, reload: refresh)
             if let released {
                 PatientNotice(text: released)
             } else {
@@ -722,8 +739,11 @@ private struct ReviewDetailView: View {
                 if order.allows(.revisar) {
                     ClimesaButton(title: L.text("results.release"), loading: submission.busy) { submission.clearFailure(); confirmingRelease = true }
                 }
-                if order.allowsExternal(.enviarExterno) {
+                if LabExternalRules.canSend(order, sentHere: sentExternal) {
                     ClimesaButton(title: L.text("results.external.send"), kind: .secondary) { sendingExternal = true }
+                }
+                if LabExternalRules.canLoadResult(order) {
+                    ClimesaButton(title: L.text("results.externalLoad.open"), kind: .secondary) { loadingExternal = true }
                 }
                 if order.allows(.cancelar) {
                     ClimesaButton(title: L.text("results.cancel"), kind: .secondary) { cancelling = true }
@@ -740,10 +760,34 @@ private struct ReviewDetailView: View {
             CancelLabOrderSheet(order: order, submission: cancelSubmission, reload: reload) { cancelled = true }
         }
         .sheet(isPresented: $sendingExternal) {
-            SendExternalSheet(order: order, submission: externalSubmission, reload: reload)
+            SendExternalSheet(order: order, submission: externalSubmission, reload: refresh) {
+                sentExternal = true
+                externalNotice = L.text("results.external.done")
+            }
+        }
+        .sheet(isPresented: $loadingExternal) {
+            ExternalResultSheet(order: order, reload: refresh) { message in externalNotice = message }
         }
         .sheet(isPresented: $confirmingRelease) {
             ReleaseResultsSheet(order: order, submission: submission) { followUp, note in await review(followUp: followUp, note: note) }
+        }
+        // A live lab event (another device, the lab) brings the current version of this order.
+        .task(id: live.snapshot.version(.laboratory)) { await refreshOrder() }
+    }
+
+    /// The list behind and this order, after a write from this screen.
+    private func refresh() async {
+        await reload()
+        await refreshOrder()
+    }
+
+    private func refreshOrder() async {
+        do {
+            order = try await account.client().get("/laboratorio/ordenes/\(order.id)", as: LabOrder.self)
+            refreshError = nil
+        } catch is CancellationError {
+        } catch {
+            refreshError = error.userMessage
         }
     }
 
@@ -755,7 +799,7 @@ private struct ReviewDetailView: View {
             answer = try await account.client().send("POST", "/laboratorio/ordenes/\(order.id)/revisar", body: body, key: key, as: LabReviewResult.self)
         }
         if ok { released = ReleaseRules.done(order, result: answer) }
-        await reload()
+        await refresh()
         return ok
     }
 }
@@ -805,6 +849,8 @@ private struct SendExternalSheet: View {
     let order: LabOrder
     let submission: Submission
     let reload: () async -> Void
+    /// Called once the API accepted the send, before the order is read again.
+    let onSent: () -> Void
     @EnvironmentObject private var account: AccountModel
     @Environment(\.dismiss) private var dismiss
     @State private var place = ""
@@ -829,6 +875,7 @@ private struct SendExternalSheet: View {
         let ok = await submission.run(order.id, body: body, success: L.text("results.external.done")) { key in
             _ = try await account.client().send("POST", LabExternalRules.sendPath(order.id), body: body, key: key, as: LabExternalSent.self)
         }
+        if ok { onSent() }
         await reload()
         if ok { dismiss() }
     }
@@ -1137,6 +1184,8 @@ struct AmbulanceArrivalView: View {
     @State private var loader = Loader<AmbulanceArrival>()
     @State private var submission = Submission()
     @State private var chosen: String?
+    /// §4.7: receiving the patient is recorded with the doctor's name and time, so it asks first.
+    @State private var confirmingReceive = false
 
     var body: some View {
         LoadState(loader: loader, retry: load) { arrival in
@@ -1186,15 +1235,22 @@ struct AmbulanceArrivalView: View {
                 Text(verbatim: String(format: L.text("arrival.receivedBy"), done.receivedByName ?? L.text("arrival.clinicalStaff"), ClimesaDates.display(done.receivedAt, .time)))
                     .font(Typo.body).foregroundStyle(Theme.ink)
             } else if view.canReceive {
-                SubmissionNotice(submission: submission)
-                ClimesaButton(title: L.text("arrival.receive"), loading: submission.busy) { Task { await receive(view) } }
+                ClimesaButton(title: L.text("arrival.receive"), loading: submission.busy) { submission.clearFailure(); confirmingReceive = true }
+                    .confirmationDialog(L.text("arrival.receive.confirm"), isPresented: $confirmingReceive, titleVisibility: .visible) {
+                        Button(L.text("arrival.receive")) { Task { await receive(view) } }
+                    } message: {
+                        Text("arrival.receive.confirm.message")
+                    }
             } else {
                 Text(verbatim: L.text(view.arrived == true ? "arrival.receive.otherRole" : "arrival.receive.wait")).font(Typo.small).foregroundStyle(Theme.muted)
             }
+            // Outside the branches: a refusal stays visible even when the reload changes what this card offers.
+            SubmissionNotice(submission: submission)
         }
     }
 
     private func receive(_ view: PrehospitalView) async {
+        guard !submission.busy else { return }
         let body = EmptyBody()
         _ = await submission.run(view.serviceId, body: body, success: L.text("arrival.receive.done")) { key in
             _ = try await account.client().send("POST", "/ambulancia/servicios/\(view.serviceId)/recepcion", body: body, key: key, as: HandoverResult.self)

@@ -113,10 +113,18 @@ actor APIClient {
     func sendRaw(_ method: String, _ path: String, body: Data, key: String) async throws {
         _ = try await perform(method:method,path:path,body:body,idempotencyKey:key)
     }
+    /// C2: one file as multipart/form-data in `archivo` with the intent's `Idempotency-Key`. The boundary comes from the
+    /// key, so a retry of the same intent sends the same bytes. `progress` receives 0...1 while the body goes out.
+    func upload<T:Decodable>(_ path: String, fileName: String, mimeType: String, data: Data, key: String, as type: T.Type = T.self, progress: (@Sendable (Double) -> Void)? = nil) async throws -> T {
+        let boundary="climesa-"+key.replacingOccurrences(of:"-",with:"")
+        let body=LabAttachmentRules.multipartBody(boundary:boundary,fileName:fileName,mimeType:mimeType,data:data)
+        return try decode(await perform(method:"POST",path:path,body:body,idempotencyKey:key,contentType:LabAttachmentRules.multipartContentType(boundary:boundary),progress:progress ?? { _ in }))
+    }
     private func decode<T:Decodable>(_ data: Data) throws -> T {
         do { return try JSONDecoder().decode(T.self,from:data) } catch { throw APIFailure.invalidResponse }
     }
-    private func perform(method: String, path: String, body: Data?, idempotencyKey: String?) async throws -> Data {
+    /// `progress` set means an upload: the body goes through `URLSession.upload` so its bytes can be reported.
+    private func perform(method: String, path: String, body: Data?, idempotencyKey: String?, contentType: String="application/json", progress: (@Sendable (Double) -> Void)?=nil) async throws -> Data {
         let session: AuthSession
         do {
             guard let current=try await auth.session() else { await expire(); throw APIFailure.sessionExpired }
@@ -126,15 +134,22 @@ actor APIClient {
         catch is URLError { throw APIFailure.transport }
         catch { await expire(); throw APIFailure.sessionExpired }
         guard let url=URL(string:config.api.absoluteString.trimmingCharacters(in:CharacterSet(charactersIn:"/"))+path) else { throw APIFailure.invalidResponse }
-        var request=URLRequest(url:url,cachePolicy:.reloadIgnoringLocalCacheData,timeoutInterval:ColdStartPolicy.timeout(path:path,lastSuccess:lastSuccess,now:Date()))
+        let timeout=progress==nil ? ColdStartPolicy.timeout(path:path,lastSuccess:lastSuccess,now:Date()) : ColdStartPolicy.uploadTimeout
+        var request=URLRequest(url:url,cachePolicy:.reloadIgnoringLocalCacheData,timeoutInterval:timeout)
         request.httpMethod=method
         request.setValue("Bearer \(session.access_token)",forHTTPHeaderField:"Authorization")
         request.setValue("application/json",forHTTPHeaderField:"Accept")
-        if let body { request.httpBody=body; request.setValue("application/json",forHTTPHeaderField:"Content-Type") }
+        if let body {
+            if progress==nil { request.httpBody=body }
+            request.setValue(contentType,forHTTPHeaderField:"Content-Type")
+        }
         if let idempotencyKey { request.setValue(idempotencyKey,forHTTPHeaderField:"Idempotency-Key") }
         let data: Data; let response: URLResponse
         began(); defer { ended() }
-        do { (data,response)=try await transport.data(for:request) }
+        do {
+            if let body, let progress { (data,response)=try await transport.upload(for:request,from:body,delegate:UploadProgressDelegate(progress)) }
+            else { (data,response)=try await transport.data(for:request) }
+        }
         catch let error as URLError where error.code == .cancelled { throw CancellationError() }
         catch is CancellationError { throw CancellationError() }
         catch { throw APIFailure.transport }
@@ -166,6 +181,16 @@ actor APIClient {
     private func expire() async {
         await auth.signOut()
         if let onUnauthorized { await onUnauthorized() }
+    }
+}
+
+/// Reports how much of an upload body has gone out (0...1). It holds only an immutable closure, so it is Sendable.
+private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, Sendable {
+    private let report: @Sendable (Double) -> Void
+    init(_ report: @escaping @Sendable (Double) -> Void) { self.report=report }
+    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+        guard totalBytesExpectedToSend>0 else { return }
+        report(min(1,Double(totalBytesSent)/Double(totalBytesExpectedToSend)))
     }
 }
 

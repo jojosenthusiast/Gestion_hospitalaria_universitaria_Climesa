@@ -76,6 +76,165 @@ public enum LabExternalRules {
         guard order.external, order.state == .pendiente else { return nil }
         return "Hazte el examen en \(order.externalPlace ?? "el lugar indicado") y trae el informe."
     }
+
+    // MARK: C2 · send once, then load the result
+
+    /// «Enviar a externo» only while the API offers it on an order that is not external yet, and never again after this
+    /// screen sent it: a copy taken before the send still carries the old version and would hit `version_conflicto`.
+    public static func canSend(_ order: LabOrder, sentHere: Bool) -> Bool {
+        !sentHere && !order.external && order.allowsExternal(.enviarExterno)
+    }
+
+    /// «Cargar resultado externo»: an external order still waiting for its report, when the API offers the action.
+    public static func canLoadResult(_ order: LabOrder) -> Bool {
+        order.external && order.state == .pendiente && order.allowsExternal(.cargarExterno)
+    }
+
+    public static let noteMaximum = 1000
+
+    public static func resultPath(_ orderId: String) -> String { "/laboratorio/ordenes/\(orderId)/resultado-externo" }
+
+    /// Checked before sending: a PDF or photo of at most 10 MiB. The API reads the bytes again.
+    public static func attachmentError(_ file: LabExternalFile?) -> String? {
+        guard let file else { return "Adjunta la foto o el PDF del informe externo." }
+        if file.sizeBytes <= 0 { return "El archivo está vacío." }
+        if !LabAttachmentRules.allowedTypes.contains(file.mimeType) { return "El informe debe ser PDF o una foto (JPG, PNG, HEIC o WEBP)." }
+        if file.sizeBytes > LabAttachmentRules.maxBytes { return LabAttachmentRules.tooLarge }
+        return nil
+    }
+
+    /// Accepts a decimal comma, as people type it in El Salvador.
+    public static func number(_ value: String) -> Double? {
+        Double(value.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: "."))
+    }
+
+    /// Every exam needs its key value, a number where the exam is numeric.
+    public static func valuesError(items: [LabOrderItem], values: [String: String]) -> String? {
+        let missing = items.filter { (values[$0.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+        if missing > 0 { return "Falta el valor de \(missing) examen(es)." }
+        if let item = items.first(where: { $0.numeric && number(values[$0.id] ?? "") == nil }) { return "El valor de \(item.name) debe ser un número." }
+        return nil
+    }
+
+    /// `LabExternalResultDto`: the order version, the file reference and one value per exam.
+    public static func resultBody(version: Int, file: LabExternalFile, items: [LabOrderItem], values: [String: String], note: String) -> LabExternalResultBody {
+        let results = items.map { item -> LabExternalValueBody in
+            let raw = values[item.id] ?? ""
+            return item.numeric
+                ? LabExternalValueBody(orderItemId: item.id, value: number(raw), text: nil)
+                : LabExternalValueBody(orderItemId: item.id, value: nil, text: raw.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return LabExternalResultBody(version: version, attachment: file.reference, results: results, note: trimmed.isEmpty ? nil : trimmed)
+    }
+}
+
+/// The photo or PDF picked on the phone, with its bytes, so a retry sends exactly the same file.
+public struct LabExternalFile: Sendable, Equatable {
+    public let fileName: String
+    /// Read from the bytes (`LabAttachmentRules.detectType`); `application/octet-stream` when it is not a valid type.
+    public let mimeType: String
+    public let sizeBytes: Int
+    /// SHA-256 in lowercase hex, computed by the app; the API checks the uploaded bytes against it.
+    public let sha256: String?
+    public let data: Data
+
+    public static func make(data: Data, fileName: String, sha256: String?) -> LabExternalFile {
+        let type = LabAttachmentRules.detectType(data) ?? "application/octet-stream"
+        let name = fileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return LabExternalFile(fileName: String((name.isEmpty ? LabAttachmentRules.defaultFileName(type) : name).prefix(200)),
+                               mimeType: type, sizeBytes: data.count, sha256: sha256, data: data)
+    }
+
+    public var reference: LabAttachmentReferenceBody {
+        LabAttachmentReferenceBody(fileName: fileName, mimeType: mimeType, sizeBytes: sizeBytes, sha256: sha256)
+    }
+
+    /// Fingerprint of the upload intent: the same bytes keep the same `Idempotency-Key` on every retry.
+    public var uploadIntent: LabAttachmentReferenceBody { reference }
+}
+
+/// `LabAttachmentDto`: the reference of the file sent with the values.
+public struct LabAttachmentReferenceBody: Encodable, Sendable, Equatable {
+    public let fileName: String
+    public let mimeType: String
+    public let sizeBytes: Int
+    public let sha256: String?
+}
+
+/// `LabExternalValueDto`: `value` for a numeric exam, `text` otherwise (the other key is left out).
+public struct LabExternalValueBody: Encodable, Sendable, Equatable {
+    public let orderItemId: String
+    public let value: Double?
+    public let text: String?
+}
+
+/// `LabExternalResultDto` of `POST /laboratorio/ordenes/{id}/resultado-externo`.
+public struct LabExternalResultBody: Encodable, Sendable, Equatable {
+    public let version: Int
+    public let attachment: LabAttachmentReferenceBody
+    public let results: [LabExternalValueBody]
+    public let note: String?
+}
+
+/// `LabExternalResultResponse`: the completed order and the attachment that receives the file next.
+public struct LabExternalResultSaved: Decodable, Sendable, Equatable {
+    public let id: String
+    public let version: Int
+    public let attachmentId: String?
+}
+
+/// `LabAttachmentStoredResponse` of `POST /laboratorio/adjuntos/{id}/archivo`.
+public struct LabAttachmentStored: Decodable, Sendable, Equatable {
+    public let id: String
+    public let stored: Bool
+}
+
+/// C2: the two steps of an external result. The values (with the file reference) go first; then the file. When the
+/// upload fails the values are already saved, so «Reintentar» only uploads the file again, never the values.
+public struct ExternalResultFlow: Equatable, Sendable {
+    public enum Step: Equatable, Sendable { case saveValues, upload(attachmentId: String), finished }
+    public enum Status: Equatable, Sendable { case editing, saving, uploading, failed(String), done(withFile: Bool) }
+
+    public private(set) var status: Status = .editing
+    public private(set) var attachmentId: String?
+    private var valuesDone = false
+    private var stored = false
+
+    public init() {}
+
+    public var next: Step {
+        if !valuesDone { return .saveValues }
+        if let attachmentId, !stored { return .upload(attachmentId: attachmentId) }
+        return .finished
+    }
+
+    public var busy: Bool { status == .saving || status == .uploading }
+    /// The file and the values change only until the reference (with its SHA-256) is saved.
+    public var canEdit: Bool { !valuesDone && !busy }
+    /// The values are saved but the file is not: the screen shows «Archivo pendiente · Reintentar».
+    public var filePending: Bool { valuesDone && attachmentId != nil && !stored }
+
+    public mutating func begin() {
+        switch next {
+        case .saveValues: status = .saving
+        case .upload: status = .uploading
+        case .finished: break
+        }
+    }
+
+    public mutating func valuesSaved(attachmentId: String?) {
+        valuesDone = true
+        self.attachmentId = attachmentId
+        status = attachmentId == nil ? .done(withFile: false) : .uploading
+    }
+
+    public mutating func fileStored() {
+        stored = true
+        status = .done(withFile: true)
+    }
+
+    public mutating func fail(_ message: String) { status = .failed(message) }
 }
 
 /// Grupos de la lista de órdenes, en el orden en que se trabaja; lo cerrado empieza plegado. Mismos grupos que la web y Android.

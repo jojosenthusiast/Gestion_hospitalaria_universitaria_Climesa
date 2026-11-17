@@ -108,6 +108,14 @@ public struct Prescription: Decodable, Sendable, Identifiable, Equatable {
     public let items: [PrescriptionLine]
 }
 
+/// `Cie10Response` de `GET /consultas/cie10?q=`: una entrada del catálogo CIE-10.
+public struct Cie10Entry: Decodable, Sendable, Identifiable, Equatable {
+    public let code: String
+    public let description: String
+    public var id: String { code }
+    public init(code: String, description: String) { self.code = code; self.description = description }
+}
+
 /// `DiagnosisCreatedResponse` de `POST /consultas/{id}/diagnosticos`.
 public struct DiagnosisCreated: Decodable, Sendable, Equatable {
     public let id: String
@@ -215,10 +223,12 @@ public struct Admission: Decodable, Sendable, Identifiable, Equatable {
     public let discharge: Discharge?
     public let bedCategory: String?
     public let authorized: Bool?
+    /// The record the admission came from (`origin`); for an indication, the consultation. Nil on an older server.
+    public let originId: String?
 
     enum CodingKeys: String, CodingKey {
         case id, patientId, patientName, origin, requestedCategory, state, isolation, scheduledAt, attendingDoctorId, version, bed
-        case allowedActions, attendingDoctorName, attendingDoctorHasAccount, dischargeRequestedAt, discharge, bedCategory, authorized
+        case allowedActions, attendingDoctorName, attendingDoctorHasAccount, dischargeRequestedAt, discharge, bedCategory, authorized, originId
     }
 
     public init(from decoder: Decoder) throws {
@@ -241,6 +251,7 @@ public struct Admission: Decodable, Sendable, Identifiable, Equatable {
         discharge = (try? container.decodeIfPresent(Discharge.self, forKey: .discharge)) ?? nil
         bedCategory = (try? container.decodeIfPresent(String.self, forKey: .bedCategory)) ?? nil
         authorized = (try? container.decodeIfPresent(Bool.self, forKey: .authorized)) ?? nil
+        originId = (try? container.decodeIfPresent(String.self, forKey: .originId)) ?? nil
     }
 
     /// La API permite esta acción al usuario actual.
