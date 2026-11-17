@@ -14,11 +14,26 @@ public struct AppointmentRequestBody: Encodable, Sendable, Equatable {
     }
 }
 
-/// `AppointmentCancelDto`
+/// `AppointmentCancelDto`. D-8: the patient's quick reason adds `reasonCode`; without it (nil is not sent) this is the
+/// released body `{version, reason}` that every API version accepts.
 public struct AppointmentCancelBody: Encodable, Sendable, Equatable {
     public let version: Int
     public let reason: String
-    public init(version: Int, reason: String) { self.version = version; self.reason = reason }
+    public let reasonCode: String?
+    public init(version: Int, reason: String, reasonCode: String? = nil) {
+        self.version = version; self.reason = reason; self.reasonCode = reasonCode
+    }
+}
+
+/// `LabReviewDto` of `POST /laboratorio/ordenes/{id}/revisar`. The released body is `{version}`: the API proposes the
+/// follow-up appointment when `followUp` is absent (D-4), so it is sent only as `false`, and `patientNote` only when written.
+public struct LabReviewBody: Encodable, Sendable, Equatable {
+    public let version: Int
+    public let followUp: Bool?
+    public let patientNote: String?
+    public init(version: Int, followUp: Bool? = nil, patientNote: String? = nil) {
+        self.version = version; self.followUp = followUp; self.patientNote = patientNote
+    }
 }
 
 /// `LinkRequestDto`

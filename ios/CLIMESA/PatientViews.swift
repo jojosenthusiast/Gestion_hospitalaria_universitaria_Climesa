@@ -347,8 +347,9 @@ private struct QueueTicketCard: View {
                         .accessibilityLabel(Text(verbatim: "\(L.text("ds.paciente.queue.number")) \(ticket.number)"))
                 }
                 PatientTag(ticket.state.rawValue, label: ticket.state.label)
-                if ticket.state == .enEspera, let board, let ahead = QueueRules.ahead(of: ticket.number, called: board.called) {
-                    // B5: one sentence, not a bare figure ("3 personas antes de ti", "Eres el siguiente").
+                if ticket.state == .enEspera, let ahead = PatientTurnRules.ahead(ticket, called: board?.called) {
+                    // B5: one sentence, not a bare figure ("3 personas antes de ti", "Eres el siguiente"). The server's
+                    // `ahead` when it sends one; otherwise the estimate from the public board.
                     Text(verbatim: PatientTurnRules.aheadText(ahead)).font(Typo.subheading).foregroundStyle(Theme.ink)
                 }
                 Text(verbatim: String(format: L.text("queue.issued"), ClimesaDates.display(ticket.issuedAt, .time))).font(Typo.small).foregroundStyle(Theme.muted)
@@ -366,6 +367,8 @@ struct PatientAppointmentsView: View {
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<[Appointment]>()
     @State private var submission = Submission()
+    /// D-8: keys of the cancel bodies per appointment; outlives the sheet so a retry replays the same key.
+    @State private var cancelFlow = PatientCancelFlow()
     @State private var cancelling: Appointment?
     @State private var rescheduling: Appointment?
     @State private var requesting = false
@@ -443,7 +446,7 @@ struct PatientAppointmentsView: View {
         }
         .onDisappear { requestSent = false }
         .sheet(item: $cancelling) { item in
-            CancelAppointmentSheet(appointment: item, submission: submission, reload: load)
+            CancelAppointmentSheet(appointment: item, submission: submission, flow: cancelFlow, reload: load)
         }
         .sheet(item: $rescheduling) { item in RescheduleAppointmentSheet(appointment: item, reload: load) }
         .sheet(isPresented: $requesting) { CategoryRequestSheet(reload: load) { requestSent = true } }
@@ -513,6 +516,7 @@ private struct AppointmentRow: View {
 private struct CancelAppointmentSheet: View {
     let appointment: Appointment
     let submission: Submission
+    let flow: PatientCancelFlow
     let reload: () async -> Void
     @EnvironmentObject private var account: AccountModel
     @Environment(\.dismiss) private var dismiss
@@ -557,11 +561,15 @@ private struct CancelAppointmentSheet: View {
         }
     }
 
+    /// D-8: the quick reason goes with its `reasonCode`; `PatientCancelFlow` owns the keys and the fallback to the
+    /// released body for an API before D-8. The sheet waits for the answer and stays open with the error.
     private func send() async {
-        guard let reason else { return }
-        let body = AppointmentCancelBody(version: appointment.version, reason: reason)
-        let ok = await submission.run(appointment.id, body: body, success: L.text("appointments.cancelled")) { key in
-            _ = try await account.client().send("POST", "/citas/\(appointment.id)/cancelar", body: body, key: key, as: AppointmentCommandResult.self)
+        guard reason != nil else { return }
+        let path = "/citas/\(appointment.id)/cancelar"
+        let ok = await submission.perform(appointment.id, success: L.text("appointments.cancelled")) {
+            try await flow.cancel(appointment.id, version: appointment.version, chip: chip, otherText: other) { body, key in
+                _ = try await account.client().send("POST", path, body: body, key: key, as: AppointmentCommandResult.self)
+            }
         }
         await reload()
         if ok { dismiss() }

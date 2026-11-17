@@ -73,19 +73,41 @@ final class JourneyRulesTests: XCTestCase {
         XCTAssertEqual(PatientCancelReasons.chips, ["Ya no lo necesito", "No puedo a esa hora", "Otro"])
         let reason = PatientCancelReasons.reason(chip: "No puedo a esa hora", otherText: "")
         XCTAssertEqual(reason, "No puedo a esa hora")
-        // The API still asks for 10 characters: every quick reason already has them.
-        for chip in PatientCancelReasons.quick { XCTAssertNil(AppointmentRules.cancelReasonError(chip), chip) }
+        XCTAssertEqual(PatientCancelReasons.code(chip: "Ya no lo necesito"), "ya_no_lo_necesito")
+        XCTAssertEqual(PatientCancelReasons.code(chip: "No puedo a esa hora"), "no_puedo_a_esa_hora")
+        XCTAssertEqual(PatientCancelReasons.code(chip: "Otro"), "otro")
+        XCTAssertNil(PatientCancelReasons.code(chip: nil))
+        // The released body keeps the 10-character rule: every quick reason already has 10 characters.
+        for chip in PatientCancelReasons.quick { XCTAssertNil(PatientCancelReasons.legacyReasonError(chip), chip) }
         XCTAssertNil(PatientCancelReasons.reason(chip: nil, otherText: "algo"))
     }
 
-    func testOtroPideTresCaracteresYCumpleElMinimoDeLaAPI() {
+    func testOtroPideTresCaracteresYVaTalCualConSuCodigo() {
         XCTAssertNil(PatientCancelReasons.reason(chip: "Otro", otherText: "ab"))
         XCTAssertEqual(PatientCancelReasons.otherError("ab"), "Escribe al menos 3 caracteres.")
         XCTAssertNil(PatientCancelReasons.otherError(""))
-        let reason = PatientCancelReasons.reason(chip: "Otro", otherText: " viaje ")
-        XCTAssertEqual(reason, "Otro motivo: viaje")
-        XCTAssertNil(AppointmentRules.cancelReasonError(reason ?? ""))
+        XCTAssertEqual(PatientCancelReasons.reason(chip: "Otro", otherText: " viaje "), "viaje")
         XCTAssertEqual(PatientCancelReasons.reason(chip: "Otro", otherText: String(repeating: "x", count: 600))?.count, 500)
+        // Only the released body (an API before D-8) asks «Otro» for 10 characters.
+        XCTAssertEqual(PatientCancelReasons.legacyReasonError("viaje"), "Escribe un motivo de al menos 10 caracteres.")
+        XCTAssertNil(PatientCancelReasons.legacyReasonError("viaje largo"))
+    }
+
+    func testCuerpoConCodigoYCuerpoPublicado() {
+        let coded = AppointmentCancelBody(version: 2, reason: "No puedo a esa hora", reasonCode: "no_puedo_a_esa_hora")
+        XCTAssertEqual(JSONBody.fingerprint(coded), #"{"reason":"No puedo a esa hora","reasonCode":"no_puedo_a_esa_hora","version":2}"#)
+        // Without a code it is byte for byte the released body.
+        XCTAssertEqual(JSONBody.fingerprint(AppointmentCancelBody(version: 2, reason: "No puedo a esa hora")), #"{"reason":"No puedo a esa hora","version":2}"#)
+    }
+
+    func testSoloElCampoNoAdmitidoReasonCodeActivaElCuerpoPublicado() {
+        func failure(_ status: Int, _ field: String, _ message: String) -> APIFailure {
+            .http(status: status, problem: Problem(status: status, code: "validacion", detail: "Revisa el campo \(field).", field: field, errors: [.init(field: field, message: message)]))
+        }
+        XCTAssertTrue(PatientCancelReasons.refusesReasonCode(failure(400, "reasonCode", "Este campo no se admite en la solicitud.")))
+        XCTAssertFalse(PatientCancelReasons.refusesReasonCode(failure(400, "reasonCode", "Recepción escribe el motivo de la cancelación.")))
+        XCTAssertFalse(PatientCancelReasons.refusesReasonCode(failure(400, "reason", "Este campo no se admite en la solicitud.")))
+        XCTAssertFalse(PatientCancelReasons.refusesReasonCode(.transport))
     }
 
     func testAnterioresPlegadasConSuConteo() {
@@ -114,6 +136,18 @@ final class JourneyRulesTests: XCTestCase {
         XCTAssertEqual(PatientTurnRules.aheadText(3), "3 personas antes de ti")
         XCTAssertEqual(PatientTurnRules.aheadText(1), "1 persona antes de ti")
         XCTAssertEqual(PatientTurnRules.aheadText(0), "Eres el siguiente")
+    }
+
+    func testPersonasAntesDeTiUsaAheadDelServidorYSinoElTablero() throws {
+        let called = try JSONDecoder().decode([PublicQueue.Called].self, from: Data(#"[{"numero":9,"consultorio":"2","llamados":1}]"#.utf8))
+        let fromServer = try JSONDecoder().decode(QueueTicket.self, from: Data(#"{"id":"t","service":"consulta_general","fecha":"2026-11-20","numero":12,"patientId":null,"patientName":null,"state":"en_espera","officeId":null,"llamados":0,"version":1,"issuedAt":"2026-11-20T14:00:00Z","ahead":4}"#.utf8))
+        XCTAssertEqual(fromServer.ahead, 4)
+        XCTAssertEqual(PatientTurnRules.ahead(fromServer, called: called), 4)
+        // Without `ahead` (the patient's GET /fila today) the public board gives the estimate, as in U4.
+        let plain = ticket("t", number: 12, state: "en_espera")
+        XCTAssertNil(plain.ahead)
+        XCTAssertEqual(PatientTurnRules.ahead(plain, called: called), 2)
+        XCTAssertNil(PatientTurnRules.ahead(plain, called: nil))
     }
 
     func testAlSerLlamadoPantallaCompletaUnaVezPorLlamado() {
@@ -205,5 +239,112 @@ final class JourneyRulesTests: XCTestCase {
         let recap = DischargeConfirmRules.signRecap(patient: "Ana Pérez", type: .medica, pendingCount: 1, summary: "Evolución favorable.")
         XCTAssertTrue(recap.hasPrefix("Alta de Ana Pérez · \(DischargeType.medica.label), con 1 pendiente. Resumen: Evolución favorable."), recap)
         XCTAssertEqual(DischargeConfirmRules.signedNotice, "Alta firmada. Recepción registrará la salida.")
+    }
+}
+
+/// A4 / D-8 on iOS: the patient's cancel sends `reasonCode`; an API before D-8 gets the released body under its own key.
+@MainActor
+final class PatientCancelFlowTests: XCTestCase {
+    private var sent: [(key: String, body: String)] = []
+    private var answers: [APIFailure?] = []
+    private var keys = 0
+
+    private func makeFlow() -> PatientCancelFlow {
+        PatientCancelFlow(makeKey: { [unowned self] in self.keys += 1; return "k\(self.keys)" })
+    }
+
+    private func post(_ body: AppointmentCancelBody, _ key: String) async throws {
+        sent.append((key, JSONBody.fingerprint(body)))
+        if !answers.isEmpty, let failure = answers.removeFirst() { throw failure }
+    }
+
+    private func cancel(_ flow: PatientCancelFlow, _ id: String = "a1", version: Int = 2, chip: String?, other: String = "") async -> Error? {
+        do { try await flow.cancel(id, version: version, chip: chip, otherText: other, post: post); return nil } catch { return error }
+    }
+
+    private let unsupported = APIFailure.http(status: 400, problem: Problem(status: 400, code: "validacion", detail: "Revisa el campo reasonCode: este campo no se admite en la solicitud.", field: "reasonCode",
+                                                                           errors: [.init(field: "reasonCode", message: "Este campo no se admite en la solicitud.")]))
+
+    func testChipRapidoEnviaReasonCodeConUnToque() async {
+        let error = await cancel(makeFlow(), chip: "No puedo a esa hora")
+        XCTAssertNil(error)
+        XCTAssertEqual(sent.map(\.key), ["k1"])
+        XCTAssertEqual(sent.first?.body, #"{"reason":"No puedo a esa hora","reasonCode":"no_puedo_a_esa_hora","version":2}"#)
+    }
+
+    func testAPIAnteriorRecibeElCuerpoPublicadoConClaveNueva() async {
+        answers = [unsupported, nil]
+        let flow = makeFlow()
+        let error = await cancel(flow, chip: "Ya no lo necesito")
+        XCTAssertNil(error)
+        XCTAssertEqual(sent.map(\.key), ["k1", "k2"], "the released body never reuses the coded body's key")
+        XCTAssertEqual(sent.last?.body, #"{"reason":"Ya no lo necesito","version":2}"#)
+        XCTAssertTrue(flow.legacyServer)
+        // Later cancels on this server go straight to the released body.
+        sent = []
+        _ = await cancel(flow, "a2", chip: "No puedo a esa hora")
+        XCTAssertEqual(sent.map(\.body), [#"{"reason":"No puedo a esa hora","version":2}"#])
+    }
+
+    func testReintentoDelCuerpoPublicadoRepiteClaveYCuerpo() async {
+        answers = [unsupported, .transport, nil]
+        let flow = makeFlow()
+        let first = await cancel(flow, chip: "Ya no lo necesito")
+        XCTAssertEqual(first as? APIFailure, .transport)
+        XCTAssertEqual(flow.pendingKey("a1", legacy: true), "k2")
+        let retry = await cancel(flow, chip: "Ya no lo necesito")
+        XCTAssertNil(retry)
+        XCTAssertEqual(sent.map(\.key), ["k1", "k2", "k2"])
+        XCTAssertEqual(sent[1].body, sent[2].body)
+    }
+
+    func testReintentoTras5xxRepiteClaveYCuerpoConCodigo() async {
+        answers = [.http(status: 503, problem: nil), nil]
+        let flow = makeFlow()
+        _ = await cancel(flow, chip: "Ya no lo necesito")
+        _ = await cancel(flow, chip: "Ya no lo necesito")
+        XCTAssertEqual(sent.map(\.key), ["k1", "k1"])
+        XCTAssertEqual(sent[0].body, sent[1].body)
+    }
+
+    func testOtroCuerpoNuncaVaConUnaClavePendiente() async {
+        answers = [.transport, nil]
+        let flow = makeFlow()
+        _ = await cancel(flow, chip: "Ya no lo necesito")
+        // The person picks another reason after the network error: another body, so another key.
+        _ = await cancel(flow, chip: "No puedo a esa hora")
+        XCTAssertEqual(sent.map(\.key), ["k1", "k2"])
+    }
+
+    func testOtroCortoEnUnaAPIAnteriorPideDiezCaracteresSinEnviar() async {
+        answers = [unsupported]
+        let flow = makeFlow()
+        let error = await cancel(flow, chip: "Otro", other: "viaje")
+        XCTAssertEqual((error as? CancelRefusal)?.message, "Escribe un motivo de al menos 10 caracteres.")
+        XCTAssertEqual(sent.count, 1, "only the coded attempt reached the server")
+        // With 10 characters the released body goes under its own key.
+        let ok = await cancel(flow, chip: "Otro", other: "viaje de trabajo")
+        XCTAssertNil(ok)
+        XCTAssertEqual(sent.map(\.key), ["k1", "k2"])
+        XCTAssertEqual(sent.last?.body, #"{"reason":"viaje de trabajo","version":2}"#)
+    }
+
+    func testOtroError400NoCambiaAlCuerpoPublicado() async {
+        let refused = APIFailure.http(status: 400, problem: Problem(status: 400, code: "validacion", detail: "Escribe brevemente el motivo.", field: "reason", errors: [.init(field: "reason", message: "Escribe brevemente el motivo.")]))
+        answers = [refused]
+        let flow = makeFlow()
+        let error = await cancel(flow, chip: "Otro", other: "abc")
+        XCTAssertEqual(error as? APIFailure, refused)
+        XCTAssertFalse(flow.legacyServer)
+        XCTAssertEqual(sent.count, 1)
+    }
+
+    func testSinMotivoNoSeEnviaNada() async {
+        let flow = makeFlow()
+        let none = await cancel(flow, chip: nil)
+        XCTAssertEqual((none as? CancelRefusal)?.message, "Elige un motivo.")
+        let short = await cancel(flow, chip: "Otro", other: "ab")
+        XCTAssertEqual((short as? CancelRefusal)?.message, "Escribe al menos 3 caracteres.")
+        XCTAssertTrue(sent.isEmpty)
     }
 }

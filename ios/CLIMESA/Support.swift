@@ -64,6 +64,26 @@ final class Submission {
             return false
         }
     }
+
+    /// A write whose idempotency keys live elsewhere (the D-8 cancel keeps one key per body in `PatientCancelFlow`):
+    /// only the screen state is kept here. A refusal before sending (`CancelRefusal`) shows its message with no failure.
+    @discardableResult
+    func perform(_ id: String = "form", success: String? = nil, _ work: () async throws -> Void) async -> Bool {
+        guard !busy else { return false }
+        busy = true; busyId = id; error = nil; notice = nil; lastFailure = nil
+        defer { busy = false; busyId = nil }
+        do {
+            try await work()
+            notice = success
+            return true
+        } catch is CancellationError {
+            return false
+        } catch {
+            lastFailure = error as? APIFailure
+            self.error = error.userMessage
+            return false
+        }
+    }
 }
 
 extension Submission {

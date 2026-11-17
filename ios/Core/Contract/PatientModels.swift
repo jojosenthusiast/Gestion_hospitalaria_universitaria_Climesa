@@ -36,10 +36,13 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     /// Nil on an older server; a call by reception, an assistant or with no recorded caller sets neither.
     public var calledByMe: Bool? = nil
     public var calledByColleague: Bool? = nil
+    /// B5: numbers waiting before this one in its area, when the API sends it (today only the issue response does);
+    /// nil otherwise, and the public board gives the estimate.
+    public var ahead: Int? = nil
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
         case consultationId, consultationState, allowedActions, blockedActions, maxCalls, callsForAbsence
-        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague
+        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague, ahead
     }
 }
 

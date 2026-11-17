@@ -102,24 +102,43 @@ public enum PatientResultsRules {
 
 // MARK: - A1, A4, A5 · Citas del paciente
 
-/// D-8: the patient cancels with a quick reason and no typing; only «Otro» asks for text (3 characters or more).
-/// The API still asks for a reason of 10 to 500 characters (gap A-2 / sweep #14: `reasonCode` is for the API), so a quick
-/// reason goes as written and «Otro» goes as "Otro motivo: <texto>".
+/// D-8: the patient cancels with a quick reason and no typing; only «Otro» asks for text (3 characters or more). The
+/// reason goes with its `reasonCode`. An API released before D-8 refuses that field; then the released body
+/// `{version, reason}` goes instead, and only that body keeps the old rule of 10 or more characters (it matters for
+/// «Otro»: every quick reason already has 10 characters).
 public enum PatientCancelReasons {
     public static let other = "Otro"
     public static let quick = ["Ya no lo necesito", "No puedo a esa hora"]
     public static let otherMinimum = 3
-    public static let prefix = "Otro motivo: "
+    /// The released body's rule (`AppointmentCancelDto.reason` without `reasonCode`).
+    public static let legacyMinimum = 10
+    public static let maximum = 500
+
+    public static let chooseError = "Elige un motivo."
+    public static let otherShort = "Escribe al menos \(otherMinimum) caracteres."
+    public static let legacyError = "Escribe un motivo de al menos \(legacyMinimum) caracteres."
+    /// What a server before D-8 says of `reasonCode` (whitelist validation): the only answer that switches to the released body.
+    public static let unsupportedField = "Este campo no se admite en la solicitud."
 
     public static var chips: [String] { quick + [other] }
 
-    /// The reason to send; nil while nothing valid is chosen (the confirm button stays off).
+    /// The API code of a chip (`AppointmentCancelDto.reasonCode`); nil while nothing is chosen.
+    public static func code(chip: String?) -> String? {
+        guard let chip else { return nil }
+        if chip == other { return "otro" }
+        if chip == quick[0] { return "ya_no_lo_necesito" }
+        if chip == quick[1] { return "no_puedo_a_esa_hora" }
+        return nil
+    }
+
+    /// The reason to send: the chip's words, or what was typed under «Otro». nil while nothing valid is chosen (the
+    /// confirm button stays off).
     public static func reason(chip: String?, otherText: String) -> String? {
         guard let chip else { return nil }
         if chip == other {
             let text = otherText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard text.count >= otherMinimum else { return nil }
-            return String((prefix + text).prefix(500))
+            return String(text.prefix(maximum))
         }
         return quick.contains(chip) ? chip : nil
     }
@@ -127,7 +146,107 @@ public enum PatientCancelReasons {
     /// Shown under the «Otro» field once something was typed and it is still too short.
     public static func otherError(_ text: String) -> String? {
         let size = text.trimmingCharacters(in: .whitespacesAndNewlines).count
-        return (1..<otherMinimum).contains(size) ? "Escribe al menos \(otherMinimum) caracteres." : nil
+        return (1..<otherMinimum).contains(size) ? otherShort : nil
+    }
+
+    /// The released body's rule; nil when the reason can go without a code.
+    public static func legacyReasonError(_ reason: String) -> String? {
+        reason.trimmingCharacters(in: .whitespacesAndNewlines).count < legacyMinimum ? legacyError : nil
+    }
+
+    /// A 400 whose field error on `reasonCode` is the unknown-field message: the server was released before D-8.
+    public static func refusesReasonCode(_ failure: APIFailure) -> Bool {
+        guard failure.status == 400, let problem = failure.problem else { return false }
+        return problem.errors.contains { $0.field == "reasonCode" && $0.message == unsupportedField }
+    }
+}
+
+/// A write the app refuses before sending anything, with its Spanish message.
+public struct CancelRefusal: Error, LocalizedError, Equatable, Sendable {
+    public let message: String
+    public init(message: String) { self.message = message }
+    public var errorDescription: String? { message }
+}
+
+/// A4 / D-8 · the patient's cancel, with the fallback to the released body for an API before D-8.
+/// - The coded body `{version, reason, reasonCode}` and the released body `{version, reason}` each keep their own
+///   idempotency key per appointment: a retry after no signal or a 5xx replays the same body under the same key.
+/// - A pending key never carries another body: a changed body (another chip, a new version) takes a new key.
+/// - When the API refuses `reasonCode` as an unknown field, the released body goes at once under a NEW key, and every
+///   later cancel of this session sends the released body.
+@MainActor
+public final class PatientCancelFlow {
+    public typealias Post = @MainActor (AppointmentCancelBody, String) async throws -> Void
+
+    /// One body and its pending key; the key is dropped on success and after `idempotencia_conflicto`.
+    private struct Lane {
+        var key: String?
+        var body: AppointmentCancelBody?
+    }
+
+    /// This server refused `reasonCode` once.
+    public private(set) var legacyServer: Bool
+    private var coded: [String: Lane] = [:]
+    private var released: [String: Lane] = [:]
+    private let makeKey: @MainActor () -> String
+
+    /// `nonisolated` so a view can hold it in `@State` (like `Submission`).
+    nonisolated public init(legacyServer: Bool = false, makeKey: @escaping @MainActor () -> String = { UUID().uuidString.lowercased() }) {
+        self.legacyServer = legacyServer
+        self.makeKey = makeKey
+    }
+
+    /// The key waiting for a retry of an appointment's coded body (or of its released body with `legacy`).
+    public func pendingKey(_ appointmentId: String, legacy: Bool = false) -> String? {
+        (legacy ? released : coded)[appointmentId]?.key
+    }
+
+    /// Sends the cancel; throws `CancelRefusal` when nothing could be sent, or the API's failure.
+    public func cancel(_ appointmentId: String, version: Int, chip: String?, otherText: String, post: Post) async throws {
+        guard let reason = PatientCancelReasons.reason(chip: chip, otherText: otherText) else {
+            throw CancelRefusal(message: chip == PatientCancelReasons.other ? PatientCancelReasons.otherShort : PatientCancelReasons.chooseError)
+        }
+        if let code = PatientCancelReasons.code(chip: chip), !legacyServer {
+            do {
+                try await send(AppointmentCancelBody(version: version, reason: reason, reasonCode: code), appointmentId, legacy: false, post: post)
+                return
+            } catch let failure as APIFailure where PatientCancelReasons.refusesReasonCode(failure) {
+                // A definitive answer: the coded key is done, and from now on this server gets the released body.
+                coded[appointmentId] = nil
+                legacyServer = true
+            }
+        }
+        if let error = PatientCancelReasons.legacyReasonError(reason) { throw CancelRefusal(message: error) }
+        try await send(AppointmentCancelBody(version: version, reason: reason), appointmentId, legacy: true, post: post)
+    }
+
+    private func send(_ body: AppointmentCancelBody, _ id: String, legacy: Bool, post: Post) async throws {
+        var lane = (legacy ? released[id] : coded[id]) ?? Lane()
+        // Same body: the pending key (an exact replay). Another body: a new key, never the pending one.
+        if lane.key == nil || lane.body != body { lane = Lane(key: makeKey(), body: body) }
+        store(lane, id, legacy: legacy)
+        let key = lane.key ?? ""
+        do {
+            try await post(body, key)
+        } catch {
+            // No signal, 5xx or a definitive 4xx with the same body keep the key; only a key conflict drops it.
+            if (error as? APIFailure)?.code == "idempotencia_conflicto" { settle(id, key: key, legacy: legacy) }
+            throw error
+        }
+        settle(id, key: key, legacy: legacy)
+    }
+
+    private func store(_ lane: Lane, _ id: String, legacy: Bool) {
+        if legacy { released[id] = lane } else { coded[id] = lane }
+    }
+
+    /// Drops the lane only if it still holds `key` (a newer body may have taken it while this one was in flight).
+    private func settle(_ id: String, key: String, legacy: Bool) {
+        if legacy {
+            if released[id]?.key == key { released[id] = nil }
+        } else if coded[id]?.key == key {
+            coded[id] = nil
+        }
     }
 }
 
@@ -175,6 +294,14 @@ public enum PatientTurnRules {
         case 1: return "1 persona antes de ti"
         default: return "\(ahead) personas antes de ti"
         }
+    }
+
+    /// The server's `ahead` when it sends one; otherwise the estimate from the public board (U4). nil before anyone
+    /// was called and without `ahead`.
+    public static func ahead(_ ticket: QueueTicket, called: [PublicQueue.Called]?) -> Int? {
+        if let ahead = ticket.ahead { return max(0, ahead) }
+        guard let called else { return nil }
+        return QueueRules.ahead(of: ticket.number, called: called)
     }
 
     /// "Pasa al consultorio 2" (or "Pasa al Consultorio 2" when the API already names it); without an office, "Es tu turno".
