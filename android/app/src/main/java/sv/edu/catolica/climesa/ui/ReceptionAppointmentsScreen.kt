@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,6 +74,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
         if (quickAction == QuickAction.REVIEW_REQUESTS) model.showRequests(true)
         onQuickActionHandled()
     }
+    BackHandler(enabled = state.scheduling) { model.leaveScheduling() }
     if (state.scheduling) { SchedulingForm(state, model, modifier); return }
     PageList(modifier) {
         item { SectionIntro(stringResource(R.string.rec_citas_eyebrow), stringResource(R.string.rec_citas_titulo), stringResource(R.string.rec_citas_detalle)) }

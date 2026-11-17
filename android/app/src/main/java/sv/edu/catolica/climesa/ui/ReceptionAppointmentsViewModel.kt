@@ -30,6 +30,8 @@ data class ReceptionAppointmentsState(
     val loading: Boolean = true,
     val appointments: List<ReceptionAppointment> = emptyList(),
     val scheduling: Boolean = false,
+    /** Reception left "Agendar cita" with the back gesture; reopening resumes it. */
+    val schedulingKept: Boolean = false,
     val query: String = "",
     val results: List<PickerPatient> = emptyList(),
     val hasMore: Boolean = false,
@@ -85,11 +87,16 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
         }
     }
 
+    /** Opens "Agendar cita"; after a system back ([leaveScheduling]) it resumes the same patient, doctor and slot. */
     fun openScheduling() {
+        if (mutable.value.schedulingKept) { mutable.update { it.copy(scheduling = true, schedulingKept = false, error = null) }; return }
         mutable.update { ReceptionAppointmentsState(loading = it.loading, appointments = it.appointments, scheduling = true, date = it.date, requestsOnly = it.requestsOnly) }
         loadDoctors()
     }
-    fun closeScheduling() { searchJob?.cancel(); slotsJob?.cancel(); doctorsJob?.cancel(); mutable.update { it.copy(scheduling = false, error = null) } }
+    fun closeScheduling() { searchJob?.cancel(); slotsJob?.cancel(); doctorsJob?.cancel(); mutable.update { it.copy(scheduling = false, schedulingKept = false, error = null) } }
+
+    /** R3 A-1: the system back returns to the list and keeps the form; "Cancelar" ([closeScheduling]) discards it. */
+    fun leaveScheduling() { if (!mutable.value.saving) mutable.update { it.copy(scheduling = false, schedulingKept = true, error = null) } }
 
     /** Búsqueda mientras se escribe: espera, pide solo desde dos caracteres y descarta respuestas de consultas viejas. */
     fun query(text: String) {

@@ -70,4 +70,42 @@ class AndroidR3ViewModelsTest {
         val order = LaboratoryOrder("o1", "Ana", "rutina", "completado", 3, listOf(item, item.copy(id = "i2", name = "Glucosa", result = null)), false)
         assertEquals(listOf("Hemoglobina: 9.5 g/dL · Bajo", "Glucosa: Sin resultado"), LabReviewSummary.lines(order))
     }
+
+    // A-1: the system back leaves "Pedir cita" for the list and keeps the draft; "Cancelar" discards it.
+    @Test fun backFromPedirCitaKeepsTheDraft() = runTest(dispatcher) {
+        val vm = CategoryRequestsViewModel(FakeGateway(), R3Bus())
+        vm.openForm(); vm.note("Dolor de espalda")
+        vm.leaveForm()
+        assertTrue(!vm.state.value.formOpen)
+        vm.openForm()
+        assertTrue(vm.state.value.formOpen)
+        assertEquals("Dolor de espalda", vm.state.value.note)
+        vm.closeForm(); vm.openForm()
+        assertEquals("", vm.state.value.note)
+    }
+
+    // A-1: back from "Agendar cita" keeps the typed search for when reception comes back.
+    @Test fun backFromAgendarCitaKeepsTheForm() = runTest(dispatcher) {
+        val vm = ReceptionAppointmentsViewModel(FakeGateway(), R3Bus()).apply { debounceMs = 0 }
+        vm.openScheduling(); vm.query("Ana"); runCurrent()
+        vm.leaveScheduling()
+        assertTrue(!vm.state.value.scheduling)
+        vm.openScheduling()
+        assertTrue(vm.state.value.scheduling)
+        assertEquals("Ana", vm.state.value.query)
+        vm.closeScheduling(); vm.openScheduling()
+        assertEquals("", vm.state.value.query)
+    }
+
+    // A-1: on "Ingresar paciente" back closes from the first step and reopening resumes it.
+    @Test fun backFromIngresarPacienteResumesTheDraft() = runTest(dispatcher) {
+        val vm = AdmissionIntakeViewModel(FakeGateway(), R3Bus())
+        vm.open()
+        vm.backPressed(canAssignBed = false)
+        assertTrue(!vm.state.value.open)
+        assertTrue(vm.state.value.kept)
+        vm.open()
+        assertTrue(vm.state.value.open)
+        assertTrue(!vm.state.value.kept)
+    }
 }

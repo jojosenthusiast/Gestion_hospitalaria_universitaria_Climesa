@@ -1,5 +1,6 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -114,6 +115,9 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     LaunchedEffect(role,sections){if(sections.none{it.name==selectedName})selectedName=sections.firstOrNull{it==AndroidSection.HOME}?.name?:sections.firstOrNull{it==AndroidSection.PROFILE}?.name?:sections.first().name}
     val inbox=rememberQuickActionInbox()
     LaunchedEffect(page){inbox.dropUnless(page)}
+    // R3 A-2: back from any section returns to Inicio before leaving the app. Screens compose their own BackHandler later,
+    // so an open form or detail closes first.
+    BackHandler(enabled=page!=AndroidSection.HOME&&AndroidSection.HOME in sections){selectedName=AndroidSection.HOME.name}
     val handled={inbox.consume(page)}
     val onDashboardAction:(QuickActionRequest)->Unit={request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}}
     LaunchedEffect(role,page){model.load(path)}

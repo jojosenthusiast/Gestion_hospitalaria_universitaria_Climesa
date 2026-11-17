@@ -33,6 +33,8 @@ import sv.edu.catolica.climesa.domain.ReceptionScheduling
 
 data class AdmissionIntakeState(
     val open: Boolean = false,
+    /** Left with the back gesture on the first step; [AdmissionIntakeViewModel.open] resumes it. */
+    val kept: Boolean = false,
     val step: Int = 0,
     val draft: AdmissionDraft = AdmissionDraft(),
     val query: String = "",
@@ -98,7 +100,17 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
         else "/admisiones/mapa-camas?patientId=${enc(patient.id)}"
     }
 
-    fun open() { prefillTried.clear(); mutable.value = AdmissionIntakeState(open = true) }
+    fun open() {
+        if (mutable.value.kept) { mutable.value = mutable.value.copy(open = true, kept = false); return }
+        prefillTried.clear(); mutable.value = AdmissionIntakeState(open = true)
+    }
+
+    /** R3 A-1: system back goes to the previous step; on the first step it returns to the list keeping the draft. */
+    fun backPressed(canAssignBed: Boolean) {
+        val s = mutable.value
+        if (s.busy) return
+        if (s.step > 0) back(canAssignBed) else mutable.value = s.copy(open = false, kept = true)
+    }
     fun close() { searchJob?.cancel(); stepJob?.cancel(); doctorsJob?.cancel(); liveJob?.cancel(); prefillTried.clear(); mutable.value = AdmissionIntakeState() }
 
     /** Each automatic choice runs once per guide: a field the person cleared or changed is not filled again. */

@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -318,6 +320,7 @@ fun HospitalizationScreen(
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels); intake.startLive(it.channels) } }
     val permissions = profile?.permissions.orEmpty()
     val canAssignBed = "camas.asignar" in permissions
+    BackHandler(enabled = intakeState.open) { intake.backPressed(canAssignBed) }
     if (intakeState.open) { AdmissionIntakeScreen(canAssignBed, modifier, intake); return }
     fun byId(id: String?) = id?.let { wanted -> state.admissions.firstOrNull { it.id == wanted } }
     byId(state.selectedId)?.let { BedSuggestionDialog(it, state, model) }

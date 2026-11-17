@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -65,6 +67,7 @@ fun PatientAppointmentsScreen(
         onQuickActionHandled()
     }
     // Fase 2, flow A: the patient asks by reason instead of picking one of every doctor; reception assigns doctor and time.
+    BackHandler(enabled = requestState.formOpen) { requests.leaveForm() }
     if (requestState.formOpen) { CategoryRequestForm(requestState, requests, state.doctors, modifier); return }
     val cancelAppointment = state.appointments.firstOrNull { it.id == cancelTarget }
 
