@@ -90,7 +90,22 @@ export class ConsultationService {
     const day = businessDate(new Date((await c.query('SELECT lower(horario) AS start FROM atencion.cita WHERE id=$1', [id])).rows[0].start));
     if (day !== this.clock.today()) throw new ProblemException('cita_fuera_de_dia', 409, day > this.clock.today() ? 'La consulta se inicia el día de la cita.' : 'La cita fue de un día anterior; ya no se puede iniciar.');
     await this.rejectStarted(c, actor, 'cita_id', id, 'La consulta ya fue iniciada para esta cita.');
-    return { patientId: appointment.paciente_id as string, officeId: null as string | null };
+    // D-1 / B-1: the number reception issued when the patient arrived moves into attention with this consultation,
+    // so it leaves the waiting queue and signing closes it (it no longer waits forever).
+    const ticket = (await c.query(`SELECT id,estado,consultorio_id FROM atencion.ticket_fila WHERE cita_id=$1 AND estado IN ('en_espera','llamado','en_atencion') FOR UPDATE`, [id])).rows[0] as Row | undefined;
+    if (ticket) {
+      await this.rejectStarted(c, actor, 'ticket_id', ticket.id, 'La consulta ya fue iniciada para el número de esta cita.');
+      await this.moveIntoAttention(c, actor, ticket, appointment.paciente_id);
+    }
+    return { patientId: appointment.paciente_id as string, officeId: (ticket?.consultorio_id ?? null) as string | null, appointmentId: id, ticketId: (ticket?.id ?? null) as string | null };
+  }
+
+  /** A waiting or called number moves to `en_atencion` (a waiting one through `llamado`, as the state machine requires). */
+  private async moveIntoAttention(c: PoolClient, actor: Actor, ticket: Row, patientId: string) {
+    if (ticket.estado === 'en_atencion') return;
+    if (ticket.estado === 'en_espera') await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,llamado_por=$2::uuid,version=version+1 WHERE id=$1`, [ticket.id, actor.staffId]);
+    const moved = (await c.query(`UPDATE atencion.ticket_fila SET estado='en_atencion',version=version+1 WHERE id=$1 RETURNING version`, [ticket.id])).rows[0];
+    await this.commands.event(c, 'fila.actualizada', 'ticket_fila', ticket.id, moved.version, await channelsFor(c, ['fila.ver', 'fila.llamar', 'fila.gestionar'], { users: [await patientAccount(c, patientId)] }));
   }
 
   /**
@@ -98,18 +113,19 @@ export class ConsultationService {
    * called (`llamado`) or already in attention; a called number moves to `en_atencion` in the same transaction.
    */
   private async fromTicket(c: PoolClient, actor: Actor, id: string) {
-    const ticket = (await c.query(`SELECT id,paciente_id,estado,consultorio_id,version,fecha=$2::date AS today FROM atencion.ticket_fila WHERE id=$1 FOR UPDATE`, [id, this.clock.today()])).rows[0] as Row | undefined;
+    const ticket = (await c.query(`SELECT id,paciente_id,estado,consultorio_id,version,cita_id,fecha=$2::date AS today FROM atencion.ticket_fila WHERE id=$1 FOR UPDATE`, [id, this.clock.today()])).rows[0] as Row | undefined;
     if (!ticket) throw new NotFoundException('No se encontró el número de fila.');
     // The day-end sweep may not have closed it yet (it skips while another one holds the lock).
     if (!ticket.today) throw new ProblemException('transicion_invalida', 409, 'El número es de un día anterior; emite uno nuevo para hoy.');
     if (!ticket.paciente_id) throw new ProblemException('validacion', 400, 'El número de fila no tiene un paciente asociado.', 'ticketId');
     if (!['llamado', 'en_atencion'].includes(ticket.estado)) throw new ProblemException('transicion_invalida', 409, 'Llama el número antes de iniciar la consulta.');
     await this.rejectStarted(c, actor, 'ticket_id', id, 'La consulta ya fue iniciada para este número.');
-    if (ticket.estado === 'llamado') {
-      const moved = (await c.query(`UPDATE atencion.ticket_fila SET estado='en_atencion',version=version+1 WHERE id=$1 RETURNING version`, [id])).rows[0];
-      await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, moved.version, await channelsFor(c, ['fila.ver', 'fila.llamar', 'fila.gestionar'], { users: [await patientAccount(c, ticket.paciente_id)] }));
-    }
-    return { patientId: ticket.paciente_id as string, officeId: ticket.consultorio_id as string | null };
+    // D-1 / B-1: a number registered from an appointment carries it: the consultation is of that appointment too, so the
+    // appointment does not fall into "no asistió" and signing closes both.
+    const appointment = ticket.cita_id ? (await c.query(`SELECT id FROM atencion.cita WHERE id=$1 AND estado='confirmada' FOR UPDATE`, [ticket.cita_id])).rows[0] as Row | undefined : undefined;
+    if (appointment) await this.rejectStarted(c, actor, 'cita_id', appointment.id, 'La consulta ya fue iniciada para la cita de este número.');
+    if (ticket.estado === 'llamado') await this.moveIntoAttention(c, actor, ticket, ticket.paciente_id);
+    return { patientId: ticket.paciente_id as string, officeId: ticket.consultorio_id as string | null, appointmentId: (appointment?.id ?? null) as string | null, ticketId: id as string | null };
   }
 
   async start(actor: Actor, dto: ConsultationStartDto, key?: string) {
@@ -118,12 +134,12 @@ export class ConsultationService {
     return this.commands.run(actor, `consulta.iniciar:${dto.appointmentId ?? dto.ticketId}`, key, dto, async c => {
       const origin = dto.appointmentId ? await this.fromAppointment(c, actor, dto.appointmentId) : await this.fromTicket(c, actor, dto.ticketId!);
       const row = (await c.query(`INSERT INTO atencion.consulta(paciente_id,medico_id,consultorio_id,cita_id,ticket_id,motivo,estado,iniciada_en)
-        VALUES($1,$2,$3,$4,$5,$6,'abierta',$7) RETURNING id,version,estado`, [origin.patientId, actor.staffId, dto.officeId ?? origin.officeId, dto.appointmentId ?? null, dto.ticketId ?? null, dto.reason?.trim() || null, this.clock.now()])).rows[0];
+        VALUES($1,$2,$3,$4,$5,$6,'abierta',$7) RETURNING id,version,estado`, [origin.patientId, actor.staffId, dto.officeId ?? origin.officeId, origin.appointmentId, origin.ticketId, dto.reason?.trim() || null, this.clock.now()])).rows[0];
       await c.query(`INSERT INTO atencion.relacion_atencion(paciente_id,profesional_id,origen,origen_id,vigencia)
         VALUES($1,$2,'consulta',$3,tstzrange($4::timestamptz,$4::timestamptz+interval '30 days','[)'))`, [origin.patientId, actor.staffId, row.id, this.clock.now()]);
       await this.commands.audit(c, actor, { action: 'consulta.iniciar', entity: 'consulta', entityId: row.id, patientId: origin.patientId, permission: 'consulta.iniciar', detail: dto.appointmentId ? { appointmentId: dto.appointmentId } : { ticketId: dto.ticketId } });
       await this.commands.event(c, 'consulta.actualizada', 'consulta', row.id, row.version, await this.channels(c, origin.patientId));
-      return { id: row.id, appointmentId: dto.appointmentId ?? null, ticketId: dto.ticketId ?? null, version: row.version, state: row.estado };
+      return { id: row.id, appointmentId: origin.appointmentId, ticketId: origin.ticketId, version: row.version, state: row.estado };
     });
   }
 

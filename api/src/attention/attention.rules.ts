@@ -145,8 +145,11 @@ export const APPOINTMENT_WINDOW = { beforeMinutes: 15, afterMinutes: 15 } as con
 /** The documented rule (docs/arquitectura/reglas-negocio.md, RN-FILA-SIGUIENTE); the API returns it with each proposal. */
 export const NEXT_PATIENT_RULE = 'Emergencias primero; luego urgentes; luego citas dentro de su ventana (de 15 min antes a 15 min después de la hora, por hora de cita); luego el resto en orden de llegada (número del área).';
 
+/** D-2 (R7 U1): the rule a doctor gets when calling the next patient; reception and assistants keep NEXT_PATIENT_RULE. */
+export const NEXT_PATIENT_RULE_DOCTOR = 'Primero tus citas dentro de su ventana (de 15 min antes a 15 min después de la hora); luego emergencias, urgentes y el resto en orden de llegada. Quien tiene cita con otro médico lo espera mientras dure su ventana.';
+
 export type NextReason = 'emergencia' | 'urgente' | 'cita' | 'llegada';
-export type NextCandidate = { id: string; numero: number; priority: QueuePriority | string; appointmentAt: Date | null };
+export type NextCandidate = { id: string; numero: number; priority: QueuePriority | string; appointmentAt: Date | null; appointmentDoctorId?: string | null };
 
 const MINUTE = 60_000;
 const byNumber = (a: NextCandidate, b: NextCandidate) => a.numero - b.numero;
@@ -172,9 +175,30 @@ export function proposeNext<T extends NextCandidate>(waiting: T[], now: Date): {
   return { ticket: [...waiting].sort(byNumber)[0], reason: 'llegada' };
 }
 
+const inWindow = (t: NextCandidate, instant: number) => !!t.appointmentAt
+  && instant >= t.appointmentAt.valueOf() - APPOINTMENT_WINDOW.beforeMinutes * MINUTE
+  && instant <= t.appointmentAt.valueOf() + APPOINTMENT_WINDOW.afterMinutes * MINUTE;
+
+/**
+ * D-2 (R7 U1): who goes next when a doctor calls. 1. The doctor's own cited patients whose window contains `now`, by
+ * appointment time and number. 2. The general rule (`proposeNext`) over everyone else, leaving out the patients cited
+ * with another doctor while their window is open: they wait for their own doctor. Without `doctorId` (reception,
+ * assistants) it is exactly `proposeNext`. `own` says the choice is one of the doctor's appointments.
+ */
+export function proposeNextFor<T extends NextCandidate>(waiting: T[], now: Date, doctorId?: string | null): { ticket: T; reason: NextReason; own: boolean } | null {
+  if (!doctorId) { const next = proposeNext(waiting, now); return next ? { ...next, own: false } : null; }
+  const instant = now.valueOf();
+  const own = waiting.filter(t => t.appointmentDoctorId === doctorId && inWindow(t, instant))
+    .sort((a, b) => a.appointmentAt!.valueOf() - b.appointmentAt!.valueOf() || byNumber(a, b))[0];
+  if (own) return { ticket: own, reason: 'cita', own: true };
+  const next = proposeNext(waiting.filter(t => !(t.appointmentDoctorId && t.appointmentDoctorId !== doctorId && inWindow(t, instant))), now);
+  return next ? { ...next, own: false } : null;
+}
+
 const hhmmLocal = (at: Date) => new Date(at.valueOf() - 6 * 3_600_000).toISOString().slice(11, 16);
 /** Spanish sentence shown to reception and the doctor next to the proposal. */
-export function nextReasonText(reason: NextReason, appointmentAt: Date | null) {
+export function nextReasonText(reason: NextReason, appointmentAt: Date | null, own = false) {
+  if (reason === 'cita' && own) return `Tu cita de las ${appointmentAt ? hhmmLocal(appointmentAt) : ''}, dentro de su ventana.`;
   if (reason === 'emergencia') return 'Emergencia: pasa antes que todos.';
   if (reason === 'urgente') return 'Urgente: pasa antes que las citas y la fila.';
   if (reason === 'cita') return `Cita de las ${appointmentAt ? hhmmLocal(appointmentAt) : ''}, dentro de su ventana.`;

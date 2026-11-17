@@ -7219,6 +7219,193 @@
         "x-permiso": "fila.ver"
       }
     },
+    "/api/v1/fila/mi-puesto": {
+      "get": {
+        "operationId": "QueueController_myPost",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueMyPostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Servicio y consultorio de quien llama, según su turno en curso (B-5): \"Llamar siguiente\" sin elegir servicio",
+        "tags": [
+          "queue"
+        ],
+        "x-permiso": "fila.llamar"
+      }
+    },
+    "/api/v1/fila/{id}/anular": {
+      "post": {
+        "operationId": "QueueController_voidIssued",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueVoidDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueTransitionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Anular un número recién emitido por error: solo quien lo emitió, mientras espera y dentro de 10 minutos (B-3)",
+        "tags": [
+          "queue"
+        ],
+        "x-permiso": "fila.emitir"
+      }
+    },
     "/api/v1/fila/{id}/deshacer-llamado": {
       "post": {
         "operationId": "QueueController_undoCall",
@@ -23250,6 +23437,10 @@
           },
           "reasonText": {
             "type": "string"
+          },
+          "ownAppointment": {
+            "type": "boolean",
+            "description": "D-2: true si es una cita de quien consulta, dentro de su ventana"
           }
         },
         "required": [
@@ -23262,7 +23453,8 @@
           "appointmentAt",
           "version",
           "reason",
-          "reasonText"
+          "reasonText",
+          "ownAppointment"
         ]
       },
       "QueueNextProposalResponse": {
@@ -23474,6 +23666,33 @@
             "type": "boolean",
             "description": "Llegó sin cita"
           },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Cita del número: la ligada al registrar la llegada (D-1) o, sin enlace, la de hoy del paciente"
+          },
+          "appointmentDoctorId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Médico de esa cita (B-4)"
+          },
+          "appointmentDoctorName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre del médico de esa cita (B-4)"
+          },
+          "arrivalFromAppointment": {
+            "type": "boolean",
+            "description": "true si el número se emitió al registrar la llegada de la cita (D-1)"
+          },
+          "voidableUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hasta cuándo quien lo emitió puede anularlo (B-3); null para los demás o si ya no espera"
+          },
           "undoActions": {
             "type": "array",
             "description": "Acciones reversibles que el servidor acepta ahora",
@@ -23543,6 +23762,11 @@
           "priority",
           "appointmentAt",
           "walkIn",
+          "appointmentId",
+          "appointmentDoctorId",
+          "appointmentDoctorName",
+          "arrivalFromAppointment",
+          "voidableUntil",
           "undoActions",
           "consultationId",
           "consultationState",
@@ -23578,6 +23802,11 @@
               "rutina"
             ],
             "description": "Prioridad clínica; por omisión rutina"
+          },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cita de hoy cuya llegada se registra con este número"
           }
         },
         "required": [
@@ -23636,6 +23865,26 @@
           "patientId": {
             "type": "string",
             "format": "uuid"
+          },
+          "patientName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre del paciente, para mostrar el número donde se emitió"
+          },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Cita cuya llegada se registró con este número (D-1)"
+          },
+          "ahead": {
+            "type": "integer",
+            "description": "Números en espera antes de este en su área"
+          },
+          "voidableUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hasta cuándo quien lo emitió puede anularlo (B-3)"
           }
         },
         "required": [
@@ -23648,7 +23897,11 @@
           "serviceName",
           "area",
           "priority",
-          "patientId"
+          "patientId",
+          "patientName",
+          "appointmentId",
+          "ahead",
+          "voidableUntil"
         ]
       },
       "QueueCallNextDto": {
@@ -23716,6 +23969,10 @@
           },
           "reasonText": {
             "type": "string"
+          },
+          "ownAppointment": {
+            "type": "boolean",
+            "description": "D-2: true si es una cita de quien llama, dentro de su ventana"
           }
         },
         "required": [
@@ -23727,7 +23984,95 @@
           "patientName",
           "area",
           "reason",
-          "reasonText"
+          "reasonText",
+          "ownAppointment"
+        ]
+      },
+      "QueueMyPostResponse": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "nullable": true,
+            "description": "Servicio del área del turno en curso; null sin turno o en un área sin fila",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ServicioFila"
+              }
+            ]
+          },
+          "area": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AreaFila"
+              }
+            ]
+          },
+          "areaName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre del área del turno en curso"
+          },
+          "officeId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Consultorio de la última consulta o el último llamado de hoy"
+          },
+          "officeCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "shiftEnd": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Fin del turno en curso"
+          }
+        },
+        "required": [
+          "service",
+          "area",
+          "areaName",
+          "officeId",
+          "officeCode",
+          "shiftEnd"
+        ]
+      },
+      "QueueVoidDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "QueueTransitionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoFila"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "state"
         ]
       },
       "QueueUndoDto": {
@@ -23847,30 +24192,6 @@
         },
         "required": [
           "version"
-        ]
-      },
-      "QueueTransitionResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "version": {
-            "type": "integer"
-          },
-          "state": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/EstadoFila"
-              }
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "version",
-          "state"
         ]
       },
       "ConsultationSummaryResponse": {
