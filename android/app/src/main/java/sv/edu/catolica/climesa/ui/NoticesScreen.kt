@@ -136,7 +136,7 @@ fun NoticesScreen(account: AuthenticatedAccount, modifier: Modifier = Modifier) 
     PageList(modifier) {
         item {
             CompactHeader(
-                stringResource(R.string.avisos_titulo), breadcrumb = stringResource(R.string.avisos_breadcrumb),
+                "",
                 filters = {
                     NoticeFilter.entries.forEach { f ->
                         val count = inbox?.let { NoticeInboxRules.count(it, f) }?.takeIf { it > 0 }

@@ -333,7 +333,6 @@ fun HospitalizationScreen(
     PageList(modifier) {
         // One primary per screen: the first admission with a main action; "Ingresar paciente" is primary only when none has one.
         val primaryRow = HospitalizationRules.primaryAdmission(state.admissions)
-        item { SectionIntro("", stringResource(R.string.hosp_titulo)) }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         if ("admision.crear" in permissions) item {
             if (primaryRow == null) PrimaryButton(stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, icon = Icons.Default.Add, enabled = !state.busy)

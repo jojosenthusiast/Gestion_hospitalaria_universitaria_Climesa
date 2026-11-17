@@ -77,7 +77,6 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     BackHandler(enabled = state.scheduling) { model.leaveScheduling() }
     if (state.scheduling) { SchedulingForm(state, model, modifier); return }
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.rec_citas_eyebrow), stringResource(R.string.rec_citas_titulo), stringResource(R.string.rec_citas_detalle)) }
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
         (actionState.done ?: state.notice)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         if (canSchedule) item { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = Icons.Default.Add) }

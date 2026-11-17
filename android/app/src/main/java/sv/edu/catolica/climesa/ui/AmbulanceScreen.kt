@@ -89,7 +89,6 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
     }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.amb_eyebrow), section.label) }
         state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         if (state.loading) item { LoadingState() }

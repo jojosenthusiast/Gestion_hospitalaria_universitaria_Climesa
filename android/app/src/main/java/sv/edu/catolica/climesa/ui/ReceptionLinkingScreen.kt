@@ -39,7 +39,6 @@ fun ReceptionLinkingScreen(channels: List<String>, canVerify: Boolean, openPatie
     val sent = remember { mutableStateOf(false) }
     CloseWhenDone(state.busyId != null, sent) { rejecting = null }
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.rec_vinc_eyebrow), stringResource(R.string.rec_vinc_titulo), "") }
         item { LinkingGuide() }
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton(stringResource(R.string.ui_reintentar), { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }

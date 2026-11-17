@@ -117,7 +117,6 @@ import java.time.format.DateTimeFormatter
 }
 @Composable private fun Patients(state:ReceptionState,model:ReceptionViewModel) {
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item { SectionIntro("", stringResource(R.string.rec_pacientes_titulo)) }
         item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text(stringResource(R.string.rec_buscar_label))},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,stringResource(R.string.rec_limpiar_busqueda))}}) }
         item { Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
             if(PatientAction.SEARCH in state.actions) ClimesaButton(stringResource(if(state.searching) R.string.rec_buscando else R.string.rec_buscar),Icons.Default.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)

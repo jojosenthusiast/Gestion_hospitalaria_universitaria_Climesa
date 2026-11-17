@@ -80,7 +80,6 @@ internal fun stockFamily(status: StockStatus): StatusFamily? = if (StatusFamily.
         )
     } }
     PageList(modifier) {
-        item { SectionIntro(stringResource(R.string.inv_eyebrow), stringResource(R.string.inv_titulo), stringResource(R.string.inv_descripcion)) }
         if (state.error != null && state.articles.isNotEmpty()) item { NoticeBanner(NoticeKind.ERROR, state.error!!) }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         val detail = state.detail
