@@ -187,6 +187,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/turnos/lote/validar` | `turnos.planificar` | No guarda; un resultado por turno con las reglas de un turno suelto (descanso, tope de 7 días, traslape, inscripción) y huecos de cobertura | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/lote` | `turnos.planificar` | Todo o nada, como borradores; 409 lote_con_conflictos con el resultado de cada turno | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/generar` | `turnos.planificar` | Vista previa sin guardar: rotativo, 12x36, 24x72 o personalizado; llena la cobertura mínima del área y explica los huecos; máximo 31 días | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/turnos/candidatos` | `turnos.planificar` | Sin guardar: cada persona de la función pasa las reglas de un turno suelto; válidas primero (área, menos horas) y las demás con su código | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/turnos/plantillas` | `turnos.planificar` |  | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/plantillas` | `turnos.planificar` | Nombre único por área | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | PATCH | `/api/v1/turnos/plantillas/{id}` | `turnos.planificar` | Versión optimista | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |

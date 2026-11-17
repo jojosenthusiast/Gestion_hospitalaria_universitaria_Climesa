@@ -16,6 +16,14 @@ export class StaffDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) version?:number;
   @Text(10,500,true) reason?:string;
 }
+/** R7 F-1: the coverage gap to fill (`GET /turnos/candidatos`); `role` is the gap's function as `/turnos/cobertura` returns it. */
+export class ShiftCandidatesQuery {
+  @ApiProperty({format:'uuid'}) @IsUUID() areaId!:string;
+  @ApiProperty({enum:['MED','ENF','REC','LAB'],description:'Función del hueco (`role` de /turnos/cobertura)'}) @IsIn(['MED','ENF','REC','LAB']) role!:string;
+  @ApiProperty({format:'date-time'}) @IsISO8601({strict:true}) start!:string;
+  @ApiProperty({format:'date-time'}) @IsISO8601({strict:true}) end!:string;
+  @ApiProperty({enum:['diurno','nocturno','guardia']}) @IsIn(['diurno','nocturno','guardia']) type!:string;
+}
 export const boards=['JVPM','JVPE','JVPL','JVPO','otra'];
 export class RegistrationDto {
   @ApiProperty({enum:boards}) @IsIn(boards) board!:string;

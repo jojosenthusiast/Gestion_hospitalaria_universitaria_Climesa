@@ -2899,6 +2899,130 @@
         "x-permiso": "turnos.ver"
       }
     },
+    "/api/v1/turnos/candidatos": {
+      "get": {
+        "operationId": "OperationsController_gapCandidates",
+        "parameters": [
+          {
+            "name": "areaId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": true,
+            "in": "query",
+            "description": "Función del hueco (`role` de /turnos/cobertura)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MED",
+                "ENF",
+                "REC",
+                "LAB"
+              ]
+            }
+          },
+          {
+            "name": "start",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "end",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "diurno",
+                "nocturno",
+                "guardia"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapCandidatesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "R7 F-1: quiénes pueden cubrir un hueco de cobertura con las reglas de un turno suelto (descanso, tope de 7 días, días seguidos, traslape, inscripción); no guarda nada",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
     "/api/v1/turnos/especialistas": {
       "get": {
         "operationId": "OperationsController_specialists",
@@ -21804,6 +21928,117 @@
           "gaps"
         ]
       },
+      "ShiftWarningResponse": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "description": "Código de la advertencia, por ejemplo horas_semanales_excedidas"
+          },
+          "horasSemana": {
+            "type": "number"
+          },
+          "limite": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "codigo",
+          "horasSemana",
+          "limite"
+        ]
+      },
+      "GapCandidateValidResponse": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "person": {
+            "type": "string"
+          },
+          "sameArea": {
+            "type": "boolean",
+            "description": "La persona está asignada al área del hueco"
+          },
+          "weekHours": {
+            "type": "number",
+            "description": "Horas de turnos que trabaja en los 7 días antes del fin del hueco"
+          },
+          "advertencias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShiftWarningResponse"
+            }
+          }
+        },
+        "required": [
+          "staffId",
+          "person",
+          "sameArea",
+          "weekHours",
+          "advertencias"
+        ]
+      },
+      "GapCandidateRejectedResponse": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "person": {
+            "type": "string"
+          },
+          "sameArea": {
+            "type": "boolean",
+            "description": "La persona está asignada al área del hueco"
+          },
+          "weekHours": {
+            "type": "number",
+            "description": "Horas de turnos que trabaja en los 7 días antes del fin del hueco"
+          },
+          "codigo": {
+            "type": "string",
+            "description": "Mismo código que respondería POST /turnos (personal_en_descanso, carga_semanal_excedida, conflicto...)"
+          },
+          "mensaje": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "staffId",
+          "person",
+          "sameArea",
+          "weekHours",
+          "codigo",
+          "mensaje"
+        ]
+      },
+      "GapCandidatesResponse": {
+        "type": "object",
+        "properties": {
+          "candidatos": {
+            "description": "Quienes pueden cubrirlo sin romper ninguna regla; primero los del área y los de menos horas",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GapCandidateValidResponse"
+            }
+          },
+          "descartados": {
+            "description": "Quienes no pueden y por qué",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GapCandidateRejectedResponse"
+            }
+          }
+        },
+        "required": [
+          "candidatos",
+          "descartados"
+        ]
+      },
       "SpecialistShiftResponse": {
         "type": "object",
         "properties": {
@@ -22148,26 +22383,6 @@
         },
         "required": [
           "items"
-        ]
-      },
-      "ShiftWarningResponse": {
-        "type": "object",
-        "properties": {
-          "codigo": {
-            "type": "string",
-            "description": "Código de la advertencia, por ejemplo horas_semanales_excedidas"
-          },
-          "horasSemana": {
-            "type": "number"
-          },
-          "limite": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "codigo",
-          "horasSemana",
-          "limite"
         ]
       },
       "BatchItemResultResponse": {

@@ -5,7 +5,7 @@ import { Actor, SYSTEM_ACTOR, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService } from '../platform/command.service';
 import { Clock,businessDate,businessDayRange } from '../platform/clock';
-import { StaffDto, ShiftDto, RegistrationDto, PublishDto, AttendanceDto, ShiftBatchDto, ShiftBatchItemDto, RotationDto, WeekTemplateDto, WeekTemplateRetireDto } from './operations.dto';
+import { StaffDto, ShiftDto, RegistrationDto, PublishDto, AttendanceDto, ShiftBatchDto, ShiftBatchItemDto, ShiftCandidatesQuery, RotationDto, WeekTemplateDto, WeekTemplateRetireDto } from './operations.dto';
 import { RotationOptions, RotationPattern, daysBetween, rotationShapes, rotationSlots, slotRange } from './rotation.rules';
 import { AttendancePolicy, LoadPolicy, allowedActions, attendanceOf, consecutiveDays, isLate, stateByClock, windowLoad } from './shift.rules';
 import { PolicyRegistry } from '../platform/policy.registry';
@@ -526,6 +526,37 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       const from=new Date(Math.max(rangeStart.valueOf(),Math.ceil(now/HOUR)*HOUR));
       const huecos=from<rangeEnd?await this.fillCoverage(c,actor,dto,people,options,from,rangeEnd,items,budget):[];
       return {items,personas:people.length,huecos,intentos:budget.used,limiteIntentos:budget.limit};
+    });
+  }
+  /**
+   * R7 F-1 («Cubrir hueco»): who can take one coverage gap. Every active person of the gap's function goes through
+   * `tryItem`, the same rules a single shift, the generator and publication apply (rest, 7-day cap, consecutive days,
+   * overlap, registration), each in its own savepoint that is rolled back, inside a transaction that is always rolled
+   * back: nothing is written. Valid people first (same area first, then the fewest hours of working shifts in the 7 days
+   * before the gap ends, then surnames); the others with the code and message that rejected them.
+   */
+  async gapCandidates(actor:Actor,q:ShiftCandidatesQuery) {
+    const start=new Date(q.start),end=new Date(q.end);
+    if(!(end>start))throw new ProblemException('validacion',400,'El fin del hueco debe ser posterior a su inicio.','end');
+    await this.advanceSafely();
+    return this.dryRun(async c=>{
+      await this.area(c,q.areaId);
+      const people=(await c.query(`SELECT p.id,p.nombres||' '||p.apellidos AS name,(p.area_id IS NOT DISTINCT FROM $2::uuid) AS "sameArea",
+          coalesce((SELECT sum(extract(epoch FROM upper(t.periodo)-lower(t.periodo)))/3600 FROM personal.turno t WHERE ${WORKING} AND t.persona_id=p.id AND t.periodo && tstzrange($3,$4,'[)')),0)::float8 AS "weekHours"
+        FROM personal.persona p WHERE p.activo AND p.tipo=$1 ORDER BY (p.area_id IS NOT DISTINCT FROM $2::uuid) DESC,p.apellidos,p.nombres,p.id LIMIT 60`,
+        [COVERAGE_ROLES[q.role],q.areaId,new Date(end.valueOf()-7*DAY),end])).rows as {id:string;name:string;sameArea:boolean;weekHours:number}[];
+      const candidatos=[],descartados=[];
+      for(const [index,person] of people.entries()){
+        await c.query('SAVEPOINT candidato_hueco');
+        const result=await this.tryItem(c,actor,{staffId:person.id,areaId:q.areaId,start:q.start,end:q.end,type:q.type},undefined,index);
+        await c.query('ROLLBACK TO SAVEPOINT candidato_hueco');
+        await c.query('RELEASE SAVEPOINT candidato_hueco');
+        const who={staffId:person.id,person:person.name,sameArea:person.sameArea,weekHours:Math.round(person.weekHours*10)/10};
+        if(result.ok)candidatos.push({...who,advertencias:result.advertencias??[]});
+        else descartados.push({...who,codigo:result.codigo!,mensaje:result.mensaje!});
+      }
+      candidatos.sort((a,b)=>Number(b.sameArea)-Number(a.sameArea)||a.weekHours-b.weekHours);
+      return {candidatos,descartados};
     });
   }
   /**

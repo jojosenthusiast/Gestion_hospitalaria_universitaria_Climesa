@@ -451,6 +451,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/turnos/candidatos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** R7 F-1: quiénes pueden cubrir un hueco de cobertura con las reglas de un turno suelto (descanso, tope de 7 días, días seguidos, traslape, inscripción); no guarda nada */
+        get: operations["OperationsController_gapCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/turnos/especialistas": {
         parameters: {
             query?: never;
@@ -3591,6 +3608,40 @@ export interface components {
             to: string;
             gaps: components["schemas"]["CoverageGapResponse"][];
         };
+        ShiftWarningResponse: {
+            /** @description Código de la advertencia, por ejemplo horas_semanales_excedidas */
+            codigo: string;
+            horasSemana: number;
+            limite: number;
+        };
+        GapCandidateValidResponse: {
+            /** Format: uuid */
+            staffId: string;
+            person: string;
+            /** @description La persona está asignada al área del hueco */
+            sameArea: boolean;
+            /** @description Horas de turnos que trabaja en los 7 días antes del fin del hueco */
+            weekHours: number;
+            advertencias: components["schemas"]["ShiftWarningResponse"][];
+        };
+        GapCandidateRejectedResponse: {
+            /** Format: uuid */
+            staffId: string;
+            person: string;
+            /** @description La persona está asignada al área del hueco */
+            sameArea: boolean;
+            /** @description Horas de turnos que trabaja en los 7 días antes del fin del hueco */
+            weekHours: number;
+            /** @description Mismo código que respondería POST /turnos (personal_en_descanso, carga_semanal_excedida, conflicto...) */
+            codigo: string;
+            mensaje: string;
+        };
+        GapCandidatesResponse: {
+            /** @description Quienes pueden cubrirlo sin romper ninguna regla; primero los del área y los de menos horas */
+            candidatos: components["schemas"]["GapCandidateValidResponse"][];
+            /** @description Quienes no pueden y por qué */
+            descartados: components["schemas"]["GapCandidateRejectedResponse"][];
+        };
         SpecialistShiftResponse: {
             /**
              * Format: date
@@ -3709,12 +3760,6 @@ export interface components {
         ShiftBatchDto: {
             items: components["schemas"]["ShiftBatchItemDto"][];
             justification?: string;
-        };
-        ShiftWarningResponse: {
-            /** @description Código de la advertencia, por ejemplo horas_semanales_excedidas */
-            codigo: string;
-            horasSemana: number;
-            limite: number;
         };
         BatchItemResultResponse: {
             /** @description Posición del turno en el lote (desde 0) */
@@ -9252,6 +9297,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoverageResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_gapCandidates: {
+        parameters: {
+            query: {
+                areaId: string;
+                /** @description Función del hueco (`role` de /turnos/cobertura) */
+                role: "MED" | "ENF" | "REC" | "LAB";
+                start: string;
+                end: string;
+                type: "diurno" | "nocturno" | "guardia";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GapCandidatesResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
