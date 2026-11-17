@@ -30,9 +30,17 @@ export class AppointmentDecisionDto {
   @Text(0, 500, true) rejectionReason?: string;
 }
 
+/** D-8 (R7 U1): quick reasons the patient taps to cancel; `otro` asks for a short text. */
+export const CANCEL_REASON_CODES = ['ya_no_lo_necesito', 'no_puedo_a_esa_hora', 'otro'] as const;
+
+/**
+ * Reception writes the reason (10 or more characters). The patient sends `reasonCode` with no text, or `otro` with a
+ * short text (3 or more); a request without `reasonCode` keeps the 10-character rule (clients before D-8).
+ */
 export class AppointmentCancelDto {
   @ApiProperty({ minimum: 1 }) @IsInt() @Min(1) version!: number;
-  @Text(10, 500) reason!: string;
+  @Text(0, 500, true) reason?: string;
+  @ApiPropertyOptional({ enum: CANCEL_REASON_CODES, description: 'Opción rápida del paciente (D-8)' }) @IsOptional() @IsIn(CANCEL_REASON_CODES) reasonCode?: typeof CANCEL_REASON_CODES[number];
 }
 
 /** CITA-02: new slot of the same doctor (20 minutes); reception applies it, the patient files a request. */

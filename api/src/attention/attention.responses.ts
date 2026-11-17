@@ -70,6 +70,13 @@ export class AppointmentRescheduleResponse {
   @IntProp() version!: number;
 }
 
+/** D-1: the queue number reception issued when the patient arrived for this appointment. */
+export class AppointmentArrivalResponse {
+  @UuidProp() id!: string;
+  @IntProp() numero!: number;
+  @EnumProp(ESTADO_FILA, 'EstadoFila') state!: string;
+}
+
 export class AppointmentResponse {
   @UuidProp() id!: string;
   @UuidProp() patientId!: string;
@@ -87,6 +94,9 @@ export class AppointmentResponse {
   @UuidProp({ nullable: true, description: 'Cita nueva cuando esta quedó reprogramada' }) rescheduledToId!: string | null;
   @ClassProp(AppointmentRescheduleResponse, { nullable: true, description: 'Última solicitud de reprogramación de la cita' }) reschedule!: AppointmentRescheduleResponse | null;
   @DateTimeProp({ nullable: true, description: 'Hasta cuándo puede cancelar o reprogramar quien lee (RN-21: N h antes para el paciente)' }) cancelableUntil!: string | null;
+  @StrProp({ nullable: true, description: 'Opción rápida con la que el paciente canceló (D-8): ya_no_lo_necesito, no_puedo_a_esa_hora u otro' }) cancelReasonCode!: string | null;
+  @StrProp({ nullable: true, description: 'Motivo escrito de la cancelación' }) cancelReason!: string | null;
+  @ClassProp(AppointmentArrivalResponse, { nullable: true, description: 'Número de fila con el que Recepción registró la llegada (D-1)' }) arrival!: AppointmentArrivalResponse | null;
   @EnumArrayProp(APPOINTMENT_ACTIONS, 'AccionCita', { description: 'Acciones que el servidor acepta ahora para quien lee' }) allowedActions!: string[];
   @ClassArrayProp(BlockedAppointmentActionResponse, { description: 'Acciones del rol bloqueadas ahora, con su motivo' }) blockedActions!: BlockedAppointmentActionResponse[];
 }
