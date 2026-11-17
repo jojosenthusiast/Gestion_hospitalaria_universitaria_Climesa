@@ -1,6 +1,28 @@
 {
   "sourceLanguage": "es",
   "strings": {
+    "appointments.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu próxima cita"
+          }
+        }
+      }
+    },
+    "appointments.cancel.other": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuéntanos el motivo"
+          }
+        }
+      }
+    },
     "queue.called.ok": {
       "extractionState": "manual",
       "localizations": {

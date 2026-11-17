@@ -13,15 +13,15 @@ final class DeferredQueueTests: XCTestCase {
     private var rebaseBody: Data? = Data(#"{"version":4}"#.utf8)
 
     private func makeQueue(stored initial: [DeferredRequest] = []) -> DeferredQueue {
-        let queue = DeferredQueue(stored: initial, autoTimers: false, now: { [unowned self] in clock },
-                                  makeKey: { [unowned self] in keys += 1; return "k\(keys)" },
-                                  save: { [unowned self] in stored = $0 },
+        let queue = DeferredQueue(stored: initial, autoTimers: false, now: { [unowned self] in self.clock },
+                                  makeKey: { [unowned self] in self.keys += 1; return "k\(self.keys)" },
+                                  save: { [unowned self] in self.stored = $0 },
                                   send: { [unowned self] item in
-                                      sent.append((item.id, String(decoding: item.body, as: UTF8.self)))
-                                      if !failures.isEmpty { throw failures.removeFirst() }
+                                      self.sent.append((item.id, String(decoding: item.body, as: UTF8.self)))
+                                      if !self.failures.isEmpty { throw self.failures.removeFirst() }
                                   },
-                                  rebase: { [unowned self] _ in rebaseBody })
-        queue.onReport = { [unowned self] in reports.append($0) }
+                                  rebase: { [unowned self] _ in self.rebaseBody })
+        queue.onReport = { [unowned self] in self.reports.append($0) }
         return queue
     }
 

@@ -394,16 +394,32 @@ struct PatientAppointmentsView: View {
                         if split.upcoming.isEmpty && split.past.isEmpty {
                             EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar")
                         } else {
-                            if split.upcoming.isEmpty {
-                                SectionCard(title: L.text("appointments.upcoming")) { EmptyNote("appointments.upcoming.none") }
-                            } else {
-                                ListCard(title: L.text("appointments.upcoming"), items: split.upcoming) { item in
-                                    AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date, cancel: { cancelling = item }, reschedule: { rescheduling = item })
+                            if let next = split.upcoming.first {
+                                // A1: the next appointment leads, on its own card; the others follow.
+                                SectionCard(title: L.text("appointments.next")) {
+                                    AppointmentRow(appointment: next, option: cancelOption(next, now: context.date), now: context.date, cancel: { cancelling = next }, reschedule: { rescheduling = next })
                                 }
+                                let later = Array(split.upcoming.dropFirst())
+                                if !later.isEmpty {
+                                    ListCard(title: L.text("appointments.upcoming"), items: later) { item in
+                                        AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date, cancel: { cancelling = item }, reschedule: { rescheduling = item })
+                                    }
+                                }
+                            } else {
+                                SectionCard(title: L.text("appointments.upcoming")) { EmptyNote("appointments.upcoming.none") }
                             }
                             if !split.past.isEmpty {
-                                ListCard(title: L.text("appointments.past"), items: split.past) { item in
-                                    AppointmentRow(appointment: item, option: .hidden, now: context.date, cancel: {}, reschedule: nil)
+                                // A5: past appointments stay folded under the upcoming ones.
+                                SectionCard {
+                                    DisclosureGroup {
+                                        ForEach(Array(split.past.enumerated()), id: \.element.id) { index, item in
+                                            if index > 0 { Divider().overlay(Theme.line) }
+                                            AppointmentRow(appointment: item, option: .hidden, now: context.date, cancel: {}, reschedule: nil)
+                                        }
+                                    } label: {
+                                        Text(verbatim: AppointmentRules.pastTitle(split.past.count)).font(Typo.label).foregroundStyle(Theme.ink).frame(minHeight: 44)
+                                    }
+                                    .tint(Theme.primaryText)
                                 }
                             }
                         }
@@ -419,6 +435,13 @@ struct PatientAppointmentsView: View {
             }
         }
         .task(id: live.snapshot.version(.appointments)) { await load() }
+        .task(id: requestSent) {
+            // A1: the confirmation stays a few seconds and when the screen comes back it is gone.
+            guard requestSent else { return }
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            if !Task.isCancelled { requestSent = false }
+        }
+        .onDisappear { requestSent = false }
         .sheet(item: $cancelling) { item in
             CancelAppointmentSheet(appointment: item, submission: submission, reload: load)
         }
@@ -493,8 +516,11 @@ private struct CancelAppointmentSheet: View {
     let reload: () async -> Void
     @EnvironmentObject private var account: AccountModel
     @Environment(\.dismiss) private var dismiss
-    @State private var reason = ""
-    @State private var fieldError: String?
+    /// D-8: one tap on a reason; only «Otro» asks for a few words.
+    @State private var chip: String?
+    @State private var other = ""
+
+    private var reason: String? { PatientCancelReasons.reason(chip: chip, otherText: other) }
 
     var body: some View {
         NavigationStack {
@@ -502,19 +528,38 @@ private struct CancelAppointmentSheet: View {
                 SectionCard {
                     ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName)
                 }
-                PatientTextArea(label: L.text("appointments.cancel.reason"), text: $reason, lines: 3...6, error: fieldError ?? submission.fieldErrors["reason"])
-                CharacterCounter(count: reason.trimmingCharacters(in: .whitespacesAndNewlines).count, range: 10...500)
+                SectionTitle("appointments.cancel.reason")
+                VStack(spacing: Spacing.s) {
+                    ForEach(PatientCancelReasons.chips, id: \.self) { option in
+                        Button { chip = option } label: {
+                            HStack(spacing: Spacing.m) {
+                                Image(systemName: chip == option ? "largecircle.fill.circle" : "circle").foregroundStyle(chip == option ? Theme.primary : Theme.muted).accessibilityHidden(true)
+                                Text(verbatim: option).font(Typo.body).foregroundStyle(Theme.ink)
+                                Spacer()
+                            }
+                            .padding(.horizontal, Spacing.m).frame(minHeight: 48)
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(chip == option ? Theme.primary : Theme.controlLine, lineWidth: 1))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(chip == option ? AccessibilityTraits.isSelected : AccessibilityTraits())
+                    }
+                }
+                if chip == PatientCancelReasons.other {
+                    FormField(label: L.text("appointments.cancel.other"), text: $other, error: PatientCancelReasons.otherError(other) ?? submission.fieldErrors["reason"])
+                }
                 PatientSubmissionNotice(submission: submission)
                 if submission.lastFailure?.code == "version_conflicto" { ConflictBanner { Task { await reload(); dismiss() } } }
                 ClimesaButton(title: L.text("appointments.cancel.confirm"), kind: .destructive, loading: submission.busy) { Task { await send() } }
+                    .disabled(reason == nil)
             }
         }
     }
 
     private func send() async {
-        fieldError = AppointmentRules.cancelReasonError(reason)
-        guard fieldError == nil else { return }
-        let body = AppointmentCancelBody(version: appointment.version, reason: reason.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard let reason else { return }
+        let body = AppointmentCancelBody(version: appointment.version, reason: reason)
         let ok = await submission.run(appointment.id, body: body, success: L.text("appointments.cancelled")) { key in
             _ = try await account.client().send("POST", "/citas/\(appointment.id)/cancelar", body: body, key: key, as: AppointmentCommandResult.self)
         }
@@ -531,7 +576,8 @@ private struct RescheduleAppointmentSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var availability = Loader<Availability>()
     @State private var submission = Submission()
-    @State private var day = Date()
+    /// A4: the chosen day (`yyyy-MM-dd` in El Salvador), picked from a row of chips.
+    @State private var day = ClimesaDates.localDay(Date())
     @State private var slot: Period?
 
     var body: some View {
@@ -539,11 +585,26 @@ private struct RescheduleAppointmentSheet: View {
             ScreenFrame(title: "appointments.reschedule.title", onClose: { dismiss() }) {
                 SectionCard { ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName) }
                 Text("appointments.reschedule.intro").font(Typo.small).foregroundStyle(Theme.muted)
-                DatePicker("appointments.date", selection: $day, in: Date()..., displayedComponents: .date)
-                    .environment(\.timeZone, ClimesaDates.zone).environment(\.calendar, ClimesaDates.calendar)
+                SectionTitle("appointments.date")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Spacing.s) {
+                        ForEach(DayChipRules.days(from: Date()), id: \.self) { option in
+                            Button { day = option } label: {
+                                Text(verbatim: DayChipRules.label(option, today: Date())).font(Typo.label)
+                                    .padding(.horizontal, Spacing.m).frame(minHeight: 44)
+                                    .background(day == option ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+                                    .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(day == option ? Theme.primary : Theme.controlLine, lineWidth: 1))
+                                    .foregroundStyle(day == option ? Theme.onPrimary : Theme.ink)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(day == option ? AccessibilityTraits.isSelected : AccessibilityTraits())
+                        }
+                    }
+                }
                 SectionTitle("appointments.slots")
                 LoadState(loader: availability, retry: loadSlots) { value in
-                    let free = value.slots.filter { $0.start != appointment.start }
+                    let free = AppointmentRules.freeSlots(value, excluding: appointment.start)
                     if free.isEmpty { EmptyStateView(title: L.text("appointments.slots.none"), symbol: "calendar.badge.exclamationmark") }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 8) {
                         ForEach(free, id: \.self) { period in
@@ -559,12 +620,12 @@ private struct RescheduleAppointmentSheet: View {
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.reschedule.submit"), loading: submission.busy) { Task { await send() } }.disabled(slot == nil)
             }
-            .task(id: ClimesaDates.localDay(day)) { slot = nil; await loadSlots() }
+            .task(id: day) { slot = nil; await loadSlots() }
         }
     }
 
     private func loadSlots() async {
-        let path = "/citas/disponibilidad?doctorId=\(Query.encode(appointment.doctorId))&date=\(ClimesaDates.localDay(day))"
+        let path = "/citas/disponibilidad?doctorId=\(Query.encode(appointment.doctorId))&date=\(day)"
         await availability.load { try await account.client().get(path, as: Availability.self) }
     }
 
