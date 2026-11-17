@@ -28,14 +28,14 @@ interface DraftStore {
  * sign-out in `MainActivity`, or an expired session) and every other account's drafts when one signs in.
  * Pending writes ([PENDING_WRITES]: the paramedic's offline milestone and prehospital queues and the provisional patient)
  * are not drafts: they stay in their owner's folder, are only read by that account and are sent when it signs in again.
- * They hold clinical data, so they live at most [PENDING_WRITES_TTL_MS] after their last write: older ones are purged on
+ * Those with clinical data ([EXPIRING]) live at most [PENDING_WRITES_TTL_MS] after their last write: older ones are purged on
  * app start and on any sign-in (the API no longer accepts a milestone older than that either).
  */
 class SessionDrafts(private val drafts: DraftStore, private val now: () -> Long = System::currentTimeMillis) {
     fun appStarted() = purgeStale()
     fun signedIn(userId: String) { purgeStale(); drafts.retainOnly(userId, PENDING_WRITES) }
     fun ended() = drafts.clearAll(PENDING_WRITES)
-    private fun purgeStale() = drafts.expire(PENDING_WRITES, now() - PENDING_WRITES_TTL_MS)
+    private fun purgeStale() = drafts.expire(EXPIRING, now() - PENDING_WRITES_TTL_MS)
     /** True when [userId] still has milestones or a prehospital report waiting for signal (sign-out warns about it). */
     fun hasPendingWrites(userId: String) =
         (drafts.load(userId, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.length() ?: 0) > 0 || drafts.load(userId, FormDrafts.PREHOSPITAL_QUEUE) != null ||
@@ -43,6 +43,11 @@ class SessionDrafts(private val drafts: DraftStore, private val now: () -> Long 
 
     companion object {
         val PENDING_WRITES = setOf(FormDrafts.MILESTONE_QUEUE, FormDrafts.PREHOSPITAL_QUEUE, FormDrafts.PROVISIONAL_PATIENT, FormDrafts.DEFERRED_NO_SHOW, FormDrafts.DEFERRED_ABSENCE, ResultsSeen.KEY)
+        /**
+         * The pending writes that hold clinical data and expire. The "results seen" marker ([ResultsSeen]) survives
+         * sign-out like a pending write but never expires; otherwise "Resultados nuevos" would come back after 24 h.
+         */
+        val EXPIRING = PENDING_WRITES - ResultsSeen.KEY
         /** 24 h, the API's `PREHOSPITAL_GRACE_MS`: after it the server rejects the milestone and the report is no longer received. */
         const val PENDING_WRITES_TTL_MS = 24 * 3_600_000L
     }
