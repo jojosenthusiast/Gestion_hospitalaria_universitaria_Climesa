@@ -16,6 +16,8 @@ Inicio, Avisos, Mi día, Resultados por revisar, Mis hospitalizados, Expediente,
 ### Mi día (consulta)
 
 - Ves tu agenda y tu fila. Llamas al paciente desde la tarjeta de la fila e inicias la consulta.
+- Si nadie está en tu consultorio y hay pacientes esperando en consulta general, el botón principal es **Llamar siguiente**: el sistema elige a quien sigue según prioridad y citas.
+- Un número que llamó otro consultorio muestra "Llamado desde otro consultorio" y no ofrece **Iniciar consulta**. Mi día se actualiza solo cuando cambia la fila.
 - Si dejaste una consulta sin firmar, aparece **Reanudar**.
 - En la consulta: **Registrar signos**, **Registrar diagnóstico** (CIE-10; solo un diagnóstico principal), **Emitir receta** y **Ordenar exámenes**.
 - **Firmar** cierra la consulta: la cita pasa a `Atendida` y la consulta ya no se edita. **Salir sin guardar** descarta los cambios no guardados.

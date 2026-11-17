@@ -18,7 +18,7 @@ import sv.edu.catolica.climesa.domain.ConsultationResume
 import sv.edu.catolica.climesa.domain.QueueConsultation
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
-import sv.edu.catolica.climesa.domain.ConsultationEvents
+import sv.edu.catolica.climesa.domain.DoctorDayEvents
 import sv.edu.catolica.climesa.domain.LabExam
 import sv.edu.catolica.climesa.domain.LabOrderRules
 import sv.edu.catolica.climesa.data.AuthRequestException
@@ -51,8 +51,8 @@ data class ConsultationState(
     val reschedules: List<ReceptionAppointment> = emptyList(),
     /** S9: after signing, who goes next in the consultation's area (`nextProposal` of the signature). */
     val handoff: NextProposal? = null,
-    /** Ticket this doctor called with "Llamar siguiente"; only that called number may be the main action. */
-    val calledByMe: String? = null,
+    /** B4: someone waits in general consultation (`GET /fila`), so a doctor who may call can call the first patient. */
+    val waitingGeneral: Boolean = false,
 )
 
 @HiltViewModel
@@ -91,11 +91,12 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         loadJob = viewModelScope.launch {
             try {
                 val rows = ConsultationResume.parseAgenda(api.request("/consultas/agenda"))
-                val queue = if (withQueue) ConsultationResume.attendable(ConsultationResume.parseQueue(api.request("/fila"))) else emptyList()
+                val day = if (withQueue) ConsultationResume.parseQueue(api.request("/fila")) else emptyList()
+                val queue = ConsultationResume.attendable(day)
                 // Secondary lists: a failure leaves them as they were instead of hiding the agenda.
                 val unsigned = if (withUnsigned) optional { ConsultationResume.parseUnsigned(api.request("/consultas/sin-firmar")) } ?: mutable.value.unsigned else emptyList()
                 val reschedules = if (withReschedules) optional { ReceptionScheduling.rescheduleDecisions(ReceptionScheduling.appointments(api.request("/citas") as? JSONArray ?: JSONArray())) } ?: mutable.value.reschedules else emptyList()
-                mutable.value = mutable.value.copy(loading = false, appointments = rows, queue = queue, unsigned = unsigned, reschedules = reschedules)
+                mutable.value = mutable.value.copy(loading = false, appointments = rows, queue = queue, unsigned = unsigned, reschedules = reschedules, waitingGeneral = ConsultationResume.waitingInGeneral(day))
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e)) }
         }
@@ -104,7 +105,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     /** Idempotent per channel list: reloads when a consultation or appointment event arrives, or after a gap. */
     fun startLive(channels: List<String>) {
         live.start(viewModelScope, channels) { signal ->
-            if (signal is RealtimeSignal.Event && ConsultationEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load(silent = true)
+            if (signal is RealtimeSignal.Event && DoctorDayEvents.matches(signal.event) || signal is RealtimeSignal.Resync) load(silent = true)
         }
     }
 
@@ -204,7 +205,25 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         viewModelScope.launch {
             try {
                 api.request("/fila/${proposal.id}/llamar", "POST", JSONObject().put("version", proposal.version))
-                mutable.value = mutable.value.copy(saving = false, handoff = null, calledByMe = proposal.id, notice = "Llamaste ${proposal.code}.")
+                mutable.value = mutable.value.copy(saving = false, handoff = null, notice = "Llamaste ${proposal.code}.")
+                load(silent = true)
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
+        }
+    }
+
+    /**
+     * B4: the first patient of the day. The API picks who waits in general consultation by its rule
+     * (`POST /fila/llamar-siguiente`); the reload then shows the number as called by this doctor (`calledByMe`).
+     */
+    fun callWaiting() {
+        if (mutable.value.saving) return
+        mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
+        viewModelScope.launch {
+            try {
+                val called = api.request("/fila/llamar-siguiente", "POST", QueueRules.callNextBody("consulta_general")) as? JSONObject
+                val number = called?.optInt("numero", 0)?.takeIf { it > 0 }
+                mutable.value = mutable.value.copy(saving = false, notice = number?.let { "Llamaste CON $it." } ?: "Número llamado.")
                 load(silent = true)
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }

@@ -70,11 +70,20 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     selectedItem?.let { item -> ConsultationDialog(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, onClose = { selected = null; model.closeResumed() }) }
     val retry = { model.clearMessages(); model.load() }
     // S13: one primary action for the whole screen (call next, resume own patient, resume unsigned, or start a called number).
-    val primary = ConsultationPrimary.pick(state.queue, state.unsigned.map { it.id }, canCallNext = state.handoff?.proposal != null && "fila.llamar" in permissions, calledByMe = state.calledByMe)
+    val canCall = "fila.llamar" in permissions
+    val primary = ConsultationPrimary.pick(state.queue, state.unsigned.map { it.id }, canCallNext = state.handoff?.proposal != null && canCall,
+        canCallWaiting = state.handoff == null && canCall && state.waitingGeneral)
     PageList(modifier) {
         item { SectionIntro("", stringResource(R.string.consulta_mi_consultorio)) }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
-        state.handoff?.let { handoff -> item { NextPatientHandoff(handoff, "fila.llamar" in permissions, state.saving, onCall = { model.callProposed() }, onDismiss = { model.dismissHandoff() }) } }
+        state.handoff?.let { handoff -> item { NextPatientHandoff(handoff, canCall, state.saving, onCall = { model.callProposed() }, onDismiss = { model.dismissHandoff() }) } }
+        // B4: with nobody in the office yet, calling who waits in general consultation is the day's first action.
+        if (primary == ConsultationPrimary.CallWaiting) item {
+            SectionCard(stringResource(R.string.clin_llamar_primero_titulo)) {
+                Text(stringResource(R.string.clin_llamar_primero_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PrimaryButton(stringResource(R.string.fila_llamar_siguiente), { model.clearMessages(); model.callWaiting() }, enabled = !state.saving, loading = state.saving)
+            }
+        }
         actionState.done?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         if (state.unsigned.isNotEmpty()) {
             item { Text(stringResource(R.string.clin_sin_firmar_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
@@ -134,13 +143,18 @@ private fun MedicalAppointmentCard(item: MedicalAppointment, onOpen: () -> Unit)
 private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, primary: Boolean, onAttend: () -> Unit) {
     SectionCard(stringResource(R.string.clin_fila_numero, ticket.number), action = { OperacionStatusTag(ticket.state) }) {
         Text(ticket.patientName, style = MaterialTheme.typography.bodyLarge)
-        val label = when {
-            opening == ticket.ticketId -> stringResource(R.string.clin_fila_abriendo)
-            ticket.consultationState == "firmada" -> stringResource(R.string.clin_fila_ver)
-            ticket.consultationId != null -> stringResource(R.string.clin_fila_retomar)
-            else -> stringResource(R.string.clin_fila_iniciar)
+        // B2: another clinician called this number (web `calledElsewhere`): informative only, no "Iniciar consulta".
+        if (ticket.calledElsewhere) {
+            Text(stringResource(R.string.clin_fila_otro_consultorio), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            val label = when {
+                opening == ticket.ticketId -> stringResource(R.string.clin_fila_abriendo)
+                ticket.consultationState == "firmada" -> stringResource(R.string.clin_fila_ver)
+                ticket.consultationId != null -> stringResource(R.string.clin_fila_retomar)
+                else -> stringResource(R.string.clin_fila_iniciar)
+            }
+            if (primary) PrimaryButton(label, onAttend, enabled = opening == null) else SecondaryButton(label, onAttend, enabled = opening == null)
         }
-        if (primary) PrimaryButton(label, onAttend, enabled = opening == null) else SecondaryButton(label, onAttend, enabled = opening == null)
     }
 }
 

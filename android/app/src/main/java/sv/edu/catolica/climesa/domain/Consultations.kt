@@ -38,28 +38,41 @@ data class QueueConsultation(
     val consultationState: String?,
     /** Queue service (`servicio`), null when the API does not send it. */
     val service: String? = null,
-)
+    /** T10f: this doctor made the last call (`calledByMe`); another clinician made it (`calledByColleague`). Missing is false. */
+    val calledByMe: Boolean = false,
+    val calledByColleague: Boolean = false,
+) {
+    /**
+     * A called number without an own consultation is another office's only when another clinician called it (web
+     * `calledElsewhere`). A call by reception or an assistant, or one with no recorded caller, stays actionable.
+     */
+    val calledElsewhere: Boolean get() = state == "llamado" && consultationId == null && calledByColleague
+}
 
 /**
  * S13: the single primary action of the doctor's day. `/fila` is not scoped to the doctor: a ticket in attention is the
  * reader's own only when it carries `consultationId`, and numbers of other services belong to other areas. `/fila` also lists
- * the called numbers of every office, so a called number is this doctor's only when this doctor called it (`calledByMe`).
+ * the called numbers of every office, so a called number is this doctor's only when the API says this doctor called it
+ * (`calledByMe`). With nothing else pending, an account that may call starts by calling who waits ([CallWaiting]).
  */
 sealed interface ConsultationPrimary {
     data object CallNext : ConsultationPrimary
     data class ResumeTicket(val ticketId: String) : ConsultationPrimary
     data class ResumeUnsigned(val consultationId: String) : ConsultationPrimary
     data class StartTicket(val ticketId: String) : ConsultationPrimary
+    /** "Llamar siguiente" of general consultation (`POST /fila/llamar-siguiente`) when no signing handoff offers one. */
+    data object CallWaiting : ConsultationPrimary
 
     companion object {
         private fun QueueConsultation.general() = service == null || service == "consulta_general"
 
-        fun pick(queue: List<QueueConsultation>, unsigned: List<String>, canCallNext: Boolean, calledByMe: String? = null): ConsultationPrimary? {
+        fun pick(queue: List<QueueConsultation>, unsigned: List<String>, canCallNext: Boolean, canCallWaiting: Boolean = false): ConsultationPrimary? {
             if (canCallNext) return CallNext
             queue.filter { it.general() && it.state == "en_atencion" && it.consultationId != null && it.consultationState != "firmada" }
                 .minByOrNull { it.number }?.let { return ResumeTicket(it.ticketId) }
             unsigned.firstOrNull()?.let { return ResumeUnsigned(it) }
-            return queue.firstOrNull { it.ticketId == calledByMe && it.general() && it.state == "llamado" && it.consultationId == null }?.let { StartTicket(it.ticketId) }
+            queue.firstOrNull { it.calledByMe && it.general() && it.state == "llamado" && it.consultationId == null }?.let { return StartTicket(it.ticketId) }
+            return if (canCallWaiting) CallWaiting else null
         }
     }
 }
@@ -100,10 +113,14 @@ object ConsultationResume {
     /** Called and in-attention numbers, ordered by number: the ones a doctor starts or resumes. */
     fun attendable(rows: List<QueueConsultation>) = rows.filter { it.state == "llamado" || it.state == "en_atencion" }.sortedBy { it.number }
 
+    /** Someone waits in general consultation, so a doctor who may call has a first patient to call. */
+    fun waitingInGeneral(rows: List<QueueConsultation>) = rows.any { it.state == "en_espera" && (it.service == null || it.service == "consulta_general") }
+
     fun parseQueue(value: Any): List<QueueConsultation> {
         val rows = value as? org.json.JSONArray ?: return emptyList()
         return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
-            QueueConsultation(row.optString("id"), row.optInt("numero"), row.optString("patientName").takeIf { it.isNotBlank() && it != "null" } ?: "Paciente no identificado", row.optString("state"), row.text("consultationId"), row.text("consultationState"), row.text("service"))
+            QueueConsultation(row.optString("id"), row.optInt("numero"), row.optString("patientName").takeIf { it.isNotBlank() && it != "null" } ?: "Paciente no identificado", row.optString("state"), row.text("consultationId"), row.text("consultationState"), row.text("service"),
+                calledByMe = row.optBoolean("calledByMe", false), calledByColleague = row.optBoolean("calledByColleague", false))
         } }
     }
 

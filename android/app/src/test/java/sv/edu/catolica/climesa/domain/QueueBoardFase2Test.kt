@@ -51,8 +51,8 @@ class QueueBoardFase2Test {
     }
 
     @Test fun bodiesKeepRoutineIssuesAsBefore() {
-        assertEquals("""{"service":"laboratorio"}""", QueueRules.issueBody("laboratorio", "rutina").toString())
-        assertEquals("emergencia", QueueRules.issueBody("laboratorio", "emergencia").getString("priority"))
+        assertEquals(setOf("service", "patientId"), QueueRules.issueBody("laboratorio", "rutina", "p1").keys().asSequence().toSet())
+        assertEquals("emergencia", QueueRules.issueBody("laboratorio", "emergencia", "p1").getString("priority"))
         assertEquals("""{"version":3}""", QueueRules.undoBody(3).toString())
         assertEquals("urgente", QueueRules.priorityBody(3, "urgente").getString("priority"))
         assertEquals("c-1", QueueRules.callNextBody("consulta_general", "c-1").getString("officeId"))
