@@ -281,6 +281,7 @@
     <string name="cat_asignar_titulo">Asignar cita a %1$s</string>
     <string name="cat_sugerido">Sugerido</string>
     <string name="cat_elegido">Elegido</string>
+    <string name="hosp_sin_camas_compatibles">No hay camas compatibles libres. Revisa el tablero de camas o vuelve a intentar en unos minutos.</string>
     <string name="cat_buscar_medico">Buscar médico o especialidad</string>
     <string name="cat_ver_todos_medicos">Ver todos los médicos (%1$d más)</string>
     <string name="cat_ver_todo_dia">Ver todo el día</string>

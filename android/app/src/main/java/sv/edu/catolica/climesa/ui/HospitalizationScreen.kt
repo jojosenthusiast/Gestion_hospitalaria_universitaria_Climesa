@@ -108,6 +108,8 @@ data class HospitalizationState(
     val busy: Boolean = false,
     val admissions: List<HospitalAdmission> = emptyList(),
     val suggestions: List<HospitalBedSuggestion> = emptyList(),
+    /** R3 A-25: true while the compatible beds are read, so "none free" is told apart from "still searching". */
+    val loadingSuggestions: Boolean = false,
     val selectedId: String? = null,
     val assignReason: String = "",
     val discharge: DischargeForm? = null,
@@ -151,11 +153,11 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
     }
 
     fun open(admission: HospitalAdmission) {
-        mutable.update { it.copy(selectedId = admission.id, suggestions = emptyList(), assignReason = "", formError = null, error = null) }
+        mutable.update { it.copy(selectedId = admission.id, suggestions = emptyList(), loadingSuggestions = true, assignReason = "", formError = null, error = null) }
         viewModelScope.launch {
-            try { val suggestions = AdmissionParser.suggestions(api.request("/admisiones/${admission.id}/sugerencias-cama")); mutable.update { it.copy(suggestions = suggestions) } }
+            try { val suggestions = AdmissionParser.suggestions(api.request("/admisiones/${admission.id}/sugerencias-cama")); mutable.update { it.copy(suggestions = suggestions, loadingSuggestions = false) } }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { mutable.update { it.copy(formError = readable(e, "No se pudieron consultar las camas.")) } }
+            catch (e: Exception) { mutable.update { it.copy(loadingSuggestions = false, formError = readable(e, "No se pudieron consultar las camas.")) } }
         }
     }
     fun close() = mutable.update { it.copy(selectedId = null, suggestions = emptyList(), assignReason = "", formError = null) }
@@ -399,12 +401,16 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
     ) {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
-            if (state.suggestions.isEmpty()) Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall) else state.suggestions.forEach { row ->
+            if (state.loadingSuggestions) Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall)
+            else if (state.suggestions.isEmpty() && state.formError == null) Text(stringResource(R.string.hosp_sin_camas_compatibles), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else state.suggestions.forEach { row ->
                 DataRow(
                     title = "${row.code} · ${row.room}",
                     subtitle = "${row.category} · ${row.reason}",
                     leadingIcon = if (row.id == selected) Icons.Default.Check else Icons.Default.Bed,
                     onClick = { selected = row.id },
+                    divider = true,
+                    container = false,
                 )
             }
             FormField(stringResource(R.string.hosp_motivo_asignacion), state.assignReason, model::onAssignReason, hint = stringResource(R.string.hosp_motivo_opcional_ayuda), enabled = !state.busy, singleLine = false)
@@ -523,7 +529,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
                 form.loadError != null -> NoticeBanner(NoticeKind.ERROR, form.loadError)
                 form.beds.isEmpty() -> NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_traslado_sin_camas))
                 else -> form.beds.forEach { bed ->
-                    DataRow(title = "${bed.code} · ${bed.room}", leadingIcon = if (bed.id == form.bedId) Icons.Default.Check else Icons.Default.Bed, onClick = { model.pickTransferBed(bed.id) })
+                    DataRow(title = "${bed.code} · ${bed.room}", leadingIcon = if (bed.id == form.bedId) Icons.Default.Check else Icons.Default.Bed, onClick = { model.pickTransferBed(bed.id) }, divider = true, container = false)
                 }
             }
             FormField(stringResource(R.string.hosp_traslado_motivo), form.reason, model::onTransferReason, hint = stringResource(R.string.hosp_contador_motivo, HospitalizationRules.counter(form.reason, ChangeReason.MAX)), enabled = !state.busy, singleLine = false)
@@ -551,7 +557,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
                 panel.loadError != null -> { NoticeBanner(NoticeKind.ERROR, panel.loadError); TextButton(onClick = model::retryNotes) { Text(stringResource(R.string.ui_reintentar)) } }
                 panel.notes.isEmpty() -> Text(stringResource(R.string.hosp_notas_vacio), style = MaterialTheme.typography.bodySmall)
                 else -> panel.notes.forEach { note ->
-                    DataRow(title = note.text, meta = "${note.authorName ?: stringResource(R.string.hosp_nota_autor_desconocido)} · ${localTime(note.createdAt)}")
+                    DataRow(title = note.text, meta = "${note.authorName ?: stringResource(R.string.hosp_nota_autor_desconocido)} · ${localTime(note.createdAt)}", divider = true, container = false)
                 }
             }
         }

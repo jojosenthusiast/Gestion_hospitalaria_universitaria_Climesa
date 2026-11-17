@@ -144,7 +144,7 @@ internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, 
     SectionCard(stringResource(R.string.cat_mis_solicitudes)) {
         requests.forEach { r ->
             Column {
-                DataRow(r.categoryNames, subtitle = listOfNotNull(r.franja.label, r.note).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) })
+                DataRow(r.categoryNames, subtitle = listOfNotNull(r.franja.label, r.note).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) }, container = false)
                 r.appointment?.let { Text(stringResource(R.string.cat_asignada_detalle, it.doctorName, formatShort(it.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
                 r.rejectionReason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (r.allows(CategoryRequestRules.CANCEL)) TextButton(onClick = { confirm = r.id }, enabled = !busy) { Text(stringResource(R.string.cat_retirar)) }
@@ -168,13 +168,14 @@ internal fun CategoryRequestInbox(state: CategoryRequestsState, model: CategoryR
         val now = System.currentTimeMillis()
         state.inbox.forEach { r ->
             Column {
-                DataRow(r.patientName, subtitle = listOfNotNull(r.record, r.categoryNames, r.franja.label, CategoryRequestRules.waitingFor(r.createdAt, now)).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) })
+                DataRow(r.patientName, subtitle = listOfNotNull(r.record, r.categoryNames, r.franja.label, CategoryRequestRules.waitingFor(r.createdAt, now)).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) }, container = false)
                 r.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 r.preferredDoctorName?.let { Text(stringResource(R.string.cat_prefiere, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (state.assigning?.id == r.id) AssignPanel(state, model)
                 else ClimesaActionGroup {
-                    if (r.allows(CategoryRequestRules.ASSIGN)) PrimaryButton(stringResource(R.string.cat_asignar), { model.clearMessages(); model.openAssign(r) }, icon = Icons.Default.Check, enabled = !state.saving)
-                    if (r.allows(CategoryRequestRules.REJECT)) SecondaryButton(stringResource(R.string.cat_rechazar), { model.clearMessages(); rejecting = r.id }, icon = Icons.Default.Close, enabled = !state.saving)
+                    // R3 A-15: row actions are compact; the screen keeps its one primary action.
+                    if (r.allows(CategoryRequestRules.ASSIGN)) RowAction(stringResource(R.string.cat_asignar), { model.clearMessages(); model.openAssign(r) }, enabled = !state.saving)
+                    if (r.allows(CategoryRequestRules.REJECT)) RowAction(stringResource(R.string.cat_rechazar), { model.clearMessages(); rejecting = r.id }, enabled = !state.saving)
                 }
             }
         }
