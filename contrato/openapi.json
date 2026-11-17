@@ -9107,6 +9107,93 @@
         "x-permiso": "citas.solicitar"
       }
     },
+    "/api/v1/citas/solicitudes-categoria/{id}/sugerencia": {
+      "get": {
+        "operationId": "AppointmentRequestController_suggestion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryRequestSuggestionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Primer día con hueco en la franja pedida (hasta 14 días), con el médico preferido o de las especialidades sugeridas (A-1)",
+        "tags": [
+          "attention"
+        ],
+        "x-permiso": "citas.agendar"
+      }
+    },
     "/api/v1/citas/solicitudes-categoria/{id}/asignar": {
       "post": {
         "operationId": "AppointmentRequestController_assign",
@@ -16290,6 +16377,74 @@
         "x-permiso": "cuentas.verificar"
       }
     },
+    "/api/v1/me/vinculacion": {
+      "get": {
+        "operationId": "MyLinkController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado de la vinculación de la cuenta: si ya está vinculada y su última solicitud (pendiente, aprobada o rechazada con motivo)",
+        "tags": [
+          "accounts"
+        ],
+        "x-permiso": "cuenta.vincular"
+      }
+    },
     "/api/v1/publico/ocupacion": {
       "get": {
         "operationId": "PublicController_occupancy",
@@ -19200,6 +19355,65 @@
           "matchReason"
         ]
       },
+      "PatientAppointmentTodayResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctorName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "start",
+          "doctorId",
+          "doctorName"
+        ]
+      },
+      "PatientTicketTodayResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "service": {
+            "type": "string",
+            "description": "Servicio de la fila (consulta_general, emergencia, laboratorio, admisiones)"
+          },
+          "numero": {
+            "type": "integer"
+          },
+          "state": {
+            "type": "string",
+            "description": "en_espera, llamado o en_atencion"
+          },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Cita ligada al registrar la llegada"
+          }
+        },
+        "required": [
+          "id",
+          "service",
+          "numero",
+          "state",
+          "appointmentId"
+        ]
+      },
       "PatientPickerItemResponse": {
         "type": "object",
         "properties": {
@@ -19217,6 +19431,26 @@
           "age": {
             "type": "integer",
             "description": "Edad en años; solo si el rol puede ver la fecha de nacimiento"
+          },
+          "appointmentToday": {
+            "nullable": true,
+            "description": "Cita confirmada de hoy (B-2); solo con citas.ver global",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PatientAppointmentTodayResponse"
+              }
+            ]
+          },
+          "ticketToday": {
+            "nullable": true,
+            "description": "Número de fila vigente de hoy; solo con fila.ver global",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PatientTicketTodayResponse"
+              }
+            ]
           }
         },
         "required": [
@@ -22695,6 +22929,41 @@
           "version"
         ]
       },
+      "EstadoFila": {
+        "type": "string",
+        "enum": [
+          "en_espera",
+          "llamado",
+          "en_atencion",
+          "atendido",
+          "no_se_presento",
+          "cerrado"
+        ]
+      },
+      "AppointmentArrivalResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "numero": {
+            "type": "integer"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoFila"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "numero",
+          "state"
+        ]
+      },
       "AccionCita": {
         "type": "string",
         "enum": [
@@ -22812,6 +23081,26 @@
             "nullable": true,
             "description": "Hasta cuándo puede cancelar o reprogramar quien lee (RN-21: N h antes para el paciente)"
           },
+          "cancelReasonCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Opción rápida con la que el paciente canceló (D-8): ya_no_lo_necesito, no_puedo_a_esa_hora u otro"
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo escrito de la cancelación"
+          },
+          "arrival": {
+            "nullable": true,
+            "description": "Número de fila con el que Recepción registró la llegada (D-1)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentArrivalResponse"
+              }
+            ]
+          },
           "allowedActions": {
             "type": "array",
             "description": "Acciones que el servidor acepta ahora para quien lee",
@@ -22844,6 +23133,9 @@
           "rescheduledToId",
           "reschedule",
           "cancelableUntil",
+          "cancelReasonCode",
+          "cancelReason",
+          "arrival",
           "allowedActions",
           "blockedActions"
         ]
@@ -22957,13 +23249,21 @@
           },
           "reason": {
             "type": "string",
-            "minLength": 10,
+            "minLength": 0,
             "maxLength": 500
+          },
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "ya_no_lo_necesito",
+              "no_puedo_a_esa_hora",
+              "otro"
+            ],
+            "description": "Opción rápida del paciente (D-8)"
           }
         },
         "required": [
-          "version",
-          "reason"
+          "version"
         ]
       },
       "AppointmentRescheduleDto": {
@@ -23534,17 +23834,6 @@
           "state",
           "signedAt",
           "nextProposal"
-        ]
-      },
-      "EstadoFila": {
-        "type": "string",
-        "enum": [
-          "en_espera",
-          "llamado",
-          "en_atencion",
-          "atendido",
-          "no_se_presento",
-          "cerrado"
         ]
       },
       "DeshacerFila": {
@@ -25560,6 +25849,53 @@
           "id",
           "version",
           "state"
+        ]
+      },
+      "CategoryRequestSuggestionResponse": {
+        "type": "object",
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "description": "false si ningún médico candidato tiene hueco en la franja en 14 días"
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "doctorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "specialty": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd",
+            "nullable": true
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "found",
+          "doctorId",
+          "doctorName",
+          "specialty",
+          "date",
+          "start",
+          "end"
         ]
       },
       "CategoryRequestAssignDto": {
@@ -29807,13 +30143,24 @@
             "format": "date",
             "description": "Día local, yyyy-MM-dd",
             "nullable": true
+          },
+          "dui": {
+            "type": "string",
+            "nullable": true,
+            "description": "DUI del expediente con guion (G-2), para compararlo con el declarado"
+          },
+          "exact": {
+            "type": "boolean",
+            "description": "true si DUI y nacimiento coinciden con lo declarado; false si es el expediente más parecido (mismo nacimiento, DUI distinto en un dígito) y no se puede aprobar"
           }
         },
         "required": [
           "id",
           "record",
           "fullName",
-          "birth"
+          "birth",
+          "dui",
+          "exact"
         ]
       },
       "PendingLinkResponse": {
@@ -29838,7 +30185,7 @@
           },
           "candidate": {
             "nullable": true,
-            "description": "Solo si un único expediente coincide",
+            "description": "El único expediente que coincide o, sin coincidencia, el más parecido (exact=false)",
             "type": "object",
             "allOf": [
               {
@@ -29889,6 +30236,29 @@
         "required": [
           "version",
           "reason"
+        ]
+      },
+      "MyLinkResponse": {
+        "type": "object",
+        "properties": {
+          "linked": {
+            "type": "boolean",
+            "description": "La cuenta ya está vinculada a un expediente"
+          },
+          "request": {
+            "nullable": true,
+            "description": "Última solicitud de vinculación; null si nunca pidió",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LinkRequestResponse"
+              }
+            ]
+          }
+        },
+        "required": [
+          "linked",
+          "request"
         ]
       },
       "PublicOccupancyRowResponse": {

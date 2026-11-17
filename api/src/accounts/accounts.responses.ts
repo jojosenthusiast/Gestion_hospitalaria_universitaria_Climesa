@@ -1,4 +1,4 @@
-import { ClassProp, DateProp, DateTimeProp, EnumProp, IntProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassProp, DateProp, DateTimeProp, EnumProp, IntProp, StrProp, UuidProp } from '../platform/responses';
 import { ESTADO_VINCULACION } from '../platform/states';
 
 export class LinkRequestResponse {
@@ -25,6 +25,8 @@ export class LinkCandidateResponse {
   @StrProp({ description: 'Número de expediente' }) record!: string;
   @StrProp({ nullable: true }) fullName!: string | null;
   @DateProp({ nullable: true }) birth!: string | null;
+  @StrProp({ nullable: true, description: 'DUI del expediente con guion (G-2), para compararlo con el declarado' }) dui!: string | null;
+  @BoolProp({ description: 'true si DUI y nacimiento coinciden con lo declarado; false si es el expediente más parecido (mismo nacimiento, DUI distinto en un dígito) y no se puede aprobar' }) exact!: boolean;
 }
 
 export class PendingLinkResponse {
@@ -33,6 +35,12 @@ export class PendingLinkResponse {
   @IntProp() version!: number;
   @ClassProp(LinkAccountResponse) account!: LinkAccountResponse;
   @ClassProp(LinkDeclaredResponse) declared!: LinkDeclaredResponse;
-  @ClassProp(LinkCandidateResponse, { nullable: true, description: 'Solo si un único expediente coincide' }) candidate!: LinkCandidateResponse | null;
+  @ClassProp(LinkCandidateResponse, { nullable: true, description: 'El único expediente que coincide o, sin coincidencia, el más parecido (exact=false)' }) candidate!: LinkCandidateResponse | null;
   @IntProp({ description: 'Cuántos expedientes coinciden' }) candidates!: number;
+}
+
+/** G-1: the account's link state. */
+export class MyLinkResponse {
+  @BoolProp({ description: 'La cuenta ya está vinculada a un expediente' }) linked!: boolean;
+  @ClassProp(LinkRequestResponse, { nullable: true, description: 'Última solicitud de vinculación; null si nunca pidió' }) request!: LinkRequestResponse | null;
 }

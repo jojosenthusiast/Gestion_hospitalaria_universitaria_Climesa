@@ -27,6 +27,26 @@ export class AccountLinkingService {
       WHERE i.tipo='dui' AND i.valor_normalizado=$1 AND i.estado IN ('sin_verificar','verificado') AND p.nacimiento=$2::date AND p.estado<>'inactivo'`, [dui, birth])).rows.map(r => r.id as string);
   }
 
+  /**
+   * G-2: the one active record with the same birth date whose DUI number differs from the declared one in exactly one
+   * of its eight digits (a typo; the check digit follows the number, so it is not compared).
+   */
+  private async closest(c: PoolClient, dui: string, birth: string) {
+    const rows = (await c.query(`SELECT p.id,i.valor_normalizado AS dui FROM pacientes.identificador i JOIN pacientes.paciente p ON p.id=i.paciente_id
+      WHERE i.tipo='dui' AND i.estado IN ('sin_verificar','verificado') AND p.nacimiento=$1::date AND p.estado<>'inactivo' LIMIT 200`, [birth])).rows;
+    const near = rows.filter(r => { const other = String(r.dui).replace(/-/g, '').slice(0, 8); return other.length === 8 && [...other].filter((ch, i) => ch !== dui[i]).length === 1; });
+    return near.length === 1 ? near[0].id as string : null;
+  }
+
+  /** G-1: whether the account is linked and its latest request, so the app opens on the real state. */
+  async mine(actor: Actor) {
+    return this.db.transaction(async c => {
+      const account = (await c.query('SELECT paciente_id FROM acceso.usuario WHERE id=$1', [actor.id])).rows[0];
+      const latest = (await c.query("SELECT * FROM acceso.vinculacion_paciente WHERE usuario_id=$1 ORDER BY (estado='pendiente') DESC,creado_en DESC,id DESC LIMIT 1", [actor.id])).rows[0];
+      return { linked: !!account?.paciente_id, request: latest ? this.view(latest) : null };
+    });
+  }
+
   private view(row: Row) {
     return { id: row.id, state: row.estado, createdAt: row.creado_en, resolvedAt: row.resuelto_en ?? null, rejectionReason: row.motivo_rechazo ?? null, version: row.version };
   }
@@ -64,11 +84,16 @@ export class AccountLinkingService {
         const dui = String(row.dui_declarado);
         const found = await this.matches(c, dui, row.nacimiento);
         const candidateId = found.length === 1 ? found[0] : null;
+        // G-2: with no exact match, the closest record (same birth, DUI one digit away) is shown as not approvable.
+        const shownId = candidateId ?? (found.length ? null : await this.closest(c, dui, row.nacimiento));
         let candidate = null;
-        if (candidateId) {
-          const p = (await c.query(`SELECT id,expediente,nacimiento::text AS nacimiento,coalesce(nullif(concat_ws(' ',nombres,primer_apellido,segundo_apellido),''),alias_provisional) AS nombre FROM pacientes.paciente WHERE id=$1`, [candidateId])).rows[0];
-          candidate = { id: p.id, record: p.expediente, fullName: p.nombre, birth: dateText(p.nacimiento) };
-          await this.commands.audit(c, actor, { action: 'vinculacion.leer', entity: 'vinculacion_paciente', entityId: row.id, patientId: candidateId, permission: 'cuentas.verificar' });
+        if (shownId) {
+          const p = (await c.query(`SELECT p.id,p.expediente,p.nacimiento::text AS nacimiento,coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS nombre,
+              (SELECT i.valor_normalizado FROM pacientes.identificador i WHERE i.paciente_id=p.id AND i.tipo='dui' AND i.estado IN ('sin_verificar','verificado') LIMIT 1) AS dui
+            FROM pacientes.paciente p WHERE p.id=$1`, [shownId])).rows[0];
+          const recordDui = p.dui ? String(p.dui).replace(/-/g, '') : null;
+          candidate = { id: p.id, record: p.expediente, fullName: p.nombre, birth: dateText(p.nacimiento), dui: recordDui ? `${recordDui.slice(0, 8)}-${recordDui.slice(8)}` : null, exact: shownId === candidateId };
+          await this.commands.audit(c, actor, { action: 'vinculacion.leer', entity: 'vinculacion_paciente', entityId: row.id, patientId: shownId, permission: 'cuentas.verificar', detail: { exact: shownId === candidateId } });
         }
         result.push({
           id: row.id, createdAt: row.creado_en, version: row.version,

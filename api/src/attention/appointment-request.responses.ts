@@ -1,4 +1,4 @@
-import { ClassArrayProp, ClassProp, DateTimeProp, EnumArrayProp, EnumProp, IntProp, StrArrayProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, EnumArrayProp, EnumProp, IntProp, StrArrayProp, StrProp, UuidProp } from '../platform/responses';
 import { ESTADO_SOLICITUD_CITA } from '../platform/states';
 import { FRANJAS_SOLICITUD } from './appointment-request.dto';
 import { CATEGORY_REQUEST_ACTIONS } from './appointment-request.rules';
@@ -58,4 +58,15 @@ export class CategoryRequestCommandResponse {
   @IntProp() version!: number;
   @EnumProp(ESTADO_SOLICITUD_CITA, 'EstadoSolicitudCita') state!: string;
   @UuidProp({ optional: true, description: 'Cita confirmada creada al asignar' }) appointmentId?: string;
+}
+
+/** A-1: the slot the assign panel opens with. */
+export class CategoryRequestSuggestionResponse {
+  @BoolProp({ description: 'false si ningún médico candidato tiene hueco en la franja en 14 días' }) found!: boolean;
+  @UuidProp({ nullable: true }) doctorId!: string | null;
+  @StrProp({ nullable: true }) doctorName!: string | null;
+  @StrProp({ nullable: true }) specialty!: string | null;
+  @DateProp({ nullable: true }) date!: string | null;
+  @DateTimeProp({ nullable: true }) start!: string | null;
+  @DateTimeProp({ nullable: true }) end!: string | null;
 }
