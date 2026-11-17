@@ -54,7 +54,7 @@ Muestra tu número y su estado: "Esperando a que el médico llame", "Llamado N d
 - En iOS, **Pedir cita** abre la misma hoja: motivos con ícono, **Buscar motivo**, **Franja preferida**, la nota y **Ya tengo médico (opcional)**; **Enviar solicitud**. **Mis solicitudes** aparece arriba de tus citas, con **Retirar solicitud**. Al enviar, la hoja se cierra y queda el aviso "Solicitud enviada. Recepción te asignará médico y hora; te avisaremos aquí." Una solicitud con médico y hora dice **Cita asignada**.
 - Puedes tener hasta 2 solicitudes esperando a la vez (por motivo o con médico y hora). Una solicitud por motivo deja de contar para ese límite a los 14 días, aunque Recepción todavía puede asignarla.
 - **Solicitar reprogramación** (en iOS, **Reprogramar → Pedir el cambio**): tu cita original sigue vigente hasta que Recepción o tu médico acepten el cambio.
-- **Cancelar** (en iOS, **Cancelar cita → Confirmar cancelación**).
+- **Cancelar** (en iOS, **Cancelar cita → Confirmar cancelación**). En la web eliges un motivo con un toque (**Ya no lo necesito**, **No puedo a esa hora** u **Otro motivo**, que pide unas palabras); no hace falta escribir.
 - La cita muestra "Puedes cancelar o reprogramar hasta las …": puedes hacerlo hasta 2 horas antes.
 - Puedes tener como máximo 2 solicitudes pendientes. Una solicitud que nadie confirmó antes de su hora queda vencida.
 
