@@ -168,6 +168,8 @@ object RoleDashboard {
         unavailable: Set<DashboardSource> = emptySet(),
         now: Instant = Instant.now(),
         linked: Boolean = true,
+        /** When the patient last opened their results (device marker until G-7); later releases only count as new. */
+        resultsSeenAt: Instant? = null,
     ): DashboardModel {
         val sections = AndroidSections.visible(role, permissions)
         fun target(section: AndroidSection) = section.takeIf { it in sections }
@@ -347,7 +349,7 @@ object RoleDashboard {
                 lab?.let {
                     kpis += DashboardKpi("Exámenes en trámite", (it.requested + it.inProcess + it.toReview).toString(), DashboardTone.PROCESS, target = target(AndroidSection.RESULTS))
                     // G6: "Resultados nuevos" counts only those released in the last 7 days, not the whole history (gap G-7: no "seen").
-                    val recent = recentResults(data[DashboardSource.MY_LAB], now)
+                    val recent = recentResults(data[DashboardSource.MY_LAB], now, resultsSeenAt)
                     if (recent > 0 && AndroidSection.RESULTS in sections) attention += DashboardAttention("Resultados nuevos ($recent)", "Tu médico ya los revisó; puedes verlos.", DashboardTone.SUCCESS, "Ver resultados", QuickActionRequest(AndroidSection.RESULTS))
                 }
                 labChart("Mis exámenes")
@@ -369,8 +371,9 @@ object RoleDashboard {
     }
 
     /** G6: results released (reviewed) in the last 7 days. */
-    fun recentResults(value: Any?, now: Instant): Int = rows(value).count { order ->
-        order.optString("state") == "completado" && instant(text(order, "reviewedAt"))?.isAfter(now.minus(java.time.Duration.ofDays(7))) == true
+    fun recentResults(value: Any?, now: Instant, seenAt: Instant? = null): Int {
+        val since = listOfNotNull(now.minus(java.time.Duration.ofDays(7)), seenAt).max()
+        return rows(value).count { order -> order.optString("state") == "completado" && instant(text(order, "reviewedAt"))?.isAfter(since) == true }
     }
 
     fun unitLabel(state: String) = mapOf("disponible" to "Disponible", "en_servicio" to "En servicio", "en_mantenimiento" to "En mantenimiento")[state] ?: state

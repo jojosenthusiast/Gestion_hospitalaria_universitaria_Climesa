@@ -97,9 +97,11 @@ fun LaboratoryScreen(
     modifier: Modifier = Modifier,
     ownResults: Boolean = false,
     section: AndroidSection? = null,
+    userId: String? = null,
     model: LaboratoryViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
+    LaunchedEffect(ownResults, userId) { if (ownResults && userId != null) model.markResultsSeen(userId) }
     var filterName by rememberSaveable(section) { mutableStateOf(LabFlow.defaultFilter(section).name) }
     val filter = LabFilter.entries.firstOrNull { it.name == filterName } ?: LabFilter.ALL
     var query by rememberSaveable { mutableStateOf("") }

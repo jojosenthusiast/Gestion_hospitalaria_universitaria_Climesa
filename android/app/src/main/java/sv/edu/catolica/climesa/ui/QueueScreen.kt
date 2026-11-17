@@ -123,7 +123,7 @@ fun QueueScreen(
             })
         }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
-        state.undo?.let { undo -> item { UndoRow(undo.label, state.busy) { model.undoLastCall() } } }
+        // Sweep: the call's undo lives only on its card ("Deshacer"), not again at the top.
         if (service != null && !state.loading) item {
             NextCard(state, service!!, canCall, primary = !canIssue, state.tickets.any { it.service == service && it.state == "en_espera" }, office, { office = it }) { model.callNext(service!!, office) }
         }
@@ -242,9 +242,9 @@ private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Bo
             Text(stringResource(R.string.fila_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(QueueBoard.waitLevel(ticket, now)))
         }
         // D-3: "No se presentó" waits on its own card with "Deshacer" before it is sent.
-        val absence = state.pendingAbsence?.takeIf { it.key == ticket.id }
+        val absence = state.pendingAbsences.firstOrNull { it.key == ticket.id }
         if (absence != null) {
-            UndoRow(absence.label, busy = false) { model.undoAbsence() }
+            UndoRow(absence.label, busy = false) { model.undoAbsence(ticket.id) }
             return@Column
         }
         // Buttons come from the API (`allowedActions`). R3 A-14/A-31: only allowed actions, as compact row actions in one line

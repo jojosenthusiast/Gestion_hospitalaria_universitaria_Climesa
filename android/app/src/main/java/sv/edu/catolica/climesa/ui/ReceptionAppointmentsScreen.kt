@@ -112,8 +112,8 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                     item(key = "d-$day") { Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(day), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
                     items(rows, key = { it.id }) { row ->
                         // D-3: "No asistió" is one tap; the row offers "Deshacer" for 8 s before anything is sent.
-                        val pending = actionState.pendingNoShow?.takeIf { it.key == row.id }
-                        if (pending != null) PendingUndoRow(pending.label) { actions.undoNoShow() }
+                        val pending = actionState.pendingNoShows.firstOrNull { it.key == row.id }
+                        if (pending != null) PendingUndoRow(pending.label) { actions.undoNoShow(row.id) }
                         else AppointmentRow(row) { action -> if (action == AppointmentAction.NO_SHOW) { actions.markNoShow(row) } else actions.open(row, action) }
                     }
                 }

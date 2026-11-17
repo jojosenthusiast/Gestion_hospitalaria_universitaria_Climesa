@@ -23,6 +23,8 @@ data class ConsultationRecord(
     val labOrders: List<RecordedLabOrder> = emptyList(),
     /** Catalog ids ordered from this device for this consultation (a panel is listed later by its component exams). */
     val orderedIds: Set<String> = emptySet(),
+    /** False while this consultation's order list could not be read: ordering waits until it is known. */
+    val labOrdersKnown: Boolean = true,
 ) {
     /** Exams of a non-cancelled order of this consultation: the catalog does not offer them again. */
     fun alreadyOrdered(exam: LabExam): Boolean = exam.id in orderedIds || labOrders.any { it.state != "cancelado" && (exam.id in it.examIds || exam.code in it.examCodes) }

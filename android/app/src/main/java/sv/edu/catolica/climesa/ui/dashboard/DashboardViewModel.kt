@@ -31,7 +31,9 @@ data class DashboardUiState(val loading: Boolean = true, val model: DashboardMod
  * zero. Realtime events trigger a debounced silent re-read; there is no timer.
  */
 @HiltViewModel
-class DashboardViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository) : ViewModel() {
+class DashboardViewModel @Inject constructor(private val api: ApiGateway, realtime: RealtimeRepository, private val drafts: sv.edu.catolica.climesa.data.DraftStore = sv.edu.catolica.climesa.data.NoDraftStore) : ViewModel() {
+    private var userId: String? = null
+    private var last: Pair<Map<sv.edu.catolica.climesa.domain.DashboardSource, Any>, Set<sv.edu.catolica.climesa.domain.DashboardSource>>? = null
     private data class Args(val role: String, val permissions: List<String>, val linked: Boolean, val channels: List<String>)
 
     private val mutable = MutableStateFlow(DashboardUiState())
@@ -41,7 +43,8 @@ class DashboardViewModel @Inject constructor(private val api: ApiGateway, realti
     private var job: Job? = null
 
     /** Idempotent for the same role, permissions and channels: reads once and subscribes to the realtime channels. */
-    fun start(role: String, permissions: List<String>, channels: List<String>, linked: Boolean) {
+    fun start(role: String, permissions: List<String>, channels: List<String>, linked: Boolean, userId: String? = null) {
+        this.userId = userId
         val next = Args(role, permissions, linked, channels)
         if (next != args) {
             args = next
@@ -57,6 +60,16 @@ class DashboardViewModel @Inject constructor(private val api: ApiGateway, realti
     }
 
     fun reload() = load(silent = false)
+
+    /** Back on Inicio after opening "Mis exámenes": the results seen there no longer count as new (no new read). */
+    fun refreshSeen() {
+        val current = args ?: return
+        val (data, failed) = last ?: return
+        mutable.value = mutable.value.copy(model = build(current, data, failed))
+    }
+
+    private fun build(current: Args, data: Map<sv.edu.catolica.climesa.domain.DashboardSource, Any>, failed: Set<sv.edu.catolica.climesa.domain.DashboardSource>) =
+        RoleDashboard.build(current.role, current.permissions, data, failed, linked = current.linked, resultsSeenAt = userId?.let { sv.edu.catolica.climesa.data.ResultsSeen.load(drafts, it) })
 
     private fun reloadSoon() {
         job?.cancel()
@@ -80,7 +93,8 @@ class DashboardViewModel @Inject constructor(private val api: ApiGateway, realti
             mutable.value = DashboardUiState(loading = false, error = results.firstNotNullOfOrNull { it.second.exceptionOrNull()?.message } ?: "No se pudo cargar el tablero.")
             return
         }
-        mutable.value = DashboardUiState(loading = false, model = RoleDashboard.build(current.role, current.permissions, data, failed, linked = current.linked))
+        last = data to failed
+        mutable.value = DashboardUiState(loading = false, model = build(current, data, failed))
     }
 
     private suspend fun read(source: DashboardSource): Result<Any> =

@@ -61,7 +61,13 @@ internal class UndoWindow(
     private val onFailed: (DeferredRequest, Exception, kept: Boolean) -> Unit = { _, _, _ -> },
     /** Actions dropped because their tap is older than [MAX_AGE_MS]. */
     private val onExpired: (List<DeferredRequest>) -> Unit = {},
-    private val onChange: (PendingUndo?) -> Unit,
+    /**
+     * On 409 `version_conflicto` the owner re-reads the subject: a new body (fresh version) is sent once more under a NEW
+     * idempotency key (a key never carries two bodies); null means the action no longer applies and it is dropped.
+     */
+    private val rebase: suspend (DeferredRequest) -> JSONObject? = { null },
+    /** Every action still inside its window, in tap order (one per subject). */
+    private val onChange: (List<PendingUndo>) -> Unit,
 ) {
     private var userId: String? = null
     private var items: List<DeferredRequest> = emptyList()
@@ -70,6 +76,9 @@ internal class UndoWindow(
 
     /** The latest action still inside its window (the one "Deshacer" cancels). */
     val pending: PendingUndo? get() = items.lastOrNull { it.id in timers }?.let { PendingUndo(it.key, it.label) }
+
+    /** Every action inside its window, in tap order. */
+    val pendingAll: List<PendingUndo> get() = items.filter { it.id in timers }.map { PendingUndo(it.key, it.label) }
 
     /** Stored actions whose window ended and whose last send failed. */
     val failed: List<DeferredRequest> get() = items.filter { it.error != null && it.id !in timers }
@@ -91,7 +100,8 @@ internal class UndoWindow(
     }
 
     fun start(key: String, label: String, path: String, body: JSONObject) {
-        flush()
+        // Only a waiting action on the same subject is sent first; other subjects keep their own undo.
+        if (endWindows(key)) drain()
         val tap = now()
         val item = DeferredRequest(UUID.randomUUID().toString(), key, label, path, body.toString(), tap, tap + windowMs)
         items = items + item
@@ -101,8 +111,8 @@ internal class UndoWindow(
     }
 
     /** Cancels the action in its window; true when there was one (nothing reached the server). */
-    fun undo(): Boolean {
-        val item = items.lastOrNull { it.id in timers } ?: return false
+    fun undo(key: String? = null): Boolean {
+        val item = items.lastOrNull { it.id in timers && (key == null || it.key == key) } ?: return false
         timers.remove(item.id)?.cancel()
         remove(item.id)
         return true
@@ -143,14 +153,20 @@ internal class UndoWindow(
     }
 
     /**
-     * Ends every window now and waits until each stored action got its answer, so another request on the same board is
-     * sent only after the waiting one (and never overtakes it).
+     * Ends the window of [key] (every subject when null) and waits until the stored actions got their answer, so another
+     * request on that subject is sent only after the waiting one (and never overtakes it). Other subjects keep their undo.
      */
-    suspend fun settle() {
-        timers.values.forEach { it.cancel() }
-        timers.clear()
-        notifyChange()
+    suspend fun settle(key: String? = null) {
+        endWindows(key)
         drainNow()
+    }
+
+    private fun endWindows(key: String?): Boolean {
+        val ending = items.filter { it.id in timers && (key == null || it.key == key) }
+        if (ending.isEmpty()) return false
+        ending.forEach { timers.remove(it.id)?.cancel() }
+        notifyChange()
+        return true
     }
 
     private fun drain() { scope.launch { drainNow() } }
@@ -159,25 +175,40 @@ internal class UndoWindow(
     private suspend fun drainNow() {
             sending.withLock {
                 val held = mutableSetOf<String>()
-                for (item in items.filter { it.id !in timers }) {
-                    if (item.key in held || items.none { it.id == item.id } || item.id in timers) continue
-                    try {
+                for (queued in items.filter { it.id !in timers }) {
+                    if (queued.key in held || items.none { it.id == queued.id } || queued.id in timers) continue
+                    var item = queued
+                    var rebased = false
+                    while (true) try {
                         // Exact replay: the body stored at the tap, with the key stored at the tap.
                         val result = withContext(RequestIntent(item.id)) { api.request(item.path, "POST", JSONObject(item.body)) }
                         remove(item.id)
                         onSent(item, result)
+                        break
                     } catch (e: CancellationException) { throw e }
                     catch (e: Exception) {
+                        if (!rebased && (e as? AuthRequestException)?.code == "version_conflicto") {
+                            val fresh = try { rebase(item) } catch (c: CancellationException) { throw c } catch (_: Exception) { null }
+                            if (fresh != null) {
+                                // New body, new key: the stored entry is replaced, never resent under the old key.
+                                val next = item.copy(id = UUID.randomUUID().toString(), body = fresh.toString(), error = null)
+                                items = items.map { if (it.id == item.id) next else it }
+                                save()
+                                item = next; rebased = true
+                                continue
+                            }
+                        }
                         if (definitive(e)) {
                             remove(item.id)
                             onFailed(item, e, false)
-                            continue
+                            break
                         }
                         items = items.map { if (it.id == item.id) it.copy(error = userMessage(e, "No se pudo enviar.")) else it }
                         save()
                         held += item.key
                         onFailed(item, e, true)
-                        if (e is AuthRequestException && e.statusCode == null) break
+                        if (e is AuthRequestException && e.statusCode == null) return@withLock
+                        break
                     }
                 }
             }
@@ -195,7 +226,7 @@ internal class UndoWindow(
         notifyChange()
     }
 
-    private fun notifyChange() = onChange(pending)
+    private fun notifyChange() = onChange(pendingAll)
 
     private fun save() {
         val user = userId ?: return

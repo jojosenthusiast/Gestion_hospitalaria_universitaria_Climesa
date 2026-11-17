@@ -213,8 +213,8 @@ class DeferredActionsTest {
         assertNotNull("still stored for its own account", drafts.load("rec-1", FormDrafts.DEFERRED_NO_SHOW))
     }
 
-    // Advisory: another board action waits until the pending absence got its answer.
-    @Test fun aBoardActionWaitsForThePendingAbsence() = runTest(dispatcher) {
+    // Another ticket's action does not end this ticket's window (same-ticket order: SweepFixesTest).
+    @Test fun anotherTicketsActionLeavesThePendingAbsenceAlone() = runTest(dispatcher) {
         val drafts = MemoryDrafts()
         val api = FakeGateway()
         api.responses["/fila"] = JSONArray().put(JSONObject().put("id", "t1").put("numero", 7).put("service", "consulta_general").put("area", "CON").put("state", "llamado").put("priority", "normal").put("version", 4)
@@ -225,6 +225,8 @@ class DeferredActionsTest {
         vm.bindUser("rec-1"); vm.load(); runCurrent()
         vm.absent(vm.state.value.tickets.first { it.id == "t1" })
         vm.attend(vm.state.value.tickets.first { it.id == "t2" }); runCurrent()
-        assertEquals(listOf("/fila/t1/no-se-presento", "/fila/t2/atender"), api.calls.filter { it.second == "POST" }.map { it.first })
+        // Sweep #4: another ticket's action leaves t1 in its window, with its undo.
+        assertEquals(listOf("/fila/t2/atender"), api.calls.filter { it.second == "POST" }.map { it.first })
+        assertEquals(listOf("t1"), vm.state.value.pendingAbsences.map { it.key })
     }
 }

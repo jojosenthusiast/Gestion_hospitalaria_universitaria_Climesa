@@ -42,7 +42,7 @@ class SessionDrafts(private val drafts: DraftStore, private val now: () -> Long 
             listOf(FormDrafts.DEFERRED_NO_SHOW, FormDrafts.DEFERRED_ABSENCE).any { (drafts.load(userId, it)?.optJSONArray("items")?.length() ?: 0) > 0 }
 
     companion object {
-        val PENDING_WRITES = setOf(FormDrafts.MILESTONE_QUEUE, FormDrafts.PREHOSPITAL_QUEUE, FormDrafts.PROVISIONAL_PATIENT, FormDrafts.DEFERRED_NO_SHOW, FormDrafts.DEFERRED_ABSENCE)
+        val PENDING_WRITES = setOf(FormDrafts.MILESTONE_QUEUE, FormDrafts.PREHOSPITAL_QUEUE, FormDrafts.PROVISIONAL_PATIENT, FormDrafts.DEFERRED_NO_SHOW, FormDrafts.DEFERRED_ABSENCE, ResultsSeen.KEY)
         /** 24 h, the API's `PREHOSPITAL_GRACE_MS`: after it the server rejects the milestone and the report is no longer received. */
         const val PENDING_WRITES_TTL_MS = 24 * 3_600_000L
     }

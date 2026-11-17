@@ -40,6 +40,8 @@ data class AppointmentActionState(
     val error: String? = null,
     /** D-3: "No asistió" waiting 8 s with "Deshacer" before it is sent ([PendingUndo.key] is the appointment id). */
     val pendingNoShow: PendingUndo? = null,
+    /** Every "No asistió" still in its window, one per appointment. */
+    val pendingNoShows: List<PendingUndo> = emptyList(),
     /** The stored "No asistió" whose last send failed (kept, with [error], until it goes through or is discarded). */
     val failedNoShow: String? = null,
 ) {
@@ -69,7 +71,7 @@ class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway
             }
         },
         onExpired = { gone -> mutable.update { it.copy(error = "${gone.size} «No asistió» de hace más de 24 h no se enviaron.") } },
-    ) { pending -> mutable.update { it.copy(pendingNoShow = pending) } }
+    ) { pending -> mutable.update { it.copy(pendingNoShow = pending.lastOrNull(), pendingNoShows = pending) } }
 
     /** Signed-in user: a "No asistió" stored before the app closed is sent now if its window ended. */
     fun bindUser(id: String) = noShow.bind(id)
@@ -93,7 +95,7 @@ class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway
         val name = target.patientName.ifBlank { "el paciente" }
         noShow.start(target.id, "Cita de $name marcada como no asistió.", AppointmentActions.path(AppointmentAction.NO_SHOW, target.id), AppointmentActions.body(AppointmentAction.NO_SHOW, target.version, ""))
     }
-    fun undoNoShow() { if (noShow.undo()) mutable.update { it.copy(done = "Se mantiene la cita.", error = null) } }
+    fun undoNoShow(appointmentId: String? = null) { if (noShow.undo(appointmentId)) mutable.update { it.copy(done = "Se mantiene la cita.", error = null) } }
 
     /** D-8 / A4: a quick reason chip fills the reason; "Otro" empties it for typing. */
     fun quickReason(text: String?) = mutable.update { if (it.busy) it else it.copy(reason = text.orEmpty(), serverError = null, error = null) }
@@ -105,7 +107,7 @@ class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway
         mutable.value = AppointmentActionState(target = target, action = action, date = date)
         if (action == AppointmentAction.RESCHEDULE) loadSlots()
     }
-    fun close() { if (!mutable.value.busy) { intent.reset(); slotsJob?.cancel(); mutable.update { AppointmentActionState(done = it.done, pendingNoShow = it.pendingNoShow, failedNoShow = it.failedNoShow, error = it.error.takeIf { _ -> it.failedNoShow != null }) } } }
+    fun close() { if (!mutable.value.busy) { intent.reset(); slotsJob?.cancel(); mutable.update { AppointmentActionState(done = it.done, pendingNoShow = it.pendingNoShow, pendingNoShows = it.pendingNoShows, failedNoShow = it.failedNoShow, error = it.error.takeIf { _ -> it.failedNoShow != null }) } } }
     fun consumeDone() = mutable.update { it.copy(done = null) }
     fun reason(text: String) = mutable.update { if (it.busy) it else it.copy(reason = text.take(AppointmentActions.REASON_MAX), serverError = null, error = null) }
 
@@ -149,7 +151,7 @@ class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway
             try {
                 val result = intent.send { api.request(AppointmentActions.path(action, target.id, reschedule?.id), "POST", AppointmentActions.body(action, version, s.reason, s.slot)) }
                 val rescheduleState = (result as? JSONObject)?.optString("rescheduleState")?.takeIf { it.isNotBlank() }
-                mutable.value = AppointmentActionState(done = AppointmentActions.doneNotice(action, target.patientName.ifBlank { "el paciente" }, rescheduleState), pendingNoShow = mutable.value.pendingNoShow)
+                mutable.value = AppointmentActionState(done = AppointmentActions.doneNotice(action, target.patientName.ifBlank { "el paciente" }, rescheduleState), pendingNoShow = mutable.value.pendingNoShow, pendingNoShows = mutable.value.pendingNoShows)
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 val field = ApiProblems.fieldErrors(e)[AppointmentActions.reasonField(action)]
                 mutable.update { it.copy(busy = false, serverError = field, error = businessMessage(e, "No se pudo completar la acción.")) }

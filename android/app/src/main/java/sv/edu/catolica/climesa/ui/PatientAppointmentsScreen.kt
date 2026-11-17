@@ -75,7 +75,8 @@ fun PatientAppointmentsScreen(
     BackHandler(enabled = requestState.formOpen) { requests.leaveForm() }
     // A1: "Solicitud enviada" goes away by itself after 5 s (it also goes when leaving the screen).
     LaunchedEffect(requestState.notice) { if (requestState.notice != null) { kotlinx.coroutines.delay(5_000); requests.clearMessages() } }
-    if (requestState.formOpen) { CategoryRequestForm(requestState, requests, state.doctors, modifier); return }
+    LaunchedEffect(requestState.formOpen) { if (requestState.formOpen) model.loadRequestDoctors() }
+    if (requestState.formOpen) { CategoryRequestForm(requestState, requests, state.requestDoctors.ifEmpty { state.doctors }, modifier); return }
     val cancelAppointment = state.appointments.firstOrNull { it.id == cancelTarget }
 
     if (cancelAppointment != null) {

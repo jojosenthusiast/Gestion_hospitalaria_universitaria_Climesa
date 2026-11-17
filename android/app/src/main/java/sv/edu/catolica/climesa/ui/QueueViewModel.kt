@@ -57,6 +57,8 @@ data class QueueState(
     val lastService: String = QueueLabels.services.first().first,
     /** B3 / D-3: "No se presentó" waits 8 s with "Deshacer" before it is sent. */
     val pendingAbsence: PendingUndo? = null,
+    /** Every "No se presentó" still in its window, one per ticket. */
+    val pendingAbsences: List<PendingUndo> = emptyList(),
     /** A stored "No se presentó" whose last send failed and will be retried (it can be discarded). */
     val failedAbsence: String? = null,
     /** B5: called numbers of the patient's service, for "faltan N" and the room once called. */
@@ -82,11 +84,18 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
         onSent = { item, _ -> mutable.value = mutable.value.copy(notice = "${item.label.substringBefore(" se marcará")} marcado como no presentado.", error = null, failedAbsence = null); load(silent = true) },
         onFailed = { item, e, kept ->
             val code = item.label.substringBefore(" se marcará")
-            mutable.value = if (kept) mutable.value.copy(error = "$code: ${message(e)} Queda guardado y se reintentará.", failedAbsence = item.id)
+            mutable.value = if ((e as? sv.edu.catolica.climesa.data.AuthRequestException)?.code == "version_conflicto") mutable.value.copy(error = "El número cambió mientras esperaba; no se marcó.", failedAbsence = null).also { load(silent = true) }
+            else if (kept) mutable.value.copy(error = "$code: ${message(e)} Queda guardado y se reintentará.", failedAbsence = item.id)
             else mutable.value.copy(error = "$code no se marcó como no presentado: ${message(e)}", failedAbsence = null).also { load(silent = true) }
         },
         onExpired = { gone -> mutable.value = mutable.value.copy(error = "${gone.size} «No se presentó» de hace más de 24 h no se enviaron.") },
-    ) { pending -> mutable.value = mutable.value.copy(pendingAbsence = pending) }
+        // #3: the ticket changed version while the absence waited: re-read it and, if it still allows it, send a new body.
+        rebase = { item ->
+            QueueRules.parse(api.request("/fila")).firstOrNull { it.id == item.key }
+                ?.takeIf { QueueAction.ABSENT in it.allowedActions }
+                ?.let { JSONObject().put("version", it.version) }
+        },
+    ) { pending -> mutable.value = mutable.value.copy(pendingAbsence = pending.lastOrNull(), pendingAbsences = pending) }
 
     /** Signed-in user: a "No se presentó" stored before the app closed is sent now if its window ended. */
     fun bindUser(id: String) = absence.bind(id)
@@ -236,7 +245,7 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
         if (QueueAction.ABSENT !in ticket.allowedActions) return
         absence.start(ticket.id, "${QueueLabels.code(ticket)} se marcará como no presentado.", "/fila/${ticket.id}/no-se-presento", JSONObject().put("version", ticket.version))
     }
-    fun undoAbsence() { if (absence.undo()) mutable.value = mutable.value.copy(notice = "Se mantiene en la fila.", error = null) }
+    fun undoAbsence(ticketId: String? = null) { if (absence.undo(ticketId)) mutable.value = mutable.value.copy(notice = "Se mantiene en la fila.", error = null) }
 
     /**
      * The API picks who goes next in [service] by RN-FILA-SIGUIENTE (priority, appointments in their window, then arrival)
@@ -252,7 +261,8 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     private fun mutate(path: String, body: JSONObject, notice: String, key: String, intentKey: String = path, describe: (Any) -> String? = { null }, undoOf: (Any) -> UndoableCall? = { null }, onDone: (Any) -> Unit = {}) {
         if (mutable.value.busy) return
         // Another action waits until a pending "No se presentó" got its answer, so it never overtakes it.
-        viewModelScope.launch { absence.settle(); send(path, body, notice, key, intentKey, describe, undoOf, onDone) }
+        // #4: only this ticket's waiting absence goes first; the others keep their undo.
+        viewModelScope.launch { absence.settle(key); send(path, body, notice, key, intentKey, describe, undoOf, onDone) }
     }
 
     private suspend fun send(path: String, body: JSONObject, notice: String, key: String, intentKey: String = path, describe: (Any) -> String? = { null }, undoOf: (Any) -> UndoableCall? = { null }, onDone: (Any) -> Unit = {}) {

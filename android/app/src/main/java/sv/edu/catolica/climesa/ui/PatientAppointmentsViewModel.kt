@@ -32,6 +32,8 @@ data class PatientAppointmentsState(
     val loading: Boolean = true,
     val appointments: List<PatientAppointment> = emptyList(),
     val doctors: List<AppointmentDoctor> = emptyList(),
+    /** Doctors for the request form's "Ya tengo médico": on shift on any of the next 7 days. */
+    val requestDoctors: List<AppointmentDoctor> = emptyList(),
     val selectedDoctorId: String = "",
     val selectedDate: LocalDate = ReceptionScheduling.today(),
     val workPeriods: List<AppointmentWorkPeriod> = emptyList(),
@@ -205,6 +207,19 @@ class PatientAppointmentsViewModel @Inject constructor(
     }
 
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
+
+    /**
+     * The request form's "Ya tengo médico": reception may assign any of the next 7 days, so a doctor counts as on shift
+     * when they have a shift on any of them (not only today). A day that fails is skipped; today's list is the fallback.
+     */
+    fun loadRequestDoctors(from: java.time.LocalDate = ReceptionScheduling.today()) {
+        viewModelScope.launch {
+            val days = (0L until 7L).map { from.plusDays(it) }
+            val lists = days.mapNotNull { day -> try { parseDoctors(api.request("/citas/catalogos?date=$day")) } catch (e: CancellationException) { throw e } catch (_: Exception) { null } }
+            val merged = lists.flatten().groupBy { it.id }.map { (_, same) -> same.firstOrNull { it.hasShift }?.copy(reason = null) ?: same.first() }
+            mutable.value = mutable.value.copy(requestDoctors = merged.ifEmpty { mutable.value.doctors })
+        }
+    }
 
     /** Al cambiar de día se vuelve a pedir quién tiene turno ese día. */
     private fun loadDoctors() {

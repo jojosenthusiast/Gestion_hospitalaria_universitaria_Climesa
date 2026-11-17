@@ -34,6 +34,8 @@ import sv.edu.catolica.climesa.domain.NextProposal
 import sv.edu.catolica.climesa.domain.QueueRules
 
 data class ConsultationState(
+    /** Why the consultation record (or its lab orders) could not be read; null when it is current. */
+    val recordError: String? = null,
     val loading: Boolean = true,
     val appointments: List<MedicalAppointment> = emptyList(),
     val saving: Boolean = false,
@@ -181,11 +183,18 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         viewModelScope.launch {
             try {
                 val detail = api.request("/consultas/$consultationId/detalle")
-                val orders = if (withLabOrders) optional { ConsultationRecordRules.labOrders(api.request("/laboratorio/ordenes"), consultationId) } ?: mutable.value.record?.takeIf { it.consultationId == consultationId }?.labOrders.orEmpty() else emptyList()
-                val ordered = mutable.value.record?.takeIf { it.consultationId == consultationId }?.orderedIds.orEmpty() + storedOrdered(consultationId)
-                mutable.value = mutable.value.copy(record = ConsultationRecord(consultationId, ConsultationRecordRules.diagnoses(detail), ConsultationRecordRules.medications(detail), orders, ordered))
+                // #6: an unreadable order list is never shown as "Exámenes (0)": it is said, and ordering waits for it.
+                var ordersError: Exception? = null
+                val read = if (withLabOrders) try { ConsultationRecordRules.labOrders(api.request("/laboratorio/ordenes"), consultationId) } catch (e: CancellationException) { throw e } catch (e: Exception) { ordersError = e; null } else emptyList()
+                val previous = mutable.value.record?.takeIf { it.consultationId == consultationId }
+                val orders = read ?: previous?.labOrders.orEmpty()
+                val ordered = previous?.orderedIds.orEmpty() + storedOrdered(consultationId)
+                mutable.value = mutable.value.copy(
+                    record = ConsultationRecord(consultationId, ConsultationRecordRules.diagnoses(detail), ConsultationRecordRules.medications(detail), orders, ordered, labOrdersKnown = read != null),
+                    recordError = ordersError?.let { userMessage(it, "No se pudieron leer las órdenes de laboratorio de esta consulta.") },
+                )
             } catch (e: CancellationException) { throw e
-            } catch (_: Exception) { }
+            } catch (e: Exception) { mutable.value = mutable.value.copy(recordError = userMessage(e, "No se pudo leer lo registrado en esta consulta.")) }
         }
     }
 
@@ -330,6 +339,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         if (mutable.value.saving) return
         // B4: an exam already ordered in this consultation is never sent twice.
         val record = mutable.value.record?.takeIf { it.consultationId == consultationId }
+        if (withLabOrders && record?.labOrdersKnown != true) { mutable.value = mutable.value.copy(error = "No se pudieron leer las órdenes de esta consulta; vuelve a cargarlas antes de ordenar."); return }
         val repeated = record?.let { r -> mutable.value.labCatalog.filter { it.id in exams && r.alreadyOrdered(it) } }.orEmpty()
         if (repeated.isNotEmpty()) { mutable.value = mutable.value.copy(error = "Ya ordenaste ${repeated.joinToString { it.name }} en esta consulta."); return }
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null, stepNotice = null)
