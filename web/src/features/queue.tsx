@@ -150,7 +150,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
           {visible.length ? <div className="qb-board">{COLUMNS.map(column => <Lane key={column} column={column} tickets={sortColumn(shown.filter(t => t.column === column), column)} now={now} busy={action.busy} call={call} manage={manage} issue={issue}
               pendingIds={pending} averageWait={column === 'espera' ? summary.averageWait : 0} current={id => all.find(t => t.id === id) ?? null} undos={undos}
               cardError={id => failedId === id && action.error && !isVersionConflict(action.error) ? action.error.message : moveError?.ticketId === id ? moveError.text : null}
-              onTransition={transition} onMove={move} onPriority={changePriority} onUndo={item => void undoCall(item)} onVoid={ticket => void voidTicket(ticket)} />)}</div>
+              onTransition={transition} onMove={async (ticket, to) => { await move(ticket, to); }} onPriority={changePriority} onUndo={item => void undoCall(item)} onVoid={ticket => void voidTicket(ticket)} />)}</div>
             : <Empty title={all.length ? 'Ningún número coincide con los filtros' : 'La fila está vacía'} description={all.length ? 'Quita algún filtro para ver todos los números del día.' : 'Los números emitidos para este día aparecerán aquí.'} />}
         </>;
       }}</RemoteState>
