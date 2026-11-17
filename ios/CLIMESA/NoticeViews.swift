@@ -107,7 +107,8 @@ struct CriticalNoticeBanner: View {
                         .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
                     Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                     if model.failedNotice == notice.id, let error = model.submission.error { PatientNotice(text: error, failure: true) }
-                    ClimesaButton(title: L.text("notices.ack"), loading: model.busy) {
+                    // Inside a home screen the screen keeps its own primary: «Enterado» is secondary.
+                    ClimesaButton(title: L.text("notices.ack"), kind: .secondary, loading: model.busy) {
                         Task { await model.send(.enterado, notice) { try account.client() } }
                     }
                     if NoticeRules.canSnooze(notice) {

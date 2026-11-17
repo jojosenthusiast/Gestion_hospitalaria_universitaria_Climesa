@@ -155,7 +155,7 @@ private struct HomeLabCard: View {
     let open: () -> Void
     var body: some View {
         HomeCardLink(eyebrow: L.text("home.labs"), open: open) {
-            let pending = labs.filter { $0.reviewedAt == nil && $0.state != .cancelado }.count
+            let pending = PatientLabRules.pendingCount(labs)
             let ready = labs.filter { $0.reviewedAt != nil }.count
             HStack(spacing: Spacing.m) {
                 StatTile(value: String(pending), label: L.text("ds.paciente.home.pending"))
@@ -204,7 +204,12 @@ private struct QueueTicketCard: View {
                 let office = board.flatMap { QueueRules.office(for: ticket.number, called: $0.called) }
                 PatientNotice(text: office.map { String(format: L.text("queue.called.office"), $0) } ?? L.text("queue.called"))
             }
-            SectionCard(eyebrow: ticket.service.label) {
+            // S9: the ticket wears its area (code chip and tinted surface), like the web board.
+            VStack(alignment: .leading, spacing: Spacing.m) {
+                HStack(spacing: Spacing.s) {
+                    AreaTag(QueueBoardRules.area(ticket))
+                    Text(verbatim: ticket.service.label).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase)
+                }
                 HStack(alignment: .firstTextBaseline) {
                     Text(verbatim: "\(ticket.number)").font(Typo.number(96)).foregroundStyle(Theme.ink).minimumScaleFactor(0.5)
                         .accessibilityLabel(Text(verbatim: "\(L.text("ds.paciente.queue.number")) \(ticket.number)"))
@@ -216,6 +221,9 @@ private struct QueueTicketCard: View {
                 }
                 Text(verbatim: String(format: L.text("queue.issued"), ClimesaDates.display(ticket.issuedAt, .time))).font(Typo.small).foregroundStyle(Theme.muted)
             }
+            .padding(Spacing.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .areaSurface(QueueBoardRules.area(ticket))
         }
     }
 }
@@ -230,14 +238,21 @@ struct PatientAppointmentsView: View {
     @State private var rescheduling: Appointment?
     @State private var requesting = false
     @State private var requests = Loader<[CategoryRequest]>()
+    /// The sheet closes on success, so the confirmation lives here (web `MyRequests` `sent`).
+    @State private var requestSent = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Fase 2, flujo A: se pide por motivo, no eligiendo entre todos los médicos; recepción asigna médico y hora.
-            if account.can("citas.solicitar") { ClimesaButton(title: L.text("appointments.request")) { requesting = true } }
+            if account.can("citas.solicitar") { ClimesaButton(title: L.text("appointments.request")) { requestSent = false; requesting = true } }
+            if requestSent { PatientNotice(text: L.text("appointments.category.sent")) }
             PatientSubmissionNotice(submission: submission)
-            if let mine = requests.value, !mine.isEmpty { MyCategoryRequests(requests: mine, submission: submission, reload: load) }
-            if submission.lastFailure?.code == "version_conflicto" { ConflictBanner { Task { submission.error = nil; await load() } } }
+            if let message = requests.error {
+                SectionCard(title: L.text("appointments.category.mine")) { PartError(message: message, retry: load) }
+            } else if let mine = requests.value, !mine.isEmpty {
+                MyCategoryRequests(requests: mine, submission: submission, reload: load)
+            }
+            if submission.lastFailure?.code == "version_conflicto" { ConflictBanner { Task { submission.clearFailure(); await load() } } }
             LoadState(loader: loader, retry: load) { list in
                 // CITA-04: el reloj de interfaz (cada minuto) solo recalcula qué acciones siguen válidas; no pide datos.
                 TimelineView(.everyMinute) { context in
@@ -260,7 +275,7 @@ struct PatientAppointmentsView: View {
             CancelAppointmentSheet(appointment: item, submission: submission, reload: load)
         }
         .sheet(item: $rescheduling) { item in RescheduleAppointmentSheet(appointment: item, reload: load) }
-        .sheet(isPresented: $requesting) { CategoryRequestSheet(reload: load) }
+        .sheet(isPresented: $requesting) { CategoryRequestSheet(reload: load) { requestSent = true } }
     }
 
     private func load() async {
@@ -287,7 +302,7 @@ private struct AppointmentRow: View {
                 PatientTag(appointment.state.rawValue, label: appointment.state.label)
             }
             if let rejection = appointment.rejectionReason, !rejection.isEmpty {
-                Text(verbatim: String(format: L.text("appointments.rejected.reason"), rejection)).font(Typo.small).foregroundStyle(Theme.danger)
+                Text(verbatim: String(format: L.text("appointments.rejected.reason"), rejection)).font(Typo.small).foregroundStyle(Theme.warning)
             }
             switch option {
             case .hidden: EmptyView()
@@ -304,7 +319,7 @@ private struct AppointmentRow: View {
             }
             // CITA-02: reprogramar solo si el servidor lo permite; si no, el motivo.
             if let text = AppointmentRules.rescheduleText(appointment) {
-                Text(verbatim: text).font(Typo.small).foregroundStyle(appointment.reschedule?.state == .rechazada ? Theme.danger : Theme.muted)
+                Text(verbatim: text).font(Typo.small).foregroundStyle(appointment.reschedule?.state == .rechazada ? Theme.warning : Theme.muted)
             }
             if let reschedule {
                 if AppointmentRules.canReschedule(appointment) {
@@ -424,7 +439,7 @@ private struct MyCategoryRequests: View {
         ForEach(requests) { item in
             SectionCard {
                 ListRow(title: item.categoryNames, subtitle: L.text(item.franja.titleKey), meta: item.note) {
-                    PatientTag(item.state, label: L.text(CategoryRequestRules.stateKey(item.state)))
+                    PatientTag(CategoryRequestRules.badgeValue(item.state), label: L.text(CategoryRequestRules.stateKey(item.state)))
                 }
                 if let appointment = item.appointment {
                     Text(verbatim: String(format: L.text("appointments.category.assigned"), appointment.doctorName, ClimesaDates.display(appointment.start)))
@@ -453,6 +468,8 @@ private struct MyCategoryRequests: View {
 /// solo una opción secundaria; recepción asigna médico y hora.
 private struct CategoryRequestSheet: View {
     let reload: () async -> Void
+    /// Tells the list the request went through, before the sheet closes.
+    let sent: () -> Void
     @EnvironmentObject private var account: AccountModel
     @Environment(\.dismiss) private var dismiss
     @State private var categories = Loader<[AppointmentCategory]>()
@@ -495,7 +512,7 @@ private struct CategoryRequestSheet: View {
                 ClimesaButton(title: L.text("common.close"), kind: .secondary) { dismiss() }
             }
             .task { await loadCategories() }
-            .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await catalog.load { try await account.client().get("/citas/catalogos", as: AppointmentCatalogs.self) } } }
+            .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await loadCatalog() } }
         }
     }
 
@@ -529,7 +546,13 @@ private struct CategoryRequestSheet: View {
             Button(L.text("appointments.category.doctor")) { doctorOpen = true }.font(Typo.label).foregroundStyle(Theme.primary)
         } else {
             searchField(L.text("appointments.category.doctor.search"), text: $doctorQuery)
-            ForEach(CategoryRequestRules.doctors(catalog.value?.doctors ?? [], query: doctorQuery)) { d in
+            let found = CategoryRequestRules.doctors(catalog.value?.doctors ?? [], query: doctorQuery)
+            if let message = catalog.error {
+                PartError(message: message, retry: loadCatalog)
+            } else if catalog.value != nil, found.isEmpty, !doctorQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("appointments.category.doctor.none").font(Typo.small).foregroundStyle(Theme.muted)
+            }
+            ForEach(found) { d in
                 Button { doctor = d; doctorQuery = "" } label: {
                     ListRow(title: d.fullName, subtitle: d.specialty ?? L.text("appointments.category.general"), meta: nil) { EmptyView() }
                 }.buttonStyle(.plain)
@@ -547,6 +570,8 @@ private struct CategoryRequestSheet: View {
         .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(Theme.controlLine, lineWidth: 1))
     }
 
+    private func loadCatalog() async { await catalog.load { try await account.client().get("/citas/catalogos", as: AppointmentCatalogs.self) } }
+
     private func loadCategories() async { await categories.load { try await account.client().get(CategoryRequestRules.categoriesPath, as: [AppointmentCategory].self) } }
 
     private func send() async {
@@ -554,7 +579,7 @@ private struct CategoryRequestSheet: View {
         let ok = await submission.run(body: body, success: L.text("appointments.category.sent")) { key in
             _ = try await account.client().send("POST", CategoryRequestRules.path, body: body, key: key, as: CategoryRequestCommandResult.self)
         }
-        if ok { await reload(); dismiss() }
+        if ok { sent(); await reload(); dismiss() }
     }
 }
 
@@ -606,7 +631,7 @@ struct LabOrderRow: View {
                 Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
             }
             HStack(spacing: Spacing.s) {
-                PatientTag(order.reviewedAt != nil ? "firmada" : order.state.rawValue, label: status)
+                PatientTag(PatientLabRules.badgeValue(order), label: status)
                 // Priority uses the priority badge (amber), not a queue state family.
                 if order.priority == .urgente { PriorityBadge(order.priority.rawValue) }
                 if critical { PatientTag("critico_alto", label: L.text("results.critical")) }
@@ -624,10 +649,10 @@ struct LabOrderDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if staffView {
-                PatientTag(order.state.rawValue, label: order.state.label)
+                PatientTag(PatientLabRules.badgeValue(order), label: PatientLabRules.awaitsReview(order) ? L.text("results.awaitingReview") : order.state.label)
             } else {
                 // Same wording as the list: a completed order not yet reviewed stays "En revisión médica".
-                PatientTag(order.reviewedAt != nil ? "firmada" : order.state.rawValue, label: PatientLabRules.statusText(order))
+                PatientTag(PatientLabRules.badgeValue(order), label: PatientLabRules.statusText(order))
             }
             // Solo el paciente ve este aviso (sin valores): el médico ve los valores y su propia etiqueta.
             // S10: orden externa. El paciente ve dónde hacerse el examen y las instrucciones tal como se escribieron.
@@ -637,7 +662,7 @@ struct LabOrderDetail: View {
                     if let instructions = order.externalInstructions { Text(verbatim: instructions).font(Typo.body).foregroundStyle(Theme.ink) }
                 }
             }
-            if !showValues && LabExternalRules.patientNote(order) == nil { PatientNotice(text: L.text(ReviewRules.isAmendedPendingReview(order) ? "exams.amended" : "exams.waiting_review")) }
+            if !showValues && PatientLabRules.awaitsReview(order) && LabExternalRules.patientNote(order) == nil { PatientNotice(text: L.text(ReviewRules.isAmendedPendingReview(order) ? "exams.amended" : "exams.waiting_review")) }
             ForEach(order.items) { item in
                 SectionCard(title: "\(item.name) (\(item.code))") {
                     if showValues {
