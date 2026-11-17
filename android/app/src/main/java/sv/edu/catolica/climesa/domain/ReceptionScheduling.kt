@@ -7,8 +7,27 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /** Row of `GET /pacientes/selector`: lo mínimo para elegir a alguien en una lista con búsqueda. */
-data class PickerPatient(val id: String, val record: String, val name: String, val age: Int?) {
+data class PickerPatient(
+    val id: String, val record: String, val name: String, val age: Int?,
+    /** B-2: the patient's confirmed appointment of today (`appointmentToday`), only for accounts that see appointments. */
+    val appointmentToday: TodayAppointment? = null,
+    /** B-2: the patient's live queue number of today (`ticketToday`). */
+    val ticketToday: TodayTicket? = null,
+) {
     val detail get() = "Expediente $record" + (age?.let { " · $it años" } ?: "")
+    /** B1 "Registrar llegada": an appointment today whose arrival is not registered yet with a live number. */
+    val canRegisterArrival get() = appointmentToday != null && ticketToday?.appointmentId != appointmentToday.id
+}
+
+/** `appointmentToday` of a selector row: the appointment and its doctor. */
+data class TodayAppointment(val id: String, val start: String, val doctorId: String, val doctorName: String) {
+    /** Sweep #11: "Cita 09:00 con Ana Médica"; never "· <doctor>", which reads as a second patient. */
+    val chip get() = "Cita ${AppointmentAgenda.time(start)} con $doctorName"
+}
+
+/** `ticketToday` of a selector row: the number the patient already holds today. */
+data class TodayTicket(val id: String, val service: String, val number: Int, val state: String, val appointmentId: String?) {
+    val code get() = "${QueueLabels.areaOf(service)} $number"
 }
 data class PickerPage(val items: List<PickerPatient>, val hasMore: Boolean)
 
@@ -73,7 +92,17 @@ object ReceptionScheduling {
     private fun JSONArray?.objects() = (0 until (this?.length() ?: 0)).mapNotNull { this?.optJSONObject(it) }
 
     fun pickerPage(json: JSONObject) = PickerPage(
-        json.optJSONArray("items").objects().map { PickerPatient(it.getString("id"), it.optString("record"), it.optString("fullName"), if (it.has("age") && !it.isNull("age")) it.optInt("age") else null) },
+        json.optJSONArray("items").objects().map {
+            PickerPatient(
+                it.getString("id"), it.optString("record"), it.optString("fullName"), if (it.has("age") && !it.isNull("age")) it.optInt("age") else null,
+                appointmentToday = it.optJSONObject("appointmentToday")?.let { a ->
+                    a.text("id")?.let { id -> TodayAppointment(id, a.optString("start"), a.optString("doctorId"), a.text("doctorName") ?: "") }
+                },
+                ticketToday = it.optJSONObject("ticketToday")?.let { t ->
+                    t.text("id")?.let { id -> TodayTicket(id, t.optString("service"), t.optInt("numero"), t.optString("state"), t.text("appointmentId")) }
+                },
+            )
+        },
         json.optBoolean("hasMore"),
     )
 

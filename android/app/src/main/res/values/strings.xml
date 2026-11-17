@@ -306,4 +306,9 @@
     <string name="consulta_quien_sigue">Consulta cerrada · quién pasa después</string>
     <string name="consulta_llamar_a">Llamar a %1$s</string>
     <string name="consulta_ahora_no">Ahora no</string>
+    <!-- U5: Registrar llegada (B1, D-1) -->
+    <string name="u5_registrar_llegada">Registrar llegada</string>
+    <string name="u5_llegada_explica">Tiene cita hoy: su número queda ligado a la cita, en Consulta general.</string>
+    <string name="u5_emitir_sin_cita">Emitir otro número sin la cita</string>
+    <string name="u5_ya_tiene_numero">Ya tiene el número %1$s</string>
 </resources>
