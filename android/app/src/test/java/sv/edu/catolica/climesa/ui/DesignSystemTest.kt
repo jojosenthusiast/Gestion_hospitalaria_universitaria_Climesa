@@ -159,7 +159,7 @@ class DesignSystemTest {
 
     @Test fun `stock and link-check states have a family and are never critical`() {
         // S13: inventory and account-link screens use the shared families instead of hand-picked tones.
-        assertEquals(StatusFamily.CERRADO, StatusFamily.of("agotado"))
+        assert(StatusFamily.urgent("agotado"))
         assertEquals(StatusFamily.ESPERA, StatusFamily.of("bajo_minimo"))
         assertEquals(StatusFamily.ESPERA, StatusFamily.of("por_vencer"))
         assertEquals(StatusFamily.LISTO, StatusFamily.of("coincide"))

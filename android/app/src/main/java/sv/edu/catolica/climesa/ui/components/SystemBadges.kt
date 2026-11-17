@@ -141,7 +141,8 @@ internal fun FamilyBadge(text: String, family: StatusFamily?, modifier: Modifier
  */
 @Composable
 internal fun StatusBadge(value: String, modifier: Modifier = Modifier, label: String? = null, fallback: StatusTone? = StatusCatalog.tone(value)) =
-    FamilyBadge(label ?: StatusCatalog.label(value), StatusFamily.resolve(value, fallback), modifier)
+    if (StatusFamily.urgent(value)) PriorityBadge(Priority.URGENTE, modifier, label ?: StatusCatalog.label(value))
+    else FamilyBadge(label ?: StatusCatalog.label(value), StatusFamily.resolve(value, fallback), modifier)
 
 /** Priority (S7): emergency solid critical red, urgent amber tint, routine gray. */
 @Composable

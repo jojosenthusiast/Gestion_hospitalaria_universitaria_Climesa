@@ -10,7 +10,7 @@ import sv.edu.catolica.climesa.domain.VitalLevel
 /** S13: screens that used hand-picked tones now read the shared family table (no red outside critical values). */
 class StatusFamilyMigrationTest {
     @Test fun `stock states follow the shared families and are never critical`() {
-        assertEquals(StatusFamily.CERRADO, stockFamily(StockStatus.OUT))
+        assertNull("agotado is the urgent priority, not a family", stockFamily(StockStatus.OUT))
         assertEquals(StatusFamily.ESPERA, stockFamily(StockStatus.LOW))
         assertEquals(StatusFamily.ESPERA, stockFamily(StockStatus.EXPIRING))
         assertEquals(StatusFamily.LISTO, stockFamily(StockStatus.OK))
@@ -51,9 +51,24 @@ class StatusFamilyMigrationTest {
             "libre" to StatusFamily.LISTO,
             "cancelada" to StatusFamily.CERRADO,
             "critico_alto" to StatusFamily.CRITICO,
+            "requiere_atencion" to StatusFamily.ATENCION,
         )
         expected.forEach { (value, family) -> assertEquals(value, family, StatusFamily.of(value)) }
         val called = listOf("confirmada", "reprogramada", "bajo_minimo", "limpieza", "publicado").filter { StatusFamily.of(it) == StatusFamily.LLAMADO }
         assertEquals(emptyList<String>(), called)
+    }
+
+    // Lab out of range and unusable stock are urgent (amber, double chevron); `sin_rango` is neutral; only critico* is red.
+    @Test fun `out of range and unusable stock render as urgent priority`() {
+        listOf("alto", "bajo", "agotado", "vencido").forEach { value ->
+            assert(StatusFamily.urgent(value)) { value }
+            assertNull(value, StatusFamily.resolve(value, StatusCatalog.tone(value)))
+        }
+        assertEquals(StatusIcon.DOUBLE_ARROW_UP, Priority.URGENTE.icon)
+        listOf("sin_rango", "normal", "critico_alto", "requiere_atencion").forEach { assert(!StatusFamily.urgent(it)) { it } }
+        assertNull(StatusFamily.resolve("sin_rango", StatusCatalog.tone("sin_rango")))
+        val red = listOf("alto", "bajo", "agotado", "vencido", "sin_rango", "requiere_atencion", "critico_alto", "critico_bajo")
+            .filter { StatusFamily.resolve(it, StatusCatalog.tone(it)) == StatusFamily.CRITICO }
+        assertEquals(listOf("critico_alto", "critico_bajo"), red)
     }
 }

@@ -59,20 +59,27 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
                 "confirmada", "reprogramada",
             ).forEach { put(it, ESPERA) }
             listOf("llamado", "en_proceso").forEach { put(it, LLAMADO) }
-            listOf("en_atencion", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta", "limpieza").forEach { put(it, ATENCION) }
+            listOf("en_atencion", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta", "limpieza", "requiere_atencion").forEach { put(it, ATENCION) }
             listOf("atendida", "atendido", "ok", "completado", "firmada", "alta_firmada", "egresado", "libre", "disponible", "activo", "exito", "normal", "aprobada").forEach { put(it, LISTO) }
             listOf(
-                "cancelado", "cancelada", "no_asistio", "no_se_presento", "cerrado", "rechazada", "vencida", "vencido", "bloqueada",
+                "cancelado", "cancelada", "no_asistio", "no_se_presento", "cerrado", "rechazada", "vencida", "bloqueada",
                 "inactivo", "desactivado", "denegado", "fallido", "en_mantenimiento",
             ).forEach { put(it, CERRADO) }
             listOf("critico_alto", "critico_bajo").forEach { put(it, CRITICO) }
             // Stock (inventory) and link checks (account linking). Never critical: red stays for clinical values.
-            put("agotado", CERRADO)
             put("bajo_minimo", ESPERA)
             put("por_vencer", ESPERA)
             put("coincide", LISTO)
             put("revisar", ESPERA)
         }
+
+        /**
+         * Out of range but not critical (lab `alto`/`bajo`) and stock that cannot be used (`agotado`, lot `vencido`): drawn
+         * as the urgent priority (amber, double chevron), never red and never neutral. Same rule as the web.
+         */
+        private val urgentValues = setOf("alto", "bajo", "agotado", "vencido")
+
+        fun urgent(value: String): Boolean = value in urgentValues
 
         /** Family of an API state value, or null when the value has none (`alto`, `bajo`, `sin_rango`). */
         fun of(value: String): StatusFamily? = byValue[value]
@@ -94,7 +101,7 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
          * The API value decides first, so every platform shows the same family. A value the shared table does not know
          * (`atendido`, `sin_traslado`) keeps the family of its catalog tone; with no tone it is neutral.
          */
-        fun resolve(value: String, fallback: StatusTone?): StatusFamily? = of(value) ?: fallback?.let(::fromTone)
+        fun resolve(value: String, fallback: StatusTone?): StatusFamily? = if (urgent(value)) null else of(value) ?: fallback?.let(::fromTone)
     }
 }
 

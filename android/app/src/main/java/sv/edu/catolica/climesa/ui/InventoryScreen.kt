@@ -56,9 +56,11 @@ private fun categoryIcon(category: ArticleCategory): ImageVector = when (categor
     ArticleCategory.MINOR_EQUIPMENT -> Icons.Default.MedicalServices
 }
 /** Stock state on the shared family table (`agotado` closed, `bajo_minimo` called, `por_vencer` waiting); `ok` is done. Never red. */
-internal fun stockFamily(status: StockStatus): StatusFamily = StatusFamily.of(status.code) ?: StatusFamily.LISTO
-@Composable private fun statusColor(status: StockStatus): Color = MaterialTheme.system.status(stockFamily(status)).first
-@Composable private fun StockBadge(status: StockStatus) = FamilyBadge(status.label, stockFamily(status))
+/** Family of a stock state; null for `agotado`, which is drawn as the urgent priority ([StatusFamily.urgent]). */
+internal fun stockFamily(status: StockStatus): StatusFamily? = if (StatusFamily.urgent(status.code)) null else StatusFamily.of(status.code) ?: StatusFamily.LISTO
+@Composable private fun statusColor(status: StockStatus): Color =
+    stockFamily(status)?.let { MaterialTheme.system.status(it).first } ?: MaterialTheme.system.priority(Priority.URGENTE).first
+@Composable private fun StockBadge(status: StockStatus) = StatusBadge(status.code, label = status.label)
 
 /** Inventory as master-detail: the article list (search, filters, status) and, once one is chosen, its lots, warehouses and history. */
 @Composable fun InventoryScreen(modifier: Modifier = Modifier, profile: AccessProfile? = null, model: InventoryViewModel = viewModel()) {
