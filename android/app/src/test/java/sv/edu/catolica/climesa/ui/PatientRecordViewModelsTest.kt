@@ -47,25 +47,30 @@ class PatientRecordViewModelsTest {
 
     @Test fun pendingRequestBecomesApprovedWhenReceptionApproves() = runTest(dispatcher) {
         val api = FakeGateway(); val bus = RecordSignalBus()
-        api.responses["/cuentas/vinculacion"] = JSONObject().put("state", "pendiente")
+        val pending = JSONObject().put("id", "v1").put("state", "pendiente").put("createdAt", "2026-11-13T15:00:00Z")
+        api.responses["/cuentas/vinculacion"] = pending
+        api.responses["/me/vinculacion"] = JSONObject().put("linked", false).put("request", pending)
         val vm = linkModel(api, bus)
         vm.startLive(listOf("usuario:u1")); vm.submit("10000001-9", "1990-01-01"); runCurrent()
         assertEquals(LinkStatus.PENDING, vm.state.value.status)
         assertEquals("10000001-9", api.calls.single { it.first == "/cuentas/vinculacion" }.third!!.getString("dui"))
-        api.responses["/me/paciente"] = JSONObject().put("id", "p1")
+        api.responses["/me/vinculacion"] = JSONObject().put("linked", true).put("request", JSONObject(pending.toString()).put("state", "aprobada"))
         bus.signals.tryEmit(resolved); runCurrent()
         assertEquals(LinkStatus.APPROVED, vm.state.value.status)
     }
 
     @Test fun resolutionWithoutLinkedRecordIsARejection() = runTest(dispatcher) {
         val api = FakeGateway(); val bus = RecordSignalBus()
+        val pending = JSONObject().put("id", "v1").put("state", "pendiente").put("createdAt", "2026-11-12T15:00:00Z")
         api.failures["/cuentas/vinculacion"] = AuthRequestException("Ya tienes una solicitud en verificación.", 409, "vinculacion_pendiente")
-        api.failures["/me/paciente"] = AuthRequestException("Tu cuenta todavía no está vinculada a un expediente.", 404, "sin_vinculacion")
+        api.responses["/me/vinculacion"] = JSONObject().put("linked", false).put("request", pending)
         val vm = linkModel(api, bus)
         vm.startLive(listOf("usuario:u1")); vm.submit("10000001-9", "1990-01-01"); runCurrent()
         assertEquals(LinkStatus.PENDING, vm.state.value.status)
+        assertEquals("the API says since when", LocalDate.of(2026, 11, 12), vm.state.value.since)
         bus.signals.tryEmit(RealtimeSignal.Resync); runCurrent()
-        assertEquals("a resync alone does not decide", LinkStatus.PENDING, vm.state.value.status)
+        assertEquals(LinkStatus.PENDING, vm.state.value.status)
+        api.responses["/me/vinculacion"] = JSONObject().put("linked", false).put("request", JSONObject(pending.toString()).put("state", "rechazada").put("rejectionReason", "Datos distintos."))
         bus.signals.tryEmit(resolved); runCurrent()
         assertEquals(LinkStatus.REJECTED, vm.state.value.status)
         vm.retry()

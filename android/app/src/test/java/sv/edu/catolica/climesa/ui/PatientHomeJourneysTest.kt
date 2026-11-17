@@ -49,41 +49,7 @@ class PatientHomeJourneysTest {
     private val quiet = object : RealtimeRepository { override fun observe(channels: List<String>) = emptyFlow<RealtimeSignal>() }
     private val notFound = AuthRequestException("No encontrado", 404, "no_encontrado")
 
-    // "Paciente: enviar, salir y volver. Se espera 'En revisión desde 16/11' en lugar del formulario."
-    @Test fun aSentRequestIsShownAgainInsteadOfAnEmptyForm() = runTest(dispatcher) {
-        val drafts = MemoryDrafts()
-        val api = FakeGateway()
-        api.responses["/cuentas/vinculacion"] = JSONObject().put("state", "pendiente")
-        api.failures["/me/paciente"] = notFound
-        val first = LinkRecordViewModel(api, quiet, drafts).apply { today = { LocalDate.parse("2026-11-16") } }
-        first.init(null, "u1")
-        first.submit("10000001-9", "1990-01-01"); runCurrent()
-        assertEquals(LinkStatus.PENDING, first.state.value.status)
-        val again = LinkRecordViewModel(api, quiet, drafts)
-        again.init(null, "u1"); runCurrent()
-        assertEquals(LinkStatus.PENDING, again.state.value.status)
-        assertEquals(LocalDate.parse("2026-11-16"), again.state.value.since)
-        assertEquals("the form is not offered again", 1, api.calls.count { it.first == "/cuentas/vinculacion" })
-    }
-
-    @Test fun anApprovalFoundOnReturnClearsTheRememberedRequest() = runTest(dispatcher) {
-        val drafts = MemoryDrafts()
-        drafts.save("u1", "vinculacion:solicitud", JSONObject().put("since", "2026-11-16"))
-        val api = FakeGateway()
-        api.responses["/me/paciente"] = JSONObject().put("id", "p1")
-        val vm = LinkRecordViewModel(api, quiet, drafts)
-        vm.init(null, "u1"); runCurrent()
-        assertEquals(LinkStatus.APPROVED, vm.state.value.status)
-        assertNull(drafts.load("u1", "vinculacion:solicitud"))
-    }
-
-    @Test fun anotherAccountNeverSeesThisRequest() = runTest(dispatcher) {
-        val drafts = MemoryDrafts()
-        drafts.save("u1", "vinculacion:solicitud", JSONObject().put("since", "2026-11-16"))
-        val vm = LinkRecordViewModel(FakeGateway(), quiet, drafts)
-        vm.init(null, "u2"); runCurrent()
-        assertEquals(LinkStatus.FORM, vm.state.value.status)
-    }
+    // G2 (the patient sees the real state of the link request, from `GET /me/vinculacion`) is covered in SweepU9AndroidTest.
 
     private val now = Instant.parse("2026-11-16T15:00:00Z")
     private val permissions = listOf("sesion.perfil", "citas.ver", "citas.solicitar", "resultados.ver", "fila.ver", "cuenta.vincular", "ambulancia.solicitar")

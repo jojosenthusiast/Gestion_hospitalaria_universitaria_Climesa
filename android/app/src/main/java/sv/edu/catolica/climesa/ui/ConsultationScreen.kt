@@ -168,7 +168,7 @@ private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, p
 }
 
 @Composable
-private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, record: ConsultationRecord?, stepNotice: Pair<RecordSection, String>?, recordError: String? = null, onClose: () -> Unit) {
+private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, record: ConsultationRecord?, stepNotice: Pair<RecordSection, String>?, recordError: String? = null, cie10: Cie10SearchViewModel = viewModel(), onClose: () -> Unit) {
     // B4: what this consultation already has is listed under each step, so nothing is registered twice.
     LaunchedEffect(item.consultationId) { item.consultationId?.let { model.loadRecord(it, withLabOrders = "resultados.ver" in profile?.permissions.orEmpty()) } }
     val draftId = item.consultationId?.takeIf { item.consultationState != "firmada" }
@@ -183,6 +183,7 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
     var temperature by rememberSaveable(item.key) { mutableStateOf(text("temperature", "")) }
     var oxygenSaturation by rememberSaveable(item.key) { mutableStateOf(text("oxygenSaturation", "")) }
     var diagnosisCode by rememberSaveable(item.key) { mutableStateOf(text("diagnosisCode", "")) }
+    var diagnosisDescription by rememberSaveable(item.key) { mutableStateOf(text("diagnosisDescription", "")) }
     var diagnosisNote by rememberSaveable(item.key) { mutableStateOf(text("diagnosisNote", "")) }
     var diagnosisPrincipal by rememberSaveable(item.key) { mutableStateOf(DraftRules.flag(stored, "diagnosisPrincipal", false)) }
     var medication by rememberSaveable(item.key) { mutableStateOf(text("medication", "")) }
@@ -196,7 +197,7 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
     var labUrgent by rememberSaveable(item.key) { mutableStateOf(DraftRules.flag(stored, "labUrgent", false)) }
     val signed = item.consultationState == "firmada"
     val permissions = profile?.permissions.orEmpty()
-    val values = mapOf<String, Any>("reason" to reason, "physicalExam" to physicalExam, "plan" to plan, "systolic" to systolic, "diastolic" to diastolic, "heartRate" to heartRate, "temperature" to temperature, "oxygenSaturation" to oxygenSaturation, "diagnosisCode" to diagnosisCode, "diagnosisNote" to diagnosisNote, "diagnosisPrincipal" to diagnosisPrincipal, "medication" to medication, "dose" to dose, "route" to route, "frequency" to frequency, "duration" to duration, "instructions" to instructions, "labExams" to labExams, "labUrgent" to labUrgent)
+    val values = mapOf<String, Any>("reason" to reason, "physicalExam" to physicalExam, "plan" to plan, "systolic" to systolic, "diastolic" to diastolic, "heartRate" to heartRate, "temperature" to temperature, "oxygenSaturation" to oxygenSaturation, "diagnosisCode" to diagnosisCode, "diagnosisDescription" to diagnosisDescription, "diagnosisNote" to diagnosisNote, "diagnosisPrincipal" to diagnosisPrincipal, "medication" to medication, "dose" to dose, "route" to route, "frequency" to frequency, "duration" to duration, "instructions" to instructions, "labExams" to labExams, "labUrgent" to labUrgent)
     // What the API already has: after "Guardar borrador" the ViewModel updates the item, so only pending fields stay local.
     val baseline = mapOf<String, Any>("reason" to (item.consultationReason ?: item.reason.orEmpty()), "physicalExam" to item.physicalExam.orEmpty(), "plan" to item.plan.orEmpty())
     val dirty = DraftRules.isDirty(values, baseline)
@@ -255,9 +256,11 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
             record?.diagnoses?.forEach { d -> RecordLine(listOfNotNull(d.code, d.note).joinToString(" · "), if (d.principal) stringResource(R.string.consulta_principal) else null) }
         }
         if (item.consultationId != null && !signed && "consulta.registrar" in permissions) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_codigo), diagnosisCode, { diagnosisCode = it.take(20) }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_nota), diagnosisNote, { diagnosisNote = it.take(2000) }, Modifier.weight(2f)) }
+            // Sweep U6 #5: the code comes from the API CIE-10 search; typed by hand only when the search fails.
+            Cie10Picker(diagnosisCode, diagnosisDescription, enabled = !busy, resetKey = item.key, model = cie10) { code, description -> diagnosisCode = code; diagnosisDescription = description }
+            FormField(stringResource(R.string.consulta_nota), diagnosisNote, { diagnosisNote = it.take(2000) })
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(diagnosisPrincipal, { diagnosisPrincipal = it }); Text(stringResource(R.string.consulta_principal)) }
-            SecondaryButton(stringResource(R.string.consulta_registrar_diagnostico), { model.diagnosis(item, diagnosisCode, diagnosisNote, diagnosisPrincipal) { diagnosisCode = ""; diagnosisNote = ""; diagnosisPrincipal = false } }, enabled = !busy && diagnosisCode.trim().isNotBlank())
+            SecondaryButton(stringResource(R.string.consulta_registrar_diagnostico), { model.diagnosis(item, diagnosisCode, diagnosisNote, diagnosisPrincipal) { diagnosisCode = ""; diagnosisDescription = ""; diagnosisNote = ""; diagnosisPrincipal = false } }, enabled = !busy && diagnosisCode.trim().isNotBlank())
             StepNotice(stepNotice, RecordSection.DIAGNOSIS)
         }
         Text(stringResource(R.string.consulta_paso2), style = MaterialTheme.typography.titleSmall)
