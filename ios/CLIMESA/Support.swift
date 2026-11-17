@@ -74,6 +74,22 @@ extension Submission {
     var fieldErrors: [String: String] { lastFailure?.fieldErrors ?? [:] }
 }
 
+/// One `Submission` per row (B3, I-15): the tapped row shows pending, then done or error, in place; the other rows stay
+/// usable, and each row refuses a second tap while its own write is in flight.
+@MainActor @Observable
+final class SubmissionBook {
+    @ObservationIgnored private var rows: [String: Submission] = [:]
+
+    nonisolated init() {}
+
+    subscript(_ id: String) -> Submission {
+        if let row = rows[id] { return row }
+        let row = Submission()
+        rows[id] = row
+        return row
+    }
+}
+
 /// Parte de un tablero que se pide por separado: si una lectura falla, solo esa tarjeta muestra el error con
 /// «Reintentar» y las demás siguen visibles (CH-02: un fallo nunca se ve como "no hay datos").
 enum Part<Value: Sendable>: Sendable {

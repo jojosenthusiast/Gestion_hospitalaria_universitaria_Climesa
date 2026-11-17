@@ -109,6 +109,10 @@ actor APIClient {
     func send<Body:Encodable,T:Decodable>(_ method: String, _ path: String, body: Body, key: String, as type: T.Type = T.self) async throws -> T {
         try decode(await perform(method:method,path:path,body:try JSONBody.encode(body),idempotencyKey:key))
     }
+    /// D-3 deferred write: the JSON frozen at the tap goes byte for byte with the key stored with it (an exact replay).
+    func sendRaw(_ method: String, _ path: String, body: Data, key: String) async throws {
+        _ = try await perform(method:method,path:path,body:body,idempotencyKey:key)
+    }
     private func decode<T:Decodable>(_ data: Data) throws -> T {
         do { return try JSONDecoder().decode(T.self,from:data) } catch { throw APIFailure.invalidResponse }
     }

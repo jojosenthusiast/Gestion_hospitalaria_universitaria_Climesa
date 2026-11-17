@@ -100,6 +100,11 @@ struct ConsultationView: View {
     @State private var labQuery = ""
     /// Descriptions returned when a diagnosis is added (the detail response only carries the code).
     @State private var diagnosisNames: [String: String] = [:]
+    /// B-6: this consultation's lab orders, read from the doctor's order list (the detail does not carry them). A failed
+    /// read is never "no orders": ordering waits until the list is known, so an exam is not ordered twice.
+    @State private var labOrders: Part<[LabOrder]>?
+    /// Exams ordered from this device in this consultation (stored per account), so a repeat is blocked at once.
+    @State private var orderedHere: Set<String> = []
 
     init(origin: ConsultationOrigin, profile: AccessProfile) {
         self.origin = origin
@@ -213,9 +218,12 @@ struct ConsultationView: View {
             }
         }
         WriteNotice(submission: undoing, reload: loadDetail)
+        // Sweep #7: the signature result shows after signing too, when the screen is no longer editable.
+        WriteNotice(submission: signing, reload: loadDetail)
         if editable {
-            // S9 / I-19: consultation → procedures → prescription and exams → close, one step at a time.
-            ConsultationStepBar(current: $step)
+            // S9 / I-19: consultation → procedures → prescription and exams → close, one step at a time. Each step
+            // carries how many records it already holds.
+            ConsultationStepBar(current: $step, counts: stepCounts(value))
             switch step {
             case .consulta:
                 vitalSigns(value.vitalSigns)
@@ -244,21 +252,72 @@ struct ConsultationView: View {
             draftSection(value, editable: false, planOnly: false)
             diagnosesSection(value, editable: false)
             prescriptionSection(value, editable: false)
+            labOrdersCard()
         }
     }
 
+    private func stepCounts(_ value: ConsultationDetail) -> [ConsultationStep: Int] {
+        let orders = labOrders?.value?.count ?? 0
+        var counts: [ConsultationStep: Int] = [:]
+        for step in ConsultationStep.allCases {
+            if let count = ConsultationRecordRules.stepCount(step, diagnoses: value.diagnoses.count, prescriptions: value.prescriptions.count, labOrders: orders), count > 0 {
+                counts[step] = count
+            }
+        }
+        return counts
+    }
+
     @ViewBuilder private func signSection(_ value: ConsultationDetail, editable: Bool) -> some View {
-        WriteNotice(submission: signing, reload: loadDetail)
+        // What the record holds, so the doctor sees what is signed before tapping.
+        SectionCard(title: L.text("consultation.sign.record")) {
+            ListRow(title: L.text("consultation.diagnoses"), meta: "\(value.diagnoses.count)")
+            ListRow(title: L.text("consultation.prescriptions"), meta: "\(value.prescriptions.count)")
+            ListRow(title: L.text("lab.order"), meta: labOrders?.value.map { "\($0.count)" } ?? "—")
+        }
         if signSaveFailed {
             Text("consultation.sign.saveFailed").font(Typo.small).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
             WriteNotice(submission: saving, reload: loadDetail)
         }
+        // The API signs only with a reason and a plan: say what is missing and take the doctor there, instead of failing.
+        let blocker = ConsultationRecordRules.signBlocker(reason: reason, plan: plan)
+        if let blocker {
+            Text(verbatim: blocker).font(Typo.body).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
+            if let target = ConsultationRecordRules.stepFor(reason: reason, plan: plan) {
+                Button { step = target } label: {
+                    Label { Text(verbatim: String(format: L.text("consultation.sign.goTo"), L.text(target.titleKey))) } icon: { Image(systemName: "arrow.left") }
+                        .font(Typo.label).frame(minHeight: 44).contentShape(Rectangle())
+                }
+                .foregroundStyle(Theme.primaryText)
+            }
+        }
         ClimesaButton(title: L.text("consultation.sign"), kind: kind(.sign, editable: editable), loading: signFlow || signing.busy || saving.busy) { confirmingSign = true }
+            .disabled(blocker != nil)
             .confirmationDialog(L.text("consultation.sign.confirm"), isPresented: $confirmingSign, titleVisibility: .visible) {
                 Button(L.text("consultation.sign")) { Task { await sign(value) } }
             } message: {
-                Text(verbatim: ConsultationActionRules.signSummary(notesPending: notesPending, unsentWork: unsentWork))
+                Text(verbatim: ConsultationRecordRules.signRecap(diagnoses: value.diagnoses.count, prescriptions: value.prescriptions.count,
+                                                                labOrders: labOrders?.value?.count, notesPending: notesPending, unsentWork: unsentWork))
             }
+    }
+
+    /// This consultation's lab orders, or why they are not known (with «Reintentar»).
+    @ViewBuilder private func labOrdersList() -> some View {
+        if let message = labOrders?.error {
+            PartError(message: ConsultationRecordRules.ordersUnknown + " " + message, retry: loadLabOrders)
+        } else if let orders = labOrders?.value, !orders.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text("lab.ordered.title").font(Typo.label).foregroundStyle(Theme.muted)
+                ForEach(orders) { order in
+                    Text(verbatim: ConsultationRecordRules.orderLine(order)).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func labOrdersCard() -> some View {
+        if labOrders?.error != nil || !(labOrders?.value?.isEmpty ?? true) {
+            SectionCard(title: L.text("lab.ordered.title")) { labOrdersList() }
+        }
     }
 
     @ViewBuilder private func vitalSigns(_ signs: [ConsultationDetail.VitalSigns]) -> some View {
@@ -387,9 +446,16 @@ struct ConsultationView: View {
                 }
             }
             .task { if catalog.value == nil { await loadCatalog() } }
-            WriteNotice(submission: ordering, reload: loadDetail)
+            labOrdersList()
+            // Never the same exam twice in one consultation; never an order while the list is unknown.
+            let blocker = ConsultationRecordRules.orderBlocker(canReadOrders: profile.hasPermission("resultados.ver"), ordersKnown: labOrders?.value != nil)
+            let repeated = ConsultationRecordRules.repeated(selected: selectedExams, catalog: catalog.value ?? [], orders: labOrders?.value ?? [], orderedHere: orderedHere)
+            if let reason = blocker ?? ConsultationRecordRules.repeatError(repeated) {
+                Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
+            }
+            WriteNotice(submission: ordering, reload: loadLabOrders)
             ClimesaButton(title: L.text("lab.submit"), kind: kind(.orderLab, editable: true), loading: ordering.busy) { Task { await order(value) } }
-                .disabled(selectedExams.isEmpty || ordering.busy)
+                .disabled(selectedExams.isEmpty || ordering.busy || blocker != nil || !repeated.isEmpty)
         }
     }
 
@@ -411,6 +477,22 @@ struct ConsultationView: View {
                 draftRecovered = true
             }
             persistDraft()
+        }
+        await loadLabOrders()
+    }
+
+    /// B-6: the orders of this consultation from `/laboratorio/ordenes` (needs `resultados.ver`), plus the exams this
+    /// device ordered here.
+    private func loadLabOrders() async {
+        guard let id = consultationId else { return }
+        orderedHere = DraftStore.shared.load(Set<String>.self, user: profile.id, key: ConsultationRecordRules.orderedKey(id)) ?? []
+        guard profile.hasPermission("resultados.ver") else { return }
+        do {
+            let orders = try await account.client().get("/laboratorio/ordenes", as: [LabOrder].self)
+            labOrders = .loaded(ConsultationRecordRules.labOrders(orders, consultationId: id))
+        } catch is CancellationError {
+        } catch {
+            labOrders = .failed(error.userMessage)
         }
     }
 
@@ -496,11 +578,22 @@ struct ConsultationView: View {
     }
 
     private func order(_ value: ConsultationDetail) async {
-        let body = LabOrderBody(consultationId: value.consultation.id, exams: selectedExams.sorted(), priority: priority)
+        let id = value.consultation.id
+        let catalogExams = catalog.value ?? []
+        // Checked again at the tap: the list may have changed since the screen drew.
+        guard ConsultationRecordRules.orderBlocker(canReadOrders: profile.hasPermission("resultados.ver"), ordersKnown: labOrders?.value != nil) == nil,
+              ConsultationRecordRules.repeated(selected: selectedExams, catalog: catalogExams, orders: labOrders?.value ?? [], orderedHere: orderedHere).isEmpty
+        else { return }
+        let body = LabOrderBody(consultationId: id, exams: selectedExams.sorted(), priority: priority)
         let ok = await ordering.run(body: body, success: L.text("lab.ordered")) { key in
             _ = try await account.client().send("POST", "/laboratorio/ordenes", body: body, key: key, as: LabOrderCreated.self)
         }
-        if ok { selectedExams = [] }
+        if ok {
+            orderedHere.formUnion(selectedExams)
+            _ = DraftStore.shared.save(orderedHere, user: profile.id, key: ConsultationRecordRules.orderedKey(id))
+            selectedExams = []
+        }
+        await loadLabOrders()
     }
 
     private func sign(_ value: ConsultationDetail) async {
@@ -546,8 +639,8 @@ struct ConsultationView: View {
             }
             // I-31: the rule stays one tap away instead of a sentence under every proposal.
             DisclosureGroup {
-                Text(verbatim: String(format: L.text("queue.next.rule"), next.rule)).font(Typo.small).foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                // In the app's words, never the server's raw `rule` text.
+                NextRuleList()
             } label: { Text("queue.next.why").font(Typo.small).foregroundStyle(Theme.primaryText).frame(minHeight: 44) }
             WriteNotice(submission: handoffCall, reload: loadDetail)
             if let proposal = next.proposal, profile.hasPermission("fila.llamar") {
@@ -586,6 +679,8 @@ struct ConsultationView: View {
 /// I-19: step indicator like the web (`consult-steps`): done steps carry a check, the current one is filled.
 private struct ConsultationStepBar: View {
     @Binding var current: ConsultationStep
+    /// Records already held by a step ("Consulta 2"), so the doctor sees what is done without opening it.
+    var counts: [ConsultationStep: Int] = [:]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -597,6 +692,12 @@ private struct ConsultationStepBar: View {
                         HStack(spacing: Spacing.space1) {
                             if state == .hecho { Image(systemName: "checkmark").imageScale(.small).accessibilityHidden(true) }
                             Text(LocalizedStringKey(step.titleKey)).font(Typo.label).lineLimit(1)
+                            if let count = counts[step] {
+                                Text(verbatim: "\(count)").font(Typo.caption).monospacedDigit()
+                                    .padding(.horizontal, Spacing.space1)
+                                    .background((isCurrent ? Theme.onPrimary : Theme.ink).opacity(0.12), in: Capsule())
+                                    .accessibilityLabel(Text(verbatim: String(format: L.text("consultation.step.count"), count)))
+                            }
                         }
                         .padding(.horizontal, Spacing.space3).frame(minHeight: 44)
                         .foregroundStyle(isCurrent ? Theme.onPrimary : (state == .hecho ? Theme.ink : Theme.muted))
