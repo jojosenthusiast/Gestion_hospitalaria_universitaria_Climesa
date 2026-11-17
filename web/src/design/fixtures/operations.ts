@@ -150,6 +150,12 @@ export class OperationsFixtures {
     }
     if (p === '/me/avisos/bandeja') return this.inbox();
     if (p === '/avisos') return this.notices.map(({ enteradoEn: _seen, ...n }) => ({ ...n, allowedActions: n.estado === 'vigente' || n.estado === 'programado' ? ['editar', 'retirar'] : [] }));
+    // R7 D-2: reach while composing; a stable count per role and area so the preview reads naturally.
+    if (p === '/avisos/alcance') {
+      const roles = (url.searchParams.get('roles') ?? '').split(',').filter(Boolean), areas = (url.searchParams.get('areas') ?? '').split(',').filter(Boolean);
+      const perRole: Record<string, number | undefined> = { MED: 14, ENF: 22, REC: 6, LAB: 5, PAR: 4, JOP: 3 };
+      return { destinatarios: roles.reduce((n, r) => n + (perRole[r] ?? 2), 0) + areas.length * 9 };
+    }
     if (p === '/avisos/estadisticas') return this.notices.filter(n => n.publicadoEn).map((n, i) => ({ avisoId: n.id, enterados: 4 + i * 3, destinatarios: n.publico ? 48 : 12 + i * 2 }));
     if (p === '/turnos/catalogo') return this.catalog();
     if (p === '/turnos/cobertura') {

@@ -41,10 +41,10 @@ const week: ShiftRow[] = [
   shift('b-hos-2', 's-3', '2026-12-05', { state: 'borrador', attendance: null, areaId: 'a-2', area: 'Hospitalización' }),
 ];
 
-function mount(who: AccessProfile, write: (path: string, body: any) => unknown = () => ({})) {
+function mount(who: AccessProfile, write: (path: string, body: unknown) => unknown = () => ({})) {
   const api = {
     request: vi.fn(async (path: string) => path === '/turnos/catalogo' ? catalog : path.startsWith('/turnos/cobertura') ? { from: '2026-11-30', to: '2026-12-06', gaps: [] } : path === '/turnos/plantillas' ? [] : path.startsWith('/turnos?') ? [] : week),
-    write: vi.fn(async (path: string, body: any) => write(path, body)),
+    write: vi.fn(async (path: string, body: unknown) => write(path, body)),
   };
   render(<ShiftsPage api={api as unknown as Api} profile={who} version={0} />);
   return api;

@@ -105,6 +105,15 @@ export class AmbulanceFixtures {
       Object.assign(this.unit, { state: d.inMaintenance ? 'en_mantenimiento' : 'disponible', stateReason: d.inMaintenance ? d.reason : null, stateSince: new Date().toISOString() });
       return { id: this.unit.id, version: this.unit.version, state: this.unit.state };
     }
+    if (parts[1] === 'ambulancia' && parts[2] === 'servicios' && parts[4] === 'hitos' && parts[5] === 'deshacer') {
+      // R7 G-4: the crew undoes its last milestone.
+      if (!this.active || this.active.id !== parts[3]) throw new ApiError('No se encontró el servicio activo.', 404);
+      const s = this.active, last = s.milestones?.at(-1);
+      if (!last || last.type === 'finalizado') throw new ApiError('El servicio no tiene hitos para deshacer.', 409, 'hito_no_deshacible');
+      s.milestones = s.milestones!.slice(0, -1);
+      s.version = (s.version ?? 1) + 1;
+      return { id: s.id, undoneType: last.type, version: s.version, nextMilestones: [last.type] };
+    }
     if (parts[1] === 'ambulancia' && parts[2] === 'servicios' && parts[4] === 'cerrar') {
       if (!this.active || this.active.id !== parts[3]) throw new ApiError('No se encontró el servicio activo.', 404);
       const s = this.active;
