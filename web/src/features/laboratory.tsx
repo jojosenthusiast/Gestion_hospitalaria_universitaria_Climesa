@@ -13,10 +13,13 @@ import { useQuickAction } from './personal/accion';
 import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
 import { STAGE_LABEL, elapsedMinutes, formatElapsed, isCritical, slaLevel, sortOrders, stageOf, type Stage, type WorkSort } from './listas/lab-worklist';
 import './listas/lists.css';
+import { markOf, parseValue, rangeText, type ReferenceRange, type SheetMark } from '../lib/lab-sheet';
+import { ReleaseDialog, releasedMessage } from './lab-release';
+import { writeHashParams } from '../lib/hash-params';
 
 type LabResult = { value?: number | null; text?: string | null; mark: string; version: number; observation?: string | null; relevant?: boolean };
 const sexShort: Record<string, string> = { femenino: 'F', masculino: 'M' };
-type LabItem = { id: string; code: string; name: string; unit?: string | null; resultType?: string; result?: LabResult | null };
+type LabItem = { id: string; code: string; name: string; unit?: string | null; resultType?: string; result?: LabResult | null; referenceRange?: ReferenceRange | null };
 /** `allowedActions` of the API (MA-LAB-01..05): every button below comes from this list, never from role or state guesses. */
 type LabAction = 'tomar_muestra' | 'capturar' | 'completar' | 'revisar' | 'cancelar' | 'enmendar';
 /** S10: the external path has its own list (`externalActions`) so older clients keep decoding `allowedActions`. */
@@ -112,6 +115,11 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
     if (quick === 'muestra' && isLab) { const first = [...data.data].reverse().find(o => allows(o, 'tomar_muestra')); if (first) { setSelectedId(first.id); setSampleFor(first); } }
     consumeQuick();
   }, [quick, data.data, isLab, consumeQuick]);
+  // `?orden=<id>` (from "Resultados por revisar" in Inicio): opens that order's detail directly.
+  useEffect(() => {
+    const wanted = new URLSearchParams(location.hash.split('?')[1] ?? '').get('orden');
+    if (wanted && data.data?.some(order => order.id === wanted)) { setSelectedId(wanted); setStage('todas'); writeHashParams({ orden: null }); }
+  }, [data.data]);
   /** Acción por lote: cada orden se completa con su propia versión; las que fallan se informan sin detener las demás. */
   async function completeBatch() {
     setBatchBusy(true); setOutcome(null);
@@ -161,7 +169,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
                 batchable={allows(order, 'completar')} inBatch={batch.has(order.id)} onBatch={() => setBatch(current => toggle(current, order.id))} />) : []),
             ];
           })}</ul>
-          {selected && <LabDetail key={selected.id} api={api} order={selected} canAttach={can(profile, 'laboratorio.procesar') || can(profile, 'laboratorio.revisar')} onChanged={data.refresh} onSample={() => setSampleFor(selected)} />}
+          {selected && <LabDetail key={selected.id} api={api} order={selected} canAttach={can(profile, 'laboratorio.procesar') || can(profile, 'laboratorio.revisar')} canComplete={can(profile, 'laboratorio.validar')} onChanged={data.refresh} onSample={() => setSampleFor(selected)} />}
         </div></>
         : all.length ? <Empty title="Ninguna orden coincide con los filtros" description="Quita algún filtro o cambia lo que buscas." />
           : <Empty title="No hay órdenes de laboratorio" description="Las órdenes aparecerán cuando Medicina solicite estudios para una consulta." />}
@@ -200,27 +208,32 @@ function LabStepper({ order }: { order: LabOrder }) {
  * Panel de detalle con detalle progresivo: arriba quién actúa y la acción principal, luego los valores; las fechas quedan
  * plegadas en «Datos de la orden» y el avance va al final.
  */
-function LabDetail({ api, order, canAttach, onChanged, onSample }: { api: Api; order: LabOrder; canAttach: boolean; onChanged: () => void; onSample: () => void }) {
+function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample }: { api: Api; order: LabOrder; canAttach: boolean; canComplete: boolean; onChanged: () => void; onSample: () => void }) {
   const action = useAction(api), [cancelOpen, setCancelOpen] = useState(false), [externalOpen, setExternalOpen] = useState(false), [loadOpen, setLoadOpen] = useState(false);
-  const { captured, total } = labProgress(order), ready = total > 0 && captured === total, next = nextActor(order), stage = stageOf(order);
+  const [releaseOpen, setReleaseOpen] = useState(false), [done, setDone] = useState<string | null>(null);
+  const capturing = allows(order, 'capturar');
+  const next = nextActor(order), stage = stageOf(order);
   const when = (value?: string | null) => value ? formatDateTime(value) : 'Pendiente';
   async function transition(path: string, body: unknown) { if (await action.run(path, body)) onChanged(); }
   return <aside className="cl-detail" aria-label={`Detalle de la orden de ${order.patientName}`}>
     <header><StageBadge stage={stage} /><h3>{order.patientName}</h3><p className="muted">{patientLine(order) || 'Sin datos del expediente'}</p><Tag value={order.state} label={stageLabel(order, allows(order, 'revisar'))} />
       {next && <small className="lab-next"><strong>Ahora: {next.who}</strong> {next.what}</small>}</header>
     {order.external && <ExternalNote order={order} />}
-    <WriteError error={action.error} onReload={onChanged} reloadLabel="Recargar la orden" />
+    {done && <Notice kind="success">{done}</Notice>}
+    <WriteError error={spanishProblem(action.error)} onReload={onChanged} reloadLabel="Recargar la orden" />
     <div className="lw-actions">
       {allows(order, 'tomar_muestra') && <button className="primary-button" onClick={onSample}>Tomar muestra</button>}
       {allowsExternal(order, 'cargar_externo') && <button className="primary-button" onClick={() => setLoadOpen(true)}>Cargar resultado externo</button>}
-      {(allows(order, 'completar') || allows(order, 'capturar')) && <button className="primary-button" disabled={!allows(order, 'completar') || action.busy} title={allows(order, 'completar') ? undefined : `Faltan ${total - captured} valores para completar`} onClick={() => void transition(`/laboratorio/ordenes/${order.id}/completar`, { version: order.version })}>Completar</button>}
-      {allows(order, 'revisar') && <button className="primary-button" disabled={action.busy} onClick={() => void transition(`/laboratorio/ordenes/${order.id}/revisar`, { version: order.version })}>Revisar y liberar</button>}
+      {/* While capturing, the sheet below has the one primary action («Guardar y completar»). */}
+      {allows(order, 'completar') && !capturing && <button className="primary-button" disabled={action.busy} onClick={() => void transition(`/laboratorio/ordenes/${order.id}/completar`, { version: order.version })}>Completar</button>}
+      {allows(order, 'revisar') && <button className="primary-button" disabled={action.busy} onClick={() => { setDone(null); setReleaseOpen(true); }}>Revisar y liberar</button>}
       {allowsExternal(order, 'enviar_externo') && <button className="secondary-button" onClick={() => setExternalOpen(true)}>Se realiza en otro sitio</button>}
       {allows(order, 'cancelar') && <button className="secondary-button" onClick={() => setCancelOpen(true)}>Cancelar orden</button>}
     </div>
     {order.amendedAt && <p className="lab-requirement" role="note">Un resultado se corrigió el {formatDateTime(order.amendedAt)}; el valor anterior queda en el historial.{order.reviewedAt ? '' : ' Medicina debe revisarlo de nuevo antes de que el paciente lo vea.'}</p>}
-    {allows(order, 'capturar') && <p className={`lab-requirement ${ready ? 'is-ready' : ''}`} role="status">Para completar la orden hace falta el valor de todos los exámenes: {captured} de {total} capturados{ready ? ' · lista para completar' : ''}.</p>}
-    <div className="lab-order-detail">{order.items.map(item => <LabItemRow key={item.id} api={api} order={order} item={item} onChanged={onChanged} />)}</div>
+    {capturing
+      ? <ResultSheet api={api} order={order} canComplete={canComplete || allows(order, 'completar')} onSaved={message => { setDone(message); onChanged(); }} />
+      : <div className="lab-order-detail">{order.items.map(item => <LabItemRow key={item.id} api={api} order={order} item={item} onChanged={onChanged} />)}</div>}
     {order.external && order.state === 'completado' && <ExternalReport api={api} order={order} canAttach={canAttach} />}
     <details className="lab-more">
       <summary>Datos de la orden</summary>
@@ -229,6 +242,8 @@ function LabDetail({ api, order, canAttach, onChanged, onSample }: { api: Api; o
     <LabStepper order={order} />
     {cancelOpen && <CancelDialog api={api} order={order} onClose={() => setCancelOpen(false)} onSaved={() => { setCancelOpen(false); onChanged(); }} />}
     {externalOpen && <SendExternalDialog api={api} order={order} onClose={() => setExternalOpen(false)} onSaved={() => { setExternalOpen(false); onChanged(); }} />}
+    {releaseOpen && <ReleaseDialog api={api} target={{ orderId: order.id, version: order.version, patientName: order.patientName, doctorName: order.doctorName, values: order.items.map(item => ({ name: item.name, value: item.result?.value, text: item.result?.text, unit: item.unit, mark: item.result?.mark })) }}
+      onClose={() => { setReleaseOpen(false); onChanged(); }} onReleased={outcome => { setReleaseOpen(false); setDone(releasedMessage(order.patientName, outcome)); onChanged(); }} />}
     {loadOpen && <ExternalResultDialog api={api} order={order} onClose={() => setLoadOpen(false)} onSaved={() => { setLoadOpen(false); onChanged(); }} />}
   </aside>;
 }
@@ -266,10 +281,18 @@ function AttachmentRow({ api, file, canAttach, onStored }: { api: Api; file: Att
     setBusy(true); setError(null);
     try { await work(); after?.(); } catch (e) { setError(spanishProblem(e instanceof ApiError ? e : new ApiError('No se pudo completar la operación.'))); } finally { setBusy(false); }
   }
-  function upload(picked: File | null) {
+  // R7 C2: a retry first shows which file was chosen and uploads only after «Confirmar y subir».
+  const [chosen, setChosen] = useState<File | null>(null);
+  function pick(picked: File | null) {
     const problem = attachmentProblem(picked);
+    setChosen(null);
     if (problem || !picked) { setError(new ApiError(problem ?? 'Elige un archivo.')); return; }
-    void attempt(() => uploadAttachment(api, file.id, picked), onStored);
+    setError(null); setChosen(picked);
+  }
+  function upload() {
+    const picked = chosen;
+    if (!picked) return;
+    void attempt(() => uploadAttachment(api, file.id, picked), () => { setChosen(null); onStored(); });
   }
   return <li>
     <Icon name="download" size={16} /><span><strong>{file.fileName}</strong> <span className="muted">{file.mimeType === 'application/pdf' ? 'PDF' : 'Foto'} · {formatBytes(file.sizeBytes)} · {formatDateTime(file.uploadedAt)}{file.uploadedByName ? ` · ${file.uploadedByName}` : ''}</span>
@@ -278,7 +301,12 @@ function AttachmentRow({ api, file, canAttach, onStored }: { api: Api; file: Att
         ? <button type="button" className="secondary-button" disabled={busy} aria-label={`Descargar ${file.fileName}`} onClick={() => void attempt(() => downloadAttachment(api, file.id))}>{busy ? 'Preparando…' : 'Descargar'}</button>
         : <>
           <small className="muted">Solo se guardó la referencia del archivo (nombre, tipo, tamaño y huella) y los valores; el archivo no está en el sistema.</small>
-          {canAttach && <small>{busy ? 'Subiendo el archivo…' : 'Sube aquí la foto o el PDF (hasta 10 MB):'} <input type="file" aria-label={`Subir archivo de ${file.fileName}`} accept={ATTACHMENT_ACCEPT} disabled={busy} onChange={event => upload(event.target.files?.[0] ?? null)} /></small>}
+          {canAttach && <span className="lab-attachment-retry"><Tag value="pendiente" label="Archivo pendiente" />
+            <label className="secondary-button">{busy ? 'Subiendo el archivo…' : 'Reintentar'}<input type="file" className="sr-only" aria-label={`Subir archivo de ${file.fileName}`} accept={ATTACHMENT_ACCEPT} disabled={busy} onChange={event => { pick(event.target.files?.[0] ?? null); event.target.value = ''; }} /></label></span>}
+          {canAttach && chosen && !busy && <span className="lab-attachment-confirm" role="group" aria-label="Confirmar archivo">
+            <small>¿Subir «{chosen.name}» ({attachmentMimeType(chosen) === 'application/pdf' ? 'PDF' : 'Foto'} · {formatBytes(chosen.size)}) como el archivo de «{file.fileName}»?</small>
+            <button type="button" className="primary-button" onClick={upload}>Confirmar y subir</button>
+            <button type="button" className="secondary-button" onClick={() => setChosen(null)}>Elegir otro</button></span>}
         </>}
       {error && <Notice kind="error">{error.message}</Notice>}</span>
   </li>;
@@ -287,7 +315,18 @@ function AttachmentRow({ api, file, canAttach, onStored }: { api: Api; file: Att
 function SendExternalDialog({ api, order, onClose, onSaved }: { api: Api; order: LabOrder; onClose: () => void; onSaved: () => void }) {
   const action = useAction(api), [place, setPlace] = useState(''), [instructions, setInstructions] = useState(EXTERNAL_INSTRUCTIONS_TEMPLATE);
   const ready = place.trim().length >= 3 && instructions.trim().length >= 10;
-  async function save() { if (await action.run(`/laboratorio/ordenes/${order.id}/externa`, { version: order.version, place: place.trim(), instructions: instructions.trim() })) onSaved(); }
+  // R7 C-6: the API says whether the patient got the notice in the app; without the app, the instructions go on paper.
+  const [sent, setSent] = useState<boolean | null>(null);
+  async function save() {
+    const done = await action.run<{ patientNotified?: boolean }>(`/laboratorio/ordenes/${order.id}/externa`, { version: order.version, place: place.trim(), instructions: instructions.trim() });
+    if (!done) return;
+    if (typeof done.patientNotified === 'boolean') setSent(done.patientNotified); else onSaved();
+  }
+  if (sent !== null) return <Dialog title="Examen en otro sitio" onClose={onSaved}><div className="module-form">
+    <Notice kind={sent ? 'success' : 'info'}>{sent ? `${order.patientName} recibió el aviso en su app con el lugar y las instrucciones.` : `${order.patientName} no tiene la app: entrégale las instrucciones impresas.`}</Notice>
+    <div className="lab-external lab-external-print" role="note"><strong>Se realiza en otro sitio: {place.trim()}</strong><p>{instructions.trim()}</p></div>
+    <div className="dialog-actions">{!sent && <button className="secondary-button" type="button" onClick={() => window.print()}>Imprimir instrucciones</button>}<button className="primary-button" type="button" onClick={onSaved}>Listo</button></div>
+  </div></Dialog>;
   return <Dialog title="Examen en otro sitio" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
     <p className="form-intro">La orden de {order.patientName} queda como externa: ya no se toma muestra aquí. El paciente ve el lugar y estas instrucciones en sus exámenes.</p>
     <WriteError error={action.error} onReload={onSaved} reloadLabel="Recargar la orden" />
@@ -313,19 +352,22 @@ function ExternalResultDialog({ api, order, onClose, onSaved }: { api: Api; orde
     const body = externalResultBody(order.version, attachment, order.items.map(item => ({ id: item.id, numeric: isNumeric(item) })), values, note);
     const saved = await action.run<{ attachmentId?: string }>(`/laboratorio/ordenes/${order.id}/resultado-externo`, body);
     if (!saved) return;
-    if (saved.attachmentId) {
-      setUploading(true);
-      try { await uploadAttachment(api, saved.attachmentId, file); } catch (e) {
-        setUploadError(spanishProblem(e instanceof ApiError ? e : new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.')));
-        return;
-      } finally { setUploading(false); }
-    }
+    if (saved.attachmentId) { setAttachmentId(saved.attachmentId); if (!await sendFile(saved.attachmentId, file)) return; }
     onSaved();
   }
-  if (uploadError) return <Dialog title="Cargar resultado externo" onClose={onSaved}><div className="module-form">
+  const [attachmentId, setAttachmentId] = useState<string | null>(null);
+  async function sendFile(id: string, picked: File) {
+    setUploading(true); setUploadError(null);
+    try { await uploadAttachment(api, id, picked); return true; } catch (e) {
+      setUploadError(spanishProblem(e instanceof ApiError ? e : new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.')));
+      return false;
+    } finally { setUploading(false); }
+  }
+  if (uploadError && file) return <Dialog title="Cargar resultado externo" onClose={onSaved} busy={uploading}><div className="module-form">
     <Notice kind="error">Los valores se guardaron, pero el archivo no se subió: {uploadError.message}</Notice>
-    <p className="form-intro">Puedes subir el archivo desde la orden, en «Informe externo».</p>
-    <div className="dialog-actions"><button className="primary-button" type="button" onClick={onSaved}>Entendido</button></div>
+    <p className="form-intro">Archivo pendiente: «{file.name}» ({formatBytes(file.size)}). Reintenta con este mismo archivo o súbelo después desde la orden, en «Informe externo».</p>
+    <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onSaved} disabled={uploading}>Más tarde</button>
+      {attachmentId && <button className="primary-button" type="button" disabled={uploading} onClick={() => void sendFile(attachmentId, file).then(ok => { if (ok) onSaved(); })}>{uploading ? 'Subiendo archivo…' : `Reintentar con «${file.name}»`}</button>}</div>
   </div></Dialog>;
   const busy = action.busy || uploading;
   return <Dialog title="Cargar resultado externo" onClose={onClose} busy={busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
@@ -357,7 +399,28 @@ function SampleDialog({ api, order, onClose, onSaved }: { api: Api; order: LabOr
   const [expediente, setExpediente] = useState(''), [nombreCompleto, setNombreCompleto] = useState('');
   const action = useAction(api);
   async function save() { if (await action.run(`/laboratorio/ordenes/${order.id}/muestra`, { version: order.version, expediente: expediente.trim(), nombreCompleto: nombreCompleto.trim() })) onSaved(); }
-  return <Dialog title="Confirmar identidad para toma de muestra" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}><p className="form-intro">Confirma dos datos independientes antes de tomar la muestra: expediente y nombre completo.</p><WriteError error={action.error} onReload={onSaved} /><Field label="Número de expediente" value={expediente} onChange={setExpediente} required autoFocus /><Field label="Nombre completo" value={nombreCompleto} onChange={setNombreCompleto} required /><div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose}>Cancelar</button><button className="primary-button" type="submit" disabled={action.busy || !expediente.trim() || !nombreCompleto.trim()}>Confirmar identidad</button></div></form></Dialog>;
+  // R7 C1: each datum is compared in place with the order (same normalization as the API); the API still decides.
+  const recordOk = identityCheck(expediente, order.patientRecord, value => value.trim()), nameOk = identityCheck(nombreCompleto, order.patientName, normalizeName);
+  const mismatch = recordOk === false || nameOk === false;
+  return <Dialog title="Confirmar identidad para toma de muestra" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
+    <p className="form-intro">Pide al paciente su expediente y su nombre completo antes de tomar la muestra.</p>
+    <WriteError error={spanishProblem(action.error)} onReload={onSaved} />
+    <Field label="Número de expediente" value={expediente} onChange={setExpediente} required autoFocus />
+    <IdentityHint ok={recordOk} />
+    <Field label="Nombre completo" value={nombreCompleto} onChange={setNombreCompleto} required />
+    <IdentityHint ok={nameOk} />
+    <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={action.busy}>Cancelar</button><button className="primary-button" type="submit" disabled={action.busy || !expediente.trim() || !nombreCompleto.trim() || mismatch}>{action.busy ? 'Confirmando…' : 'Confirmar identidad'}</button></div></form></Dialog>;
+}
+
+const normalizeName = (value: string) => value.trim().toLocaleLowerCase('es-SV').replace(/\s+/g, ' ');
+/** null while empty or when the order does not carry the datum; true/false once typed. */
+export function identityCheck(typed: string, expected: string | null | undefined, normalize: (value: string) => string): boolean | null {
+  if (!typed.trim() || !expected) return null;
+  return normalize(typed) === normalize(expected);
+}
+function IdentityHint({ ok }: { ok: boolean | null }) {
+  if (ok === null) return null;
+  return <small className={`lab-identity ${ok ? 'is-ok' : 'is-bad'}`} role="status"><Icon name={ok ? 'check' : 'close'} size={14} />{ok ? 'Coincide con la orden' : 'No coincide con la orden'}</small>;
 }
 
 const resultText = (item: LabItem) => item.result ? `${item.result.text ?? item.result.value}${item.unit && item.result.text == null ? ` ${item.unit}` : ''}` : '';
@@ -368,28 +431,104 @@ function ObservationLine({ result }: { result: LabResult }) {
   return <small className={`lab-observation${result.relevant ? ' is-relevant' : ''}`}>{result.relevant ? <><Icon name="info" size={14} />Observación relevante (enviada al médico): </> : 'Observación: '}{result.observation}</small>;
 }
 
-/** Capture while the order is in process (`capturar`, with the order version), amend once completed (`enmendar`), read-only otherwise. */
+/** Read-only value of a completed or pending exam; amend once completed (`enmendar`). Capture happens in `ResultSheet`. */
 function LabItemRow({ api, order, item, onChanged }: { api: Api; order: LabOrder; item: LabItem; onChanged: () => void }) {
-  const action = useAction(api), [amending, setAmending] = useState(false);
-  const [value, setValue] = useState(item.result?.value?.toString() ?? ''), [text, setText] = useState(item.result?.text ?? ''), [reason, setReason] = useState('');
-  const [observation, setObservation] = useState(item.result?.observation ?? ''), [relevant, setRelevant] = useState(!!item.result?.relevant);
+  const [amending, setAmending] = useState(false);
   const title = <strong>{item.code} · {item.name}{item.unit ? <small className="muted"> ({item.unit})</small> : null}</strong>;
-  if (!allows(order, 'capturar')) return <div className="lab-result-row">{title}{item.result ? <span><Tag value={item.result.mark} /> {resultText(item)}</span> : <span>Resultado pendiente</span>}
+  return <div className="lab-result-row">{title}{item.result ? <span><Tag value={item.result.mark} /> {resultText(item)}</span> : <span>Resultado pendiente</span>}
     {item.result && <ObservationLine result={item.result} />}
     {allows(order, 'enmendar') && item.result && <button className="secondary-button" type="button" onClick={() => setAmending(true)}>Corregir resultado</button>}
     {amending && <AmendDialog api={api} order={order} item={item} onClose={() => setAmending(false)} onSaved={() => { setAmending(false); onChanged(); }} />}</div>;
-  async function save() {
-    const note = observation.trim();
-    const body = { orderItemId: item.id, version: order.version, ...(value.trim() ? { value: Number(value) } : { text: text.trim() }), ...(item.result ? { reason: reason.trim() } : {}), ...(note ? { observation: note, relevant } : {}) };
-    if (await action.run(`/laboratorio/ordenes/${order.id}/resultados`, body)) onChanged();
-  }
-  return <div className="lab-result-row">{title} {item.result ? <Tag value="completado" label="Valor capturado" /> : <Tag value="pendiente" label="Falta el valor" />}
-    <p>La marca se calcula con el rango vigente; no se selecciona manualmente. Un valor crítico avisa solo al médico que pidió la orden.</p>
-    <div className="form-grid"><Field label="Valor" type="number" value={value} onChange={setValue} /><Field label="Texto" value={text} onChange={setText} />{item.result && <Field label="Motivo de corrección" value={reason} onChange={setReason} />}</div>
-    <Field label="Observación (opcional)" value={observation} onChange={next => { setObservation(next); if (!next.trim()) setRelevant(false); }} maxLength={1000} />
-    <label className="lab-relevant"><input type="checkbox" checked={relevant} disabled={!observation.trim()} onChange={event => setRelevant(event.target.checked)} />Es relevante: crea un pendiente en «Resultados por revisar» del médico</label>
-    <button className="secondary-button" type="button" onClick={() => void save()} disabled={action.busy || (!value.trim() && !text.trim()) || (!!item.result && !reason.trim())}>Guardar resultado</button><WriteError error={action.error} onReload={onChanged} reloadLabel="Recargar la orden" /></div>;
 }
+
+type SheetRow = { raw: string; note: string; relevant: boolean; noteOpen: boolean; left: boolean };
+const SHEET_MARK: Record<SheetMark, { label: string; status: string } | null> = { critico: { label: 'Crítico', status: 'critico_alto' }, fuera: { label: 'Fuera de rango', status: 'en_espera' }, normal: { label: 'Normal', status: 'completado' }, sin_rango: null };
+
+/**
+ * R7 U3, journey C1 (C-1): one sheet per order. Every exam in a table with its range beside it; Tab goes to the next
+ * value; leaving a field flags it in place («Crítico», «Fuera de rango»). One primary action saves the whole sheet and,
+ * with laboratorio.validar and every value present, completes the order. Critical values confirm first, naming the
+ * doctor who will be notified. The stored mark is still the server's.
+ */
+function ResultSheet({ api, order, canComplete, onSaved }: { api: Api; order: LabOrder; canComplete: boolean; onSaved: (message: string) => void }) {
+  const action = useAction(api);
+  const [rows, setRows] = useState<Record<string, SheetRow>>(() => Object.fromEntries(order.items.map(item => [item.id, {
+    raw: item.result ? String(item.result.text ?? item.result.value ?? '') : '', note: item.result?.observation ?? '', relevant: !!item.result?.relevant, noteOpen: !!item.result?.observation, left: !!item.result,
+  }])));
+  const [reason, setReason] = useState(''), [confirming, setConfirming] = useState(false);
+  const patch = (id: string, change: Partial<SheetRow>) => setRows(current => ({ ...current, [id]: { ...current[id], ...change } }));
+  const numericValue = (item: LabItem) => parseValue(rows[item.id].raw);
+  const valid = (item: LabItem) => { const raw = rows[item.id].raw.trim(); return isNumeric(item) ? numericValue(item) !== null : raw.length > 0; };
+  const mark = (item: LabItem): SheetMark => isNumeric(item) && numericValue(item) !== null ? markOf(numericValue(item)!, item.referenceRange) : 'sin_rango';
+  const savedText = (item: LabItem) => item.result ? String(item.result.text ?? item.result.value ?? '') : '';
+  const changed = order.items.filter(item => {
+    const row = rows[item.id];
+    return valid(item) && (row.raw.trim() !== savedText(item) || row.note.trim() !== (item.result?.observation ?? '') || row.relevant !== !!item.result?.relevant);
+  });
+  const corrections = changed.filter(item => !!item.result);
+  const invalid = order.items.filter(item => rows[item.id].raw.trim() && !valid(item));
+  const allFilled = order.items.every(valid);
+  const completes = canComplete && allFilled;
+  const critical = changed.filter(item => mark(item) === 'critico');
+  const needsReason = corrections.length > 0 && !reason.trim();
+  const count = completes ? order.items.length : changed.length;
+  const label = completes ? `Guardar y completar (${count})` : `Guardar resultados (${count})`;
+  const blocked = action.busy || invalid.length > 0 || needsReason || (!changed.length && !completes);
+  async function save() {
+    setConfirming(false);
+    const items = changed.map(item => {
+      const row = rows[item.id], note = row.note.trim();
+      return { orderItemId: item.id, ...(isNumeric(item) ? { value: numericValue(item)! } : { text: row.raw.trim() }), ...(item.result ? { reason: reason.trim() } : {}), ...(note ? { observation: note, relevant: row.relevant } : {}) };
+    });
+    const result = items.length
+      ? await action.run<{ state: string; criticalCount: number }>(`/laboratorio/ordenes/${order.id}/resultados/lote`, { version: order.version, items, ...(completes ? { complete: true } : {}) })
+      : await action.run<{ state: string }>(`/laboratorio/ordenes/${order.id}/completar`, { version: order.version }).then(r => r ? { ...r, criticalCount: 0 } : r);
+    if (!result) return;
+    const saved = items.length === 1 ? 'Se guardó 1 resultado' : `Se guardaron ${items.length} resultados`;
+    const tail = result.state === 'completado' ? ' y la orden quedó completada; espera la revisión médica.' : '.';
+    const warn = result.criticalCount ? ` ${result.criticalCount === 1 ? '1 valor crítico avisó' : `${result.criticalCount} valores críticos avisaron`} a ${order.doctorName ?? 'el médico que pidió la orden'}.` : '';
+    onSaved(items.length ? `${saved}${tail}${warn}` : 'La orden quedó completada; espera la revisión médica.');
+  }
+  const submit = () => { if (blocked) return; if (critical.length) setConfirming(true); else void save(); };
+  return <form className="lab-sheet" aria-label={`Resultados de ${order.patientName}`} onSubmit={event => { event.preventDefault(); submit(); }}>
+    <table className="lab-sheet-table">
+      <thead><tr><th scope="col">Examen</th><th scope="col">Valor</th><th scope="col">Referencia</th><th scope="col"><span className="sr-only">Marca</span></th></tr></thead>
+      <tbody>{order.items.map(item => {
+        const row = rows[item.id], shown = row.left && valid(item) ? SHEET_MARK[mark(item)] : null, bad = row.left && row.raw.trim() && !valid(item);
+        return <tr key={item.id} className={shown?.label === 'Crítico' ? 'is-critical' : undefined}>
+          <th scope="row"><span className="lab-sheet-name">{item.name}</span><small className="muted">{item.code}</small></th>
+          <td><span className="lab-sheet-value">
+            <input aria-label={`${item.name}${item.unit ? ` (${item.unit})` : ''}`} inputMode={isNumeric(item) ? 'decimal' : 'text'} value={row.raw} disabled={action.busy}
+              aria-invalid={bad ? true : undefined} onChange={event => patch(item.id, { raw: event.target.value, left: false })} onBlur={() => patch(item.id, { left: true })} />
+            {item.unit && <span className="muted">{item.unit}</span>}</span>
+            {bad && <small className="field-error">Escribe un número, por ejemplo 5.1.</small>}
+            {row.noteOpen
+              ? <span className="lab-sheet-note"><input aria-label={`Observación de ${item.name}`} value={row.note} maxLength={1000} disabled={action.busy} placeholder="Observación" onChange={event => patch(item.id, { note: event.target.value, relevant: event.target.value.trim() ? row.relevant : false })} />
+                <label className="lab-relevant"><input type="checkbox" checked={row.relevant} disabled={!row.note.trim() || action.busy} onChange={event => patch(item.id, { relevant: event.target.checked })} />Avisar al médico</label></span>
+              : <button type="button" className="lab-sheet-add" onClick={() => patch(item.id, { noteOpen: true })}>Agregar observación</button>}
+          </td>
+          <td className="lab-num">{rangeText(item.referenceRange) || <span className="muted">Sin rango</span>}</td>
+          <td aria-live="polite">{shown && <StatusBadge value={shown.status} label={shown.label} />}</td>
+        </tr>;
+      })}</tbody>
+    </table>
+    {corrections.length > 0 && <Field label={corrections.length === 1 ? 'Motivo de la corrección' : `Motivo de las ${corrections.length} correcciones`} value={reason} onChange={setReason} required maxLength={500} />}
+    <WriteError error={spanishProblem(action.error)} onReload={() => onSaved('')} reloadLabel="Recargar la orden" />
+    <div className="lab-sheet-actions">
+      <span className="muted lab-num" role="status">{order.items.filter(valid).length} de {order.items.length} con valor{canComplete && !allFilled ? ' · completa cuando estén todos' : ''}</span>
+      <button className="primary-button" type="submit" disabled={blocked}>{action.busy ? 'Guardando…' : label}</button>
+    </div>
+    {confirming && <Dialog title={critical.length === 1 ? '1 valor crítico' : `${critical.length} valores críticos`} onClose={() => setConfirming(false)}>
+      <div className="module-form">
+        <p className="form-intro">Se avisará a <strong>{order.doctorName ?? 'el médico que pidió la orden'}</strong> en cuanto guardes:</p>
+        <ul className="lab-release-list">{critical.map(item => <li key={item.id} className="is-critical"><Icon name="alert" size={16} />{item.name} {rows[item.id].raw.trim()}{item.unit ? ` ${item.unit}` : ''} · referencia {rangeText(item.referenceRange)}</li>)}</ul>
+        <div className="dialog-actions"><button className="secondary-button" type="button" onClick={() => setConfirming(false)}>Revisar valores</button>
+          <button className="primary-button" type="button" onClick={() => void save()}>{completes ? 'Guardar, completar y avisar' : 'Guardar y avisar'}</button></div>
+      </div>
+    </Dialog>}
+  </form>;
+}
+
 
 /** MA-LAB-02 (D-13): amend a completed result with a reason of 10+ characters; the order goes back to the doctor's review. */
 function AmendDialog({ api, order, item, onClose, onSaved }: { api: Api; order: LabOrder; item: LabItem; onClose: () => void; onSaved: () => void }) {

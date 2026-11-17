@@ -2899,6 +2899,130 @@
         "x-permiso": "turnos.ver"
       }
     },
+    "/api/v1/turnos/candidatos": {
+      "get": {
+        "operationId": "OperationsController_gapCandidates",
+        "parameters": [
+          {
+            "name": "areaId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": true,
+            "in": "query",
+            "description": "Función del hueco (`role` de /turnos/cobertura)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MED",
+                "ENF",
+                "REC",
+                "LAB"
+              ]
+            }
+          },
+          {
+            "name": "start",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "end",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "diurno",
+                "nocturno",
+                "guardia"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapCandidatesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "R7 F-1: quiénes pueden cubrir un hueco de cobertura con las reglas de un turno suelto (descanso, tope de 7 días, días seguidos, traslape, inscripción); no guarda nada",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "turnos.planificar"
+      }
+    },
     "/api/v1/turnos/especialistas": {
       "get": {
         "operationId": "OperationsController_specialists",
@@ -8120,6 +8244,87 @@
         "x-permiso": "fila.gestionar"
       }
     },
+    "/api/v1/consultas/cie10": {
+      "get": {
+        "operationId": "ClinicalRecordController_cie10",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Al menos 2 caracteres",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Cie10Response"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar en el catálogo CIE-10 por código o por palabras (hasta 20)",
+        "tags": [
+          "clinical-record"
+        ],
+        "x-permiso": "consulta.registrar"
+      }
+    },
     "/api/v1/consultas/{id}/detalle": {
       "get": {
         "operationId": "ClinicalRecordController_detail",
@@ -10117,6 +10322,125 @@
         "x-permiso": "laboratorio.procesar"
       }
     },
+    "/api/v1/laboratorio/ordenes/{id}/resultados/lote": {
+      "post": {
+        "operationId": "LaboratoryController_resultBatch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabResultBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabResultBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "C-1: guardar los resultados de todos los exámenes de una orden en un solo paso (todo o nada, una sola versión); con complete=true también la completa",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "laboratorio.procesar"
+      }
+    },
     "/api/v1/laboratorio/ordenes/{id}/enmendar": {
       "post": {
         "operationId": "LaboratoryController_amend",
@@ -10385,7 +10709,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LabVersionDto"
+                "$ref": "#/components/schemas/LabReviewDto"
               }
             }
           }
@@ -10467,7 +10791,7 @@
             "bearer": []
           }
         ],
-        "summary": "Revisar y liberar resultados al paciente",
+        "summary": "Revisar y liberar resultados al paciente; cierra los pendientes de la orden en «Resultados por revisar» (C-2) y, si el médico lo decide, propone la cita de seguimiento (D-4)",
         "tags": [
           "laboratory"
         ],
@@ -10829,6 +11153,125 @@
           "laboratory"
         ],
         "x-permiso": "laboratorio.procesar OR laboratorio.revisar"
+      }
+    },
+    "/api/v1/laboratorio/pacientes/{id}/resultado-externo": {
+      "post": {
+        "operationId": "LaboratoryController_recordExternal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabExternalRecordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabExternalRecordResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "R7 C-5 (D-5): registrar un examen hecho en otro sitio sin orden previa; solo el médico con relación de atención vigente",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "laboratorio.ordenar"
       }
     },
     "/api/v1/laboratorio/adjuntos/{id}/archivo": {
@@ -16920,6 +17363,93 @@
         "x-permiso": "avisos.publicar"
       }
     },
+    "/api/v1/avisos/alcance": {
+      "get": {
+        "operationId": "NoticesController_reach",
+        "parameters": [
+          {
+            "name": "roles",
+            "required": false,
+            "in": "query",
+            "description": "Códigos de rol separados por coma, por ejemplo ENF,MED",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "areas",
+            "required": false,
+            "in": "query",
+            "description": "Códigos de espacio separados por coma, por ejemplo P1-HOS",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeReachResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Al redactar: a cuántas cuentas del personal llegaría el aviso por roles y áreas (solo el conteo)",
+        "tags": [
+          "publico"
+        ],
+        "x-permiso": "avisos.publicar"
+      }
+    },
     "/api/v1/avisos/{id}": {
       "put": {
         "operationId": "NoticesController_edit",
@@ -18478,6 +19008,125 @@
           }
         ],
         "summary": "Registrar hito en orden: salida, en escena, trasladando, en hospital, finalizado",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.operar"
+      }
+    },
+    "/api/v1/ambulancia/servicios/{id}/hitos/deshacer": {
+      "post": {
+        "operationId": "AmbulanceController_undoMilestone",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]{8,128}$"
+            },
+            "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UndoMilestoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UndoMilestoneResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No encontrado (`no_encontrado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deshacer el último hito (solo la tripulación, hasta 15 minutos después, nunca finalizado ni una llegada ya recibida)",
         "tags": [
           "ambulancia"
         ],
@@ -21279,6 +21928,117 @@
           "gaps"
         ]
       },
+      "ShiftWarningResponse": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "description": "Código de la advertencia, por ejemplo horas_semanales_excedidas"
+          },
+          "horasSemana": {
+            "type": "number"
+          },
+          "limite": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "codigo",
+          "horasSemana",
+          "limite"
+        ]
+      },
+      "GapCandidateValidResponse": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "person": {
+            "type": "string"
+          },
+          "sameArea": {
+            "type": "boolean",
+            "description": "La persona está asignada al área del hueco"
+          },
+          "weekHours": {
+            "type": "number",
+            "description": "Horas de turnos que trabaja en los 7 días antes del fin del hueco"
+          },
+          "advertencias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShiftWarningResponse"
+            }
+          }
+        },
+        "required": [
+          "staffId",
+          "person",
+          "sameArea",
+          "weekHours",
+          "advertencias"
+        ]
+      },
+      "GapCandidateRejectedResponse": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "person": {
+            "type": "string"
+          },
+          "sameArea": {
+            "type": "boolean",
+            "description": "La persona está asignada al área del hueco"
+          },
+          "weekHours": {
+            "type": "number",
+            "description": "Horas de turnos que trabaja en los 7 días antes del fin del hueco"
+          },
+          "codigo": {
+            "type": "string",
+            "description": "Mismo código que respondería POST /turnos (personal_en_descanso, carga_semanal_excedida, conflicto...)"
+          },
+          "mensaje": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "staffId",
+          "person",
+          "sameArea",
+          "weekHours",
+          "codigo",
+          "mensaje"
+        ]
+      },
+      "GapCandidatesResponse": {
+        "type": "object",
+        "properties": {
+          "candidatos": {
+            "description": "Quienes pueden cubrirlo sin romper ninguna regla; primero los del área y los de menos horas",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GapCandidateValidResponse"
+            }
+          },
+          "descartados": {
+            "description": "Quienes no pueden y por qué",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GapCandidateRejectedResponse"
+            }
+          }
+        },
+        "required": [
+          "candidatos",
+          "descartados"
+        ]
+      },
       "SpecialistShiftResponse": {
         "type": "object",
         "properties": {
@@ -21623,26 +22383,6 @@
         },
         "required": [
           "items"
-        ]
-      },
-      "ShiftWarningResponse": {
-        "type": "object",
-        "properties": {
-          "codigo": {
-            "type": "string",
-            "description": "Código de la advertencia, por ejemplo horas_semanales_excedidas"
-          },
-          "horasSemana": {
-            "type": "number"
-          },
-          "limite": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "codigo",
-          "horasSemana",
-          "limite"
         ]
       },
       "BatchItemResultResponse": {
@@ -24484,6 +25224,21 @@
           "version"
         ]
       },
+      "Cie10Response": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "description"
+        ]
+      },
       "ConsultationSummaryResponse": {
         "type": "object",
         "properties": {
@@ -24696,6 +25451,60 @@
           "items"
         ]
       },
+      "ConsultationLabItemResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "ConsultationLabOrderResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "description": "Estado de la orden (pendiente, en_proceso, completado, cancelado, externo)"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsultationLabItemResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "priority",
+          "createdAt",
+          "reviewedAt",
+          "items"
+        ]
+      },
       "ConsultationDetailResponse": {
         "type": "object",
         "properties": {
@@ -24718,6 +25527,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PrescriptionResponse"
+            }
+          },
+          "labOrders": {
+            "description": "R7 B-6: órdenes de laboratorio de la consulta; solo para el personal clínico (el paciente las ve en Mis resultados)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsultationLabOrderResponse"
             }
           }
         },
@@ -26038,6 +26854,33 @@
           "version"
         ]
       },
+      "LabItemRangeResponse": {
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "number",
+            "nullable": true
+          },
+          "max": {
+            "type": "number",
+            "nullable": true
+          },
+          "criticalLow": {
+            "type": "number",
+            "nullable": true
+          },
+          "criticalHigh": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "min",
+          "max",
+          "criticalLow",
+          "criticalHigh"
+        ]
+      },
       "LabOrderItemResponse": {
         "type": "object",
         "properties": {
@@ -26075,6 +26918,16 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/LabItemResultResponse"
+              }
+            ]
+          },
+          "referenceRange": {
+            "nullable": true,
+            "description": "C-3: rango de referencia y críticos vigentes para este paciente; solo para quien ve valores",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LabItemRangeResponse"
               }
             ]
           }
@@ -26224,6 +27077,11 @@
             "type": "string",
             "nullable": true,
             "description": "S10: instrucciones para el paciente de la orden externa"
+          },
+          "patientNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "R7 C1: nota del médico para el paciente; solo después de liberar los resultados"
           },
           "externalActions": {
             "type": "array",
@@ -26487,6 +27345,11 @@
             "type": "string",
             "nullable": true,
             "description": "S10: instrucciones para el paciente de la orden externa"
+          },
+          "patientNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "R7 C1: nota del médico para el paciente; solo después de liberar los resultados"
           },
           "externalActions": {
             "type": "array",
@@ -26784,6 +27647,133 @@
           "orderVersion"
         ]
       },
+      "LabResultBatchItemDto": {
+        "type": "object",
+        "properties": {
+          "orderItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "value": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unidad del catálogo; si se envía debe coincidir."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Obligatorio al corregir un resultado existente."
+          },
+          "observation": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "relevant": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "orderItemId"
+        ]
+      },
+      "LabResultBatchDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Versión vigente de la orden."
+          },
+          "items": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabResultBatchItemDto"
+            }
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "Completar la orden después de guardar (requiere laboratorio.validar)"
+          }
+        },
+        "required": [
+          "version",
+          "items"
+        ]
+      },
+      "LabBatchResultItemResponse": {
+        "type": "object",
+        "properties": {
+          "orderItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mark": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MarcaResultado"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "description": "Versión del resultado"
+          }
+        },
+        "required": [
+          "orderItemId",
+          "mark",
+          "version"
+        ]
+      },
+      "LabResultBatchResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoOrdenLaboratorio"
+              }
+            ]
+          },
+          "orderVersion": {
+            "type": "integer",
+            "description": "Versión de la orden después del lote"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabBatchResultItemResponse"
+            }
+          },
+          "criticalCount": {
+            "type": "integer",
+            "description": "Valores críticos del lote (avisan al médico que pidió la orden)"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "orderVersion",
+          "results",
+          "criticalCount",
+          "completedAt"
+        ]
+      },
       "LabAmendDto": {
         "type": "object",
         "properties": {
@@ -26863,6 +27853,30 @@
           "completedAt"
         ]
       },
+      "LabReviewDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string"
+          },
+          "followUp": {
+            "type": "boolean",
+            "description": "D-4: proponer a recepción una cita de seguimiento con el médico que pidió la orden. Si no se envía, se propone (comportamiento anterior)."
+          },
+          "patientNote": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "R7 C1: nota para el paciente, que la ve junto a los resultados liberados"
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
       "LabReviewResponse": {
         "type": "object",
         "properties": {
@@ -26876,6 +27890,20 @@
           "reviewedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "followUpsClosed": {
+            "type": "integer",
+            "description": "C-2: pendientes de «Resultados por revisar» que se cerraron con la revisión"
+          },
+          "followUpProposalId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "D-4: propuesta de cita de seguimiento creada para recepción, o null"
+          },
+          "followUpSkipped": {
+            "type": "string",
+            "description": "A5: por qué no se propuso cita: no_pedida, hospitalizado, ya_propuesta o sin_consulta"
           }
         },
         "required": [
@@ -26969,6 +27997,10 @@
           },
           "external": {
             "type": "boolean"
+          },
+          "patientNotified": {
+            "type": "boolean",
+            "description": "R7 C-6: el paciente tiene cuenta y ve «Examen en otro sitio» con las instrucciones en su app; si es false, entrégaselas impresas"
           }
         },
         "required": [
@@ -27094,6 +28126,98 @@
           "attachmentId"
         ]
       },
+      "LabExternalRecordValueDto": {
+        "type": "object",
+        "properties": {
+          "examId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Examen del catálogo (no un panel)"
+          },
+          "value": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "examId"
+        ]
+      },
+      "LabExternalRecordDto": {
+        "type": "object",
+        "properties": {
+          "place": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "description": "Dónde se hizo el examen"
+          },
+          "attachment": {
+            "$ref": "#/components/schemas/LabAttachmentDto"
+          },
+          "results": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabExternalRecordValueDto"
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Nota sobre el informe externo"
+          }
+        },
+        "required": [
+          "place",
+          "attachment",
+          "results"
+        ]
+      },
+      "LabExternalRecordResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoOrdenLaboratorio"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attachmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Adjunto creado con la referencia; su archivo se sube con POST /laboratorio/adjuntos/{id}/archivo"
+          },
+          "consultationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "version",
+          "completedAt",
+          "attachmentId",
+          "consultationId"
+        ]
+      },
       "LabAttachmentStoredResponse": {
         "type": "object",
         "properties": {
@@ -27179,6 +28303,44 @@
           "revisado"
         ]
       },
+      "LabFollowUpValueResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          },
+          "mark": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MarcaResultado"
+              }
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "unit",
+          "value",
+          "text",
+          "mark"
+        ]
+      },
       "LabFollowUpResponse": {
         "type": "object",
         "properties": {
@@ -27247,6 +28409,24 @@
           },
           "version": {
             "type": "integer"
+          },
+          "orderVersion": {
+            "type": "integer",
+            "description": "C-4: versión vigente de la orden, para revisarla desde la bandeja"
+          },
+          "orderActions": {
+            "type": "array",
+            "description": "C-4: acciones sobre la orden que el servidor acepta ahora para quien lee",
+            "items": {
+              "$ref": "#/components/schemas/AccionOrdenLaboratorio"
+            }
+          },
+          "values": {
+            "description": "C-4: valores capturados de la orden, críticos primero",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabFollowUpValueResponse"
+            }
           }
         },
         "required": [
@@ -30694,6 +31874,18 @@
           "destinatarios"
         ]
       },
+      "NoticeReachResponse": {
+        "type": "object",
+        "properties": {
+          "destinatarios": {
+            "type": "integer",
+            "description": "Cuentas activas del personal a las que llegaría por rol o por área (misma regla que `destinatarios` en las estadísticas)"
+          }
+        },
+        "required": [
+          "destinatarios"
+        ]
+      },
       "NoticeDto": {
         "type": "object",
         "properties": {
@@ -32502,6 +33694,49 @@
           "nextMilestones"
         ]
       },
+      "UndoMilestoneDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "UndoMilestoneResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "undoneType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HitoServicio"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "nextMilestones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HitoServicio"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "undoneType",
+          "version",
+          "nextMilestones"
+        ]
+      },
       "CloseServiceDto": {
         "type": "object",
         "properties": {
@@ -32830,6 +34065,18 @@
           "receivedByName": {
             "type": "string",
             "nullable": true
+          },
+          "serviceClosed": {
+            "type": "boolean",
+            "description": "R7 D-7: true cuando la recepción cerró el servicio (hito `finalizado`, estado `completado`) y la unidad volvió a Disponible."
+          },
+          "unitState": {
+            "description": "R7 D-7: estado de la unidad después de la recepción.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoAmbulancia"
+              }
+            ]
           }
         },
         "required": [
@@ -33087,6 +34334,8 @@
           "sin_tripulacion_de_turno",
           "tripulante_sin_turno",
           "hito_hora_invalida",
+          "hito_no_deshacible",
+          "sin_consulta",
           "sin_servicio_activo",
           "solicitud_resuelta",
           "unidad_en_mantenimiento",

@@ -58,10 +58,28 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
     }
     consumeQuick();
   }, [quick]); // eslint-disable-line react-hooks/exhaustive-deps
-  const close = () => setDialog(null), saved = () => { setDialog(null); data.refresh(); };
+  // R7 G3: `?ingresar=<id>` (Inicio, «Ingresos indicados») opens the bed choice for that admission directly.
+  const [target] = useState(() => readHashParams().get('ingresar'));
+  useEffect(() => {
+    if (!target || !data.data) return;
+    const row = data.data.find(a => a.id === target && a.allowedActions?.includes('asignar_cama'));
+    if (row) setDialog({ kind: 'asignar_cama', admission: row });
+    writeHashParams({ ingresar: null });
+  }, [target, data.data]);
+  const [done, setDone] = useState('');
+  const close = () => setDialog(null), saved = (message = '') => { setDialog(null); setDone(message); data.refresh(); };
+  const indicatedRows = (data.data ?? []).filter(a => a.state === 'pendiente_cama' && a.origin === 'consulta' && a.allowedActions?.includes('asignar_cama'));
   const props = dialog && { api, admission: dialog.admission, onClose: close, onSaved: saved };
   return <>
     <CompactHeader breadcrumb="Hospital / Admisiones" title="Hospitalización" actions={can(profile, 'admision.crear') && <button className="primary-button" onClick={() => setCreating(true)}><Icon name="plus" size={18}/>Ingresar paciente</button>}/>
+    {done && <p className="admission-done" role="status"><Icon name="check" size={18} />{done}</p>}
+    {indicatedRows.length > 0 && <section className="admission-indicated" aria-label="Ingresos indicados">
+      <h2>Ingresos indicados <span className="count-chip">{indicatedRows.length}</span></h2>
+      <ul>{indicatedRows.map(row => <li key={row.id}>
+        <div><strong>{row.patientName}</strong><small>{[row.attendingDoctorName ? `Indicado por ${row.attendingDoctorName}` : null, categoryNames[row.requestedCategory] ?? row.requestedCategory, row.isolation ? 'Aislamiento' : null, row.unstable ? 'Inestable' : null].filter(Boolean).join(' · ')}</small>{row.motive && <small>{row.motive}</small>}</div>
+        <button type="button" className="primary-button" onClick={() => setDialog({ kind: 'asignar_cama', admission: row })}>Ingresar</button>
+      </li>)}</ul>
+    </section>}
     <section className="data-workbench"><RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Admisiones activas</caption><thead><tr><th>Paciente</th><th>Origen</th><th>Categoría</th><th>Estado</th><th>Cama</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}>
       <td data-label="Paciente"><strong>{row.patientName}</strong><small>{[row.isolation ? 'Aislamiento' : null, row.unstable ? 'Inestable' : null, row.postSurgical ? 'Posquirúrgico' : null].filter(Boolean).join(' · ')}</small>{row.motive && <small>{row.motive}</small>}</td>
       <td data-label="Origen">{originNames[row.origin] ?? row.origin}</td>
@@ -70,7 +88,7 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
       <td data-label="Cama">{row.bed ? <span className="nowrap-code">{row.bed}</span> : 'Sin cama'}</td>
       <td data-label="Acción"><div className="row-actions">{availableActions(row).map((a, index) => <button key={a.key} className="row-action" onClick={() => setDialog({ kind: a.key, admission: row })}>{a.label}{index === 0 && <> <Icon name="arrow" size={16} /></>}</button>)}</div></td>
     </tr>)}</tbody></table> : <Empty title="No hay admisiones activas" description="Las nuevas admisiones aparecerán aquí cuando Recepción o Jefatura las registren." />}</RemoteState></section>
-    {creating && <AdmissionStepper api={api} profile={profile} patient={prefill} onClose={() => { setCreating(false); setPrefill(null); }} onSaved={() => { setCreating(false); setPrefill(null); data.refresh(); }} />}
+    {creating && <AdmissionStepper api={api} profile={profile} patient={prefill} onClose={() => { setCreating(false); setPrefill(null); }} onSaved={() => { setCreating(false); setPrefill(null); setDone('Ingreso registrado; aparece en la lista.'); data.refresh(); }} />}
     {dialog?.kind === 'asignar_cama' && <BedSuggestionDialog api={api} admission={dialog.admission} version={version} onClose={close} onSaved={saved} />}
     {dialog?.kind === 'trasladar' && <TransferDialog api={api} admission={dialog.admission} version={version} onClose={close} onSaved={saved} />}
     {dialog?.kind === 'registrar_salida' && props && <ExitDialog {...props} />}
@@ -93,7 +111,7 @@ function categoryOptions(admission: Admission) {
  * S13: the suggested beds show at once. With an authorized exception (or a VIP request) both categories are listed, the
  * requested one first, so nobody picks a category before seeing beds. The first suggestion comes chosen until the person picks.
  */
-function BedSuggestionDialog({ api, admission, version, onClose, onSaved }: { api: Api; admission: Admission; version: number; onClose: () => void; onSaved: () => void }) {
+function BedSuggestionDialog({ api, admission, version, onClose, onSaved }: { api: Api; admission: Admission; version: number; onClose: () => void; onSaved: (message?: string) => void }) {
   const options = categoryOptions(admission), both = options.length > 1;
   const path = (category: string) => `/admisiones/${admission.id}/sugerencias-cama${both ? `?category=${encodeURIComponent(category)}` : ''}`;
   const requested = useData<Suggestion[]>(api, path(options[0]), version), other = useData<Suggestion[]>(api, path(options[1] ?? options[0]), version, both);
@@ -106,12 +124,13 @@ function BedSuggestionDialog({ api, admission, version, onClose, onSaved }: { ap
   const prefilled = useRef(false);
   useEffect(() => { if (!prefilled.current && first) { prefilled.current = true; setBedId(first); } }, [first]);
   // WEB-08: el motivo lo escribe la persona; si queda vacío no se envía uno inventado.
-  async function assign() { if (selected && await action.run(`/admisiones/${admission.id}/cama`, { bedId: selected.id, version: selected.version, ...(reason.trim() ? { reason: reason.trim() } : {}) })) onSaved(); }
+  async function assign() { if (selected && await action.run(`/admisiones/${admission.id}/cama`, { bedId: selected.id, version: selected.version, ...(reason.trim() ? { reason: reason.trim() } : {}) })) onSaved(`${admission.patientName}: ingresada · Cama ${selected.code}.`); }
   const group = (category: string, rows: Suggestion[]) => <fieldset className="choice-list" key={category}><legend>{both ? `Camas sugeridas · ${categoryNames[category] ?? category}${category !== admission.requestedCategory ? ' (excepción)' : ''}` : 'Camas sugeridas'}</legend>
     {rows.length ? rows.map(row => <label className="check-field" key={row.id}><input type="radio" name="bed" value={row.id} checked={bedId === row.id} onChange={() => setBedId(row.id)} /><span><strong>{row.code}</strong> <small>{row.room} · {categoryNames[row.category] ?? row.category} · {row.reason}</small></span></label>) : <p className="muted">Sin camas libres de esta categoría.</p>}</fieldset>;
-  return <Dialog title="Asignar cama" onClose={onClose} busy={action.busy}>
-    <p className="form-intro">Paciente: <strong>{admission.patientName}</strong> · categoría solicitada {categoryNames[admission.requestedCategory] ?? admission.requestedCategory} · médico tratante {admission.attendingDoctorName || 'sin asignar'}.</p>
-    <RemoteState state={requested}>{rows => rows.length || (both && other.data?.length) ? <div className="module-form"><WriteError error={spanishProblem(action.error)} onReload={onSaved} /><p className="form-intro">Te proponemos la primera cama libre; cambia si prefieres otra. Se vuelve a comprobar al confirmar.</p>{group(options[0], rows)}{both && (other.data ? group(options[1], other.data) : other.error ? <p className="muted">No pudimos cargar las camas de la otra categoría.</p> : null)}<Field label="Motivo de la asignación (opcional)" value={reason} onChange={setReason} maxLength={500} hint="Si lo escribes, al menos 10 caracteres." aria-invalid={reasonInvalid || undefined} /><div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose}>Cancelar</button><button className="primary-button" type="button" onClick={() => void assign()} disabled={action.busy || !selected || reasonInvalid}>Confirmar cama</button></div></div> : both && !other.data && !other.error ? <p className="muted" role="status">Buscando camas…</p> : <Empty title="Sin camas sugeridas" description={both ? 'No hay camas libres en ninguna de las dos categorías. Revisa el aislamiento y la disponibilidad del edificio.' : 'Revisa la categoría, aislamiento o disponibilidad del edificio. Jefatura puede autorizar una excepción de categoría.'} />}</RemoteState>
+  const summary = [['Paciente', admission.patientName], ['Origen', originNames[admission.origin] ?? admission.origin], ['Médico tratante', admission.attendingDoctorName || 'Sin asignar'], ['Categoría', categoryNames[admission.requestedCategory] ?? admission.requestedCategory], ['Aislamiento', admission.isolation ? 'Sí' : 'No'], ...(admission.motive ? [['Motivo', admission.motive]] : [])];
+  return <Dialog title={admission.origin === 'consulta' ? 'Ingresar paciente indicado' : 'Asignar cama'} onClose={onClose} busy={action.busy}>
+    <dl className="detail-grid admission-summary">{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+    <RemoteState state={requested}>{rows => rows.length || (both && other.data?.length) ? <div className="module-form"><WriteError error={spanishProblem(action.error)} onReload={onSaved} /><p className="form-intro">Te proponemos la primera cama libre; cambia si prefieres otra. Se vuelve a comprobar al confirmar.</p>{group(options[0], rows)}{both && (other.data ? group(options[1], other.data) : other.error ? <p className="muted">No pudimos cargar las camas de la otra categoría.</p> : null)}<Field label="Motivo de la asignación (opcional)" value={reason} onChange={setReason} maxLength={500} hint="Si lo escribes, al menos 10 caracteres." aria-invalid={reasonInvalid || undefined} /><div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose}>Cancelar</button><button className="primary-button" type="button" onClick={() => void assign()} disabled={action.busy || !selected || reasonInvalid}>Confirmar cama</button></div></div> : both && !other.data && !other.error ? <p className="muted" role="status">Buscando camas…</p> : <div className="admission-no-beds"><Empty title="No hay camas compatibles" description={both ? 'No hay camas libres en ninguna de las dos categorías. Revisa el aislamiento y la disponibilidad del edificio.' : `Ninguna cama libre cumple ${admission.isolation ? 'aislamiento y ' : ''}la categoría ${categoryNames[admission.requestedCategory] ?? admission.requestedCategory}. Jefatura puede autorizar una excepción de categoría.`} /><div className="dialog-actions"><a className="secondary-button" href="#/camas">Ver tablero</a><button type="button" className="primary-button" onClick={() => onSaved(admission.origin === 'consulta' ? `${admission.patientName} queda pendiente de cama en «Ingresos indicados»; asígnale una desde ahí cuando se libere.` : `${admission.patientName} queda ingresada sin cama; aparece en «Admisiones sin cama» de Inicio.`)}>Ingresar sin cama</button></div></div>}</RemoteState>
   </Dialog>;
 }
 

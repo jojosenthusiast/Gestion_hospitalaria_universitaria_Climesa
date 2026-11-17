@@ -18,6 +18,7 @@ const fixed: Record<string, string> = {
   adjunto_sin_archivo: 'Este adjunto solo tiene la referencia: el archivo no se guardó en el sistema.',
   adjunto_ya_almacenado: 'Este adjunto ya tiene su archivo guardado.',
   adjunto_no_coincide: 'El archivo no coincide con el que se adjuntó al resultado; sube el mismo archivo.',
+  sin_consulta: 'Para registrar un resultado externo necesitas una consulta tuya con este paciente. Ábrela desde Consultas y vuelve a intentarlo.',
 };
 const fallback: Record<string, string> = {
   validacion: 'Revisa los datos e intenta de nuevo.',

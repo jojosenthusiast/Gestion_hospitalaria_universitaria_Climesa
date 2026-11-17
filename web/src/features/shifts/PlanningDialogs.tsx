@@ -31,8 +31,8 @@ function datesBetween(from: string, to: string): string[] {
  * suelto). Se puede quitar un turno o cambiar la persona; un cambio de persona pide validar de nuevo antes de crear.
  * `initial` ya validado (el generador) no se vuelve a pedir al abrir.
  */
-export function BatchPreview({ api, catalog, items: start, initial, onClose, onCreated }: {
-  api: Api; catalog: ShiftCatalog; items: PreviewItem[]; initial?: Validation; onClose: () => void; onCreated: (count: number) => void;
+export function BatchPreview({ api, catalog, items: start, initial, onClose, onBack, onCreated }: {
+  api: Api; catalog: ShiftCatalog; items: PreviewItem[]; initial?: Validation; onClose: () => void; onBack?: () => void; onCreated: (count: number) => void;
 }) {
   const [items, setItems] = useState(() => initial ? start.map((item, index) => ({ ...item, result: initial.resultados.find(r => r.index === index) })) : start);
   const [gaps, setGaps] = useState<BatchGap[]>(initial?.huecos ?? []);
@@ -124,7 +124,8 @@ export function BatchPreview({ api, catalog, items: start, initial, onClose, onC
       {needsJustification && <Field label="Justificación de más de 44 h diurnas en la semana" value={justification} onChange={setJustification} minLength={10} maxLength={500}
         hint="Se guarda en cada turno que la necesite. Luego vuelve a validar." />}
       <div className="dialog-actions">
-        <button type="button" className="secondary-button" onClick={onClose} disabled={create.busy}>Cancelar</button>
+        {/* R7 F1: «Atrás» returns to the generator with everything still filled in. */}
+        {onBack ? <button type="button" className="secondary-button" onClick={onBack} disabled={create.busy}>Atrás</button> : <button type="button" className="secondary-button" onClick={onClose} disabled={create.busy}>Cancelar</button>}
         <button type="button" className="secondary-button" onClick={() => void validate()} disabled={check.busy || !items.length}>Validar de nuevo</button>
         <SaveButton busy={create.busy} label={label} disabled={blocked} />
       </div>
@@ -168,8 +169,8 @@ const PATTERNS: { code: string; label: string; hint: string }[] = [
  * reparte las vueltas respetando descanso, tope de 7 días y cobertura, llena la cobertura mínima del área (L13) y
  * devuelve la vista previa con conflictos y los huecos que quedan con su motivo.
  */
-export function RotationDialog({ api, catalog, defaultFrom, defaultTo, areaId: presetArea, onClose, onPreview }: {
-  api: Api; catalog: ShiftCatalog; defaultFrom: string; defaultTo: string; areaId?: string; onClose: () => void;
+export function RotationDialog({ api, catalog, defaultFrom, defaultTo, areaId: presetArea, hidden = false, onClose, onPreview }: {
+  api: Api; catalog: ShiftCatalog; defaultFrom: string; defaultTo: string; areaId?: string; hidden?: boolean; onClose: () => void;
   onPreview: (items: PreviewItem[], validation: Validation) => void;
 }) {
   const [areaId, setAreaId] = useState(presetArea ?? ''), [people, setPeople] = useState<string[]>([]), [role, setRole] = useState('');
@@ -192,6 +193,8 @@ export function RotationDialog({ api, catalog, defaultFrom, defaultTo, areaId: p
     onPreview(items, { resultados: result.items.map((i, index) => ({ index, ok: i.ok, codigo: i.codigo, mensaje: i.mensaje })), huecos: result.huecos });
   }
 
+  // While its preview is open the generator stays mounted but hidden, so «Atrás» finds it as it was left.
+  if (hidden) return null;
   return <Dialog title="Generar rotación" onClose={onClose} busy={action.busy}>
     <form className="module-form shift-form" onSubmit={preview} noValidate>
       <WriteError error={action.error} />
@@ -322,22 +325,37 @@ export function TemplatesDialog({ api, catalog, days, rows, version, areaId: pre
 
 type PublishResult = { published: number; warnings: BatchGap[] };
 /** Publicar semana: resume cuántos borradores salen al personal; los huecos que queden se informan después. */
-export function PublishWeekDialog({ api, drafts, label, from, to, areaId, areaName, onClose, onPublished }: {
-  api: Api; drafts: number; label: string; from: string; to: string; areaId?: string; areaName?: string; onClose: () => void; onPublished: (result: PublishResult) => void;
+export type DraftsByArea = { id: string; name: string; count: number }[];
+
+/**
+ * R7 F1: the confirmation breaks the drafts down by area. With an area filter on, it says so and offers
+ * «Publicar todas las áreas» instead of silently publishing only the filtered one.
+ */
+export function PublishWeekDialog({ api, drafts, byArea = [], label, from, to, areaId, areaName, onClose, onPublished }: {
+  api: Api; drafts: number; byArea?: DraftsByArea; label: string; from: string; to: string; areaId?: string; areaName?: string; onClose: () => void; onPublished: (result: PublishResult) => void;
 }) {
   const action = useAction(api);
+  const total = byArea.reduce((sum, a) => sum + a.count, 0), others = !!areaId && byArea.some(a => a.id !== areaId);
+  const [scope, setScope] = useState<'area' | 'todas'>('area');
+  const allAreas = !areaId || scope === 'todas', count = allAreas ? Math.max(total, drafts) : drafts;
+  const listed = allAreas ? byArea : byArea.filter(a => a.id === areaId);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const result = await action.run<PublishResult>('/turnos/publicar', { from, to, ...(areaId ? { areaId } : {}) });
+    const result = await action.run<PublishResult>('/turnos/publicar', { from, to, ...(allAreas ? {} : { areaId }) });
     if (result) onPublished(result);
   }
   return <Dialog title="Publicar semana" onClose={onClose} busy={action.busy}>
     <form className="module-form" onSubmit={submit}>
       <WriteError error={action.error} />
-      <p>Se publicará{drafts === 1 ? '' : 'n'} <strong>{plural(drafts, 'borrador', 'borradores')}</strong> de la semana del {label}{areaName ? ` en ${areaName}` : ''}. Desde ese momento el personal los ve en Mis turnos y la base vuelve a revisar el descanso y el tope de horas de cada uno.</p>
+      {others && <fieldset className="choice-list"><legend>¿Qué áreas publicas?</legend>
+        <label className="check-field"><input type="radio" name="publish-scope" checked={scope === 'area'} onChange={() => setScope('area')} /><span>Solo {areaName ?? 'el área filtrada'} ({drafts})</span></label>
+        <label className="check-field"><input type="radio" name="publish-scope" checked={scope === 'todas'} onChange={() => setScope('todas')} /><span>Publicar todas las áreas ({total})</span></label>
+      </fieldset>}
+      <p>Se publicará{count === 1 ? '' : 'n'} <strong>{plural(count, 'borrador', 'borradores')}</strong> de la semana del {label}{allAreas ? '' : ` en ${areaName ?? 'el área filtrada'}`}. Desde ese momento el personal los ve en Mis turnos y la base vuelve a revisar el descanso y el tope de horas de cada uno.</p>
+      {listed.length > 0 && <ul className="shift-publish-areas" aria-label="Borradores por área">{listed.map(a => <li key={a.id}><span>{a.name}</span><strong>{plural(a.count, 'borrador', 'borradores')}</strong></li>)}</ul>}
       <div className="dialog-actions">
         <button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Volver</button>
-        <SaveButton busy={action.busy} label="Publicar" />
+        <SaveButton busy={action.busy} label={`Publicar (${count})`} />
       </div>
     </form>
   </Dialog>;

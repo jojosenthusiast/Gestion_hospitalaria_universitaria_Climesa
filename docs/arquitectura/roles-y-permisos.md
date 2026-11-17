@@ -187,6 +187,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/turnos/lote/validar` | `turnos.planificar` | No guarda; un resultado por turno con las reglas de un turno suelto (descanso, tope de 7 días, traslape, inscripción) y huecos de cobertura | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/lote` | `turnos.planificar` | Todo o nada, como borradores; 409 lote_con_conflictos con el resultado de cada turno | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/generar` | `turnos.planificar` | Vista previa sin guardar: rotativo, 12x36, 24x72 o personalizado; llena la cobertura mínima del área y explica los huecos; máximo 31 días | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/turnos/candidatos` | `turnos.planificar` | Sin guardar: cada persona de la función pasa las reglas de un turno suelto; válidas primero (área, menos horas) y las demás con su código | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | GET | `/api/v1/turnos/plantillas` | `turnos.planificar` |  | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/turnos/plantillas` | `turnos.planificar` | Nombre único por área | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | PATCH | `/api/v1/turnos/plantillas/{id}` | `turnos.planificar` | Versión optimista | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
@@ -256,6 +257,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/consultas/agenda` | `consulta.iniciar` | Solo agenda propia | R | 3 | · | · | · | · | · | ✔ | · | · | · | · |
 | PATCH | `/api/v1/consultas/{id}` | `consulta.registrar` | Versión y autor | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | GET | `/api/v1/consultas/{id}/detalle` | `expediente.ver` o `consulta.iniciar` | Relación clínica y auditoría | R | 3 | · | · | · | · | relación | relación / ✔ | · | · | · | propio revisado |
+| GET | `/api/v1/consultas/cie10` | `consulta.registrar` | Al menos 2 caracteres; hasta 20 | R | 6 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/consultas/{id}/receta` | `recetas.emitir` | Inscripción vigente | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | GET | `/api/v1/consultas/sin-firmar` | `consulta.iniciar` | Solo propias | R | 4 | · | · | · | · | · | ✔ | · | · | · | · |
 
@@ -274,9 +276,11 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/laboratorio/catalogo` | `laboratorio.ordenar` o `catalogo.configurar` | Catálogo activo | R | 3 | ✔ | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes` | `laboratorio.ordenar` | Consulta propia | R | 3 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/resultados` | `laboratorio.procesar` | Marca calculada en servidor | R | 3 | · | · | · | · | · | · | ✔ | · | · | · |
+| POST | `/api/v1/laboratorio/ordenes/{id}/resultados/lote` | `laboratorio.procesar` | Solo En Proceso; todo o nada con una versión; complete=true exige laboratorio.validar | R | 4 | · | · | · | · | · | · | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/enmendar` | `laboratorio.validar` | Solo Completado; motivo de 10 o más; vuelve a revisión médica | R | 4 | · | · | · | · | · | · | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/externa` | `laboratorio.procesar` o `laboratorio.ordenar` | Solo Pendiente; laboratorio o médico que pidió; lugar e instrucciones para el paciente | R | 4 | · | · | · | · | · | relación | ✔ | · | · | · |
 | POST | `/api/v1/laboratorio/ordenes/{id}/resultado-externo` | `laboratorio.procesar` o `laboratorio.revisar` | Solo orden externa Pendiente; referencia del adjunto y valor de cada examen; completa la orden | R | 4 | · | · | · | · | · | relación | ✔ | · | · | · |
+| POST | `/api/v1/laboratorio/pacientes/{id}/resultado-externo` | `laboratorio.ordenar` | Médico con relación de atención vigente; exámenes del catálogo uno por uno; crea la orden externa ya completada | R | 4 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/laboratorio/adjuntos/{id}/archivo` | `laboratorio.procesar` o `laboratorio.revisar` | Adjunto solo con referencia; laboratorio o médico que puede revisar; tipo por contenido, 10 MB, SHA-256 del servidor; bucket privado; no reemplaza | R | 4 | · | · | · | · | · | relación | ✔ | · | · | · |
 | GET | `/api/v1/laboratorio/adjuntos/{id}/enlace` | `resultados.ver` | Personal que ve los valores de la orden; nunca el paciente (404); enlace firmado de 5 minutos; auditado | R | 4 | · | · | · | · | relación | relación | ✔ | · | · | propio revisado |
 | GET | `/api/v1/laboratorio/pendientes` | `laboratorio.revisar` | Órdenes que pidió quien lee; crítico primero | R | 4 | · | · | · | · | · | relación | · | · | · | · |
@@ -322,6 +326,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/ambulancia/solicitudes/{id}/cancelar` | `ambulancia.solicitar` | Solo quien pidió y solo por confirmar; motivo opcional; MA-AMB-05 | R | 6 | · | · | ✔ | · | · | · | · | · | · | propio |
 | POST | `/api/v1/ambulancia/servicios` | `ambulancia.despachar` | Solo si Disponible; bloqueo de fila | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/hitos` | `ambulancia.operar` | Orden de hitos | R | 4 | · | · | · | · | · | · | · | ✔ | · | · |
+| POST | `/api/v1/ambulancia/servicios/{id}/hitos/deshacer` | `ambulancia.operar` | Solo la tripulación; último hito; 15 minutos; nunca finalizado ni llegada recibida | R | 6 | · | · | · | · | · | · | · | ✔ | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/cerrar` | `ambulancia.mantenimiento` | Solo servicio activo; motivo; estado final cancelado; unidad a Disponible | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.reportar_prehospital` | Funciona sin conexión con reintento | E | 4 | · | · | · | · | · | · | · | ✔ | · | · |
 | GET | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.recibir_prehospital` |  | E | 4 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
@@ -364,6 +369,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/me/avisos/{id}/enterado` | `sesion.perfil` | Propio; aviso dirigido a la cuenta | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | POST | `/api/v1/me/avisos/{id}/posponer` | `sesion.perfil` | Propio; aviso dirigido a la cuenta | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | GET | `/api/v1/avisos/estadisticas` | `avisos.publicar` |  | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/avisos/alcance` | `avisos.publicar` | Solo el conteo; misma regla que estadisticas | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
 | PUT | `/api/v1/avisos/{id}` | `avisos.publicar` | Vigente o programado; exige versión | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/avisos/{id}/retirar` | `avisos.publicar` | Motivo de 10 caracteres o más (D-13) | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |
 

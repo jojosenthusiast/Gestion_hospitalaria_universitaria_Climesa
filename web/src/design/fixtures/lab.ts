@@ -93,7 +93,9 @@ export class LabFixtures {
       : o.state === 'completado' ? (doctor && !o.reviewedAt ? ['revisar'] : doctor ? [] : ['enmendar']) : [];
     const external = this.role === 'LAB' && o.state === 'pendiente' ? (o.external ? ['cargar_externo'] : ['enviar_externo']) : [];
     const { attachments: _attachments, ...rest } = o;
-    return { ...rest, allowedActions: allowed, externalActions: external };
+    // R7 C-3: the lab and the doctor see the patient's range next to each value.
+    const items = this.role === 'PAC' ? rest.items : rest.items.map(item => { const r = this.exam(item.code)?.ranges[0]; return { ...item, referenceRange: r ? { min: r.min, max: r.max, criticalLow: r.criticalLow, criticalHigh: r.criticalHigh } : null }; });
+    return { ...rest, items, allowedActions: allowed, externalActions: external };
   }
   private order(id: string) {
     const o = this.orders.find(x => x.id === id);
@@ -114,7 +116,13 @@ export class LabFixtures {
     if (p === '/laboratorio/catalogo') return this.exams.filter(e => e.active).map(e => ({ id: e.id, code: e.code, name: e.name, isPanel: e.isPanel, unit: e.unit, resultType: e.resultType }));
     if (p === '/catalogo/examenes') return this.exams;
     if (p === '/laboratorio/seguimientos') return this.proposals;
-    if (p === '/laboratorio/pendientes') return this.pending;
+    if (p === '/laboratorio/pendientes') return this.pending.map(row => {
+      // R7 C-4: the tray brings the order's version, whether it can be released, and the key values (critical first).
+      const o = this.orders.find(x => x.id === row.orderId)!;
+      const values = o.items.filter(i => i.result).map(i => ({ code: i.code, name: i.name, unit: i.unit, value: i.result!.value ?? null, text: i.result!.text ?? null, mark: i.result!.mark }))
+        .sort((a, b) => Number(b.mark.startsWith('critico')) - Number(a.mark.startsWith('critico')));
+      return { ...row, orderVersion: o.version, orderActions: this.role === 'MED' && !o.reviewedAt ? ['revisar'] : [], values };
+    });
     if (/^\/laboratorio\/adjuntos\/[^/]+\/enlace$/.test(p)) return { url: 'about:blank', expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(), expiresInSeconds: 300, fileName: 'informe-externo-ejemplo.pdf', mimeType: 'application/pdf', sizeBytes: 182_000 };
     return undefined;
   }
@@ -129,6 +137,25 @@ export class LabFixtures {
     }
     if (parts[1] === 'laboratorio' && parts[2] === 'ordenes' && parts[3]) {
       const o = this.order(parts[3]), verb = parts[4], now = new Date().toISOString();
+      if (verb === 'resultados' && parts[5] === 'lote') {
+        // R7 C-1: the whole sheet in one step, optionally completing the order.
+        for (const entry of d.items as Record<string, any>[]) {
+          const item = o.items.find(x => x.id === entry.orderItemId);
+          if (!item) throw new ApiError('No se encontró el examen de la orden.', 404);
+          item.result = { ...(typeof entry.value === 'number' ? { value: entry.value } : { text: entry.text }), mark: typeof entry.value === 'number' ? this.mark(item.code, entry.value) : 'normal', version: (item.result?.version ?? 0) + 1, observation: entry.observation ?? null, relevant: entry.relevant ?? false };
+        }
+        if (d.complete) Object.assign(o, { state: 'completado', completedAt: now });
+        const saved = this.bump(o, d);
+        const results = o.items.filter(i => i.result).map(i => ({ orderItemId: i.id, mark: i.result!.mark, version: i.result!.version }));
+        return { id: o.id, state: o.state, orderVersion: saved.version, results, criticalCount: results.filter(r => r.mark.startsWith('critico')).length, completedAt: o.completedAt };
+      }
+      if (verb === 'revisar') {
+        // R7 C-2: releasing closes the order's pending items too.
+        const closed = this.pending.filter(x => x.orderId === o.id).length;
+        this.pending = this.pending.filter(x => x.orderId !== o.id);
+        Object.assign(o, { reviewedAt: now });
+        return { ...this.bump(o, d), reviewedAt: now, followUpsClosed: closed, followUpProposalId: d.followUp === false ? null : this.nextId() };
+      }
       if (verb === 'resultados' || verb === 'enmendar') {
         const item = o.items.find(x => x.id === d.orderItemId);
         if (!item) throw new ApiError('No se encontró el examen de la orden.', 404);
@@ -149,8 +176,12 @@ export class LabFixtures {
         return { ...this.bump(o, d), attachmentId: attachment.id };
       }
       Object.assign(o, next[verb] ?? {});
+      // R7 C-6: the fixture patient has the app, so the notice reaches them.
+      if (verb === 'externa') return { ...this.bump(o, d), patientNotified: true };
       return this.bump(o, d);
     }
+    // R7 C-5: an exam done elsewhere without a prior order; the API ties it to the latest consultation.
+    if (parts[1] === 'laboratorio' && parts[2] === 'pacientes' && parts[4] === 'resultado-externo') return { id: this.nextId(), version: 3, state: 'completado', attachmentId: this.nextId(), consultationId: this.nextId() };
     if (parts[1] === 'laboratorio' && parts[2] === 'seguimientos' && parts[3]) { this.proposals = this.proposals.filter(x => x.id !== parts[3]); return { id: parts[3], version: 2 }; }
     if (parts[1] === 'laboratorio' && parts[2] === 'pendientes' && parts[3]) { this.pending = this.pending.filter(x => x.id !== parts[3]); return { id: parts[3], version: 2 }; }
     if (parts[1] === 'catalogo' && parts[2] === 'examenes' && parts[3]) {

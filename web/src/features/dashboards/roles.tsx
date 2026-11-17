@@ -7,7 +7,7 @@ import type { Remote } from '../common';
 import { milestoneNames, priorityLevel, priorityNames, stateNames as unitStateNames } from '../ambulance/types';
 import { isPendingCategoryRequest } from '../listas/requests';
 import { shownState } from '../listas/schedule';
-import type { DashboardData, LabOrderRow, QueueTicket, Source } from './data';
+import type { AdmissionRow, DashboardData, LabOrderRow, QueueTicket, Source } from './data';
 import { auditActionLabel } from './labels';
 import { AttentionList, Panel, PanelState, isToday, localDay, minutesBetween, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
@@ -47,8 +47,9 @@ function AppointmentsToday({ appts }: { appts: Remote<Appointment[]> }) {
   </Panel>;
 }
 
-function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
-  return <Panel title="Mi turno" icon="clock" action={{ label: 'Ver turnos', href: '#/turnos' }}>
+/** R7 F3: today's (or the next) own shift, with the way to «Mis turnos» (the calendar filtered to this person). */
+export function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
+  return <Panel title="Mi turno" icon="clock" action={{ label: 'Ver mis turnos', href: '#/turnos?persona=yo' }}>
     <PanelState state={shifts} empty={rows => nextShift(rows) ? null : 'No tienes turnos publicados próximos.'}>{rows => {
       const next = nextShift(rows)!, active = new Date(next.start).getTime() <= Date.now();
       return <div className="my-shift"><StatusBadge value={active ? 'en_curso' : 'publicado'} label={active ? 'En curso' : 'Próximo'} /><strong>{shiftText(next)}</strong></div>;
@@ -67,9 +68,15 @@ const pendingAmbulance = (d: DashboardData): TrayGroupSpec => ({
   id: 'ambulancia', title: 'Ambulancia por confirmar', href: '#/ambulancia', state: asRemote(d.ambulance),
   items: (d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: `${r.address} · ${formatRelative(r.createdAt)}`, tone: 'urgent' as Tone, href: '#/ambulancia', action: 'Despachar', area: 'AMB' as const })),
 });
+/** R7 G3: an admission the doctor indicated in the consultation; Recepción only picks the bed. */
+const indicated = (a: AdmissionRow) => a.state === 'pendiente_cama' && a.origin === 'consulta';
+const indicatedAdmissions = (d: DashboardData): TrayGroupSpec => ({
+  id: 'ingresos-indicados', title: 'Ingresos indicados', href: '#/hospitalizacion', state: asRemote(d.admissions),
+  items: (d.admissions.data ?? []).filter(indicated).map(a => ({ id: `i-${a.id}`, title: a.patientName, detail: [a.attendingDoctorName, a.isolation ? 'Aislamiento' : null, a.motive].filter(Boolean).join(' · ') || undefined, tone: 'warn' as Tone, href: `#/hospitalizacion?ingresar=${a.id}`, action: 'Ingresar', tag: 'Indicado', status: 'pendiente_cama' })),
+});
 const noBed = (d: DashboardData): TrayGroupSpec => ({
   id: 'sin-cama', title: 'Admisiones sin cama', href: '#/hospitalizacion', state: asRemote(d.admissions),
-  items: (d.admissions.data ?? []).filter(a => a.state === 'pendiente_cama').map(a => ({ id: `a-${a.id}`, title: a.patientName, tone: 'warn' as Tone, href: '#/hospitalizacion', action: 'Asignar cama', tag: 'Sin cama', status: 'pendiente_cama' })),
+  items: (d.admissions.data ?? []).filter(a => a.state === 'pendiente_cama' && !indicated(a)).map(a => ({ id: `a-${a.id}`, title: a.patientName, tone: 'warn' as Tone, href: `#/hospitalizacion?ingresar=${a.id}`, action: 'Asignar cama', tag: 'Sin cama', status: 'pendiente_cama' })),
 });
 
 const labCount = (rows: LabOrderRow[], state: string) => rows.filter(o => o.state === state).length;
@@ -127,7 +134,7 @@ const jop: RoleDashboard = {
   tray: ({ d }) => [
     { id: 'huecos', title: 'Huecos de cobertura', href: '#/turnos', masculine: true, state: asRemote(d.board),
       items: (d.board.data?.cobertura.detalle ?? []).map((g, i) => ({ id: `gap-${i}`, title: `${g.area} · ${roleNames[g.rol] ?? g.rol}`, detail: `${timeLabel(g.inicio)}–${timeLabel(g.fin)} · ${g.actuales} de ${plural(g.requeridos, 'persona', 'personas')}`, tone: 'warn' as Tone, href: '#/turnos?accion=planificar', action: 'Planificar' })) },
-    noBed(d), pendingAmbulance(d), lowStock(d),
+    indicatedAdmissions(d), noBed(d), pendingAmbulance(d), lowStock(d),
   ],
   figures: ({ d }) => [
     fig('camas-libres', 'Camas libres', d.board, b => b.camas.libres, { href: '#/camas', of: d.board.data ? `de ${d.board.data.camas.total}` : undefined }),
@@ -193,7 +200,7 @@ const rec: RoleDashboard = {
       ] },
     { id: 'vinculaciones', title: 'Vinculaciones por verificar', href: '#/vinculaciones', state: asRemote(d.links),
       items: (d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name, detail: l.candidate ? `Expediente ${l.candidate.record}` : 'Sin expediente sugerido', tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar' })) },
-    noBed(d), pendingAmbulance(d),
+    indicatedAdmissions(d), noBed(d), pendingAmbulance(d),
   ],
   figures: ({ d }) => [
     fig('espera', 'En espera', d.queue, r => tickets(r, 'en_espera').length, { href: '#/fila' }),
@@ -331,7 +338,11 @@ const pac: RoleDashboard = {
   title: 'Mi atención',
   needs: ['appts', 'queue', 'myLab'],
   actions: [{ id: 'cita', label: 'Pedir una cita', hint: 'Elige el motivo; recepción te asigna médico y hora', icon: 'calendar', href: '#/citas?accion=solicitar', permission: 'citas.solicitar' }],
-  tray: () => [],
+  // R7 C-6: an order sent outside tells the patient where to go and what to bring, until it is done.
+  tray: ({ d }) => [{
+    id: 'examen-externo', title: 'Exámenes en otro sitio', href: '#/inicio', state: asRemote(d.myLab), masculine: true,
+    items: (d.myLab.data ?? []).filter(o => o.external && ['pendiente', 'en_proceso'].includes(o.state)).map(o => ({ id: `ext-${o.id}`, title: `Examen en otro sitio: ${o.externalPlace ?? 'lugar por confirmar'}`, detail: [o.items.map(i => i.name).join(', '), o.externalInstructions].filter(Boolean).join(' · '), tone: 'info' as Tone, href: '#/inicio', action: 'Ver', tag: 'En otro sitio' })),
+  }],
   figures: ({ d }) => [
     fig('proxima', 'Próxima cita', d.appts, rows => { const next = upcoming(rows)[0]; return next ? `${formatDate(next.start, { withYear: false })}, ${timeLabel(next.start)}` : 'Sin citas'; }, { href: '#/citas' }),
     fig('mi-numero', 'Mi número en la fila', d.queue, rows => rows.find(t => ['en_espera', 'llamado', 'en_atencion'].includes(t.state))?.numero ?? null),

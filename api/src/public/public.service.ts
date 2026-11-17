@@ -243,6 +243,25 @@ export class PublicService {
        FROM publico.aviso a ORDER BY lower(a.vigencia) DESC,a.creado_en DESC LIMIT 100`, [this.clock.now()]);
   }
 
+  /**
+   * R7 D-2: alcance al redactar, con la misma regla que `noticeStats` (rol, área de ficha o de turno en curso). Los
+   * códigos que no tienen forma de rol o espacio responden `validacion`; uno inexistente simplemente no suma.
+   */
+  async noticeReach(rolesText?: string, areasText?: string) {
+    const list = (text?: string) => [...new Set((text ?? '').split(',').map(s => s.trim()).filter(Boolean))];
+    const roles = list(rolesText), areas = list(areasText);
+    if (roles.some(r => !/^[A-Z]{2,4}$/.test(r))) throw new ProblemException('validacion', 400, 'Los roles van como códigos separados por coma, por ejemplo ENF,MED.', 'roles');
+    if (areas.some(a => !/^[A-Z0-9-]{2,20}$/.test(a))) throw new ProblemException('validacion', 400, 'Las áreas van como códigos separados por coma, por ejemplo P1-HOS.', 'areas');
+    const [row] = await this.db.query<{ destinatarios: number }>(
+      `SELECT count(*)::int AS destinatarios FROM acceso.usuario u WHERE u.estado='activo' AND (
+         EXISTS (SELECT 1 FROM acceso.asignacion_rol r WHERE r.usuario_id=u.id AND r.rol_codigo=ANY($2::text[]))
+         OR (cardinality($3::text[]) > 0 AND u.persona_personal_id IS NOT NULL AND (
+           EXISTS (SELECT 1 FROM personal.persona p JOIN infra.espacio s ON s.id=p.area_id WHERE p.id=u.persona_personal_id AND s.codigo=ANY($3::text[]))
+           OR EXISTS (SELECT 1 FROM personal.turno t JOIN infra.espacio s ON s.id=t.area_id WHERE t.persona_id=u.persona_personal_id AND s.codigo=ANY($3::text[])
+             AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz))))`, [this.clock.now(), roles, areas]);
+    return { destinatarios: row?.destinatarios ?? 0 };
+  }
+
   /** Para quien redacta: todos los avisos recientes con su audiencia, estado (vigente, programado, vencido, retirado) y acciones. */
   async listNotices() {
     const at = this.clock.now();

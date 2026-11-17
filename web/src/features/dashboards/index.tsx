@@ -6,7 +6,7 @@ import { useDashboardData, type Source } from './data';
 import { LabFollowUpPanel } from './lab-follow-up';
 import { LabResultsInbox } from './lab-results-inbox';
 import { DayFigures, PendingTray, QuickActions, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
-import { roleDashboards, roleOrder, type RoleId } from './roles';
+import { MyShift, roleDashboards, roleOrder, type RoleId } from './roles';
 
 const unique = <T extends { id: string }>(items: T[]) => [...new Map(items.map(item => [item.id, item])).values()];
 
@@ -21,8 +21,11 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
   const needed = useMemo(() => {
     const set = new Set<Source>(roles.flatMap(role => roleDashboards[role].needs));
     set.add('followUps'); set.add('labPending');
+    if (can(profile, 'turnos.ver')) set.add('myShifts');
     return set;
-  }, [roles]);
+  }, [roles, profile]);
+  // R7 F3: every role that sees shifts gets «Mi turno» on Inicio; roles whose panels already show it keep theirs.
+  const ownShiftPanel = can(profile, 'turnos.ver') && !roles.some(role => roleDashboards[role].needs.includes('myShifts'));
   const d = useDashboardData(api, profile, version, needed);
   if (roles.length === 0) return <>
     <CompactHeader breadcrumb="CLIMESA / Inicio" title="Inicio" />
@@ -48,6 +51,7 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
       </PendingTray>
       <DayFigures figures={figures} />
     </div>
+    {ownShiftPanel && <div className="role-dashboard"><MyShift shifts={d.myShifts} /></div>}
     {roles.map((role: RoleId) => { const panels = roleDashboards[role].panels?.(ctx); return panels ? <div className="role-dashboard" key={role}>{panels}</div> : null; })}
   </>;
 }

@@ -4,8 +4,9 @@ import { Field, Icon, Notice } from '../../components/ui';
 import { can, roleNames, type AccessProfile, type Api, type Space } from '../../lib/api';
 import { useRefreshAt } from '../../lib/publico';
 import { Dialog, Empty, CompactHeader, RemoteState, Tag, WriteError, formatDateTime, useAction, useData, type Remote } from '../common';
+import { formatNumber } from '../../lib/format';
 import { NoticeCard, NoticeLevelBadge } from './NoticePreview';
-import { audienceRoles, audienceText, durations, filterInbox, inboxFilters, isoToLocalInput, levels, localInput, localToIso, personalDataIn, priorities, priorityOfLevel, WITHDRAW_MIN, type Inbox, type InboxFilter, type InboxNotice, type Level, type NoticeListItem, type NoticeStats, type Priority } from './rules';
+import { audienceRoles, audienceText, durations, filterInbox, inboxFilters, isoToLocalInput, levels, localInput, localToIso, personalDataIn, priorityOfLevel, WITHDRAW_MIN, type Inbox, type InboxFilter, type InboxNotice, type Level, type NoticeListItem, type NoticeStats, type Priority } from './rules';
 import './avisos.css';
 
 export { localToIso } from './rules';
@@ -100,10 +101,10 @@ function PublishedNotices({ api, profile, version }: { api: Api; profile: Access
         ? <table className="record-table"><caption className="sr-only">Avisos publicados</caption><thead><tr><th>Aviso</th><th>Nivel</th><th>Dónde se ve</th><th>Vigencia</th><th>Enterado</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>{rows.map(a => { const count = statsOf(a.id); return <tr key={a.id}>
             <td data-label="Aviso"><strong>{a.titulo}</strong><small>{a.cuerpo}</small></td>
-            <td data-label="Nivel"><NoticeLevelBadge level={a.nivel} /><small>Pantalla pública: <span>{priorities.find(p => p.id === a.prioridad)?.label ?? a.prioridad}</span></small></td>
+            <td data-label="Nivel"><NoticeLevelBadge level={a.nivel} /></td>
             <td data-label="Dónde se ve">{audienceText(a)}</td>
             <td data-label="Vigencia">{a.desde ? formatDateTime(a.desde) : '—'}<small>hasta {a.hasta ? formatDateTime(a.hasta) : '—'}</small></td>
-            <td data-label="Enterado" className="numeric">{count ? (count.destinatarios ? `${count.enterados} de ${count.destinatarios}` : String(count.enterados)) : '—'}</td>
+            <td data-label="Enterado" className="numeric">{count ? (count.destinatarios ? `${count.enterados}/${count.destinatarios} enterados` : String(count.enterados)) : '—'}</td>
             <td data-label="Estado"><Tag value={stateTag[a.estado] ?? a.estado} label={stateLabel[a.estado] ?? a.estado} />
               {a.estado === 'retirado' && <small>{a.retiradoEn ? `${formatDateTime(a.retiradoEn)} · ` : ''}Motivo: {a.motivoRetiro ?? 'sin motivo registrado'}</small>}</td>
             <td data-label="Acciones">{(a.allowedActions ?? []).length
@@ -150,9 +151,21 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
   const scheduled = editing?.estado === 'programado';
   const [title, setTitle] = useState(editing?.titulo ?? ''), [body, setBody] = useState(editing?.cuerpo ?? ''), [level, setLevel] = useState<Level>(editing?.nivel ?? 'informativo');
   const [isPublic, setPublic] = useState(editing?.publico ?? true), [roles, setRoles] = useState<string[]>(editing?.roles ?? []), [areas, setAreas] = useState<string[]>(editing?.areas ?? []);
-  // The public screen keeps its D-071 priority: it follows the level, except an edit that leaves the level as it was.
-  const priority: Priority = editing && level === (editing.nivel ?? 'informativo') ? editing.prioridad as Priority : priorityOfLevel[level];
-  const spaces = useData<Space[]>(api, '/espacios', 0, can(profile, 'espacios.ver'));
+  // R7 D-6: one scale only. The web sends `nivel`; the API derives the public screen's old priority from it.
+  // An edit that leaves the level as it was keeps the stored priority, so an older notice never changes rank silently.
+  const keepPriority = !!editing && level === (editing.nivel ?? 'informativo');
+  const priority: Priority = keepPriority ? editing!.prioridad as Priority : priorityOfLevel[level];
+  const canSeeAreas = can(profile, 'espacios.ver');
+  const spaces = useData<Space[]>(api, '/espacios', 0, canSeeAreas);
+  // R7 D-2: «llega a N personas» while composing, with the same rule as the «Enterado» counts.
+  const reachQuery = new URLSearchParams({ ...(roles.length ? { roles: [...roles].sort().join(',') } : {}), ...(areas.length ? { areas: [...areas].sort().join(',') } : {}) }).toString();
+  const reach = useData<{ destinatarios: number }>(api, `/avisos/alcance?${reachQuery}`, 0, reachQuery.length > 0);
+  // break-ui: an audience with nobody active is a real case (a new area, a role without staff); say so instead of "0 personas".
+  const reachCount = reach.data?.destinatarios;
+  const reachText = reachQuery ? (reachCount === undefined ? 'Calculando a cuántas personas llega…'
+    : reachCount === 0 ? `Nadie del personal activo recibe este aviso con esta audiencia${isPublic ? '; solo lo verá la pantalla pública' : ''}.`
+    : `Llega a ${formatNumber(reachCount)} ${reachCount === 1 ? 'persona' : 'personas'}${isPublic ? ' y a la pantalla pública' : ''}`) : isPublic ? 'Solo pantalla pública y apps sin sesión' : '';
+  const [confirming, setConfirming] = useState(false);
   const areaOptions = (Array.isArray(spaces.data) ? spaces.data : []).filter(s => s.active && (s.type === 'area' || s.type === 'bahia'));
   const [from, setFrom] = useState(editing && !started && editing.desde ? isoToLocalInput(editing.desde) : ''), [until, setUntil] = useState(() => editing?.hasta ? isoToLocalInput(editing.hasta) : localInput(72));
   const [done, setDone] = useState(false);
@@ -164,14 +177,17 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
   const toggleArea = (code: string) => setAreas(current => current.includes(code) ? current.filter(a => a !== code) : [...current, code]);
 
   async function publish(confirm: boolean) {
-    const payload = { titulo: title.trim(), cuerpo: body.trim(), nivel: level, prioridad: priority, publico: isPublic, roles, areas, ...(started ? {} : from ? { desde: localToIso(from) } : scheduled ? { desde: new Date().toISOString() } : {}), hasta: localToIso(until), ...(confirm ? { confirmarDatosPersonales: true } : {}) };
+    const payload = { titulo: title.trim(), cuerpo: body.trim(), nivel: level, ...(keepPriority ? { prioridad: priority } : {}), publico: isPublic, roles, areas, ...(started ? {} : from ? { desde: localToIso(from) } : scheduled ? { desde: new Date().toISOString() } : {}), hasta: localToIso(until), ...(confirm ? { confirmarDatosPersonales: true } : {}) };
     if (editing) {
       if (await action.run(`/avisos/${editing.id}`, { ...payload, version: editing.version }, 'PUT')) onDone();
       return;
     }
     if (await action.run('/avisos', payload)) { setTitle(''); setBody(''); setLevel('informativo'); setPublic(true); setRoles([]); setAreas([]); setFrom(''); setUntil(localInput(72)); setDone(true); onDone(); }
   }
-  const submit = (event: FormEvent) => { event.preventDefault(); setDone(false); void publish(false); };
+  // R7 D1: a critical or public notice reaches many people at once, so it confirms with a summary first.
+  const needsConfirm = (level === 'critico' || isPublic) && (!editing || level !== (editing.nivel ?? 'informativo') || isPublic !== editing.publico);
+  const submit = (event: FormEvent) => { event.preventDefault(); setDone(false); if (needsConfirm) setConfirming(true); else void publish(false); };
+  const confirmAndPublish = async () => { setConfirming(false); await publish(false); };
   const label = editing ? (action.busy ? 'Guardando…' : 'Guardar cambios') : (action.busy ? 'Publicando…' : 'Publicar aviso');
 
   return <section className="notice-composer" aria-label={editing ? 'Editar aviso' : 'Nuevo aviso'}>
@@ -192,9 +208,11 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
       <fieldset className="notice-fieldset"><legend>¿Quién lo ve?</legend>
         <label className="notice-check"><input type="checkbox" checked={isPublic} onChange={e => setPublic(e.target.checked)} />Público: pantalla pública y apps sin iniciar sesión</label>
         <div className="notice-roles">{audienceRoles.map(r => <label key={r} className="notice-check"><input type="checkbox" checked={roles.includes(r)} onChange={() => toggle(r)} />{roleNames[r]}</label>)}</div>
+        {!canSeeAreas && <small className="field-hint">Para dirigirlo a un área hace falta el permiso de ver espacios; pídeselo a Administración.</small>}
         {areaOptions.length > 0 && <div className="notice-roles" role="group" aria-label="Áreas">{areaOptions.map(a => <label key={a.id} className="notice-check"><input type="checkbox" checked={areas.includes(a.code)} onChange={() => toggleArea(a.code)} /><AreaTag code={a.code} />{a.name}</label>)}</div>}
         <small className="field-hint">Los roles y las áreas lo ven en Avisos, en la web y en las apps; si es crítico, también en su inicio. Un aviso solo para roles o áreas no sale en la pantalla pública.</small>
         {noAudience && <Notice kind="error">Elige a quién va dirigido: público, uno o más roles o áreas.</Notice>}
+        {reachText && <p className={reachCount === 0 ? 'notice-reach is-empty' : 'notice-reach'} role="status">{reachText}</p>}
       </fieldset>
       <fieldset className="notice-fieldset"><legend>Vigencia</legend>
         <div className="form-grid">
@@ -216,5 +234,21 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
       <NoticeCard notice={{ titulo: title.trim(), cuerpo: body.trim(), prioridad: priority, nivel: level, publico: isPublic, roles, areas, hasta: until ? localToIso(until) : null }} />
       <p className="muted">Así lo ve quien lo recibe. {isPublic ? 'En la pantalla pública solo se muestran título y texto.' : 'No saldrá en la pantalla pública.'}</p>
     </aside>
+    {confirming && <Dialog title={editing ? 'Guardar cambios del aviso' : 'Publicar aviso'} onClose={() => setConfirming(false)}>
+      <div className="module-form">
+        <p>Revisa antes de {editing ? 'guardar' : 'publicar'}: {level === 'critico' ? 'un aviso crítico se destaca en el inicio de cada persona hasta que da «Enterado».' : 'un aviso público sale en la pantalla pública y en las apps sin sesión.'}</p>
+        <dl className="detail-grid">
+          <div><dt>Título</dt><dd>{title.trim()}</dd></div>
+          <div><dt>Nivel</dt><dd><NoticeLevelBadge level={level} /></dd></div>
+          <div><dt>Dónde se ve</dt><dd>{audienceText({ publico: isPublic, roles, areas })}</dd></div>
+          {reachText && <div><dt>Alcance</dt><dd>{reachText}</dd></div>}
+          <div><dt>Hasta</dt><dd>{until ? formatDateTime(localToIso(until)) : '—'}</dd></div>
+        </dl>
+        <div className="dialog-actions">
+          <button type="button" className="secondary-button" onClick={() => setConfirming(false)}>Volver</button>
+          <button type="button" className="primary-button" onClick={() => void confirmAndPublish()}><Icon name="megaphone" size={18} />{editing ? 'Guardar cambios' : 'Publicar aviso'}</button>
+        </div>
+      </div>
+    </Dialog>}
   </section>;
 }

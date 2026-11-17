@@ -79,7 +79,23 @@ create temp table unidad_previa on commit drop as
 -- ---------------------------------------------------------------------------------------------------------
 delete from ambulancia.ubicacion where servicio_id::text like 'de300000-%';
 delete from ambulancia.reporte_prehospital where servicio_id::text like 'de300000-%' or id::text like 'de300000-%';
+-- R7 G-4: `hito_borrado_guardia` (20261126002100) blocks deleting milestones of finished services, and
+-- `hito_anulado` (20261126002000) keeps undone milestones. Only demo services are touched: the guard is disabled
+-- inside this transaction and enabled again right after. Both steps are skipped on a base without those migrations.
+do $$ begin
+  if to_regclass('ambulancia.hito_anulado') is not null then
+    execute $q$delete from ambulancia.hito_anulado where servicio_id::text like 'de300000-%'$q$;
+  end if;
+  if exists (select 1 from pg_trigger where tgrelid = 'ambulancia.hito'::regclass and tgname = 'hito_borrado_guardia') then
+    execute 'alter table ambulancia.hito disable trigger hito_borrado_guardia';
+  end if;
+end $$;
 delete from ambulancia.hito where servicio_id::text like 'de300000-%' or id::text like 'de300000-%';
+do $$ begin
+  if exists (select 1 from pg_trigger where tgrelid = 'ambulancia.hito'::regclass and tgname = 'hito_borrado_guardia') then
+    execute 'alter table ambulancia.hito enable trigger hito_borrado_guardia';
+  end if;
+end $$;
 delete from ambulancia.tripulacion where servicio_id::text like 'de300000-%';
 delete from ambulancia.servicio where id::text like 'de300000-%';
 delete from ambulancia.solicitud s where s.id::text like 'de300000-%' and not exists (select 1 from ambulancia.servicio v where v.solicitud_id = s.id);
