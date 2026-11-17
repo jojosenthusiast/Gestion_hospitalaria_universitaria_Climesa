@@ -84,7 +84,7 @@ class AppointmentActionViewModel @Inject constructor(private val api: ApiGateway
                 val slots = ReceptionScheduling.daySlots(api.request("/citas/disponibilidad?doctorId=${target.doctorId}&date=${s.date}") as JSONObject)
                 mutable.update { st -> st.copy(loadingSlots = false, slots = slots, slot = st.slot?.takeIf { chosen -> slots.any { it.start == chosen.start && it.selectable } }) }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                mutable.update { it.copy(loadingSlots = false, slots = emptyList(), error = e.message ?: "No se pudo consultar el horario.") }
+                mutable.update { it.copy(loadingSlots = false, slots = emptyList(), error = userMessage(e, "No se pudo consultar el horario.")) }
             }
         }
     }

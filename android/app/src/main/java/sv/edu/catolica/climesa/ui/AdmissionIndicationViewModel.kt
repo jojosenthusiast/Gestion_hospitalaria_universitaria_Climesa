@@ -70,7 +70,7 @@ class AdmissionIndicationViewModel @Inject constructor(private val api: ApiGatew
                 mutable.update { it.copy(busy = false, sent = true) }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 val fields = ApiProblems.fieldErrors(e)
-                mutable.update { it.copy(busy = false, serverFields = fields, error = e.message ?: "No se pudo indicar la hospitalización.") }
+                mutable.update { it.copy(busy = false, serverFields = fields, error = userMessage(e, "No se pudo indicar la hospitalización.")) }
             }
         }
     }

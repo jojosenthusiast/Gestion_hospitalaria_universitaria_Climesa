@@ -50,7 +50,7 @@ class ClinicalHistoryViewModel @Inject constructor(private val api: ApiGateway, 
         loadJob = viewModelScope.launch {
             try { mutable.value = mutable.value.copy(loading = false, history = ClinicalHistoryParser.parse(api.request("/pacientes/$patientId/historial"))) }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (!silent || mutable.value.history == null) mutable.value = mutable.value.copy(loading = false, error = e.message ?: "No se pudo cargar el historial.") }
+            catch (e: Exception) { if (!silent || mutable.value.history == null) mutable.value = mutable.value.copy(loading = false, error = userMessage(e, "No se pudo cargar el historial.")) }
         }
     }
 
@@ -65,7 +65,7 @@ class ClinicalHistoryViewModel @Inject constructor(private val api: ApiGateway, 
                 val found = (0 until rows.length()).mapNotNull(rows::optJSONObject).map { HistoryCandidate(it.optString("id"), it.optString("fullName"), it.optString("record")) }
                 mutable.value = mutable.value.copy(searching = false, candidates = found)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { mutable.value = mutable.value.copy(searching = false, error = e.message ?: "No se pudo buscar.") }
+            catch (e: Exception) { mutable.value = mutable.value.copy(searching = false, error = userMessage(e, "No se pudo buscar.")) }
         }
     }
 

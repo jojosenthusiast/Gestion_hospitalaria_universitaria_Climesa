@@ -71,7 +71,7 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
                 val rows = ReceptionScheduling.appointments(api.request("/citas") as? JSONArray ?: JSONArray())
                 mutable.update { it.copy(loading = false, appointments = rows) }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                mutable.update { it.copy(loading = false, error = e.message ?: "No se pudieron cargar las citas.") }
+                mutable.update { it.copy(loading = false, error = userMessage(e, "No se pudieron cargar las citas.")) }
             }
         }
     }
@@ -107,7 +107,7 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
             val page = ReceptionScheduling.pickerPage(api.request("/pacientes/selector?query=${URLEncoder.encode(q.trim(), "UTF-8")}&limit=10&offset=$offset") as JSONObject)
             if (mutable.value.query.trim() == q.trim()) mutable.update { it.copy(searching = false, results = if (offset == 0) page.items else it.results + page.items, hasMore = page.hasMore) }
         } catch (e: CancellationException) { throw e } catch (e: Exception) {
-            mutable.update { it.copy(searching = false, error = e.message ?: "No se pudo buscar.") }
+            mutable.update { it.copy(searching = false, error = userMessage(e, "No se pudo buscar.")) }
         }
     }
 
@@ -135,7 +135,7 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
                 val doctors = ReceptionScheduling.doctors(api.request("/citas/catalogos?date=$date") as JSONObject)
                 mutable.update { s -> s.copy(doctors = doctors, doctor = s.doctor?.let { d -> doctors.firstOrNull { it.id == d.id } }) }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                mutable.update { it.copy(error = e.message ?: "No se pudieron cargar los médicos.") }
+                mutable.update { it.copy(error = userMessage(e, "No se pudieron cargar los médicos.")) }
             }
         }
     }
@@ -150,7 +150,7 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
                 val slots = ReceptionScheduling.daySlots(api.request("/citas/disponibilidad?doctorId=${doctor.id}&date=${s.date}") as JSONObject)
                 mutable.update { st -> st.copy(loadingSlots = false, slots = slots, slot = st.slot?.takeIf { chosen -> slots.any { it.start == chosen.start && it.selectable } }) }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                mutable.update { it.copy(loadingSlots = false, slots = emptyList(), error = e.message ?: "No se pudo consultar el horario.") }
+                mutable.update { it.copy(loadingSlots = false, slots = emptyList(), error = userMessage(e, "No se pudo consultar el horario.")) }
             }
         }
     }
@@ -167,7 +167,7 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
                 load()
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 // El horario pudo ocuparse mientras se elegía: se vuelve a pedir el día para mostrar el estado real.
-                mutable.update { it.copy(saving = false, slot = null, error = e.message ?: "No se pudo agendar la cita.") }
+                mutable.update { it.copy(saving = false, slot = null, error = userMessage(e, "No se pudo agendar la cita.")) }
                 loadSlots()
             }
         }

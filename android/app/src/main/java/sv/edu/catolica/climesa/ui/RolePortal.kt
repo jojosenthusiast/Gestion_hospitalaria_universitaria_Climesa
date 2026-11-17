@@ -64,10 +64,10 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
             try{source.post("/ambulancia/mantenimiento",MaintenanceRules.body(version,inMaintenance,reason));maintenanceMutable.value=MaintenanceState(saved=true);load(current,silent=true)}
             catch(e:Exception){if(e is CancellationException)throw e
                 val conflict=(e as? sv.edu.catolica.climesa.data.AuthRequestException)?.let{it.statusCode==409||it.code=="version_conflicto"}==true
-                maintenanceMutable.value=MaintenanceState(conflict=conflict,error=if(conflict)"La unidad cambió. Cierra y vuelve a abrir para ver su estado actual; el cambio no se guardó." else e.message?:"No se pudo guardar. Intenta de nuevo.")}
+                maintenanceMutable.value=MaintenanceState(conflict=conflict,error=if(conflict)"La unidad cambió. Cierra y vuelve a abrir para ver su estado actual; el cambio no se guardó." else userMessage(e, "No se pudo guardar. Intenta de nuevo."))}
         }
     }
-    fun load(path:String?,silent:Boolean=false){current=path;job?.cancel();job=viewModelScope.launch{if(!silent||path==null)mutable.value=RoleData(loading=path!=null);if(path!=null)try{mutable.value=RoleData(data=source.get(path))}catch(e:Exception){if(e is CancellationException)throw e;if(silent&&mutable.value.data!=null)return@launch;mutable.value=RoleData(error=e.message?:"No se pudo cargar la información.")}}}
+    fun load(path:String?,silent:Boolean=false){current=path;job?.cancel();job=viewModelScope.launch{if(!silent||path==null)mutable.value=RoleData(loading=path!=null);if(path!=null)try{mutable.value=RoleData(data=source.get(path))}catch(e:Exception){if(e is CancellationException)throw e;if(silent&&mutable.value.data!=null)return@launch;mutable.value=RoleData(error=userMessage(e, "No se pudo cargar la información."))}}}
     /**
      * RN-25: llegó un valor crítico y la API deja a esta cuenta revisar una orden crítica (`allowedActions` incluye `revisar`,
      * como en iOS); sigue visible hasta que se cierra o se abre la revisión.

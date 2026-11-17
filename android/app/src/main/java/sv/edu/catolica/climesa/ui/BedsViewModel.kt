@@ -114,7 +114,7 @@ class BedsViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 val api = e as? AuthRequestException
-                val text = BedRules.errorMessage(api?.statusCode, api?.code, e.message)
+                val text = BedRules.errorMessage(api?.statusCode, api?.code, userMessage(e, "").ifBlank { null })
                 mutable.update { it.copy(submitting = false, actionError = text) }
                 if (api?.statusCode == 409 || api?.statusCode == 404) reload()
             }
