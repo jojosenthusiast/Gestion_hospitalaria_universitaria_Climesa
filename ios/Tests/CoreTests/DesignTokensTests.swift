@@ -28,13 +28,25 @@ final class DesignTokensTests: XCTestCase {
     func testApiValuesMapToTheirFamily() {
         let cases: [String: StatusFamily] = [
             "en_espera": .espera, "solicitada": .espera, "pendiente_cama": .espera, "provisional": .espera,
-            "llamado": .llamado, "confirmada": .llamado, "limpieza": .llamado, "reprogramada": .llamado,
-            "en_atencion": .atencion, "ocupada": .atencion, "hospitalizado": .atencion, "abierta": .atencion,
+            "confirmada": .espera, "reprogramada": .espera, "bajo_minimo": .espera,
+            "llamado": .llamado, "en_proceso": .llamado,
+            "limpieza": .atencion, "en_atencion": .atencion, "ocupada": .atencion, "hospitalizado": .atencion, "abierta": .atencion,
             "atendida": .listo, "atendido": .listo, "alta_firmada": .listo, "libre": .listo, "normal": .listo, "aprobada": .listo,
             "cancelado": .cerrado, "cancelada": .cerrado, "no_se_presento": .cerrado, "en_mantenimiento": .cerrado,
             "critico_alto": .critico, "critico_bajo": .critico
         ]
         for (value, family) in cases { XCTAssertEqual(StatusFamily.of(value), family, value) }
+    }
+
+    /// R2 (I-4): an appointment that is confirmed or rescheduled is waiting for its time, never "Llamado" (megaphone).
+    func testScheduledAppointmentStatesAreWaitingNotCalled() {
+        for value in ["confirmada", "reprogramada", "solicitada"] {
+            XCTAssertEqual(StatusFamily.of(value), .espera, value)
+            XCTAssertNotEqual(StatusFamily.of(value), .llamado, value)
+        }
+        XCTAssertEqual(StatusBadgeStyle.of("confirmada"), StatusBadgeStyle(label: "Confirmada", family: .espera))
+        XCTAssertEqual(StatusBadgeStyle.of("limpieza"), StatusBadgeStyle(label: "En limpieza", family: .atencion))
+        XCTAssertEqual(StatusBadgeStyle.of("bajo_minimo"), StatusBadgeStyle(label: "Bajo mínimo", family: .espera))
     }
 
     func testBadgeStyleUsesCatalogLabelAndFamily() {

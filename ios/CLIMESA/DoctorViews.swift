@@ -986,8 +986,14 @@ private struct PrehospitalReportCard: View {
             if let eta = report.estimatedArrival { Text(verbatim: String(format: L.text("arrival.eta"), ClimesaDates.display(eta, .time))).font(Typo.heading).foregroundStyle(Theme.ink) }
             if let reason = report.reason { Text(verbatim: reason).font(Typo.body).foregroundStyle(Theme.ink) }
             if let signs = report.vitalSigns, !signs.isEmpty {
-                ForEach(signs.keys.sorted(), id: \.self) { key in
-                    HStack { Text(verbatim: key).font(Typo.mono).foregroundStyle(Theme.muted); Spacer(); Text(verbatim: signs[key]?.text ?? "").font(Typo.body).foregroundStyle(Theme.ink) }
+                // I-21: Spanish names and units, never the raw API key.
+                ForEach(VitalSignLabels.ordered(Array(signs.keys)), id: \.self) { key in
+                    HStack {
+                        Text(verbatim: VitalSignLabels.label(key)).font(Typo.small).foregroundStyle(Theme.muted)
+                        Spacer()
+                        Text(verbatim: VitalSignLabels.value(key, signs[key]?.text ?? "")).font(Typo.body).monospacedDigit().foregroundStyle(Theme.ink)
+                    }
+                    .accessibilityElement(children: .combine)
                 }
             }
         }

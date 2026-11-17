@@ -82,6 +82,8 @@ public struct ConsultationDetail: Decodable, Sendable, Equatable {
         public let code: String
         public let principal: Bool
         public let note: String?
+        /// CIE-10 description when the API sends it (the history does; the detail may not yet).
+        public let description: String?
     }
     public let consultation: Summary
     public let vitalSigns: [VitalSigns]

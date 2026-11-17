@@ -1255,17 +1255,6 @@
         }
       }
     },
-    "consultation.diagnosis.hint": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La API valida el código contra el catálogo CIE-10."
-          }
-        }
-      }
-    },
     "consultation.diagnosis.note": {
       "extractionState": "manual",
       "localizations": {
@@ -4643,17 +4632,6 @@
         }
       }
     },
-    "consultation.steps": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Consulta → procedimientos → receta o exámenes → cerrar"
-          }
-        }
-      }
-    },
     "consultation.step.1": {
       "extractionState": "manual",
       "localizations": {
@@ -4694,17 +4672,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "4. Cerrar consulta"
-          }
-        }
-      }
-    },
-    "consultation.step.4.hint": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Firmar cierra la consulta y el número de fila; luego te proponemos quién pasa después."
           }
         }
       }
@@ -5233,6 +5200,83 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reenviar correo en %lld s"
+          }
+        }
+      }
+    },
+    "consultation.steps.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pasos de la consulta"
+          }
+        }
+      }
+    },
+    "consultation.step.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siguiente: %@"
+          }
+        }
+      }
+    },
+    "lab.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar examen"
+          }
+        }
+      }
+    },
+    "lab.selected": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld seleccionados"
+          }
+        }
+      }
+    },
+    "lab.search.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ningún examen coincide con la búsqueda."
+          }
+        }
+      }
+    },
+    "rx.removeLine": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar línea"
+          }
+        }
+      }
+    },
+    "queue.next.why": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Por qué este número?"
           }
         }
       }

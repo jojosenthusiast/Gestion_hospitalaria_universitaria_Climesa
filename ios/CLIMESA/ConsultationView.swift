@@ -93,6 +93,13 @@ struct ConsultationView: View {
     @State private var signFlow = false
     /// The notes save that runs before signing failed: its error shows next to «Firmar» too.
     @State private var signSaveFailed = false
+    /// I-19: one step at a time, with the step indicator on top (same steps as web `STEPS`).
+    @State private var step: ConsultationStep = .consulta
+    /// I-18: «Atender» opens the consultation already started; the start runs once when the screen opens.
+    @State private var autoStartTried = false
+    @State private var labQuery = ""
+    /// Descriptions returned when a diagnosis is added (the detail response only carries the code).
+    @State private var diagnosisNames: [String: String] = [:]
 
     init(origin: ConsultationOrigin, profile: AccessProfile) {
         self.origin = origin
@@ -118,7 +125,9 @@ struct ConsultationView: View {
             Text(verbatim: patientName).font(Typo.heading).foregroundStyle(Theme.ink)
             if consultationId == nil {
                 WriteNotice(submission: starting, reload: loadDetail)
-                if profile.hasPermission("consulta.iniciar") {
+                if starting.busy || !autoStartTried { Skeleton(rows: 3) }
+                else if profile.hasPermission("consulta.iniciar") {
+                    // Only after the automatic start failed: retry by hand.
                     ClimesaButton(title: L.text("consultation.start"), loading: starting.busy) { Task { await start() } }
                 }
             } else {
@@ -127,6 +136,7 @@ struct ConsultationView: View {
                 }
             }
         }
+        .task { await autoStart() }
         .task(id: "\(consultationId ?? "-")|\(live.snapshot.version(.consultations))") { await loadDetail() }
         .onChange(of: currentDraft) { _, _ in persistDraft() }
     }
@@ -199,39 +209,56 @@ struct ConsultationView: View {
             HStack(spacing: Spacing.m) {
                 Text(verbatim: String(format: L.text("queue.called.undoable"), lastCall.code)).font(Typo.body).foregroundStyle(Theme.ink)
                 Spacer()
-                Button(L.text("queue.undo")) { Task { await undoCall() } }.disabled(undoing.busy)
+                Button(L.text("queue.undo")) { Task { await undoCall() } }.disabled(undoing.busy).frame(minHeight: 44)
             }
         }
         WriteNotice(submission: undoing, reload: loadDetail)
         if editable {
-            // S9: consultation → procedures → prescription and/or exams → close, in that order.
-            Text("consultation.steps").font(Typo.small).foregroundStyle(Theme.muted)
-            Text("consultation.step.1").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
-        }
-        vitalSigns(value.vitalSigns)
-        draftSection(value, editable: editable)
-        diagnosesSection(value, editable: editable)
-        if editable { Text("consultation.step.3").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader) }
-        prescriptionSection(value, editable: editable && profile.hasPermission("recetas.emitir"))
-        if editable && profile.hasPermission("laboratorio.ordenar") { labSection(value) }
-        if editable && profile.hasPermission("admision.solicitar") && profile.staffId != nil {
-            AdmissionIndicationCard(consultationId: value.consultation.id, patientId: value.consultation.patientId)
-        }
-        if editable {
-            Text("consultation.step.4").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
-            Text("consultation.step.4.hint").font(Typo.small).foregroundStyle(Theme.muted)
-            WriteNotice(submission: signing, reload: loadDetail)
-            if signSaveFailed {
-                Text("consultation.sign.saveFailed").font(Typo.small).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
-                WriteNotice(submission: saving, reload: loadDetail)
-            }
-            ClimesaButton(title: L.text("consultation.sign"), kind: kind(.sign, editable: editable), loading: signFlow || signing.busy || saving.busy) { confirmingSign = true }
-                .confirmationDialog(L.text("consultation.sign.confirm"), isPresented: $confirmingSign, titleVisibility: .visible) {
-                    Button(L.text("consultation.sign")) { Task { await sign(value) } }
-                } message: {
-                    Text(verbatim: ConsultationActionRules.signSummary(notesPending: notesPending, unsentWork: unsentWork))
+            // S9 / I-19: consultation → procedures → prescription and exams → close, one step at a time.
+            ConsultationStepBar(current: $step)
+            switch step {
+            case .consulta:
+                vitalSigns(value.vitalSigns)
+                draftSection(value, editable: true, planOnly: false)
+                diagnosesSection(value, editable: true)
+            case .procedimientos:
+                draftSection(value, editable: true, planOnly: true)
+                if profile.hasPermission("admision.solicitar") && profile.staffId != nil {
+                    AdmissionIndicationCard(consultationId: value.consultation.id, patientId: value.consultation.patientId)
                 }
+            case .recetaExamenes:
+                prescriptionSection(value, editable: profile.hasPermission("recetas.emitir"))
+                if profile.hasPermission("laboratorio.ordenar") { labSection(value) }
+            case .cierre:
+                signSection(value, editable: editable)
+            }
+            if let next = step.next {
+                Button { step = next } label: {
+                    Label { Text(verbatim: String(format: L.text("consultation.step.next"), L.text(next.titleKey))) } icon: { Image(systemName: "arrow.right") }
+                        .font(Typo.label).frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing).contentShape(Rectangle())
+                }
+                .foregroundStyle(Theme.primaryText)
+            }
+        } else {
+            vitalSigns(value.vitalSigns)
+            draftSection(value, editable: false, planOnly: false)
+            diagnosesSection(value, editable: false)
+            prescriptionSection(value, editable: false)
         }
+    }
+
+    @ViewBuilder private func signSection(_ value: ConsultationDetail, editable: Bool) -> some View {
+        WriteNotice(submission: signing, reload: loadDetail)
+        if signSaveFailed {
+            Text("consultation.sign.saveFailed").font(Typo.small).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
+            WriteNotice(submission: saving, reload: loadDetail)
+        }
+        ClimesaButton(title: L.text("consultation.sign"), kind: kind(.sign, editable: editable), loading: signFlow || signing.busy || saving.busy) { confirmingSign = true }
+            .confirmationDialog(L.text("consultation.sign.confirm"), isPresented: $confirmingSign, titleVisibility: .visible) {
+                Button(L.text("consultation.sign")) { Task { await sign(value) } }
+            } message: {
+                Text(verbatim: ConsultationActionRules.signSummary(notesPending: notesPending, unsentWork: unsentWork))
+            }
     }
 
     @ViewBuilder private func vitalSigns(_ signs: [ConsultationDetail.VitalSigns]) -> some View {
@@ -256,13 +283,15 @@ struct ConsultationView: View {
         return parts.isEmpty ? "—" : parts.joined(separator: " · ")
     }
 
-    @ViewBuilder private func draftSection(_ value: ConsultationDetail, editable: Bool) -> some View {
-        SectionCard(title: L.text("consultation.notes")) {
+    @ViewBuilder private func draftSection(_ value: ConsultationDetail, editable: Bool, planOnly: Bool) -> some View {
+        SectionCard(title: L.text(planOnly ? "consultation.plan" : "consultation.notes")) {
             if editable {
-                MedicoTextArea(label: L.text("consultation.reason"), text: $reason, error: draftErrors["reason"], lines: 2...5)
-                MedicoTextArea(label: L.text("consultation.exam"), text: $exam, error: draftErrors["physicalExam"])
-                Text("consultation.step.2").font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
-                MedicoTextArea(label: L.text("consultation.plan"), text: $plan, error: draftErrors["plan"], lines: 2...6)
+                if planOnly {
+                    MedicoTextArea(label: L.text("consultation.plan"), text: $plan, error: draftErrors["plan"], lines: 2...6)
+                } else {
+                    MedicoTextArea(label: L.text("consultation.reason"), text: $reason, error: draftErrors["reason"], lines: 2...5)
+                    MedicoTextArea(label: L.text("consultation.exam"), text: $exam, error: draftErrors["physicalExam"])
+                }
                 draftStatus
                 WriteNotice(submission: saving, reload: loadDetail)
                 ClimesaButton(title: L.text("consultation.save"), kind: kind(.save, editable: editable), loading: saving.busy) { Task { await save(value) } }
@@ -281,15 +310,22 @@ struct ConsultationView: View {
         }
     }
 
+    /// I-16: «J45.9 · Asma no especificada», never the bare code.
+    private func diagnosisTitle(_ diagnosis: ConsultationDetail.Diagnosis) -> String {
+        guard let name = diagnosis.description ?? diagnosisNames[diagnosis.code], !name.isEmpty else { return diagnosis.code }
+        return "\(diagnosis.code) · \(name)"
+    }
+
     @ViewBuilder private func diagnosesSection(_ value: ConsultationDetail, editable: Bool) -> some View {
         SectionCard(title: L.text("consultation.diagnoses")) {
-            ForEach(value.diagnoses) { diagnosis in
-                ListRow(title: diagnosis.code, subtitle: diagnosis.note) {
-                    if diagnosis.principal { StatusTag("activo", label: L.text("consultation.principal")) }
+            ForEach(Array(value.diagnoses.enumerated()), id: \.element.id) { index, diagnosis in
+                if index > 0 { Divider().overlay(Theme.line) }
+                ListRow(title: diagnosisTitle(diagnosis), subtitle: diagnosis.note) {
+                    if diagnosis.principal { StatusBadge("principal", label: L.text("consultation.principal")) }
                 }
             }
             if editable {
-                FormField(label: L.text("consultation.diagnosis.code"), text: $code, hint: L.text("consultation.diagnosis.hint"), error: codeError)
+                FormField(label: L.text("consultation.diagnosis.code"), text: $code, error: codeError)
                     .textInputAutocapitalization(.characters).autocorrectionDisabled()
                 Toggle("consultation.principal", isOn: $principal).font(Typo.body).tint(Theme.primary)
                 FormField(label: L.text("consultation.diagnosis.note"), text: $note)
@@ -311,17 +347,9 @@ struct ConsultationView: View {
             }
             if editable {
                 ForEach($lines) { $line in
-                    VStack(alignment: .leading, spacing: Spacing.m) {
-                        FormField(label: L.text("rx.medication"), text: $line.medication)
-                        HStack(alignment: .top, spacing: Spacing.m) {
-                            FormField(label: L.text("rx.dose"), text: $line.dose)
-                            FormField(label: L.text("rx.route"), text: $line.route)
-                        }
-                        HStack(alignment: .top, spacing: Spacing.m) {
-                            FormField(label: L.text("rx.frequency"), text: $line.frequency)
-                            FormField(label: L.text("rx.duration"), text: $line.duration)
-                        }
-                        FormField(label: L.text("rx.instructions"), text: $line.instructions)
+                    PrescriptionLineFields(line: $line, removable: lines.count > 1) {
+                        let id = line.id
+                        lines.removeAll { $0.id == id }
                     }
                 }
                 if let lineError { Text(verbatim: lineError).font(Typo.caption).foregroundStyle(Theme.danger) }
@@ -335,12 +363,20 @@ struct ConsultationView: View {
     @ViewBuilder private func labSection(_ value: ConsultationDetail) -> some View {
         SectionCard(title: L.text("lab.order")) {
             LoadState(loader: catalog, retry: loadCatalog) { exams in
-                ForEach(exams) { item in
+                // I-20: search the catalog by name or code; what is already picked stays visible.
+                FormField(label: L.text("lab.search"), text: $labQuery)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                if !selectedExams.isEmpty {
+                    Text(verbatim: String(format: L.text("lab.selected"), selectedExams.count)).font(Typo.small).foregroundStyle(Theme.muted)
+                }
+                let visible = LabCatalogFilter.filter(exams, query: labQuery, selected: selectedExams)
+                if visible.isEmpty { EmptyNote("lab.search.none") }
+                ForEach(visible) { item in
                     Toggle(isOn: Binding(get: { selectedExams.contains(item.id) }, set: { on in
                         if on { selectedExams.insert(item.id) } else { selectedExams.remove(item.id) }
                     })) {
                         Text(verbatim: item.isPanel ? "\(item.name) · \(L.text("lab.panel"))" : item.name).font(Typo.body).foregroundStyle(Theme.ink)
-                    }.tint(Theme.primary)
+                    }.tint(Theme.primary).frame(minHeight: 44)
                 }
                 VStack(alignment: .leading, spacing: Spacing.s) {
                     Text("lab.priority").font(Typo.label).foregroundStyle(Theme.ink)
@@ -381,6 +417,13 @@ struct ConsultationView: View {
     private func loadCatalog() async { await catalog.load { try await account.client().get("/laboratorio/catalogo", as: [LabExam].self) } }
 
     // MARK: - Escrituras
+
+    /// I-18: the consultation starts when the screen opens from «Atender» or «Iniciar»; one try, then a manual retry.
+    private func autoStart() async {
+        guard !autoStartTried else { return }
+        if consultationId == nil && profile.hasPermission("consulta.iniciar") { await start() }
+        autoStartTried = true
+    }
 
     private func start() async {
         let body: ConsultationStartBody
@@ -431,9 +474,11 @@ struct ConsultationView: View {
         guard codeError == nil, let id = consultationId else { return }
         let text = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let body = DiagnosisBody(code: code.trimmingCharacters(in: .whitespaces).uppercased(), principal: principal, note: text.isEmpty ? nil : text)
+        var created: DiagnosisCreated?
         let ok = await diagnosing.run(body: body) { key in
-            _ = try await account.client().send("POST", "/consultas/\(id)/diagnosticos", body: body, key: key, as: DiagnosisCreated.self)
+            created = try await account.client().send("POST", "/consultas/\(id)/diagnosticos", body: body, key: key, as: DiagnosisCreated.self)
         }
+        if ok, let created { diagnosisNames[created.code] = created.description }
         if ok { code = ""; note = ""; principal = false }
         await loadDetail()
     }
@@ -499,7 +544,11 @@ struct ConsultationView: View {
             } else {
                 Text("queue.next.none").font(Typo.body).foregroundStyle(Theme.ink)
             }
-            Text(verbatim: String(format: L.text("queue.next.rule"), next.rule)).font(Typo.small).foregroundStyle(Theme.muted)
+            // I-31: the rule stays one tap away instead of a sentence under every proposal.
+            DisclosureGroup {
+                Text(verbatim: String(format: L.text("queue.next.rule"), next.rule)).font(Typo.small).foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } label: { Text("queue.next.why").font(Typo.small).foregroundStyle(Theme.primaryText).frame(minHeight: 44) }
             WriteNotice(submission: handoffCall, reload: loadDetail)
             if let proposal = next.proposal, profile.hasPermission("fila.llamar") {
                 ClimesaButton(title: String(format: L.text("consultation.next.call"), proposal.code), kind: kind(.callNext, editable: editable), loading: handoffCall.busy) { Task { await callProposed(proposal) } }
@@ -531,5 +580,72 @@ struct ConsultationView: View {
             _ = try await account.client().send("POST", "/fila/\(last.id)/deshacer-llamado", body: body, key: key, as: QueueTransitionResult.self)
         }
         if ok { lastCall = nil }
+    }
+}
+
+/// I-19: step indicator like the web (`consult-steps`): done steps carry a check, the current one is filled.
+private struct ConsultationStepBar: View {
+    @Binding var current: ConsultationStep
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.space2) {
+                ForEach(ConsultationStep.allCases, id: \.self) { step in
+                    let state = step.state(current: current)
+                    let isCurrent = state == .actual
+                    Button { current = step } label: {
+                        HStack(spacing: Spacing.space1) {
+                            if state == .hecho { Image(systemName: "checkmark").imageScale(.small).accessibilityHidden(true) }
+                            Text(LocalizedStringKey(step.titleKey)).font(Typo.label).lineLimit(1)
+                        }
+                        .padding(.horizontal, Spacing.space3).frame(minHeight: 44)
+                        .foregroundStyle(isCurrent ? Theme.onPrimary : (state == .hecho ? Theme.ink : Theme.muted))
+                        .background(isCurrent ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(isCurrent ? Theme.primary : Theme.line, lineWidth: 1))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(isCurrent ? AccessibilityTraits.isSelected : AccessibilityTraits())
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("consultation.steps.label"))
+    }
+}
+
+/// One prescription line. I-39: dose/route and frequency/duration stack in a column with large text, and a line can
+/// be removed while there is more than one.
+private struct PrescriptionLineFields: View {
+    @Binding var line: PrescriptionDraft
+    let removable: Bool
+    let remove: () -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let pair = typeSize >= .xxLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.m))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: Spacing.m))
+        VStack(alignment: .leading, spacing: Spacing.m) {
+            HStack(alignment: .bottom, spacing: Spacing.s) {
+                FormField(label: L.text("rx.medication"), text: $line.medication)
+                if removable {
+                    Button(action: remove) {
+                        Image(systemName: "minus.circle").font(Typo.heading).frame(width: 44, height: 44).contentShape(Rectangle())
+                    }
+                    .foregroundStyle(Theme.muted)
+                    .accessibilityLabel(Text("rx.removeLine"))
+                }
+            }
+            pair {
+                FormField(label: L.text("rx.dose"), text: $line.dose)
+                FormField(label: L.text("rx.route"), text: $line.route)
+            }
+            pair {
+                FormField(label: L.text("rx.frequency"), text: $line.frequency)
+                FormField(label: L.text("rx.duration"), text: $line.duration)
+            }
+            FormField(label: L.text("rx.instructions"), text: $line.instructions)
+        }
     }
 }

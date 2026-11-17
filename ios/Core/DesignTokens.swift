@@ -204,12 +204,13 @@ public enum StatusFamily: String, CaseIterable, Sendable {
     }
 
     private static let byValue: [String: StatusFamily] = [
+        // Una cita confirmada o reprogramada espera su hora: no es "Llamado" (megáfono). Mismo mapa que web `familyOfValue`.
         "en_espera": .espera, "solicitada": .espera, "pendiente": .espera, "pendiente_cama": .espera, "borrador": .espera,
         "publicado": .espera, "reservada": .espera, "provisional": .espera, "por_vencer": .espera, "revisar": .espera,
-        "llamado": .llamado, "confirmada": .llamado, "en_proceso": .llamado, "limpieza": .llamado, "reprogramada": .llamado,
-        "bajo_minimo": .llamado,
+        "confirmada": .espera, "reprogramada": .espera, "bajo_minimo": .espera,
+        "llamado": .llamado, "en_proceso": .llamado,
         "en_atencion": .atencion, "en_curso": .atencion, "ocupada": .atencion, "hospitalizado": .atencion,
-        "en_servicio": .atencion, "abierta": .atencion,
+        "en_servicio": .atencion, "abierta": .atencion, "limpieza": .atencion,
         "atendida": .listo, "atendido": .listo, "completado": .listo, "firmada": .listo, "alta_firmada": .listo, "egresado": .listo, "libre": .listo,
         "disponible": .listo, "activo": .listo, "exito": .listo, "normal": .listo, "aprobada": .listo, "ok": .listo, "coincide": .listo,
         "cancelado": .cerrado, "cancelada": .cerrado, "no_asistio": .cerrado, "no_se_presento": .cerrado, "cerrado": .cerrado,

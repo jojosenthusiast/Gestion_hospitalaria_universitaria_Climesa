@@ -890,7 +890,7 @@ private struct ConsultationRecord: View {
             ForEach(Array(consultation.diagnoses.enumerated()), id: \.offset) { _, diagnosis in
                 SectionCard {
                     ListRow(title: "\(diagnosis.code) · \(diagnosis.description)") {
-                        if diagnosis.principal { PatientTag("activo", label: L.text("consultation.principal")) }
+                        if diagnosis.principal { StatusBadge("principal", label: L.text("consultation.principal")) }
                     }
                 }
             }
@@ -1048,7 +1048,7 @@ struct MyAccessView: View {
             if rows.isEmpty { EmptyStateView(title: L.text("accesses.none"), symbol: "eye.slash") }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 SectionCard {
-                    ListRow(title: String(format: L.text("accesses.row"), row.role, row.dataType),
+                    ListRow(title: String(format: L.text("accesses.row"), RoleNames.label(row.role), row.dataType),
                             subtitle: String(format: L.text("accesses.reason"), row.reason), meta: ClimesaDates.display(row.date))
                 }
             }
