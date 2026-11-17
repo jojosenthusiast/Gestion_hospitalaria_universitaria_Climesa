@@ -41,6 +41,22 @@ function montar(profile: AccessProfile, falla: string[] = []) {
 }
 const hrefs = () => screen.getAllByRole('link').map(a => a.getAttribute('href'));
 
+describe('R7 C-6 · aviso al paciente', () => {
+  it('PAC ve «Examen en otro sitio» con el lugar y las instrucciones de su orden externa pendiente', async () => {
+    respuestas['/me/laboratorio'] = [
+      { id: 'o-ext', priority: 'rutina', state: 'pendiente', createdAt: hoy, items: [{ id: 'i', name: 'Glucosa' }], external: true, externalPlace: 'Laboratorio Ejemplo, San Salvador', externalInstructions: 'Ir en ayunas con este documento.' },
+      { id: 'o-int', priority: 'rutina', state: 'pendiente', createdAt: hoy, items: [{ id: 'i', name: 'Hemograma' }], external: false, externalPlace: null },
+    ];
+    try {
+      montar(perfil('PAC'));
+      const tray = await screen.findByRole('region', { name: 'Pendientes' });
+      expect(await within(tray).findByText('Examen en otro sitio: Laboratorio Ejemplo, San Salvador')).toBeTruthy();
+      expect(within(tray).getByText(/Glucosa · Ir en ayunas con este documento\./)).toBeTruthy();
+      expect(within(tray).queryByText(/Hemograma/)).toBeNull();
+    } finally { respuestas['/me/laboratorio'] = []; }
+  });
+});
+
 describe('inicio por rol', () => {
   it('REC: acciones rápidas reales con ?accion=, cifras y lista de atención con acción directa', async () => {
     montar(perfil('REC'));

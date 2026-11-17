@@ -91,3 +91,7 @@
 /* R7 C1: the release form keeps its summary readable; the exam name leads its row. */
 .lab-release { gap: 0.75rem; }
 .lab-sheet-name { display: block; font-weight: 600; }
+
+/* R7 C2: a reference-only attachment shows «Archivo pendiente · Reintentar» and confirms the chosen file before uploading. */
+.lab-attachment-retry, .lab-attachment-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.lab-attachment-retry label { cursor: pointer; }

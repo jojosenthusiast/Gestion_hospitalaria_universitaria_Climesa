@@ -92,6 +92,21 @@ describe('Laboratorio · flujo C en pantalla', () => {
     expect(api.write).toHaveBeenCalledWith('/laboratorio/ordenes/a/externa', { version: 3, place: 'Clínica Ficticia de Imágenes', instructions: EXTERNAL_INSTRUCTIONS_TEMPLATE }, 'POST');
   });
 
+  it('R7 C-6: al enviar a externo dice si el paciente recibió el aviso; sin app pide entregar las instrucciones impresas', async () => {
+    for (const [notified, text] of [[true, 'Ana Externa recibió el aviso en su app con el lugar y las instrucciones.'], [false, 'Ana Externa no tiene la app: entrégale las instrucciones impresas.']] as const) {
+      const api = montar([order('a', 'Ana Externa', 'pendiente', { allowedActions: ['tomar_muestra'], externalActions: ['enviar_externo'] })]);
+      api.write.mockResolvedValue({ id: 'a', version: 4, patientNotified: notified });
+      await userEvent.click(await screen.findByRole('button', { name: 'Se realiza en otro sitio' }));
+      const dialogo = await screen.findByRole('dialog', { name: 'Examen en otro sitio' });
+      await userEvent.type(within(dialogo).getByLabelText('Dónde se realiza'), 'Clínica Ficticia');
+      await userEvent.click(within(dialogo).getByRole('button', { name: 'Enviar a externo' }));
+      expect(await within(dialogo).findByText(text)).toBeTruthy();
+      expect(!!within(dialogo).queryByRole('button', { name: 'Imprimir instrucciones' })).toBe(!notified);
+      await userEvent.click(within(dialogo).getByRole('button', { name: 'Listo' }));
+      cleanup();
+    }
+  });
+
   it('una orden externa dice dónde y qué hacer, y su informe entra con adjunto y valores clave', async () => {
     const api = montar([order('a', 'Ana Externa', 'pendiente', { external: true, externalPlace: 'Clínica Ficticia', externalInstructions: 'Sin ayuno. Traiga su DUI.', externalActions: ['cargar_externo'] })]);
     expect(await screen.findByText(/Se realiza en otro sitio: Clínica Ficticia/)).toBeTruthy();

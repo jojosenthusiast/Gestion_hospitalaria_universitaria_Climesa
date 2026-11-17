@@ -338,7 +338,11 @@ const pac: RoleDashboard = {
   title: 'Mi atención',
   needs: ['appts', 'queue', 'myLab'],
   actions: [{ id: 'cita', label: 'Pedir una cita', hint: 'Elige el motivo; recepción te asigna médico y hora', icon: 'calendar', href: '#/citas?accion=solicitar', permission: 'citas.solicitar' }],
-  tray: () => [],
+  // R7 C-6: an order sent outside tells the patient where to go and what to bring, until it is done.
+  tray: ({ d }) => [{
+    id: 'examen-externo', title: 'Exámenes en otro sitio', href: '#/inicio', state: asRemote(d.myLab), masculine: true,
+    items: (d.myLab.data ?? []).filter(o => o.external && ['pendiente', 'en_proceso'].includes(o.state)).map(o => ({ id: `ext-${o.id}`, title: `Examen en otro sitio: ${o.externalPlace ?? 'lugar por confirmar'}`, detail: [o.items.map(i => i.name).join(', '), o.externalInstructions].filter(Boolean).join(' · '), tone: 'info' as Tone, href: '#/inicio', action: 'Ver', tag: 'En otro sitio' })),
+  }],
   figures: ({ d }) => [
     fig('proxima', 'Próxima cita', d.appts, rows => { const next = upcoming(rows)[0]; return next ? `${formatDate(next.start, { withYear: false })}, ${timeLabel(next.start)}` : 'Sin citas'; }, { href: '#/citas' }),
     fig('mi-numero', 'Mi número en la fila', d.queue, rows => rows.find(t => ['en_espera', 'llamado', 'en_atencion'].includes(t.state))?.numero ?? null),

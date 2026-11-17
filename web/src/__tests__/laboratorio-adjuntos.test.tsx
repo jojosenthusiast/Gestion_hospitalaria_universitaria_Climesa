@@ -66,6 +66,11 @@ describe('archivo privado del resultado externo (T07b)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar resultado' }));
     expect(await within(dialog).findByText(/Los valores se guardaron, pero el archivo no se subió/)).toBeTruthy();
     expect(within(dialog).getByText(/no es un PDF ni una foto/)).toBeTruthy();
+    // R7 C2: «Archivo pendiente» names the file, and the retry reuses exactly that file.
+    expect(within(dialog).getByText(/Archivo pendiente: «informe.pdf»/)).toBeTruthy();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reintentar con «informe.pdf»' }));
+    await vi.waitFor(() => expect(uploads(api)).toHaveLength(2));
+    expect(((uploads(api)[1][1] as RequestInit).body as FormData).get('archivo')).toMatchObject({ name: 'informe.pdf' });
   });
 
   it('el médico descarga un archivo guardado con un enlace firmado que no se muestra', async () => {
@@ -83,7 +88,14 @@ describe('archivo privado del resultado externo (T07b)', () => {
     const api = mount({ ...base, state: 'completado', completedAt: new Date().toISOString() }, lab, [attachment(false)]);
     expect(await screen.findByText(/Solo se guardó la referencia/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Descargar/ })).toBeNull();
-    await userEvent.upload(screen.getByLabelText('Subir archivo de informe.pdf'), new File(['%PDF-1.4'], 'informe.pdf', { type: 'application/pdf' }));
+    const row = screen.getByText(/Solo se guardó la referencia/).closest('li')!;
+    expect(within(row).getByText('Archivo pendiente')).toBeTruthy();
+    expect(within(row).getByText('Reintentar')).toBeTruthy();
+    await userEvent.upload(screen.getByLabelText('Subir archivo de informe.pdf'), new File(['%PDF-1.4'], 'informe-escaneado.pdf', { type: 'application/pdf' }));
+    // The retry asks to confirm the chosen file before uploading it.
+    expect(uploads(api)).toHaveLength(0);
+    expect(within(row).getByText(/¿Subir «informe-escaneado.pdf» \(PDF · 1 KB\) como el archivo de «informe.pdf»\?/)).toBeTruthy();
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirmar y subir' }));
     await vi.waitFor(() => expect(uploads(api)).toHaveLength(1));
     expect(uploads(api)[0][0]).toBe('/laboratorio/adjuntos/att-1/archivo');
   });
@@ -92,6 +104,7 @@ describe('archivo privado del resultado externo (T07b)', () => {
   it('una foto HEIC sin tipo del navegador sube con su tipo por extensión', async () => {
     const api = mount({ ...base, state: 'completado', completedAt: new Date().toISOString() }, lab, [attachment(false)]);
     await userEvent.upload(await screen.findByLabelText('Subir archivo de informe.pdf'), new File(['ftypheic'], 'Foto.HEIC', { type: '' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirmar y subir' }));
     await vi.waitFor(() => expect(uploads(api)).toHaveLength(1));
     const part = (uploads(api)[0][1] as RequestInit).body as FormData;
     expect([(part.get('archivo') as File).name, (part.get('archivo') as File).type]).toEqual(['Foto.HEIC', 'image/heic']);
@@ -104,6 +117,7 @@ describe('archivo privado del resultado externo (T07b)', () => {
       return [{ ...base, state: 'completado', completedAt: new Date().toISOString() }];
     });
     await userEvent.upload(await screen.findByLabelText('Subir archivo de informe.pdf'), new File(['%PDF-1.4'], 'informe.pdf', { type: 'application/pdf' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirmar y subir' }));
     expect(await screen.findByText(/no coincide con el que se adjuntó/)).toBeTruthy();
   });
 

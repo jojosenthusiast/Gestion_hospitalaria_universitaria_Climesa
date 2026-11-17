@@ -281,10 +281,18 @@ function AttachmentRow({ api, file, canAttach, onStored }: { api: Api; file: Att
     setBusy(true); setError(null);
     try { await work(); after?.(); } catch (e) { setError(spanishProblem(e instanceof ApiError ? e : new ApiError('No se pudo completar la operación.'))); } finally { setBusy(false); }
   }
-  function upload(picked: File | null) {
+  // R7 C2: a retry first shows which file was chosen and uploads only after «Confirmar y subir».
+  const [chosen, setChosen] = useState<File | null>(null);
+  function pick(picked: File | null) {
     const problem = attachmentProblem(picked);
+    setChosen(null);
     if (problem || !picked) { setError(new ApiError(problem ?? 'Elige un archivo.')); return; }
-    void attempt(() => uploadAttachment(api, file.id, picked), onStored);
+    setError(null); setChosen(picked);
+  }
+  function upload() {
+    const picked = chosen;
+    if (!picked) return;
+    void attempt(() => uploadAttachment(api, file.id, picked), () => { setChosen(null); onStored(); });
   }
   return <li>
     <Icon name="download" size={16} /><span><strong>{file.fileName}</strong> <span className="muted">{file.mimeType === 'application/pdf' ? 'PDF' : 'Foto'} · {formatBytes(file.sizeBytes)} · {formatDateTime(file.uploadedAt)}{file.uploadedByName ? ` · ${file.uploadedByName}` : ''}</span>
@@ -293,7 +301,12 @@ function AttachmentRow({ api, file, canAttach, onStored }: { api: Api; file: Att
         ? <button type="button" className="secondary-button" disabled={busy} aria-label={`Descargar ${file.fileName}`} onClick={() => void attempt(() => downloadAttachment(api, file.id))}>{busy ? 'Preparando…' : 'Descargar'}</button>
         : <>
           <small className="muted">Solo se guardó la referencia del archivo (nombre, tipo, tamaño y huella) y los valores; el archivo no está en el sistema.</small>
-          {canAttach && <small>{busy ? 'Subiendo el archivo…' : 'Sube aquí la foto o el PDF (hasta 10 MB):'} <input type="file" aria-label={`Subir archivo de ${file.fileName}`} accept={ATTACHMENT_ACCEPT} disabled={busy} onChange={event => upload(event.target.files?.[0] ?? null)} /></small>}
+          {canAttach && <span className="lab-attachment-retry"><Tag value="pendiente" label="Archivo pendiente" />
+            <label className="secondary-button">{busy ? 'Subiendo el archivo…' : 'Reintentar'}<input type="file" className="sr-only" aria-label={`Subir archivo de ${file.fileName}`} accept={ATTACHMENT_ACCEPT} disabled={busy} onChange={event => { pick(event.target.files?.[0] ?? null); event.target.value = ''; }} /></label></span>}
+          {canAttach && chosen && !busy && <span className="lab-attachment-confirm" role="group" aria-label="Confirmar archivo">
+            <small>¿Subir «{chosen.name}» ({attachmentMimeType(chosen) === 'application/pdf' ? 'PDF' : 'Foto'} · {formatBytes(chosen.size)}) como el archivo de «{file.fileName}»?</small>
+            <button type="button" className="primary-button" onClick={upload}>Confirmar y subir</button>
+            <button type="button" className="secondary-button" onClick={() => setChosen(null)}>Elegir otro</button></span>}
         </>}
       {error && <Notice kind="error">{error.message}</Notice>}</span>
   </li>;
@@ -302,7 +315,18 @@ function AttachmentRow({ api, file, canAttach, onStored }: { api: Api; file: Att
 function SendExternalDialog({ api, order, onClose, onSaved }: { api: Api; order: LabOrder; onClose: () => void; onSaved: () => void }) {
   const action = useAction(api), [place, setPlace] = useState(''), [instructions, setInstructions] = useState(EXTERNAL_INSTRUCTIONS_TEMPLATE);
   const ready = place.trim().length >= 3 && instructions.trim().length >= 10;
-  async function save() { if (await action.run(`/laboratorio/ordenes/${order.id}/externa`, { version: order.version, place: place.trim(), instructions: instructions.trim() })) onSaved(); }
+  // R7 C-6: the API says whether the patient got the notice in the app; without the app, the instructions go on paper.
+  const [sent, setSent] = useState<boolean | null>(null);
+  async function save() {
+    const done = await action.run<{ patientNotified?: boolean }>(`/laboratorio/ordenes/${order.id}/externa`, { version: order.version, place: place.trim(), instructions: instructions.trim() });
+    if (!done) return;
+    if (typeof done.patientNotified === 'boolean') setSent(done.patientNotified); else onSaved();
+  }
+  if (sent !== null) return <Dialog title="Examen en otro sitio" onClose={onSaved}><div className="module-form">
+    <Notice kind={sent ? 'success' : 'info'}>{sent ? `${order.patientName} recibió el aviso en su app con el lugar y las instrucciones.` : `${order.patientName} no tiene la app: entrégale las instrucciones impresas.`}</Notice>
+    <div className="lab-external lab-external-print" role="note"><strong>Se realiza en otro sitio: {place.trim()}</strong><p>{instructions.trim()}</p></div>
+    <div className="dialog-actions">{!sent && <button className="secondary-button" type="button" onClick={() => window.print()}>Imprimir instrucciones</button>}<button className="primary-button" type="button" onClick={onSaved}>Listo</button></div>
+  </div></Dialog>;
   return <Dialog title="Examen en otro sitio" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
     <p className="form-intro">La orden de {order.patientName} queda como externa: ya no se toma muestra aquí. El paciente ve el lugar y estas instrucciones en sus exámenes.</p>
     <WriteError error={action.error} onReload={onSaved} reloadLabel="Recargar la orden" />
@@ -328,19 +352,22 @@ function ExternalResultDialog({ api, order, onClose, onSaved }: { api: Api; orde
     const body = externalResultBody(order.version, attachment, order.items.map(item => ({ id: item.id, numeric: isNumeric(item) })), values, note);
     const saved = await action.run<{ attachmentId?: string }>(`/laboratorio/ordenes/${order.id}/resultado-externo`, body);
     if (!saved) return;
-    if (saved.attachmentId) {
-      setUploading(true);
-      try { await uploadAttachment(api, saved.attachmentId, file); } catch (e) {
-        setUploadError(spanishProblem(e instanceof ApiError ? e : new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.')));
-        return;
-      } finally { setUploading(false); }
-    }
+    if (saved.attachmentId) { setAttachmentId(saved.attachmentId); if (!await sendFile(saved.attachmentId, file)) return; }
     onSaved();
   }
-  if (uploadError) return <Dialog title="Cargar resultado externo" onClose={onSaved}><div className="module-form">
+  const [attachmentId, setAttachmentId] = useState<string | null>(null);
+  async function sendFile(id: string, picked: File) {
+    setUploading(true); setUploadError(null);
+    try { await uploadAttachment(api, id, picked); return true; } catch (e) {
+      setUploadError(spanishProblem(e instanceof ApiError ? e : new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.')));
+      return false;
+    } finally { setUploading(false); }
+  }
+  if (uploadError && file) return <Dialog title="Cargar resultado externo" onClose={onSaved} busy={uploading}><div className="module-form">
     <Notice kind="error">Los valores se guardaron, pero el archivo no se subió: {uploadError.message}</Notice>
-    <p className="form-intro">Puedes subir el archivo desde la orden, en «Informe externo».</p>
-    <div className="dialog-actions"><button className="primary-button" type="button" onClick={onSaved}>Entendido</button></div>
+    <p className="form-intro">Archivo pendiente: «{file.name}» ({formatBytes(file.size)}). Reintenta con este mismo archivo o súbelo después desde la orden, en «Informe externo».</p>
+    <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onSaved} disabled={uploading}>Más tarde</button>
+      {attachmentId && <button className="primary-button" type="button" disabled={uploading} onClick={() => void sendFile(attachmentId, file).then(ok => { if (ok) onSaved(); })}>{uploading ? 'Subiendo archivo…' : `Reintentar con «${file.name}»`}</button>}</div>
   </div></Dialog>;
   const busy = action.busy || uploading;
   return <Dialog title="Cargar resultado externo" onClose={onClose} busy={busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
