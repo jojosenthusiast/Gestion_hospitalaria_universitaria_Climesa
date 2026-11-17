@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Field, Icon, Notice } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
 import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
-import { APPOINTMENT_STATE_TONE, addDays, dayKey, dayLabel, groupAgenda, minutesBetween, timeRange, weekOf } from './listas/schedule';
+import { addDays, dayKey, dayLabel, groupAgenda, minutesBetween, timeRange, weekOf } from './listas/schedule';
 import './listas/lists.css';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
 import { useQuickAction } from './personal/accion';
@@ -91,7 +91,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
           <p className="cl-count" aria-live="polite">{rows.length} de {all.length} citas, agrupadas por día y por médico.</p>
           {agenda.map(group => <section className="ag-day" key={group.day} aria-label={dayLabel(group.day)}><h3>{dayLabel(group.day)}</h3>
             {group.doctors.map(d => <div className="ag-doctor" key={d.doctorId}><header><strong><Icon name="steth" size={16} /> {d.doctorName}</strong><small>{d.items.length} cita(s)</small></header>
-              {d.items.map(row => <div className={`ag-slot tone-${APPOINTMENT_STATE_TONE[row.state] ?? 'info'}`} key={row.id}>
+              {d.items.map(row => <div className="ag-slot" key={row.id}>
                 <span className="ag-time">{timeRange(row.start, row.end)}<small>{minutesBetween(row.start, row.end)} min</small></span>
                 <span><strong>{row.patientName}</strong>{row.reason && <small className="muted"> · {row.reason}</small>}</span>
                 <Tag value={row.state} />

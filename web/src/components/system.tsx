@@ -79,23 +79,34 @@ export const STATUS_FAMILIES: { id: StatusFamilyId; label: string; icon: IconNam
   { id: 'critico', label: 'Crítico', icon: 'alert', pattern: 'doble' },
 ];
 const familyOfValue: Record<string, StatusFamilyId> = {
-  en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera', por_vencer: 'espera', revisar: 'espera',
-  llamado: 'llamado', confirmada: 'llamado', en_proceso: 'llamado', limpieza: 'llamado', reprogramada: 'llamado', bajo_minimo: 'llamado',
-  en_atencion: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion',
+  // R1: a confirmed or rescheduled appointment waits for its time; it is not being called.
+  en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera', por_vencer: 'espera', revisar: 'espera', confirmada: 'espera', reprogramada: 'espera',
+  llamado: 'llamado', en_proceso: 'llamado',
+  // R1: a bed being cleaned is in use, not available and not called.
+  en_atencion: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion', limpieza: 'atencion',
   atendida: 'listo', atendido: 'listo', completado: 'listo', firmada: 'listo', alta_firmada: 'listo', egresado: 'listo', libre: 'listo', disponible: 'listo', activo: 'listo', exito: 'listo', normal: 'listo', aprobada: 'listo', ok: 'listo', coincide: 'listo',
-  cancelado: 'cerrado', cancelada: 'cerrado', no_asistio: 'cerrado', no_se_presento: 'cerrado', cerrado: 'cerrado', rechazada: 'cerrado', vencida: 'cerrado', vencido: 'cerrado', bloqueada: 'cerrado', inactivo: 'cerrado', desactivado: 'cerrado', denegado: 'cerrado', fallido: 'cerrado', en_mantenimiento: 'cerrado', agotado: 'cerrado',
+  cancelado: 'cerrado', cancelada: 'cerrado', no_asistio: 'cerrado', no_se_presento: 'cerrado', cerrado: 'cerrado', rechazada: 'cerrado', vencida: 'cerrado', bloqueada: 'cerrado', inactivo: 'cerrado', desactivado: 'cerrado', denegado: 'cerrado', fallido: 'cerrado', en_mantenimiento: 'cerrado',
   critico_alto: 'critico', critico_bajo: 'critico',
 };
+/**
+ * R1: values that ask for attention without being a step of a flow. They show as urgent priority (amber, double
+ * chevron): a lab value out of range that is not critical, and stock problems. Red stays for critical values.
+ */
+const priorityOfValue: Record<string, Priority> = { alto: 'urgente', bajo: 'urgente', bajo_minimo: 'urgente', agotado: 'urgente', vencido: 'urgente' };
 export const statusFamily = (value: string): StatusFamilyId | null => familyOfValue[value] ?? null;
+export const statusPriority = (value: string): Priority | null => priorityOfValue[value] ?? null;
 export const statusNames: Record<string, string> = { activo: 'Activo', inactivo: 'Inactivo', provisional: 'Provisional', libre: 'Libre', ocupada: 'Ocupada', reservada: 'Reservada', limpieza: 'En limpieza', bloqueada: 'Bloqueada', borrador: 'Borrador', publicado: 'Pendiente de iniciar', pendiente: 'Pendiente de iniciar', en_curso: 'En curso', completado: 'Completado', cancelado: 'Cancelado', cancelada: 'Cancelada', solicitada: 'Solicitada', confirmada: 'Confirmada', atendida: 'Atendida', atendido: 'Atendido', firmada: 'Firmada', rechazada: 'Rechazada', no_asistio: 'No asistió', vencida: 'Vencida', reprogramada: 'Reprogramada', cerrado: 'Cerrado sin atender', desactivado: 'Desactivado', pendiente_cama: 'Pendiente de cama', hospitalizado: 'Hospitalizado', alta_firmada: 'Alta firmada', egresado: 'Egresado', exito: 'Correcto', denegado: 'Denegado', fallido: 'Fallido', en_espera: 'En espera', llamado: 'Llamado', en_atencion: 'En atención', no_se_presento: 'No se presentó', en_proceso: 'En proceso', abierta: 'Abierta', bajo_minimo: 'Bajo mínimo', vencido: 'Vencido', normal: 'Normal', alto: 'Alto', bajo: 'Bajo', critico_alto: 'Crítico alto', critico_bajo: 'Crítico bajo', sin_rango: 'Sin rango', disponible: 'Disponible', en_servicio: 'En servicio', en_mantenimiento: 'En mantenimiento', agotado: 'Agotado', por_vencer: 'Por vencer', ok: 'En orden', coincide: 'Coincide', revisar: 'Revisar' };
 
 /**
  * Estado con ícono + etiqueta + patrón. Conserva las clases `status-tag status-<valor>` para las vistas que ya las usan.
- * Un valor sin familia (por ejemplo `alto` en laboratorio) se muestra neutro, con un punto y su texto.
+ * Un valor que pide atención (`alto`, `bajo_minimo`) usa la prioridad urgente; uno sin familia (`sin_rango`) se muestra
+ * neutro, con un punto y su texto.
  */
 export function StatusBadge({ value, label }: { value: string; label?: string }) {
   const family = STATUS_FAMILIES.find(f => f.id === statusFamily(value));
   const text = label ?? statusNames[value] ?? value.replace(/_/g, ' ');
+  const priority = PRIORITIES.find(p => p.id === statusPriority(value));
+  if (priority) return <span className={`status-badge status-tag status-${value} priority-${priority.id}`}><Icon name={priority.icon} size={14} /><span>{text}</span></span>;
   if (!family) return <span className={`status-badge status-tag status-${value} status-neutral`}><span className="status-dot" aria-hidden="true" /><span>{text}</span></span>;
   return <span className={`status-badge status-tag status-${value} fam-${family.id} pattern-${family.pattern}`}><Icon name={family.icon} size={14} /><span>{text}</span></span>;
 }

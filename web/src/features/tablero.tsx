@@ -24,7 +24,7 @@ const Tarjeta = ({ titulo, children, className = '' }: { titulo: string; childre
 const nombrePlanta = (planta: number | null) => planta == null ? 'Sin planta' : `Planta ${planta}`;
 
 /** Semáforo de ocupación: hasta 70 % holgura, hasta 90 % atención, más de eso crítico (solo el rojo es crítico, como en el prototipo). */
-export const occupancyTone = (percent: number): Tone => percent >= 90 ? 'danger' : percent >= 70 ? 'warn' : 'ok';
+export const occupancyTone = (percent: number): Tone => percent >= 90 ? 'urgent' : percent >= 70 ? 'warn' : 'ok';
 export const bedSegments = (c: { libres: number; ocupadas: number; limpieza: number; bloqueadas: number; reservadas: number }) => [
   { label: 'Libres', value: c.libres, tone: 'ok' as Tone },
   { label: 'Ocupadas', value: c.ocupadas, tone: 'ink' as Tone },

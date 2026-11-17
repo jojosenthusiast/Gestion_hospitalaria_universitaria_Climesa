@@ -13,8 +13,8 @@ export const isToday = (iso: string) => localDay(iso) === localDay();
 export const minutesBetween = (from: string, to: string) => Math.max(0, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 60000));
 export const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/** Estado de un valor frente a umbrales; `higherIsWorse` invierte la lectura (tiempos de espera, ocupación). */
-export const toneFor = (value: number, warnAt: number, dangerAt: number): Tone => value >= dangerAt ? 'danger' : value >= warnAt ? 'warn' : 'ok';
+/** Estado de un valor frente a umbrales. Pasar el umbral alto es urgente (ámbar), nunca rojo crítico. */
+export const toneFor = (value: number, warnAt: number, urgentAt: number): Tone => value >= urgentAt ? 'urgent' : value >= warnAt ? 'warn' : 'ok';
 
 export type KpiProps = { icon: IconName; label: string; value: string | number; sub?: string; tone?: Tone | 'neutral'; href?: string };
 /** Tarjeta de cifra con estado de color. El color acompaña a la palabra del subtítulo, nunca la sustituye. */

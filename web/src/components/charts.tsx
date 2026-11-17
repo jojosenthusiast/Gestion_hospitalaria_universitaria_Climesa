@@ -6,10 +6,14 @@ import { useId, type ReactNode } from 'react';
  * lectores de pantalla (`sr`) o visible bajo «Ver datos» (`details`). El color nunca es el único canal: cada
  * valor lleva etiqueta y número. Los colores salen de los tokens de `styles.css`, así que siguen el tema oscuro.
  */
-export type Tone = 'ok' | 'warn' | 'danger' | 'info' | 'urgent' | 'violet' | 'slate' | 'primary' | 'ink';
+/**
+ * R1 (S7): tones are the family and priority tokens. A threshold passed is `urgent` (amber); `critical` (red) is only
+ * for critical clinical values. There is no generic "danger" tone: red never marks a busy queue or a full ward.
+ */
+export type Tone = 'ok' | 'warn' | 'info' | 'urgent' | 'critical' | 'violet' | 'slate' | 'primary' | 'ink';
 export const toneColor: Record<Tone, string> = {
-  ok: 'var(--success)', warn: 'var(--warning)', danger: 'var(--danger)', info: 'var(--state-process)', urgent: 'var(--urgent)',
-  violet: 'var(--state-reserved)', slate: 'var(--state-blocked)', primary: 'var(--primary)', ink: 'var(--ink)',
+  ok: 'var(--status-listo)', warn: 'var(--status-llamado)', info: 'var(--status-atencion)', urgent: 'var(--priority-urgente)', critical: 'var(--critical)',
+  violet: 'var(--status-espera)', slate: 'var(--status-cerrado)', primary: 'var(--primary)', ink: 'var(--ink)',
 };
 export type Datum = { label: string; value: number | null; tone?: Tone };
 type TableMode = 'sr' | 'details';

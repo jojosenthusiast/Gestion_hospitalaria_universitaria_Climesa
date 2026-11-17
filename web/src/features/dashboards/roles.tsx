@@ -54,7 +54,7 @@ function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
 function LowStock({ d, tone = 'warn' as Tone }: { d: DashboardData; tone?: Tone }) {
   return <Panel title="Inventario bajo el mínimo" icon="inventory" action={{ label: 'Abrir inventario', href: '#/inventario' }} hint="Artículos con menos existencias que su mínimo o con lotes vencidos.">
     <PanelState state={d.stock}>{rows => {
-      const items: AttentionItem[] = rows.filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: `${r.disponible} disponibles · mínimo ${r.minimo}${r.vencido > 0 ? ` · ${r.vencido} vencidos` : ''}`, tone: r.vencido > 0 ? 'danger' : tone, href: '#/inventario', action: 'Ver', tag: r.vencido > 0 ? 'Vencido' : 'Bajo mínimo', status: r.vencido > 0 ? 'vencido' : 'bajo_minimo' }));
+      const items: AttentionItem[] = rows.filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: `${r.disponible} disponibles · mínimo ${r.minimo}${r.vencido > 0 ? ` · ${r.vencido} vencidos` : ''}`, tone: r.vencido > 0 ? 'urgent' : tone, href: '#/inventario', action: 'Ver', tag: r.vencido > 0 ? 'Vencido' : 'Bajo mínimo', status: r.vencido > 0 ? 'vencido' : 'bajo_minimo' }));
       return <AttentionList items={items} empty="Todo el inventario está sobre su mínimo." />;
     }}</PanelState>
   </Panel>;
@@ -135,7 +135,7 @@ const jop: RoleDashboard = {
             const items: AttentionItem[] = board.cobertura.detalle.map((g, i) => ({ id: `gap-${i}`, title: `${g.area} · ${roleNames[g.rol] ?? g.rol}`, detail: `${timeLabel(g.inicio)}–${timeLabel(g.fin)} · ${g.actuales} de ${g.requeridos} personas`, tone: 'warn', href: '#/turnos?accion=planificar', action: 'Planificar', tag: 'Hueco de cobertura' }));
             if (noBed) items.push({ id: 'sin-cama', title: plural(noBed, 'admisión sin cama', 'admisiones sin cama'), detail: 'Asigna una cama para que el paciente pase a hospitalización.', tone: 'warn', href: '#/hospitalizacion', action: 'Asignar cama' });
             const pending = d.ambulance.data?.pendingRequests?.length ?? 0;
-            if (pending) items.push({ id: 'amb', title: plural(pending, 'solicitud de ambulancia', 'solicitudes de ambulancia'), detail: 'Esperan confirmación o despacho.', tone: 'danger', href: '#/ambulancia', action: 'Despachar' });
+            if (pending) items.push({ id: 'amb', title: plural(pending, 'solicitud de ambulancia', 'solicitudes de ambulancia'), detail: 'Esperan confirmación o despacho.', tone: 'urgent', href: '#/ambulancia', action: 'Despachar' });
             return <AttentionList items={items} empty="Cobertura completa y sin solicitudes pendientes." />;
           }}</PanelState>
         </Panel>
@@ -147,7 +147,7 @@ const jop: RoleDashboard = {
 };
 
 // ───────────────────────────── DPD · protección de datos
-const resultTone: Record<string, Tone> = { exito: 'ok', denegado: 'danger', fallido: 'urgent' };
+const resultTone: Record<string, Tone> = { exito: 'ok', denegado: 'urgent', fallido: 'urgent' };
 const auditBy = (rows: AuditRow[], result: string) => rows.filter(r => r.result === result);
 const dpd: RoleDashboard = {
   title: 'Protección de datos', description: 'Quién vio qué y cuándo, con metadatos y nunca valores clínicos',
@@ -161,7 +161,7 @@ const dpd: RoleDashboard = {
     <KpiRow>
       <Kpi icon="audit" label="Eventos recientes" value={num(d.audit, r => r.length)} sub="Últimos eventos auditados" tone="info" href="#/auditoria" />
       <Kpi icon="clock" label="Eventos de hoy" value={num(d.audit, r => r.filter(x => isToday(x.at)).length)} sub="Desde las 00:00 (hora de El Salvador)" tone="neutral" />
-      <Kpi icon="alert" label="Accesos denegados" value={num(d.audit, r => auditBy(r, 'denegado').length)} sub={d.audit.data && auditBy(d.audit.data, 'denegado').length ? 'Revísalos: alguien intentó entrar sin permiso' : 'Sin intentos denegados'} tone={d.audit.data && auditBy(d.audit.data, 'denegado').length ? 'danger' : 'ok'} href="#/auditoria" />
+      <Kpi icon="alert" label="Accesos denegados" value={num(d.audit, r => auditBy(r, 'denegado').length)} sub={d.audit.data && auditBy(d.audit.data, 'denegado').length ? 'Revísalos: alguien intentó entrar sin permiso' : 'Sin intentos denegados'} tone={d.audit.data && auditBy(d.audit.data, 'denegado').length ? 'urgent' : 'ok'} href="#/auditoria" />
       <Kpi icon="shield" label="Cuentas activas" value={num(d.users, u => u.filter(x => x.state === 'activo').length)} sub="Pueden ingresar al sistema" tone="ok" />
     </KpiRow>
     {grid(<>
@@ -196,7 +196,7 @@ const rec: RoleDashboard = {
     <KpiRow>
       <Kpi icon="queue" label="En espera en la fila" value={num(d.queue, r => tickets(r, 'en_espera').length)} sub={d.queue.data ? `${tickets(d.queue.data, 'llamado').length} llamados` : undefined} tone={d.queue.data ? toneFor(tickets(d.queue.data, 'en_espera').length, 8, 15) : 'neutral'} href="#/fila" />
       <Kpi icon="calendar" label="Citas de hoy" value={num(d.appts, r => todays(r).length)} sub={d.appts.data ? `${d.appts.data.filter(a => a.state === 'solicitada').length + (d.apptRequests.data ?? []).filter(r => r.state === 'pendiente').length} por confirmar o asignar` : undefined} tone="info" href="#/citas" />
-      <Kpi icon="bed" label="Camas libres" value={num(d.summary, s => s.beds ? s.beds.free : '—')} sub={d.summary.data?.beds ? `de ${d.summary.data.beds.total} camas` : undefined} tone={d.summary.data?.beds?.free === 0 ? 'danger' : 'ok'} href="#/camas" />
+      <Kpi icon="bed" label="Camas libres" value={num(d.summary, s => s.beds ? s.beds.free : '—')} sub={d.summary.data?.beds ? `de ${d.summary.data.beds.total} camas` : undefined} tone={d.summary.data?.beds?.free === 0 ? 'urgent' : 'ok'} href="#/camas" />
       <Kpi icon="users" label="Pacientes activos" value={num(d.summary, s => s.patients ? s.patients.active : '—')} sub="Expedientes vigentes" tone="neutral" href="#/pacientes" />
     </KpiRow>
     {grid(<>
@@ -206,7 +206,7 @@ const rec: RoleDashboard = {
           ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `Solicita cita el ${new Intl.DateTimeFormat('es-SV', { day: 'numeric', month: 'short', timeZone: 'America/El_Salvador' }).format(new Date(a.start))} a las ${timeLabel(a.start)}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Cita solicitada', status: 'solicitada' })),
           ...(d.apptRequests.data ?? []).filter(r => r.state === 'pendiente').map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: `Pide cita por ${r.categories.map(c => c.name.toLowerCase()).join(', ')}${r.note ? `: ${r.note}` : ''}`, tone: 'warn' as Tone, href: '#/citas', action: 'Asignar', tag: 'Por asignar', status: 'pendiente' })),
           ...(d.admissions.data ?? []).filter(a => a.state === 'pendiente_cama').map(a => ({ id: `a-${a.id}`, title: a.patientName, detail: 'Admisión sin cama asignada', tone: 'warn' as Tone, href: '#/hospitalizacion', action: 'Asignar cama', tag: 'Sin cama', status: 'pendiente_cama' })),
-          ...(d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: r.address, tone: 'danger' as Tone, href: '#/ambulancia', action: 'Despachar', tag: 'Ambulancia', area: 'AMB' as const })),
+          ...(d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: r.address, tone: 'urgent' as Tone, href: '#/ambulancia', action: 'Despachar', tag: 'Ambulancia', area: 'AMB' as const })),
         ]} />
       </Panel>
       <QueuePanel queue={d.queue} />
@@ -343,11 +343,11 @@ const par: RoleDashboard = {
   needs: ['ambulance', 'myShifts'],
   actions: [{ id: 'unidad', label: 'Abrir ambulancia', hint: 'Estado, servicio e hitos', icon: 'ambulance', href: '#/ambulancia', permission: 'ambulancia.ver_estado' }],
   render: ({ d }) => {
-    const a = d.ambulance.data, stateTone: Tone | 'neutral' = !a ? 'neutral' : a.unit.state === 'disponible' ? 'ok' : a.unit.state === 'en_servicio' ? 'danger' : 'slate';
+    const a = d.ambulance.data, stateTone: Tone | 'neutral' = !a ? 'neutral' : a.unit.state === 'disponible' ? 'ok' : a.unit.state === 'en_servicio' ? 'info' : 'slate';
     return <>
       <KpiRow>
         <Kpi icon="ambulance" label="Estado de la unidad" value={a ? ({ disponible: 'Disponible', en_servicio: 'En servicio', en_mantenimiento: 'En mantenimiento' } as Record<string, string>)[a.unit.state] ?? a.unit.state : d.ambulance.error ? '—' : '…'} sub={a ? `Placa ${a.unit.plate}` : undefined} tone={stateTone} href="#/ambulancia" />
-        <Kpi icon="pulse" label="Servicio en curso" value={a ? (a.activeService ? 'Sí' : 'No') : '…'} sub={a?.activeService ? `${a.activeService.origin} → ${a.activeService.destination}` : 'Sin servicio activo'} tone={a?.activeService ? 'danger' : 'ok'} />
+        <Kpi icon="pulse" label="Servicio en curso" value={a ? (a.activeService ? 'Sí' : 'No') : '…'} sub={a?.activeService ? `${a.activeService.origin} → ${a.activeService.destination}` : 'Sin servicio activo'} tone={a?.activeService ? 'info' : 'ok'} />
         <Kpi icon="alert" label="Solicitudes por atender" value={a ? a.pendingRequests?.length ?? '—' : '…'} sub="Pedidos sin despachar" tone={a?.pendingRequests?.length ? 'warn' : 'ok'} />
       </KpiRow>
       {grid(<>
@@ -358,7 +358,7 @@ const par: RoleDashboard = {
           </>}</PanelState>
         </Panel>
         <Panel title="Requiere tu atención" icon="alert" hint="Solicitudes de ambulancia que esperan despacho.">
-          <PanelState state={d.ambulance}>{s => <AttentionList empty="No hay solicitudes pendientes." items={(s.pendingRequests ?? []).map(r => ({ id: r.id, title: r.reason, detail: r.address, tone: 'danger' as Tone, href: '#/ambulancia', action: 'Ver', tag: timeLabel(r.createdAt) }))} />}</PanelState>
+          <PanelState state={d.ambulance}>{s => <AttentionList empty="No hay solicitudes pendientes." items={(s.pendingRequests ?? []).map(r => ({ id: r.id, title: r.reason, detail: r.address, tone: 'urgent' as Tone, href: '#/ambulancia', action: 'Ver', tag: timeLabel(r.createdAt) }))} />}</PanelState>
         </Panel>
         <MyShift shifts={d.myShifts} />
       </>)}

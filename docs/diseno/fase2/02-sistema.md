@@ -29,15 +29,21 @@ El estado lleva siempre **ícono + etiqueta + patrón**. El color acompaña, nun
 
 | Familia | Patrón | Ícono | Valores de la API que la usan |
 |---|---|---|---|
-| En espera | rayado diagonal | reloj | `en_espera`, `solicitada`, `pendiente`, `pendiente_cama`, `borrador`, `publicado`, `reservada`, `provisional`, `por_vencer`, `revisar` |
-| Llamado o en proceso | punteado | megáfono | `llamado`, `confirmada`, `en_proceso`, `limpieza`, `reprogramada`, `bajo_minimo` |
-| En atención o en uso | sólido | pulso | `en_atencion`, `en_curso`, `ocupada`, `hospitalizado`, `en_servicio`, `abierta` |
+| En espera | rayado diagonal | reloj | `en_espera`, `solicitada`, `pendiente`, `pendiente_cama`, `borrador`, `publicado`, `reservada`, `provisional`, `por_vencer`, `revisar`, `confirmada`, `reprogramada` |
+| Llamado o en proceso | punteado | megáfono | `llamado`, `en_proceso` |
+| En atención o en uso | sólido | pulso | `en_atencion`, `en_curso`, `ocupada`, `hospitalizado`, `en_servicio`, `abierta`, `limpieza` |
 | Terminado o disponible | contorno | check | `atendida`, `atendido`, `completado`, `firmada`, `alta_firmada`, `egresado`, `libre`, `disponible`, `activo`, `exito`, `normal`, `aprobada`, `ok`, `coincide` |
-| Cancelado o fuera de servicio | contorno discontinuo | cruz | `cancelado(a)`, `no_asistio`, `no_se_presento`, `cerrado`, `rechazada`, `vencida`, `vencido`, `bloqueada`, `inactivo`, `desactivado`, `denegado`, `fallido`, `en_mantenimiento`, `agotado` |
+| Cancelado o fuera de servicio | contorno discontinuo | cruz | `cancelado(a)`, `no_asistio`, `no_se_presento`, `cerrado`, `rechazada`, `vencida`, `vencido`, `bloqueada`, `inactivo`, `desactivado`, `denegado`, `fallido`, `en_mantenimiento` |
 | Crítico | borde doble | alerta | `critico_alto`, `critico_bajo` |
 
 Existencias (`agotado`, `bajo_minimo`, `por_vencer`, `ok`) y verificación de vinculación (`coincide`, `revisar`) usan la
-misma tabla que Android; nunca rojo. Valores sin familia (`alto`, `bajo`, `sin_rango`) se muestran neutros, con un punto y su texto.
+misma tabla que Android; nunca rojo.
+
+**Valores que piden atención (R1, 2026-11-16).** `alto`, `bajo` (laboratorio fuera de rango, no crítico), `bajo_minimo`,
+`agotado` y `vencido` (existencias) no son un paso de un flujo: se muestran con la prioridad **urgente** (ámbar, doble
+flecha arriba) dentro del mismo `StatusBadge`. Una cita `confirmada` o `reprogramada` espera su hora (reloj, no
+megáfono) y una cama en `limpieza` está en uso. Solo `sin_rango` queda neutro, con un punto y su texto. Android e iOS
+deben copiar esta tabla (pendiente en R2/R3).
 Componente web: `StatusBadge` (el `Tag` de siempre ahora lo usa, así que todas las vistas lo heredan).
 
 **Escala de grises.** Los colores fuertes de las familias tienen casi la misma luminancia (8 a 13 % de luminancia
@@ -53,7 +59,10 @@ cada familia tenga patrón e ícono propios. La captura visual en gris queda par
 | Urgente | tinte ámbar, borde y texto ámbar oscuro | doble flecha arriba |
 | Rutina | tinte gris, texto gris | guion |
 
-El rojo crítico (`--critical`) se usa solo para emergencia y valores críticos de laboratorio. Componente: `PriorityBadge`
+El rojo crítico (`--critical`) se usa solo para emergencia y valores críticos de laboratorio. `--danger` queda solo
+para errores (campo inválido, carga o escritura fallida, cadena de auditoría rota). Los umbrales de cifras y gráficos
+(fila larga, ocupación alta, cero camas libres, métricas fuera de la referencia) son urgentes, nunca rojos: el tono
+`danger` de `charts.tsx` se quitó y existe `critical` para lo crítico (R1). Componente: `PriorityBadge`
 (acepta `label`). El triage de ambulancia se lleva a esta escala: roja = emergencia, naranja y amarilla = urgente,
 verde = rutina, conservando el nombre del color como etiqueta.
 `StatusLegend` muestra áreas, estados y prioridad con las mismas piezas.
