@@ -210,11 +210,12 @@ select:focus-visible {
 }
 
 ::selection { background: var(--primary); color: var(--on-primary); }
-.mono-label, .eyebrow, .role-label, .section-number, .flow-number { font-family: "Atkinson Hyperlegible Mono", monospace; }
+/* R1 (S5): mono is only for codes (ficha, ticket, DUI, CIE-10, chips). Labels and numbers are sans with tabular figures. */
+.mono-label, .eyebrow, .role-label, .section-number, .flow-number { font-variant-numeric: tabular-nums; }
 .eyebrow { display: block; color: var(--primary-text); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; line-height: 1.4; text-transform: uppercase; }
 .mono-label { font-size: 12px; letter-spacing: 0.03em; line-height: 1.5; }
 /* Fase 2: cifras tabulares en tablas, contadores, horas y códigos, para que las columnas no bailen. */
-table, time, .tabular, .mono-data, .number-strip strong, .hospital-clock-time, .status-badge, .priority-badge, .area-tag { font-variant-numeric: tabular-nums; }
+table, time, .tabular, .mono-data, .number-strip strong, .status-badge, .priority-badge, .area-tag { font-variant-numeric: tabular-nums; }
 
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--ink); white-space: nowrap; }
 .brand-mark { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-card); background: var(--primary); color: var(--on-primary); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16); }
@@ -242,13 +243,19 @@ table, time, .tabular, .mono-data, .number-strip strong, .hospital-clock-time, .
   line-height: 1.35;
   text-align: center;
   text-decoration: none;
-  transition: transform var(--motion-instant) ease, background var(--motion-fast) ease, border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, color var(--motion-fast) ease;
+  /* R1 (better-ui): only the properties that change; press feedback is a 0.96 scale over 150 ms. */
+  transition-property: scale, background-color, border-color, box-shadow, color;
+  transition-duration: 150ms, var(--motion-fast), var(--motion-fast), var(--motion-fast), var(--motion-fast);
+  transition-timing-function: ease-out;
 }
 .primary-button { border: 1px solid var(--primary); background: var(--primary); color: var(--on-primary); box-shadow: 0 5px 14px rgb(0 67 178 / 0.16); }
-.primary-button:hover:not(:disabled) { border-color: var(--primary-strong); background: var(--primary-strong); box-shadow: 0 8px 20px rgb(0 67 178 / 0.22); transform: translateY(-1px); }
+.primary-button:hover:not(:disabled) { border-color: var(--primary-strong); background: var(--primary-strong); box-shadow: 0 6px 16px rgb(0 67 178 / 0.2); }
 .secondary-button { border: 1px solid var(--control-line); background: var(--surface); color: var(--ink); }
-.secondary-button:hover:not(:disabled) { border-color: var(--primary-text); color: var(--primary-text); background: var(--soft); transform: translateY(-1px); }
-.primary-button:active:not(:disabled), .secondary-button:active:not(:disabled) { transform: translateY(1px) scale(0.99); box-shadow: none; }
+.secondary-button:hover:not(:disabled) { border-color: var(--primary-text); color: var(--primary-text); background: var(--soft); }
+@media (prefers-reduced-motion: no-preference) {
+  .primary-button:active:not(:disabled):not([aria-disabled="true"]), .secondary-button:active:not(:disabled):not([aria-disabled="true"]) { scale: 0.96; }
+}
+.primary-button:active:not(:disabled), .secondary-button:active:not(:disabled) { box-shadow: none; }
 .primary-button:disabled, .secondary-button:disabled { border-color: var(--disabled); background: var(--disabled); color: var(--muted); opacity: 0.72; box-shadow: none; }
 
 .field { display: grid; gap: 8px; min-width: 0; color: var(--ink); font-size: 14px; font-weight: 700; }
@@ -351,7 +358,7 @@ table, time, .tabular, .mono-data, .number-strip strong, .hospital-clock-time, .
 .section-number { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-control); background: var(--soft); color: var(--primary-text); font-size: 13px; }
 .workbench-heading h2 { margin-bottom: 4px; font-size: 24px; }
 .workbench-heading p { color: var(--muted); line-height: 1.45; }
-.access-tag { margin-left: auto; padding: 8px 10px; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: var(--soft); color: var(--primary-text); font-family: "Atkinson Hyperlegible Mono", monospace; font-size: 11px; white-space: nowrap; }
+.access-tag { margin-left: auto; padding: 8px 10px; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: var(--soft); color: var(--primary-text); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .access-tag > span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .invite-form { padding: 28px; }
 .invite-form > .notice { margin-bottom: 24px; }
@@ -446,5 +453,4 @@ table, time, .tabular, .mono-data, .number-strip strong, .hospital-clock-time, .
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-  .primary-button:hover, .secondary-button:hover { transform: none; }
 }

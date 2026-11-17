@@ -126,10 +126,12 @@ describe('agenda de citas (obs. 12)', () => {
 });
 
 describe('acciones de cita según el servidor (CITA-04, CITA-06, CITA-08)', () => {
-  it('una acción bloqueada no aparece como botón y muestra su motivo', async () => {
+  // R1 (S4): the blocked reason is not body text in each row any more.
+  it('una acción bloqueada no aparece como botón ni imprime su motivo', async () => {
     mount();
-    expect(await screen.findByText(/No asistió: Disponible cuando llegue la hora de la cita/)).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /^Cancelar · Paciente Ficticio Uno/ })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^No asistió ·/ })).toBeNull();
+    expect(screen.queryByText(/Disponible cuando llegue la hora de la cita/)).toBeNull();
   });
 
   it('una solicitud vencida no ofrece Cancelar ni Gestionar', async () => {

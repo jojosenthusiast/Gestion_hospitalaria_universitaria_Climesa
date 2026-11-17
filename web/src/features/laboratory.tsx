@@ -129,7 +129,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
   });
   return <>
     <CompactHeader breadcrumb="Atención / Diagnóstico" title="Laboratorio"/>
-    <section className="data-workbench lab-workbench" aria-label="Lista de trabajo de laboratorio"><RemoteState state={data}>{() => <>
+    <section className="data-workbench" aria-label="Lista de trabajo de laboratorio"><RemoteState state={data}>{() => <>
       <ListToolbar trailing={<><label className="cl-sort">Ordenar<select value={sort} onChange={event => setSort(event.target.value as WorkSort)}>{(Object.keys(SORT_NAMES) as WorkSort[]).map(key => <option key={key} value={key}>{SORT_NAMES[key]}</option>)}</select></label><ExportMenu table={exportTable} disabled={!rows.length} /></>}>
         <LiveSearch label="Buscar órdenes" placeholder="Paciente, expediente, examen o médico" value={query} onChange={setQuery} />
       </ListToolbar>
@@ -205,7 +205,7 @@ function LabDetail({ api, order, canAttach, onChanged, onSample }: { api: Api; o
   const { captured, total } = labProgress(order), ready = total > 0 && captured === total, next = nextActor(order), stage = stageOf(order);
   const when = (value?: string | null) => value ? formatDateTime(value) : 'Pendiente';
   async function transition(path: string, body: unknown) { if (await action.run(path, body)) onChanged(); }
-  return <aside className="cl-detail lab-detail" aria-label={`Detalle de la orden de ${order.patientName}`}>
+  return <aside className="cl-detail" aria-label={`Detalle de la orden de ${order.patientName}`}>
     <header><StageBadge stage={stage} /><h3>{order.patientName}</h3><p className="muted">{patientLine(order) || 'Sin datos del expediente'}</p><Tag value={order.state} label={stageLabel(order, allows(order, 'revisar'))} />
       {next && <small className="lab-next"><strong>Ahora: {next.who}</strong> {next.what}</small>}</header>
     {order.external && <ExternalNote order={order} />}

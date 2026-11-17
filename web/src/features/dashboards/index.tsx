@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { Icon } from '../../components/ui';
 import { can, roleNames, type AccessProfile, type Api } from '../../lib/api';
 import { CompactHeader } from '../common';
 import { CriticalNoticeBanner } from '../avisos/CriticalNoticeBanner';
@@ -23,7 +22,8 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
   if (roles.length === 0) return <>
     <CompactHeader breadcrumb="CLIMESA / Inicio" title="Inicio" />
     <CriticalNoticeBanner api={api} version={version} />
-    <div className="dashboard-account"><Icon name="shield" size={24} /><div><h3>Tu función no tiene un tablero en la web</h3><p>Usa los módulos del menú que tu cuenta tiene habilitados. Las operaciones y los datos corresponden a los roles de tu cuenta.</p></div><a className="row-action" href="#/perfil">Ver mi cuenta <Icon name="arrow" size={16} /></a></div>
+    {/* R1: one quiet line with the way out; no decorative card. */}
+    <p className="section-empty" role="status"><strong>Tu función no tiene un tablero en la web</strong> · <a className="row-action" href="#/perfil">Ver mi cuenta</a></p>
   </>;
   const many = roles.length > 1;
   return <>
@@ -42,6 +42,5 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
         {dash.render({ d: data, profile })}
       </div>;
     })}
-    <div className="dashboard-account"><Icon name="shield" size={24} /><div><h3>Acceso según tu función</h3><p>Las operaciones y los datos disponibles corresponden a los roles de tu cuenta.</p></div><a className="row-action" href="#/perfil">Ver mi cuenta <Icon name="arrow" size={16} /></a></div>
   </>;
 }

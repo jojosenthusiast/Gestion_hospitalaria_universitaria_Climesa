@@ -49,3 +49,10 @@
 .lab-external-values legend { padding: 0 var(--space-1); font-weight: 700; }
 .lab-storage-note { margin: 0; font-size: var(--text-sm); }
 @media (max-width: 720px) { .lab-batch > span { flex-basis: 100%; } }
+
+/* R1: detalle de la orden. Cada examen es una fila; el rango de referencia es un grupo sin caja. */
+.lab-order-detail { display: grid; }
+.lab-result-row { padding: var(--space-3) 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); border-top: 1px solid var(--line); }
+.lab-result-row:first-child { border-top: 0; }
+.lab-ranges { margin: 0; padding: 0; min-width: 0; display: grid; gap: var(--space-2); border: 0; }
+.lab-ranges > legend { margin-bottom: var(--space-2); padding: 0; font-size: var(--text-md); font-weight: 700; }

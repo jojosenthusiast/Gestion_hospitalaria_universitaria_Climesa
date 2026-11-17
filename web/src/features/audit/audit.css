@@ -56,3 +56,4 @@
   .audit-facts > div, .audit-meta > div { grid-template-columns: 1fr; gap: 4px; }
   .audit-diff-grid { grid-template-columns: 1fr; }
 }
+.audit-diff { display: grid; gap: var(--space-2); }

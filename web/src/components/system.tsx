@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useId, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
 import { Icon, type IconName } from './ui';
 
 /**
@@ -29,6 +29,52 @@ export function Skeleton({ rows = 3, label = 'Cargando información…', minHeig
     <span className="sr-only">{label}</span>
     {Array.from({ length: rows }, (_, i) => <span key={i} className="skeleton-line" aria-hidden="true" />)}
   </div>;
+}
+
+/** What a section reads: the same shape as `useData` (features/common.tsx), kept structural so the system has no API import. */
+export type SectionSource<T> = { data: T | null; loading: boolean; error: { status?: number; message: string } | null; refresh: () => void };
+
+/**
+ * R1 (S2, S3): the one loading, error and empty state of a section. Every module, home panel and tray uses it, so the
+ * skeleton, the wording and the retry are the same everywhere. `compact` is the one-line form for panels and trays.
+ * With `empty`, a section with nothing to show collapses to a single quiet line; no second heading.
+ */
+export function SectionState<T>({ state, children, rows = 4, compact = false, empty }: { state: SectionSource<T>; children: (data: T) => ReactNode; rows?: number; compact?: boolean; empty?: (data: T) => string | null }) {
+  if (state.loading && !state.data) return <Skeleton rows={compact ? 2 : rows} />;
+  if (state.error) {
+    // WEB-04: "no permission" and "load failed" are distinct; both can retry (access can be granted meanwhile).
+    const denied = state.error.status === 403;
+    const title = denied ? 'No tienes acceso a esta información' : 'No pudimos cargar esta información';
+    const message = denied ? 'Tu cuenta no tiene permiso para consultar esta sección.' : state.error.message;
+    return <div className={`section-state-error${compact ? ' is-compact' : ''}`} role="alert">
+      <Icon name="alert" size={compact ? 16 : 20} />
+      <div><strong>{title}</strong><span>{message}</span>{denied && !compact && <span>Si la necesitas para tu trabajo, pide a un administrador que revise los permisos de tu cuenta y vuelve a intentar.</span>}</div>
+      <button type="button" className={compact ? 'row-action' : 'secondary-button'} onClick={state.refresh}><Icon name="retry" size={compact ? 16 : 18} />Volver a intentar</button>
+    </div>;
+  }
+  if (!state.data) return null;
+  const message = empty?.(state.data);
+  if (message) return <p className="section-empty" role="status">{message}</p>;
+  // Background revalidation: a thin line that does not push the content; the text is for screen readers.
+  return <>{state.loading && <span className="refresh-line" role="status" aria-live="polite"><span className="sr-only">Actualizando información…</span></span>}{children(state.data)}</>;
+}
+
+export type BlockedAction = { action: string; reason: string };
+/**
+ * R1 (S4): one action from the server's `allowedActions` / `blockedActions`; the server stays the authority.
+ * Allowed: a button. Blocked: nothing, because the reason is not content. Only with `showBlocked` (the action is the
+ * row's next step and seeing it helps) it stays visible, `aria-disabled` and focusable, with the reason as a tooltip
+ * tied by `aria-describedby`. Never as body text.
+ */
+export function ActionButton({ action, allowed, blocked = [], showBlocked = false, className = 'row-action', onClick, children, ...button }: { action: string; allowed: readonly string[]; blocked?: readonly BlockedAction[]; showBlocked?: boolean } & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const tipId = useId();
+  if (allowed.includes(action)) return <button type="button" className={className} onClick={onClick} {...button}>{children}</button>;
+  const reason = blocked.find(item => item.action === action)?.reason;
+  if (!showBlocked || !reason) return null;
+  return <span className="action-blocked">
+    <button type="button" className={className} aria-disabled="true" aria-describedby={tipId} {...button} onClick={event => event.preventDefault()}>{children}</button>
+    <span id={tipId} role="tooltip" className="action-tooltip">{reason}</span>
+  </span>;
 }
 
 // ---------------------------------------------------------------- Áreas (S7)
@@ -79,23 +125,35 @@ export const STATUS_FAMILIES: { id: StatusFamilyId; label: string; icon: IconNam
   { id: 'critico', label: 'Crítico', icon: 'alert', pattern: 'doble' },
 ];
 const familyOfValue: Record<string, StatusFamilyId> = {
-  en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera', por_vencer: 'espera', revisar: 'espera',
-  llamado: 'llamado', confirmada: 'llamado', en_proceso: 'llamado', limpieza: 'llamado', reprogramada: 'llamado', bajo_minimo: 'llamado',
-  en_atencion: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion',
+  // R1 (shared with iOS and Android): a confirmed or rescheduled appointment waits for its time, and stock below the
+  // minimum waits for a restock; none of them is being called.
+  en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera', por_vencer: 'espera', revisar: 'espera', confirmada: 'espera', reprogramada: 'espera', bajo_minimo: 'espera',
+  llamado: 'llamado', en_proceso: 'llamado',
+  // R1: a bed being cleaned is in use; a metric that asks for attention (metrics.tsx) is an attention state.
+  en_atencion: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion', limpieza: 'atencion', requiere_atencion: 'atencion',
   atendida: 'listo', atendido: 'listo', completado: 'listo', firmada: 'listo', alta_firmada: 'listo', egresado: 'listo', libre: 'listo', disponible: 'listo', activo: 'listo', exito: 'listo', normal: 'listo', aprobada: 'listo', ok: 'listo', coincide: 'listo',
-  cancelado: 'cerrado', cancelada: 'cerrado', no_asistio: 'cerrado', no_se_presento: 'cerrado', cerrado: 'cerrado', rechazada: 'cerrado', vencida: 'cerrado', vencido: 'cerrado', bloqueada: 'cerrado', inactivo: 'cerrado', desactivado: 'cerrado', denegado: 'cerrado', fallido: 'cerrado', en_mantenimiento: 'cerrado', agotado: 'cerrado',
+  cancelado: 'cerrado', cancelada: 'cerrado', no_asistio: 'cerrado', no_se_presento: 'cerrado', cerrado: 'cerrado', rechazada: 'cerrado', vencida: 'cerrado', bloqueada: 'cerrado', inactivo: 'cerrado', desactivado: 'cerrado', denegado: 'cerrado', fallido: 'cerrado', en_mantenimiento: 'cerrado',
   critico_alto: 'critico', critico_bajo: 'critico',
 };
+/**
+ * R1: values that ask for attention without being a step of a flow. They show as urgent priority (amber, double
+ * chevron): a lab value out of range that is not critical, and stock that ran out or expired. Red stays for critical.
+ */
+const priorityOfValue: Record<string, Priority> = { alto: 'urgente', bajo: 'urgente', agotado: 'urgente', vencido: 'urgente' };
 export const statusFamily = (value: string): StatusFamilyId | null => familyOfValue[value] ?? null;
-export const statusNames: Record<string, string> = { activo: 'Activo', inactivo: 'Inactivo', provisional: 'Provisional', libre: 'Libre', ocupada: 'Ocupada', reservada: 'Reservada', limpieza: 'En limpieza', bloqueada: 'Bloqueada', borrador: 'Borrador', publicado: 'Pendiente de iniciar', pendiente: 'Pendiente de iniciar', en_curso: 'En curso', completado: 'Completado', cancelado: 'Cancelado', cancelada: 'Cancelada', solicitada: 'Solicitada', confirmada: 'Confirmada', atendida: 'Atendida', atendido: 'Atendido', firmada: 'Firmada', rechazada: 'Rechazada', no_asistio: 'No asistió', vencida: 'Vencida', reprogramada: 'Reprogramada', cerrado: 'Cerrado sin atender', desactivado: 'Desactivado', pendiente_cama: 'Pendiente de cama', hospitalizado: 'Hospitalizado', alta_firmada: 'Alta firmada', egresado: 'Egresado', exito: 'Correcto', denegado: 'Denegado', fallido: 'Fallido', en_espera: 'En espera', llamado: 'Llamado', en_atencion: 'En atención', no_se_presento: 'No se presentó', en_proceso: 'En proceso', abierta: 'Abierta', bajo_minimo: 'Bajo mínimo', vencido: 'Vencido', normal: 'Normal', alto: 'Alto', bajo: 'Bajo', critico_alto: 'Crítico alto', critico_bajo: 'Crítico bajo', sin_rango: 'Sin rango', disponible: 'Disponible', en_servicio: 'En servicio', en_mantenimiento: 'En mantenimiento', agotado: 'Agotado', por_vencer: 'Por vencer', ok: 'En orden', coincide: 'Coincide', revisar: 'Revisar' };
+export const statusPriority = (value: string): Priority | null => priorityOfValue[value] ?? null;
+export const statusNames: Record<string, string> = { activo: 'Activo', inactivo: 'Inactivo', provisional: 'Provisional', libre: 'Libre', ocupada: 'Ocupada', reservada: 'Reservada', limpieza: 'En limpieza', bloqueada: 'Bloqueada', borrador: 'Borrador', publicado: 'Pendiente de iniciar', pendiente: 'Pendiente de iniciar', en_curso: 'En curso', completado: 'Completado', cancelado: 'Cancelado', cancelada: 'Cancelada', solicitada: 'Solicitada', confirmada: 'Confirmada', atendida: 'Atendida', atendido: 'Atendido', firmada: 'Firmada', rechazada: 'Rechazada', no_asistio: 'No asistió', vencida: 'Vencida', reprogramada: 'Reprogramada', cerrado: 'Cerrado sin atender', desactivado: 'Desactivado', pendiente_cama: 'Pendiente de cama', hospitalizado: 'Hospitalizado', alta_firmada: 'Alta firmada', egresado: 'Egresado', exito: 'Correcto', denegado: 'Denegado', fallido: 'Fallido', en_espera: 'En espera', llamado: 'Llamado', en_atencion: 'En atención', no_se_presento: 'No se presentó', en_proceso: 'En proceso', abierta: 'Abierta', bajo_minimo: 'Bajo mínimo', vencido: 'Vencido', normal: 'Normal', alto: 'Alto', bajo: 'Bajo', critico_alto: 'Crítico alto', critico_bajo: 'Crítico bajo', sin_rango: 'Sin rango', disponible: 'Disponible', en_servicio: 'En servicio', en_mantenimiento: 'En mantenimiento', agotado: 'Agotado', por_vencer: 'Por vencer', ok: 'En orden', coincide: 'Coincide', revisar: 'Revisar', requiere_atencion: 'Requiere atención' };
 
 /**
  * Estado con ícono + etiqueta + patrón. Conserva las clases `status-tag status-<valor>` para las vistas que ya las usan.
- * Un valor sin familia (por ejemplo `alto` en laboratorio) se muestra neutro, con un punto y su texto.
+ * Un valor que pide atención (`alto`, `agotado`) usa la prioridad urgente; uno sin familia (`sin_rango`) se muestra
+ * neutro, con un punto y su texto.
  */
 export function StatusBadge({ value, label }: { value: string; label?: string }) {
   const family = STATUS_FAMILIES.find(f => f.id === statusFamily(value));
   const text = label ?? statusNames[value] ?? value.replace(/_/g, ' ');
+  const priority = PRIORITIES.find(p => p.id === statusPriority(value));
+  if (priority) return <span className={`status-badge status-tag status-${value} priority-${priority.id}`}><Icon name={priority.icon} size={14} /><span>{text}</span></span>;
   if (!family) return <span className={`status-badge status-tag status-${value} status-neutral`}><span className="status-dot" aria-hidden="true" /><span>{text}</span></span>;
   return <span className={`status-badge status-tag status-${value} fam-${family.id} pattern-${family.pattern}`}><Icon name={family.icon} size={14} /><span>{text}</span></span>;
 }

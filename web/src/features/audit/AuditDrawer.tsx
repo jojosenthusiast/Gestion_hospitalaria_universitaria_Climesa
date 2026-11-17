@@ -35,7 +35,7 @@ export function AuditDrawer({ api, seq, version, onClose, onOpen }: { api: Api; 
             <div><dt>Quién</dt><dd>{row.actor ?? 'Sistema'}<small>{(row.role ?? '').split(',').filter(Boolean).map(r => roleNames[r] ?? r).join(' · ') || 'Sin rol'}</small>{row.actorId && <small className="mono">{row.actorId}</small>}</dd></div>
             <div><dt>Qué</dt><dd>{row.entity}{row.entityId ? <small className="mono">{row.entityId}</small> : null}<small>Permiso: {row.permission ?? 'sin permiso asociado'}</small></dd></div>
             <div><dt>Cuándo</dt><dd>{fullDate(row.at)}<small className="mono">{row.at}</small></dd></div>
-            <div><dt>Dónde</dt><dd>API CLIMESA<small>{row.correlation ? <>Petición <span className="mono">{row.correlation}</span></> : 'Sin identificador de petición'}</small><small>La auditoría no guarda direcciones IP ni ubicación del equipo.</small></dd></div>
+            <div><dt>Dónde</dt><dd><small>{row.correlation ? <>Petición <span className="mono">{row.correlation}</span></> : 'Sin identificador de petición'}</small><small>La auditoría no guarda direcciones IP ni ubicación del equipo.</small></dd></div>
             <div><dt>Paciente</dt><dd>{row.patientRecord ? <>Expediente <span className="mono">{row.patientRecord}</span></> : 'No se refiere a un paciente'}</dd></div>
             <div><dt>Resultado</dt><dd><Tag value={row.result} label={resultNames[row.result]} />{row.reason && <small>Motivo: {row.reason}</small>}</dd></div>
           </dl>

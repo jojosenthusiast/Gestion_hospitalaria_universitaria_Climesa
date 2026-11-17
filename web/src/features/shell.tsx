@@ -102,12 +102,13 @@ export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permis
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
 export const hasWebModule=(profile:AccessProfile)=>visibleModules(profile).some(m=>m.permission);
 const readRoute=()=>location.hash.replace(/^#\/?/,'').split('?')[0]||'inicio';
-function HospitalClock(){
+/** R1 (S5): the hospital day as plain small text; the time is already on the device, so no decorative clock. */
+function HospitalDate(){
  const [now,setNow]=useState(()=>new Date());
- useEffect(()=>{let timer:number;const tick=()=>{setNow(new Date());timer=window.setTimeout(tick,1000);};timer=window.setTimeout(tick,1000);return()=>window.clearTimeout(timer);},[]);
- const time=new Intl.DateTimeFormat('es-SV',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,hourCycle:'h23',timeZone:'America/El_Salvador'}).format(now).replace(/^24:/,'00:');
- const date=new Intl.DateTimeFormat('es-SV',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'America/El_Salvador'}).format(now);
- return <div className="hospital-clock" aria-label={`Hora actual ${time}, ${date}`}><Icon name="calendar" size={18}/><div><time className="hospital-clock-time" dateTime={now.toISOString()}>{time}</time><span className="hospital-clock-date">{date}</span></div></div>;
+ // A minute is enough to roll over at midnight; nothing ticks every second.
+ useEffect(()=>{const timer=window.setInterval(()=>setNow(new Date()),60_000);return()=>window.clearInterval(timer);},[]);
+ const date=new Intl.DateTimeFormat('es-SV',{weekday:'long',day:'numeric',month:'long',timeZone:'America/El_Salvador'}).format(now);
+ return <time className="topbar-date" dateTime={new Intl.DateTimeFormat('en-CA',{timeZone:'America/El_Salvador'}).format(now)}>{date}</time>;
 }
 export function HospitalShell({api,profile,version=0,connection='live',onLogout,onChangePassword}:{api:Api;profile:AccessProfile;version?:number;connection?:'live'|'offline'|'reconnecting';onLogout:()=>void;onChangePassword?:(current:string,next:string)=>Promise<string|null>}){
  const [route,setRoute]=useState(readRoute),[navOpen,setNavOpen]=useState(false),[mobileNav,setMobileNav]=useState(false),menu=visibleModules(profile),roleLabel=profile.roles.map(r=>roleNames[r]??r).join(' · ');
@@ -165,7 +166,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
    <div className="hospital-header-inner">
     <button ref={toggleRef} className="nav-toggle" type="button" aria-label={navOpen?'Cerrar navegación':'Abrir navegación'} aria-expanded={navOpen} aria-controls="primary-navigation" onClick={()=>setNavOpen(open=>!open)}><Icon name={navOpen?'close':'menu'} size={22}/></button>
     <Brand light/>
-    <div className="workspace-role"><span>{roleLabel}</span><span className="mono-label">HOSPITAL UNIVERSITARIO</span></div><HospitalClock />
+    <div className="workspace-role"><span>{roleLabel}</span><span className="mono-label">HOSPITAL UNIVERSITARIO</span></div><HospitalDate />
     <details className="account-menu"><summary aria-label="Opciones de cuenta"><span className="account-avatar">{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><span className="account-menu-label">Mi cuenta</span><span aria-hidden="true">⌄</span></summary><div className="account-popover"><span>Sesión iniciada</span><strong>{profile.email}</strong><a href="#/perfil">Ver mi cuenta</a><button onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></div></details>
    </div>
   </header>

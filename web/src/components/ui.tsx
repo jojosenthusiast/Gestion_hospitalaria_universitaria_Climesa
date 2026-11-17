@@ -184,7 +184,7 @@ export function ActivationView({ ready, email, password, confirmation, setPasswo
   const rules = [{ label: 'Al menos 8 caracteres', ok: password.length >= 8 }, { label: 'Mayúscula y minúscula', ok: /[a-z]/.test(password) && /[A-Z]/.test(password) }, { label: 'Un número y un símbolo', ok: /\d/.test(password) && /[^A-Za-z0-9]/.test(password) }];
   return (
     <AuthLayout activation>
-      <form className="auth-form activation-form" onSubmit={onSubmit}>
+      <form className="auth-form" onSubmit={onSubmit}>
         {reset
           ? <div className="form-heading"><span className="eyebrow">Nueva contraseña</span><h1>Crea una nueva contraseña</h1><p>Elige una contraseña segura para tu cuenta de CLIMESA.</p></div>
           : <div className="form-heading"><span className="eyebrow">Activación de cuenta</span><h1>Hazla tuya</h1><p>Crea una contraseña para tu cuenta de CLIMESA.</p></div>}
