@@ -67,3 +67,4 @@
 
 @media (max-width: 900px) { .notice-inbox { grid-template-columns: 1fr; } .notice-detail { position: static; } }
 @media (prefers-reduced-motion: reduce) { .notice-row { transition: none; } }
+.notice-reach { margin: 0.25rem 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
