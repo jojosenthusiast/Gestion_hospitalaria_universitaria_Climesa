@@ -88,10 +88,11 @@ describe('Fila del día · tablero (S9)', () => {
   it('arriba muestra quién pasa después con su motivo y llama al siguiente hacia un consultorio', async () => {
     const api = montar(['fila.ver', 'fila.llamar', 'espacios.ver'], [ticket({ allowedActions: ['llamar'] })]);
     await userEvent.click(await screen.findByRole('button', { name: /^Consulta general/ }));
-    const next = await screen.findByRole('region', { name: 'Quién pasa después' });
+    // R4a: the region is «Quién sigue»; the ordering rule moved from printed text to the line's tooltip.
+    const next = await screen.findByRole('region', { name: 'Quién sigue' });
     expect(await within(next).findByText('Paciente Ficticio Nueve')).toBeTruthy();
     expect(within(next).getByText('Urgente: pasa antes que las citas y la fila.')).toBeTruthy();
-    expect(within(next).getByText(/Regla: Emergencias primero/)).toBeTruthy();
+    expect(next.getAttribute('title')).toMatch(/Emergencias primero/);
     await userEvent.selectOptions(await within(next).findByRole('combobox', { name: 'Consultorio' }), 'c-1');
     await userEvent.click(within(next).getByRole('button', { name: /Llamar siguiente/ }));
     expect(api.write).toHaveBeenCalledWith('/fila/llamar-siguiente', { service: 'consulta_general', officeId: 'c-1' }, 'POST');
@@ -125,7 +126,7 @@ describe('Fila del día · tablero (S9)', () => {
     const paciente: AccessProfile = { ...perfil([]), roles: ['PAC'], permissions: [{ code: 'fila.ver', context: 'propio' }] };
     render(<QueuePage api={api} profile={paciente} version={0} />);
     await userEvent.click(await screen.findByRole('button', { name: /^Consulta general/ }));
-    expect(screen.queryByRole('region', { name: 'Quién pasa después' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Quién sigue' })).toBeNull();
     expect(api.request.mock.calls.some(([path]) => String(path).startsWith('/fila/siguiente'))).toBe(false);
   });
 
@@ -133,7 +134,7 @@ describe('Fila del día · tablero (S9)', () => {
     const api = { request: vi.fn(async (path: string) => { if (path.startsWith('/fila/siguiente')) throw new ApiError('No se pudo calcular quién pasa después.', 500); return [ticket()]; }), write: vi.fn() } as unknown as Api;
     render(<QueuePage api={api} profile={perfil(['fila.ver', 'fila.llamar'])} version={0} />);
     await userEvent.click(await screen.findByRole('button', { name: /^Consulta general/ }));
-    const next = await screen.findByRole('region', { name: 'Quién pasa después' });
+    const next = await screen.findByRole('region', { name: 'Quién sigue' });
     expect(await within(next).findByText(/No se pudo calcular quién pasa después/)).toBeTruthy();
     expect(within(next).queryByText('Nadie espera en este servicio.')).toBeNull();
   });

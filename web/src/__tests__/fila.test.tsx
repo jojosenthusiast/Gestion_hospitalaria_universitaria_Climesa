@@ -28,7 +28,8 @@ describe('Fila del día (W29)', () => {
     const api = montar(['fila.ver', 'fila.llamar'], [ticket('en_espera', 7, ['llamar'])]);
     await userEvent.click(await screen.findByRole('button', { name: /^Llamar$/ }));
     expect(api.write).toHaveBeenCalledWith('/fila/t-7/llamar', { version: 2 }, 'POST');
-    await vi.waitFor(() => expect(api.request.mock.calls.filter(([p]) => String(p).startsWith('/fila')).length).toBe(2));
+    // R4a: «Quién sigue» is always on the board now, so the refresh also re-reads `/fila/siguiente`; count the board only.
+    await vi.waitFor(() => expect(api.request.mock.calls.filter(([p]) => String(p) === '/fila').length).toBe(2));
   });
 
   it('muestra los estados en español, no el código', async () => {
@@ -41,7 +42,8 @@ describe('Fila del día (W29)', () => {
   it('sin fila.llamar ni fila.gestionar solo consulta: no hay acciones ni botón de emitir', async () => {
     montar(['fila.ver'], [ticket('llamado')]);
     await screen.findByText('Paciente Ficticio Uno');
-    expect(screen.getByText(/Vista de solo lectura/)).toBeTruthy();
+    // R4a: the read-only sentence became a short «Solo lectura» mark in the header.
+    expect(screen.getByText('Solo lectura')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Llamar|Iniciar atención|No se presentó/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Emitir número/ })).toBeNull();
   });
@@ -63,15 +65,15 @@ describe('Fila del día (W29)', () => {
     expect(api.write).toHaveBeenCalledWith('/fila', { service: 'consulta_general', patientId: 'p-1' }, 'POST');
   });
 
-  it('filtra por servicio con chips y cuenta cada estado en el resumen', async () => {
+  // R4a: the summary cards were removed (they repeated the column counts); the column headers carry the counts.
+  it('filtra por servicio con el control segmentado y cuenta cada estado en su columna', async () => {
     montar(['fila.ver'], [{ ...ticket('en_espera', 1) }, { ...ticket('llamado', 2), service: 'laboratorio' }, { ...ticket('atendido', 3) }]);
-    await screen.findByRole('region', { name: 'En espera' });
-    const resumen = screen.getByLabelText('Resumen de la fila');
-    expect(within(resumen).getAllByText('1').length).toBeGreaterThanOrEqual(3);
-    await userEvent.click(screen.getByRole('button', { name: /^Laboratorio/ }));
+    const espera = await screen.findByRole('region', { name: 'En espera' });
+    expect(within(espera).getByLabelText('1 número')).toBeTruthy();
+    await userEvent.click(within(screen.getByRole('group', { name: 'Servicio' })).getByRole('button', { name: /^Laboratorio/ }));
     expect(within(screen.getByRole('region', { name: 'Llamados' })).getByText('2')).toBeTruthy();
     expect(within(screen.getByRole('region', { name: 'En espera' })).getByText('Nadie por ahora.')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Servicio' })).getByRole('button', { name: /^Todos/ }));
     expect(within(screen.getByRole('region', { name: 'En espera' })).queryByText('Nadie por ahora.')).toBeNull();
   });
 });
