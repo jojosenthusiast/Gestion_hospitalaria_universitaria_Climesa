@@ -659,7 +659,10 @@ export class LaboratoryService {
     return this.commands.run(actor, `citas.agendar:seguimiento:${id}`, key, dto, async c => {
       const proposal = await this.proposal(c, id, dto.version);
       const appointment = (await c.query(`SELECT paciente_id AS "patientId",medico_id AS "doctorId",estado AS state FROM atencion.cita WHERE id=$1`, [dto.appointmentId])).rows[0] as Row | undefined;
-      if (!appointment || !appointmentMatchesProposal(appointment as any, proposal as any)) {
+      // R7 C1: another active doctor of the same specialty also serves (the ordering doctor may have no free slot).
+      const sameSpecialty = !!appointment && appointment.doctorId !== proposal.doctorId && !!(await c.query(`SELECT 1 FROM personal.persona a JOIN personal.persona b ON b.id=$2
+        WHERE a.id=$1 AND a.tipo='medico' AND a.activo AND a.especialidad IS NOT NULL AND lower(a.especialidad)=lower(b.especialidad)`, [appointment.doctorId, proposal.doctorId])).rowCount;
+      if (!appointment || !appointmentMatchesProposal(appointment as any, proposal as any, sameSpecialty)) {
         throw new ProblemException('cita_no_coincide', 409, 'La cita debe ser del mismo paciente con el médico que pidió los exámenes, y estar vigente.', 'appointmentId');
       }
       // One appointment backs at most one proposal (unique index propuesta_cita_cita_unica guards concurrent links).

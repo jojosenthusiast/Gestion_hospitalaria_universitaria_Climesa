@@ -122,4 +122,19 @@ describe('R7 · laboratorio: hoja de resultados, bandeja y liberación', () => {
     expect(released.body.followUpProposalId).toBe(proposal.id);
     expect(released.body.followUpsClosed).toBe(0);
   });
+
+  test('C1 REC: la propuesta se confirma con otro médico de la misma especialidad, nunca con uno de otra', async () => {
+    const o = await inProcess();
+    const done = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultados/lote`, { version: o.version, items: sheet(o, 13), complete: true });
+    await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version: done.body.orderVersion });
+    const proposal = (await proposals()).find(p => p.orderId === o.id);
+    const specialty = (await t.one<{ s: string }>(`UPDATE personal.persona SET especialidad=coalesce(especialidad,'Medicina general') WHERE id=$1 RETURNING especialidad AS s`, [proposal.doctorId])).s;
+    const doctor = async (especialidad: string) => (await t.one<{ id: string }>(`INSERT INTO personal.persona(nombres,apellidos,tipo,especialidad) VALUES('Otra','Médica Ficticia','medico',$1) RETURNING id`, [especialidad])).id;
+    const book = async (doctorId: string, day: number) => (await t.one<{ id: string }>(`INSERT INTO atencion.cita(paciente_id,medico_id,horario,estado,origen) VALUES($1,$2,tstzrange($3::timestamptz,$3::timestamptz+interval '20 minutes','[)'),'confirmada','recepcion') RETURNING id`,
+      [o.patientId, doctorId, new Date(NOW.valueOf() + day * 86_400_000)])).id;
+    const other = await t.call('REC', 'POST', `/laboratorio/seguimientos/${proposal.id}/confirmar`, { version: proposal.version, appointmentId: await book(await doctor('Dermatología Ficticia'), 3) });
+    expect([other.status, other.body.codigo, other.body.campo]).toEqual([409, 'cita_no_coincide', 'appointmentId']);
+    const same = await t.call('REC', 'POST', `/laboratorio/seguimientos/${proposal.id}/confirmar`, { version: proposal.version, appointmentId: await book(await doctor(specialty), 4) });
+    expect([same.status, same.body.state]).toEqual([201, 'confirmada']);
+  });
 });
