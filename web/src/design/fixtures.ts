@@ -31,7 +31,7 @@ export class FixtureApi implements Api {
  async request<T>(path:string):Promise<T>{
   const url=new URL(path,'https://fixture.invalid'),p=url.pathname;
   let result:unknown=this.desk.request(path);
-  if(result!==undefined){}
+  if(result!==undefined){/* the front desk fixture answered */}
   else if(p==='/auth/me')result=fixtureProfile(this.role);
   else if(p==='/pacientes')result=this.patients;
   else if(p.startsWith('/pacientes/'))result=this.patients.find(r=>r.id===p.split('/')[2]);
