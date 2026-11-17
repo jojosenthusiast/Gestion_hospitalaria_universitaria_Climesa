@@ -232,6 +232,7 @@ export class LabReviewResponse {
   @DateTimeProp() reviewedAt!: string;
   @IntProp({ optional: true, description: 'C-2: pendientes de «Resultados por revisar» que se cerraron con la revisión' }) followUpsClosed?: number;
   @UuidProp({ nullable: true, optional: true, description: 'D-4: propuesta de cita de seguimiento creada para recepción, o null' }) followUpProposalId?: string | null;
+  @StrProp({ optional: true, description: 'A5: por qué no se propuso cita: no_pedida, hospitalizado, ya_propuesta o sin_consulta' }) followUpSkipped?: string;
 }
 
 export class LabBatchResultItemResponse {

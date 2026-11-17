@@ -95,9 +95,22 @@ describe('R7 · laboratorio: resultado externo sin orden, aviso al paciente y pe
     expect(before.patientNote ?? null).toBeNull();
     const released = await t.call('MED', 'POST', `/laboratorio/ordenes/${saved.body.id}/revisar`, { version: saved.body.version, followUp: false, patientNote: '  Repetir en ayunas el lunes.  ' });
     expect(released.status).toBe(201);
+    expect(released.body).toMatchObject({ followUpProposalId: null, followUpSkipped: 'no_pedida' });
     const mine = ((await t.call('PAC', 'GET', '/me/laboratorio')).body as any[]).find(o => o.id === saved.body.id);
     expect(mine.patientNote).toBe('Repetir en ayunas el lunes.');
     const long = await t.call('MED', 'POST', `/laboratorio/ordenes/${saved.body.id}/revisar`, { version: released.body.version, patientNote: 'x'.repeat(501) });
     expect(long.status).toBe(400);
+  });
+
+  test('A5: con el paciente hospitalizado no se propone cita y la respuesta dice por qué', async () => {
+    const patientId = await t.patient({ linkPac: true });
+    await t.consultation(patientId);
+    const saved = await record(patientId, { place: 'Laboratorio Ejemplo', results: [{ examId: glu, value: 95 }], attachment });
+    // An active admission (pendiente_cama) makes the patient «hospitalizado».
+    const admitted = await t.call('REC', 'POST', '/admisiones', await t.admissionBody(patientId, { requestedCategory: 'semiprivada', isolation: false }));
+    expect(admitted.status).toBe(201);
+    const released = await t.call('MED', 'POST', `/laboratorio/ordenes/${saved.body.id}/revisar`, { version: saved.body.version, followUp: true });
+    expect(released.status).toBe(201);
+    expect(released.body).toMatchObject({ followUpProposalId: null, followUpSkipped: 'hospitalizado' });
   });
 });

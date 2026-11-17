@@ -392,12 +392,13 @@ export class LaboratoryService {
    * S10: when the results of an outpatient order arrive (completed), the system proposes a follow-up appointment with the
    * doctor who ordered it; reception confirms it. Orders of an admission, or of a patient with an active admission, get none.
    */
-  private async proposeFollowUp(c: PoolClient, order: Row) {
-    if (!order.consultationId) return false;
+  /** True when a follow-up proposal was created; otherwise why not (A5: the doctor is told the real reason). */
+  private async proposeFollowUp(c: PoolClient, order: Row): Promise<true | 'sin_consulta' | 'hospitalizado' | 'ya_propuesta'> {
+    if (!order.consultationId) return 'sin_consulta';
     const admitted = (await c.query(`SELECT 1 FROM hospitalizacion.admision WHERE paciente_id=$1 AND estado IN ${ACTIVE_ADMISSION} LIMIT 1`, [order.patientId])).rowCount;
-    if (admitted) return false;
+    if (admitted) return 'hospitalizado';
     const created = await c.query(`INSERT INTO laboratorio.propuesta_cita(orden_id,paciente_id,medico_id,creada_en) VALUES($1,$2,$3,$4) ON CONFLICT (orden_id) DO NOTHING`, [order.id, order.patientId, order.doctorId, this.clock.now()]);
-    return (created.rowCount ?? 0) > 0;
+    return (created.rowCount ?? 0) > 0 ? true : 'ya_propuesta';
   }
 
   async complete(actor: Actor, id: string, dto: LabVersionDto, key?: string) {
@@ -431,12 +432,13 @@ export class LaboratoryService {
       const row = (await c.query(`UPDATE laboratorio.orden SET revisada_en=$2,revisada_por=$3,nota_paciente=$4,version=version+1 WHERE id=$1 RETURNING id,version,revisada_en AS "reviewedAt"`, [id, this.clock.now(), actor.staffId, dto.patientNote?.trim() || null])).rows[0];
       const closed = (await c.query(`UPDATE laboratorio.pendiente_medico SET estado='revisado',revisado_en=$2,revisado_por=$3,actualizado_en=$2,version=version+1
         WHERE orden_id=$1 AND estado='pendiente' RETURNING id`, [id, this.clock.now(), actor.staffId])).rowCount ?? 0;
-      const proposed = dto.followUp === false ? false : await this.proposeFollowUp(c, old);
+      const outcome = dto.followUp === false ? 'no_pedida' : await this.proposeFollowUp(c, old);
+      const proposed = outcome === true;
       const proposalId = proposed ? (await c.query('SELECT id FROM laboratorio.propuesta_cita WHERE orden_id=$1', [id])).rows[0]?.id ?? null : null;
       await this.commands.audit(c, actor, { action: 'laboratorio.revisar', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.revisar', detail: { substitute: old.doctorId !== actor.staffId, followUpsClosed: closed, followUpProposed: proposed, followUpDecision: dto.followUp ?? null } });
       // SEG-05: the patient hears about the order only once the doctor reviews and releases it (`propio_revisado`).
       await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['resultados.ver', ...(proposed ? ['citas.agendar'] : [])], { users: [await patientAccount(c, old.patientId), ...await this.staffAccounts(c, [old.doctorId, actor.staffId])] }));
-      return { ...row, followUpsClosed: closed, followUpProposalId: proposalId as string | null };
+      return { ...row, followUpsClosed: closed, followUpProposalId: proposalId as string | null, ...(outcome === true ? {} : { followUpSkipped: outcome }) };
     });
   }
 

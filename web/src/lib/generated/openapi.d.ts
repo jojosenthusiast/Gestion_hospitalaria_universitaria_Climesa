@@ -5386,6 +5386,8 @@ export interface components {
              * @description D-4: propuesta de cita de seguimiento creada para recepción, o null
              */
             followUpProposalId?: string | null;
+            /** @description A5: por qué no se propuso cita: no_pedida, hospitalizado, ya_propuesta o sin_consulta */
+            followUpSkipped?: string;
         };
         LabCancelDto: {
             version: number;
