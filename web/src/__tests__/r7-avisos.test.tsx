@@ -16,11 +16,11 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 const profile = (permissions: string[]): AccessProfile => ({ id: 'u-1', user: { id: 'u-1' }, email: 'jop@example.test', name: 'Jefatura Ficticia', roles: ['JOP'], platforms: ['web'], permissions: permissions.map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId: 's-1' });
 const spaces = [{ id: 's-1', parentId: null, type: 'area', code: 'P1-HOS', name: 'Hospitalización', active: true, version: 1, path: 'P1-HOS', totalBeds: 0, freeBeds: 0 }];
 
-function mount(permissions = ['avisos.publicar', 'espacios.ver']) {
+function mount(permissions = ['avisos.publicar', 'espacios.ver'], reachFor = (path: string): number => path.includes('areas=P1-HOS') ? 38 : 12) {
   const request = vi.fn(async (path: string) => {
     if (path === '/avisos' || path === '/avisos/estadisticas') return [];
     if (path === '/espacios') return spaces;
-    if (path.startsWith('/avisos/alcance')) return { destinatarios: path.includes('areas=P1-HOS') ? 38 : 12 };
+    if (path.startsWith('/avisos/alcance')) return { destinatarios: reachFor(path) };
     return { avisos: [], noLeidos: 0, criticos: 0, recordatorioHoras: 4 };
   });
   const write = vi.fn(async () => ({ id: 'n-1' }));
@@ -29,6 +29,17 @@ function mount(permissions = ['avisos.publicar', 'espacios.ver']) {
 }
 
 describe('R7 D1 · publicar avisos', () => {
+  it('una audiencia sin nadie activo lo dice en vez de «Llega a 0 personas»; los miles llevan separador', async () => {
+    mount(undefined, path => path.includes('areas=P1-HOS') ? 1284 : 0);
+    await userEvent.type(await screen.findByLabelText('Título'), 'Aviso');
+    await userEvent.click(screen.getByLabelText(/^Público/));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Enfermería/ }));
+    expect(await screen.findByText('Nadie del personal activo recibe este aviso con esta audiencia.')).toBeTruthy();
+    expect(screen.queryByText(/Llega a 0/)).toBeNull();
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Hospitalización/ }));
+    expect(await screen.findByText(/^Llega a 1.?284 personas$/)).toBeTruthy();
+  });
+
   it('«Importante» para ENF de HOS: muestra «llega a N personas» y publica solo con nivel', async () => {
     const { request, write } = mount();
     await userEvent.type(await screen.findByLabelText('Título'), 'Cambio de turno');

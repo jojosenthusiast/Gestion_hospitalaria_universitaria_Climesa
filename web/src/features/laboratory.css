@@ -77,6 +77,8 @@
 .lab-release-list { margin: 0; padding: 0; list-style: none; display: grid; font-variant-numeric: tabular-nums; }
 .lab-release-list li { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
 .lab-release-list li.is-critical { color: var(--critical); font-weight: 700; }
+/* break-ui: a long exam name ("Tiempo de tromboplastina parcial activada") must not squeeze the alert icon. */
+.lab-release-list li > svg { flex-shrink: 0; }
 .lab-identity { display: inline-flex; align-items: center; gap: 4px; margin-top: calc(var(--space-2) * -1); font-size: var(--text-sm); font-weight: 700; }
 .lab-identity.is-ok { color: var(--success); }
 .lab-identity.is-bad { color: var(--critical); }

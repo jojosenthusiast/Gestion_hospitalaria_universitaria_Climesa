@@ -4,6 +4,7 @@ import { Field, Icon, Notice } from '../../components/ui';
 import { can, roleNames, type AccessProfile, type Api, type Space } from '../../lib/api';
 import { useRefreshAt } from '../../lib/publico';
 import { Dialog, Empty, CompactHeader, RemoteState, Tag, WriteError, formatDateTime, useAction, useData, type Remote } from '../common';
+import { formatNumber } from '../../lib/format';
 import { NoticeCard, NoticeLevelBadge } from './NoticePreview';
 import { audienceRoles, audienceText, durations, filterInbox, inboxFilters, isoToLocalInput, levels, localInput, localToIso, personalDataIn, priorityOfLevel, WITHDRAW_MIN, type Inbox, type InboxFilter, type InboxNotice, type Level, type NoticeListItem, type NoticeStats, type Priority } from './rules';
 import './avisos.css';
@@ -159,7 +160,11 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
   // R7 D-2: «llega a N personas» while composing, with the same rule as the «Enterado» counts.
   const reachQuery = new URLSearchParams({ ...(roles.length ? { roles: [...roles].sort().join(',') } : {}), ...(areas.length ? { areas: [...areas].sort().join(',') } : {}) }).toString();
   const reach = useData<{ destinatarios: number }>(api, `/avisos/alcance?${reachQuery}`, 0, reachQuery.length > 0);
-  const reachText = reachQuery ? (reach.data ? `Llega a ${reach.data.destinatarios} ${reach.data.destinatarios === 1 ? 'persona' : 'personas'}${isPublic ? ' y a la pantalla pública' : ''}` : 'Calculando a cuántas personas llega…') : isPublic ? 'Solo pantalla pública y apps sin sesión' : '';
+  // break-ui: an audience with nobody active is a real case (a new area, a role without staff); say so instead of "0 personas".
+  const reachCount = reach.data?.destinatarios;
+  const reachText = reachQuery ? (reachCount === undefined ? 'Calculando a cuántas personas llega…'
+    : reachCount === 0 ? `Nadie del personal activo recibe este aviso con esta audiencia${isPublic ? '; solo lo verá la pantalla pública' : ''}.`
+    : `Llega a ${formatNumber(reachCount)} ${reachCount === 1 ? 'persona' : 'personas'}${isPublic ? ' y a la pantalla pública' : ''}`) : isPublic ? 'Solo pantalla pública y apps sin sesión' : '';
   const [confirming, setConfirming] = useState(false);
   const areaOptions = (Array.isArray(spaces.data) ? spaces.data : []).filter(s => s.active && (s.type === 'area' || s.type === 'bahia'));
   const [from, setFrom] = useState(editing && !started && editing.desde ? isoToLocalInput(editing.desde) : ''), [until, setUntil] = useState(() => editing?.hasta ? isoToLocalInput(editing.hasta) : localInput(72));
@@ -207,7 +212,7 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
         {areaOptions.length > 0 && <div className="notice-roles" role="group" aria-label="Áreas">{areaOptions.map(a => <label key={a.id} className="notice-check"><input type="checkbox" checked={areas.includes(a.code)} onChange={() => toggleArea(a.code)} /><AreaTag code={a.code} />{a.name}</label>)}</div>}
         <small className="field-hint">Los roles y las áreas lo ven en Avisos, en la web y en las apps; si es crítico, también en su inicio. Un aviso solo para roles o áreas no sale en la pantalla pública.</small>
         {noAudience && <Notice kind="error">Elige a quién va dirigido: público, uno o más roles o áreas.</Notice>}
-        {reachText && <p className="notice-reach" role="status">{reachText}</p>}
+        {reachText && <p className={reachCount === 0 ? 'notice-reach is-empty' : 'notice-reach'} role="status">{reachText}</p>}
       </fieldset>
       <fieldset className="notice-fieldset"><legend>Vigencia</legend>
         <div className="form-grid">
