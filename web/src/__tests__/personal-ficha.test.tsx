@@ -103,7 +103,7 @@ describe('W08 · ficha de personal', () => {
     expect(within(por('JVPM-0001')).getByText('Vigente')).toBeTruthy();
     expect(within(por('JVPM-0000')).getByText('Vencida')).toBeTruthy();
     expect(within(por('JVPE-0002')).getByText('Por vencer')).toBeTruthy();
-    expect(within(por('JVPM-0001')).getByText(/1\/1\/2026 al 31\/12\/2026/)).toBeTruthy();
+    expect(within(por('JVPM-0001')).getByText(/1 ene 2026 al 31 dic 2026/)).toBeTruthy();
   });
 
   it('muestra solo los turnos próximos publicados de esa persona, en orden', async () => {
@@ -112,8 +112,8 @@ describe('W08 · ficha de personal', () => {
     const tabla = await within(ficha).findByRole('table', { name: 'Turnos próximos publicados' });
     const filas = within(tabla).getAllByRole('row').slice(1);
     expect(filas).toHaveLength(2);
-    expect(filas[0].querySelector('[data-label="Inicio"]')!.textContent).toMatch(/30 oct 2026/);
-    expect(filas[1].querySelector('[data-label="Inicio"]')!.textContent).toMatch(/5 nov 2026/);
+    expect(filas[0].querySelector('[data-label="Inicio"]')!.textContent).toMatch(/^30 oct(, | 2026, )07:00$/);
+    expect(filas[1].querySelector('[data-label="Inicio"]')!.textContent).toMatch(/^5 nov(, | 2026, )/);
   });
 
   it('avisa cuando no hay inscripciones ni turnos próximos', async () => {

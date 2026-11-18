@@ -28,7 +28,6 @@ export function weekDays(monday: string): WeekDay[] {
 const longDay = new Intl.DateTimeFormat('es-SV', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/El_Salvador' });
 const weekdayName = new Intl.DateTimeFormat('es-SV', { weekday: 'long', timeZone: 'America/El_Salvador' });
 const dayMonth = new Intl.DateTimeFormat('es-SV', { day: 'numeric', month: 'long', timeZone: 'America/El_Salvador' });
-const dayMonthYear = new Intl.DateTimeFormat('es-SV', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/El_Salvador' });
 
 /** Encabezado de un día: `Hoy`, `Mañana` o `Ayer` cuando aplica, y siempre el día de la semana con la fecha. */
 export function dayHeading(date: string, today: string): { relative: string | null; label: string; weekday: string; dayNumber: number } {
@@ -38,13 +37,15 @@ export function dayHeading(date: string, today: string): { relative: string | nu
 }
 
 
-/** `16 al 22 de noviembre de 2026` (o `30 de noviembre al 6 de diciembre de 2026`). */
-export function weekLabel(monday: string): string {
+/** R4: `16 al 22 de noviembre` (o `30 de noviembre al 6 de diciembre`); the year only when the week ends in another year or `withYear` (exports). */
+export function weekLabel(monday: string, { withYear = false, today = localDay(Date.now()) }: { withYear?: boolean; today?: string } = {}): string {
   const sunday = addWeeks(monday, 1);
   const last = new Date(noon(sunday) - DAY);
   const first = new Date(noon(monday));
   const sameMonth = monday.slice(0, 7) === localDay(last.valueOf()).slice(0, 7);
-  return `${sameMonth ? first.getUTCDate() : dayMonth.format(first)} al ${dayMonthYear.format(last)}`;
+  const lastDay = localDay(last.valueOf());
+  const year = !withYear && lastDay.slice(0, 4) === today.slice(0, 4) ? '' : ` de ${lastDay.slice(0, 4)}`;
+  return `${sameMonth ? first.getUTCDate() : dayMonth.format(first)} al ${dayMonth.format(last)}${year}`;
 }
 
 /** Estados que se dibujan, en el orden de la leyenda. */

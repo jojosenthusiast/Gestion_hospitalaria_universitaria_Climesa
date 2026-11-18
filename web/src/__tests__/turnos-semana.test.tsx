@@ -32,8 +32,10 @@ describe('turnos · reglas de la semana', () => {
     expect(dayHeading('2026-11-11', '2026-11-10').relative).toBe('Mañana');
     expect(dayHeading('2026-11-09', '2026-11-10').relative).toBe('Ayer');
     expect(dayHeading('2026-11-13', '2026-11-10').relative).toBeNull();
-    expect(weekLabel('2026-11-09')).toBe('9 al 15 de noviembre de 2026');
-    expect(weekLabel('2026-11-30')).toBe('30 de noviembre al 6 de diciembre de 2026');
+    expect(weekLabel('2026-11-09', { today: '2026-11-18' })).toBe('9 al 15 de noviembre');
+    expect(weekLabel('2026-11-30', { today: '2026-11-18' })).toBe('30 de noviembre al 6 de diciembre');
+    expect(weekLabel('2026-12-28', { today: '2026-11-18' })).toBe('28 de diciembre al 3 de enero de 2027');
+    expect(weekLabel('2026-11-09', { withYear: true, today: '2026-11-18' })).toBe('9 al 15 de noviembre de 2026');
   });
 
   it('una guardia de 24 h se parte en dos días y los traslapes toman carriles', () => {
@@ -99,7 +101,7 @@ function montar(ancho: boolean, lista: ShiftRow[] = turnos, semana: (path: strin
 describe('turnos · vista semanal', () => {
   it('en pantalla ancha abre la semana actual con un bloque por turno, la guardia de 24 h en dos días y la leyenda', async () => {
     const api = montar(true);
-    const semana = await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre de 2026/ });
+    const semana = await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre$/ });
     expect(screen.getByRole('button', { name: 'Semana' }).getAttribute('aria-pressed')).toBe('true');
     const hoy = within(semana).getByRole('group', { name: /Hoy, martes, 10 de noviembre/ });
     // Cada día tiene además su botón "Asignar turno el …" (S12); los bloques son los turnos.

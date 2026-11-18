@@ -5,6 +5,9 @@ import { PriorityBadge, SectionState } from '../../components/system';
 import { ApiError, type Api } from '../../lib/api';
 import { Select, WriteError, useAction, useData, type Remote } from '../common';
 import { formatDate } from '../../lib/format';
+import { useFold } from '../../components/fold';
+
+const FOLD_LIMIT = 3;
 import { newIntentKey, withIntentKey } from '../intent';
 import { spanishProblem } from '../problems';
 
@@ -41,7 +44,9 @@ export function LabFollowUpPanel({ api, version, state, inTray = false }: { api:
   const [done, setDone] = useState<string | null>(null);
   const remember = (proposalId: string, appointmentId: string) => setScheduled(current => ({ ...current, [proposalId]: appointmentId }));
   const finish = (message: string) => { setDone(message); data.refresh(); };
-  const list = () => <ul className="lab-follow-up-list">{rows.map(row => <ProposalRow key={row.id} api={api} proposal={row} scheduled={scheduled[row.id] ?? null} onScheduled={id => remember(row.id, id)} onDone={finish} />)}</ul>;
+  // R3: the first proposals show; the rest fold behind «Ver N más».
+  const fold = useFold(rows, FOLD_LIMIT);
+  const list = () => <><ul className="lab-follow-up-list">{fold.shown.map(row => <ProposalRow key={row.id} api={api} proposal={row} scheduled={scheduled[row.id] ?? null} onScheduled={id => remember(row.id, id)} onDone={finish} />)}</ul>{fold.more}</>;
   const notice = done && <Notice kind="success">{done}</Notice>;
   if (inTray && data.data && !data.error && rows.length === 0 && !done) return null;
   if (inTray) return <section className="tray-group" aria-label="Citas de seguimiento por confirmar">

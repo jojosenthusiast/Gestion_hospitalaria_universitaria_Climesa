@@ -50,7 +50,8 @@ describe('Fila · tablero (R4a)', () => {
     expect(within(next).queryByText(/^Regla:/)).toBeNull();
     expect(screen.queryByText(/Elige un servicio/)).toBeNull();
     await userEvent.selectOptions(await within(next).findByRole('combobox', { name: 'Consultorio' }), 'c-1');
-    await userEvent.click(within(next).getByRole('button', { name: /Llamar siguiente/ }));
+    // Android parity: the call button lives in the bottom dock, with the room chosen in «Quién sigue».
+    await userEvent.click(within(screen.getByRole('region', { name: 'Resumen de atención' })).getByRole('button', { name: /Llamar siguiente/ }));
     expect(api.write).toHaveBeenCalledWith('/fila/llamar-siguiente', { service: 'consulta_general', officeId: 'c-1' }, 'POST');
   });
 
@@ -75,5 +76,45 @@ describe('Fila · tablero (R4a)', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Emitir número/ }));
     const dialogo = await screen.findByRole('dialog', { name: 'Mostrador' });
     expect(within(dialogo).queryByText(/cuenta desde 1|pasan antes que las citas/)).toBeNull();
+  });
+});
+
+// Android parity (QueueDock): what matters stays docked at the bottom with the two actions sharing the full width.
+describe('Fila · dock inferior', () => {
+  it('muestra en atención, quién sigue con su área, los en espera y la espera promedio y máxima', async () => {
+    const now = Date.now();
+    const issued = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+    montar(['fila.ver', 'fila.llamar', 'fila.emitir', 'fila.gestionar'], [
+      ticket({ id: 't-3', numero: 3, state: 'en_atencion', issuedAt: issued(50) }),
+      ticket({ id: 't-7', numero: 7, issuedAt: issued(30) }),
+      ticket({ id: 't-8', numero: 8, issuedAt: issued(10) }),
+    ]);
+    const dock = await screen.findByRole('region', { name: 'Resumen de atención' });
+    expect(dock.classList.contains('qb-dock')).toBe(true);
+    expect(within(dock).getByText('En atención').parentElement!.textContent).toMatch(/CON\s*3/);
+    // «Sigue» is the server proposal (number 9) once it arrives.
+    await vi.waitFor(() => expect(within(dock).getByText('Sigue').parentElement!.textContent).toMatch(/CON\s*9/));
+    expect(within(dock).getByText('2 en espera')).toBeTruthy();
+    expect(within(dock).getByText('20 min')).toBeTruthy();
+    expect(within(dock).getByText('Máxima 30 min')).toBeTruthy();
+    const buttons = within(dock).getAllByRole('button');
+    expect(buttons.map(b => b.textContent)).toEqual(['Llamar siguiente', 'Emitir número']);
+    expect(buttons[0].className).toBe('secondary-button');
+    expect(buttons[1].className).toBe('primary-button');
+    // «Emitir número» is not repeated in the header.
+    expect(screen.getAllByRole('button', { name: /Emitir número/ })).toHaveLength(1);
+  });
+
+  it('sin permisos de llamar ni emitir no hay botones, y con uno solo ocupa todo el ancho como principal', async () => {
+    montar(['fila.ver'], [ticket()]);
+    const dock = await screen.findByRole('region', { name: 'Resumen de atención' });
+    expect(within(dock).queryAllByRole('button')).toHaveLength(0);
+    expect(within(dock).getByText('Nadie')).toBeTruthy();
+    cleanup();
+    montar(['fila.ver', 'fila.emitir', 'fila.gestionar'], [ticket()]);
+    const solo = await screen.findByRole('region', { name: 'Resumen de atención' });
+    const only = within(solo).getAllByRole('button');
+    expect(only.map(b => b.textContent)).toEqual(['Emitir número']);
+    expect(only[0].className).toBe('primary-button');
   });
 });

@@ -6,6 +6,7 @@ import { exportName, type ExportTable } from '../lib/export';
 import { can, type AccessProfile, type Api } from '../lib/api';
 import { CompactHeader, RemoteState, useData, type Remote } from './common';
 import { StatusBadge } from '../components/system';
+import { formatDate } from '../lib/format';
 
 /** Respuesta de `GET /metricas/{indicador}` (FR-113-05). */
 export type IndicatorSeries = { indicador: string; unidad: string; desde: string; hasta: string; actualizadoEn: string; serie: { fecha: string; valor: number | null; muestras: number }[] };
@@ -42,7 +43,7 @@ const stats = (series: IndicatorSeries) => {
 };
 const fmt = (value: number | null, unit: string) => value == null ? 'Sin datos' : `${new Intl.NumberFormat('es-SV', { maximumFractionDigits: 1 }).format(value)} ${unit}`;
 const tableOf = (spec: Indicator, series: IndicatorSeries): ExportTable => ({
-  filename: exportName(`metrica-${spec.id}`), title: spec.label, subtitle: `Del ${series.desde} al ${series.hasta}. ${spec.what}`,
+  filename: exportName(`metrica-${spec.id}`), title: spec.label, subtitle: `Del ${formatDate(series.desde, { withYear: true })} al ${formatDate(series.hasta, { withYear: true })}. ${spec.what}`,
   columns: ['Fecha', `Valor (${units[series.unidad] ?? series.unidad})`, 'Muestras'], rows: series.serie.map(p => [p.fecha, p.valor, p.muestras]),
 });
 

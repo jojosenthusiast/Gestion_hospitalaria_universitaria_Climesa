@@ -1,4 +1,5 @@
 import type { Shift } from '../../lib/api';
+import { formatDateTime } from '../../lib/format';
 
 /** Respuesta de `GET /turnos/catalogo`: todas las opciones reales, no solo las de los turnos cargados. */
 export type CatalogRole = { code: string; name: string };
@@ -119,7 +120,7 @@ export function loadFor(personId: string, startMs: number, endMs: number, shifts
 }
 
 export type Conflict = { code: 'traslape' | 'descanso' | 'jornada' | 'inscripcion'; text: string };
-const stamp = (ms: number) => new Intl.DateTimeFormat('es-SV', { dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23', timeZone: 'America/El_Salvador' }).format(new Date(ms));
+const stamp = (ms: number) => formatDateTime(new Date(ms));
 
 /** Conflictos de una persona con un horario propuesto, calculados con los turnos cargados. La base de datos sigue siendo la garantía. */
 export function conflictsFor(person: CatalogStaff | undefined, startMs: number, endMs: number, _kind: string, shifts: Shift[], ignoreId?: string): Conflict[] {

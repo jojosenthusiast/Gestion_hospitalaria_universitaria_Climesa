@@ -83,7 +83,7 @@ export function AuditPage({ api, version }: { api: Api; version: number }) {
             <thead><tr>{columns.map(col => <th key={col.key} aria-sort={sort.key === col.key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
               <button type="button" className="audit-sort" onClick={() => sortBy(col.key)}>{col.label}<span aria-hidden="true">{sort.key === col.key ? (sort.dir === 'asc' ? '▲' : '▼') : ''}</span></button></th>)}<th>Detalle</th></tr></thead>
             <tbody>{result.filas.map(r => <tr key={r.seq}>
-              <td data-label="Fecha">{formatDateTime(r.at)}<small className="mono">N.º {r.seq}</small></td>
+              <td data-label="Fecha">{formatDateTime(r.at, { withYear: true })}<small className="mono">N.º {r.seq}</small></td>
               <td data-label="Persona"><strong>{r.actor ?? 'Sistema'}</strong></td>
               <td data-label="Rol">{r.role ?? '—'}</td>
               <td data-label="Acción">{describeAction(r.action)}<small className="mono">{r.action}</small></td>

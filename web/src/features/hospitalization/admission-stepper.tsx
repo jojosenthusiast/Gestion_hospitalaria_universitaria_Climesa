@@ -6,7 +6,7 @@ import { can, type AccessProfile, type Api } from '../../lib/api';
 import { patientPicker } from '../appointments';
 import { Dialog, Empty, RemoteState, WriteError, formatDateTime, useAction, useData } from '../common';
 import {
-  MOTIVE_MAX, VISITOR_LIMIT, admissionBody, categoryNames, feasibilityQuery, groupBeds, initialForm, isImmediate, isolationNames, originNames, salvadorInstant, salvadorNow, stepError, stepTitles, stepsFor, visitorError,
+  MOTIVE_MAX, VISITOR_LIMIT, admissionBody, categoryNames, feasibilityQuery, groupBeds, initialForm, isImmediate, isolationNames, originNames, originRecordLabel, salvadorInstant, salvadorNow, stepError, stepTitles, stepsFor, visitorError,
   type AdmissionForm, type StepId, type BedPick, type Category, type CategoryCount, type Check, type DoctorPick, type IsolationType, type OriginKind, type OriginRecord,
 } from './admission-rules';
 import './admission-stepper.css';
@@ -73,7 +73,7 @@ function OriginStep({ api, form, update }: StepProps & { api: Api }) {
         const count = rows.filter(row => row.origin === kind).length;
         return <label key={kind} className={`choice-chip${form.origin === kind ? ' is-selected' : ''}${count === 0 ? ' is-disabled' : ''}`}><input type="radio" name="origin-kind" checked={form.origin === kind} disabled={count === 0} onChange={() => update({ origin: kind, originRecord: null })} /><strong>{originNames[kind]}</strong><small>{count === 0 ? 'Sin registros' : `${count} reciente${count === 1 ? '' : 's'}`}</small></label>;
       })}</div></fieldset>
-      {form.origin && <fieldset className="choice-list"><legend>Registro de origen</legend>{rows.filter(row => row.origin === form.origin).map(row => <label className="check-field" key={row.id}><input type="radio" name="origin-record" checked={form.originRecord?.id === row.id} onChange={() => update({ originRecord: row })} /><span><strong>{row.label}</strong> <small>{row.detail}</small></span></label>)}</fieldset>}
+      {form.origin && <fieldset className="choice-list"><legend>Registro de origen</legend>{rows.filter(row => row.origin === form.origin).map(row => <label className="check-field" key={row.id}><input type="radio" name="origin-record" checked={form.originRecord?.id === row.id} onChange={() => update({ originRecord: row })} /><span><strong>{originRecordLabel(row)}</strong> <small>{row.detail}</small></span></label>)}</fieldset>}
       {rows.length === 0 && <Empty title="Sin registros recientes" description="El paciente no tiene citas, consultas, emergencias ni servicios de ambulancia a los que enlazar el ingreso." />}
     </>}</RemoteState>
     <Field label="Motivo del ingreso" value={form.motive} onChange={motive => update({ motive })} required maxLength={MOTIVE_MAX} hint="Obligatorio, al menos 10 caracteres." aria-invalid={motiveShort || undefined} />
@@ -173,7 +173,7 @@ function SummaryStep({ api, form, update, canAssignBed }: StepProps & { api: Api
   return <>
     <dl className="summary-list">
       <div><dt>Paciente</dt><dd>{form.patient!.label}</dd></div>
-      <div><dt>Origen</dt><dd>{originNames[form.origin!]} · {form.originRecord!.label}</dd></div>
+      <div><dt>Origen</dt><dd>{originRecordLabel(form.originRecord!)}</dd></div>
       <div><dt>Motivo</dt><dd>{form.motive.trim()}</dd></div>
       <div><dt>Fecha y médico</dt><dd>{formatDateTime(salvadorInstant(form.at))} · {form.doctor!.label}</dd></div>
       <div><dt>Categoría</dt><dd>{categoryNames[form.category!]}</dd></div>
