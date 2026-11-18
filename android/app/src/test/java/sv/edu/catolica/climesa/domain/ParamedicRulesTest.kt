@@ -53,6 +53,12 @@ class ParamedicRulesTest {
         assertTrue(ParamedicRules.blockGuidance("sin_tripulacion_de_turno", canPlanShifts = false).contains("Jefatura de Operaciones"))
     }
 
+    @Test fun laTripulacionNoVeElBloqueoDeSuPropioServicio() {
+        assertFalse(ParamedicRules.showsDispatchBlock("en_servicio"))
+        listOf("sin_paramedico_de_turno", "sin_motorista_de_turno", "sin_tripulacion_de_turno", "en_mantenimiento")
+            .forEach { assertTrue(it, ParamedicRules.showsDispatchBlock(it)) }
+    }
+
     @Test fun elPacienteSeNombraSinInventarIdentidad() {
         assertEquals("Sin identificar · expediente provisional 000123", ParamedicRules.patientLabel("000123", false))
         assertEquals("Sin paciente vinculado", ParamedicRules.patientLabel(null, false))
