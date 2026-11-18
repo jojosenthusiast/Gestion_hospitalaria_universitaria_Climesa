@@ -5,8 +5,11 @@ import org.json.JSONObject
 
 /** [observation] is the lab note on the value; [relevant] means it opened an item in the doctor's "Resultados por revisar" (S10). */
 data class LaboratoryResult(val value: Double?, val text: String?, val mark: String, val version: Int, val observation: String? = null, val relevant: Boolean = false)
-/** [resultType] is `numerico` or `texto` (null on older API rows: then a unit means numeric). */
-data class LaboratoryItem(val id: String, val code: String, val name: String, val result: LaboratoryResult?, val unit: String? = null, val resultType: String? = null) {
+/** C-3: reference and critical limits valid for this patient; the API sends them only to staff who see values. */
+data class LabRange(val min: Double?, val max: Double?, val criticalLow: Double?, val criticalHigh: Double?)
+
+/** [resultType] is `numerico` or `texto` (null on older API rows: then a unit means numeric). [range] is null for the patient. */
+data class LaboratoryItem(val id: String, val code: String, val name: String, val result: LaboratoryResult?, val unit: String? = null, val resultType: String? = null, val range: LabRange? = null) {
     val numeric get() = resultType?.let { it == "numerico" } ?: (unit != null)
 }
 
@@ -28,6 +31,8 @@ data class LaboratoryOrder(
     val record: String? = null, val sex: String? = null, val age: String? = null, val doctorName: String? = null, val createdAtMillis: Long? = null,
     val allowedActions: Set<String> = emptySet(), val amendedAtMillis: Long? = null,
     val external: Boolean = false, val externalPlace: String? = null, val externalInstructions: String? = null, val externalActions: Set<String> = emptySet(),
+    /** R7 C1: the doctor's note for the patient, only once released; [cancellationReason] only on a cancelled order. */
+    val patientNote: String? = null, val cancellationReason: String? = null,
 ) {
     fun allows(action: LabOrderAction) = action.wire in allowedActions
     fun allowsExternal(action: LabExternalAction) = action.wire in externalActions
@@ -51,6 +56,7 @@ object LaboratoryParser {
             allowedActions = actions, amendedAtMillis = if (row.isNull("amendedAt")) null else parseMillis(row.optString("amendedAt")),
             external = row.optBoolean("external"), externalPlace = text(row, "externalPlace"), externalInstructions = text(row, "externalInstructions"),
             externalActions = strings(row.optJSONArray("externalActions")),
+            patientNote = text(row, "patientNote"), cancellationReason = text(row, "cancellationReason"),
         )
     }
 
@@ -61,8 +67,10 @@ object LaboratoryParser {
         val result = item.optJSONObject("result")?.let {
             LaboratoryResult(if (it.isNull("value")) null else it.optDouble("value"), text(it, "text"), it.optString("mark"), it.optInt("version", 1), text(it, "observation"), it.optBoolean("relevant"))
         }
-        return LaboratoryItem(item.optString("id"), item.optString("code"), item.optString("name"), result, unit = text(item, "unit"), resultType = text(item, "resultType"))
+        val range = item.optJSONObject("referenceRange")?.let { LabRange(number(it, "min"), number(it, "max"), number(it, "criticalLow"), number(it, "criticalHigh")) }
+        return LaboratoryItem(item.optString("id"), item.optString("code"), item.optString("name"), result, unit = text(item, "unit"), resultType = text(item, "resultType"), range = range)
     }
+    private fun number(row: JSONObject, key: String) = if (row.isNull(key) || !row.has(key)) null else row.optDouble(key).takeUnless { it.isNaN() }
 }
 
 /** RN-25: critical values the doctor still has to review (only orders the API lets this reader review). */
@@ -72,9 +80,24 @@ object LabCritical {
 
 object LaboratoryLabels {
     fun state(value: String) = mapOf("pendiente" to "Pendiente", "en_proceso" to "En proceso", "completado" to "Completado", "cancelado" to "Cancelado")[value] ?: value
+    /** One es-SV number format for lab values on every screen («13.5», «452», at most three decimals, no grouping). */
+    fun number(value: Double): String = java.text.NumberFormat.getNumberInstance(java.util.Locale.forLanguageTag("es-SV")).apply { maximumFractionDigits = 3; isGroupingUsed = false }.format(value)
+    /** The value (or text) of a result; a number carries its unit when the exam has one («5.1 g/dL»). */
+    fun value(result: LaboratoryResult, unit: String? = null): String? = result.text ?: result.value?.let { n -> if (unit.isNullOrBlank()) number(n) else "${number(n)} $unit" }
     /** Value (or text) followed by its mark, for the result rows. */
-    fun valueAndMark(result: LaboratoryResult, unit: String? = null) =
-        listOfNotNull((result.text ?: result.value?.let { n -> if (n % 1.0 == 0.0 && !n.isInfinite()) n.toLong().toString() else n.toString() })?.let { value -> if (result.text == null && unit != null) "$value $unit" else value }, mark(result.mark)).joinToString(" · ")
+    fun valueAndMark(result: LaboratoryResult, unit: String? = null) = listOfNotNull(value(result, unit), mark(result.mark)).joinToString(" · ")
+    /** «12–15.5 · crítico < 7 o > 20» for doctors; null without limits. */
+    fun rangeText(range: LabRange?): String? {
+        range ?: return null
+        val normal = when {
+            range.min != null && range.max != null -> "${number(range.min)}–${number(range.max)}"
+            range.max != null -> "≤ ${number(range.max)}"
+            range.min != null -> "≥ ${number(range.min)}"
+            else -> null
+        }
+        val limits = listOfNotNull(range.criticalLow?.let { "< ${number(it)}" }, range.criticalHigh?.let { "> ${number(it)}" }).joinToString(" o ")
+        return listOfNotNull(normal, limits.takeIf(String::isNotEmpty)?.let { "crítico $it" }).joinToString(" · ").ifEmpty { null }
+    }
     fun mark(value: String) = mapOf("normal" to "Normal", "alto" to "Alto", "bajo" to "Bajo", "critico_alto" to "Crítico alto", "critico_bajo" to "Crítico bajo", "sin_rango" to "Sin rango")[value] ?: value
 }
 
@@ -116,4 +139,21 @@ object LabOrderRules {
 
     /** `POST /laboratorio/ordenes/{id}/cancelar` body: the order version and the trimmed reason. */
     fun cancelBody(version: Int, reason: String): JSONObject = JSONObject().put("version", version).put("reason", reason.trim())
+}
+
+/** The patient's "Mis exámenes": open orders always show; closed ones (released or cancelled) beyond the newest [KEEP] fold under "Ver N más". */
+object LabPatientList {
+    const val KEEP = 3
+    private val day = java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale.forLanguageTag("es-SV")).withZone(java.time.ZoneId.of("America/El_Salvador"))
+
+    private fun closed(order: LaboratoryOrder) = order.state == "cancelado" || (order.state == "completado" && order.reviewed)
+
+    /** (shown, folded), keeping the incoming order. */
+    fun fold(orders: List<LaboratoryOrder>): Pair<List<LaboratoryOrder>, List<LaboratoryOrder>> {
+        val keep = orders.filter(::closed).take(KEEP).toSet()
+        return orders.partition { !closed(it) || it in keep }
+    }
+
+    /** Short date without year («16 nov»); empty when unknown. */
+    fun shortDate(millis: Long?): String = millis?.let { day.format(java.time.Instant.ofEpochMilli(it)) }.orEmpty()
 }

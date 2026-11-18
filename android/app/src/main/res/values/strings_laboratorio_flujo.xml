@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Laboratory flow: cancel reason, doctor's note, ranges, in-process group and folded history. -->
+    <string name="lab_motivo_cancelacion">Motivo de la cancelación: %1$s</string>
+    <string name="lab_nota_medico">Nota de tu médico: %1$s</string>
+    <string name="lab_referencia">Referencia: %1$s</string>
+    <string name="lab_grupo_en_proceso">En proceso</string>
+    <string name="lab_ver_mas">Ver %1$d más</string>
+    <string name="lab_ver_menos">Ver menos</string>
+</resources>
