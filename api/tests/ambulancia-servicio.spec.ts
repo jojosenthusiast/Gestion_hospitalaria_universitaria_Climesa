@@ -164,6 +164,14 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     expect(outsider.body.activeService.id).toBe(service.body.id);
     expect(outsider.body.activeService.patient).toBeNull();
     expect(JSON.stringify(outsider.body)).not.toContain(linked.expediente);
+    // The patient view is audited once per actor and service, not on every refetch (each GPS ping refetches the status).
+    const viewAudits = () => t.one<{ n: number; permisos: string[] | null; actores: number }>(`SELECT count(*)::int AS n,array_agg(permiso ORDER BY seq) AS permisos,count(DISTINCT actor_id)::int AS actores
+      FROM plataforma.auditoria WHERE accion='ambulancia.servicio.paciente.ver' AND entidad_id=$1`, [service.body.id]);
+    await t.call('PAR', 'GET', '/ambulancia');
+    expect((await viewAudits()).n).toBe(1);
+    expect((await t.call('JOP', 'GET', '/ambulancia')).body.activeService.patient).toEqual({ record: linked.expediente, fullName: linked.alias_provisional });
+    await t.call('JOP', 'GET', '/ambulancia');
+    expect(await viewAudits()).toEqual({ n: 2, permisos: ['ambulancia.operar', 'ambulancia.despachar'], actores: 2 });
     const other = await t.call('PAR', 'POST', `/ambulancia/servicios/${service.body.id}/prehospital`, { reason: 'Otro paciente', priority: 'verde', capturedAt: at('08:00').toISOString(), patientId: await t.patient() });
     expect(other.body.codigo).toBe('paciente_ya_vinculado');
     const noReason = await milestone(service.body.id, { type: 'finalizado', finalState: 'rechaza_traslado' });

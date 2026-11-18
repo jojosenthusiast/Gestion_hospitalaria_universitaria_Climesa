@@ -79,7 +79,11 @@ export class AmbulanceService {
         if (service.patientId && patientPermission) {
           patient = (await c.query<{ record: string; fullName: string | null }>(`SELECT expediente AS record,coalesce(nullif(concat_ws(' ',nombres,primer_apellido,segundo_apellido),''),alias_provisional) AS "fullName"
             FROM pacientes.paciente WHERE id=$1`, [service.patientId])).rows[0] ?? null;
-          if (patient) await this.commands.audit(c, actor, { action: 'ambulancia.servicio.paciente.ver', entity: 'servicio', entityId: service.id, patientId: service.patientId, permission: patientPermission });
+          // One audit row per (actor, service, patient): every GPS ping refetches this status, and auditing each read would add
+          // noise and serialize on the audit-chain lock. The lookup uses the existing `auditoria_entidad` index (entidad, entidad_id, seq).
+          const alreadyAudited = !!patient && !!(await c.query(`SELECT 1 FROM plataforma.auditoria WHERE entidad='servicio' AND entidad_id=$1 AND accion='ambulancia.servicio.paciente.ver'
+            AND actor_id=$2 AND paciente_id=$3 LIMIT 1`, [service.id, actor.id, service.patientId])).rowCount;
+          if (patient && !alreadyAudited) await this.commands.audit(c, actor, { action: 'ambulancia.servicio.paciente.ver', entity: 'servicio', entityId: service.id, patientId: service.patientId, permission: patientPermission });
         }
         const { patientId: _patientId, ...serviceFields } = service;
         activeService = { ...serviceFields, crew, milestones, nextMilestones: nextMilestones(done), lastLocation: location, allowedActions, finalStates: allowedFinalStates(done), patient };
