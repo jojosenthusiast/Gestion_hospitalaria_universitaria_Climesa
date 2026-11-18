@@ -25,14 +25,22 @@ public enum DemoLogin {
         #endif
     }
 
-    /// Reads `[{"rol","correo","contrasena"}]`; invalid JSON or incomplete entries give no account, never an error.
+    /// Reads `[{"rol","correo","contrasena"}]` in file order, keeping only roles that use iOS (`usesIOS`); invalid JSON or
+    /// incomplete entries give no account, never an error.
     public static func parse(_ data: Data) -> [DemoAccount] {
         guard let items = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else { return [] }
         return items.compactMap { item in
             guard let role = item["rol"] as? String, let email = item["correo"] as? String, let password = item["contrasena"] as? String,
-                  !role.isEmpty, !email.isEmpty, !password.isEmpty else { return nil }
+                  usesIOS(role), !email.isEmpty, !password.isEmpty else { return nil }
             return DemoAccount(role: role, email: email, password: password)
         }
+    }
+
+    /// Same rule as sign-in (`AccessProfile.allowedIOSRoles`, MED and PAC): the app turns any other role away.
+    /// ios/scripts/demo-login.sh writes only these roles to the xcconfig (DemoLoginTests checks they match).
+    public static func usesIOS(_ role: String) -> Bool {
+        let profile = AccessProfile(id: "", email: "", name: "", roles: [role], platforms: ["ios"], permissions: [Permission(code: "sesion.perfil", context: "")])
+        return !profile.allowedIOSRoles.isEmpty
     }
 
     static func decodeHex(_ hex: String) -> Data? {
