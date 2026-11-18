@@ -1,5 +1,5 @@
 import { MoreLink } from '../../components/fold';
-import type { ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from '../../components/ui';
 import { AreaTag, SectionState, StatusBadge, type AreaCode } from '../../components/system';
 import { type Tone } from '../../components/charts';
@@ -68,6 +68,8 @@ export function TrayGroup({ group }: { group: TrayGroupSpec }) {
   </section>;
 }
 
+/** A tray group that renders itself (`node`); `count` null while it loads. */
+export type TrayExtra = { id: string; title: string; count: number | null; node: ReactNode };
 const settled = (group: TrayGroupSpec) => !group.state || (!!group.state.data && !group.state.error);
 const OPEN_GROUPS = 2, OPEN_ROWS = 2;
 /** Out of stock is as urgent as a red tone: nothing left to work with. */
@@ -78,18 +80,31 @@ const urgency = (group: TrayGroupSpec) => Math.min(2, ...group.items.map(itemRan
  * glance is what to do now: the two most urgent groups open with their first rows, every other group folds into one
  * line (name, count, «Ver») that leads to its section. Loading or failed groups keep their place and state.
  */
-export function PendingTray({ groups, children, othersClear = true }: { groups: TrayGroupSpec[]; children?: ReactNode; othersClear?: boolean }) {
+export function PendingTray({ groups, extras = [], children, othersClear = true }: { groups: TrayGroupSpec[]; extras?: TrayExtra[]; children?: ReactNode; othersClear?: boolean }) {
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const clear = othersClear && groups.every(g => settled(g) && g.items.length === 0);
   const ready = groups.filter(g => settled(g) && g.items.length > 0);
   const open = new Set([...ready].sort((a, b) => urgency(a) - urgency(b)).slice(0, OPEN_GROUPS).map(g => g.id));
   const folded = ready.filter(g => !open.has(g.id));
+  // Extra groups (S10 panels with their own inline actions) take only the slots the tray groups left; the rest fold
+  // into the same line list and unfold in place, since no other screen hosts them. An empty extra renders its own
+  // node (null, or the notice of what was just done) without taking a slot.
+  const pending = extras.filter(x => x.count !== 0);
+  const extraOpen = new Set(pending.slice(0, Math.max(0, OPEN_GROUPS - open.size)).map(x => x.id));
+  const extraFolded = pending.filter(x => !extraOpen.has(x.id));
+  const toggle = (id: string) => setExpanded(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   return <section className="pending-tray" aria-label="Pendientes">
     <h2 className="pending-tray-title">Pendientes</h2>
     {groups.filter(g => !settled(g) || open.has(g.id)).map(group => <TrayGroup key={group.id} group={open.has(group.id) ? { ...group, items: [...group.items].sort((a, b) => itemRank(a) - itemRank(b)), limit: Math.min(group.limit ?? OPEN_ROWS, OPEN_ROWS) } : group} />)}
-    {folded.length > 0 && <ul className="tray-folded" aria-label="Otros pendientes">{folded.map(g => <li key={g.id}>
+    {extras.filter(x => x.count === 0 || extraOpen.has(x.id)).map(x => <Fragment key={x.id}>{x.node}</Fragment>)}
+    {(folded.length > 0 || extraFolded.length > 0) && <ul className="tray-folded" aria-label="Otros pendientes">{folded.map(g => <li key={g.id}>
       <span>{g.title}</span><span className="tray-count">{formatNumber(g.items.length)}</span>
       <a className="row-action" href={g.href}>Ver<Icon name="arrow" size={16} /></a>
+    </li>)}{extraFolded.map(x => <li key={x.id}>
+      <span>{x.title}</span>{x.count != null && <span className="tray-count">{formatNumber(x.count)}</span>}
+      <button type="button" className="row-action" aria-expanded={expanded.has(x.id)} onClick={() => toggle(x.id)}>{expanded.has(x.id) ? 'Ocultar' : 'Ver'}</button>
     </li>)}</ul>}
+    {extraFolded.filter(x => expanded.has(x.id)).map(x => <Fragment key={x.id}>{x.node}</Fragment>)}
     {children}
     {clear && <p className="section-empty" role="status">Al día: nada pendiente.</p>}
   </section>;
