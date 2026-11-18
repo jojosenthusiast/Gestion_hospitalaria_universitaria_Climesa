@@ -117,7 +117,12 @@ export class OperationsFixtures {
       const [mid, spread] = base[id], wave = Math.sin(i * 1.3) * 0.5 + Math.cos(i * 0.7) * 0.5;
       serie.push({ fecha: d, valor: i === 2 && id === 'tiempo_ambulancia' ? null : Math.max(0, Math.round((mid + wave * spread / 2) * 10) / 10), muestras: i === 2 && id === 'tiempo_ambulancia' ? 0 : 3 + (i % 6) });
     }
-    return { indicador: id, unidad: units[id], desde: from, hasta: to, actualizadoEn: new Date().toISOString(), serie };
+    if (id !== 'tiempo_laboratorio') return { indicador: id, unidad: units[id], desde: from, hasta: to, actualizadoEn: new Date().toISOString(), serie };
+    // D2: the lab turnaround also carries the median (fixture: a little under the average) and the range summary.
+    const lab = serie.map(p => ({ ...p, mediana: p.valor == null ? null : Math.round(p.valor * 0.85 * 10) / 10 }));
+    const muestras = lab.reduce((a, p) => a + p.muestras, 0);
+    const promedio = muestras ? Math.round(lab.reduce((a, p) => a + (p.valor ?? 0) * p.muestras, 0) / muestras * 10) / 10 : null;
+    return { indicador: id, unidad: units[id], desde: from, hasta: to, actualizadoEn: new Date().toISOString(), serie: lab, resumen: { promedio, mediana: promedio == null ? null : Math.round(promedio * 0.85 * 10) / 10, muestras } };
   }
   private auditRows(q: URLSearchParams) {
     const person = fold(q.get('persona') ?? ''), patient = fold(q.get('paciente') ?? ''), results = (q.get('resultado') ?? '').split(',').filter(Boolean);
@@ -134,6 +139,8 @@ export class OperationsFixtures {
   request(path: string): unknown {
     const url = new URL(path, 'https://fixture.invalid'), p = url.pathname, q = url.searchParams;
     if (p === '/metricas/tablero') return this.board();
+    // D3: the lab's own turnaround, the last 7 days of the same series.
+    if (p === '/laboratorio/tiempo-entrega') return this.series('tiempo_laboratorio', addDays(localDay(), -6), localDay());
     if (/^\/metricas\/[a-z_]+$/.test(p)) return this.series(p.split('/')[2], q.get('desde') ?? addDays(localDay(), -6), q.get('hasta') ?? localDay());
     if (p === '/inventario/articulos') return this.articles.map(a => this.stockOf(a));
     if (/^\/inventario\/articulos\/[^/]+$/.test(p)) {
