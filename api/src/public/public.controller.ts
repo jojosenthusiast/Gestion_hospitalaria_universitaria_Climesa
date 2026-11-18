@@ -49,7 +49,7 @@ export class MyNoticesController {
   constructor(private readonly service: PublicService) {}
   @Get() @RequirePermission('sesion.perfil') @ApiOperation({ summary: 'Avisos vigentes para mis roles, incluidos los públicos' }) @ApiOkResponse({ type: MyNoticesResponse })
   mine(@Req() r: ActorRequest) { return this.service.myNotices(r.actor); }
-  @Get('bandeja') @RequirePermission('sesion.perfil') @ApiOperation({ summary: 'Bandeja de avisos: nivel, "Enterado", recordatorio, cuáles se destacan en el inicio y conteos de sin leer y críticos' }) @ApiOkResponse({ type: MyInboxResponse })
+  @Get('bandeja') @RequirePermission('sesion.perfil') @ApiOperation({ summary: 'Bandeja de avisos: vigentes, programados y vencidos de los últimos 30 días con su estado; nivel, "Enterado", recordatorio, cuáles se destacan en el inicio y conteos de sin leer y críticos (solo vigentes)' }) @ApiOkResponse({ type: MyInboxResponse })
   inbox(@Req() r: ActorRequest) { return this.service.myInbox(r.actor); }
   @Post(':id/enterado') @RequirePermission('sesion.perfil') @ApiOperation({ summary: 'Dar "Enterado" a un aviso dirigido a mi cuenta; idempotente y auditado' }) @ApiCreatedResponse({ type: NoticeAckResponse })
   acknowledge(@Req() r: ActorRequest, @Param('id', ParseUUIDPipe) id: string, @Headers('idempotency-key') k?: string) { return this.service.acknowledge(r.actor, id, k); }

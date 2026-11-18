@@ -25,6 +25,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +49,8 @@ import sv.edu.catolica.climesa.domain.NoticeFilter
 import sv.edu.catolica.climesa.domain.NoticeInboxRules
 import sv.edu.catolica.climesa.domain.NoticeLevel
 import sv.edu.catolica.climesa.domain.NoticeRefresh
+import sv.edu.catolica.climesa.domain.NoticeState
+import sv.edu.catolica.climesa.domain.AppointmentAgenda
 
 /** One inbox per account, shared by "Avisos" and the banner of "Inicio" (the same key returns the same ViewModel). */
 @Composable
@@ -127,6 +132,7 @@ internal fun CriticalNoticeBanner(account: AuthenticatedAccount, onOpenNotices: 
 /**
  * W25 / A14 · "Avisos" (S11): pending-items inbox of the account. Critical first (server order), filters Todos, Sin leer and
  * Críticos with the counts the API computes, and a detail where "Enterado" is the primary action. Publishing stays on the web.
+ * Like "Citas": in force first, scheduled ones by day, and the expired ones of the last 30 days folded behind one button.
  */
 @Composable
 fun NoticesScreen(account: AuthenticatedAccount, modifier: Modifier = Modifier) {
@@ -139,6 +145,7 @@ fun NoticesScreen(account: AuthenticatedAccount, modifier: Modifier = Modifier) 
     // The opened notice left the inbox (withdrawn or expired): back to the list, with the reason if a write said it.
     LaunchedEffect(state.selectedId, inbox) { if (state.selectedId != null && inbox != null && selected == null) model.select(null) }
     BackHandler(selected != null) { model.select(null) }
+    var showPast by rememberSaveable { mutableStateOf(false) }
     if (selected != null) { NoticeDetail(selected, state, model, modifier); return }
     PageList(modifier) {
         item {
@@ -161,22 +168,51 @@ fun NoticesScreen(account: AuthenticatedAccount, modifier: Modifier = Modifier) 
             items.isEmpty() -> item {
                 EmptyState(stringResource(if (state.filter == NoticeFilter.CRITICAL) R.string.avisos_sin_criticos else R.string.avisos_todo_leido), detail = stringResource(R.string.avisos_filtro_vacio_detalle))
             }
-            else -> items(items, key = { it.id }) { notice -> NoticeRow(notice) { model.select(notice.id) } }
+            else -> {
+                // Same fold as the appointments agenda: past days stay behind one button while something is ahead.
+                val timeline = NoticeInboxRules.timeline(items)
+                val foldPast = !showPast && timeline.pastCount > 0 && (timeline.current.isNotEmpty() || timeline.upcoming.isNotEmpty())
+                if (timeline.current.isNotEmpty()) {
+                    item(key = "h-vigentes") { DayHeader(stringResource(R.string.avisos_vigentes)) }
+                    items(timeline.current, key = { it.id }) { notice -> NoticeRow(notice) { model.select(notice.id) } }
+                }
+                timeline.upcoming.forEach { (day, rows) ->
+                    item(key = "u-$day") { DayHeader(stringResource(R.string.avisos_programados_dia, AppointmentAgenda.dayLabel(day))) }
+                    items(rows, key = { it.id }) { notice -> NoticeRow(notice) { model.select(notice.id) } }
+                }
+                if (foldPast) item(key = "p-fold") { RowAction(stringResource(R.string.avisos_ver_vencidos, timeline.pastCount), { showPast = true }) }
+                else timeline.past.forEach { (day, rows) ->
+                    item(key = "p-$day") { DayHeader(AppointmentAgenda.dayLabel(day)) }
+                    items(rows, key = { it.id }) { notice -> NoticeRow(notice) { model.select(notice.id) } }
+                }
+            }
         }
     }
 }
 
+/** Day heading of the inbox, the same style as the day headings of the appointments agenda. */
+@Composable
+private fun DayHeader(text: String) = Text(text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm).semantics { heading() })
+
 /** One row of the inbox: level and read state, title, date. Read notices step back in colour; the words still say it. */
 @Composable
 private fun NoticeRow(notice: InboxNotice, onOpen: () -> Unit) {
-    val read = notice.acknowledgedAt != null
+    val read = notice.acknowledgedAt != null || notice.state != NoticeState.CURRENT
     ClimesaClickableCard(onOpen) {
         Row(Modifier.fillMaxWidth().heightIn(min = Spacing.touch + Spacing.sm).padding(horizontal = Space4, vertical = Space3), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space3)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space1 + 2.dp)) {
                 // Level and read state as their coloured, textured tags: the owner reads the inbox by these marks at a glance.
                 Row(horizontalArrangement = Arrangement.spacedBy(Space2), verticalAlignment = Alignment.CenterVertically) {
                     NoticeLevelBadge(notice.level)
-                    FamilyBadge(stringResource(if (read) R.string.aviso_enterado else R.string.aviso_sin_leer), if (read) StatusFamily.LISTO else StatusFamily.ESPERA)
+                    when (notice.state) {
+                        NoticeState.SCHEDULED -> FamilyBadge(stringResource(R.string.aviso_programado), StatusFamily.ESPERA)
+                        NoticeState.EXPIRED -> FamilyBadge(stringResource(R.string.aviso_vencido), StatusFamily.CERRADO)
+                        NoticeState.CURRENT -> Unit
+                    }
+                    if (notice.state == NoticeState.CURRENT || notice.acknowledgedAt != null) {
+                        val acked = notice.acknowledgedAt != null
+                        FamilyBadge(stringResource(if (acked) R.string.aviso_enterado else R.string.aviso_sin_leer), if (acked) StatusFamily.LISTO else StatusFamily.ESPERA)
+                    }
                 }
                 Text(
                     notice.title, style = MaterialTheme.typography.titleMedium, fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold,
@@ -185,10 +221,15 @@ private fun NoticeRow(notice: InboxNotice, onOpen: () -> Unit) {
                 // Dates said the way people say them ("Ayer 23:22", "Jueves 01:53"), never a full date with the year.
                 val now = java.time.Instant.now()
                 fun near(iso: String?) = iso?.let { runCatching { sv.edu.catolica.climesa.domain.MyShifts.relative(java.time.Instant.parse(it), now) }.getOrNull() }
-                val line = listOfNotNull(
-                    near(notice.publishedAt),
-                    near(notice.until)?.let { stringResource(R.string.aviso_hasta, it.replaceFirstChar { c -> c.lowercase() }) },
-                ).joinToString(" · ")
+                fun lower(text: String) = text.replaceFirstChar { c -> c.lowercase() }
+                val line = when (notice.state) {
+                    NoticeState.SCHEDULED -> near(notice.from)?.let { stringResource(R.string.aviso_empieza, lower(it)) }.orEmpty()
+                    NoticeState.EXPIRED -> near(notice.until)?.let { stringResource(R.string.aviso_vencio, lower(it)) }.orEmpty()
+                    NoticeState.CURRENT -> listOfNotNull(
+                        near(notice.publishedAt),
+                        near(notice.until)?.let { stringResource(R.string.aviso_hasta, lower(it)) },
+                    ).joinToString(" · ")
+                }
                 Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.climesa.primaryText)
@@ -217,7 +258,8 @@ private fun NoticeDetail(notice: InboxNotice, state: NoticeInboxState, model: No
                     Text(stringResource(R.string.aviso_para, NoticeInboxRules.audience(notice)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     HorizontalDivider(color = MaterialTheme.climesa.line)
                     LabeledValue(stringResource(R.string.aviso_publicado), NoticeInboxRules.dateText(notice.publishedAt).ifBlank { none })
-                    LabeledValue(stringResource(R.string.aviso_vigente_hasta), NoticeInboxRules.dateText(notice.until).ifBlank { none })
+                    if (notice.state == NoticeState.SCHEDULED) LabeledValue(stringResource(R.string.aviso_empieza_label), NoticeInboxRules.dateText(notice.from).ifBlank { none })
+                    LabeledValue(stringResource(if (notice.state == NoticeState.EXPIRED) R.string.aviso_vencio_label else R.string.aviso_vigente_hasta), NoticeInboxRules.dateText(notice.until).ifBlank { none })
                     if (notice.remindAt != null && notice.acknowledgedAt == null) LabeledValue(stringResource(R.string.aviso_te_recordamos), NoticeInboxRules.dateText(notice.remindAt))
                 }
             }
@@ -225,11 +267,14 @@ private fun NoticeDetail(notice: InboxNotice, state: NoticeInboxState, model: No
         state.actionError?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
         state.done?.let { done -> item { NoticeBanner(NoticeKind.SUCCESS, done) } }
         if (!NoticeInboxRules.canAcknowledge(notice)) {
-            item {
+            if (notice.acknowledgedAt != null) item {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space2)) {
                     FamilyBadge(stringResource(R.string.aviso_enterado), StatusFamily.LISTO)
                     Text(stringResource(R.string.aviso_enterado_el, NoticeInboxRules.dateText(notice.acknowledgedAt)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+            if (notice.state != NoticeState.CURRENT) item {
+                Text(stringResource(if (notice.state == NoticeState.EXPIRED) R.string.aviso_vencido_detalle else R.string.aviso_programado_detalle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             item { PrimaryButton(stringResource(R.string.aviso_enterado), { model.acknowledge(notice.id) }, icon = Icons.Default.Check, enabled = !busy, loading = state.busyId == notice.id) }

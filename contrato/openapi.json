@@ -17817,7 +17817,7 @@
             "bearer": []
           }
         ],
-        "summary": "Bandeja de avisos: nivel, \"Enterado\", recordatorio, cuáles se destacan en el inicio y conteos de sin leer y críticos",
+        "summary": "Bandeja de avisos: vigentes, programados y vencidos de los últimos 30 días con su estado; nivel, \"Enterado\", recordatorio, cuáles se destacan en el inicio y conteos de sin leer y críticos (solo vigentes)",
         "tags": [
           "publico"
         ],
@@ -32300,6 +32300,10 @@
               "type": "string"
             }
           },
+          "estado": {
+            "type": "string",
+            "description": "vigente, programado o vencido (últimos 30 días); \"Enterado\" y los conteos solo aplican a los vigentes"
+          },
           "publicadoEn": {
             "type": "string",
             "format": "date-time",
@@ -32337,6 +32341,7 @@
           "roles",
           "nivel",
           "areas",
+          "estado",
           "publicadoEn",
           "dirigido",
           "enteradoEn",
@@ -32359,11 +32364,11 @@
           },
           "noLeidos": {
             "type": "integer",
-            "description": "Avisos sin \"Enterado\""
+            "description": "Avisos vigentes sin \"Enterado\""
           },
           "criticos": {
             "type": "integer",
-            "description": "Avisos críticos dirigidos a la cuenta sin \"Enterado\""
+            "description": "Avisos vigentes críticos dirigidos a la cuenta sin \"Enterado\""
           },
           "recordatorioHoras": {
             "type": "number",

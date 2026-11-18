@@ -40,6 +40,8 @@ type Query = <T>(sql: string, params?: unknown[]) => Promise<T[]>;
 const viaClient = (c: PoolClient): Query => async <T>(sql: string, params: unknown[] = []) => (await c.query(sql, params)).rows as T[];
 /** Aviso visible para una cuenta: vigente, sin retirar y público o dirigido a uno de sus roles o de sus áreas. */
 const AUDIENCE = '(publico OR roles && $2::text[] OR areas && $3::text[])';
+/** Días que un aviso vencido sigue en la bandeja de la cuenta, como historial. */
+export const INBOX_HISTORY_DAYS = 30;
 const earliest = (values: unknown[]) => values.filter(v => v != null).map(v => new Date(v as string).valueOf()).filter(Number.isFinite).sort((a, b) => a - b)[0];
 
 /**
@@ -144,6 +146,8 @@ export class PublicService {
    * S11 · Bandeja de avisos de la cuenta: los mismos que `/me/avisos` (hasta 100) con su nivel, si la cuenta dio
    * "Enterado", hasta cuándo pospuso el recordatorio y si se destaca en el inicio. `proximoCambio` incluye el instante
    * en que vuelve un recordatorio pospuesto: el cliente vuelve a pedir una vez en ese instante, sin sondeo.
+   * Con la misma audiencia trae también los vencidos de los últimos 30 días y los programados, cada uno con su `estado`,
+   * como el historial de citas: `noLeidos`, `criticos`, `destacado` y los recordatorios solo cuentan los vigentes.
    */
   async myInbox(actor: Actor) {
     const at = this.clock.now();
@@ -155,15 +159,30 @@ export class PublicService {
        WHERE retirado_en IS NULL AND vigencia @> $1::timestamptz AND ${AUDIENCE}
        ORDER BY lower(vigencia) DESC,creado_en DESC LIMIT 100`, [at, actor.roles, areas, actor.id]);
     const items = inboxOrder(rows.map(r => ({ row: r, nivel: r.nivel, dirigido: r.dirigido, desde: new Date(r.desde), enteradoEn: r.enterado_en ? new Date(r.enterado_en) : null, recordarEn: r.recordar_en ? new Date(r.recordar_en) : null })), at);
+    // History like appointments: scheduled notices (soonest first) and those expired in the last 30 days (latest first).
+    const others = await this.db.query<NoticeRow & { enterado_en: string | null; recordar_en: string | null; dirigido: boolean }>(
+      `(SELECT ${NOTICE_COLUMNS},e.enterado_en,e.recordar_en,(roles && $2::text[] OR areas && $3::text[]) AS dirigido
+         FROM publico.aviso a LEFT JOIN publico.aviso_enterado e ON e.aviso_id=a.id AND e.usuario_id=$4
+        WHERE retirado_en IS NULL AND lower(vigencia) > $1::timestamptz AND ${AUDIENCE}
+        ORDER BY lower(vigencia),creado_en LIMIT 50)
+       UNION ALL
+       (SELECT ${NOTICE_COLUMNS},e.enterado_en,e.recordar_en,(roles && $2::text[] OR areas && $3::text[]) AS dirigido
+         FROM publico.aviso a LEFT JOIN publico.aviso_enterado e ON e.aviso_id=a.id AND e.usuario_id=$4
+        WHERE retirado_en IS NULL AND upper(vigencia) <= $1::timestamptz AND upper(vigencia) > $1::timestamptz - $5::interval AND ${AUDIENCE}
+        ORDER BY upper(vigencia) DESC,creado_en DESC LIMIT 100)`, [at, actor.roles, areas, actor.id, `${INBOX_HISTORY_DAYS} days`]);
     const next = (await this.db.query<{ desde: string }>(`SELECT min(lower(vigencia)) AS desde FROM publico.aviso WHERE retirado_en IS NULL AND ${AUDIENCE} AND lower(vigencia) > $1::timestamptz`, [at, actor.roles, areas]))[0]?.desde;
     const reminders = items.filter(n => n.nivel === 'critico' && n.dirigido && !n.enteradoEn && n.recordarEn && n.recordarEn > at).map(n => n.recordarEn!.toISOString());
+    const historyOut = others.filter(r => noticeState(r, at) === 'vencido').map(r => new Date(new Date(r.hasta).valueOf() + INBOX_HISTORY_DAYS * 86_400_000).toISOString());
     return {
       actualizadoEn: at.toISOString(),
-      avisos: items.map(n => ({ ...noticeOf(n.row), publicadoEn: iso(n.row.creado_en), dirigido: n.dirigido, enteradoEn: iso(n.row.enterado_en), recordarEn: iso(n.row.recordar_en), destacado: isHighlighted(n, at) })),
+      avisos: [
+        ...items.map(n => ({ ...noticeOf(n.row), estado: noticeState(n.row, at), publicadoEn: iso(n.row.creado_en), dirigido: n.dirigido, enteradoEn: iso(n.row.enterado_en), recordarEn: iso(n.row.recordar_en), destacado: isHighlighted(n, at) })),
+        ...others.map(r => ({ ...noticeOf(r), estado: noticeState(r, at), publicadoEn: iso(r.creado_en), dirigido: r.dirigido, enteradoEn: iso(r.enterado_en), recordarEn: iso(r.recordar_en), destacado: false })),
+      ],
       noLeidos: items.filter(n => !n.enteradoEn).length,
       criticos: items.filter(n => n.nivel === 'critico' && n.dirigido && !n.enteradoEn).length,
       recordatorioHoras: hours,
-      proximoCambio: iso(earliest([...rows.map(r => r.hasta), next, ...reminders]) ?? null),
+      proximoCambio: iso(earliest([...rows.map(r => r.hasta), next, ...reminders, ...historyOut]) ?? null),
     };
   }
 

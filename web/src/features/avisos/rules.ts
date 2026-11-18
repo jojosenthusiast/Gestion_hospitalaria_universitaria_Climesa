@@ -1,4 +1,5 @@
 import { roleNames } from '../../lib/api';
+import { formatDate, formatTime, localDayKey } from '../../lib/format';
 
 export type Priority = 'atencion' | 'urgente' | 'critico';
 export const priorities: { id: Priority; label: string; hint: string }[] = [
@@ -34,7 +35,11 @@ export type NoticeListItem = NoticeAudience & {
 export const WITHDRAW_MIN = 10;
 export type MyNotices = { actualizadoEn: string; avisos: NoticeAudience[]; proximoCambio: string | null };
 /** `GET /me/avisos/bandeja` (S11). */
-export type InboxNotice = NoticeAudience & { nivel: Level; areas: string[]; publicadoEn: string | null; dirigido: boolean; enteradoEn: string | null; recordarEn: string | null; destacado: boolean };
+/** `vigente` is in force now; `programado` starts later; `vencido` ended in the last 30 days (history, like past appointments). */
+export type InboxState = 'vigente' | 'programado' | 'vencido';
+/** `estado` is absent in answers older than the history: those only carried notices in force. */
+export type InboxNotice = NoticeAudience & { nivel: Level; areas: string[]; estado?: InboxState; publicadoEn: string | null; dirigido: boolean; enteradoEn: string | null; recordarEn: string | null; destacado: boolean };
+export const inboxState = (n: Pick<InboxNotice, 'estado'>): InboxState => n.estado ?? 'vigente';
 export type Inbox = { actualizadoEn: string; avisos: InboxNotice[]; noLeidos: number; criticos: number; recordatorioHoras: number; proximoCambio: string | null };
 export type NoticeAck = { avisoId: string; enteradoEn: string | null; recordarEn: string | null };
 /** `GET /avisos/estadisticas` (S11): solo conteos, nunca nombres. */
@@ -42,8 +47,32 @@ export type NoticeStats = { avisoId: string; enterados: number; destinatarios: n
 export type InboxFilter = 'todos' | 'sin-leer' | 'criticos';
 /** `status`: the look of what each filter keeps («Sin leer» badge, «Crítico» level badge), so the button matches it. */
 export const inboxFilters: { id: InboxFilter; label: string; status?: string }[] = [{ id: 'todos', label: 'Todos' }, { id: 'sin-leer', label: 'Sin leer', status: 'pendiente' }, { id: 'criticos', label: 'Críticos', status: 'emergencia' }];
+/** «Sin leer» keeps only notices in force without «Enterado»: expired and scheduled ones cannot be acknowledged. */
 export const filterInbox = (items: InboxNotice[], filter: InboxFilter) =>
-  filter === 'sin-leer' ? items.filter(n => !n.enteradoEn) : filter === 'criticos' ? items.filter(n => n.nivel === 'critico') : items;
+  filter === 'sin-leer' ? items.filter(n => inboxState(n) === 'vigente' && !n.enteradoEn) : filter === 'criticos' ? items.filter(n => n.nivel === 'critico') : items;
+
+/** Tag of a notice that is not in force, with the shared status families: scheduled waits, expired is closed. */
+export const inboxStateTag: Record<Exclude<InboxState, 'vigente'>, { value: string; label: string }> = { programado: { value: 'pendiente', label: 'Programado' }, vencido: { value: 'inactivo', label: 'Vencido' } };
+export type InboxDay = { day: string; items: InboxNotice[] };
+/**
+ * The inbox laid out like the appointments agenda: notices in force first, then scheduled ones by the day they start
+ * (soonest first), and expired ones by the day they ended (latest first), which the page folds by default.
+ */
+export function groupInbox(items: InboxNotice[]) {
+  const byDay = (list: InboxNotice[], at: (n: InboxNotice) => string, order: 1 | -1): InboxDay[] => {
+    const sorted = [...list].sort((a, b) => order * (Date.parse(at(a)) - Date.parse(at(b))));
+    const days: InboxDay[] = [];
+    for (const n of sorted) { const day = localDayKey(at(n)); const last = days[days.length - 1]; if (last?.day === day) last.items.push(n); else days.push({ day, items: [n] }); }
+    return days;
+  };
+  return {
+    current: items.filter(n => inboxState(n) === 'vigente'),
+    upcoming: byDay(items.filter(n => inboxState(n) === 'programado'), n => n.desde ?? '', 1),
+    past: byDay(items.filter(n => inboxState(n) === 'vencido'), n => n.hasta ?? '', -1),
+  };
+}
+/** «hoy, 09:33» or «16 nov, 09:33»: short and without the year, like the agenda. */
+export const shortWhen = (iso: string, now = new Date()) => `${localDayKey(iso) === localDayKey(now) ? 'hoy' : formatDate(iso, { withYear: false })}, ${formatTime(iso)}`;
 
 /** Dónde se ve un aviso, en palabras: «Pantalla pública y apps sin sesión» o «Medicina y Enfermería». */
 export function audienceText(notice: Pick<NoticeAudience, 'publico' | 'roles' | 'areas'>) {

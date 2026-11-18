@@ -1,7 +1,7 @@
 import { Icon } from '../../components/ui';
 import type { Api } from '../../lib/api';
 import { useData } from '../common';
-import type { Inbox } from './rules';
+import { inboxState, type Inbox } from './rules';
 
 /**
  * Notices one click away on every screen (they used to live only in the sidebar): a bell in the header with the unread
@@ -10,7 +10,8 @@ import type { Inbox } from './rules';
 export function NoticesBell({ api, version, current }: { api: Api; version: number; current: boolean }) {
   const inbox = useData<Inbox>(api, '/me/avisos/bandeja', version);
   const unread = inbox.data?.noLeidos ?? 0;
-  const critical = (inbox.data?.avisos ?? []).some(a => a.nivel === 'critico' && !a.enteradoEn);
+  // Only notices in force tint the bell: expired and scheduled ones in the history cannot be acknowledged.
+  const critical = (inbox.data?.avisos ?? []).some(a => inboxState(a) === 'vigente' && a.nivel === 'critico' && !a.enteradoEn);
   const label = unread ? `Avisos, ${unread} sin leer` : 'Avisos';
   return <a className={`notices-bell${critical ? ' is-critical' : ''}`} href={unread ? '#/avisos?filtro=sin-leer' : '#/avisos'} aria-label={label} title={label} aria-current={current ? 'page' : undefined}>
     <Icon name="bell" size={20} />

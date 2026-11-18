@@ -2712,7 +2712,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Bandeja de avisos: nivel, "Enterado", recordatorio, cuáles se destacan en el inicio y conteos de sin leer y críticos */
+        /** Bandeja de avisos: vigentes, programados y vencidos de los últimos 30 días con su estado; nivel, "Enterado", recordatorio, cuáles se destacan en el inicio y conteos de sin leer y críticos (solo vigentes) */
         get: operations["MyNoticesController_inbox"];
         put?: never;
         post?: never;
@@ -6687,6 +6687,8 @@ export interface components {
             nivel: components["schemas"]["NivelAviso"];
             /** @description Códigos de espacio (área o bahía) a cuyo personal va dirigido */
             areas: string[];
+            /** @description vigente, programado o vencido (últimos 30 días); "Enterado" y los conteos solo aplican a los vigentes */
+            estado: string;
             /** Format: date-time */
             publicadoEn: string | null;
             /** @description Dirigido al rol o al área de la cuenta (no solo público) */
@@ -6708,9 +6710,9 @@ export interface components {
             /** Format: date-time */
             actualizadoEn: string;
             avisos: components["schemas"]["MyInboxNoticeResponse"][];
-            /** @description Avisos sin "Enterado" */
+            /** @description Avisos vigentes sin "Enterado" */
             noLeidos: number;
-            /** @description Avisos críticos dirigidos a la cuenta sin "Enterado" */
+            /** @description Avisos vigentes críticos dirigidos a la cuenta sin "Enterado" */
             criticos: number;
             /** @description Horas que tarda en volver un crítico pospuesto (política avisos.recordatorio_horas) */
             recordatorioHoras: number;
