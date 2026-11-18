@@ -270,7 +270,7 @@ object RoleDashboard {
             "AST" -> {
                 queueKpis()
                 queue?.let {
-                    kpis += DashboardKpi("En atención", ((it["llamado"] ?: 0) + (it["en_atencion"] ?: 0)).toString(), DashboardTone.PROCESS, target = target(AndroidSection.ASSISTANT_STATION))
+                    kpis += DashboardKpi("Llamados o en atención", ((it["llamado"] ?: 0) + (it["en_atencion"] ?: 0)).toString(), DashboardTone.PROCESS, target = target(AndroidSection.ASSISTANT_STATION))
                     kpis += DashboardKpi("Atendidos hoy", (it["atendido"] ?: 0).toString(), DashboardTone.SUCCESS)
                 }
                 shiftKpi()

@@ -334,7 +334,9 @@ class LaboratoryViewModel @Inject constructor(
     private fun send(target: LabReviewTarget) {
         val s = mutable.value
         mutate(target.orderId, LabInbox.releasePath(target.orderId), LabInbox.releaseBody(target.version, s.reviewFollowUp, s.reviewNote), { answer -> LabInbox.releasedNotice(target.patientName, answer) }) {
-            it.copy(reviewOrderId = it.reviewOrderId.takeIf { id -> id != target.orderId }, followUps = it.followUps.filterNot { f -> f.orderId == target.orderId }, reviewFollowUp = true, reviewNote = "")
+            // The released order leaves "por revisar" at once; the reload that follows brings its new state.
+            it.copy(reviewOrderId = it.reviewOrderId.takeIf { id -> id != target.orderId }, followUps = it.followUps.filterNot { f -> f.orderId == target.orderId }, reviewFollowUp = true, reviewNote = "",
+                orders = it.orders.map { o -> if (o.id == target.orderId) o.copy(reviewed = true, allowedActions = o.allowedActions - LabOrderAction.REVIEW.wire) else o })
         }
     }
 
