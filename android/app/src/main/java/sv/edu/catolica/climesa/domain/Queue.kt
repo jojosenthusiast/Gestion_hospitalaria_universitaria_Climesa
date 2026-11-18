@@ -34,6 +34,12 @@ data class QueueTicket(
     val appointmentDoctorName: String? = null,
     /** B5: numbers waiting before this one, when the API sends it on the row (`ahead`); null otherwise. */
     val ahead: Int? = null,
+    /** B-3: until when this reader (the issuer) may void the number (`voidableUntil`, epoch ms); null for anyone else. */
+    val voidableUntilMillis: Long? = null,
+    /** The server says this reader made the last call of the number (`calledByMe`), so "Deshacer" survives a restart. */
+    val calledByMe: Boolean = false,
+    /** The patient of the number (`patientId`), for "Tomar signos" from the card; null for an unidentified number. */
+    val patientId: String? = null,
 ) {
     fun allows(action: QueueAction) = action in allowedActions
     /** The action is shown: allowed, or blocked with a reason from the server. */
@@ -116,9 +122,31 @@ object QueueRules {
                 officeCode = ServerActions.text(row, "officeCode"),
                 appointmentDoctorName = ServerActions.text(row, "appointmentDoctorName"),
                 ahead = if (row.has("ahead") && !row.isNull("ahead")) row.optInt("ahead") else null,
+                voidableUntilMillis = ServerActions.text(row, "voidableUntil")?.let(::parseMillis),
+                calledByMe = row.optBoolean("calledByMe", false),
+                patientId = ServerActions.text(row, "patientId"),
             )
         } }
     }
+
+    /**
+     * B-3 (same rule as the web): "Anular este número" shows only while the server window is open and the number still
+     * waits; the server checks again (only the issuer, 10 minutes).
+     */
+    fun voidable(untilMillis: Long?, state: String, now: Long): Boolean = untilMillis != null && untilMillis > now && state == "en_espera"
+
+    /** G5 on the board (like the ward): a called or attended number opens "Signos vitales" on its patient. */
+    fun vitalsSubject(ticket: QueueTicket): QuickSubject? {
+        val id = ticket.patientId ?: return null
+        if (ticket.state !in setOf("llamado", "en_atencion")) return null
+        return QuickSubject(id, ticket.patientName, QueueLabels.code(ticket))
+    }
+
+    /** Waiting numbers shown before "Ver N más"; finished ones start folded (they grow all day). */
+    const val WAITING_FOLD = 6
+
+    /** B3: the numbers whose last call this reader made, by the server (`calledByMe`), still called. */
+    fun calledByMe(tickets: List<QueueTicket>): Set<String> = tickets.filter { it.calledByMe && it.state == "llamado" }.map { it.id }.toSet()
 
     /** B1: numbers still waiting before [ticket] in its service (lower number, waiting), for "3 antes". */
     fun ahead(tickets: List<QueueTicket>, ticket: QueueTicket): Int =

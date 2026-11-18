@@ -143,14 +143,29 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
 
     // --- Reception ---
 
-    /** Opens the inline assign panel prefilled with the suggested doctor and the first free slot of the requested time of day. */
+    /**
+     * Opens the inline assign panel. A-1, like the web: it first asks the server for its suggestion (`.../sugerencia`, the
+     * first day with a gap in the requested time of day and that doctor); without one it falls back to the suggested
+     * doctor and the first free slot, trying the next days.
+     */
     fun openAssign(request: CategoryRequest, date: LocalDate = ReceptionScheduling.today()) {
         if (!request.allows(CategoryRequestRules.ASSIGN)) return
         resolveIntent.reset()
+        suggestion = null
         mutable.update { it.copy(assigning = request, date = date, doctor = null, slots = emptyList(), slot = null, wholeDay = false, error = null, notice = null, searchingDay = true) }
-        daysLeft = SEARCH_DAYS - 1
-        loadDoctors(prefill = true)
+        doctorsJob?.cancel()
+        doctorsJob = viewModelScope.launch {
+            val found = try { CategoryRequestRules.suggestion(api.request(CategoryRequestRules.suggestionPath(request))) }
+                catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+            if (mutable.value.assigning?.id != request.id) return@launch
+            suggestion = found
+            if (found != null) { daysLeft = 0; mutable.update { it.copy(date = found.date) } } else daysLeft = SEARCH_DAYS - 1
+            loadDoctors(prefill = true)
+        }
     }
+
+    /** The server's suggestion for the open request; used only on its own day, until the person picks another. */
+    private var suggestion: sv.edu.catolica.climesa.domain.RequestSuggestion? = null
 
     /** Days still to try while looking for the first free one (A2; no API returns it, see gap A-1). */
     private var daysLeft = 0
@@ -206,7 +221,8 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
                 val doctors = ReceptionScheduling.doctors(api.request("/citas/catalogos?date=$date") as JSONObject)
                 mutable.update { s ->
                     val kept = s.doctor?.let { d -> doctors.firstOrNull { it.id == d.id && it.hasShift } }
-                    s.copy(doctors = doctors, doctor = kept ?: if (prefill) s.assigning?.let { CategoryRequestRules.suggestedDoctor(it, doctors) } else null)
+                    val suggested = suggestion?.takeIf { it.date == date }?.let { sug -> doctors.firstOrNull { it.id == sug.doctorId && it.hasShift } }
+                    s.copy(doctors = doctors, doctor = kept ?: if (prefill) suggested ?: s.assigning?.let { CategoryRequestRules.suggestedDoctor(it, doctors) } else null)
                 }
                 if (mutable.value.doctor != null) loadSlots(keepSlot = false) else advanceIfFull()
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
@@ -226,7 +242,8 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
                 val slots = ReceptionScheduling.daySlots(api.request("/citas/disponibilidad?doctorId=${doctor.id}&date=${s.date}") as JSONObject)
                 mutable.update { st ->
                     val kept = if (keepSlot) st.slot?.let { picked -> slots.firstOrNull { it.start == picked.start && it.selectable } } else null
-                    st.copy(loadingSlots = false, slots = slots, slot = kept ?: st.assigning?.let { CategoryRequestRules.firstFreeSlot(slots, it.franja, st.wholeDay) })
+                    val start = suggestion?.takeIf { it.date == s.date && it.doctorId == doctor.id }?.start
+                    st.copy(loadingSlots = false, slots = slots, slot = kept ?: st.assigning?.let { CategoryRequestRules.suggestedSlot(slots, start, it.franja, st.wholeDay) })
                 }
                 advanceIfFull()
             } catch (e: CancellationException) { throw e } catch (e: Exception) {

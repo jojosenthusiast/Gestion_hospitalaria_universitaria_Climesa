@@ -20,6 +20,7 @@
     <string name="cita_comentario">Comentario · opcional</string>
     <string name="cita_solo_solicitudes">Solo solicitudes</string>
     <string name="cita_todas">Todas</string>
+    <string name="cita_llego">Llegó · %1$s</string>
     <string name="cita_vencida_detalle">No se atendió antes de su hora.</string>
     <string name="cita_paciente_reprogramar">Solicitar reprogramación</string>
     <string name="fila_esperando_medico">Esperando a que el médico llame</string>

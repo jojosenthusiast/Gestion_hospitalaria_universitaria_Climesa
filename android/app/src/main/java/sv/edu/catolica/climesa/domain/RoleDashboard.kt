@@ -64,6 +64,8 @@ enum class DashboardSource(val path: String, val anyOf: List<String>) {
     AMBULANCE("/ambulancia", listOf("ambulancia.ver_estado")),
     AGENDA("/consultas/agenda", listOf("consulta.iniciar")),
     APPOINTMENTS("/citas", listOf("citas.ver")),
+    /** S8: requests by category (no doctor yet) also wait on Recepción; same source and permission as the web Inicio. */
+    CATEGORY_REQUESTS("/citas/solicitudes-categoria", listOf("citas.agendar")),
     LINKS("/cuentas/vinculaciones", listOf("cuentas.verificar")),
     STOCK("/inventario/existencias", listOf("inventario.ver")),
     SHIFTS("/turnos/mios", listOf("turnos.ver")),
@@ -73,7 +75,7 @@ object RoleDashboard {
     private val zone: ZoneId = ZoneId.of("America/El_Salvador")
 
     private val sourcesByRole: Map<String, List<DashboardSource>> = mapOf(
-        "REC" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.LINKS, DashboardSource.APPOINTMENTS, DashboardSource.SHIFTS),
+        "REC" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.LINKS, DashboardSource.APPOINTMENTS, DashboardSource.CATEGORY_REQUESTS, DashboardSource.SHIFTS),
         "AST" to listOf(DashboardSource.QUEUE, DashboardSource.SHIFTS),
         "ENF" to listOf(DashboardSource.BEDS, DashboardSource.ADMISSIONS, DashboardSource.STOCK, DashboardSource.AMBULANCE, DashboardSource.SHIFTS),
         "MED" to listOf(DashboardSource.AGENDA, DashboardSource.LAB, DashboardSource.ADMISSIONS, DashboardSource.SHIFTS),
@@ -86,6 +88,10 @@ object RoleDashboard {
         sourcesByRole[role].orEmpty().filter { source -> source.anyOf.any { it in permissions } }
 
     fun builds(role: String) = role in sourcesByRole
+
+    /** S8: one count of appointment requests for Inicio and Citas (web `appointmentRequestCount`). */
+    fun appointmentRequestCount(appointments: List<JSONObject>, categoryRequests: List<JSONObject>): Int =
+        appointments.count { it.optString("state") == "solicitada" } + categoryRequests.count { it.optString("state") == "pendiente" }
 
     // --- parsing ---------------------------------------------------------------------------------------------------
 
@@ -247,9 +253,11 @@ object RoleDashboard {
         when (role) {
             "REC" -> {
                 queueKpis()
-                // Only requests still ahead in time: a past one is "vencida" (the server marks it) and nobody can confirm it.
+                // S8, the same rule as the web (`appointmentRequestCount`): asked appointments ("solicitada") plus requests by
+                // category ("pendiente") both wait on Recepción, one count. A past request is never "solicitada": the server
+                // marks it "vencida" before every read.
                 val appointments = data[DashboardSource.APPOINTMENTS]?.let { rows(it) }
-                val requested = appointments?.count { it.optString("state") == "solicitada" && instant(text(it, "start"))?.isAfter(now) == true } ?: 0
+                val requested = appointments?.let { appointmentRequestCount(it, data[DashboardSource.CATEGORY_REQUESTS]?.let { r -> rows(r) }.orEmpty()) } ?: 0
                 val requestsAction = QuickAction.REVIEW_REQUESTS.takeIf { QuickActions.allowed(it, permissions) }
                 appointments?.let { kpis += DashboardKpi("Citas por confirmar", requested.toString(), if (requested > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.APPOINTMENTS), action = requestsAction) }
                 val links = data[DashboardSource.LINKS]?.let { rows(it).size }

@@ -52,6 +52,18 @@ import java.time.format.DateTimeFormatter
         inbox.consume(AndroidSection.PATIENTS)
     }
     LaunchedEffect(state.message) { state.message?.let { snack.showSnackbar(it);model.clearMessage() } }
+    // G2 (web `declaredPatient`): "Buscar antes de crear" in Vinculaciones searches the declared DUI and, if the person then
+    // registers, the form starts with the declared DUI, birth date and the account's name.
+    var linkPrefill by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(state.formOpen,state.editingId) {
+        val prefill=linkPrefill?:return@LaunchedEffect
+        if(!state.formOpen||state.editingId!=null)return@LaunchedEffect
+        val names=PatientRules.prefill(prefill[2])
+        model.draft(state.draft.copy(dui=prefill[0].ifBlank{state.draft.dui},birth=prefill[1].ifBlank{state.draft.birth},givenNames=state.draft.givenNames.ifBlank{names.givenNames},surnames=state.draft.surnames.ifBlank{names.surnames}))
+        linkPrefill=null
+    }
+    /** R7 U1 (G2, hub): an action of the patient record opens its section with this patient already chosen. */
+    fun openWith(section:AndroidSection,action:QuickAction,p:Patient){model.select(null);selectedName=section.name;inbox.post(QuickActionRequest(section,action,QuickSubject(p.id,p.fullName,p.record)))}
     fun back() { if(state.saving)return;if(state.formOpen) discard=true else model.select(null) }
     BackHandler(state.formOpen || state.selected!=null) { back() }
     PortalScaffold(
@@ -72,16 +84,20 @@ import java.time.format.DateTimeFormatter
         } }
         when {
             state.formOpen -> PatientForm(state,model)
-            state.selected!=null -> PatientDetail(state.selected!!,state,model)
+            state.selected!=null -> PatientDetail(state.selected!!,state,model,hub=patientHub(account.profile.permissions,sections),onHub={section,action->openWith(section,action,state.selected!!)})
             page==AndroidSection.HOME -> RoleDashboardScreen(account,"REC",{request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}},onOpenNotices={if(AndroidSection.NOTICES in sections)selectedName=AndroidSection.NOTICES.name})
             page==AndroidSection.NOTICES -> NoticesScreen(account)
-            page==AndroidSection.APPOINTMENTS -> ReceptionAppointmentsScreen(account.profile.channels,"citas.agendar" in account.profile.permissions,userId=account.session.userId,quickAction=inbox.actionFor(AndroidSection.APPOINTMENTS),onQuickActionHandled={inbox.consume(AndroidSection.APPOINTMENTS)},permissions=account.profile.permissions)
-            page==AndroidSection.LINKING -> ReceptionLinkingScreen(account.profile.channels,"cuentas.verificar" in account.profile.permissions,{selectedName=AndroidSection.PATIENTS.name})
+            page==AndroidSection.APPOINTMENTS -> ReceptionAppointmentsScreen(account.profile.channels,"citas.agendar" in account.profile.permissions,userId=account.session.userId,quickAction=inbox.actionFor(AndroidSection.APPOINTMENTS),onQuickActionHandled={inbox.consume(AndroidSection.APPOINTMENTS)},permissions=account.profile.permissions,subject=inbox.subjectFor(AndroidSection.APPOINTMENTS))
+            page==AndroidSection.LINKING -> ReceptionLinkingScreen(account.profile.channels,"cuentas.verificar" in account.profile.permissions,{row->
+                linkPrefill=listOf(row.declaredDui,row.declaredBirth,row.accountName)
+                model.select(null);model.query(row.declaredDui);selectedName=AndroidSection.PATIENTS.name
+                if(row.declaredDui.isNotBlank()&&PatientAction.SEARCH in state.actions)model.search()
+            })
             page==AndroidSection.BEDS -> BedsScreen(account.profile)
-            page==AndroidSection.QUEUE -> QueueScreen(account.profile,userId=account.session.userId)
+            page==AndroidSection.QUEUE -> QueueScreen(account.profile,userId=account.session.userId,quickAction=inbox.actionFor(page),onQuickActionHandled={inbox.consume(page)},subject=inbox.subjectFor(page))
             page==AndroidSection.HOSPITAL_INFO -> HospitalInfoScreen()
-            page==AndroidSection.DISPATCH -> AmbulanceScreen(page,account.profile,account.session.userId)
-            page==AndroidSection.ADMISSION -> HospitalizationScreen(profile=account.profile)
+            page==AndroidSection.DISPATCH -> AmbulanceScreen(page,account.profile,account.session.userId,quickAction=inbox.actionFor(page),onQuickActionHandled={inbox.consume(page)})
+            page==AndroidSection.ADMISSION -> HospitalizationScreen(profile=account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled={inbox.consume(page)},subject=inbox.subjectFor(page))
             page==AndroidSection.SHIFTS -> MyShiftsScreen(account,"REC")
             page==AndroidSection.PROFILE -> Profile(state,dark,setDark,account,{if(!signingOut)logout()})
             page!=AndroidSection.PATIENTS -> {
@@ -117,7 +133,13 @@ import java.time.format.DateTimeFormatter
     // R3 A-39: "Activo" is the normal case and gets no badge; only an inactive record is marked.
     DataRow(p.fullName,meta=stringResource(R.string.rec_exp_corto,p.record),status=if(p.active) null else ({StatusTag("inactivo")}),onClick=click)
 }
-@Composable private fun PatientDetail(p:Patient,state:ReceptionState,model:ReceptionViewModel) {
+/** R7 U1 (G2): the record's shortcuts, the same three as the web `PatientHubActions`, by permission and reachable section. */
+internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSection>):List<Pair<AndroidSection,QuickAction>> = listOfNotNull(
+    (AndroidSection.QUEUE to QuickAction.ISSUE_NUMBER).takeIf{"fila.emitir" in permissions&&AndroidSection.QUEUE in sections},
+    (AndroidSection.APPOINTMENTS to QuickAction.SCHEDULE_APPOINTMENT).takeIf{"citas.agendar" in permissions&&AndroidSection.APPOINTMENTS in sections},
+    (AndroidSection.ADMISSION to QuickAction.ADMIT).takeIf{"admision.crear" in permissions&&AndroidSection.ADMISSION in sections},
+)
+@Composable private fun PatientDetail(p:Patient,state:ReceptionState,model:ReceptionViewModel,hub:List<Pair<AndroidSection,QuickAction>> = emptyList(),onHub:(AndroidSection,QuickAction)->Unit={_,_->}) {
     var dialog by remember(p.id) {mutableStateOf(false)}
     var tab by rememberSaveable(p.id) {mutableStateOf(0)}
     val gaps=sv.edu.catolica.climesa.domain.PatientCompleteness.gaps(p)
@@ -127,9 +149,16 @@ import java.time.format.DateTimeFormatter
         item {SectionCard(p.fullName,eyebrow=stringResource(R.string.rec_expediente_n,p.record),action={StatusTag(if(p.active) "activo" else "inactivo")}) {Text(if(gaps.isEmpty()) stringResource(R.string.pac_ficha_completa) else stringResource(R.string.pac_ficha_faltan,gaps.joinToString(", ")),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
         item {androidx.compose.material3.TabRow(selectedTabIndex=tab) {listOf(R.string.pac_ficha_datos,R.string.pac_ficha_cambios).forEachIndexed {i,id->androidx.compose.material3.Tab(selected=tab==i,onClick={tab=i},text={Text(stringResource(id))})}}}
         if(tab==0) item {ClimesaCard {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
-            val none=stringResource(R.string.rec_no_registrado);Value(stringResource(R.string.rec_dui),p.dui ?: stringResource(R.string.rec_sin_documento));Value(stringResource(R.string.rec_nacimiento),p.birth?.toString() ?: none);Value(stringResource(R.string.rec_sexo),p.sex.label);Value(stringResource(R.string.rec_telefono),p.phone.ifBlank {none})
+            val none=stringResource(R.string.rec_no_registrado);Value(stringResource(R.string.rec_dui),p.dui ?: stringResource(R.string.rec_sin_documento));Value(stringResource(R.string.rec_nacimiento),p.birth?.let { BirthDates.format(it) } ?: none);Value(stringResource(R.string.rec_sexo),p.sex.label);Value(stringResource(R.string.rec_telefono),p.phone.ifBlank {none})
         }}}
-        if(tab==0) item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) ClimesaButton(stringResource(R.string.rec_editar_datos),Icons.Default.Edit,{model.edit(p)})
+        // One primary per screen: with the hub, its first action ("Emitir número o registrar llegada") is the primary one.
+        if(tab==0&&p.active&&hub.isNotEmpty()) item {ClimesaActionGroup {hub.forEachIndexed {i,(section,action)->
+            val label=stringResource(when(action){QuickAction.ISSUE_NUMBER->R.string.rec_hub_emitir;QuickAction.SCHEDULE_APPOINTMENT->R.string.rec_citas_agendar;else->R.string.ing_ingresar})
+            val icon=when(action){QuickAction.ISSUE_NUMBER->Icons.Default.Campaign;QuickAction.SCHEDULE_APPOINTMENT->Icons.Default.CalendarMonth;else->Icons.Default.Bed}
+            ClimesaButton(label,icon,{onHub(section,action)},enabled=!state.saving,outlined=i>0)
+        }}}
+        val hubShown=p.active&&hub.isNotEmpty()
+        if(tab==0) item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) ClimesaButton(stringResource(R.string.rec_editar_datos),Icons.Default.Edit,{model.edit(p)},outlined=hubShown)
             if(PatientAction.CHANGE_STATUS in state.actions) ClimesaButton(stringResource(if(p.active) R.string.rec_inactivar else R.string.rec_reactivar),Icons.Default.ToggleOff,{dialog=true},enabled=!state.saving,outlined=true)}}
         if(tab==1) item {Text(stringResource(R.string.rec_historial),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         val events=state.registry.audit.filter {it.record==p.record}.reversed()
@@ -185,5 +214,6 @@ import java.time.format.DateTimeFormatter
 @Composable private fun AuditRow(a:AuditEvent) {ClimesaCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
     Text("${a.action} · ${a.record}",fontWeight=FontWeight.SemiBold);Text(a.reason)
     a.changes.forEach { (field,value) -> Text("$field: $value",style=MaterialTheme.typography.bodySmall) }
-    Text("${DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.of("America/El_Salvador")).format(Instant.parse(a.at))} · v${a.version}",style=MaterialTheme.typography.labelSmall)
+    // Short date without the year, like the rest of the app ("16 nov, 09:33").
+    Text("${DateTimeFormatter.ofPattern("d MMM, HH:mm",java.util.Locale("es","SV")).withZone(ZoneId.of("America/El_Salvador")).format(Instant.parse(a.at))} · v${a.version}",style=MaterialTheme.typography.labelSmall)
 }}}
