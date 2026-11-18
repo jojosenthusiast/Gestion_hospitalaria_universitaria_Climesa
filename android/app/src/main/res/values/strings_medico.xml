@@ -22,6 +22,9 @@
     <string name="med_ind_revisando">Revisando si el paciente ya tiene una admisión…</string>
     <!-- Hospitalizados: pendientes del alta firmada -->
     <string name="med_alta_pendiente_item">%1$s · Responsable: %2$s</string>
-    <string name="med_alta_pendientes_n">%1$d pendientes del alta</string>
+    <plurals name="med_alta_pendientes_n">
+        <item quantity="one">%1$d pendiente del alta</item>
+        <item quantity="other">%1$d pendientes del alta</item>
+    </plurals>
     <string name="med_alta_sin_pendientes">Sin pendientes del alta</string>
 </resources>

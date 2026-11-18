@@ -95,7 +95,7 @@ fun ClinicalHistoryScreen(
             else items(history.laboratory, key = { it.id }) { OrderHistoryCard(it) }
             if (!own && history.admissions.isNotEmpty()) {
                 item { Text(stringResource(R.string.historial_hospitalizaciones), style = MaterialTheme.typography.titleLarge) }
-                items(history.admissions, key = { it.id }) { admission -> DataRow(admission.doctor, subtitle = admission.date, leadingIcon = Icons.Default.Bed, status = { StatusTag(admission.state) }) }
+                items(history.admissions, key = { it.id }) { admission -> DataRow(admission.doctor, subtitle = sv.edu.catolica.climesa.domain.ClinicalHistoryParser.label(admission.date), leadingIcon = Icons.Default.Bed, status = { StatusTag(admission.state) }) }
             }
         }
     }
@@ -105,7 +105,7 @@ fun ClinicalHistoryScreen(
 private fun ConsultationHistoryCard(consultation: HistoryConsultation) {
     SectionCard(
         title = consultation.reason.ifBlank { stringResource(R.string.historial_sin_motivo) },
-        eyebrow = "${consultation.date} · ${consultation.doctor}",
+        eyebrow = "${sv.edu.catolica.climesa.domain.ClinicalHistoryParser.label(consultation.date)} · ${consultation.doctor}",
         action = { StatusTag(consultation.state) },
     ) {
         if (consultation.state != "firmada") NoticeBanner(NoticeKind.WARNING, stringResource(if (consultation.state == "abierta") R.string.historial_borrador else R.string.historial_por_error))

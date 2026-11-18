@@ -85,6 +85,14 @@ sealed interface ConsultationPrimary {
             queue.firstOrNull { it.calledByMe && it.general() && it.state == "llamado" && it.consultationId == null }?.let { return StartTicket(it.ticketId) }
             return if (canCallWaiting) CallWaiting else null
         }
+
+        /**
+         * QA final (iOS parity, `DoctorViews` callNext): "Llamar siguiente" stays on screen whenever someone waits in general
+         * consultation and no signing handoff offers a number, even when an unsigned consultation is the primary action
+         * (then it is a secondary button). Before, an old unsigned consultation hid the waiting queue's only call. It hides while
+         * the doctor already has a number called or in attention ([officeBusy]): the card says nobody is in the office.
+         */
+        fun showsCallWaiting(hasHandoff: Boolean, canCall: Boolean, waitingGeneral: Boolean, officeBusy: Boolean = false) = !hasHandoff && canCall && waitingGeneral && !officeBusy
     }
 }
 

@@ -65,6 +65,10 @@ import java.time.format.DateTimeFormatter
     /** R7 U1 (G2, hub): an action of the patient record opens its section with this patient already chosen. */
     fun openWith(section:AndroidSection,action:QuickAction,p:Patient){model.select(null);selectedName=section.name;inbox.post(QuickActionRequest(section,action,QuickSubject(p.id,p.fullName,p.record)))}
     fun back() { if(state.saving)return;if(state.formOpen) discard=true else model.select(null) }
+    // R3 A-2 (QA final): back from any section returns to Inicio before leaving the app, as in RolePortal. The form/detail
+    // handler below is composed later, so an open form or patient record closes first.
+    val backTarget=AndroidSections.backTarget(page,sections)
+    BackHandler(backTarget!=null) { backTarget?.let { selectedName=it.name } }
     BackHandler(state.formOpen || state.selected!=null) { back() }
     PortalScaffold(
         role="REC",sections=sections,selected=page,onSelected={selectedName=it.name},dark=dark,setDark=setDark,

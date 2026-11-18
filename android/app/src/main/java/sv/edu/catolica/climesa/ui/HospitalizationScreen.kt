@@ -483,7 +483,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             val pending = d.pending
             when {
                 !pending.isNullOrEmpty() -> pending.forEach { p -> Text(stringResource(R.string.med_alta_pendiente_item, p.description, p.responsible), style = MaterialTheme.typography.bodySmall) }
-                pending == null && d.pendingCount > 0 -> Text(stringResource(R.string.med_alta_pendientes_n, d.pendingCount), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                pending == null && d.pendingCount > 0 -> Text(androidx.compose.ui.res.pluralStringResource(R.plurals.med_alta_pendientes_n, d.pendingCount, d.pendingCount), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else -> Text(stringResource(R.string.med_alta_sin_pendientes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

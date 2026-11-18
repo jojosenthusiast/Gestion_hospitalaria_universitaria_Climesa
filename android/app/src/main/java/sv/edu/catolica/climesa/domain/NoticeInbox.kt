@@ -212,8 +212,8 @@ object NoticeInboxRules {
         n.id != event?.id && (n.state == NoticeState.EXPIRED || n.until?.let { u -> runCatching { Instant.parse(u).toEpochMilli() > nowMs }.getOrDefault(true) } ?: true)
     })
 
-    private val dates = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale("es", "SV")).withZone(ZoneId.of("America/El_Salvador"))
+    private val dates = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale("es", "SV")).withZone(ZoneId.of("America/El_Salvador"))
 
-    /** A server instant in El Salvador time ("16 nov 2026, 06:00"); empty when absent or unreadable. */
+    /** A server instant in El Salvador time ("16 nov, 06:00", owner rule: short dates without year); empty when absent or unreadable. */
     fun dateText(iso: String?): String = iso?.let { runCatching { dates.format(Instant.parse(it)) }.getOrNull() }.orEmpty()
 }

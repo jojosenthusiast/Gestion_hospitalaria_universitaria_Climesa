@@ -147,6 +147,13 @@ object AndroidSections {
     fun forAccount(role: String, profile: AccessProfile): List<AndroidSection> =
         visible(role, profile.permissions).filterNot { (it == AndroidSection.LINK_RECORD && profile.patientId != null) || (it == AndroidSection.MY_ROOM && profile.patientId == null) }
 
+    /**
+     * R3 A-2: where system back goes from [page] before leaving the app: Inicio, when the role has it and is elsewhere.
+     * Null means back leaves the app. Every portal (RolePortal and ReceptionApp) uses this same rule.
+     */
+    fun backTarget(page: AndroidSection, sections: List<AndroidSection>): AndroidSection? =
+        AndroidSection.HOME.takeIf { page != it && it in sections }
+
     /** Without a destination beyond Home, Avisos, Hospital and Profile, the role has no operational Android flow. */
     fun hasAppScreens(role: String, permissions: Collection<String>) =
         visible(role, permissions).any { it != AndroidSection.HOME && it != AndroidSection.NOTICES && it != AndroidSection.HOSPITAL_INFO && it != AndroidSection.PROFILE }
