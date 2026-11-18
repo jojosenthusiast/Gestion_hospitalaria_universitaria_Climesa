@@ -47,14 +47,18 @@ data class QueueTicket(
 }
 
 /**
- * R3 A-6: what a patient sees in "Mi turno": only their own ticket, never the reception board. The active one (waiting,
- * called or in attention) comes first; with none active, the most recent of the day.
+ * R3 A-6: what a patient sees in "Mi turno": only their own ticket, never the reception board. Only an active ticket
+ * (waiting, called or in attention) is "my number" (iOS `QueueRules.activeTicket`); a finished one is history.
  */
 object PatientQueue {
     private val active = setOf("en_espera", "llamado", "en_atencion")
     fun current(tickets: List<QueueTicket>): QueueTicket? =
-        tickets.firstOrNull { it.state in active } ?: tickets.maxByOrNull { it.issuedAtMillis ?: 0L }
-    fun others(tickets: List<QueueTicket>): List<QueueTicket> = current(tickets)?.let { mine -> tickets.filter { it.id != mine.id } }.orEmpty()
+        tickets.filter { it.state in active }.maxByOrNull { it.issuedAtMillis ?: 0L }
+    /** The day's other tickets (finished ones included), under the current number. */
+    fun others(tickets: List<QueueTicket>): List<QueueTicket> {
+        val mine = current(tickets)
+        return tickets.filter { it.id != mine?.id }
+    }
 
     /** B5: called numbers of the patient's service today (`GET /publico/fila/{servicio}`), without names. */
     fun parsePublic(value: Any?): List<PublicCall> {

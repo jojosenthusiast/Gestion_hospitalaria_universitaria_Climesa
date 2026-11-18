@@ -129,6 +129,11 @@ fun QueueScreen(
     // large in place and the search is cleared for the next patient; back returns to the board.
     if (issueOpen) { IssuePanel(state, model, modifier, onClose = { issueOpen = false; model.closeIssue() }); return }
     // R3 A-6: a patient follows only their own number, never the reception board.
+    // An unlinked patient (read-only, may link) has no number to follow: never the reception board.
+    if (readOnly && profile.patientId == null && "cuenta.vincular" in profile.permissions) {
+        PageList(modifier) { item { EmptyState(stringResource(R.string.pac_fila_sin_vincular), detail = stringResource(R.string.pac_fila_sin_vincular_detalle)) } }
+        return
+    }
     if (readOnly && profile.patientId != null) {
         LaunchedEffect(Unit) { model.followOwnTicket(); model.load(silent = true) }
         PatientTicketView(state, modifier, onRetry = { model.clearMessages(); model.load() }); return

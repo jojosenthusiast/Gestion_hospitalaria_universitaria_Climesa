@@ -63,6 +63,8 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     MY_APPOINTMENTS("A06", "Mis citas", "citas.ver", true),
     RESULTS("A07", "Mis exámenes", "resultados.ver", true),
     HISTORY("A08", "Mi historial", "expediente.ver", true),
+    /** The patient's bed while hospitalized (own `GET /admisiones`), as iOS «Mi habitación». */
+    MY_ROOM("A15", "Mi habitación", "admision.ver", true),
     AMBULANCE_REQUEST("A09", "Pedir ambulancia", "ambulancia.solicitar", true),
     HOSPITAL_INFO("A10", "Hospital", "sesion.perfil", true),
     MY_ACCESS("A11", "Quién vio mi expediente", "auditoria.mis_accesos", true),
@@ -112,7 +114,7 @@ object AndroidSections {
         "ENF" to careStation,
         "MED" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.UNIT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "PAR" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "PAC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.LINK_RECORD, AndroidSection.HISTORY, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
+        "PAC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.PATIENT_QUEUE, AndroidSection.MY_APPOINTMENTS, AndroidSection.RESULTS, AndroidSection.LINK_RECORD, AndroidSection.HISTORY, AndroidSection.MY_ROOM, AndroidSection.AMBULANCE_REQUEST, AndroidSection.HOSPITAL_INFO, AndroidSection.MY_ACCESS, AndroidSection.PROFILE),
     )
 
     /** The role's core tasks, in bar order (they are what its dashboard leads to). The bar takes the first visible ones after "Inicio". */
@@ -137,6 +139,13 @@ object AndroidSections {
      */
     fun visible(role: String, permissions: Collection<String>): List<AndroidSection> =
         roleCatalog[role].orEmpty().filter { it.permission in permissions }
+
+    /**
+     * What this account sees: [visible], then "Vincular expediente" leaves once the record is linked (`patientId`), and
+     * "Mi habitación" waits for it (without a record there is no own admission).
+     */
+    fun forAccount(role: String, profile: AccessProfile): List<AndroidSection> =
+        visible(role, profile.permissions).filterNot { (it == AndroidSection.LINK_RECORD && profile.patientId != null) || (it == AndroidSection.MY_ROOM && profile.patientId == null) }
 
     /** Without a destination beyond Home, Avisos, Hospital and Profile, the role has no operational Android flow. */
     fun hasAppScreens(role: String, permissions: Collection<String>) =

@@ -85,7 +85,8 @@ class DashboardViewModel @Inject constructor(private val api: ApiGateway, realti
         val current = args ?: return
         if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
         val sources = if (current.role == "PAC" && !current.linked) emptyList() else RoleDashboard.sources(current.role, current.permissions)
-        val results = coroutineScope { sources.map { source -> async { source to read(source) } }.awaitAll() }
+        val today = sv.edu.catolica.climesa.domain.ReceptionScheduling.today()
+        val results = coroutineScope { sources.map { source -> async { source to read(RoleDashboard.path(current.role, source, today)) } }.awaitAll() }
         val data = results.mapNotNull { (source, result) -> result.getOrNull()?.let { source to it } }.toMap()
         val failed = results.filter { it.second.isFailure }.map { it.first }.toSet()
         if (sources.isNotEmpty() && data.isEmpty()) {
@@ -97,8 +98,8 @@ class DashboardViewModel @Inject constructor(private val api: ApiGateway, realti
         mutable.value = DashboardUiState(loading = false, model = build(current, data, failed))
     }
 
-    private suspend fun read(source: DashboardSource): Result<Any> =
-        try { Result.success(api.request(source.path)) } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
+    private suspend fun read(path: String): Result<Any> =
+        try { Result.success(api.request(path)) } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
 
     private companion object { const val DEBOUNCE_MS = 400L }
 }

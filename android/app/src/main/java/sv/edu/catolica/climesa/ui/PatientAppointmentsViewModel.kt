@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -70,18 +71,22 @@ class PatientAppointmentsViewModel @Inject constructor(
     private val rescheduleIntent = SubmissionIntent()
     private val requestIntent = SubmissionIntent()
 
+    /**
+     * Reads only the appointments, over an explicit window ([PatientAppointmentRules.listPath]). The doctor catalog is
+     * read when the request form opens ([loadRequestDoctors]): a failing catalog no longer hides the list, and a live
+     * event no longer reads it again.
+     */
     fun load() {
         viewModelScope.launch {
             mutable.updateLoading(true)
             try {
-                val appointments = PatientAppointmentRules.parse(api.request("/citas"))
-                val doctors = parseDoctors(api.request("/citas/catalogos?date=${mutable.value.selectedDate}"))
-                mutable.value = mutable.value.copy(loading = false, appointments = appointments, doctors = doctors, error = null)
+                val appointments = PatientAppointmentRules.parse(api.request(PatientAppointmentRules.listPath(ReceptionScheduling.today())))
+                mutable.update { it.copy(loading = false, appointments = appointments, error = null) }
                 if (mutable.value.selectedDoctorId.isNotBlank()) loadAvailability()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                mutable.value = mutable.value.copy(loading = false, error = message(e))
+                mutable.update { it.copy(loading = false, error = message(e)) }
             }
         }
     }

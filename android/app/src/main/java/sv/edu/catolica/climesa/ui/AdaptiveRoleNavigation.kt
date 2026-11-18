@@ -113,6 +113,7 @@ internal fun iconFor(section: AndroidSection): ImageVector = when (section) {
     AndroidSection.PATIENT_QUEUE -> Icons.Default.HourglassTop
     AndroidSection.QUEUE -> Icons.Default.ConfirmationNumber
     AndroidSection.HISTORY -> Icons.Default.History
+    AndroidSection.MY_ROOM -> Icons.Default.KingBed
     AndroidSection.RECORD -> Icons.Default.FolderShared
     AndroidSection.LOG -> Icons.AutoMirrored.Filled.ListAlt
     AndroidSection.MY_ACCESS -> Icons.Default.Shield
