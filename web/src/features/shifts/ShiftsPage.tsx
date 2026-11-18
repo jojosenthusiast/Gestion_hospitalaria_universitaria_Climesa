@@ -275,7 +275,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
           planning={planning} highlight={highlight} maxLanes={scale === 'dia' ? DAY_VIEW_LANES : undefined} />
         {plan && openBlocks.length > 0 && <section className="gap-list" aria-label="Huecos por cubrir"><h3>Huecos por cubrir ({openBlocks.length})</h3><ul>
           {openBlocks.slice(0, 12).map(b => <li key={b.key}><span>{blockLabel(b)}{b.missing > 1 ? ` · faltan ${b.missing}` : ''}</span><button type="button" className="secondary-button" aria-label={`Cubrir hueco: ${blockLabel(b)}`} onClick={() => setCovering(b)}>Cubrir hueco</button></li>)}
-        </ul>{openBlocks.length > 12 && <p className="muted">Y {openBlocks.length - 12} más; «Llenar todos los huecos» los incluye.</p>}</section>}
+        </ul>{openBlocks.length > 12 && <p className="muted">Y {openBlocks.length - 12} más; «Llenar los huecos de esta semana» los incluye.</p>}</section>}
         {!drawn.length && <Empty title="Sin turnos en esta semana" description={active.length ? 'Ajusta los filtros o la búsqueda para consultar otros horarios.' : plan ? 'Haz clic en una hora del calendario, usa el botón + de cada día, genera una rotación o copia la semana anterior.' : 'Cambia de semana.'} />}
       </section> : drawn.length ? <ShiftDayList days={days} today={today} now={at} rows={drawn} plan={plan} byPerson={sort === 'persona'} typeOf={typeOf} actions={actions} />
         : <Empty title="Sin turnos en esta vista" description="Ajusta los filtros, la búsqueda o la semana para consultar otros horarios." />}</RemoteState>

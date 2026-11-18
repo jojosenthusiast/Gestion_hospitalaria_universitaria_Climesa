@@ -86,7 +86,7 @@ export function FillGapsDialog({ api, blocks: given, onClose, onPreview }: { api
     return () => { alive = false; };
   }, [api, blocks]);
   const people = plan ? new Set(plan.items.map(i => i.staffId)).size : 0;
-  return <Dialog title="Llenar todos los huecos" onClose={onClose}><div className="module-form">
+  return <Dialog title="Llenar los huecos de esta semana" onClose={onClose}><div className="module-form">
     {error ? <Notice kind="error">{error}</Notice> : !plan ? <p className="muted" role="status">Buscando quién puede cubrir {blocks.length === 1 ? '1 hueco' : `${blocks.length} huecos`}…</p> : <>
       <p className="form-intro" role="status">{plan.items.length ? `Se propondrán ${plan.items.length === 1 ? '1 turno' : `${plan.items.length} turnos`} con ${people === 1 ? '1 persona' : `${people} personas`} para ${blocks.length - plan.uncovered.length} de ${blocks.length} huecos.` : 'Ningún hueco se puede cubrir sin romper una regla.'} Nada se guarda hasta que confirmes en el resumen.</p>
       {plan.items.length > 0 && <ul className="gap-fill-list">{plan.items.map(i => <li key={i.key}><strong>{i.person}</strong> · {blockLabel(blocks.find(b => i.key.startsWith(`hueco-${b.key}-`))!)}</li>)}</ul>}

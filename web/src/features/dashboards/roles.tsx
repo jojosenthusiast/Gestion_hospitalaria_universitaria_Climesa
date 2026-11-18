@@ -7,7 +7,8 @@ import type { Remote } from '../common';
 import { milestoneNames, priorityLevel, priorityNames, stateNames as unitStateNames } from '../ambulance/types';
 import { isPendingCategoryRequest } from '../listas/requests';
 import { shownState } from '../listas/schedule';
-import type { AdmissionRow, DashboardData, LabOrderRow, QueueTicket, Source } from './data';
+import type { AdmissionRow, DashboardData, LabOrderRow, QueueTicket, Source, StockRow } from './data';
+import { unitPlural } from '../inventory/model';
 import { auditActionLabel } from './labels';
 import { AttentionList, Panel, PanelState, isToday, localDay, minutesBetween, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
@@ -59,10 +60,12 @@ export function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
 
 /** Zero stock reads «Agotado» (urgent), never «Bajo mínimo» with the waiting clock (coordinator, prod). */
 const stockState = (r: { disponible: number; vencido: number }) => r.disponible <= 0 ? { tag: 'Agotado', status: 'agotado' } : r.vencido > 0 ? { tag: 'Vencido', status: 'vencido' } : { tag: 'Bajo mínimo', status: 'bajo_minimo' };
-const unitsOf = (unit: string) => unit === 'unidad' ? 'unidades' : /[aeiou]$/.test(unit) ? `${unit}s` : `${unit}es`;
+const unitsOf = unitPlural;
+/** `/inventario/existencias` returns one row per lot and warehouse, repeating the article columns: keep one row per article. */
+const perArticle = (rows: StockRow[]) => [...new Map(rows.map(r => [r.articulo_id, { ...r, minimo: Number(r.minimo), disponible: Number(r.disponible), vencido: Number(r.vencido) }])).values()];
 const lowStock = (d: DashboardData): TrayGroupSpec => ({
   id: 'inventario', title: 'Inventario bajo el mínimo', href: '#/inventario', masculine: true, state: asRemote(d.stock),
-  items: (d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: `${r.disponible} de ${plural(r.minimo, r.unidad, unitsOf(r.unidad))}${r.vencido > 0 ? ` · ${r.vencido} vencidos` : ''}`, tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', ...stockState(r) })),
+  items: perArticle(d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: `${r.disponible} de ${plural(r.minimo, r.unidad, unitsOf(r.unidad))}${r.vencido > 0 ? ` · ${r.vencido} vencidos` : ''}`, tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', ...stockState(r) })),
 });
 const pendingAmbulance = (d: DashboardData): TrayGroupSpec => ({
   id: 'ambulancia', title: 'Ambulancia por confirmar', href: '#/ambulancia', state: asRemote(d.ambulance),
