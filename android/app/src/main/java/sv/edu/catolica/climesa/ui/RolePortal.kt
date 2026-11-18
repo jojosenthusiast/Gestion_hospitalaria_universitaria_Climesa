@@ -196,11 +196,13 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
             }else if(page==AndroidSection.MY_ROOM){
                 val admissions=AdmissionParser.admissions(data.data)
                 val room=MyRoomRules.current(admissions,account.profile.patientId)
+                val discharge=DischargeSummaryRules.summary(admissions,account.profile.patientId)
                 when{
                     room!=null->item{MyRoomCard(room)}
                     MyRoomRules.waiting(admissions,account.profile.patientId)!=null->item{NoticeBanner(NoticeKind.INFO,stringResource(R.string.pac_habitacion_espera))}
-                    else->item{EmptyState(stringResource(R.string.pac_habitacion_ninguna),detail=stringResource(R.string.pac_habitacion_ninguna_detalle),icon=Icons.Default.KingBed)}
+                    discharge==null->item{EmptyState(stringResource(R.string.pac_habitacion_ninguna),detail=stringResource(R.string.pac_habitacion_ninguna_detalle),icon=Icons.Default.KingBed)}
                 }
+                discharge?.let{item{MyRoomDischargeCard(it)}}
             }else if(page==AndroidSection.SHIFTS){
                 val shifts=MyShifts.parse(data.data)
                 if(shifts.isEmpty())item{EmptyState(stringResource(R.string.turnos_vacio))}
