@@ -17,7 +17,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -148,7 +147,7 @@ fun NoticesScreen(account: AuthenticatedAccount, modifier: Modifier = Modifier) 
                 filters = {
                     NoticeFilter.entries.forEach { f ->
                         val count = inbox?.let { NoticeInboxRules.count(it, f) }?.takeIf { it > 0 }
-                        FilterChip(state.filter == f, { model.setFilter(f) }, { Text(if (count != null) "${f.label} ($count)" else f.label) }, Modifier.heightIn(min = Spacing.touch))
+                        StatusFilterChip(state.filter == f, { model.setFilter(f) }, if (count != null) "${f.label} ($count)" else f.label, FilterTones.notice(f), Modifier.heightIn(min = Spacing.touch))
                     }
                 },
             )

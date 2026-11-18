@@ -9,7 +9,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,9 +35,13 @@ internal fun LiveSearchField(value: String, onChange: (String) -> Unit, label: S
 
 /** Fila de chips de filtro con su conteo; una opción activa a la vez. */
 @Composable
-internal fun <T> ChipRow(options: List<Triple<T, String, Int?>>, selected: T, onSelect: (T) -> Unit) {
+internal fun <T> ChipRow(options: List<Triple<T, String, Int?>>, selected: T, onSelect: (T) -> Unit) = ChipRow(options, selected, { null }, onSelect)
+
+/** Same row where each option may copy the badge of the status it filters ([tone]); null keeps the plain chip. */
+@Composable
+internal fun <T> ChipRow(options: List<Triple<T, String, Int?>>, selected: T, tone: (T) -> ChipTone?, onSelect: (T) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        items(options) { (value, label, count) -> FilterChip(selected == value, { onSelect(value) }, { Text(if (count != null) "$label ($count)" else label) }) }
+        items(options) { (value, label, count) -> StatusFilterChip(selected == value, { onSelect(value) }, if (count != null) "$label ($count)" else label, tone(value)) }
     }
 }
 

@@ -117,3 +117,31 @@ internal enum class Priority(val code: String, val label: String, val icon: Stat
         fun of(code: String?): Priority = entries.firstOrNull { it.code == code } ?: RUTINA
     }
 }
+
+/**
+ * Look of a filter chip that filters by a status or a priority: the chip wears the same colour, texture and icon as the
+ * badge it filters, so «Sin leer» looks like the waiting badge and «Críticos» like the critical one. «Todos» has none.
+ */
+internal sealed interface ChipTone {
+    val icon: StatusIcon
+
+    /** Texture drawn on the chip; null is a plain soft tint with a border (urgent and routine priority badges). */
+    val pattern: StatusPattern?
+
+    data class Family(val family: StatusFamily) : ChipTone {
+        override val icon get() = family.icon
+        override val pattern get() = family.pattern
+    }
+
+    /** Priority look. Emergency is the critical family (red, double border), like the critical notice banner. */
+    data class Level(val priority: Priority) : ChipTone {
+        override val icon get() = priority.icon
+        override val pattern get() = if (priority == Priority.EMERGENCIA) StatusPattern.DOUBLE else null
+    }
+
+    companion object {
+        /** Tone of an API state value, resolved exactly like [StatusBadge] draws it; null when the badge is neutral. */
+        fun of(value: String, fallback: StatusTone? = StatusCatalog.tone(value)): ChipTone? =
+            if (StatusFamily.urgent(value)) Level(Priority.URGENTE) else StatusFamily.resolve(value, fallback)?.let(::Family)
+    }
+}

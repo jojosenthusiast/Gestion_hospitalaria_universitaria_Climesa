@@ -107,7 +107,7 @@ import java.time.format.DateTimeFormatter
             if(PatientAction.REGISTER in state.actions) SecondaryButton(stringResource(R.string.rec_form_registrar),model::newPatient,icon=Icons.Default.Add,enabled=!state.searching)
             if(PatientAction.REGISTER in state.actions && state.searchedQuery==null && PatientRules.normalize(state.query).replace(" ","").length<2) Text(stringResource(R.string.rec_registrar_sin_busqueda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         } }
-        item { LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(3) {i->val label=stringResource(listOf(R.string.rec_filtro_activos,R.string.rec_filtro_inactivos,R.string.rec_filtro_todos)[i]);FilterChip(selected=state.filter==i,onClick={model.filter(i)},label={Text(label)})}} }
+        item { LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(3) {i->val label=stringResource(listOf(R.string.rec_filtro_activos,R.string.rec_filtro_inactivos,R.string.rec_filtro_todos)[i]);StatusFilterChip(selected=state.filter==i,onClick={model.filter(i)},label=label,tone=FilterTones.patientActivity(i))}} }
         item { Text(stringResource(if(state.searchedQuery==null) R.string.rec_n_pacientes else R.string.rec_n_coincidencias,state.results.size),style=MaterialTheme.typography.labelLarge) }
         if(state.results.isEmpty()) item { EmptyState(stringResource(R.string.rec_sin_coincidencias)) }
         items(state.results,key={it.id}) {p -> PatientRow(p) {model.select(p.id)} }

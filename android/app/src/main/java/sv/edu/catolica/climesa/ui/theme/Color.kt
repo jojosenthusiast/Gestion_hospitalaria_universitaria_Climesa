@@ -169,6 +169,26 @@ fun badge(family: StatusFamily, surface: Color): Pair<Color, Color> {
         Priority.RUTINA -> priorityRutina to priorityRutinaSoft
     }
 
+    /** Strong and soft colour of a filter chip tone: the family colours, or the priority ones (emergency is critical red). */
+    fun tone(tone: ChipTone): Pair<Color, Color> = when (tone) {
+        is ChipTone.Family -> status(tone.family)
+        is ChipTone.Level -> if (tone.priority == Priority.EMERGENCIA) critical to criticalSoft else priority(tone.priority)
+    }
+
+    /**
+     * Text and background of a status filter chip. Unselected it is the badge it filters (strong on the soft tint, or on the
+     * [surface] for outline and dashed families); selected it fills with the strong colour and [onStatus] text. Tested for
+     * WCAG AA (4.5:1) in both themes.
+     */
+    fun chip(tone: ChipTone, selected: Boolean, surface: Color): Pair<Color, Color> {
+        val (strong, soft) = tone(tone)
+        return when {
+            selected -> onStatus to strong
+            tone.pattern == StatusPattern.OUTLINE || tone.pattern == StatusPattern.DASHED -> strong to surface
+            else -> strong to soft
+        }
+    }
+
     /** Tokens by their Kotlin name in the section 7 table (`AreaEmg`, `StatusListoSoft`...), for checks against the doc. */
     fun byName(): Map<String, Color> = linkedMapOf(
         "AreaEmg" to areaEmg, "AreaEmgSoft" to areaEmgSoft, "AreaCon" to areaCon, "AreaConSoft" to areaConSoft,
