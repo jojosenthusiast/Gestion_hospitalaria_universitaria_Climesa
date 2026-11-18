@@ -16,4 +16,12 @@
     <string name="amb_tipo">Tipo</string>
     <string name="amb_servicios_n">%1$d servicios</string>
     <string name="amb_bitacora_sin_resultados">Ningún servicio coincide con la búsqueda y los filtros.</string>
+    <!-- Auditoría del flujo de ambulancia. -->
+    <string name="amb_ultima_solicitud">Tu última solicitud</string>
+    <string name="amb_motivo_descarte">Motivo de despacho</string>
+    <string name="amb_dias_anteriores">Días anteriores · %1$d servicios</string>
+    <string name="amb_dias_anteriores_ocultar">Ocultar días anteriores</string>
+    <string name="amb_en_curso_filtro">En curso</string>
+    <string name="amb_siguiente_admision">Siguiente paso: Recepción ingresa al paciente en Admisión con origen «Ambulancia».</string>
+    <string name="par_abrir_bitacora">Ver la bitácora completa</string>
 </resources>

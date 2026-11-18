@@ -73,8 +73,8 @@ val ambulanceSections = setOf(
  * reporte prehospital (A72) y el reporte en cola sobreviva al cambio de sección y al giro.
  */
 @Composable
-fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: String, modifier: Modifier = Modifier) {
-    if (ParamedicRules.handles(section, profile.permissions)) { ParamedicScreen(section, profile, accountId, modifier); return }
+fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: String, modifier: Modifier = Modifier, onOpenSection: ((AndroidSection) -> Unit)? = null) {
+    if (ParamedicRules.handles(section, profile.permissions)) { ParamedicScreen(section, profile, accountId, modifier, onOpenSection); return }
     val model: AmbulanceViewModel = viewModel(key = "ambulance-$accountId")
     val state by model.state.collectAsStateWithLifecycle()
     val readsStatus = "ambulancia.ver_estado" in profile.permissions
@@ -88,6 +88,8 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         }, readsStatus)
     }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
+    // Past days of the log stay folded until opened; the choice survives rotation.
+    var pastOpen by rememberSaveable { mutableStateOf(false) }
     PageList(modifier) {
         // G4: the request form and the dispatch dialogs show their own error next to their button.
         if (section != AndroidSection.AMBULANCE_REQUEST && section != AndroidSection.DISPATCH) state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
@@ -97,7 +99,7 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         else when (section) {
             AndroidSection.AMBULANCE_REQUEST -> requestContent(state, model)
             AndroidSection.DISPATCH -> dispatchContent(state, model)
-            AndroidSection.LOG -> logContent(state, model)
+            AndroidSection.LOG -> logContent(state, model, pastOpen) { pastOpen = !pastOpen }
             else -> arrivalContent(state, model)
         }
     }
@@ -118,6 +120,8 @@ private fun LazyListScope.requestContent(state: AmbulanceUiState, model: Ambulan
     item { NoticeBanner(NoticeKind.WARNING, AmbulanceRules.NOTICE_911) }
     val requests = state.ownRequests ?: return
     val active = AmbulanceRules.activeRequest(requests)
+    // With nothing active, how the last request ended (discarded and why, cancelled, finished) sits above the form.
+    if (active == null) AmbulanceRules.latestResolved(requests)?.let { last -> item(key = "last-${last.id}") { OwnRequestCard(last, state.busy, model) } }
     if (active == null) item { RequestForm(state.busy, state.requestPrefill, model, state.formError) }
     else {
         state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
@@ -128,10 +132,12 @@ private fun LazyListScope.requestContent(state: AmbulanceUiState, model: Ambulan
 @Composable
 private fun OwnRequestCard(request: sv.edu.catolica.climesa.domain.OwnAmbulanceRequest, busy: Boolean, model: AmbulanceViewModel) {
     var cancelling by rememberSaveable(request.id) { mutableStateOf(false) }
-    val family = if (request.state == "por_confirmar") StatusFamily.ESPERA else StatusFamily.ATENCION
-    SectionCard(stringResource(R.string.amb_solicitud_enviada), eyebrow = localTime(request.createdAt), action = { FamilyBadge(AmbulanceLabels.requestState(request.state), family) }) {
+    val finished = request.service?.finalState
+    val tag = finished?.let { AmbulanceLabels.finalState(it) } ?: AmbulanceLabels.requestState(request.state)
+    SectionCard(stringResource(if (request.active) R.string.amb_solicitud_enviada else R.string.amb_ultima_solicitud), eyebrow = localTime(request.createdAt), action = { FamilyBadge(tag, requestFamily(request)) }) {
         Text(AmbulanceRules.requestProgress(request), style = MaterialTheme.typography.bodyMedium)
         LabeledValue(stringResource(R.string.amb_donde), request.address)
+        request.discardReason?.takeIf { request.state == "descartada" }?.let { LabeledValue(stringResource(R.string.amb_motivo_descarte), it) }
         request.service?.let { service ->
             HorizontalDivider()
             listOf("salida", "en_escena", "trasladando", "en_hospital").forEach { type ->
@@ -154,6 +160,23 @@ private fun OwnRequestCard(request: sv.edu.catolica.climesa.domain.OwnAmbulanceR
         )
     }
 }
+
+/** The request's state as a family tag: waiting, on its way, finished, or closed (discarded, cancelled, not completed). */
+internal fun requestFamily(request: sv.edu.catolica.climesa.domain.OwnAmbulanceRequest): StatusFamily = when {
+    request.state == "por_confirmar" -> StatusFamily.ESPERA
+    request.state == "descartada" || request.state == "cancelada" -> StatusFamily.CERRADO
+    request.service?.finalState == "completado" -> StatusFamily.LISTO
+    request.service?.finalState != null -> StatusFamily.CERRADO
+    else -> StatusFamily.ATENCION
+}
+
+/** Triage colour of an ambulance priority (roja, naranja, amarilla, verde) on the shared priority badge. */
+internal fun triagePriority(priority: String) = Priority.of(AmbulanceRules.priorityLevel(priority))
+/** Priority filter chips copy the triage badge; "Todas" stays neutral. */
+internal fun triageTone(value: String): ChipTone? = if (value.isEmpty()) null else ChipTone.Level(triagePriority(value))
+
+@Composable
+internal fun TriageBadge(priority: String) = PriorityBadge(triagePriority(priority), label = AmbulanceLabels.priority(priority))
 
 @Composable
 private fun RequestForm(busy: Boolean, prefill: AmbulancePrefill?, model: AmbulanceViewModel, error: String?) {
@@ -253,7 +276,7 @@ private fun DispatchDialog(busy: Boolean, crewPool: List<sv.edu.catolica.climesa
         body = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Choices(AmbulanceLabels.types, type) { type = it }
-                Choices(AmbulanceLabels.priorities, priority) { priority = it }
+                Choices(AmbulanceLabels.priorities, priority, ::triageTone) { priority = it }
                 FormField(stringResource(R.string.amb_destino), destination, { destination = it.take(300) }, singleLine = false)
                 Text(stringResource(R.string.amb_tripulacion), style = MaterialTheme.typography.titleSmall)
                 if (crewPool.isEmpty()) Text(stringResource(R.string.amb_sin_tripulacion_turno), style = MaterialTheme.typography.bodySmall)
@@ -284,10 +307,11 @@ internal fun Choices(options: List<Pair<String, String>>, selected: String, tone
 @Composable
 private fun ServiceSummary(service: AmbulanceService) {
     SectionCard(
-        "${AmbulanceLabels.type(service.type)} · ${stringResource(R.string.amb_prioridad)} ${AmbulanceLabels.priority(service.priority)}",
+        AmbulanceLabels.type(service.type),
         eyebrow = stringResource(R.string.unidad_servicio_activo),
         action = { StatusTag("en_curso") },
     ) {
+        TriageBadge(service.priority)
         Text("${service.origin} → ${service.destination}", style = MaterialTheme.typography.bodyMedium)
         HorizontalDivider()
         listOf("salida", "en_escena", "trasladando", "en_hospital", "finalizado").forEach { type ->
@@ -309,18 +333,37 @@ internal fun NumberField(label: String, value: String, decimal: Boolean = false,
 }
 
 /** A74: servicios con su historia en una frase; búsqueda compacta y filtros en un panel plegable con chips (obs. 8 y 16). */
-private fun LazyListScope.logContent(state: AmbulanceUiState, model: AmbulanceViewModel) {
+private fun LazyListScope.logContent(state: AmbulanceUiState, model: AmbulanceViewModel, pastOpen: Boolean, togglePast: () -> Unit) {
     item { LogToolbar(state.logFilters, model) }
     if (state.log.isEmpty()) { item { EmptyState(stringResource(if (state.logFilters.any) R.string.amb_bitacora_sin_resultados else R.string.amb_bitacora_vacia)) }; return }
     item { Text(stringResource(R.string.amb_servicios_n, state.log.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    items(state.log, key = { it.id }) { entry -> LogCard(entry) }
+    // Day-grouped: today open, the past days folded behind one toggle (open by itself when nothing happened today).
+    val today = java.time.LocalDate.now(java.time.ZoneId.of("America/El_Salvador"))
+    val days = AmbulanceRules.logDays(state.log)
+    val current = days.firstOrNull { it.first == today }
+    val past = days.filter { it.first != today }
+    fun day(date: java.time.LocalDate, entries: List<AmbulanceLogEntry>) {
+        item(key = "day-$date") { Text(sv.edu.catolica.climesa.domain.ShortDay.of(date, today), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
+        items(entries, key = { it.id }) { entry -> LogCard(entry) }
+    }
+    current?.let { (date, entries) -> day(date, entries) }
+    if (past.isEmpty()) return
+    val showPast = pastOpen || current == null
+    if (current != null) item(key = "past-toggle") {
+        SecondaryButton(if (showPast) stringResource(R.string.amb_dias_anteriores_ocultar) else stringResource(R.string.amb_dias_anteriores, past.sumOf { it.second.size }), togglePast)
+    }
+    if (showPast) past.forEach { (date, entries) -> day(date, entries) }
 }
 
 @Composable
 private fun LogCard(entry: AmbulanceLogEntry) {
     val final = entry.finalState ?: "en_curso"
-    SectionCard("${AmbulanceLabels.type(entry.type)} · ${AmbulanceLabels.priority(entry.priority)}", eyebrow = localTime(entry.dispatchedAt), action = { OperacionStatusTag(final, label = AmbulanceLabels.finalState(entry.finalState)) }) {
-        if (entry.administrativeClose) FamilyBadge(AmbulanceLabels.ADMINISTRATIVE_CLOSE, null)
+    // BL-05: an administrative close is one «Cierre administrativo» tag, not «Cancelado» plus a neutral badge.
+    SectionCard(AmbulanceLabels.type(entry.type), eyebrow = localTime(entry.dispatchedAt), action = {
+        if (entry.administrativeClose) FamilyBadge(AmbulanceLabels.ADMINISTRATIVE_CLOSE, StatusFamily.CERRADO)
+        else OperacionStatusTag(final, label = AmbulanceLabels.finalState(entry.finalState))
+    }) {
+        TriageBadge(entry.priority)
         Text(AmbulanceRules.narrate(entry), style = MaterialTheme.typography.bodyMedium)
         entry.milestones.forEach { Text("${AmbulanceLabels.milestone(it.type)}: ${localTime(it.occurredAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.success) }
         Text(entry.responseMinutes?.let { stringResource(R.string.amb_respuesta_min, it) } ?: stringResource(R.string.amb_sin_llegada), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -337,9 +380,9 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
         SecondaryButton(if (filters.activeCount > 0) stringResource(R.string.amb_filtros_n, filters.activeCount) else stringResource(R.string.amb_filtros), { open = !open }, icon = Icons.Default.FilterList)
         if (open) SectionCard(stringResource(R.string.amb_filtros)) {
             Text(stringResource(R.string.amb_prioridad), style = MaterialTheme.typography.labelLarge)
-            Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.priorities, filters.priority) { model.setLogFilters(filters.copy(priority = it)) }
+            Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.priorities, filters.priority, ::triageTone) { model.setLogFilters(filters.copy(priority = it)) }
             Text(stringResource(R.string.amb_estado_final), style = MaterialTheme.typography.labelLarge)
-            Choices(listOf("" to stringResource(R.string.amb_todas), "completado" to StatusCatalog.label("completado")) + AmbulanceLabels.earlyFinalStates, filters.finalState, FilterTones::state) { model.setLogFilters(filters.copy(finalState = it)) }
+            Choices(listOf("" to stringResource(R.string.amb_todas), AmbulanceLabels.OPEN to stringResource(R.string.amb_en_curso_filtro), "completado" to StatusCatalog.label("completado")) + AmbulanceLabels.earlyFinalStates, filters.finalState, FilterTones::state) { model.setLogFilters(filters.copy(finalState = it)) }
             Text(stringResource(R.string.amb_tipo), style = MaterialTheme.typography.labelLarge)
             Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.types, filters.type) { model.setLogFilters(filters.copy(type = it)) }
         }
@@ -406,7 +449,11 @@ private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, b
     val handover = view.handover
     SectionCard(stringResource(R.string.amb_entrega_titulo), action = { if (handover != null) FamilyBadge(stringResource(R.string.amb_recibido), StatusFamily.LISTO) }) {
         when {
-            handover != null -> Text(stringResource(R.string.amb_recibido_por, handover.receivedByName.ifBlank { stringResource(R.string.amb_personal_clinico) }, localTime(handover.receivedAt)), style = MaterialTheme.typography.bodyMedium)
+            handover != null -> {
+                Text(stringResource(R.string.amb_recibido_por, handover.receivedByName.ifBlank { stringResource(R.string.amb_personal_clinico) }, localTime(handover.receivedAt)), style = MaterialTheme.typography.bodyMedium)
+                // A54: the next step after the handover is the admission, which Recepción records with origin «Ambulancia».
+                Text(stringResource(R.string.amb_siguiente_admision), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             view.canReceive -> PrimaryButton(stringResource(R.string.amb_marcar_recibido), { confirming = true }, icon = Icons.Default.Check, enabled = !busy, loading = busy)
             !view.arrived -> Text(stringResource(R.string.amb_entrega_espera), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             else -> Text(stringResource(R.string.amb_entrega_sin_permiso), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

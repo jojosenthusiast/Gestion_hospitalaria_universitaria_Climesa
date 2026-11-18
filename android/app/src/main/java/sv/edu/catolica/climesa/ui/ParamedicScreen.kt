@@ -66,7 +66,7 @@ private enum class ParamedicSheet { NONE, PREHOSPITAL, UNIDENTIFIED }
  * (Servicio, Reporte, Paciente) caen aquí y abren la hoja que les toca.
  */
 @Composable
-fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: String, modifier: Modifier = Modifier) {
+fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: String, modifier: Modifier = Modifier, onOpenSection: ((AndroidSection) -> Unit)? = null) {
     val model: AmbulanceViewModel = viewModel(key = "ambulance-$accountId")
     val state by model.state.collectAsStateWithLifecycle()
     var sheet by rememberSaveable(section) {
@@ -116,7 +116,7 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
             else -> {
                 unitCard(state, canPlan)
                 if (service != null) activeService(service, state, model, now, sheetOpen = { sheet = it.name }, locationFix = model::sendLocation, locationFail = model::reportLocationUnavailable)
-                else idle(state.log)
+                else idle(state.log, onOpenLog = onOpenSection?.let { open -> { open(AndroidSection.LOG) } })
             }
         }
     }
@@ -154,10 +154,11 @@ private fun LazyListScope.activeService(
     item {
         val (done, total) = ParamedicRules.progress(service)
         SectionCard(
-            "${AmbulanceLabels.type(service.type)} · ${stringResource(R.string.amb_prioridad)} ${AmbulanceLabels.priority(service.priority)}",
+            AmbulanceLabels.type(service.type),
             eyebrow = stringResource(R.string.unidad_servicio_activo),
             action = { StatusTag("en_curso") },
         ) {
+            TriageBadge(service.priority)
             LabeledValue(stringResource(R.string.par_origen), service.origin)
             LabeledValue(stringResource(R.string.par_destino), service.destination)
             LabeledValue(stringResource(R.string.par_paciente), ParamedicRules.patientLabel(state.provisional?.record, service.hasPrehospital))
@@ -237,17 +238,22 @@ private fun LocationButton(busy: Boolean, onFix: (Double, Double) -> Unit, onFai
 }
 
 /** Sin servicio: la unidad ya está arriba; aquí van los últimos servicios. */
-private fun LazyListScope.idle(log: List<AmbulanceLogEntry>) {
+private fun LazyListScope.idle(log: List<AmbulanceLogEntry>, onOpenLog: (() -> Unit)?) {
     item { EmptyState(stringResource(R.string.par_titulo_libre), detail = stringResource(R.string.par_libre_detalle), icon = Icons.Default.MyLocation) }
     item { Text(stringResource(R.string.par_ultimos), style = MaterialTheme.typography.titleMedium) }
     if (log.isEmpty()) item { Text(stringResource(R.string.par_sin_ultimos), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     else {
         items(log.take(3), key = { it.id }) { entry ->
-            SectionCard("${AmbulanceLabels.type(entry.type)} · ${AmbulanceLabels.priority(entry.priority)}", eyebrow = localTime(entry.dispatchedAt), action = { OperacionStatusTag(entry.finalState ?: "en_curso", label = AmbulanceLabels.finalState(entry.finalState)) }) {
+            SectionCard(AmbulanceLabels.type(entry.type), eyebrow = localTime(entry.dispatchedAt), action = {
+                if (entry.administrativeClose) FamilyBadge(AmbulanceLabels.ADMINISTRATIVE_CLOSE, StatusFamily.CERRADO)
+                else OperacionStatusTag(entry.finalState ?: "en_curso", label = AmbulanceLabels.finalState(entry.finalState))
+            }) {
+                TriageBadge(entry.priority)
                 Text("${entry.origin} → ${entry.destination}", style = MaterialTheme.typography.bodyMedium)
             }
         }
-        item { Text(stringResource(R.string.par_ver_todos), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        // The full log is one tap away (a link to «Bitácora»), not a sentence that names it.
+        item { if (onOpenLog != null) SecondaryButton(stringResource(R.string.par_abrir_bitacora), onOpenLog) else Text(stringResource(R.string.par_ver_todos), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
@@ -274,7 +280,7 @@ private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel,
         FormField(stringResource(R.string.amb_motivo), form.reason, { model.updatePrehospital(form.copy(reason = it.take(500)), service?.id) }, singleLine = false)
         Text(stringResource(R.string.amb_prioridad), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            AmbulanceLabels.priorities.forEach { (value, label) -> FilterChip(selected = form.priority == value, onClick = { model.updatePrehospital(form.copy(priority = value), service?.id) }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp)) }
+            AmbulanceLabels.priorities.forEach { (value, label) -> StatusFilterChip(form.priority == value, { model.updatePrehospital(form.copy(priority = value), service?.id) }, label, triageTone(value), Modifier.heightIn(min = 48.dp)) }
         }
         Text(stringResource(R.string.par_eta_titulo), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {

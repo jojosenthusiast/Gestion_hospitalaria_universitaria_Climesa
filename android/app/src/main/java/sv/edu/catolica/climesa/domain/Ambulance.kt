@@ -66,6 +66,8 @@ data class OwnRequestService(val dispatchedAt: String, val milestones: List<Ambu
 data class OwnAmbulanceRequest(
     val id: String, val state: String, val address: String, val reason: String, val createdAt: String, val version: Int,
     val service: OwnRequestService? = null, val allowedActions: List<String> = emptyList(), val notice: String = "",
+    /** Why dispatch discarded it (only in state `descartada`); null from an older API. */
+    val discardReason: String? = null,
 ) {
     val canCancel get() = "cancelar" in allowedActions
     /** Still waiting or on its way: the screen follows it instead of offering a new request. */
@@ -98,6 +100,8 @@ data class PrehospitalForm(
 
 object AmbulanceLabels {
     const val ADMINISTRATIVE_CLOSE = "Cierre administrativo"
+    /** Log filter value the API reads as "still without a final state" (`finalState=en_curso`). */
+    const val OPEN = "en_curso"
     val priorities = listOf("roja" to "Roja", "naranja" to "Naranja", "amarilla" to "Amarilla", "verde" to "Verde")
     val types = listOf("emergencia_domicilio" to "Emergencia a domicilio", "traslado_interhospitalario" to "Traslado interhospitalario")
     /** Estados finales sin llegar al hospital (RN-32, MA-AMB-03): siempre con motivo. La API dice cuáles admite cada servicio. */
@@ -137,7 +141,7 @@ object AmbulanceLabels {
     /** Prioridad, estado final y tipo elegidos, como texto de chip. */
     fun chips(filters: LogFilters): List<Pair<String, String>> = buildList {
         if (filters.priority.isNotBlank()) add("priority" to "Prioridad: ${priority(filters.priority)}")
-        if (filters.finalState.isNotBlank()) add("finalState" to "Estado: ${finals[filters.finalState] ?: filters.finalState}")
+        if (filters.finalState.isNotBlank()) add("finalState" to "Estado: ${if (filters.finalState == OPEN) "En curso" else finals[filters.finalState] ?: filters.finalState}")
         if (filters.type.isNotBlank()) add("type" to "Tipo: ${type(filters.type)}")
     }
 }
@@ -228,13 +232,31 @@ object AmbulanceRules {
     /** La solicitud que sigue la pantalla del paciente: la activa más reciente (por confirmar o en camino). */
     fun activeRequest(requests: List<OwnAmbulanceRequest>) = requests.firstOrNull { it.active }
 
+    /**
+     * With nothing active, the most recent request of the last 7 days (the API's window) that already has an outcome:
+     * discarded, cancelled or with its service finished. The patient sees how it ended above the new-request form.
+     */
+    fun latestResolved(requests: List<OwnAmbulanceRequest>) = if (requests.any { it.active }) null else requests.firstOrNull()
+
+    /** Triage colour on the shared priority scale, like the web `priorityLevel`: red is the only emergency. */
+    fun priorityLevel(priority: String) = when (priority) {
+        "roja" -> "emergencia"
+        "naranja", "amarilla" -> "urgente"
+        else -> "rutina"
+    }
+
+    /** Log entries by local day of dispatch, newest day first; each day keeps the server's order. */
+    fun logDays(entries: List<AmbulanceLogEntry>, zone: java.time.ZoneId = java.time.ZoneId.of("America/El_Salvador")): List<Pair<java.time.LocalDate, List<AmbulanceLogEntry>>> =
+        entries.groupBy { runCatching { java.time.Instant.parse(it.dispatchedAt).atZone(zone).toLocalDate() }.getOrDefault(java.time.LocalDate.MIN) }
+            .toList().sortedByDescending { it.first }
+
     /** Qué pasa con la solicitud, en una frase para el paciente. */
     fun requestProgress(request: OwnAmbulanceRequest): String {
         val service = request.service
         return when {
             request.state == "por_confirmar" -> "Despacho te llamará para confirmar antes de mover la ambulancia."
             request.state == "cancelada" -> "Cancelaste esta solicitud."
-            request.state == "descartada" -> "Despacho no pudo atender esta solicitud. Si hay riesgo de vida, llama al 911."
+            request.state == "descartada" -> "Despacho no pudo atender esta solicitud" + (request.discardReason?.takeIf { it.isNotBlank() }?.let { ": ${it.trim()}" } ?: "") + ". Si hay riesgo de vida, llama al 911."
             service == null -> "Despacho confirmó tu solicitud."
             service.finalState != null -> "El servicio terminó: ${AmbulanceLabels.finalState(service.finalState).lowercase()}."
             service.milestones.any { it.type == "en_hospital" } -> "La ambulancia llegó al hospital."
@@ -266,7 +288,7 @@ object AmbulanceRules {
         val where = if (entry.municipality.isNotBlank()) " (${entry.municipality})" else ""
         val patient = if (entry.patientRef.isNotBlank()) "paciente con expediente ${entry.patientRef}" else "sin paciente vinculado"
         val crew = if (entry.crew.isNotEmpty()) ", con ${entry.crew.joinToString(" y ")}" else ""
-        val end = entry.finalState?.let { ", ${AmbulanceLabels.finalState(it).lowercase()}" } ?: ", en curso"
+        val end = if (entry.administrativeClose) ", cierre administrativo" else entry.finalState?.let { ", ${AmbulanceLabels.finalState(it).lowercase()}" } ?: ", en curso"
         return "La ambulancia ${if (moved) "salió" else "fue despachada"} de ${entry.origin}$where hacia ${entry.destination} — $patient$crew$end."
     }
 
@@ -372,7 +394,7 @@ object AmbulanceParser {
 
     fun ownRequests(value: Any?): List<OwnAmbulanceRequest> = objects(value as? JSONArray).map {
         val service = it.optJSONObject("service")?.let { s -> OwnRequestService(s.text("dispatchedAt"), objects(s.optJSONArray("milestones")).map { m -> AmbulanceMilestone(m.text("type"), m.text("occurredAt")) }, s.text("finalState").ifBlank { null }) }
-        OwnAmbulanceRequest(it.text("id"), it.text("state"), it.text("address"), it.text("reason"), it.text("createdAt"), it.optInt("version", 1), service, strings(it.optJSONArray("allowedActions")), it.text("notice"))
+        OwnAmbulanceRequest(it.text("id"), it.text("state"), it.text("address"), it.text("reason"), it.text("createdAt"), it.optInt("version", 1), service, strings(it.optJSONArray("allowedActions")), it.text("notice"), it.text("discardReason").ifBlank { null })
     }
 }
 
