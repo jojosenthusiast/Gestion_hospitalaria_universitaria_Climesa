@@ -20,9 +20,11 @@
     <string name="rec_agendar_sin_resultados">No hay pacientes con ese nombre, DUI o expediente.</string>
     <string name="rec_agendar_mas">Mostrar más resultados</string>
     <string name="rec_agendar_cambiar">Cambiar</string>
-    <string name="rec_agendar_fecha">Fecha: %1$s</string>
+    <string name="rec_agendar_fecha">%1$s</string>
     <string name="rec_agendar_medico">Médico</string>
-    <string name="rec_agendar_medico_ayuda">Los médicos sin turno ese día aparecen apagados.</string>
+    <string name="rec_agendar_medico_ayuda">Primero los médicos con turno ese día. «Todos» muestra también a los que no tienen turno, apagados.</string>
+    <string name="medico_con_turno">Con turno</string>
+    <string name="medico_todos">Todos</string>
     <string name="rec_agendar_sin_turno">Sin turno</string>
     <string name="rec_agendar_horario">Horario</string>
     <string name="rec_agendar_elige_medico">Elige un médico para ver sus horarios del día.</string>

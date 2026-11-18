@@ -32,6 +32,10 @@ import sv.edu.catolica.climesa.domain.AdmissionDraft
 import sv.edu.catolica.climesa.domain.AdmissionIntake
 import sv.edu.catolica.climesa.domain.IntakeBed
 import sv.edu.catolica.climesa.domain.IntakeDoctor
+import sv.edu.catolica.climesa.domain.DoctorShiftFilter
+import sv.edu.catolica.climesa.domain.DoctorShifts
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import sv.edu.catolica.climesa.domain.IsolationType
 import sv.edu.catolica.climesa.domain.OriginKind
 import sv.edu.catolica.climesa.domain.OriginRecord
@@ -129,14 +133,11 @@ private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this
     TextButton(onClick = { model.at(AdmissionIntake.nowLocal()) }) { Text(stringResource(R.string.ing_fecha_ahora)) }
     SectionCard(stringResource(R.string.ing_medico)) {
         Text(stringResource(R.string.ing_medico_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        state.doctors.forEach { DoctorRow(it, draft.doctor?.id == it.id) { model.pickDoctor(it) } }
-    }
-}
-@Composable private fun DoctorRow(d: IntakeDoctor, selected: Boolean, pick: () -> Unit) {
-    TextButton(onClick = pick, enabled = d.available, modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Column(Modifier.weight(1f)) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.specialty ?: stringResource(R.string.ing_medicina_general), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            if (!d.available) FamilyBadge(d.reason ?: stringResource(R.string.ing_medico_sin_turno), StatusFamily.CERRADO) else if (selected) FamilyBadge(stringResource(R.string.ing_elegido), StatusFamily.LISTO)
+        var filter by rememberSaveable { mutableStateOf(DoctorShiftFilter.WITH_SHIFT) }
+        val available: (IntakeDoctor) -> Boolean = { it.available }
+        if (state.doctors.isNotEmpty()) DoctorShiftChips(DoctorShifts.effective(filter, state.doctors, available), state.doctors.size, DoctorShifts.withShift(state.doctors, available)) { filter = it }
+        DoctorShifts.visible(state.doctors, filter, available) { it.id == draft.doctor?.id }.forEach { d ->
+            DoctorShiftRow(d.name, d.specialty ?: stringResource(R.string.ing_medicina_general), d.available, d.reason ?: stringResource(R.string.ing_medico_sin_turno), selected = draft.doctor?.id == d.id, onPick = { model.pickDoctor(d) })
         }
     }
 }

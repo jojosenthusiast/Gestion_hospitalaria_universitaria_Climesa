@@ -171,10 +171,11 @@ object LabProposalRules {
     const val REASON = "Seguimiento de resultados de laboratorio"
     const val DISCARD_MIN = 10
     const val DISCARD_MAX = 500
-    private val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+    /** R4: "16 nov, 09:00", without the year (follow-ups are about this week). */
+    private val formatter = java.time.format.DateTimeFormatter.ofPattern("d MMM, HH:mm", java.util.Locale.forLanguageTag("es-SV"))
     private val zone = java.time.ZoneId.of("America/El_Salvador")
 
-    fun dateTime(iso: String) = runCatching { formatter.format(java.time.Instant.parse(iso).atZone(zone)) }.getOrDefault(iso)
+    fun dateTime(iso: String) = runCatching { formatter.format(java.time.Instant.parse(iso).atZone(zone)).replace(".", "") }.getOrDefault(iso)
 
     private fun JSONObject.text(key: String) = if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
 

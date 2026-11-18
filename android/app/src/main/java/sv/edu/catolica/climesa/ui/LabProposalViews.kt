@@ -28,7 +28,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private val proposalDay = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
 /**
  * C1: «Citas de seguimiento por confirmar» for reception (web `LabFollowUpPanel`): patient, doctor and when the results
@@ -74,7 +73,7 @@ private fun ScheduleForm(p: LabProposal, state: LabProposalsState, model: LabPro
     state.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
     if (linkPending) NoticeBanner(NoticeKind.INFO, stringResource(R.string.seg_enlace_pendiente))
     else {
-        TextButton(onClick = { picker = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.seg_dia, state.date.format(proposalDay))) }
+        TextButton(onClick = { picker = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.seg_dia, sv.edu.catolica.climesa.domain.ShortDay.of(state.date, sv.edu.catolica.climesa.domain.ReceptionScheduling.today()))) }
         when {
             state.loadingSlots -> LoadingState()
             state.slots.none { it.selectable } -> Text(stringResource(R.string.seg_sin_horas), style = MaterialTheme.typography.bodySmall)

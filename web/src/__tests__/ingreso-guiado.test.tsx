@@ -117,6 +117,7 @@ describe('ingreso guiado · recorrido de seis pasos', { timeout: 30000 }, () => 
     await userEvent.type(within(dialog).getByLabelText(/^Motivo del ingreso/), 'Dolor abdominal con fiebre');
     await next();
     // 3. fecha y médico: el médico sin turno aparece apagado
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Todos/ }));
     await userEvent.click(within(dialog).getByRole('combobox', { name: /Médico tratante/ }));
     const off = await within(dialog).findByRole('option', { name: /Dr\. Sin Turno/ });
     expect(off.getAttribute('aria-disabled')).toBe('true');

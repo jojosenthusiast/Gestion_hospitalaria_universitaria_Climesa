@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -29,7 +30,7 @@ private val slotZone = ZoneId.of("America/El_Salvador")
 internal fun slotTime(value: String) = runCatching { slotClock.format(Instant.parse(value).atZone(slotZone)) }.getOrDefault(value)
 
 /**
- * Todas las franjas del día. Las libres van en verde y se pueden elegir; las demás salen apagadas con su motivo
+ * Todas las franjas del día. Las libres van en verde, solo con la hora, y se pueden elegir; las demás salen apagadas con su motivo
  * (Ocupado, Médico sin turno, Ya pasó), nunca solo por color: cada estado lleva su texto.
  */
 @Composable
@@ -51,9 +52,10 @@ internal fun DaySlotGrid(slots: List<DaySlot>, selected: DaySlot?, onSelect: (Da
                 onClick = { onSelect(slot) }, enabled = slot.selectable,
                 shape = MaterialTheme.shapes.small, color = bg, contentColor = fg, border = BorderStroke(2.dp, border),
             ) {
-                Column(Modifier.padding(horizontal = 6.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                // Free tiles show only the time (the green outline already says «libre»); the others name their state.
+                Column(Modifier.heightIn(min = 52.dp).padding(horizontal = 6.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Text(slotTime(slot.start), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text(if (slot.selectable) "Libre" else slot.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    if (!slot.selectable) Text(slot.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
             }
         }

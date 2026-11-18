@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Field, Icon, Notice } from '../../components/ui';
 import { SearchPicker, type PickerItem } from '../../components/search-picker';
+import { DoctorShiftPicker } from '../listas/doctor-shifts';
 import { can, type AccessProfile, type Api } from '../../lib/api';
 import { patientPicker } from '../appointments';
 import { Dialog, Empty, RemoteState, WriteError, formatDateTime, useAction, useData } from '../common';
@@ -96,7 +97,7 @@ function DoctorStep({ api, form, update }: StepProps & { api: Api }) {
   return <>
     <p className="form-intro">Primero la fecha y la hora: solo los médicos con turno en ese horario se pueden elegir; los demás aparecen apagados con su motivo.</p>
     <Field label="Fecha y hora del ingreso" type="datetime-local" value={form.at} onChange={value => update({ at: value, bed: null })} required />
-    <SearchPicker label="Médico tratante" value={form.doctor && { id: form.doctor.id, label: form.doctor.label }} onChange={pick} items={items} required emptyText={doctors.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint="Los médicos sin turno en ese horario aparecen apagados." />
+    <DoctorShiftPicker label="Médico tratante" value={form.doctor && { id: form.doctor.id, label: form.doctor.label }} onChange={pick} items={items} required emptyText={doctors.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint="Primero los médicos con turno en ese horario; «Todos» muestra también a los demás." />
     {doctors.error && <Notice kind="error">{doctors.error.message}</Notice>}
   </>;
 }

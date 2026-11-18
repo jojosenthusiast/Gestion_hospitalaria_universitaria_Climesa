@@ -49,6 +49,26 @@ export function formatDayHeading(value: string | Date) {
   const l = local(value);
   return `${weekday(l)} ${l.day} de ${MONTHS_LONG[l.month - 1]}`;
 }
+const WEEKDAYS_SHORT = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+/**
+ * R4: a day the way people say it, never with the year: "Hoy · mié 18 nov", "Mañana · jue 19 nov", "Ayer · mar 17 nov",
+ * else "Jue 26 nov". A bare `yyyy-MM-dd` is a calendar day.
+ */
+export function formatShortDay(value: string | Date, now: string | Date = new Date()) {
+  const l = local(value), today = local(now);
+  const days = Math.round((Date.UTC(l.year, l.month - 1, l.day) - Date.UTC(today.year, today.month - 1, today.day)) / 86_400_000);
+  const text = `${WEEKDAYS_SHORT[new Date(Date.UTC(l.year, l.month - 1, l.day, 12)).getUTCDay()]} ${l.day} ${MONTHS[l.month - 1]}`;
+  if (days === 0) return `Hoy · ${text}`;
+  if (days === 1) return `Mañana · ${text}`;
+  if (days === -1) return `Ayer · ${text}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+/** R4: "Hoy 09:00", "Mañana 09:00", "Ayer 09:00", else "Jue 26 nov, 09:00"; never the year. */
+export function formatShortDateTime(value: string | Date, now: string | Date = new Date()) {
+  const day = formatShortDay(value, now), time = formatTime(value);
+  const near = day.split(' · ');
+  return near.length === 2 ? `${near[0]} ${time}` : `${day}, ${time}`;
+}
 /** `yyyy-MM-dd` of the instant in hospital time. */
 export const localDayKey = (value: string | Date) => { const l = local(value); return `${l.year}-${pad(l.month)}-${pad(l.day)}`; };
 

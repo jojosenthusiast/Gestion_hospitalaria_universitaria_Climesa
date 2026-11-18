@@ -149,3 +149,4 @@
 /* G1: the row just registered stays marked (same soft fill as a selected item) until the next registration. */
 .record-table tbody tr.is-new > * { background: var(--soft); }
 .record-table tbody tr.is-new > :first-child { box-shadow: inset 3px 0 0 var(--primary); }
+.doctor-shift-picker { display: grid; gap: 8px; align-content: start; }

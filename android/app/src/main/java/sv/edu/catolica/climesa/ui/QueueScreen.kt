@@ -472,7 +472,8 @@ internal fun IssuePanel(state: QueueState, model: QueueViewModel, modifier: Modi
             }
             Text(stringResource(R.string.fila_prioridad), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                listOf("rutina", "urgente", "emergencia").forEach { value -> androidx.compose.material3.FilterChip(selected = priority == value, onClick = { priority = value }, enabled = !sending, label = { Text(QueueLabels.priority(value)) }) }
+                // R2: each priority chip wears its priority badge (routine stays neutral, like the web).
+                listOf("rutina", "urgente", "emergencia").forEach { value -> StatusFilterChip(priority == value, { priority = value }, QueueLabels.priority(value), Priority.of(value).takeIf { it != Priority.RUTINA }?.let { ChipTone.Level(it) }, enabled = !sending) }
             }
             Text(stringResource(R.string.fila_prioridad_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

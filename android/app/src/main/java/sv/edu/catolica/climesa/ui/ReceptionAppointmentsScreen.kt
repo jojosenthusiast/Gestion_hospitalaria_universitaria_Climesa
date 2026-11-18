@@ -46,12 +46,11 @@ import sv.edu.catolica.climesa.domain.PickerPatient
 import sv.edu.catolica.climesa.domain.QuickAction
 import sv.edu.catolica.climesa.domain.ReceptionAppointment
 import sv.edu.catolica.climesa.domain.SchedulingDoctor
+import sv.edu.catolica.climesa.domain.DoctorShiftFilter
+import sv.edu.catolica.climesa.domain.DoctorShifts
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
-private val dayFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-private val dateTimeFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 private val zone = ZoneId.of("America/El_Salvador")
 
 /** A32 Citas de Recepción: lista de citas y flujo para agendar con búsqueda de paciente, médicos con/sin turno y franjas del día. */
@@ -229,7 +228,7 @@ private fun SchedulingForm(state: ReceptionAppointmentsState, model: ReceptionAp
         item { SectionIntro(stringResource(R.string.rec_citas_eyebrow), stringResource(R.string.rec_citas_agendar), stringResource(R.string.rec_citas_detalle)) }
         state.error?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
         item { PatientPicker(state, model) }
-        item { OutlinedButton(onClick = { datePicker = true }, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(Icons.Default.CalendarMonth, null); Spacer(Modifier.padding(4.dp)); Text(stringResource(R.string.rec_agendar_fecha, state.date.format(dayFormat))) } }
+        item { OutlinedButton(onClick = { datePicker = true }, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(Icons.Default.CalendarMonth, null); Spacer(Modifier.padding(4.dp)); Text(stringResource(R.string.rec_agendar_fecha, sv.edu.catolica.climesa.domain.ShortDay.of(state.date, sv.edu.catolica.climesa.domain.ReceptionScheduling.today()))) } }
         item { DoctorPicker(state, model) }
         item { SlotSection(state, model) }
         item { FormField(stringResource(R.string.rec_agendar_motivo), state.reason, model::reason, singleLine = false) }
@@ -237,9 +236,10 @@ private fun SchedulingForm(state: ReceptionAppointmentsState, model: ReceptionAp
         item { SecondaryButton(stringResource(R.string.ui_cancelar), model::closeScheduling, icon = Icons.Default.Close, enabled = !state.saving) }
     }
     if (datePicker) {
-        val picker = rememberDatePickerState(initialSelectedDateMillis = state.date.atStartOfDay(zone).toInstant().toEpochMilli())
+        // Material 3 date pickers speak UTC midnight; reading them in El Salvador time picked the day before.
+        val picker = rememberDatePickerState(initialSelectedDateMillis = state.date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli())
         DatePickerDialog(onDismissRequest = { datePicker = false },
-            confirmButton = { TextButton(onClick = { picker.selectedDateMillis?.let { model.selectDate(Instant.ofEpochMilli(it).atZone(zone).toLocalDate()) }; datePicker = false }) { Text("Aceptar") } },
+            confirmButton = { TextButton(onClick = { picker.selectedDateMillis?.let { model.selectDate(Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate()) }; datePicker = false }) { Text("Aceptar") } },
             dismissButton = { TextButton(onClick = { datePicker = false }) { Text(stringResource(R.string.ui_cancelar)) } }) { DatePicker(state = picker) }
     }
 }
@@ -252,27 +252,18 @@ private fun PatientPicker(state: ReceptionAppointmentsState, model: ReceptionApp
     }
 }
 
-/** Médicos del día: los que no tienen turno salen apagados y con su motivo, y no se pueden elegir. */
+/** Médicos del día (R1-R3): primero los que tienen turno, cada uno con su etiqueta; «Con turno» oculta a los demás. */
 @Composable
 private fun DoctorPicker(state: ReceptionAppointmentsState, model: ReceptionAppointmentsViewModel) {
+    var filter by rememberSaveable { mutableStateOf(DoctorShiftFilter.WITH_SHIFT) }
+    val hasShift: (SchedulingDoctor) -> Boolean = { it.hasShift }
     SectionCard(stringResource(R.string.rec_agendar_medico)) {
         Text(stringResource(R.string.rec_agendar_medico_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        state.doctors.forEach { d -> DoctorRow(d, selected = state.doctor?.id == d.id) { model.pickDoctor(d) } }
-    }
-}
-@Composable private fun DoctorRow(d: SchedulingDoctor, selected: Boolean, pick: () -> Unit) {
-    val colors = MaterialTheme.climesa
-    TextButton(onClick = pick, enabled = d.hasShift, modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text(d.name, style = MaterialTheme.typography.titleSmall)
-                Text(d.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (!d.hasShift) FamilyBadge(d.reason ?: stringResource(R.string.rec_agendar_sin_turno), StatusFamily.CERRADO)
-            else if (selected) FamilyBadge(stringResource(R.string.rec_leyenda_libre), StatusFamily.LISTO)
+        if (state.doctors.isNotEmpty()) DoctorShiftChips(DoctorShifts.effective(filter, state.doctors, hasShift), state.doctors.size, DoctorShifts.withShift(state.doctors, hasShift)) { filter = it }
+        DoctorShifts.visible(state.doctors, filter, hasShift) { it.id == state.doctor?.id }.forEach { d ->
+            DoctorShiftRow(d.name, d.detail, d.hasShift, d.reason, selected = state.doctor?.id == d.id, onPick = { model.pickDoctor(d) })
         }
     }
-    HorizontalDivider(color = colors.line)
 }
 
 @Composable
@@ -296,6 +287,7 @@ private fun SlotSection(state: ReceptionAppointmentsState, model: ReceptionAppoi
     }
 }
 
-private val shortFormat = DateTimeFormatter.ofPattern("dd/MM HH:mm")
-internal fun formatShort(value: String) = runCatching { shortFormat.format(Instant.parse(value).atZone(zone)) }.getOrDefault(value)
-private fun formatInstant(value: String) = runCatching { dateTimeFormat.format(Instant.parse(value).atZone(zone)) }.getOrDefault(value)
+/** R4: "Mañana 09:00", "Jue 26 nov, 09:00" instead of "26/11 09:00". */
+internal fun formatShort(value: String) = runCatching { sv.edu.catolica.climesa.domain.MyShifts.relative(Instant.parse(value), Instant.now()) }.getOrDefault(value)
+/** R4: "Hoy 09:00", "Jueves 09:00", "Jue 26 nov, 09:00"; never the year. */
+private fun formatInstant(value: String) = runCatching { sv.edu.catolica.climesa.domain.MyShifts.relative(Instant.parse(value), Instant.now()) }.getOrDefault(value)

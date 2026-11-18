@@ -46,8 +46,6 @@ import sv.edu.catolica.climesa.domain.AppointmentReasons
 import sv.edu.catolica.climesa.domain.PatientAppointment
 import sv.edu.catolica.climesa.domain.QuickAction
 
-private val appointmentDateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-private val appointmentTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 private val sanSalvador = ZoneId.of("America/El_Salvador")
 
 @Composable
@@ -222,4 +220,5 @@ private fun CancelAppointmentDialog(appointment: PatientAppointment, busy: Boole
     )
 }
 
-private fun formatAppointmentDateTime(value: String) = runCatching { appointmentTimeFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault("—")
+/** R4: "Mañana 09:00", "Jue 26 nov, 09:00"; never the year. */
+private fun formatAppointmentDateTime(value: String) = runCatching { sv.edu.catolica.climesa.domain.MyShifts.relative(Instant.parse(value), Instant.now()) }.getOrDefault("—")
