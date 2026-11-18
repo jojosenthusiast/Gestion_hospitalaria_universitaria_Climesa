@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { MoreLink } from '../../components/fold';
 import { BarChart, HBarList, type Tone } from '../../components/charts';
 import { roleNames, staffTypeNames, type AccessProfile, type Appointment, type AuditRow, type Shift } from '../../lib/api';
 import { formatDate, formatDuration, formatPercent, formatRelative, formatTime, minutesSince, plural } from '../../lib/format';
@@ -30,12 +31,14 @@ const nextShift = (rows: Shift[]) => [...rows].filter(s => s.state !== 'cancelad
 const PRIORITY_ORDER: Record<string, number> = { emergencia: 0, urgente: 1, rutina: 2 };
 const asRemote = <T,>(remote: Remote<T>) => remote as Remote<unknown>;
 
-function Timeline({ items }: { items: { id: string; start: string; end?: string; title: string; detail?: string; tag: ReactNode }[] }) {
-  const now = Date.now();
-  return <ol className="timeline">{items.map(item => {
+type TimelineItem = { id: string; start: string; end?: string; title: string; detail?: string; tag: ReactNode };
+/** R3: `limit` rows at most; the rest folds behind «Ver N más», a link to the full screen (`moreHref`). */
+function Timeline({ items: all, limit = 8, moreHref }: { items: TimelineItem[]; limit?: number; moreHref?: string }) {
+  const now = Date.now(), items = all.slice(0, limit);
+  return <><ol className="timeline">{items.map(item => {
     const current = new Date(item.start).getTime() <= now && (!item.end || new Date(item.end).getTime() > now);
     return <li key={item.id} className={current ? 'is-now' : undefined}><time dateTime={item.start}>{timeLabel(item.start)}</time><div><strong>{item.title}</strong>{item.detail && <span>{item.detail}</span>}</div>{item.tag}</li>;
-  })}</ol>;
+  })}</ol>{moreHref && <MoreLink count={all.length - items.length} href={moreHref} />}</>;
 }
 
 /** Today's agenda, still to come first: a past confirmed appointment reads «Vencida», never «Confirmada» hours later (W-REC-7). */
@@ -43,7 +46,7 @@ function AppointmentsToday({ appts }: { appts: Remote<Appointment[]> }) {
   return <Panel title="Agenda de hoy" icon="calendar" action={{ label: 'Abrir citas', href: '#/citas' }}>
     <PanelState state={appts} empty={rows => todays(rows).length === 0 ? 'No hay citas para hoy.' : null}>{rows => {
       const now = Date.now(), list = todays(rows), ahead = list.filter(a => Date.parse(a.end) >= now), past = list.filter(a => Date.parse(a.end) < now);
-      return <Timeline items={[...ahead, ...past].slice(0, 8).map(a => ({ id: a.id, start: a.start, end: a.end, title: a.patientName, detail: a.doctorName, tag: <StatusBadge value={shownState(a, now)} /> }))} />;
+      return <Timeline moreHref="#/citas" items={[...ahead, ...past].map(a => ({ id: a.id, start: a.start, end: a.end, title: a.patientName, detail: a.doctorName, tag: <StatusBadge value={shownState(a, now)} /> }))} />;
     }}</PanelState>
   </Panel>;
 }
@@ -233,7 +236,7 @@ const ast: RoleDashboard = {
   panels: ({ d }) => grid(<>
     {/* WC-51: same order as the queue rule (emergencies, then urgent, then arrival number), never by issue time alone. */}
     <Panel title="Quién sigue" icon="megaphone" action={{ label: 'Abrir la fila', href: '#/fila' }}>
-      <PanelState state={d.queue}>{rows => <AttentionList empty="Nadie espera ahora." items={tickets(rows, 'en_espera').sort((a, b) => priorityOf(a) - priorityOf(b) || a.numero - b.numero).map(t => ({ id: t.id, title: t.patientName ?? `Número ${t.numero}`, detail: `Número ${t.numero} · espera ${formatDuration(minutesSince(t.issuedAt))}`, tone: 'info' as Tone, href: '#/fila?accion=llamar', action: 'Llamar' }))} />}</PanelState>
+      <PanelState state={d.queue}>{rows => <AttentionList empty="Nadie espera ahora." moreHref="#/fila" items={tickets(rows, 'en_espera').sort((a, b) => priorityOf(a) - priorityOf(b) || a.numero - b.numero).map(t => ({ id: t.id, title: t.patientName ?? `Número ${t.numero}`, detail: `Número ${t.numero} · espera ${formatDuration(minutesSince(t.issuedAt))}`, tone: 'info' as Tone, href: '#/fila?accion=llamar', action: 'Llamar' }))} />}</PanelState>
     </Panel>
     <MyShift shifts={d.myShifts} />
   </>),
@@ -279,7 +282,7 @@ const med: RoleDashboard = {
   ],
   panels: ({ d }) => grid(<>
     <Panel title="Mi agenda de hoy" icon="calendar" action={{ label: 'Abrir mi consultorio', href: '#/consultas' }}>
-      <PanelState state={d.agenda} empty={rows => rows.filter(a => isToday(a.start)).length === 0 ? 'No tienes citas para hoy.' : null}>{rows => <Timeline items={rows.filter(a => isToday(a.start)).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 8).map(a => ({ id: a.appointmentId, start: a.start, end: a.end, title: a.patientName, detail: a.reason ?? undefined, tag: <StatusBadge value={a.consultationState ?? shownState({ state: a.appointmentState, end: a.end })} /> }))} />}</PanelState>
+      <PanelState state={d.agenda} empty={rows => rows.filter(a => isToday(a.start)).length === 0 ? 'No tienes citas para hoy.' : null}>{rows => <Timeline moreHref="#/consultas" items={rows.filter(a => isToday(a.start)).sort((a, b) => a.start.localeCompare(b.start)).map(a => ({ id: a.appointmentId, start: a.start, end: a.end, title: a.patientName, detail: a.reason ?? undefined, tag: <StatusBadge value={a.consultationState ?? shownState({ state: a.appointmentState, end: a.end })} /> }))} />}</PanelState>
     </Panel>
     <MyShift shifts={d.myShifts} />
   </>),
@@ -353,7 +356,7 @@ const pac: RoleDashboard = {
     fig('resultados', 'Resultados listos', d.myLab, r => r.filter(o => o.state === 'completado' && o.reviewedAt).length),
   ],
   panels: ({ d }) => grid(<Panel title="Mis próximas citas" icon="calendar" action={{ label: 'Abrir citas', href: '#/citas' }}>
-    <PanelState state={d.appts} empty={rows => upcoming(rows).length === 0 ? 'No tienes citas próximas.' : null}>{rows => <Timeline items={upcoming(rows).slice(0, 5).map(a => ({ id: a.id, start: a.start, end: a.end, title: a.doctorName, detail: formatDate(a.start), tag: <StatusBadge value={a.state} /> }))} />}</PanelState>
+    <PanelState state={d.appts} empty={rows => upcoming(rows).length === 0 ? 'No tienes citas próximas.' : null}>{rows => <Timeline limit={5} moreHref="#/citas" items={upcoming(rows).map(a => ({ id: a.id, start: a.start, end: a.end, title: a.doctorName, detail: formatDate(a.start), tag: <StatusBadge value={a.state} /> }))} />}</PanelState>
   </Panel>),
 };
 

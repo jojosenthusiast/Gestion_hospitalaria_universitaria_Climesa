@@ -1,3 +1,4 @@
+import { MoreLink } from '../../components/fold';
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../../components/ui';
 import { AreaTag, SectionState, StatusBadge, type AreaCode } from '../../components/system';
@@ -39,16 +40,17 @@ export type AttentionItem = { id: string; title: string; detail?: string; tone: 
  * Rows of a pending group. The name owns line 1 at full width (a 4-part Salvadoran name never wraps into 4 lines
  * because a chip or button ate the width); state and detail go on line 2; the action sits at the right of both.
  */
-export function AttentionList({ items, empty = 'Nada pendiente por ahora.', limit = 4 }: { items: AttentionItem[]; empty?: string; limit?: number }) {
+/** R3: beyond `limit` the rest is folded; with `moreHref` a «Ver N más» link opens the full screen (a tray group already links from its header). */
+export function AttentionList({ items, empty = 'Nada pendiente por ahora.', limit = 4, moreHref }: { items: AttentionItem[]; empty?: string; limit?: number; moreHref?: string }) {
   if (items.length === 0) return <p className="section-empty" role="status">{empty}</p>;
-  return <ul className="tray-list">{items.slice(0, limit).map(item => <li key={item.id} className="tray-row">
+  return <><ul className="tray-list">{items.slice(0, limit).map(item => <li key={item.id} className="tray-row">
     <strong className="tray-row-name">{item.title}</strong>
     <a className="row-action tray-row-action" href={item.href}>{item.action}<Icon name="arrow" size={16} /></a>
     {(item.detail || item.status || item.area || item.tag) && <span className="tray-row-meta">
       {item.status ? <StatusBadge value={item.status} label={item.tag} /> : item.area ? <AreaTag code={item.area} /> : item.tag && <span className="tray-row-tag">{item.tag}</span>}
       {item.detail && <span className="tray-row-detail">{item.detail}</span>}
     </span>}
-  </li>)}</ul>;
+  </li>)}</ul>{moreHref && <MoreLink count={items.length - limit} href={moreHref} />}</>;
 }
 
 /** One group of the pending tray. Hidden when it has nothing; its count is the only place this number appears. */

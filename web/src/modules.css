@@ -714,6 +714,7 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .qb-dock-value strong { font-size: var(--text-2xl); line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qb-dock-value .qb-dock-none { color: var(--muted); font-size: var(--text-lg); }
 .qb-dock-stat small { color: var(--muted); font-size: var(--text-xs); }
+.qb-dock-wait .qb-dock-value strong { color: var(--primary-text); }
 .qb-dock-actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--space-3); }
 .qb-dock-actions > button { width: 100%; justify-content: center; }
 /* Inside the dock the undo is a line of the dock, not a floating toast that would cover it. */
@@ -746,3 +747,5 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .date-native { position: absolute; right: 4px; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
 /* Sweep 2026-11-17: times and durations use plain-zero tabular figures (see --font-figures). */
 .slot strong, .qb-wait, .qb-avg, .ag-time, .lw-elapsed, .shift-block-time, .lab-slot, .figure-value { font-family: var(--font-figures); font-variant-numeric: tabular-nums; }
+/* R3: «Ver N más» under a folded list (components/fold.tsx). */
+.fold-more { display: inline-flex; margin-top: var(--space-2); }

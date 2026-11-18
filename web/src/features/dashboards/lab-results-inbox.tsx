@@ -6,6 +6,7 @@ import { releaseLines, type ReleaseValue } from '../../lib/lab-sheet';
 import { WriteError, useAction, useData, type Remote } from '../common';
 import { ReleaseDialog, releasedMessage } from '../lab-release';
 import { spanishProblem } from '../problems';
+import { useFold } from '../../components/fold';
 import './lab-follow-up.css';
 
 /**
@@ -26,10 +27,12 @@ export function LabResultsInbox({ api, profile, version, state, inTray = false }
   const own = useData<LabFollowUp[]>(api, '/laboratorio/pendientes', version, allowed && !state);
   const data = state ?? own;
   const [released, setReleased] = useState<string | null>(null);
-  if (!allowed) return null;
   const rows = data.data ? sortFollowUps(data.data) : null;
+  // R3: sorted by urgency, the first rows show and the rest fold behind «Ver N más».
+  const fold = useFold(rows ?? [], 3);
+  if (!allowed) return null;
   const doneNotice = released && <Notice kind="success">{released}</Notice>;
-  const list = () => <ul className="lab-follow-up-list">{rows!.map(item => <FollowUpRow key={item.id} api={api} item={item} onDone={data.refresh} onReleased={setReleased} />)}</ul>;
+  const list = () => <><ul className="lab-follow-up-list">{fold.shown.map(item => <FollowUpRow key={item.id} api={api} item={item} onDone={data.refresh} onReleased={setReleased} />)}</ul>{fold.more}</>;
   if (inTray && rows && !data.error && rows.length === 0 && !released) return null;
   if (inTray) return <section className="tray-group" aria-label="Resultados por revisar">
     <header><h3>Resultados por revisar</h3>{rows && rows.length > 0 && <span className="tray-count">{rows.length}</span>}</header>
