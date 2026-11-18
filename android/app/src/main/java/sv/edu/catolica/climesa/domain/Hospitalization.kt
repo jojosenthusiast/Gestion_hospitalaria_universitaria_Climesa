@@ -39,8 +39,8 @@ enum class DischargeType(val value: String, val label: String) {
 }
 
 /**
- * The current signed discharge of an admission (`discharge` of `GET /admisiones`), without the clinical summary.
- * D-031: [type] and [pending] are null for readers without a care relationship (Recepción); [pendingCount] and
+ * The current signed discharge of an admission (`discharge` of `GET /admisiones`).
+ * D-031: [type], [pending], [summary], [diagnoses] and [followUp] are null for readers without a care relationship (Recepción); [pendingCount] and
  * [specialHandling] always come.
  */
 data class AdmissionDischarge(
@@ -50,6 +50,12 @@ data class AdmissionDischarge(
     val pending: List<DischargePending>?,
     val pendingCount: Int = pending?.size ?: 0,
     val specialHandling: Boolean = false,
+    /** D7: indications written at the signature; null without a care relationship or when none was written. */
+    val summary: String? = null,
+    /** D7: diagnoses of the stay; null without a care relationship. */
+    val diagnoses: List<DischargeDiagnosis>? = null,
+    /** D7: the patient's next appointment after the discharge. */
+    val followUp: DischargeFollowUp? = null,
 )
 
 /** One row of `GET /admisiones`. */
@@ -117,6 +123,9 @@ object AdmissionParser {
                     if (d.isNull("pending")) null else objects(d.optJSONArray("pending")).map { DischargePending(it.optString("description"), it.optString("responsible")) },
                     d.optInt("pendingCount", d.optJSONArray("pending")?.length() ?: 0),
                     d.optBoolean("specialHandling"),
+                    d.textOrNull("summary"),
+                    if (d.isNull("diagnoses")) null else objects(d.optJSONArray("diagnoses")).map { DischargeDiagnosis(it.optString("code"), it.optString("description"), it.optBoolean("principal")) },
+                    if (d.isNull("followUp")) null else d.optJSONObject("followUp")?.let { f -> f.textOrNull("at")?.let { at -> DischargeFollowUp(at, f.optString("state"), f.textOrNull("doctorName"), f.textOrNull("specialty")) } },
                 )
             },
             allowedActions = (0 until (actions?.length() ?: 0)).mapNotNull { i -> actions?.optString(i)?.let(AdmissionAction::fromWire) }.toSet(),
@@ -145,9 +154,9 @@ object AdmissionParser {
  */
 /** «Mi habitación» of the patient (iOS `RoomRules`): the API only returns the patient's own admissions. */
 object MyRoomRules {
-    /** Current stay with an assigned bed. */
+    /** Current stay with an assigned bed; a signed discharge stays in the bed until the physical exit. */
     fun current(admissions: List<HospitalAdmission>, patientId: String? = null): HospitalAdmission? =
-        admissions.firstOrNull { it.state == "hospitalizado" && it.bed.isNotBlank() && (patientId == null || it.patientId == null || it.patientId == patientId) }
+        admissions.firstOrNull { it.state in setOf("hospitalizado", "alta_firmada") && it.bed.isNotBlank() && (patientId == null || it.patientId == null || it.patientId == patientId) }
 
     /** Requested stay still waiting for a bed. */
     fun waiting(admissions: List<HospitalAdmission>, patientId: String? = null): HospitalAdmission? =

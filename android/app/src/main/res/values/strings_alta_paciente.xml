@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- D7: resumen del alta en «Mi habitación» -->
+    <string name="pac_alta_titulo">Resumen de tu alta</string>
+    <string name="pac_alta_egresado">Tu estancia terminó. Este resumen queda disponible 30 días después del alta.</string>
+    <string name="pac_alta_diagnosticos">Diagnósticos</string>
+    <string name="pac_alta_diagnosticos_ninguno">Sin diagnósticos registrados en la estancia.</string>
+    <string name="pac_alta_indicaciones">Indicaciones</string>
+    <string name="pac_alta_indicaciones_ninguna">Tu médico no escribió indicaciones.</string>
+    <string name="pac_alta_pendientes">Pendientes</string>
+    <string name="pac_alta_pendientes_ninguno">No quedaron pendientes.</string>
+    <string name="pac_alta_seguimiento">Seguimiento</string>
+    <string name="pac_alta_seguimiento_ninguno">Sin cita de control agendada. Pide una en «Mis citas».</string>
+</resources>
