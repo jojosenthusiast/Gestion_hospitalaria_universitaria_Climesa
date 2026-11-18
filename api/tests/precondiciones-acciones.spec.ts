@@ -58,8 +58,21 @@ describe('Precondiciones: lo que el cliente ofrece es lo que la API acepta', () 
       expect((await t.call('ENF', 'GET', `/pacientes/${stranger}/signos`)).status).toBe(403);
       expect((await pick('ENF', today)).careContext).toBe(true);
       expect((await t.call('ENF', 'GET', `/pacientes/${today}/signos`)).status).toBe(200);
-      // Callers without clinical context requirements still get the flag.
-      expect(typeof (await pick('REC', today)).careContext).toBe('boolean');
+      // Privacy: without signos.registrar the care activity is not revealed.
+      expect((await pick('REC', today)).careContext).toBeNull();
+    });
+
+    test('privacy: admission status and care activity only for who may already see them', async () => {
+      const patientId = await t.patient({});
+      expect((await t.call('REC', 'POST', '/admisiones', await t.admissionBody(patientId, { requestedCategory: 'semiprivada', isolation: false }))).status).toBe(201);
+      // LAB: neither admision.ver/admision.crear nor signos.registrar.
+      expect(await pick('LAB', patientId)).toMatchObject({ activeAdmission: null, careContext: null });
+      // PAR: no admission permission, but it records vital signs.
+      expect(await pick('PAR', patientId)).toMatchObject({ activeAdmission: null, careContext: true });
+      // REC (admision.crear) still learns the admission; ENF and AST (signos.registrar) still get the care context.
+      expect((await pick('REC', patientId)).activeAdmission).toBe(true);
+      expect((await pick('ENF', patientId)).careContext).toBe(true);
+      expect((await pick('AST', patientId)).careContext).toBe(true);
     });
   });
 

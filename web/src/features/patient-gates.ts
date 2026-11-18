@@ -1,5 +1,5 @@
-/** S1 (preconditions): absent flags (an older API) keep every row available, as before. */
-export type PickerPatientRow = { id: string; record: string; fullName: string; age?: number | null; active?: boolean; activeAdmission?: boolean; careContext?: boolean };
+/** S1 (preconditions): absent or null flags (an older API, or a caller not allowed to see them) keep the row available, as before. */
+export type PickerPatientRow = { id: string; record: string; fullName: string; age?: number | null; active?: boolean; activeAdmission?: boolean | null; careContext?: boolean | null };
 /** What the picker is for: `attend` (number, appointment, front desk) or `admit` (admission intake). */
 export type PatientPickerGate = 'attend' | 'admit';
 export const PATIENT_INACTIVE_REASON = 'Paciente inactivo: actívalo en Pacientes para atenderlo.';

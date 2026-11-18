@@ -15,6 +15,7 @@ const rows = [
   { id: 'p-off', record: '9900002', fullName: 'Paciente Inactivo', active: false, activeAdmission: false, careContext: false },
   { id: 'p-in', record: '9900003', fullName: 'Paciente Ingresado', active: true, activeAdmission: true, careContext: true },
   { id: 'p-old', record: '9900004', fullName: 'Paciente Sin Banderas' },
+  { id: 'p-hidden', record: '9900005', fullName: 'Paciente Sin Permiso', active: true, activeAdmission: null, careContext: null },
 ];
 const api = { request: vi.fn(async () => ({ items: rows, hasMore: false })) } as unknown as Api;
 
@@ -45,6 +46,8 @@ describe('S1 · selector de pacientes con precondiciones', () => {
     expect(page.items.find(i => i.id === 'p-off')).toMatchObject({ disabled: true, reason: PATIENT_INACTIVE_REASON });
     expect(page.items.find(i => i.id === 'p-ok')?.disabled).toBeUndefined();
     expect(page.items.find(i => i.id === 'p-old')?.disabled).toBeUndefined();
+    // null: the caller may not see the admission status, so the row keeps today's behavior.
+    expect(page.items.find(i => i.id === 'p-hidden')?.disabled).toBeUndefined();
   });
 
   it('a picker without a gate (for example the ambulance call) keeps every row available', async () => {

@@ -3131,10 +3131,10 @@ export interface components {
             age?: number;
             /** @description Paciente activo o provisional; uno inactivo se lista pero no se atiende (fila, cita, consulta, admisión) */
             active: boolean;
-            /** @description Tiene una admisión activa (pendiente de cama, hospitalizado o alta firmada): no admite otra */
-            activeAdmission: boolean;
-            /** @description El actor tiene contexto de atención con el paciente (misma regla que registrar signos vitales fuera de consulta) */
-            careContext: boolean;
+            /** @description Tiene una admisión activa (pendiente de cama, hospitalizado o alta firmada): no admite otra. null sin admision.ver global ni admision.crear */
+            activeAdmission: boolean | null;
+            /** @description El actor tiene contexto de atención con el paciente (misma regla que registrar signos vitales fuera de consulta). null sin signos.registrar */
+            careContext: boolean | null;
             /** @description Cita confirmada de hoy (B-2); solo con citas.ver global */
             appointmentToday?: components["schemas"]["PatientAppointmentTodayResponse"] | null;
             /** @description Número de fila vigente de hoy; solo con fila.ver global */

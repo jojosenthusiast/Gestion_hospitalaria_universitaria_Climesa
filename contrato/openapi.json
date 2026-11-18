@@ -20161,11 +20161,13 @@
           },
           "activeAdmission": {
             "type": "boolean",
-            "description": "Tiene una admisión activa (pendiente de cama, hospitalizado o alta firmada): no admite otra"
+            "nullable": true,
+            "description": "Tiene una admisión activa (pendiente de cama, hospitalizado o alta firmada): no admite otra. null sin admision.ver global ni admision.crear"
           },
           "careContext": {
             "type": "boolean",
-            "description": "El actor tiene contexto de atención con el paciente (misma regla que registrar signos vitales fuera de consulta)"
+            "nullable": true,
+            "description": "El actor tiene contexto de atención con el paciente (misma regla que registrar signos vitales fuera de consulta). null sin signos.registrar"
           },
           "appointmentToday": {
             "nullable": true,

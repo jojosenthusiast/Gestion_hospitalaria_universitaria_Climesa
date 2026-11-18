@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { ProblemException, VersionConflictException } from '../platform/problem';
-import { Actor, hasPermission } from '../platform/actor';
+import { Actor, contextsOf, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
 import { Clock, businessDate } from '../platform/clock';
@@ -51,10 +51,13 @@ export class PatientsService {
       const ids=page.map(p=>p.id);
       const today=await this.todayAtDesk(c,actor,ids);
       // S1 (preconditions): what every picker needs to disable a row before the tap instead of letting the POST refuse it.
-      const admitted=new Set(ids.length?(await c.query(`SELECT DISTINCT paciente_id FROM hospitalizacion.admision WHERE paciente_id=ANY($1::uuid[]) AND estado IN ('pendiente_cama','hospitalizado','alta_firmada')`,[ids])).rows.map(r=>r.paciente_id as string):[]);
-      const care=await careContextPatients(c,actor.staffId,ids,this.clock.now());
+      // Privacy: admission status only for who already sees it (global admision.ver or admision.crear); care activity
+      // only for who records vital signs. Everyone else gets null (patient-list.filters.ts keeps the same line).
+      const seesAdmission=contextsOf(actor,'admision.ver').includes('x')||hasPermission(actor,'admision.crear'),seesCare=hasPermission(actor,'signos.registrar');
+      const admitted=new Set(seesAdmission&&ids.length?(await c.query(`SELECT DISTINCT paciente_id FROM hospitalizacion.admision WHERE paciente_id=ANY($1::uuid[]) AND estado IN ('pendiente_cama','hospitalizado','alta_firmada')`,[ids])).rows.map(r=>r.paciente_id as string):[]);
+      const care=seesCare?await careContextPatients(c,actor.staffId,ids,this.clock.now()):new Set<string>();
       return {items:page.map(p=>({id:p.id,record:p.record,fullName:p.fullName,...(showAge&&p.birth?{age:this.age({nacimiento:p.birth})}:{}),...today(p.id),
-        active:ATTENDABLE.includes(p.state),activeAdmission:admitted.has(p.id),careContext:care.has(p.id)})),offset,limit,hasMore:rows.length>limit};
+        active:ATTENDABLE.includes(p.state),activeAdmission:seesAdmission?admitted.has(p.id):null,careContext:seesCare?care.has(p.id):null})),offset,limit,hasMore:rows.length>limit};
     });
   }
   /**
