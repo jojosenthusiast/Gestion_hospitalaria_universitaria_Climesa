@@ -240,6 +240,13 @@ public enum PatientLabRules {
     /// pending order never says so.
     public static func awaitsReview(_ order: LabOrder) -> Bool { order.state == .completado && order.reviewedAt == nil }
 
+    /// Closed results (released or cancelled) beyond the newest `keep` fold under «Ver N más»; open orders always show.
+    public static func fold(_ orders: [LabOrder], keep: Int = 3) -> (shown: [LabOrder], folded: [LabOrder]) {
+        let closed: (LabOrder) -> Bool = { $0.state == .cancelado || ($0.state == .completado && $0.reviewedAt != nil) }
+        let kept = Set(orders.filter(closed).prefix(keep).map(\.id))
+        return (orders.filter { !closed($0) || kept.contains($0.id) }, orders.filter { closed($0) && !kept.contains($0.id) })
+    }
+
     /// One es-SV number format for lab values on every screen («13.5», «452», at most three decimals, no grouping).
     public static func number(_ value: Double) -> String {
         let formatter = NumberFormatter()

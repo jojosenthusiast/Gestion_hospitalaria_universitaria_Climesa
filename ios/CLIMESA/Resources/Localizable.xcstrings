@@ -5786,6 +5786,28 @@
           }
         }
       }
+    },
+    "exams.more": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver %lld más"
+          }
+        }
+      }
+    },
+    "exams.less": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver menos"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

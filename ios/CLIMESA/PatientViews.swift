@@ -837,6 +837,7 @@ struct PatientExamsView: View {
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<[LabOrder]>()
     @State private var filter: LabFilter = .all
+    @State private var showPast = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.space4) {
@@ -855,13 +856,18 @@ struct PatientExamsView: View {
                     .accessibilityLabel(Text("exams.filter"))
                     let shown = filter.apply(orders)
                     if shown.isEmpty { EmptyStateView(title: L.text(orders.isEmpty ? "exams.none" : "exams.filter.none"), symbol: "testtube.2") }
+                    // Closed results beyond the newest few fold under «Ver N más».
+                    let folded = PatientLabRules.fold(shown)
                     if !shown.isEmpty {
-                        ListCard(items: shown) { order in
+                        ListCard(items: showPast ? shown : folded.shown) { order in
                             NavigationLink {
                                 ScreenFrame(title: "exams.detail") { LabOrderDetail(order: order, showValues: PatientLabRules.showsValues(order)) }
                             } label: {
                                 LabOrderRow(order: order, status: PatientLabRules.statusText(order), critical: false, showPatient: false)
                             }.buttonStyle(.plain)
+                        }
+                        if !folded.folded.isEmpty {
+                            ClimesaButton(title: showPast ? L.text("exams.less") : String(format: L.text("exams.more"), folded.folded.count), kind: .secondary) { showPast.toggle() }
                         }
                     }
                 }
