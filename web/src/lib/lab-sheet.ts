@@ -17,13 +17,15 @@ export function markOf(value: number, range?: ReferenceRange | null): SheetMark 
 
 const num = (value: number) => new Intl.NumberFormat('es-SV', { maximumFractionDigits: 3 }).format(value);
 
-/** «12–15,5», «≤ 200», «≥ 70»; empty without limits. */
+/** A lab value in es-SV («5,1», «452») with its unit when it has one («5,1 g/dL»). */
+export const formatLabValue = (value: number, unit?: string | null) => `${num(value)}${unit ? ` ${unit}` : ''}`;
+
+/** «12–15,5», «≤ 200», «≥ 70», plus the critical limits when the range has them («12–15,5 · crítico < 7 o > 20»); empty without limits. */
 export function rangeText(range?: ReferenceRange | null) {
   if (!range) return '';
-  if (range.min !== null && range.max !== null) return `${num(range.min)}–${num(range.max)}`;
-  if (range.max !== null) return `≤ ${num(range.max)}`;
-  if (range.min !== null) return `≥ ${num(range.min)}`;
-  return '';
+  const normal = range.min !== null && range.max !== null ? `${num(range.min)}–${num(range.max)}` : range.max !== null ? `≤ ${num(range.max)}` : range.min !== null ? `≥ ${num(range.min)}` : '';
+  const limits = [range.criticalLow !== null ? `< ${num(range.criticalLow)}` : null, range.criticalHigh !== null ? `> ${num(range.criticalHigh)}` : null].filter(Boolean).join(' o ');
+  return [normal, limits && `crítico ${limits}`].filter(Boolean).join(' · ');
 }
 
 /** A typed number as the API wants it: «5,1» and «5.1» both mean 5.1; anything else is not a number. */
@@ -44,7 +46,7 @@ export type ReleaseValue = { name: string; value?: number | null; text?: string 
 export function releaseLines(values: ReleaseValue[]) {
   const rank = (v: ReleaseValue) => isCriticalMark(v.mark) ? 0 : isAbnormalMark(v.mark) ? 1 : 2;
   return [...values].sort((a, b) => rank(a) - rank(b)).map(v => {
-    const shown = v.text ?? (typeof v.value === 'number' ? `${num(v.value)}${v.unit ? ` ${v.unit}` : ''}` : 'sin valor');
+    const shown = v.text ?? (typeof v.value === 'number' ? formatLabValue(v.value, v.unit) : 'sin valor');
     const flag = v.mark && v.mark !== 'normal' && v.mark !== 'sin_rango' ? ` (${MARK_WORDS[v.mark] ?? v.mark})` : '';
     return { text: `${v.name} ${shown}${flag}`, critical: isCriticalMark(v.mark) };
   });

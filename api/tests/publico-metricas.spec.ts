@@ -180,7 +180,7 @@ describe('Spec 113 · tablero y métricas agregadas', () => {
     expect((await t.call('DPD', 'GET', '/metricas/tablero')).status).toBe(200);
   });
 
-  test('FR-113-05: tiempo de laboratorio por día con el valor esperado', async () => {
+  test('FR-113-05: tiempo de laboratorio por día con el valor esperado, sin órdenes externas', async () => {
     const patientId = await t.patient();
     const doctor = await t.staffOf('REC');
     // 10:00 en El Salvador de hace dos días: la orden se crea y se completa el mismo día local a cualquier hora del reloj real
@@ -190,6 +190,10 @@ describe('Spec 113 · tablero y métricas agregadas', () => {
     await t.pg.query("INSERT INTO laboratorio.orden(admision_id,paciente_id,medico_id,estado,creada_en,completada_en) VALUES($1,$2,$3,'en_proceso',$4,NULL)", [randomUUID(), patientId, doctor, created]);
     const order = await t.one<{ id: string }>('SELECT id FROM laboratorio.orden WHERE paciente_id=$1', [patientId]);
     await t.pg.query("UPDATE laboratorio.orden SET estado='completado',completada_en=$2 WHERE id=$1", [order.id, completed]);
+    // An external report (done elsewhere, loaded 5 hours later) does not measure this lab's turnaround.
+    const external = await t.patient();
+    await t.pg.query("INSERT INTO laboratorio.orden(admision_id,paciente_id,medico_id,estado,creada_en,completada_en,externa,lugar_externo,instrucciones_externas) VALUES($1,$2,$3,'en_proceso',$4,NULL,true,'Clínica ficticia','Presentarse en ayunas con la orden.')", [randomUUID(), external, doctor, created]);
+    await t.pg.query("UPDATE laboratorio.orden SET estado='completado',completada_en=$2 WHERE paciente_id=$1", [external, new Date(created.valueOf() + 300 * 60_000)]);
     const fecha = new Date(created.valueOf() - 6 * hour).toISOString().slice(0, 10);
     const response = await t.call('ADM', 'GET', `/metricas/tiempo_laboratorio?desde=${fecha}&hasta=${fecha}`);
     expect(response.status).toBe(200);

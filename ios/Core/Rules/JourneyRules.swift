@@ -570,8 +570,7 @@ public enum ReleaseRules {
     public static func summary(_ order: LabOrder) -> String {
         let who = order.patientName ?? "El paciente"
         let values = orderedItems(order).map { item -> String in
-            var text = "\(item.name) \(PatientLabRules.valueText(item.result))"
-            if let unit = item.unit, !unit.isEmpty, item.result?.value != nil { text += " \(unit)" }
+            var text = "\(item.name) \(PatientLabRules.valueText(item.result, unit: item.unit))"
             if let mark = item.result?.mark, mark != .normal, mark != .desconocido { text += " (\(mark.label.lowercased()))" }
             return text
         }

@@ -39,7 +39,12 @@ const toneStatus = { ok: 'normal', warn: 'requiere_atencion', urgent: 'alto', ne
 const toneKey = (tone: Tone | 'neutral') => (tone === 'ok' || tone === 'warn' || tone === 'urgent' ? tone : 'neutral');
 const stats = (series: IndicatorSeries) => {
   const values = series.serie.map(p => p.valor).filter((v): v is number => v != null);
-  return values.length ? { avg: Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10, min: Math.min(...values), max: Math.max(...values), last: [...series.serie].reverse().find(p => p.valor != null)!.valor as number } : null;
+  // Times and stays are per-sample averages: the period average weighs each day by its samples, not one vote per day.
+  const perSample = series.unidad === 'minutos' || series.unidad === 'dias';
+  const sampled = series.serie.filter(p => p.valor != null && p.muestras > 0);
+  const samples = sampled.reduce((a, p) => a + p.muestras, 0);
+  const avg = perSample && samples > 0 ? sampled.reduce((a, p) => a + (p.valor as number) * p.muestras, 0) / samples : values.reduce((a, b) => a + b, 0) / values.length;
+  return values.length ? { avg: Math.round(avg * 10) / 10, min: Math.min(...values), max: Math.max(...values), last: [...series.serie].reverse().find(p => p.valor != null)!.valor as number } : null;
 };
 const fmt = (value: number | null, unit: string) => value == null ? 'Sin datos' : `${new Intl.NumberFormat('es-SV', { maximumFractionDigits: 1 }).format(value)} ${unit}`;
 const tableOf = (spec: Indicator, series: IndicatorSeries): ExportTable => ({

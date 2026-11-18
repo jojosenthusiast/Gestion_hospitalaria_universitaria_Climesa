@@ -38,7 +38,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -85,6 +84,7 @@ import sv.edu.catolica.climesa.domain.LaboratoryOrder
 import sv.edu.catolica.climesa.domain.LabCritical
 import sv.edu.catolica.climesa.domain.LabOrderAction
 import sv.edu.catolica.climesa.domain.LabOrderRules
+import sv.edu.catolica.climesa.domain.LabPatientList
 import sv.edu.catolica.climesa.domain.LabStage
 import sv.edu.catolica.climesa.domain.LabWorklist
 import sv.edu.catolica.climesa.domain.elapsedText
@@ -128,7 +128,8 @@ fun LaboratoryScreen(
         when {
             state.loading && state.orders.isEmpty() -> item { LoadingState() }
             state.error != null && state.orders.isEmpty() -> item { ErrorState(state.error, retry) }
-            state.orders.isEmpty() -> item { EmptyState(stringResource(R.string.clin_lab_sin_ordenes), detail = stringResource(R.string.clin_lab_sin_ordenes_detalle)) }
+            // The follow-up inbox above already has something: no "Sin órdenes" under it.
+            state.orders.isEmpty() && !(inboxOnly && state.followUps.isNotEmpty()) -> item { EmptyState(stringResource(R.string.clin_lab_sin_ordenes), detail = stringResource(R.string.clin_lab_sin_ordenes_detalle)) }
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
@@ -148,9 +149,19 @@ fun LaboratoryScreen(
                 if (visible.isEmpty() && !inboxOnly) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
                 // R3 A-9: "Resultados por revisar" is an inbox: only the orders this doctor can review, no queue filters.
                 else if (inboxOnly) {
-                    val toReview = state.orders.filter { it.allows(LabOrderAction.REVIEW) }
-                    if (toReview.isEmpty() && state.followUps.isEmpty()) item { EmptyState(stringResource(R.string.lab_pendientes_vacio), icon = Icons.Default.Check) }
-                    items(toReview, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now) }
+                    // An order already in the follow-up inbox is not listed twice; critical first, then urgent and the oldest.
+                    val inInbox = state.followUps.map { it.orderId }.toSet()
+                    val toReview = LabWorklist.sorted(state.orders.filter { it.allows(LabOrderAction.REVIEW) && it.id !in inInbox }).sortedByDescending(LabWorklist::isCritical)
+                    // As on iOS: the doctor's own open orders that the API lets cancel or send/load as external.
+                    val inProgress = LabWorklist.sorted(state.orders.filter { !it.allows(LabOrderAction.REVIEW) && (it.allows(LabOrderAction.CANCEL) || it.externalActions.isNotEmpty()) })
+                    if (toReview.isEmpty() && state.followUps.isEmpty() && inProgress.isEmpty()) item { EmptyState(stringResource(R.string.lab_pendientes_vacio), icon = Icons.Default.Check) }
+                    // One primary per screen: the inbox keeps it when it has a release; otherwise the first card here.
+                    val inboxHasPrimary = LabInbox.rows(state.followUps).any { it.canRelease }
+                    items(toReview, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now, primary = !inboxHasPrimary && order.id == toReview.first().id) }
+                    if (inProgress.isNotEmpty()) {
+                        item(key = "g-en-proceso") { LabGroupHeader(stringResource(R.string.lab_grupo_en_proceso), inProgress.size, null) {} }
+                        items(inProgress, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now, primary = false) }
+                    }
                 }
                 else {
                     // S10: grouped by what comes next; closed groups start folded unless the person filters or searches.
@@ -369,7 +380,7 @@ private fun CancelOrderDialog(state: LaboratoryState, order: LaboratoryOrder?, m
 }
 
 @Composable
-private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, now: Long) {
+private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, now: Long, primary: Boolean = true) {
     // Buttons follow `allowedActions` from the API for this reader, never the role or the state.
     val canReview = !ownView && order.allows(LabOrderAction.REVIEW)
     val canCancel = !ownView && order.allows(LabOrderAction.CANCEL)
@@ -380,11 +391,18 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
     var expanded by rememberSaveable(order.id) { mutableStateOf(ownView || canReview || canLoadExternal || canSendExternal) }
     SectionCard(
         title = order.patientName,
-        // R3 A-33: routine is the default and gets no label; only an urgent order says so.
-        eyebrow = if (order.priority == "urgente") stringResource(R.string.lab_prioridad_urgente) else null,
         action = { LabStagePill(LabWorklist.stage(order)) },
     ) {
+        // R3 A-33: routine is the default and gets no label; an urgent order says so once, with the shared PriorityBadge.
         if (!ownView) LabWorkSummary(order, now)
+        else {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                LabPatientList.shortDate(order.createdAtMillis).takeIf(String::isNotEmpty)?.let { Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (LabWorklist.isUrgent(order)) PriorityBadge(Priority.URGENTE)
+            }
+        }
+        if (order.state == "cancelado") order.cancellationReason?.let { Text(stringResource(R.string.lab_motivo_cancelacion, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (ownView && order.reviewed) order.patientNote?.let { Text(stringResource(R.string.lab_nota_medico, it), style = MaterialTheme.typography.bodyMedium) }
         if (order.external) ExternalNote(order)
         if (!expanded) {
             Text(LabFlow.nextStep(order, ownView), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -400,11 +418,15 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
                 else Text(if (inReview) stringResource(R.string.lab_valor_en_revision) else stringResource(R.string.clin_lab_pendiente), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             item.result?.let { result -> LabFollowUpRules.labNote(result, ownView)?.let { ObservationLine(it, result.relevant) } }
+            // C-3: the doctor reviews against the range valid for this patient (never sent to the patient).
+            if (!ownView) LaboratoryLabels.rangeText(item.range)?.let { Text(stringResource(R.string.lab_referencia, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         // T07c: the report file of a completed external order. Never in the patient's own view.
         if (!ownView && order.external && order.state == "completado") ExternalReport(order, model)
-        if (canLoadExternal) PrimaryButton(stringResource(R.string.lab_cargar_externo), { model.openExternalLoad(order.id) }, enabled = !busy)
-        if (canReview) PrimaryButton(stringResource(R.string.lab_revisar), { model.openReview(order.id) }, enabled = !busy, loading = busy)
+        if (canLoadExternal && primary) PrimaryButton(stringResource(R.string.lab_cargar_externo), { model.openExternalLoad(order.id) }, enabled = !busy)
+        else if (canLoadExternal) SecondaryButton(stringResource(R.string.lab_cargar_externo), { model.openExternalLoad(order.id) }, enabled = !busy)
+        if (canReview && primary) PrimaryButton(stringResource(R.string.lab_revisar), { model.openReview(order.id) }, enabled = !busy, loading = busy)
+        else if (canReview) SecondaryButton(stringResource(R.string.lab_revisar), { model.openReview(order.id) }, enabled = !busy)
         if (canSendExternal) SecondaryButton(stringResource(R.string.lab_externo_titulo), { model.openExternal(order.id) }, enabled = !busy)
         if (canCancel) SecondaryButton(stringResource(R.string.lab_cancelar_orden), { model.openCancel(order.id) }, enabled = !busy)
         if (!ownView && !(canReview || canLoadExternal || canSendExternal)) TextButton(onClick = { expanded = false }) { Text(stringResource(R.string.lab_ocultar_detalle)) }
@@ -535,7 +557,7 @@ private fun LabWorkSummary(order: LaboratoryOrder, now: Long) {
         order.doctorName?.let { Text(stringResource(R.string.lab_pidio, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
             // S7: urgent is amber; red is only for critical values.
-            if (LabWorklist.isUrgent(order)) { Icon(Icons.Default.Warning, null, Modifier.size(18.dp), tint = MaterialTheme.climesa.warning); Text(stringResource(R.string.lab_prioridad_urgente), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.warning) }
+            if (LabWorklist.isUrgent(order)) PriorityBadge(Priority.URGENTE)
             LabWorklist.elapsedMinutes(order, now)?.let { minutes ->
                 Text(stringResource(R.string.lab_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(LabWorklist.sla(order, now)))
             }

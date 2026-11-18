@@ -44,7 +44,7 @@ export class LabOrderItemResponse {
 
 export class LabOrderResponse {
   @UuidProp() id!: string;
-  @UuidProp() consultationId!: string;
+  @UuidProp({ nullable: true, description: 'Consulta de la que cuelga la orden; null en órdenes de una admisión' }) consultationId!: string | null;
   @UuidProp() patientId!: string;
   @UuidProp() doctorId!: string;
   @EnumProp(PRIORIDAD_LABORATORIO, 'PrioridadLaboratorio') priority!: string;
@@ -68,6 +68,7 @@ export class LabOrderResponse {
   @StrProp({ nullable: true, description: 'S10: instrucciones para el paciente de la orden externa' }) externalInstructions!: string | null;
   @StrProp({ optional: true, nullable: true, description: 'R7 C1: nota del médico para el paciente; solo después de liberar los resultados' }) patientNote?: string | null;
   @EnumArrayProp(LAB_EXTERNAL_ACTIONS, 'AccionExternaLaboratorio', { description: 'S10: acciones del camino externo que el servidor acepta ahora para quien lee' }) externalActions!: string[];
+  @StrProp({ nullable: true, description: 'Motivo de la cancelación; null si la orden no está cancelada' }) cancellationReason!: string | null;
 }
 
 /** S10: reference of the photo or PDF of an external result. `stored` says whether the file is in the private bucket (T07b). */
@@ -113,9 +114,8 @@ export class LabAttachmentLinkResponse {
   @IntProp() sizeBytes!: number;
 }
 
-/** GET /laboratorio/ordenes/{id}: the list row plus the cancel reason and, for staff who see values, the correction history. */
+/** GET /laboratorio/ordenes/{id}: the list row (with its cancel reason) plus, for staff who see values, the correction history. */
 export class LabOrderDetailResponse extends LabOrderResponse {
-  @StrProp({ nullable: true }) cancellationReason!: string | null;
   @ClassArrayProp(LabResultHistoryResponse, { description: 'Vacío para quien no ve valores' }) history!: LabResultHistoryResponse[];
   @ClassArrayProp(LabAttachmentResponse, { description: 'S10: adjuntos del resultado externo; vacío para quien no ve valores' }) attachments!: LabAttachmentResponse[];
 }
