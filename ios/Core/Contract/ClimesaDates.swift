@@ -69,6 +69,74 @@ public enum ClimesaDates {
         return formatter.string(from: date)
     }
 
+    // MARK: Short dates without the year (owner rule R4, same as Android `MyShifts.relative` and `ShortDay`)
+
+    private static let weekdays = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"]
+    private static let weekdaysShort = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"]
+    private static let monthsShort = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+    private static func capitalized(_ text: String) -> String { text.prefix(1).uppercased() + text.dropFirst() }
+
+    /// "HH:mm" in El Salvador time.
+    public static func clock(_ date: Date) -> String {
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+    }
+
+    /// "jue 26 nov" in El Salvador time, never with the year.
+    public static func dayMonth(_ date: Date) -> String {
+        let parts = calendar.dateComponents([.weekday, .day, .month], from: date)
+        return "\(weekdaysShort[((parts.weekday ?? 1) - 1) % 7]) \(parts.day ?? 0) \(monthsShort[((parts.month ?? 1) - 1) % 12])"
+    }
+
+    /// Calendar days from `now`'s local day to `date`'s local day (negative in the past).
+    public static func dayOffset(_ date: Date, from now: Date) -> Int {
+        calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+    }
+
+    /// A near moment the way people say it, in El Salvador time: "Hoy 09:00", "Mañana 07:00", "Ayer 23:22", "Jueves 07:00"
+    /// within the week ahead and "Jue 26 nov, 07:00" otherwise. A `yyyy-MM-dd` day reads like `shortDay`; "—" when unreadable.
+    public static func short(_ text: String?, now: Date = Date()) -> String {
+        guard let date = parse(text) else {
+            if let text, text.count == 10 { return shortDay(text, now: now) }
+            return "—"
+        }
+        return short(date, now: now)
+    }
+
+    public static func short(_ date: Date, now: Date = Date()) -> String {
+        let time = clock(date)
+        switch dayOffset(date, from: now) {
+        case 0: return "Hoy \(time)"
+        case 1: return "Mañana \(time)"
+        case -1: return "Ayer \(time)"
+        case 2...6:
+            let weekday = calendar.component(.weekday, from: date)
+            return "\(capitalized(weekdays[(weekday - 1) % 7])) \(time)"
+        default: return "\(capitalized(dayMonth(date))), \(time)"
+        }
+    }
+
+    /// Title of a day group: "Hoy · mié 18 nov", "Mañana · jue 19 nov", "Ayer · mar 17 nov", otherwise "Jue 26 nov".
+    /// Takes an instant or a `yyyy-MM-dd` day of El Salvador.
+    public static func shortDay(_ text: String, now: Date = Date()) -> String {
+        guard let date = parse(text) ?? pickerDate(day: text) else { return text }
+        let label = dayMonth(date)
+        switch dayOffset(date, from: now) {
+        case 0: return "Hoy · \(label)"
+        case 1: return "Mañana · \(label)"
+        case -1: return "Ayer · \(label)"
+        default: return capitalized(label)
+        }
+    }
+
+    /// The `Date` a day-only `DatePicker` shows for a `yyyy-MM-dd` day of El Salvador: noon of that day there, so neither
+    /// the phone's zone nor UTC can move it to the day before or after. Read it back with `localDay`.
+    public static func pickerDate(day: String?) -> Date? {
+        guard let day, day.count == 10 else { return nil }
+        return parse("\(day)T18:00:00Z")
+    }
+
     /// Días completos entre dos instantes (para "días de hospitalización" y plazos).
     public static func days(from start: Date, to end: Date) -> Int {
         var calendar = Calendar(identifier: .gregorian)

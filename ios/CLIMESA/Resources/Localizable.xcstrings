@@ -5676,6 +5676,83 @@
           }
         }
       }
+    },
+    "notices.group.current": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vigentes · hoy"
+          }
+        }
+      }
+    },
+    "notices.group.current.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay avisos vigentes."
+          }
+        }
+      }
+    },
+    "notices.group.scheduled": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Programados · %@"
+          }
+        }
+      }
+    },
+    "notices.starts": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empieza"
+          }
+        }
+      }
+    },
+    "notices.bell": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos"
+          }
+        }
+      }
+    },
+    "notices.bell.unread": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos, %@ sin leer"
+          }
+        }
+      }
+    },
+    "notices.bell.critical": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avisos, hay un aviso crítico sin leer"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

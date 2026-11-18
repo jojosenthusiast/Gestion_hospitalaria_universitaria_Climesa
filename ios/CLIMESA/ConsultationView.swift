@@ -471,7 +471,7 @@ struct ConsultationView: View {
         SectionCard(title: L.text("consultation.prescriptions")) {
             ForEach(value.prescriptions) { prescription in
                 VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text(verbatim: ClimesaDates.display(prescription.issuedAt)).font(Typo.mono).foregroundStyle(Theme.muted)
+                    Text(verbatim: ClimesaDates.short(prescription.issuedAt)).font(Typo.mono).foregroundStyle(Theme.muted)
                     ForEach(Array(prescription.items.enumerated()), id: \.offset) { _, item in
                         Text(verbatim: "\(item.medication) \(item.dose) · \(item.route) · \(item.frequency) · \(item.duration)").font(Typo.body).foregroundStyle(Theme.ink)
                     }

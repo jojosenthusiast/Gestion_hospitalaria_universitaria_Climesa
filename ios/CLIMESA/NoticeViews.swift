@@ -158,15 +158,22 @@ struct NoticesView: View {
     /// D1: the session's inbox, shared with Inicio and the badge; opening Avisos reads it again.
     @Environment(NoticeInboxModel.self) private var model
     @State private var filter: NoticeFilter
+    /// Expired notices stay folded under «Ver avisos vencidos (N)», like past appointments.
+    @State private var showPast = false
 
     init(initialFilter: NoticeFilter = .todos) { _filter = State(initialValue: initialFilter) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
-            Picker(L.text("notices.filter"), selection: $filter) {
-                ForEach(NoticeFilter.allCases, id: \.self) { option in Text(verbatim: label(option)).tag(option) }
+            // Each chip wears the tag it filters: «Sin leer» the waiting stripes, «Críticos» the double red border.
+            FlowLayout(spacing: Spacing.s) {
+                ForEach(NoticeFilter.allCases, id: \.self) { option in
+                    StatusFilterChip(label: option.label, count: model.inbox.flatMap { NoticeRules.count($0, option) },
+                                     status: option.statusValue, selected: filter == option) { filter = option }
+                }
             }
-            .pickerStyle(.segmented)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(Text("notices.filter"))
             if let inbox = model.inbox {
                 if let error = model.error { PartError(message: error, retry: reload) }
                 list(inbox)
@@ -181,11 +188,6 @@ struct NoticesView: View {
         .onAppear { Task { await reload() } }
     }
 
-    private func label(_ option: NoticeFilter) -> String {
-        guard let inbox = model.inbox, let count = NoticeRules.count(inbox, option), count > 0 else { return option.label }
-        return "\(option.label) (\(count))"
-    }
-
     private func reload() async { await model.load { try account.client() } }
 
     @ViewBuilder private func list(_ inbox: NoticeInbox) -> some View {
@@ -195,30 +197,58 @@ struct NoticesView: View {
         } else if items.isEmpty {
             EmptyStateView(title: L.text(filter == .criticos ? "notices.empty.critical" : "notices.empty.read"), message: L.text("notices.empty.filter"), symbol: "checkmark.circle")
         } else {
-            SectionCard {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, notice in
-                    if index > 0 { Divider().overlay(Theme.line) }
-                    NavigationLink { NoticeDetailView(snapshot: notice, model: model) } label: { NoticeRow(notice: notice) }
-                        .buttonStyle(.plain)
+            let timeline = NoticeRules.timeline(items)
+            if !timeline.current.isEmpty {
+                SectionCard(title: L.text("notices.group.current")) { rows(timeline.current) }
+            } else if !timeline.upcoming.isEmpty || timeline.pastCount > 0 {
+                SectionCard(title: L.text("notices.group.current")) { EmptyNote("notices.group.current.none") }
+            }
+            ForEach(timeline.upcoming) { day in
+                SectionCard(title: String(format: L.text("notices.group.scheduled"), ClimesaDates.shortDay(day.day))) { rows(day.notices) }
+            }
+            if timeline.pastCount > 0 {
+                SectionCard {
+                    DisclosureGroup(isExpanded: $showPast) {
+                        ForEach(timeline.past) { day in
+                            Text(verbatim: ClimesaDates.shortDay(day.day)).font(Typo.eyebrow).foregroundStyle(Theme.muted)
+                                .textCase(.uppercase).padding(.top, Spacing.s).accessibilityAddTraits(.isHeader)
+                            rows(day.notices)
+                        }
+                    } label: {
+                        Text(verbatim: NoticeRules.pastTitle(timeline.pastCount)).font(Typo.label).foregroundStyle(Theme.ink).frame(minHeight: 44)
+                    }
+                    .tint(Theme.primaryText)
                 }
             }
         }
     }
+
+    @ViewBuilder private func rows(_ notices: [InboxNotice]) -> some View {
+        ForEach(Array(notices.enumerated()), id: \.element.id) { index, notice in
+            if index > 0 { Divider().overlay(Theme.line) }
+            NavigationLink { NoticeDetailView(snapshot: notice, model: model) } label: { NoticeRow(notice: notice) }
+                .buttonStyle(.plain)
+        }
+    }
 }
 
-/// Fila de la bandeja: nivel, título y fechas. «Sin leer» es un punto y el título en negrita (I-5), no una familia de
-/// estado de la fila: el reloj rayado significa «En espera» y el check «Terminado».
+/// Fila de la bandeja: nivel (Informativo / Importante / Crítico) y su estado con la familia común — «Sin leer» en
+/// espera, «Enterado» terminado, «Programado» en espera, «Vencido» cerrado —, título y fechas cortas sin año.
 private struct NoticeRow: View {
     let notice: InboxNotice
 
     var body: some View {
-        let unread = notice.acknowledgedAt == nil
+        let unread = notice.state == .vigente && notice.acknowledgedAt == nil
+        let tag = NoticeRules.tag(notice)
         HStack(alignment: .center, spacing: Spacing.m) {
-            Circle().fill(unread ? Theme.primary : Color.clear).frame(width: 8, height: 8).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Spacing.s) {
-                NoticeLevelBadge(level: notice.level)
-                Text(verbatim: notice.title).font(unread ? Typo.subheading : Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                if unread { Text("notices.unread").font(Typo.caption).foregroundStyle(Theme.primaryText) }
+                FlowLayout(spacing: Spacing.s) {
+                    NoticeLevelBadge(level: notice.level)
+                    StatusBadge(tag.value, label: tag.label)
+                }
+                Text(verbatim: notice.title).font(unread ? Typo.subheading : Typo.body)
+                    .foregroundStyle(notice.state == .vencido ? Theme.muted : Theme.ink).fixedSize(horizontal: false, vertical: true)
+                let meta = NoticeRules.whenText(notice)
                 if !meta.isEmpty { Text(verbatim: meta).font(Typo.small).foregroundStyle(Theme.muted) }
             }
             Spacer(minLength: Spacing.s)
@@ -228,11 +258,6 @@ private struct NoticeRow: View {
         .frame(minHeight: Spacing.control)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-    }
-
-    private var meta: String {
-        [notice.publishedAt.map { ClimesaDates.display($0) }, notice.until.map { String(format: L.text("notices.until.short"), ClimesaDates.display($0)) }]
-            .compactMap { $0 }.joined(separator: " · ")
     }
 }
 
@@ -249,24 +274,27 @@ struct NoticeDetailView: View {
         ScreenFrame(title: "notices.detail") {
             InboxNoticeCard(notice: notice)
             SectionCard {
-                MetaLine(label: L.text("notices.published"), value: notice.publishedAt.map { ClimesaDates.display($0) })
+                HStack { Spacer(); StatusBadge(NoticeRules.tag(notice).value, label: NoticeRules.tag(notice).label) }
                 Divider().overlay(Theme.line)
-                MetaLine(label: L.text("notices.until"), value: notice.until.map { ClimesaDates.display($0) })
-                if let remind = notice.remindAt, notice.acknowledgedAt == nil {
+                MetaLine(label: L.text(notice.state == .programado ? "notices.starts" : "notices.published"),
+                         value: (notice.state == .programado ? notice.from : notice.publishedAt).map { ClimesaDates.short($0) })
+                Divider().overlay(Theme.line)
+                MetaLine(label: L.text("notices.until"), value: notice.until.map { ClimesaDates.short($0) })
+                if let remind = notice.remindAt, NoticeRules.canAcknowledge(notice) {
                     Divider().overlay(Theme.line)
-                    MetaLine(label: L.text("notices.remind"), value: ClimesaDates.display(remind))
+                    MetaLine(label: L.text("notices.remind"), value: ClimesaDates.short(remind))
                 }
             }
             if model.failedNotice == notice.id, let error = model.submission.error { PatientNotice(text: error, failure: true) }
             if let done = model.submission.notice { PatientNotice(text: done) }
             if let acknowledged = notice.acknowledgedAt {
                 Label {
-                    Text(verbatim: "\(L.text("notices.read")) · \(ClimesaDates.display(acknowledged))").font(Typo.small)
+                    Text(verbatim: "\(L.text("notices.read")) · \(ClimesaDates.short(acknowledged))").font(Typo.small)
                 } icon: {
                     Image(systemName: "envelope.open").accessibilityHidden(true)
                 }
                 .foregroundStyle(Theme.muted)
-            } else {
+            } else if NoticeRules.canAcknowledge(notice) {
                 ClimesaButton(title: L.text("notices.ack"), loading: model.busy) {
                     Task { await model.send(.enterado, notice) { try account.client() } }
                 }

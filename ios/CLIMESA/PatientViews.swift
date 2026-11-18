@@ -224,9 +224,10 @@ private struct HomeAppointmentCard: View {
     var body: some View {
         HomeCardLink(eyebrow: eyebrow, open: open) {
             if let appointment {
-                ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName) {
+                ListRow(title: ClimesaDates.short(appointment.start), subtitle: appointment.doctorName) {
                     PatientTag(appointment.state.rawValue, label: appointment.state.label)
                 }
+                CategoryMarks(categories: appointment.categories)
             } else {
                 EmptyNote("home.appointment.none")
             }
@@ -403,8 +404,9 @@ struct PatientAppointmentsView: View {
                                     AppointmentRow(appointment: next, option: cancelOption(next, now: context.date), now: context.date, cancel: { cancelling = next }, reschedule: { rescheduling = next })
                                 }
                                 let later = Array(split.upcoming.dropFirst())
-                                if !later.isEmpty {
-                                    ListCard(title: L.text("appointments.upcoming"), items: later) { item in
+                                // The rest grouped by day like the agenda ("Mañana · jue 19 nov", "Jue 26 nov").
+                                ForEach(AppointmentRules.byDay(later)) { day in
+                                    ListCard(title: ClimesaDates.shortDay(day.day, now: context.date), items: day.appointments) { item in
                                         AppointmentRow(appointment: item, option: cancelOption(item, now: context.date), now: context.date, cancel: { cancelling = item }, reschedule: { rescheduling = item })
                                     }
                                 }
@@ -415,9 +417,13 @@ struct PatientAppointmentsView: View {
                                 // A5: past appointments stay folded under the upcoming ones.
                                 SectionCard {
                                     DisclosureGroup {
-                                        ForEach(Array(split.past.enumerated()), id: \.element.id) { index, item in
-                                            if index > 0 { Divider().overlay(Theme.line) }
-                                            AppointmentRow(appointment: item, option: .hidden, now: context.date, cancel: {}, reschedule: nil)
+                                        ForEach(AppointmentRules.byDay(split.past)) { day in
+                                            Text(verbatim: ClimesaDates.shortDay(day.day, now: context.date)).font(Typo.eyebrow).foregroundStyle(Theme.muted)
+                                                .textCase(.uppercase).padding(.top, Spacing.s).accessibilityAddTraits(.isHeader)
+                                            ForEach(Array(day.appointments.enumerated()), id: \.element.id) { index, item in
+                                                if index > 0 { Divider().overlay(Theme.line) }
+                                                AppointmentRow(appointment: item, option: .hidden, now: context.date, cancel: {}, reschedule: nil)
+                                            }
                                         }
                                     } label: {
                                         Text(verbatim: AppointmentRules.pastTitle(split.past.count)).font(Typo.label).foregroundStyle(Theme.ink).frame(minHeight: 44)
@@ -478,7 +484,7 @@ private struct AppointmentRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack(alignment: .center, spacing: Spacing.s) {
-                ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName, meta: appointment.reason) {
+                ListRow(title: ClimesaDates.short(appointment.start, now: now), subtitle: appointment.doctorName, meta: appointment.reason) {
                     PatientTag(appointment.state.rawValue, label: appointment.state.label)
                 }
                 if canCancel || canReschedule {
@@ -492,6 +498,7 @@ private struct AppointmentRow: View {
                     .accessibilityLabel(Text("appointments.actions"))
                 }
             }
+            CategoryMarks(categories: appointment.categories)
             if let rejection = appointment.rejectionReason, !rejection.isEmpty {
                 Text(verbatim: String(format: L.text("appointments.rejected.reason"), rejection)).font(Typo.small).foregroundStyle(Theme.warning)
             }
@@ -505,7 +512,7 @@ private struct AppointmentRow: View {
                 EmptyView()
             }
             // CITA-02: el estado de una solicitud de cambio de horario (pendiente, rechazada) sí importa al paciente.
-            if let text = AppointmentRules.rescheduleText(appointment) {
+            if let text = AppointmentRules.rescheduleText(appointment, now: now) {
                 Text(verbatim: text).font(Typo.small).foregroundStyle(appointment.reschedule?.state == .rechazada ? Theme.warning : Theme.muted)
             }
         }
@@ -530,7 +537,7 @@ private struct CancelAppointmentSheet: View {
         NavigationStack {
             ScreenFrame(title: "appointments.cancel.title", onClose: { dismiss() }) {
                 SectionCard {
-                    ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName)
+                    ListRow(title: ClimesaDates.short(appointment.start), subtitle: appointment.doctorName)
                 }
                 SectionTitle("appointments.cancel.reason")
                 VStack(spacing: Spacing.s) {
@@ -591,7 +598,7 @@ private struct RescheduleAppointmentSheet: View {
     var body: some View {
         NavigationStack {
             ScreenFrame(title: "appointments.reschedule.title", onClose: { dismiss() }) {
-                SectionCard { ListRow(title: ClimesaDates.display(appointment.start), subtitle: appointment.doctorName) }
+                SectionCard { ListRow(title: ClimesaDates.short(appointment.start), subtitle: appointment.doctorName) }
                 Text("appointments.reschedule.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 SectionTitle("appointments.date")
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -664,7 +671,7 @@ private struct MyCategoryRequests: View {
                     PatientTag(CategoryRequestRules.badgeValue(item.state), label: L.text(CategoryRequestRules.stateKey(item.state)))
                 }
                 if let appointment = item.appointment {
-                    Text(verbatim: String(format: L.text("appointments.category.assigned"), appointment.doctorName, ClimesaDates.display(appointment.start)))
+                    Text(verbatim: String(format: L.text("appointments.category.assigned"), appointment.doctorName, ClimesaDates.short(appointment.start)))
                         .font(Typo.small).foregroundStyle(Theme.primary)
                 }
                 if let reason = item.rejectionReason, !reason.isEmpty { Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted) }
@@ -704,6 +711,8 @@ private struct CategoryRequestSheet: View {
     @State private var doctorOpen = false
     @State private var doctorQuery = ""
     @State private var doctor: AppointmentCatalogs.Doctor?
+    /// R2: «Con turno (N)» is the default chip; «Todos (N)» shows the doctors without a shift today too.
+    @State private var shiftFilter: DoctorShiftFilter = .conTurno
 
     var body: some View {
         NavigationStack {
@@ -766,15 +775,29 @@ private struct CategoryRequestSheet: View {
             Button(L.text("appointments.category.doctor")) { doctorOpen = true }.font(Typo.label).foregroundStyle(Theme.primary)
         } else {
             searchField(L.text("appointments.category.doctor.search"), text: $doctorQuery)
-            let found = CategoryRequestRules.doctors(catalog.value?.doctors ?? [], query: doctorQuery)
+            let all = catalog.value?.doctors ?? []
+            // R1-R3: doctors with a shift today first, each with its tag; the chips wear the badge they filter.
+            if !all.isEmpty {
+                let shown = DoctorShiftRules.effective(shiftFilter, all)
+                FlowLayout(spacing: Spacing.s) {
+                    ForEach(DoctorShiftFilter.allCases, id: \.self) { option in
+                        StatusFilterChip(label: option.label, count: option == .conTurno ? DoctorShiftRules.withShift(all) : all.filter(\.active).count,
+                                         status: option.statusValue, selected: shown == option) { shiftFilter = option }
+                    }
+                }
+            }
+            let found = Array(DoctorShiftRules.visible(all, filter: shiftFilter, query: doctorQuery).prefix(12))
             if let message = catalog.error {
                 PartError(message: message, retry: loadCatalog)
-            } else if catalog.value != nil, found.isEmpty, !doctorQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            } else if catalog.value != nil, found.isEmpty {
                 Text("appointments.category.doctor.none").font(Typo.small).foregroundStyle(Theme.muted)
             }
             ForEach(found) { d in
                 Button { doctor = d; doctorQuery = "" } label: {
-                    ListRow(title: d.fullName, subtitle: d.specialty ?? L.text("appointments.category.general"), meta: nil) { EmptyView() }
+                    ListRow(title: d.fullName, subtitle: d.specialty ?? L.text("appointments.category.general"), meta: nil) {
+                        let tag = DoctorShiftRules.tag(d)
+                        StatusBadge(tag.value, label: tag.label)
+                    }
                 }.buttonStyle(.plain)
             }
         }
@@ -790,7 +813,11 @@ private struct CategoryRequestSheet: View {
         .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(Theme.controlLine, lineWidth: 1))
     }
 
-    private func loadCatalog() async { await catalog.load { try await account.client().get("/citas/catalogos", as: AppointmentCatalogs.self) } }
+    /// Asked for today, so each doctor says whether they have a shift (`tieneTurno`, `motivo`).
+    private func loadCatalog() async {
+        let path = "/citas/catalogos?date=\(ClimesaDates.localDay(Date()))"
+        await catalog.load { try await account.client().get(path, as: AppointmentCatalogs.self) }
+    }
 
     private func loadCategories() async { await categories.load { try await account.client().get(CategoryRequestRules.categoriesPath, as: [AppointmentCategory].self) } }
 
@@ -817,9 +844,15 @@ struct PatientExamsView: View {
                 EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link")
             } else {
                 LoadState(loader: loader, retry: load) { orders in
-                    Picker("exams.filter", selection: $filter) {
-                        ForEach(LabFilter.allCases, id: \.self) { Text(LocalizedStringKey($0.titleKey)).tag($0) }
-                    }.pickerStyle(.segmented)
+                    // Each chip wears the badge of the stage it filters (pending waits, in process, done).
+                    FlowLayout(spacing: Spacing.s) {
+                        ForEach(LabFilter.allCases, id: \.self) { option in
+                            StatusFilterChip(label: L.text(option.titleKey), count: option == .all ? nil : option.count(in: orders),
+                                             status: option.statusValue, selected: filter == option) { filter = option }
+                        }
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(Text("exams.filter"))
                     let shown = filter.apply(orders)
                     if shown.isEmpty { EmptyStateView(title: L.text(orders.isEmpty ? "exams.none" : "exams.filter.none"), symbol: "testtube.2") }
                     if !shown.isEmpty {
@@ -856,7 +889,7 @@ struct LabOrderRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: showPatient ? order.patientName : nil,
-                    meta: ClimesaDates.display(order.completedAt ?? order.createdAt)) {
+                    meta: ClimesaDates.short(order.completedAt ?? order.createdAt)) {
                 Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
             }
             HStack(spacing: Spacing.s) {
@@ -928,7 +961,7 @@ struct MoreView: View {
                             Text(LocalizedStringKey(section.titleKey)).font(Typo.subheading).foregroundStyle(Theme.ink)
                             Spacer()
                             // D1: the unread count (`noLeidos`) on the Avisos entry.
-                            if section == .avisos, let unread = NoticeRules.badge(notices.inbox) { UnreadBadge(count: unread) }
+                            if section == .avisos, let unread = NoticeRules.badge(notices.inbox, hiding: notices.hidden) { UnreadBadge(count: unread) }
                             Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
                         }
                     }

@@ -25,7 +25,7 @@ struct DoctorAgendaView: View {
     }
 
     @ViewBuilder private func dayCard(_ day: AgendaDay) -> some View {
-        SectionCard(title: ClimesaDates.display(day.entries.first?.start, .date)) {
+        SectionCard(title: day.entries.first.map { ClimesaDates.shortDay($0.start) } ?? "—") {
             ForEach(Array(day.entries.enumerated()), id: \.element.id) { index, entry in
                 if index > 0 { Divider().overlay(Theme.line) }
                 row(entry)
@@ -34,9 +34,12 @@ struct DoctorAgendaView: View {
     }
 
     @ViewBuilder private func row(_ entry: AgendaEntry) -> some View {
-        let content = ListRow(title: entry.patientName ?? L.text("day.patient.unknown"), subtitle: entry.reason, meta: ClimesaDates.display(entry.start, .time)) {
-            if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
-            else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
+        let content = VStack(alignment: .leading, spacing: Spacing.s) {
+            ListRow(title: entry.patientName ?? L.text("day.patient.unknown"), subtitle: entry.reason, meta: ClimesaDates.display(entry.start, .time)) {
+                if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
+                else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
+            }
+            CategoryMarks(categories: entry.categories)
         }
         if account.can("expediente.ver") {
             NavigationLink { PatientRecordScreen(patientId: entry.patientId) } label: { content }.buttonStyle(.plain)
@@ -120,7 +123,7 @@ struct AmbulanceOverviewView: View {
 
     @ViewBuilder private func statusSection(_ value: AmbulanceStatus) -> some View {
         SectionCard(eyebrow: L.text("ambulance.unit")) {
-            ListRow(title: value.unit.plate, subtitle: value.unit.stateReason, meta: value.unit.stateSince.map { String(format: L.text("ambulance.since"), ClimesaDates.display($0)) }) {
+            ListRow(title: value.unit.plate, subtitle: value.unit.stateReason, meta: value.unit.stateSince.map { String(format: L.text("ambulance.since"), ClimesaDates.short($0)) }) {
                 StatusTag(value.unit.state)
             }
             if let crew = AmbulanceLogRules.crewNotice(value) {
@@ -182,10 +185,14 @@ struct AmbulanceOverviewView: View {
                 Text("ambulance.log.any").tag(AmbulancePriority?.none)
                 ForEach([AmbulancePriority.roja, .naranja, .amarilla, .verde], id: \.self) { Text(verbatim: $0.label).tag(Optional($0)) }
             }.pickerStyle(.menu)
-            Picker("ambulance.log.state", selection: $query.finalState) {
-                Text("ambulance.log.any").tag(AmbulanceFinalState?.none)
-                ForEach(AmbulanceFinalState.allCases, id: \.self) { Text(verbatim: $0.label).tag(Optional($0)) }
-            }.pickerStyle(.menu)
+            // Each final state filters with the badge its rows wear.
+            Text("ambulance.log.state").font(Typo.label).foregroundStyle(Theme.ink)
+            FlowLayout(spacing: Spacing.s) {
+                StatusFilterChip(label: L.text("ambulance.log.any"), selected: query.finalState == nil) { query.finalState = nil }
+                ForEach(AmbulanceFinalState.allCases, id: \.self) { state in
+                    StatusFilterChip(label: state.label, status: state.statusValue, selected: query.finalState == state) { query.finalState = state }
+                }
+            }
             Toggle("ambulance.log.from", isOn: dayToggle(\.from)).tint(Theme.primary)
             if query.from != nil { DatePicker("ambulance.log.from", selection: dayBinding(\.from), displayedComponents: .date).labelsHidden()
                 .environment(\.timeZone, ClimesaDates.zone).environment(\.calendar, ClimesaDates.calendar) }
@@ -203,7 +210,7 @@ struct AmbulanceOverviewView: View {
                 MedicoTag(entry.priority.rawValue, label: entry.priority.label)
             }
             HStack(spacing: Spacing.s) {
-                Text(verbatim: AmbulanceLogRules.finalStateLabel(entry.finalState)).font(Typo.label).foregroundStyle(Theme.ink)
+                MedicoTag(AmbulanceFinalState.statusValue(entry.finalState), label: AmbulanceLogRules.finalStateLabel(entry.finalState))
                 if let response = AmbulanceLogRules.responseText(entry.responseMinutes) { Text(verbatim: response).font(Typo.small).foregroundStyle(Theme.muted) }
             }
             if !entry.crew.isEmpty {
@@ -218,7 +225,7 @@ struct AmbulanceOverviewView: View {
     }
 
     private func dayBinding(_ keyPath: WritableKeyPath<AmbulanceLogQuery, String?>) -> Binding<Date> {
-        Binding(get: { query[keyPath: keyPath].flatMap { ClimesaDates.parse($0 + "T12:00:00Z") } ?? Date() },
+        Binding(get: { ClimesaDates.pickerDate(day: query[keyPath: keyPath]) ?? Date() },
                 set: { query[keyPath: keyPath] = ClimesaDates.localDay($0) })
     }
 

@@ -284,3 +284,81 @@ public enum VitalSignLabels {
         return known + keys.filter { !order.contains($0) }.sorted()
     }
 }
+
+/// How urgent a pending item is: danger before warning before the rest (Android `AttentionList`, web focused tray).
+public enum AttentionTone: Int, Comparable, Sendable {
+    case danger = 0, warning = 1, other = 2
+    public static func < (lhs: AttentionTone, rhs: AttentionTone) -> Bool { lhs.rawValue < rhs.rawValue }
+}
+
+/// Owner rule: a home screen shows only the two most urgent pending items and folds the rest behind
+/// «Ver N pendientes más», so the first glance is what to do now, not a wall of rows.
+public enum AttentionFold {
+    public static let visible = 2
+
+    /// Most urgent first; items of the same tone keep their order.
+    public static func ranked<T>(_ items: [T], tone: (T) -> AttentionTone) -> [T] {
+        items.enumerated().sorted { a, b in
+            let (ta, tb) = (tone(a.element), tone(b.element))
+            return ta == tb ? a.offset < b.offset : ta < tb
+        }.map(\.element)
+    }
+
+    /// Rows to draw: all when expanded, otherwise the first `visible`.
+    public static func shown<T>(_ items: [T], expanded: Bool) -> [T] {
+        expanded ? items : Array(items.prefix(visible))
+    }
+
+    /// How many rows stay folded.
+    public static func hidden(_ count: Int, expanded: Bool) -> Int { expanded ? 0 : max(0, count - visible) }
+
+    /// "Ver 3 pendientes más" / "Ver 1 pendiente más", or "Ver menos" once open; nil when nothing folds.
+    public static func toggleTitle(_ count: Int, expanded: Bool) -> String? {
+        guard count > visible else { return nil }
+        if expanded { return "Ver menos" }
+        let more = count - visible
+        return more == 1 ? "Ver 1 pendiente más" : "Ver \(more) pendientes más"
+    }
+}
+
+/// Chip of a doctor picker: only the doctors with a shift that day (default) or every doctor.
+public enum DoctorShiftFilter: String, CaseIterable, Sendable, Hashable {
+    case conTurno, todos
+    public var label: String { self == .conTurno ? "Con turno" : "Todos" }
+    /// «Con turno» wears the available (green) badge; «Todos» stays neutral.
+    public var statusValue: String? { self == .conTurno ? "disponible" : nil }
+}
+
+/// Owner rules R1-R3 for every doctor picker (Android `DoctorShifts`, web `doctor-shifts.tsx`): doctors with a shift
+/// first, «Con turno» hides the others, and an unknown shift (no date asked) counts as on shift.
+public enum DoctorShiftRules {
+    public static func onShift(_ doctor: AppointmentCatalogs.Doctor) -> Bool { doctor.hasShift != false }
+
+    /// Active doctors, the ones with a shift first; each group keeps the API order.
+    public static func ordered(_ doctors: [AppointmentCatalogs.Doctor]) -> [AppointmentCatalogs.Doctor] {
+        let active = doctors.filter(\.active)
+        return active.filter(onShift) + active.filter { !onShift($0) }
+    }
+
+    public static func withShift(_ doctors: [AppointmentCatalogs.Doctor]) -> Int { doctors.filter { $0.active && onShift($0) }.count }
+
+    /// «Con turno» with nobody on shift would show an empty list: fall back to «Todos».
+    public static func effective(_ filter: DoctorShiftFilter, _ doctors: [AppointmentCatalogs.Doctor]) -> DoctorShiftFilter {
+        let active = doctors.filter(\.active)
+        return filter == .conTurno && !active.isEmpty && !active.contains(where: onShift) ? .todos : filter
+    }
+
+    /// Rows for the filter and the typed text (name or specialty).
+    public static func visible(_ doctors: [AppointmentCatalogs.Doctor], filter: DoctorShiftFilter, query: String) -> [AppointmentCatalogs.Doctor] {
+        let needle = query.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).trimmingCharacters(in: .whitespacesAndNewlines)
+        return ordered(doctors).filter { doctor in
+            (effective(filter, doctors) == .todos || onShift(doctor))
+                && (needle.isEmpty || "\(doctor.fullName) \(doctor.specialty ?? "")".folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).contains(needle))
+        }
+    }
+
+    /// Tag of a row: green «Con turno», or the closed reason ("Sin turno ese día").
+    public static func tag(_ doctor: AppointmentCatalogs.Doctor) -> (value: String, label: String) {
+        onShift(doctor) ? ("disponible", "Con turno") : ("cerrado", doctor.reason ?? "Sin turno")
+    }
+}

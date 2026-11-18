@@ -70,7 +70,7 @@ struct LabAttachmentsSection: View {
     }
 
     private func meta(_ file: LabAttachment) -> String {
-        [LabAttachmentRules.kindLabel(file), LabAttachmentRules.sizeText(file.sizeBytes), ClimesaDates.display(file.uploadedAt), file.uploadedByName]
+        [LabAttachmentRules.kindLabel(file), LabAttachmentRules.sizeText(file.sizeBytes), ClimesaDates.short(file.uploadedAt), file.uploadedByName]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 

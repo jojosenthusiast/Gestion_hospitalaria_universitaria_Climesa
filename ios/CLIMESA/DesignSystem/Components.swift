@@ -456,6 +456,125 @@ extension View {
 
 // MARK: Estados
 
+/// Filter chip that wears the badge of the status it filters (Android `StatusFilterChip`, web `ChipGroup` `status`):
+/// unselected shows the badge texture; selected fills with the strong colour and keeps the texture. A value without
+/// family («Todos») stays neutral. The count goes in the label: "Sin leer (3)".
+struct StatusFilterChip: View {
+    let label: String
+    var count: Int?
+    /// API status value whose family the chip copies (`StatusFamily.of`); nil is neutral.
+    var status: String?
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        let family = status.flatMap(StatusFamily.of)
+        let text = count.map { "\(label) (\($0))" } ?? label
+        let shape = RoundedRectangle(cornerRadius: Radius.chip)
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if let family { Image(systemName: family.symbol).imageScale(.small).accessibilityHidden(true) }
+                Text(verbatim: text).lineLimit(1)
+            }
+            .font(selected ? Typo.label : Typo.tag)
+            .foregroundStyle(foreground(family))
+            .padding(.horizontal, Spacing.space3)
+            .frame(minHeight: 44)
+            .background { background(family).clipShape(shape) }
+            .overlay { border(family) }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: text))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func foreground(_ family: StatusFamily?) -> Color {
+        guard let family else { return selected ? Theme.onPrimary : Theme.ink }
+        return selected || family.pattern == .solido ? Theme.onStatus : Theme.colors(for: family).strong
+    }
+
+    @ViewBuilder private func background(_ family: StatusFamily?) -> some View {
+        if let family {
+            let colors = Theme.colors(for: family)
+            if selected {
+                switch family.pattern {
+                case .rayado: ZStack { colors.strong; DiagonalStripes().fill(Theme.onStatus.opacity(0.22)) }
+                case .punteado: ZStack { colors.strong; DotGrid().fill(Theme.onStatus.opacity(0.4)) }
+                default: colors.strong
+                }
+            } else if family.pattern == .solido {
+                colors.strong
+            } else {
+                PatternFill(pattern: family.pattern, strong: colors.strong, soft: colors.soft)
+            }
+        } else {
+            selected ? Theme.primary : Theme.surface
+        }
+    }
+
+    @ViewBuilder private func border(_ family: StatusFamily?) -> some View {
+        if let family {
+            let colors = Theme.colors(for: family)
+            if selected && family.pattern == .doble {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radius.chip).strokeBorder(colors.strong, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: CGFloat(RadiusToken.inner(outer: RadiusToken.chip, padding: 2))).strokeBorder(Theme.onStatus, lineWidth: 1).padding(2)
+                }
+            } else if selected {
+                RoundedRectangle(cornerRadius: Radius.chip).strokeBorder(colors.strong, lineWidth: 2)
+            } else {
+                PatternBorder(pattern: family.pattern, color: colors.strong)
+            }
+        } else {
+            RoundedRectangle(cornerRadius: Radius.chip).strokeBorder(selected ? Theme.primary : Theme.controlLine, lineWidth: 1)
+        }
+    }
+}
+
+/// Category marks of an appointment born from a request by reason (web `CategoryBadges`, Android `CategoryMarks`):
+/// one small icon per category next to the title, each named for VoiceOver. Draws nothing without categories.
+struct CategoryMarks: View {
+    let categories: [AppointmentCategoryRef]?
+
+    var body: some View {
+        if let categories, !categories.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(categories, id: \.code) { category in
+                    Image(systemName: CategoryRequestRules.symbol(category.icon))
+                        .font(Typo.small).foregroundStyle(Theme.primaryText)
+                        .frame(width: 22, height: 22)
+                        .background(Theme.soft, in: RoundedRectangle(cornerRadius: Radius.chip))
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: "Motivo: \(categories.map(\.name).joined(separator: ", "))"))
+        }
+    }
+}
+
+/// «Ver N pendientes más» / «Ver menos» under a folded list (`AttentionFold`).
+struct AttentionFoldToggle: View {
+    let count: Int
+    @Binding var expanded: Bool
+
+    var body: some View {
+        if let title = AttentionFold.toggleTitle(count, expanded: expanded) {
+            Button { expanded.toggle() } label: {
+                HStack(spacing: Spacing.space1) {
+                    Text(verbatim: title).font(Typo.label)
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down").font(Typo.small).accessibilityHidden(true)
+                }
+                .foregroundStyle(Theme.primaryText)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
 /// S7: estado con ícono + etiqueta + patrón; el color acompaña, nunca va solo. Los patrones (rayado, punteado,
 /// sólido, contorno, discontinuo, doble) se distinguen en escala de grises. Un valor sin familia se muestra con un
 /// punto, su texto y `fallbackTone` (neutro por defecto).

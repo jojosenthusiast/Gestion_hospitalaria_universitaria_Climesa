@@ -127,6 +127,8 @@ public struct Appointment: Decodable, Sendable, Identifiable, Equatable {
     public var cancelableUntil: String? = nil
     public var reschedule: AppointmentReschedule? = nil
     public var rescheduledToId: String? = nil
+    /// Categories the patient chose when asking by reason; empty or absent when reception booked it directly.
+    public var categories: [AppointmentCategoryRef]? = nil
 }
 
 /// `AppointmentCommandResponse` de solicitar y cancelar una cita.
@@ -145,7 +147,12 @@ public struct AppointmentCatalogs: Decodable, Sendable, Equatable {
         public let specialty: String?
         public let area: String?
         public let active: Bool
+        /// Only when the catalog is asked for a `date`: whether the doctor has a published shift that day.
+        public var hasShift: Bool? = nil
+        /// Why not ("Sin turno ese día") when `hasShift` is false.
+        public var reason: String? = nil
         public var fullName: String { "\(givenNames) \(surnames)" }
+        enum CodingKeys: String, CodingKey { case id, givenNames, surnames, specialty, area, active, hasShift = "tieneTurno", reason = "motivo" }
     }
     public let doctors: [Doctor]
 }

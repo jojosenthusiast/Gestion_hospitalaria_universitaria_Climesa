@@ -103,6 +103,16 @@ public enum LabFilter: String, CaseIterable, Sendable, Hashable {
     /// Clave de Localizable.xcstrings con el nombre del filtro.
     public var titleKey: String { "exams.filter.\(rawValue)" }
 
+    /// Status value whose badge the filter chip wears; «Todos» stays neutral.
+    public var statusValue: String? {
+        switch self {
+        case .all: return nil
+        case .pendiente: return "pendiente"
+        case .enProceso: return "en_proceso"
+        case .completado: return "completado"
+        }
+    }
+
     public func matches(_ order: LabOrder) -> Bool {
         switch self {
         case .all: return true
@@ -271,6 +281,23 @@ public enum AmbulanceFinalState: String, CaseIterable, Sendable, Hashable {
         case .fallecido: return "Paciente fallecido"
         case .desviado: return "Desviado a otro centro"
         }
+    }
+
+    /// Status value whose badge shows the final state (and its filter chip): a completed service is done, every other
+    /// ending closes the service without a transfer.
+    public var statusValue: String {
+        switch self {
+        case .completado: return "completado"
+        case .rechazaTraslado: return "rechazada"
+        case .cancelado: return "cancelado"
+        case .sinTraslado, .fallecido, .desviado: return "cerrado"
+        }
+    }
+
+    /// Status value of a log entry's `finalState`; nil (still running) reads as in process.
+    public static func statusValue(_ code: String?) -> String {
+        guard let code else { return "en_curso" }
+        return AmbulanceFinalState(rawValue: code)?.statusValue ?? "cerrado"
     }
 }
 
