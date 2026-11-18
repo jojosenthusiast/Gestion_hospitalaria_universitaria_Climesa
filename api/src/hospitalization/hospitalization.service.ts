@@ -124,18 +124,34 @@ export class HospitalizationService {
       const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed,oc.id AS "occupationId",a.origen_id AS "originId",a.motivo AS motive,a.tipo_aislamiento AS "isolationType",a.inestable AS unstable,a.postquirurgico AS "postSurgical",a.visitas_permitidas AS "visitorsAllowed",a.visitantes_max AS "visitorsMax",
           nullif(concat_ws(' ',d.nombres,d.apellidos),'') AS "attendingDoctorName",EXISTS(SELECT 1 FROM acceso.usuario du WHERE du.persona_personal_id=a.medico_tratante_id AND du.estado='activo') AS "attendingDoctorHasAccount",
           oc.categoria AS "bedCategory",(a.autorizado_por IS NOT NULL) AS authorized,a.alta_solicitada_en AS "dischargeRequestedAt",
-          al.tipo AS "dischargeType",al.firmada_en AS "dischargeSignedAt",al.firmada_por AS "dischargeSignedBy",al.pendientes AS "dischargePending",
+          al.tipo AS "dischargeType",al.firmada_en AS "dischargeSignedAt",al.firmada_por AS "dischargeSignedBy",al.pendientes AS "dischargePending",al.resumen AS "dischargeSummary",
+          -- D7: diagnoses of the stay (signed consultations only, as the patient sees them): the origin consultation and those signed during the stay.
+          CASE WHEN al.admision_id IS NULL THEN NULL ELSE (SELECT coalesce(json_agg(json_build_object('code',x.codigo,'description',x.descripcion,'principal',dd.principal) ORDER BY dd.principal DESC,x.codigo),'[]'::json)
+            FROM (SELECT DISTINCT ON (d.cie10) d.cie10,d.principal FROM atencion.diagnostico d JOIN atencion.consulta k ON k.id=d.consulta_id
+              WHERE k.paciente_id=a.paciente_id AND k.estado='firmada' AND ((a.origen='consulta' AND k.id=a.origen_id) OR k.firmada_en BETWEEN a.creado_en AND al.firmada_en)
+              ORDER BY d.cie10,d.principal DESC) dd JOIN atencion.cie10 x ON x.codigo=dd.cie10) END AS "dischargeDiagnoses",
+          fu.at AS "followUpAt",fu.state AS "followUpState",fu."doctorName" AS "followUpDoctorName",fu.specialty AS "followUpSpecialty",
           (SELECT nullif(concat_ws(' ',sp.nombres,sp.apellidos),'') FROM acceso.usuario su JOIN personal.persona sp ON sp.id=su.persona_personal_id WHERE su.id=al.firmada_por) AS "dischargeSignedByName",
           ($6::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=a.paciente_id AND r.profesional_id=$6 AND r.vigencia @> $1::timestamptz)) AS related
         FROM hospitalizacion.admision a JOIN pacientes.paciente p ON p.id=a.paciente_id LEFT JOIN personal.persona d ON d.id=a.medico_tratante_id
           LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $1::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id
           LEFT JOIN hospitalizacion.alta al ON al.admision_id=a.id AND al.revocada_en IS NULL
-        WHERE a.estado IN ('pendiente_cama','hospitalizado','alta_firmada') AND ($2::boolean OR ($4::uuid IS NOT NULL AND a.paciente_id=$4)
+          -- D7: follow-up of the discharge, the patient's next requested or confirmed appointment from now on.
+          LEFT JOIN LATERAL (SELECT lower(ci.horario) AS at,ci.estado AS state,nullif(concat_ws(' ',m.nombres,m.apellidos),'') AS "doctorName",m.especialidad AS specialty
+            FROM atencion.cita ci LEFT JOIN personal.persona m ON m.id=ci.medico_id
+            WHERE al.admision_id IS NOT NULL AND ci.paciente_id=a.paciente_id AND ci.estado IN ('solicitada','confirmada') AND lower(ci.horario)>=greatest(al.firmada_en,$1::timestamptz)
+            ORDER BY lower(ci.horario) LIMIT 1) fu ON true
+        WHERE (a.estado IN ('pendiente_cama','hospitalizado','alta_firmada')
+          -- D7: the patient keeps seeing the summary of the most recent closed stay for 30 days after the discharge.
+          OR ($4::uuid IS NOT NULL AND a.paciente_id=$4 AND a.estado='egresado' AND al.firmada_en>=$1::timestamptz-interval '30 days'
+            AND a.id=(SELECT a2.id FROM hospitalizacion.admision a2 JOIN hospitalizacion.alta al2 ON al2.admision_id=a2.id AND al2.revocada_en IS NULL
+              WHERE a2.paciente_id=$4 AND a2.estado='egresado' ORDER BY al2.firmada_en DESC LIMIT 1)))
+          AND ($2::boolean OR ($4::uuid IS NOT NULL AND a.paciente_id=$4)
           OR ($3::uuid IS NOT NULL AND (a.medico_tratante_id=$3 OR EXISTS(SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=a.paciente_id AND r.profesional_id=$3 AND r.vigencia @> $1::timestamptz)))
           OR (cardinality($5::uuid[])>0 AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=oc.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($5::uuid[])))) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,ownDoctor ? actor.staffId : null,ownPatient ? actor.patientId : null,areas,actor.staffId ?? null])).rows;
       const enrolled = hasPermission(actor, 'alta.firmar') && !!actor.staffId && (await c.query('SELECT personal.inscrito($1::uuid,$2::date) AS ok', [actor.staffId, this.clock.today()])).rows[0]?.ok === true;
       for (const row of rows) await this.commands.audit(c, actor, { action: 'admision.leer', entity: 'admision', entityId: row.id, patientId: row.patientId, permission: 'admision.ver' });
-      return rows.map(({ dischargeType, dischargeSignedAt, dischargeSignedBy, dischargePending, dischargeSignedByName, related, ...row }) => {
+      return rows.map(({ dischargeType, dischargeSignedAt, dischargeSignedBy, dischargePending, dischargeSignedByName, dischargeSummary, dischargeDiagnoses, followUpAt, followUpState, followUpDoctorName, followUpSpecialty, related, ...row }) => {
         // D-031: without a care relationship (global context: Recepción, Jefatura) the discharge is operational only;
         // its type and pending descriptions are clinical. Non-global readers only see rows through a care context.
         const clinical = !global || (!!ownDoctor && (row.attendingDoctorId === actor.staffId || related === true));
@@ -145,6 +161,10 @@ export class HospitalizationService {
           discharge: dischargeType ? {
             type: clinical ? dischargeType : null, signedAt: dischargeSignedAt, signedByName: dischargeSignedByName ?? null,
             pending: clinical ? pending : null, pendingCount: pending.length, specialHandling: SPECIAL_EXIT.includes(dischargeType as string),
+            // D7: the discharge summary (indications, diagnoses, follow-up) is clinical too.
+            summary: clinical ? (dischargeSummary ?? null) : null,
+            diagnoses: clinical ? (dischargeDiagnoses ?? []) : null,
+            followUp: clinical && followUpAt ? { at: followUpAt, state: followUpState, doctorName: followUpDoctorName ?? null, specialty: followUpSpecialty ?? null } : null,
           } : null,
           allowedActions: admissionActions(actor, { ...row, related, enrolled, dischargeSignedBy: dischargeSignedBy ?? null }),
         };

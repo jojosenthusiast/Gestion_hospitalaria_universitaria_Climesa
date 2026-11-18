@@ -157,7 +157,7 @@ describe('Fase 0 · cierre del ciclo de la admisión', () => {
     expect(signed.status).toBe(201);
     for (const role of ['JOP', 'REC']) {
       const operational = (await row(role, admission.id)).discharge;
-      expect(operational).toEqual({ type: null, pending: null, pendingCount: 1, specialHandling: true, signedAt: expect.any(String), signedByName: expect.any(String) });
+      expect(operational).toEqual({ type: null, pending: null, pendingCount: 1, specialHandling: true, signedAt: expect.any(String), signedByName: expect.any(String), summary: null, diagnoses: null, followUp: null });
       expect(JSON.stringify(operational)).not.toMatch(/defuncion|cuerpo/);
     }
     expect((await row('MED', admission.id)).discharge).toMatchObject({ type: 'defuncion', specialHandling: true, pending: [{ description: 'Entrega del cuerpo a la familia', responsible: 'Trabajo social' }] });
