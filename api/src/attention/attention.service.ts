@@ -1,3 +1,4 @@
+import { appointmentCategoriesSql } from './appointment-categories';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
@@ -239,6 +240,7 @@ export class AttentionService {
       (SELECT n.id FROM atencion.cita n WHERE n.reprogramada_de=c.id) AS "rescheduledToId",
       atencion.cita_tiene_consulta(c.id) AS "hasConsultation",
       EXISTS (SELECT 1 FROM personal.turno t WHERE t.persona_id=c.medico_id AND t.estado='ausente' AND t.periodo && c.horario) AS "doctorAbsent",
+      ${appointmentCategoriesSql('c.id')} AS categories,
       (SELECT json_build_object('id',r.id,'start',lower(r.horario),'end',upper(r.horario),'state',r.estado,'origin',r.origen,
         'reason',r.motivo,'rejectionReason',r.motivo_rechazo,'version',r.version)
         FROM atencion.reprogramacion r WHERE r.cita_id=c.id ORDER BY r.creado_en DESC LIMIT 1) AS reschedule

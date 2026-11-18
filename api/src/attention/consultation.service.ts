@@ -1,3 +1,4 @@
+import { appointmentCategoriesSql } from './appointment-categories';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
@@ -33,7 +34,8 @@ export class ConsultationService {
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       lower(c.horario) AS start,upper(c.horario) AS "end",c.motivo AS reason,c.estado AS "appointmentState",
       k.id AS "consultationId",k.estado AS "consultationState",k.motivo AS "consultationReason",
-      k.examen_fisico AS "physicalExam",k.plan,k.version,k.iniciada_en AS "startedAt",k.firmada_en AS "signedAt"
+      k.examen_fisico AS "physicalExam",k.plan,k.version,k.iniciada_en AS "startedAt",k.firmada_en AS "signedAt",
+      ${appointmentCategoriesSql('c.id')} AS categories
       FROM atencion.cita c
       JOIN pacientes.paciente p ON p.id=c.paciente_id
       LEFT JOIN atencion.consulta k ON k.cita_id=c.id AND k.estado<>'ingresada_por_error'
