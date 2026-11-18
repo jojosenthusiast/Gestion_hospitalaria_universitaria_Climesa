@@ -31,6 +31,13 @@ class AndroidSectionsTest {
         assertFalse(AndroidSection.BEDS in AndroidSections.visible("REC", listOf("sesion.perfil", "turnos.ver")))
     }
 
+    @Test fun atrasDesdeUnaSeccionVuelveAInicioYDesdeInicioSaleDeLaApp() {
+        val recepcion = AndroidSections.visible("REC", listOf("sesion.perfil", "fila.ver", "turnos.ver"))
+        assertEquals(AndroidSection.HOME, AndroidSections.backTarget(AndroidSection.SHIFTS, recepcion))
+        assertEquals(null, AndroidSections.backTarget(AndroidSection.HOME, recepcion))
+        assertEquals(null, AndroidSections.backTarget(AndroidSection.PROFILE, listOf(AndroidSection.PROFILE)))
+    }
+
     @Test fun soloHospitalYPerfilSignificaQueElRolNoTieneFlujoOperativo() {
         assertFalse(AndroidSections.hasAppScreens("MED", listOf("sesion.perfil")))
         assertTrue(AndroidSections.hasAppScreens("MED", listOf("sesion.perfil", "consulta.iniciar")))

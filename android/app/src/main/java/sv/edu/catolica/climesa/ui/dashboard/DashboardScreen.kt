@@ -205,7 +205,7 @@ private fun AttentionList(items: List<DashboardAttention>, onAction: (QuickActio
             if (ranked.size > ATTENTION_VISIBLE) {
                 HorizontalDivider(color = MaterialTheme.climesa.line)
                 Box(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.xs)) {
-                    RowAction(if (expanded) stringResource(R.string.dash_atencion_menos) else stringResource(R.string.dash_atencion_mas, hidden), { expanded = !expanded })
+                    RowAction(if (expanded) stringResource(R.string.dash_atencion_menos) else androidx.compose.ui.res.pluralStringResource(R.plurals.dash_atencion_mas, hidden, hidden), { expanded = !expanded })
                 }
             }
         }

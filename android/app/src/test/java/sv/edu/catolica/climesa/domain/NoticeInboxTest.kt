@@ -145,7 +145,7 @@ class NoticeInboxTest {
     }
 
     @Test fun datesShowInElSalvadorTime() {
-        assertEquals("16 nov 2026, 06:00", NoticeInboxRules.dateText("2026-11-16T12:00:00.000Z").replace(".", ""))
+        assertEquals("16 nov, 06:00", NoticeInboxRules.dateText("2026-11-16T12:00:00.000Z").replace(".", ""))
         assertEquals("", NoticeInboxRules.dateText(null))
     }
 }

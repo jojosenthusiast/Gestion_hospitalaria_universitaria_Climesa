@@ -132,7 +132,8 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     LaunchedEffect(page){inbox.dropUnless(page)}
     // R3 A-2: back from any section returns to Inicio before leaving the app. Screens compose their own BackHandler later,
     // so an open form or detail closes first.
-    BackHandler(enabled=page!=AndroidSection.HOME&&AndroidSection.HOME in sections){selectedName=AndroidSection.HOME.name}
+    val backTarget=AndroidSections.backTarget(page,sections)
+    BackHandler(enabled=backTarget!=null){backTarget?.let{selectedName=it.name}}
     // ENF/AST audit #18: Signos opened from another section (the ward card) goes back there, not to Inicio.
     var vitalsOrigin by rememberSaveable{mutableStateOf<String?>(null)}
     LaunchedEffect(page){if(page!=AndroidSection.VITAL_SIGNS)vitalsOrigin=null}

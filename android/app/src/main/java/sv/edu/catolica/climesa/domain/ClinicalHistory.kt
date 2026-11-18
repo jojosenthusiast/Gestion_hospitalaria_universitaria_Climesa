@@ -12,6 +12,13 @@ data class ClinicalHistory(val patientName: String, val record: String, val acce
 
 /** Pure parsing of the history so the A08/A22 ViewModel can be tested on the JVM. */
 object ClinicalHistoryParser {
+    private val hospitalZone = java.time.ZoneId.of("America/El_Salvador")
+
+    /** QA final: the hospital's calendar day of a timestamp (a 20:00 local consultation is not the next UTC day). */
+    fun localDay(iso: String): String = runCatching { java.time.OffsetDateTime.parse(iso).atZoneSameInstant(hospitalZone).toLocalDate().toString() }.getOrElse { iso.take(10) }
+
+    /** QA final: clinical-history dates are legal dates and keep the year, read "16 oct 2026" (never the raw ISO). */
+    fun label(day: String): String = BirthDates.format(day) ?: day
     fun parse(value: Any?): ClinicalHistory? {
         val json = value as? JSONObject ?: return null
         val patient = json.optJSONObject("patient") ?: JSONObject()
@@ -21,14 +28,14 @@ object ClinicalHistoryParser {
             json.optString("access"),
             objects(json.optJSONArray("consultations")).map(::consultation),
             objects(json.optJSONArray("laboratory")).map(::order),
-            objects(json.optJSONArray("admissions")).map { HistoryAdmission(it.optString("id"), it.optString("state"), it.optString("createdAt").take(10), it.optJSONObject("doctor")?.optString("name").orEmpty()) },
+            objects(json.optJSONArray("admissions")).map { HistoryAdmission(it.optString("id"), it.optString("state"), localDay(it.optString("createdAt")), it.optJSONObject("doctor")?.optString("name").orEmpty()) },
         )
     }
 
     private fun consultation(row: JSONObject) = HistoryConsultation(
         row.optString("id"),
         row.optString("state"),
-        (if (row.isNull("signedAt")) row.optString("startedAt") else row.optString("signedAt")).take(10),
+        localDay(if (row.isNull("signedAt")) row.optString("startedAt") else row.optString("signedAt")),
         row.optJSONObject("doctor")?.optString("name").orEmpty(),
         if (row.isNull("reason")) "" else row.optString("reason"),
         if (row.isNull("plan")) "" else row.optString("plan"),

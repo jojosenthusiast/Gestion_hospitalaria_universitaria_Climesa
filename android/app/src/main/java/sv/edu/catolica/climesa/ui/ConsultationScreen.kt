@@ -101,10 +101,13 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         state.handoff?.let { handoff -> item { NextPatientHandoff(handoff, canCall, state.saving, onCall = { model.callProposed() }, onDismiss = { model.dismissHandoff() }) } }
         // B4: with nobody in the office yet, calling who waits in general consultation is the day's first action.
-        if (primary == ConsultationPrimary.CallWaiting) item {
+        // QA final: with an unsigned consultation as primary, the call stays available as a secondary button (iOS parity).
+        if (ConsultationPrimary.showsCallWaiting(state.handoff != null, canCall, state.waitingGeneral, officeBusy = state.queue.any { it.calledByMe && it.state in setOf("llamado", "en_atencion") })) item {
             SectionCard(stringResource(R.string.clin_llamar_primero_titulo)) {
                 Text(stringResource(R.string.clin_llamar_primero_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                PrimaryButton(stringResource(R.string.fila_llamar_siguiente), { model.clearMessages(); model.callWaiting() }, enabled = !state.saving, loading = state.saving)
+                val call = { model.clearMessages(); model.callWaiting() }
+                if (primary == ConsultationPrimary.CallWaiting) PrimaryButton(stringResource(R.string.fila_llamar_siguiente), call, enabled = !state.saving, loading = state.saving)
+                else SecondaryButton(stringResource(R.string.fila_llamar_siguiente), call, enabled = !state.saving)
             }
         }
         actionState.done?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
