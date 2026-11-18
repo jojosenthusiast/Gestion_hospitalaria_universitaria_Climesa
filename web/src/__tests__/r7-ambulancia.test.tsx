@@ -15,10 +15,10 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const profile = (permissions: string[]): AccessProfile => ({ id: 'u-1', user: { id: 'u-1' }, email: 'x@example.test', name: 'Cuenta Ficticia', roles: [], platforms: ['web'], permissions: permissions.map(code => ({ code, context: 'global' })), channels: ['ambulancia'], patientId: null, staffId: 's-1' });
 const crew = [{ staffId: 'p-1', role: 'paramedico', name: 'Paramédico Ficticio', hasAccount: true }, { staffId: 'm-1', role: 'motorista', name: 'Motorista Ficticio', hasAccount: true }];
-const serving = (): AmbulanceStatus => ({
+const serving = (allowedActions: string[] = ['hito', 'deshacer_hito', 'reportar']): AmbulanceStatus => ({
   unit: { id: 'unit-1', plate: 'P-000-001', state: 'en_servicio', version: 4 },
   activeService: { id: 'svc-1', type: 'emergencia_domicilio', priority: 'roja', origin: 'Calle Ficticia 1', destination: 'Hospital CLIMESA', version: 6, dispatchedAt: '2026-12-02T14:40:00Z', crew,
-    milestones: [{ type: 'salida', occurredAt: '2026-12-02T14:45:00Z' }, { type: 'en_escena', occurredAt: '2026-12-02T14:55:00Z' }] } as AmbulanceStatus['activeService'],
+    milestones: [{ type: 'salida', occurredAt: '2026-12-02T14:45:00Z' }, { type: 'en_escena', occurredAt: '2026-12-02T14:55:00Z' }], allowedActions } as AmbulanceStatus['activeService'],
   paramedicOnDuty: true,
 });
 const available = (): AmbulanceStatus => ({
@@ -39,6 +39,19 @@ describe('R7 G4 · ambulancia en web', () => {
     render(<AmbulancePage api={{ request: vi.fn(async () => serving()), write: vi.fn() } as unknown as Api} profile={profile(['ambulancia.ver_estado'])} version={0} />);
     await screen.findByRole('list', { name: 'Hitos del servicio' });
     expect(screen.queryByRole('button', { name: /^Deshacer/ })).toBeNull();
+  });
+
+  it('S5: a paramedic outside the crew sees the service read-only, with the reason and no undo', async () => {
+    render(<AmbulancePage api={{ request: vi.fn(async () => serving([])), write: vi.fn() } as unknown as Api} profile={profile(['ambulancia.ver_estado', 'ambulancia.operar'])} version={0} />);
+    expect(await screen.findByText('No estás en la tripulación de este servicio.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Deshacer/ })).toBeNull();
+  });
+
+  it('S5: the crew is not offered an undo the API no longer accepts (no deshacer_hito)', async () => {
+    render(<AmbulancePage api={{ request: vi.fn(async () => serving(['hito', 'reportar'])), write: vi.fn() } as unknown as Api} profile={profile(['ambulancia.ver_estado', 'ambulancia.operar'])} version={0} />);
+    await screen.findByRole('list', { name: 'Hitos del servicio' });
+    expect(screen.queryByRole('button', { name: /^Deshacer/ })).toBeNull();
+    expect(screen.queryByText('No estás en la tripulación de este servicio.')).toBeNull();
   });
 
   it('el despacho que falla deja el diálogo abierto con lo elegido; el que sale bien lo dice en el lugar', async () => {

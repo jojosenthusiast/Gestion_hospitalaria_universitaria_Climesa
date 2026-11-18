@@ -20058,6 +20058,10 @@
           },
           "matchReason": {
             "type": "string"
+          },
+          "careRelation": {
+            "type": "boolean",
+            "description": "El actor puede abrir su historial clínico (misma regla que GET /pacientes/{id}/historial): relación de atención vigente, consulta abierta suya, admisión activa a su cargo o su propio expediente"
           }
         },
         "required": [
@@ -20070,7 +20074,8 @@
           "active",
           "sex",
           "version",
-          "matchReason"
+          "matchReason",
+          "careRelation"
         ]
       },
       "PatientAppointmentTodayResponse": {
@@ -20150,6 +20155,20 @@
             "type": "integer",
             "description": "Edad en años; solo si el rol puede ver la fecha de nacimiento"
           },
+          "active": {
+            "type": "boolean",
+            "description": "Paciente activo o provisional; uno inactivo se lista pero no se atiende (fila, cita, consulta, admisión)"
+          },
+          "activeAdmission": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Tiene una admisión activa (pendiente de cama, hospitalizado o alta firmada): no admite otra. null sin admision.ver global ni admision.crear"
+          },
+          "careContext": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "El actor tiene contexto de atención con el paciente (misma regla que registrar signos vitales fuera de consulta). null sin signos.registrar"
+          },
           "appointmentToday": {
             "nullable": true,
             "description": "Cita confirmada de hoy (B-2); solo con citas.ver global",
@@ -20174,7 +20193,10 @@
         "required": [
           "id",
           "record",
-          "fullName"
+          "fullName",
+          "active",
+          "activeAdmission",
+          "careContext"
         ]
       },
       "PatientPickerResponse": {
@@ -26230,6 +26252,13 @@
           "doctor"
         ]
       },
+      "AccionHistorial": {
+        "type": "string",
+        "enum": [
+          "resultado_externo"
+        ],
+        "description": "resultado_externo: el actor puede registrar un examen hecho fuera sin orden (POST /laboratorio/pacientes/{id}/resultado-externo)"
+      },
       "ClinicalHistoryResponse": {
         "type": "object",
         "properties": {
@@ -26261,6 +26290,13 @@
             "items": {
               "$ref": "#/components/schemas/HistoryAdmissionResponse"
             }
+          },
+          "allowedActions": {
+            "type": "array",
+            "description": "resultado_externo: el actor puede registrar un examen hecho fuera sin orden (POST /laboratorio/pacientes/{id}/resultado-externo)",
+            "items": {
+              "$ref": "#/components/schemas/AccionHistorial"
+            }
           }
         },
         "required": [
@@ -26268,7 +26304,8 @@
           "access",
           "consultations",
           "laboratory",
-          "admissions"
+          "admissions",
+          "allowedActions"
         ]
       },
       "PatientVitalsItemResponse": {
@@ -33154,9 +33191,12 @@
       "AccionServicioAmbulancia": {
         "type": "string",
         "enum": [
-          "cerrar"
+          "cerrar",
+          "hito",
+          "deshacer_hito",
+          "reportar"
         ],
-        "description": "Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)"
+        "description": "Acciones que el actor puede hacer sobre el servicio. cerrar: cierre administrativo; hito, deshacer_hito y reportar (prehospital): solo la tripulación asignada"
       },
       "EstadoFinalServicio": {
         "type": "string",
@@ -33245,7 +33285,7 @@
           },
           "allowedActions": {
             "type": "array",
-            "description": "Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)",
+            "description": "Acciones que el actor puede hacer sobre el servicio. cerrar: cierre administrativo; hito, deshacer_hito y reportar (prehospital): solo la tripulación asignada",
             "items": {
               "$ref": "#/components/schemas/AccionServicioAmbulancia"
             }

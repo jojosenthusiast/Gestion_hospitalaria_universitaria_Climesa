@@ -7,7 +7,7 @@ type HistoryConsultation = { id: string; state: string; startedAt: string; signe
 type HistoryOrder = { id: string; state: string; createdAt: string; reviewedAt?: string | null; items: { id: string; code: string; name: string; unit?: string | null; result?: { value?: number | null; text?: string | null; mark: string } | null }[] };
 type HistoryAdmission = { id: string; state: string; origin: string; createdAt: string; doctor: { id: string; name: string } };
 /** Response of `GET /pacientes/{id}/historial` (spec 106). */
-export type ClinicalHistory = { patient: { id: string; record: string; fullName: string }; access: 'propio' | 'relacion'; consultations: HistoryConsultation[]; laboratory: HistoryOrder[]; admissions: HistoryAdmission[] };
+export type ClinicalHistory = { patient: { id: string; record: string; fullName: string }; access: 'propio' | 'relacion'; consultations: HistoryConsultation[]; laboratory: HistoryOrder[]; admissions: HistoryAdmission[]; allowedActions?: string[] };
 
 const accessText: Record<ClinicalHistory['access'], string> = {
   propio: 'Ves tu propio historial revisado.',

@@ -47,7 +47,7 @@ export class ActiveServiceResponse {
   @ClassArrayProp(MilestoneEntryResponse) milestones!: MilestoneEntryResponse[];
   @EnumArrayProp(HITO_SERVICIO, 'HitoServicio') nextMilestones!: string[];
   @ClassProp(LocationPointResponse, { nullable: true }) lastLocation!: LocationPointResponse | null;
-  @EnumArrayProp(['cerrar'], 'AccionServicioAmbulancia', { description: 'Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)' }) allowedActions!: string[];
+  @EnumArrayProp(['cerrar', 'hito', 'deshacer_hito', 'reportar'], 'AccionServicioAmbulancia', { description: 'Acciones que el actor puede hacer sobre el servicio. cerrar: cierre administrativo; hito, deshacer_hito y reportar (prehospital): solo la tripulación asignada' }) allowedActions!: string[];
   @EnumArrayProp(ESTADO_FINAL_SERVICIO, 'EstadoFinalServicio', { description: 'Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03)' }) finalStates!: string[];
 }
 

@@ -57,7 +57,7 @@ describe('Pacientes · dominio: búsqueda con motivo, DUI repetido, corrección 
    const candidate=await find('hernandes basquez jose');
    expect(candidate).toBeDefined();
    expect(candidate.matchReason).toContain('fonética');
-   expect(Object.keys(candidate).sort()).toEqual(['active','birth','fullName','givenNames','id','matchReason','record','sex','state','surnames','version']);
+   expect(Object.keys(candidate).sort()).toEqual(['active','birth','careRelation','fullName','givenNames','id','matchReason','record','sex','state','surnames','version']);
    expect(candidate.fullName).toBe('José Hernández Vásquez');
    for(const key of ['dui','phone','email','address'])expect(candidate[key]).toBeUndefined();
   });

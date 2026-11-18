@@ -355,6 +355,7 @@ export class ClinicalHistoryResponse {
   @ClassArrayProp(HistoryConsultationResponse) consultations!: HistoryConsultationResponse[];
   @ClassArrayProp(HistoryLabOrderResponse) laboratory!: HistoryLabOrderResponse[];
   @ClassArrayProp(HistoryAdmissionResponse, { description: 'Vacío para el propio paciente' }) admissions!: HistoryAdmissionResponse[];
+  @EnumArrayProp(['resultado_externo'], 'AccionHistorial', { description: 'resultado_externo: el actor puede registrar un examen hecho fuera sin orden (POST /laboratorio/pacientes/{id}/resultado-externo)' }) allowedActions!: string[];
 }
 
 // ---- Fila (queue.controller.ts) ----

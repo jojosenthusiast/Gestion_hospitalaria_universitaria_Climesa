@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { handOffPatientSearch } from './patient-handoff';
+import { patientRowBlock } from './patient-gates';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
 import { AreaTag, PriorityBadge, StatusBadge, type Priority } from '../components/system';
 import { Icon, Notice } from '../components/ui';
@@ -18,7 +19,7 @@ import './front-desk.css';
  */
 export type DeskAppointment = { id: string; start: string; doctorId: string; doctorName: string };
 export type DeskTicket = { id: string; service: string; numero: number; state: string; appointmentId: string | null };
-export type DeskPatient = { id: string; record: string; fullName: string; age?: number | null; appointmentToday?: DeskAppointment | null; ticketToday?: DeskTicket | null };
+export type DeskPatient = { id: string; record: string; fullName: string; age?: number | null; appointmentToday?: DeskAppointment | null; ticketToday?: DeskTicket | null; active?: boolean };
 export type IssuedNumber = { id: string; numero: number; service: string; area?: string; state: string; version: number; priority?: Priority; patientName?: string | null; appointmentId?: string | null; ahead?: number; voidableUntil?: string };
 
 const SERVICES = Object.entries(serviceNames);
@@ -43,7 +44,10 @@ function useDeskSearch(api: Api) {
   const search = async (query: string, offset: number): Promise<PickerPage> => {
     const page = await api.request<{ items: DeskPatient[]; hasMore: boolean }>(`/pacientes/selector?query=${encodeURIComponent(query)}&limit=10&offset=${offset}`);
     for (const item of page.items) seen.current.set(item.id, item);
-    return { hasMore: page.hasMore, items: page.items.map(p => ({ id: p.id, label: p.fullName, detail: deskDetail(p) })) };
+    return { hasMore: page.hasMore, items: page.items.map(p => {
+      const reason = patientRowBlock(p, 'attend');
+      return { id: p.id, label: p.fullName, detail: deskDetail(p), ...(reason ? { disabled: true, reason } : {}) };
+    }) };
   };
   return { search, of: (id: string | undefined) => (id ? seen.current.get(id) : undefined) };
 }
@@ -56,7 +60,7 @@ export function FrontDeskDialog({ api, patientId, onClose, onIssued }: { api: Ap
   const [picked, setPicked] = useState<PickerItem | null>(null), [patient, setPatient] = useState<DeskPatient | null>(null);
   const [service, setService] = useState('consulta_general'), [priority, setPriority] = useState<Priority>('rutina');
   const [issued, setIssued] = useState<IssuedNumber | null>(null), [voided, setVoided] = useState<IssuedNumber | null>(null);
-  const [loadingPatient, setLoadingPatient] = useState(!!patientId);
+  const [loadingPatient, setLoadingPatient] = useState(!!patientId), [presetBlock, setPresetBlock] = useState<string | null>(null);
 
   // Opened from the patient record (`#/fila?accion=emitir&paciente=<id>`): the patient comes already chosen.
   useEffect(() => {
@@ -67,7 +71,10 @@ export function FrontDeskDialog({ api, patientId, onClose, onIssued }: { api: Ap
         const record = await api.request<{ id: string; record: string; fullName: string }>(`/pacientes/${patientId}`);
         const page = await api.request<{ items: DeskPatient[] }>(`/pacientes/selector?query=${encodeURIComponent(record.record)}&limit=10&offset=0`);
         const found = page.items.find(p => p.id === patientId) ?? { id: record.id, record: record.record, fullName: record.fullName };
-        if (active) { setPatient(found); setPicked({ id: found.id, label: found.fullName, detail: deskDetail(found) }); }
+        // S1: an inactive patient is not preselected; the reason shows under the search instead of a refusal after the tap.
+        const reason = patientRowBlock(found, 'attend');
+        if (active && reason) setPresetBlock(`${found.fullName}: ${reason}`);
+        else if (active) { setPatient(found); setPicked({ id: found.id, label: found.fullName, detail: deskDetail(found) }); }
       } catch { /* the search stays empty; the person types the name */ }
       finally { if (active) setLoadingPatient(false); }
     })();
@@ -97,7 +104,7 @@ export function FrontDeskDialog({ api, patientId, onClose, onIssued }: { api: Ap
       {issued ? <IssuedCard issued={issued} appointment={appointment} busy={busy} onVoid={() => void voidIssued()} />
         : <>
           <SearchPicker label="Paciente" value={picked} onChange={choose} search={desk.search} autoFocus={!loadingPatient} onQueryChange={text => { typed.current = text; }} required disabled={loadingPatient}
-            placeholder={loadingPatient ? 'Cargando paciente…' : 'Nombre, DUI o expediente'} emptyText="No hay pacientes con ese nombre, DUI o expediente." />
+            placeholder={loadingPatient ? 'Cargando paciente…' : 'Nombre, DUI o expediente'} hint={presetBlock ?? undefined} emptyText="No hay pacientes con ese nombre, DUI o expediente." />
           {!picked && <p className="form-hint">¿No aparece? <a className="cl-link-button" href="#/pacientes?accion=registrar" onClick={() => handOffPatientSearch(typed.current)}>Registrar paciente nuevo</a></p>}
           {voided && <Notice kind="success">Se anuló {deskCode(voided)}. Puedes emitir otro número.</Notice>}
           <WriteError error={action.error} />

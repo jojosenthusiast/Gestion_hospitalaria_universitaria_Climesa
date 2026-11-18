@@ -119,6 +119,9 @@ export class HospitalizationService {
       // SEG-03: context `area` (ENF) sees the admissions whose current bed is in an area of the nurse's current shift.
       const areas = !global && contextsOf(actor, 'admision.ver').includes('area') ? await this.currentAreas(c, actor.staffId) : [];
       if (!global && !ownDoctor && !ownPatient && !areas.length) return [];
+      // S3 (preconditions): `nota_enfermeria` only where `assertNursingContext` lets the note through now.
+      const nursing = contextsOf(actor, 'enfermeria.registrar');
+      const nursingAreas = !nursing.includes('x') && nursing.includes('area') ? await this.currentAreas(c, actor.staffId) : [];
       // BL-03: MED (`relacion`) sees the admissions where it is the attending doctor or has a current care relationship,
       // the same two cases in which it may sign the discharge.
       const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed,oc.id AS "occupationId",a.origen_id AS "originId",a.motivo AS motive,a.tipo_aislamiento AS "isolationType",a.inestable AS unstable,a.postquirurgico AS "postSurgical",a.visitas_permitidas AS "visitorsAllowed",a.visitantes_max AS "visitorsMax",
@@ -132,7 +135,8 @@ export class HospitalizationService {
               ORDER BY d.cie10,d.principal DESC) dd JOIN atencion.cie10 x ON x.codigo=dd.cie10) END AS "dischargeDiagnoses",
           fu.at AS "followUpAt",fu.state AS "followUpState",fu."doctorName" AS "followUpDoctorName",fu.specialty AS "followUpSpecialty",
           (SELECT nullif(concat_ws(' ',sp.nombres,sp.apellidos),'') FROM acceso.usuario su JOIN personal.persona sp ON sp.id=su.persona_personal_id WHERE su.id=al.firmada_por) AS "dischargeSignedByName",
-          ($6::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=a.paciente_id AND r.profesional_id=$6 AND r.vigencia @> $1::timestamptz)) AS related
+          ($6::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=a.paciente_id AND r.profesional_id=$6 AND r.vigencia @> $1::timestamptz)) AS related,
+          (cardinality($7::uuid[])>0 AND oc.habitacion_id IS NOT NULL AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=oc.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($7::uuid[]))) AS "nursingArea"
         FROM hospitalizacion.admision a JOIN pacientes.paciente p ON p.id=a.paciente_id LEFT JOIN personal.persona d ON d.id=a.medico_tratante_id
           LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $1::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id
           LEFT JOIN hospitalizacion.alta al ON al.admision_id=a.id AND al.revocada_en IS NULL
@@ -148,10 +152,10 @@ export class HospitalizationService {
               WHERE a2.paciente_id=$4 AND a2.estado='egresado' ORDER BY al2.firmada_en DESC LIMIT 1)))
           AND ($2::boolean OR ($4::uuid IS NOT NULL AND a.paciente_id=$4)
           OR ($3::uuid IS NOT NULL AND (a.medico_tratante_id=$3 OR EXISTS(SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=a.paciente_id AND r.profesional_id=$3 AND r.vigencia @> $1::timestamptz)))
-          OR (cardinality($5::uuid[])>0 AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=oc.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($5::uuid[])))) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,ownDoctor ? actor.staffId : null,ownPatient ? actor.patientId : null,areas,actor.staffId ?? null])).rows;
+          OR (cardinality($5::uuid[])>0 AND EXISTS(WITH RECURSIVE up AS (SELECT id,padre_id FROM infra.espacio WHERE id=oc.habitacion_id UNION ALL SELECT e.id,e.padre_id FROM infra.espacio e JOIN up ON e.id=up.padre_id) SELECT 1 FROM up WHERE id=ANY($5::uuid[])))) ORDER BY a.creado_en DESC LIMIT 300`, [this.clock.now(),global,ownDoctor ? actor.staffId : null,ownPatient ? actor.patientId : null,areas,actor.staffId ?? null,nursingAreas])).rows;
       const enrolled = hasPermission(actor, 'alta.firmar') && !!actor.staffId && (await c.query('SELECT personal.inscrito($1::uuid,$2::date) AS ok', [actor.staffId, this.clock.today()])).rows[0]?.ok === true;
       for (const row of rows) await this.commands.audit(c, actor, { action: 'admision.leer', entity: 'admision', entityId: row.id, patientId: row.patientId, permission: 'admision.ver' });
-      return rows.map(({ dischargeType, dischargeSignedAt, dischargeSignedBy, dischargePending, dischargeSignedByName, dischargeSummary, dischargeDiagnoses, followUpAt, followUpState, followUpDoctorName, followUpSpecialty, related, ...row }) => {
+      return rows.map(({ dischargeType, dischargeSignedAt, dischargeSignedBy, dischargePending, dischargeSignedByName, dischargeSummary, dischargeDiagnoses, followUpAt, followUpState, followUpDoctorName, followUpSpecialty, related, nursingArea, ...row }) => {
         // D-031: without a care relationship (global context: Recepción, Jefatura) the discharge is operational only;
         // its type and pending descriptions are clinical. Non-global readers only see rows through a care context.
         const clinical = !global || (!!ownDoctor && (row.attendingDoctorId === actor.staffId || related === true));
@@ -166,7 +170,7 @@ export class HospitalizationService {
             diagnoses: clinical ? (dischargeDiagnoses ?? []) : null,
             followUp: clinical && followUpAt ? { at: followUpAt, state: followUpState, doctorName: followUpDoctorName ?? null, specialty: followUpSpecialty ?? null } : null,
           } : null,
-          allowedActions: admissionActions(actor, { ...row, related, enrolled, dischargeSignedBy: dischargeSignedBy ?? null }),
+          allowedActions: admissionActions(actor, { ...row, related, enrolled, dischargeSignedBy: dischargeSignedBy ?? null, nursingContext: nursing.includes('x') || nursingArea === true }),
         };
       });
     });

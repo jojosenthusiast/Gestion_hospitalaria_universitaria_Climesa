@@ -74,7 +74,7 @@ describe('Recepción · registrar pacientes y agendar con selectores', () => {
       expect(names).toEqual(expect.arrayContaining(['María Alejandra Pérez Lopez', 'María Valeria Pérez Soto', 'José María Gómez Díaz']));
       expect(names).not.toContain('Mario Ramos Cruz');
       // R7 U1 (B-2): reception also gets the appointment and the queue number of today (null when there is none).
-      expect(Object.keys(r.body.items[0]).sort()).toEqual(['age', 'appointmentToday', 'fullName', 'id', 'record', 'ticketToday']);
+      expect(Object.keys(r.body.items[0]).sort()).toEqual(['active', 'activeAdmission', 'age', 'appointmentToday', 'careContext', 'fullName', 'id', 'record', 'ticketToday']);
       expect(typeof r.body.items[0].age).toBe('number');
     });
 

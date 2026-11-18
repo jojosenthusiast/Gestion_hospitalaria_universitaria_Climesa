@@ -14,6 +14,12 @@ export type AdmissionActionInput = {
   enrolled: boolean;
   /** User id that signed the current discharge, if any. */
   dischargeSignedBy: string | null;
+  /**
+   * The actor may write nursing notes on this admission now: context `x`, or context `area` with a current shift in an
+   * area that holds the admission's bed (the same check `assertNursingContext` makes). Absent means the context is unknown
+   * and only the permission decides (kept for callers that do not compute it).
+   */
+  nursingContext?: boolean;
 };
 
 /**
@@ -25,7 +31,7 @@ export function admissionActions(actor: Actor, row: AdmissionActionInput): strin
   const actions: string[] = [];
   const signContexts = contextsOf(actor, 'alta.firmar');
   const canSign = row.enrolled && (signContexts.includes('x') || (signContexts.includes('relacion') && !!actor.staffId && (row.attendingDoctorId === actor.staffId || row.related)));
-  const notes = can('enfermeria.registrar');
+  const notes = can('enfermeria.registrar') && row.nursingContext !== false;
   if (row.state === 'pendiente_cama') {
     if (can('camas.asignar')) actions.push('asignar_cama');
     if (can('admision.autorizar') && !row.authorized) actions.push('autorizar');

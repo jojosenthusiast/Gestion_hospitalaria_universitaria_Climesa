@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { ProblemException, VersionConflictException } from '../platform/problem';
-import { Actor, hasPermission } from '../platform/actor';
+import { Actor, contextsOf, hasPermission } from '../platform/actor';
 import { DatabaseService } from '../platform/database.service';
 import { CommandService, fingerprint } from '../platform/command.service';
 import { Clock, businessDate } from '../platform/clock';
@@ -10,7 +10,10 @@ import { PatientCreateDto, PatientUpdateDto, PatientSelfUpdateDto, PatientStateD
 import { ageOn, ageRange, fichaFields, searchBirthFields, searchShowsBirth } from './patient.privacy';
 import { PatientListFilters, assertListFilters, listFilterSql } from './patient-list.filters';
 import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateContact, validateDemographics } from './patient.rules';
+import { careContextPatients, careRelationPatients } from '../platform/care-context';
 type Row = Record<string, any>;
+/** Patient states the front desk and the clinic can attend (queue, appointment, consultation, admission refuse the rest). */
+const ATTENDABLE:readonly string[]=['activo','provisional'];
 @Injectable()
 export class PatientsService {
   constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
@@ -34,7 +37,8 @@ export class PatientsService {
       // SEG-09 (audit 02 M-2): the audit keeps which patients the search exposed, not only how many.
       await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query??'')),count:result.length,patientIds:result.map(p=>p.id),...(Object.values(filters).some(Boolean)?{filtros:filters}:{})}});
       const today=businessDate(this.clock.now());
-      return result.map(p=>searchBirthFields(actor,p,today));
+      const related=await careRelationPatients(c,actor,result.map(p=>p.id),this.clock.now());
+      return result.map(p=>({...searchBirthFields(actor,p,today),careRelation:related.has(p.id)}));
     });
   }
   /** Selector de pacientes (Ronda 1, obs. 8): respuesta mínima y paginada para listas con búsqueda mientras se escribe. */
@@ -44,8 +48,16 @@ export class PatientsService {
       const page=rows.slice(0,limit);
       await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query)),count:page.length,offset,patientIds:page.map(p=>p.id)}});
       const showAge=searchShowsBirth(actor);
-      const today=await this.todayAtDesk(c,actor,page.map(p=>p.id));
-      return {items:page.map(p=>({id:p.id,record:p.record,fullName:p.fullName,...(showAge&&p.birth?{age:this.age({nacimiento:p.birth})}:{}),...today(p.id)})),offset,limit,hasMore:rows.length>limit};
+      const ids=page.map(p=>p.id);
+      const today=await this.todayAtDesk(c,actor,ids);
+      // S1 (preconditions): what every picker needs to disable a row before the tap instead of letting the POST refuse it.
+      // Privacy: admission status only for who already sees it (global admision.ver or admision.crear); care activity
+      // only for who records vital signs. Everyone else gets null (patient-list.filters.ts keeps the same line).
+      const seesAdmission=contextsOf(actor,'admision.ver').includes('x')||hasPermission(actor,'admision.crear'),seesCare=hasPermission(actor,'signos.registrar');
+      const admitted=new Set(seesAdmission&&ids.length?(await c.query(`SELECT DISTINCT paciente_id FROM hospitalizacion.admision WHERE paciente_id=ANY($1::uuid[]) AND estado IN ('pendiente_cama','hospitalizado','alta_firmada')`,[ids])).rows.map(r=>r.paciente_id as string):[]);
+      const care=seesCare?await careContextPatients(c,actor.staffId,ids,this.clock.now()):new Set<string>();
+      return {items:page.map(p=>({id:p.id,record:p.record,fullName:p.fullName,...(showAge&&p.birth?{age:this.age({nacimiento:p.birth})}:{}),...today(p.id),
+        active:ATTENDABLE.includes(p.state),activeAdmission:seesAdmission?admitted.has(p.id):null,careContext:seesCare?care.has(p.id):null})),offset,limit,hasMore:rows.length>limit};
     });
   }
   /**
@@ -76,7 +88,8 @@ export class PatientsService {
       const row=(await c.query('INSERT INTO pacientes.busqueda_registro(usuario_id,huella_criterios,resultados,vence_en,creado_en) VALUES($1,$2,$3,$4,$5) RETURNING token,vence_en',[actor.id,fingerprint(normalize(query)),candidates.length,new Date(this.clock.now().valueOf()+600000),this.clock.now()])).rows[0];
       await this.commands.audit(c,actor,{action:'pacientes.buscar',entity:'paciente',permission:'pacientes.buscar',detail:{queryHash:fingerprint(normalize(query)),count:candidates.length,patientIds:candidates.map(p=>p.id)}});
       const today=businessDate(this.clock.now());
-      return {token:row.token,expiresAt:row.vence_en,candidates:candidates.map(p=>searchBirthFields(actor,p,today))};
+      const related=await careRelationPatients(c,actor,candidates.map(p=>p.id),this.clock.now());
+      return {token:row.token,expiresAt:row.vence_en,candidates:candidates.map(p=>({...searchBirthFields(actor,p,today),careRelation:related.has(p.id)}))};
     });
   }
   private async permitted(c:PoolClient,actor:Actor,id:string) {
