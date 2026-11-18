@@ -25,6 +25,14 @@ final class DoctorRecordActionsTests: XCTestCase {
         XCTAssertFalse(ExternalRecordRules.canRecord(nil))
     }
 
+    // Final QA: without a care relationship the history is a 403; the action is not offered before the history is read.
+    func testTheExternalResultIsOfferedOnlyOnceTheHistoryWasRead() {
+        let doctor = profile(["expediente.ver", "laboratorio.ordenar"])
+        XCTAssertTrue(ExternalRecordRules.canOffer(doctor, historyReadable: true))
+        XCTAssertFalse(ExternalRecordRules.canOffer(doctor, historyReadable: false))
+        XCTAssertFalse(ExternalRecordRules.canOffer(profile(["expediente.ver"]), historyReadable: true))
+    }
+
     func testACompleteFormHasNoError() { XCTAssertNil(error()) }
 
     func testPlaceNeedsThreeToTwoHundredCharactersAfterTrimming() {

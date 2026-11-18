@@ -288,6 +288,10 @@ public enum ExternalRecordRules {
     /// Rule 8: the action depends on the permission, never on the role.
     public static func canRecord(_ profile: AccessProfile?) -> Bool { profile?.hasPermission(permission) ?? false }
 
+    /// The record offers «Registrar resultado externo» only once the history was read (Android `ClinicalHistoryScreen`):
+    /// without a care relationship the API answers 403 and the action would only fail after the form is filled.
+    public static func canOffer(_ profile: AccessProfile?, historyReadable: Bool) -> Bool { historyReadable && canRecord(profile) }
+
     /// A finite number, with the decimal comma people type in El Salvador ("nan" and "inf" are not numbers).
     public static func number(_ value: String) -> Double? {
         guard let parsed = LabExternalRules.number(value), parsed.isFinite else { return nil }

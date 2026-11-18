@@ -1214,6 +1214,8 @@ struct ClinicalHistoryView: View {
     let patientId: String
     /// Quién mira: el paciente su propio historial o el médico el de un paciente (solo el tratante lo ve).
     var viewerIsPatient = true
+    /// D4: «Registrar resultado externo» for the doctor; offered in the patient card only once the history was read.
+    var recordExternal: (() -> Void)? = nil
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<ClinicalHistory>()
@@ -1223,7 +1225,10 @@ struct ClinicalHistoryView: View {
             if let denied = RecordAccess.deniedMessage(for: loader.failure, viewerIsPatient: viewerIsPatient) {
                 EmptyStateView(title: L.text("history.forbidden.title"), message: denied, symbol: "lock.shield")
             } else {
-                LoadState(loader: loader, retry: load) { history in HistoryContent(history: history, viewerIsPatient: viewerIsPatient) }
+                LoadState(loader: loader, retry: load) { history in
+                    let offer = !viewerIsPatient && ExternalRecordRules.canOffer(account.profile, historyReadable: true)
+                    HistoryContent(history: history, viewerIsPatient: viewerIsPatient, recordExternal: offer ? recordExternal : nil)
+                }
             }
         }
         .task(id: live.snapshot.version([.consultations, .laboratory, .admissions, .patient])) { await load() }
@@ -1238,11 +1243,15 @@ private struct HistoryContent: View {
     let history: ClinicalHistory
     /// The API never returns the patient's own admissions here: «Hospitalizaciones» is only for the doctor (Android parity).
     var viewerIsPatient = true
+    var recordExternal: (() -> Void)? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionCard {
                 ListRow(title: history.patient.fullName ?? history.patient.record, meta: history.patient.record) {
                     PatientTag(history.access.rawValue, label: history.access.label)
+                }
+                if let recordExternal {
+                    ClimesaButton(title: L.text("record.external.open"), kind: .secondary, action: recordExternal)
                 }
             }
             SectionTitle("history.consultations")
