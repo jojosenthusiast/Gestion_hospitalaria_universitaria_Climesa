@@ -92,6 +92,8 @@ internal fun DataRow(
     divider: Boolean = false,
     /** R3 A-40: false draws a plain list row (inside a SectionCard or a dialog), never a card inside a card. */
     container: Boolean = true,
+    /** Small marks drawn right after the title (for example the categories of an appointment); null draws nothing. */
+    titleTrailing: (@Composable () -> Unit)? = null,
 ) {
     val body: @Composable () -> Unit = {
         Column {
@@ -106,7 +108,11 @@ internal fun DataRow(
                     }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (titleTrailing == null) Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        titleTrailing()
+                    }
                     subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis) }
                     meta?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                 }

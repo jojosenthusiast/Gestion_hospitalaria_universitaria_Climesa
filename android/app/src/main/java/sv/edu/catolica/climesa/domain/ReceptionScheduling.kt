@@ -73,6 +73,8 @@ data class ReceptionAppointment(
     val rescheduledFromId: String? = null,
     val rescheduledToId: String? = null,
     val reschedule: RescheduleRequest? = null,
+    /** Categories of the request by reason this appointment came from; empty when booked directly. */
+    val categories: List<CategoryRef> = emptyList(),
 ) {
     /** A patient's pending reschedule request that this reader can decide. */
     val pendingReschedule get() = reschedule?.takeIf { it.pending }
@@ -131,6 +133,7 @@ object ReceptionScheduling {
             rescheduledFromId = it.text("rescheduledFromId"),
             rescheduledToId = it.text("rescheduledToId"),
             reschedule = ServerActions.reschedule(it),
+            categories = CategoryRequestRules.refs(it),
         )
     }
 
