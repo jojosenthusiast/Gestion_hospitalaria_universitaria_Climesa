@@ -309,21 +309,19 @@ function RescheduleDialog({ api, appointment, onClose, onSaved }: { api: Api; ap
     <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Volver</button><SaveButton busy={action.busy} disabled={!chosen} label="Reprogramar" /></div></form></Dialog>;
 }
 
-/** Franjas de un médico en un día; se vuelve a pedir al cambiar médico o fecha y nunca muestra la respuesta de otra consulta. */
+/**
+ * Franjas de un médico en un día; se vuelve a pedir al cambiar médico o fecha y nunca muestra la respuesta de otra
+ * consulta. Va por `useData`, así una cita o un turno de otra persona (alcance de `/citas`: cita, personal, turno)
+ * refresca las franjas abiertas en vivo; mientras refresca se siguen viendo las anteriores.
+ */
 function useAvailability(api: Api, doctorId: string, date: string) {
-  const [availability, setAvailability] = useState<Availability | null>(null), [error, setError] = useState<string | null>(null), [loading, setLoading] = useState(false);
-  useEffect(() => {
-    let active = true;
-    setAvailability(null); setError(null);
-    if (!doctorId || !date) { setLoading(false); return () => { active = false; }; }
-    setLoading(true);
-    api.request<Availability>(`/citas/disponibilidad?doctorId=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}`)
-      .then(result => { if (active) setAvailability(result); })
-      .catch(err => { if (active) setError(err instanceof Error ? err.message : 'No se pudo consultar la disponibilidad.'); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [api, doctorId, date]);
-  return { availability, error, loading };
+  const enabled = Boolean(doctorId && date);
+  const remote = useData<Availability>(api, `/citas/disponibilidad?doctorId=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}`, 0, enabled);
+  return {
+    availability: enabled ? remote.data : null,
+    error: enabled && remote.error ? remote.error.message || 'No se pudo consultar la disponibilidad.' : null,
+    loading: enabled && remote.loading && !remote.data,
+  };
 }
 
 function SlotGrid({ franjas, value, onChange }: { franjas: Slot[]; value: string; onChange: (start: string) => void }) {

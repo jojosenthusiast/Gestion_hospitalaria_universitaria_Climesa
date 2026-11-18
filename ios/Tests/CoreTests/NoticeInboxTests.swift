@@ -89,11 +89,23 @@ final class NoticeInboxTests: XCTestCase {
         ], unread: 2, critical: 1)
         XCTAssertEqual(NoticeRules.filter(decoded.notices, by: .todos).map(\.id), ["c1", "i1", "c2", "n1"])
         XCTAssertEqual(NoticeRules.filter(decoded.notices, by: .sinLeer).map(\.id), ["c1", "n1"])
-        XCTAssertEqual(NoticeRules.filter(decoded.notices, by: .criticos).map(\.id), ["c1", "c2"])
+        XCTAssertEqual(NoticeRules.filter(decoded.notices, by: .criticos).map(\.id), ["c1"])
         XCTAssertEqual(NoticeFilter.allCases.map(\.label), ["Todos", "Sin leer", "Críticos"])
         XCTAssertNil(NoticeRules.count(decoded, .todos))
         XCTAssertEqual(NoticeRules.count(decoded, .sinLeer), 2)
         XCTAssertEqual(NoticeRules.count(decoded, .criticos), 1)
+    }
+
+    func testCriticosListaLoMismoQueCuentaLaAPI() throws {
+        let decoded = try inbox([
+            notice("c1", level: "critico"),
+            notice("c2", level: "critico", acknowledged: true),
+            notice("c3", level: "critico", targeted: false),
+            notice("i1", level: "importante"),
+        ], unread: 3, critical: 1)
+        let listed = NoticeRules.filter(decoded.notices, by: .criticos)
+        XCTAssertEqual(listed.map(\.id), ["c1"])
+        XCTAssertEqual(listed.count, NoticeRules.count(decoded, .criticos))
     }
 
     // MARK: Audiencia
