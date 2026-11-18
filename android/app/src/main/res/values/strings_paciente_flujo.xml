@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mis citas y Mi turno sin expediente vinculado -->
+    <string name="pac_citas_sin_vincular">Vincula tu expediente para ver y pedir citas.</string>
+    <string name="pac_citas_sin_vincular_detalle">Abre «Vincular expediente» en Más; recepción revisa tu solicitud.</string>
+    <string name="pac_fila_sin_vincular">Vincula tu expediente para seguir tu número.</string>
+    <string name="pac_fila_sin_vincular_detalle">Abre «Vincular expediente» en Más; recepción revisa tu solicitud.</string>
+
+    <!-- Mi habitación -->
+    <string name="pac_habitacion_titulo">Mi habitación</string>
+    <string name="pac_habitacion_cama">Cama %1$s</string>
+    <string name="pac_habitacion_aislamiento">Aislamiento</string>
+    <string name="pac_habitacion_medico">Médico tratante: %1$s</string>
+    <string name="pac_habitacion_espera">Tu hospitalización espera cama. Te avisaremos cuando te la asignen.</string>
+    <string name="pac_habitacion_ninguna">No estás hospitalizado.</string>
+    <string name="pac_habitacion_ninguna_detalle">Cuando te asignen una cama, aparecerá aquí.</string>
+
+    <!-- Información del hospital -->
+    <string name="pac_hospital_ubicacion">Ubicación</string>
+    <string name="pac_hospital_telefono">Teléfono: %1$s</string>
+    <string name="pac_hospital_llamar">Llamar</string>
+    <string name="pac_hospital_mapa">Abrir en mapas</string>
+    <string name="pac_hospital_medicos_todos">Ver los %1$d médicos</string>
+    <string name="pac_hospital_medicos_menos">Ver menos</string>
+    <string name="pac_hospital_parte_fallo">No se pudo cargar esta parte.</string>
+
+    <!-- Quién vio mi expediente -->
+    <string name="pac_accesos_ver_anteriores">Ver accesos anteriores (%1$d)</string>
+    <string name="pac_accesos_ocultar_anteriores">Ocultar accesos anteriores (%1$d)</string>
+
+    <!-- Solicitudes por motivo -->
+    <string name="pac_motivo_rechazo">Motivo del rechazo: %1$s</string>
+    <string name="pac_solicitudes_ver_resueltas">Ver resueltas (%1$d)</string>
+    <string name="pac_solicitudes_ocultar_resueltas">Ocultar resueltas (%1$d)</string>
+</resources>

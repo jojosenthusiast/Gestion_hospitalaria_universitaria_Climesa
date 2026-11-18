@@ -8,6 +8,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.ViewModel
@@ -25,6 +31,7 @@ import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.domain.AccessEntry
 import sv.edu.catolica.climesa.domain.MyAccessRules
+import sv.edu.catolica.climesa.domain.ShortDay
 
 data class MyAccessState(val loading: Boolean = true, val entries: List<AccessEntry> = emptyList(), val error: String? = null)
 
@@ -46,20 +53,35 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
 
 @Composable fun MyAccessScreen(modifier: Modifier = Modifier, model: MyAccessViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle(); LaunchedEffect(Unit) { model.load() }
+    var olderOpen by rememberSaveable { mutableStateOf(false) }
     PageList(modifier) {
         when {
             state.loading -> item { LoadingState() }
             state.error != null -> item { ErrorState(state.error, onRetry = { model.load() }) }
             state.entries.isEmpty() -> item { EmptyState(stringResource(R.string.mis_accesos_vacio)) }
-            else -> items(state.entries) { entry -> AccessCard(entry) }
+            else -> {
+                // Grouped by day ("Hoy · mié 18 nov"); the last week stays open and older days fold under one line.
+                val today = java.time.LocalDate.now(java.time.ZoneId.of("America/El_Salvador"))
+                val days = MyAccessRules.byDay(state.entries, today)
+                val olderCount = days.filter { it.older }.sumOf { it.entries.size }
+                for ((index, day) in days.withIndex()) {
+                    if (day.older && days.getOrNull(index - 1)?.older != true) item(key = "anteriores") {
+                        TextButton(onClick = { olderOpen = !olderOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+                            Text(stringResource(if (olderOpen) R.string.pac_accesos_ocultar_anteriores else R.string.pac_accesos_ver_anteriores, olderCount))
+                        }
+                    }
+                    if (day.older && !olderOpen) continue
+                    item(key = "dia-${day.date}") { Text(ShortDay.of(day.date, today), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
+                    items(day.entries) { entry -> AccessCard(entry) }
+                }
+            }
         }
         if (!state.loading) item { SecondaryButton(stringResource(R.string.mis_accesos_actualizar), { model.load() }, icon = Icons.Default.Refresh) }
     }
 }
 
 @Composable private fun AccessCard(entry: AccessEntry) {
-    SectionCard(entry.role) {
-        Text(MyAccessRules.displayDate(entry.at), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.primaryText)
+    SectionCard(entry.role, action = { Text(MyAccessRules.time(entry.at), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.primaryText) }) {
         Text(stringResource(R.string.mis_accesos_detalle, entry.dataKind, entry.reason), style = MaterialTheme.typography.bodySmall)
     }
 }

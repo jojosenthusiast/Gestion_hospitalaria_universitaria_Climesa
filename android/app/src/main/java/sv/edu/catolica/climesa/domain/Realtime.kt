@@ -152,6 +152,7 @@ object PortalEvents {
         path.startsWith("/inicio") -> BedEvents.matches(event) || PatientEvents.matches(event)
         path.startsWith("/turnos") -> LiveEntities.matches(event, "turno", "personal")
         path.startsWith("/pacientes") -> PatientEvents.matches(event)
+        path.startsWith("/admisiones") -> LiveEntities.matches(event, "admision", "alta", "cama")
         // La ubicación en vivo llega cada pocos segundos y no cambia esta vista; la tripulación de turno sí (RN-30).
         path.startsWith("/ambulancia") -> (LiveEntities.matches(event, "ambulancia") && event.type != "ambulancia.ubicacion") || LiveEntities.matches(event, "turno")
         else -> false

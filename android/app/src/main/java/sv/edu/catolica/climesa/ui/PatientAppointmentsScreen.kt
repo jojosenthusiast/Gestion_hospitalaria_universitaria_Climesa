@@ -55,6 +55,8 @@ fun PatientAppointmentsScreen(
     modifier: Modifier = Modifier,
     quickAction: QuickAction? = null,
     onQuickActionHandled: () -> Unit = {},
+    /** Account linked to its record (`patientId`); without it the API refuses every appointment read and request. */
+    linked: Boolean = true,
     model: PatientAppointmentsViewModel = viewModel(),
     requests: CategoryRequestsViewModel = viewModel(),
 ) {
@@ -62,7 +64,12 @@ fun PatientAppointmentsScreen(
     val requestState by requests.state.collectAsStateWithLifecycle()
     var cancelTarget by rememberSaveable { mutableStateOf<String?>(null) }
     var pastOpen by rememberSaveable { mutableStateOf(false) }
-    val canRequest = "citas.solicitar" in permissions
+    // "Pedir cita" only for a linked account: unlinked, the API answers 403 "La cuenta no está vinculada".
+    val canRequest = linked && "citas.solicitar" in permissions
+    if (!linked) {
+        PageList(modifier) { item { EmptyState(stringResource(R.string.pac_citas_sin_vincular), detail = stringResource(R.string.pac_citas_sin_vincular_detalle), icon = Icons.Default.CalendarMonth) } }
+        return
+    }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels); requests.load(withCategories = canRequest); requests.startLive(channels) }
     LaunchedEffect(quickAction) {
         if (quickAction == null) return@LaunchedEffect
@@ -111,8 +118,12 @@ fun PatientAppointmentsScreen(
             else item { Text(stringResource(R.string.cita_proximas), style = MaterialTheme.typography.titleSmall) }
             // A5: the next appointment is large on top, with its actions; the rest follow in ascending order.
             split.upcoming.firstOrNull()?.let { next -> item(key = "proxima-${next.id}") { NextAppointmentCard(next, onCancel = { cancelTarget = next.id }, onReschedule = { model.clearMessages(); model.openReschedule(next) }) } }
-            items(split.upcoming.drop(1), key = { it.id }) { appointment ->
-                AppointmentCard(appointment, onCancel = { cancelTarget = appointment.id }, onReschedule = { model.clearMessages(); model.openReschedule(appointment) })
+            // The rest grouped by day ("Mañana · jue 19 nov", "Jue 26 nov"), each card with only its time.
+            sv.edu.catolica.climesa.domain.AppointmentAgenda.groupByDay(split.upcoming.drop(1)) { it.start }.forEach { (day, list) ->
+                item(key = "dia-$day") { Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.shortDay(day), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
+                items(list, key = { it.id }) { appointment ->
+                    AppointmentCard(appointment, showDay = false, onCancel = { cancelTarget = appointment.id }, onReschedule = { model.clearMessages(); model.openReschedule(appointment) })
+                }
             }
             if (split.past.isNotEmpty()) item(key = "pasadas") {
                 TextButton(onClick = { pastOpen = !pastOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
@@ -134,7 +145,7 @@ private fun NextAppointmentCard(appointment: PatientAppointment, onCancel: () ->
             Text(stringResource(R.string.rec7_proxima_cita), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             PatientAppointmentTag(appointment.state)
         }
-        Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start)), style = MaterialTheme.typography.titleLarge)
+        Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.shortDay(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start)), style = MaterialTheme.typography.titleLarge)
         Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end), style = MaterialTheme.typography.headlineSmall)
         Text(appointment.doctorName.ifBlank { "Médico asignado" }, style = MaterialTheme.typography.bodyLarge)
         CategoryMarks(appointment.categories, showNames = true)
@@ -144,10 +155,11 @@ private fun NextAppointmentCard(appointment: PatientAppointment, onCancel: () ->
 }
 
 @Composable
-private fun AppointmentCard(appointment: PatientAppointment, onCancel: () -> Unit, onReschedule: () -> Unit) {
+private fun AppointmentCard(appointment: PatientAppointment, onCancel: () -> Unit, onReschedule: () -> Unit, showDay: Boolean = true) {
     // R3 A-41: one compact block per appointment (when, who, why) with its state on the right; no labels in capitals.
     SectionCard(appointment.doctorName.ifBlank { "Médico asignado" }, action = { PatientAppointmentTag(appointment.state) }) {
-        Text("${sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start))} · ${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end)}", style = MaterialTheme.typography.bodyLarge)
+        val time = sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end)
+        Text(if (showDay) "${sv.edu.catolica.climesa.domain.AppointmentAgenda.shortDay(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start))} · $time" else time, style = MaterialTheme.typography.bodyLarge)
         CategoryMarks(appointment.categories, showNames = true)
         appointment.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
         AppointmentDetails(appointment, onCancel, onReschedule)

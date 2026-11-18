@@ -104,6 +104,9 @@ object AppointmentAgenda {
         val date = LocalDate.parse(key)
         DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", spanish).format(date).replaceFirstChar { it.uppercase() }
     }.getOrDefault(key)
+    /** Owner rule R4: "Hoy · mié 18 nov", "Mañana · jue 19 nov", "Jue 26 nov" for a `yyyy-MM-dd` key; never the year. */
+    fun shortDay(key: String, today: LocalDate = LocalDate.now(zone)): String =
+        runCatching { ShortDay.of(LocalDate.parse(key), today) }.getOrDefault(key)
     fun <T> groupByDay(items: List<T>, start: (T) -> String): List<Pair<String, List<T>>> =
         items.sortedBy { start(it) }.groupBy { dayKey(start(it)) }.toList().sortedBy { it.first }
 }
