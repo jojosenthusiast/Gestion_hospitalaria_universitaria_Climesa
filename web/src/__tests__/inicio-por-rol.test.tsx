@@ -66,9 +66,10 @@ describe('inicio por rol', () => {
     expect(within(acciones).getByRole('link', { name: /Solicitar ambulancia/ }).getAttribute('href')).toBe('#/ambulancia?accion=solicitud');
     // R4a: «Requiere tu atención» and «Fila del día por estado» became the ONE pending tray and the day's figures.
     const atencion = await screen.findByRole('region', { name: 'Pendientes' });
-    expect(await within(atencion).findByText('Cuenta Ficticia')).toBeTruthy();
-    expect(within(atencion).getByText('Luis Ficticio')).toBeTruthy();
-    expect(within(atencion).getByRole('link', { name: /Verificar/ }).getAttribute('href')).toBe('#/vinculaciones');
+    // Only the two most urgent groups open; the rest fold into one line that leads to their section.
+    const otros = await within(atencion).findByRole('list', { name: 'Otros pendientes' });
+    const vinculaciones = within(otros).getByText('Vinculaciones por verificar').closest('li')!;
+    expect(within(vinculaciones).getByRole('link', { name: /Ver/ }).getAttribute('href')).toBe('#/vinculaciones');
     expect(await screen.findByRole('region', { name: 'Cifras del día' })).toBeTruthy();
     expect(screen.queryByText('Accesos directos')).toBeNull();
   });

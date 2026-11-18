@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile, Api } from '../lib/api';
 import { Dashboard } from '../features/dashboards';
+import { AttentionList } from '../features/dashboards/parts';
 import permisosCsv from '../../../docs/arquitectura/datos/permisos.csv?raw';
 
 // R4a (S2, S8, §4.2): Inicio is the «panel del día»: critical banner (only when one exists), then ONE pending tray,
@@ -93,14 +94,19 @@ describe('Inicio · panel del día', () => {
 
   it('REC: el nombre largo ocupa su propia línea y el «y N más» abre la bandeja completa', async () => {
     montar('REC');
-    const grupo = await screen.findByRole('region', { name: 'Vinculaciones por verificar' });
-    const nombre = await within(grupo).findByText(nombreLargo);
+    // Vinculaciones is past the two most urgent groups: it folds into one line with its count and the way to its section.
+    const otros = await screen.findByRole('list', { name: 'Otros pendientes' });
+    const linea = within(otros).getByText('Vinculaciones por verificar').closest('li')!;
+    expect(within(linea).getByText('5')).toBeTruthy();
+    expect(within(linea).getByRole('link', { name: /Ver/ }).getAttribute('href')).toBe('#/vinculaciones');
+    cleanup();
+    render(<AttentionList items={[{ id: 'n', title: nombreLargo, detail: 'pide vincular su cuenta', tone: 'warn', href: '#/vinculaciones', action: 'Verificar', tag: 'Por verificar' }]} />);
+    const nombre = screen.getByText(nombreLargo);
     // Line 1 is the name alone (no «(pide vincular su cuenta)», no chip, no button inside it).
     expect(nombre.className).toContain('tray-row-name');
     expect(nombre.textContent).toBe(nombreLargo);
     expect(nombre.querySelector('.status-tag, .row-action')).toBeNull();
     expect(nombre.closest('li')!.querySelector('.tray-row-meta')!.textContent).not.toContain(nombreLargo);
-    expect(within(grupo).getByRole('link', { name: 'Ver las 5' }).getAttribute('href')).toBe('#/vinculaciones');
   });
 
   it('JOP: sin la tercera rejilla de resumen y sin datos repetidos', async () => {
