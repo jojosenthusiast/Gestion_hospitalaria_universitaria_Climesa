@@ -65,12 +65,11 @@ struct PatientRecordScreen: View {
         ScreenFrame(title: "patients.record") {
             DoctorPatientRoom(patientId: patientId)
             DoctorPatientVitals(patientId: patientId)
-            // D4 · rule 8: the action depends on `laboratorio.ordenar`, never on the role.
-            if ExternalRecordRules.canRecord(account.profile) {
-                ClimesaButton(title: L.text("record.external.open"), kind: .secondary) { externalNotice = nil; externalOpen = true }
-            }
             if let externalNotice { PatientNotice(text: externalNotice) }
-            ClinicalHistoryView(patientId: patientId, viewerIsPatient: false).id(historyRefresh)
+            // D4 · rule 8: the action depends on `laboratorio.ordenar`, never on the role; it shows inside the patient card
+            // only once the history was read (403 without a care relationship), as on Android.
+            ClinicalHistoryView(patientId: patientId, viewerIsPatient: false,
+                                recordExternal: { externalNotice = nil; externalOpen = true }).id(historyRefresh)
         }
         .sheet(isPresented: $externalOpen) {
             ExternalRecordSheet(patientId: patientId, reload: { historyRefresh += 1 }) { message in externalNotice = message }

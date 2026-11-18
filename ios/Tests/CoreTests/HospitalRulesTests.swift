@@ -95,6 +95,15 @@ final class HospitalRulesTests: XCTestCase {
         XCTAssertNil(list[2].discharge?.summary)
     }
 
+    // Final QA: the signature reads like Android ("Firmada el … por …"); without a name there is no " por".
+    func testDischargeSignedLineMatchesAndroidWording() {
+        let at = "2026-11-18T16:30:00Z"
+        let signed = Admission.Discharge(type: "medica", signedAt: at, signedByName: "Dra. Ficticia", pending: [])
+        XCTAssertEqual(DischargeSummaryRules.signedLine(signed), "Firmada el \(ClimesaDates.display(at)) por Dra. Ficticia")
+        let anonymous = Admission.Discharge(type: "medica", signedAt: at, signedByName: " ", pending: [])
+        XCTAssertEqual(DischargeSummaryRules.signedLine(anonymous), "Firmada el \(ClimesaDates.display(at))")
+    }
+
     func testProfileRulesValidateContactLikeTheAPI() {
         XCTAssertTrue(PatientProfileRules.errors(phone: "7777-7777", email: "ejemplo@example.test", address: "Calle ficticia").isEmpty)
         XCTAssertTrue(PatientProfileRules.errors(phone: "", email: "", address: "").isEmpty)

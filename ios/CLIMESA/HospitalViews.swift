@@ -207,7 +207,7 @@ struct DischargeSummaryCard: View {
         SectionCard(title: L.text("discharge.patient.title"), eyebrow: DischargeSummaryRules.typeLabel(discharge)) {
             HStack(spacing: Spacing.s) {
                 PatientTag(admission.state.rawValue, label: admission.state.label)
-                Text(verbatim: ClimesaDates.display(discharge.signedAt) + (discharge.signedByName.map { " · " + $0 } ?? "")).font(Typo.small).foregroundStyle(Theme.muted)
+                Text(verbatim: DischargeSummaryRules.signedLine(discharge)).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
             }
             if admission.state == .egresado { PatientNotice(text: L.text("discharge.patient.closed")) }
             block(L.text("discharge.patient.diagnoses"), lines: DischargeSummaryRules.diagnoses(discharge).map(DischargeSummaryRules.diagnosisLine), empty: L.text("discharge.patient.diagnoses.none"))

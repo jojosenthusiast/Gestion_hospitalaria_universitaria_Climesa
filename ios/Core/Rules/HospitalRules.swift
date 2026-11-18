@@ -214,6 +214,13 @@ public enum DischargeSummaryRules {
         let parts = [ClimesaDates.display(followUp.at), followUp.doctorName, followUp.specialty].compactMap { $0?.isEmpty == false ? $0 : nil }
         return parts.joined(separator: " · ") + (followUp.state == "solicitada" ? " (por confirmar)" : "")
     }
+
+    /// Signature line, the same words as Android: "Firmada el 18 nov 2026, 10:32 por Dra. Ficticia" (no " por" without a name).
+    public static func signedLine(_ discharge: Admission.Discharge) -> String {
+        let line = "Firmada el \(ClimesaDates.display(discharge.signedAt))"
+        guard let name = discharge.signedByName?.trimmingCharacters(in: .whitespaces), !name.isEmpty else { return line }
+        return line + " por \(name)"
+    }
 }
 
 /// "Mis datos": el paciente edita solo su contacto con `pacientes.editar_propios` (`PATCH /me/paciente`).
