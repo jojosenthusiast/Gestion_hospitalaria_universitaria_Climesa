@@ -40,7 +40,7 @@ function availableActions(row: Admission) {
 function DischargeWait({ row }: { row: Admission }) {
   if (row.state !== 'hospitalizado' || row.allowedActions?.includes('firmar_alta')) return null;
   return <>
-    <small className="admission-wait">{row.attendingDoctorHasAccount === false ? `El médico tratante no tiene cuenta en la app; ${row.allowedActions?.includes('reasignar_tratante') ? 'reasígnalo' : 'Jefatura de operaciones debe reasignarlo'}` : `Esperando alta médica: la firma ${row.attendingDoctorName || 'el médico tratante'} desde la app`}</small>
+    <small className="admission-wait">{row.attendingDoctorHasAccount === false ? `El médico tratante no tiene cuenta en la app; ${row.allowedActions?.includes('reasignar_tratante') ? 'reasígnalo' : 'Jefatura de operaciones debe reasignarlo'}` : row.dischargeRequestedAt ? `Esperando alta médica: la firma ${row.attendingDoctorName || 'el médico tratante'} desde la app` : `El alta la firma ${row.attendingDoctorName || 'el médico tratante'} desde la app`}</small>
     {row.dischargeRequestedAt && <small>{`Alta solicitada ${relativeTime(row.dischargeRequestedAt)}`}</small>}
   </>;
 }

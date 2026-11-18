@@ -44,11 +44,12 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
     <CompactHeader breadcrumb="CLIMESA / Inicio" title={roleDashboards[roles[0]].title} actions={<QuickActions actions={actions} profile={profile} />} />
     <CriticalNoticeBanner api={api} version={version} />
     <div className="day-panel">
-      <PendingTray groups={groups} othersClear={s10Clear}>
-        {/* S10: follow-up appointments proposed when results arrive (Recepción), and results for the doctor to review. */}
-        {followUps && <LabFollowUpPanel api={api} version={version} state={d.followUps} inTray />}
-        {results && <LabResultsInbox api={api} profile={profile} version={version} state={d.labPending} inTray />}
-      </PendingTray>
+      {/* S10: follow-up appointments proposed when results arrive (Recepción), and results for the doctor to review.
+          They count toward the two open groups of the tray; beyond that they fold like any other group. */}
+      <PendingTray groups={groups} othersClear={s10Clear} extras={[
+        ...(followUps ? [{ id: 'seguimientos', title: 'Citas de seguimiento por confirmar', count: d.followUps.data ? d.followUps.data.length : null, node: <LabFollowUpPanel api={api} version={version} state={d.followUps} inTray /> }] : []),
+        ...(results ? [{ id: 'por-revisar', title: 'Resultados por revisar', count: d.labPending.data ? d.labPending.data.length : null, node: <LabResultsInbox api={api} profile={profile} version={version} state={d.labPending} inTray /> }] : []),
+      ]} />
       <DayFigures figures={figures} />
     </div>
     {ownShiftPanel && <div className="role-dashboard"><MyShift shifts={d.myShifts} /></div>}

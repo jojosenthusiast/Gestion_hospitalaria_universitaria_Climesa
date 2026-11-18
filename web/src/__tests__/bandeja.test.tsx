@@ -1,4 +1,5 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PendingTray, TrayGroup } from '../features/dashboards/parts';
 import { appointmentRequestCount } from '../features/listas/requests';
@@ -28,6 +29,22 @@ describe('bandeja de pendientes (W04, R4a)', () => {
   it('con todo vacío dice una sola vez que está al día', () => {
     render(<PendingTray groups={[{ id: 'b', title: 'Admisiones sin cama', href: '#/hospitalizacion', items: [], state: remote([]) }]} />);
     expect(screen.getByText('Al día: nada pendiente.')).toBeTruthy();
+  });
+
+  it('un grupo extra (S10) abre solo si quedan huecos de los 2 más urgentes; si no, se pliega en una línea que lo despliega', async () => {
+    const extra = { id: 'seg', title: 'Citas de seguimiento por confirmar', count: 1, node: <section aria-label="Citas de seguimiento por confirmar">Abigail</section> };
+    const { rerender } = render(<PendingTray groups={[
+      { id: 'a', title: 'Solicitudes de cita', href: '#/citas', items: [row('1', 'Ana')], state: remote([]) },
+      { id: 'b', title: 'Admisiones sin cama', href: '#/hospitalizacion', items: [row('2', 'Luis')], state: remote([]) },
+    ]} extras={[extra]} />);
+    expect(screen.queryByRole('region', { name: 'Citas de seguimiento por confirmar' })).toBeNull();
+    const folded = within(screen.getByRole('list', { name: 'Otros pendientes' })).getByText('Citas de seguimiento por confirmar').closest('li')!;
+    expect(within(folded).getByText('1').className).toContain('tray-count');
+    await userEvent.click(within(folded).getByRole('button', { name: 'Ver' }));
+    expect(screen.getByRole('region', { name: 'Citas de seguimiento por confirmar' })).toBeTruthy();
+    rerender(<PendingTray groups={[{ id: 'a', title: 'Solicitudes de cita', href: '#/citas', items: [row('1', 'Ana')], state: remote([]) }]} extras={[extra]} />);
+    expect(screen.getByRole('region', { name: 'Citas de seguimiento por confirmar' })).toBeTruthy();
+    expect(screen.queryByRole('list', { name: 'Otros pendientes' })).toBeNull();
   });
 
   it('un grupo que falla muestra su error con reintento y no un cero falso', () => {
