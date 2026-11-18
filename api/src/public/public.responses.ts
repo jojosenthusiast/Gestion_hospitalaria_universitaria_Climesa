@@ -75,6 +75,7 @@ export class MyNoticesResponse {
 
 /** S11 · Un aviso en la bandeja de la cuenta, con su acuse y si se destaca en el inicio. */
 export class MyInboxNoticeResponse extends NoticeAudienceResponse {
+  @StrProp({ description: 'vigente, programado o vencido (últimos 30 días); "Enterado" y los conteos solo aplican a los vigentes' }) estado!: string;
   @DateTimeProp({ nullable: true }) publicadoEn!: string | null;
   @BoolProp({ description: 'Dirigido al rol o al área de la cuenta (no solo público)' }) dirigido!: boolean;
   @DateTimeProp({ nullable: true, description: 'Cuándo la cuenta dio "Enterado"; null si no lo ha hecho' }) enteradoEn!: string | null;
@@ -85,8 +86,8 @@ export class MyInboxNoticeResponse extends NoticeAudienceResponse {
 export class MyInboxResponse {
   @DateTimeProp() actualizadoEn!: string;
   @ClassArrayProp(MyInboxNoticeResponse) avisos!: MyInboxNoticeResponse[];
-  @IntProp({ description: 'Avisos sin "Enterado"' }) noLeidos!: number;
-  @IntProp({ description: 'Avisos críticos dirigidos a la cuenta sin "Enterado"' }) criticos!: number;
+  @IntProp({ description: 'Avisos vigentes sin "Enterado"' }) noLeidos!: number;
+  @IntProp({ description: 'Avisos vigentes críticos dirigidos a la cuenta sin "Enterado"' }) criticos!: number;
   @NumProp({ description: 'Horas que tarda en volver un crítico pospuesto (política avisos.recordatorio_horas)' }) recordatorioHoras!: number;
   @DateTimeProp({ nullable: true, description: 'Siguiente instante en que la bandeja cambia sola: vence o empieza un aviso, o vuelve un recordatorio' }) proximoCambio!: string | null;
 }
