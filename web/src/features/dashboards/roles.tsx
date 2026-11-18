@@ -131,7 +131,7 @@ const jop: RoleDashboard = {
   actions: [
     { id: 'admision', label: 'Nueva admisión', hint: 'Ingresar a un paciente para hospitalizar', icon: 'bed', href: '#/hospitalizacion?accion=admision', permission: 'admision.crear' },
     { id: 'turno', label: 'Planificar turno', hint: 'Asignar personal a un área', icon: 'calendar', href: '#/turnos?accion=planificar', permission: 'turnos.planificar' },
-    { id: 'aviso', label: 'Publicar aviso', hint: 'Comunicado para la pantalla pública', icon: 'megaphone', href: '#/avisos?accion=publicar', permission: 'avisos.publicar' },
+    { id: 'aviso', label: 'Publicar aviso', hint: 'Comunicado para el personal o la pantalla pública', icon: 'megaphone', href: '#/avisos?accion=publicar', permission: 'avisos.publicar' },
     { id: 'metricas', label: 'Ver métricas', hint: 'Indicadores con gráficos y exportación', icon: 'chart', href: '#/metricas', permission: 'metricas.ver' },
   ],
   tray: ({ d }) => [
