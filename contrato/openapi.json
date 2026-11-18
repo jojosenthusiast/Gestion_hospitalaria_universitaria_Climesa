@@ -26997,7 +26997,9 @@
           },
           "consultationId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "Consulta de la que cuelga la orden; null en órdenes de una admisión"
           },
           "patientId": {
             "type": "string",
@@ -27265,7 +27267,9 @@
           },
           "consultationId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "Consulta de la que cuelga la orden; null en órdenes de una admisión"
           },
           "patientId": {
             "type": "string",

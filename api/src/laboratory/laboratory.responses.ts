@@ -44,7 +44,7 @@ export class LabOrderItemResponse {
 
 export class LabOrderResponse {
   @UuidProp() id!: string;
-  @UuidProp() consultationId!: string;
+  @UuidProp({ nullable: true, description: 'Consulta de la que cuelga la orden; null en órdenes de una admisión' }) consultationId!: string | null;
   @UuidProp() patientId!: string;
   @UuidProp() doctorId!: string;
   @EnumProp(PRIORIDAD_LABORATORIO, 'PrioridadLaboratorio') priority!: string;

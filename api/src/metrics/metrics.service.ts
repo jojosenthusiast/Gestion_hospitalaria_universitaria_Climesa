@@ -99,7 +99,7 @@ export class MetricsService {
         FROM d LEFT JOIN s ON (s.fin AT TIME ZONE ${zone})::date=d.fecha AND s.fin<=$3::timestamptz GROUP BY d.fecha ORDER BY d.fecha`,
       tiempo_laboratorio: `${DAYS}
         SELECT d.fecha::text AS fecha,count(o.id)::int AS muestras,round(avg(extract(epoch FROM o.completada_en-o.creada_en))/60,1) AS valor
-        FROM d LEFT JOIN laboratorio.orden o ON o.estado='completado' AND o.completada_en IS NOT NULL AND (o.completada_en AT TIME ZONE ${zone})::date=d.fecha AND o.completada_en<=$3::timestamptz
+        FROM d LEFT JOIN laboratorio.orden o ON o.estado='completado' AND NOT o.externa AND o.completada_en IS NOT NULL AND (o.completada_en AT TIME ZONE ${zone})::date=d.fecha AND o.completada_en<=$3::timestamptz
         GROUP BY d.fecha ORDER BY d.fecha`,
       tiempo_ambulancia: `${DAYS}, t AS (SELECT coalesce(sol.creada_en,s.despachado_en) AS inicio,
           (SELECT min(h.ocurrido_en) FROM ambulancia.hito h WHERE h.servicio_id=s.id AND h.tipo='en_escena') AS escena

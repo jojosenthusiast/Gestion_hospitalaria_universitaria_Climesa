@@ -73,6 +73,17 @@ describe('Laboratorio · seguimiento, orden externa y cita propuesta (S10)', () 
       expect(item.detail).toContain('Crítico bajo');
     });
 
+    test('cancelar una orden con un valor crítico capturado cierra su pendiente en la misma transacción', async () => {
+      const o = await order('en_proceso');
+      const saved = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultados`, { orderItemId: o.item, value: 5.1, version: o.version });
+      expect((await inbox()).some(p => p.orderId === o.id)).toBe(true);
+      const cancelled = await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/cancelar`, { version: saved.body.orderVersion, reason: 'Muestra hemolizada; se repite en otra orden.' });
+      expect([cancelled.status, cancelled.body.state]).toEqual([201, 'cancelado']);
+      expect((await inbox()).some(p => p.orderId === o.id)).toBe(false);
+      const rows = await t.pg.query<{ estado: string }>('SELECT estado FROM laboratorio.pendiente_medico WHERE orden_id=$1', [o.id]);
+      expect(rows.rows.map(r => r.estado)).toEqual(['revisado']);
+    });
+
     test('una observación relevante sin valor crítico crea el pendiente y avisa al médico sin aviso crítico', async () => {
       const o = await order('en_proceso');
       const saved = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultados`, { orderItemId: o.item, value: 13.4, version: o.version, observation: 'Muestra levemente hemolizada; repetir si hay duda clínica.', relevant: true });

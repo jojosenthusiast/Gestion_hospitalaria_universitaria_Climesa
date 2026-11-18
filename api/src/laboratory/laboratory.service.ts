@@ -449,6 +449,9 @@ export class LaboratoryService {
       if (old.doctorId !== actor.staffId && !contextsOf(actor, 'laboratorio.cancelar').includes('x')) throw new ForbiddenException('No puedes cancelar esta orden.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
       const row = (await c.query(`UPDATE laboratorio.orden SET estado='cancelado',motivo_cancelacion=$2,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version`, [id, dto.reason.trim()])).rows[0];
+      // A cancelled order leaves nothing to review: its open "Resultados por revisar" items close in the same transaction.
+      await c.query(`UPDATE laboratorio.pendiente_medico SET estado='revisado',revisado_en=$2,revisado_por=coalesce($3::uuid,medico_id),actualizado_en=$2,version=version+1
+        WHERE orden_id=$1 AND estado='pendiente'`, [id, this.clock.now(), actor.staffId ?? null]);
       await this.commands.audit(c, actor, { action: 'laboratorio.cancelar', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.cancelar', reason: dto.reason });
       await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver']));
       return row;
