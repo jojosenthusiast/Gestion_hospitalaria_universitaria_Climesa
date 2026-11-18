@@ -198,7 +198,40 @@ describe('Spec 113 · tablero y métricas agregadas', () => {
     const response = await t.call('ADM', 'GET', `/metricas/tiempo_laboratorio?desde=${fecha}&hasta=${fecha}`);
     expect(response.status).toBe(200);
     expect(response.body).toEqual(expect.objectContaining({ indicador: 'tiempo_laboratorio', unidad: 'minutos', desde: fecha, hasta: fecha }));
-    expect(response.body.serie).toEqual([{ fecha, valor: 90, muestras: 1 }]);
+    expect(response.body.serie).toEqual([{ fecha, valor: 90, muestras: 1, mediana: 90 }]);
+    expect(response.body.resumen).toEqual({ promedio: 90, mediana: 90, muestras: 1 });
+  });
+
+  test('D2 y D3: mediana junto al promedio; el laboratorio lee su propio tiempo de entrega sin metricas.ver', async () => {
+    const doctor = await t.staffOf('REC');
+    // Three orders created yesterday at 10:00 local, completed after 30, 40 and 140 minutes: average 70, median 40.
+    // Plus an external one, which never counts.
+    const created = new Date(`${new Date(now.valueOf() - 86400_000 - 6 * hour).toISOString().slice(0, 10)}T16:00:00Z`);
+    for (const minutes of [30, 40, 140]) {
+      const patientId = await t.patient();
+      await t.pg.query("INSERT INTO laboratorio.orden(admision_id,paciente_id,medico_id,estado,creada_en,completada_en) VALUES($1,$2,$3,'en_proceso',$4,NULL)", [randomUUID(), patientId, doctor, created]);
+      await t.pg.query("UPDATE laboratorio.orden SET estado='completado',completada_en=$2 WHERE paciente_id=$1", [patientId, new Date(created.valueOf() + minutes * 60_000)]);
+    }
+    const external = await t.patient();
+    await t.pg.query("INSERT INTO laboratorio.orden(admision_id,paciente_id,medico_id,estado,creada_en,completada_en,externa,lugar_externo,instrucciones_externas) VALUES($1,$2,$3,'en_proceso',$4,NULL,true,'Clínica ficticia','Presentarse en ayunas con la orden.')", [randomUUID(), external, doctor, created]);
+    await t.pg.query("UPDATE laboratorio.orden SET estado='completado',completada_en=$2 WHERE paciente_id=$1", [external, new Date(created.valueOf() + 100 * 60_000)]);
+    const local = (d: Date) => new Date(d.valueOf() - 6 * hour).toISOString().slice(0, 10);
+    const day = local(created);
+    const metric = await t.call('ADM', 'GET', `/metricas/tiempo_laboratorio?desde=${day}&hasta=${day}`);
+    expect(metric.status).toBe(200);
+    expect(metric.body.serie).toEqual([{ fecha: day, valor: 70, mediana: 40, muestras: 3 }]);
+    expect(metric.body.resumen).toEqual({ promedio: 70, mediana: 40, muestras: 3 });
+    expect((await t.call('ADM', 'GET', `/metricas/ocupacion_diaria?desde=${day}&hasta=${day}`)).body.serie[0]).not.toHaveProperty('mediana');
+
+    expect((await t.call('LAB', 'GET', '/metricas/tiempo_laboratorio')).status).toBe(403);
+    const lab = await t.call('LAB', 'GET', '/laboratorio/tiempo-entrega');
+    expect(lab.status).toBe(200);
+    expect(lab.body).toEqual(expect.objectContaining({ indicador: 'tiempo_laboratorio', unidad: 'minutos', hasta: local(now) }));
+    expect(lab.body.serie).toHaveLength(7);
+    expect(lab.body.serie[0].fecha).toBe(lab.body.desde);
+    expect(lab.body.serie.find((p: any) => p.fecha === day)).toEqual({ fecha: day, valor: 70, mediana: 40, muestras: 3 });
+    expectNoPersonalData(lab.body, [doctor]);
+    expect((await t.call('MED', 'GET', '/laboratorio/tiempo-entrega')).status).toBe(403);
   });
 
   test('FR-113-05: los cinco indicadores responden una serie diaria; rango y nombre se validan', async () => {

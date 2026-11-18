@@ -27,8 +27,8 @@ export class LabItemResultResponse {
 export class LabItemRangeResponse {
   @NumProp({ nullable: true }) min!: number | null;
   @NumProp({ nullable: true }) max!: number | null;
-  @NumProp({ nullable: true }) criticalLow!: number | null;
-  @NumProp({ nullable: true }) criticalHigh!: number | null;
+  @NumProp({ nullable: true, optional: true, description: 'Solo para el personal; el paciente nunca recibe los límites críticos' }) criticalLow?: number | null;
+  @NumProp({ nullable: true, optional: true, description: 'Solo para el personal; el paciente nunca recibe los límites críticos' }) criticalHigh?: number | null;
 }
 
 export class LabOrderItemResponse {
@@ -39,7 +39,7 @@ export class LabOrderItemResponse {
   @StrProp({ nullable: true, description: 'Unidad del catálogo' }) unit!: string | null;
   @EnumProp(TIPO_RESULTADO, 'TipoResultadoLaboratorio', { description: 'S10: numérico (valor) o texto' }) resultType!: string;
   @ClassProp(LabItemResultResponse, { nullable: true, description: 'null sin resultado o si el actor aún no puede ver valores' }) result!: LabItemResultResponse | null;
-  @ClassProp(LabItemRangeResponse, { nullable: true, optional: true, description: 'C-3: rango de referencia y críticos vigentes para este paciente; solo para quien ve valores' }) referenceRange?: LabItemRangeResponse | null;
+  @ClassProp(LabItemRangeResponse, { nullable: true, optional: true, description: 'C-3: rango de referencia y críticos vigentes para este paciente, para quien ve valores. D1: el paciente recibe solo min y max, y solo en resultados ya revisados' }) referenceRange?: LabItemRangeResponse | null;
 }
 
 export class LabOrderResponse {

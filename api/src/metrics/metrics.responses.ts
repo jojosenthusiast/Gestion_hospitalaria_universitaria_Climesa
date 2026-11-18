@@ -83,6 +83,14 @@ export class SeriesPointResponse {
   @DateProp() fecha!: string;
   @NumProp({ nullable: true }) valor!: number | null;
   @IntProp() muestras!: number;
+  @NumProp({ nullable: true, optional: true, description: 'D2: mediana del día; solo en tiempo_laboratorio' }) mediana?: number | null;
+}
+
+/** D2: promedio y mediana de todo el rango (la mediana del rango no se obtiene de las medianas diarias). */
+export class MetricSummaryResponse {
+  @NumProp({ nullable: true }) promedio!: number | null;
+  @NumProp({ nullable: true }) mediana!: number | null;
+  @IntProp() muestras!: number;
 }
 
 export class MetricSeriesResponse {
@@ -92,4 +100,5 @@ export class MetricSeriesResponse {
   @DateProp() hasta!: string;
   @DateTimeProp() actualizadoEn!: string;
   @ClassArrayProp(SeriesPointResponse) serie!: SeriesPointResponse[];
+  @ClassProp(MetricSummaryResponse, { optional: true, description: 'D2: resumen del rango; solo en tiempo_laboratorio' }) resumen?: MetricSummaryResponse;
 }

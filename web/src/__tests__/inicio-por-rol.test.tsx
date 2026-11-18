@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api } from '../lib/api';
+import { formatDuration, localDayKey } from '../lib/format';
 import { Dashboard } from '../features/dashboards';
 import { modules } from '../features/shell';
 import permisosCsv from '../../../docs/arquitectura/datos/permisos.csv?raw';
@@ -102,6 +103,20 @@ describe('inicio por rol', () => {
     expect(within(atencion).getByRole('link', { name: /Tomar muestra/ }).getAttribute('href')).toBe('#/laboratorio?orden=o1&accion=muestra');
     expect(await screen.findByRole('region', { name: 'Inventario bajo el mínimo' })).toBeTruthy();
     expect(await screen.findByText('Reactivo ficticio')).toBeTruthy();
+  });
+
+  it('D3: LAB lee su tiempo de entrega de /laboratorio/tiempo-entrega (promedio y mediana), no de la lista de órdenes', async () => {
+    const dia = localDayKey(new Date());
+    respuestas['/laboratorio/tiempo-entrega'] = { indicador: 'tiempo_laboratorio', unidad: 'minutos', desde: dia, hasta: dia, actualizadoEn: hoy, serie: [{ fecha: dia, valor: 70, mediana: 40, muestras: 3 }], resumen: { promedio: 70, mediana: 40, muestras: 3 } };
+    try {
+      const { container } = render(<Dashboard api={{ request: vi.fn(async (path: string) => respuestas[path.split('?')[0]] ?? []), write: vi.fn() } as unknown as Api} profile={perfil('LAB')} version={0} />);
+      const figura = async (id: string) => { await screen.findAllByText(/Mediana hoy/); return container.querySelector(`[data-figure="${id}"] .figure-value`)?.textContent; };
+      expect(await figura('lab-mediana')).toBe(formatDuration(40));
+      expect(await figura('lab-tiempo')).toBe(formatDuration(70));
+      // The list has one completed order; the API counted three today.
+      expect(await figura('lab-hoy')).toBe('3');
+      expect(await screen.findByRole('region', { name: 'Tiempo de entrega (7 días)' })).toBeTruthy();
+    } finally { delete respuestas['/laboratorio/tiempo-entrega']; }
   });
 
   it('DPD: denegados en rojo y acción de verificar la cadena', async () => {

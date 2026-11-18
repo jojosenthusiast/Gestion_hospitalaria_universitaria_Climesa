@@ -1018,6 +1018,13 @@ struct LabOrderDetail: View {
                         if staffView, let range = PatientLabRules.rangeText(item.referenceRange) {
                             Text(verbatim: String(format: L.text("results.range"), range)).font(Typo.small).foregroundStyle(Theme.muted)
                         }
+                        // D1: once released, the patient sees the range (without critical limits) and whether the value fell outside.
+                        if !staffView, let range = PatientLabRules.patientRangeText(item.referenceRange) {
+                            HStack(spacing: 8) {
+                                Text(verbatim: String(format: L.text("results.range"), range)).font(Typo.small).foregroundStyle(Theme.muted)
+                                if PatientLabRules.outOfRange(item.result?.mark), let mark = item.result?.mark { PatientTag(mark.rawValue, label: L.text("exams.outOfRange")) }
+                            }
+                        }
                         if let observation = LabFollowUpRules.labNote(item.result, staffView: staffView) {
                             Text(verbatim: String(format: L.text(item.result?.relevant == true ? "exams.observation.relevant" : "exams.observation"), observation))
                                 .font(Typo.small).foregroundStyle(item.result?.relevant == true ? Theme.ink : Theme.muted)

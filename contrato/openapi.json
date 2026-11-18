@@ -18215,6 +18215,74 @@
         "x-permiso": "metricas.ver"
       }
     },
+    "/api/v1/laboratorio/tiempo-entrega": {
+      "get": {
+        "operationId": "LabTurnaroundController_turnaround",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricSeriesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tiempo de entrega del laboratorio de los últimos 7 días: promedio y mediana por día y del rango, sin órdenes externas",
+        "tags": [
+          "laboratory"
+        ],
+        "x-permiso": "laboratorio.ver_cola"
+      }
+    },
     "/api/v1/ambulancia": {
       "get": {
         "operationId": "AmbulanceController_status",
@@ -26902,18 +26970,18 @@
           },
           "criticalLow": {
             "type": "number",
-            "nullable": true
+            "nullable": true,
+            "description": "Solo para el personal; el paciente nunca recibe los límites críticos"
           },
           "criticalHigh": {
             "type": "number",
-            "nullable": true
+            "nullable": true,
+            "description": "Solo para el personal; el paciente nunca recibe los límites críticos"
           }
         },
         "required": [
           "min",
-          "max",
-          "criticalLow",
-          "criticalHigh"
+          "max"
         ]
       },
       "LabOrderItemResponse": {
@@ -26958,7 +27026,7 @@
           },
           "referenceRange": {
             "nullable": true,
-            "description": "C-3: rango de referencia y críticos vigentes para este paciente; solo para quien ve valores",
+            "description": "C-3: rango de referencia y críticos vigentes para este paciente, para quien ve valores. D1: el paciente recibe solo min y max, y solo en resultados ya revisados",
             "type": "object",
             "allOf": [
               {
@@ -32776,11 +32844,37 @@
           },
           "muestras": {
             "type": "integer"
+          },
+          "mediana": {
+            "type": "number",
+            "nullable": true,
+            "description": "D2: mediana del día; solo en tiempo_laboratorio"
           }
         },
         "required": [
           "fecha",
           "valor",
+          "muestras"
+        ]
+      },
+      "MetricSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "promedio": {
+            "type": "number",
+            "nullable": true
+          },
+          "mediana": {
+            "type": "number",
+            "nullable": true
+          },
+          "muestras": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "promedio",
+          "mediana",
           "muestras"
         ]
       },
@@ -32820,6 +32914,14 @@
             "items": {
               "$ref": "#/components/schemas/SeriesPointResponse"
             }
+          },
+          "resumen": {
+            "description": "D2: resumen del rango; solo en tiempo_laboratorio",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MetricSummaryResponse"
+              }
+            ]
           }
         },
         "required": [

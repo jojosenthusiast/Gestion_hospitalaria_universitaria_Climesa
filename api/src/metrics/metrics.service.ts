@@ -18,7 +18,14 @@ export const INDICATORS = {
   cobertura_turnos: 'horas_con_hueco',
 } as const;
 export type Indicator = keyof typeof INDICATORS;
-type Point = { fecha: string; valor: number | null; muestras: number };
+type Point = { fecha: string; valor: number | null; muestras: number; mediana?: number | null };
+/** D2: period summary of the lab turnaround; the median of the whole range cannot be rebuilt from the daily medians. */
+type Summary = { promedio: number | null; mediana: number | null; muestras: number };
+/** D3: days of the lab's own turnaround on its Inicio (today and the six before). */
+export const LAB_TURNAROUND_DAYS = 7;
+/** Completed orders of this lab: external reports are done elsewhere and never measure its turnaround. */
+const LAB_DONE = `o.estado='completado' AND NOT o.externa AND o.completada_en IS NOT NULL AND o.completada_en<=$3::timestamptz`;
+const LAB_MINUTES = 'extract(epoch FROM o.completada_en-o.creada_en)/60';
 
 const num = (v: unknown) => v == null ? null : Number(v);
 const zone = `'${BUSINESS_ZONE}'`;
@@ -86,8 +93,27 @@ export class MetricsService {
     const key = indicator as Indicator;
     return this.cache.get(`serie:${key}:${desde}:${hasta}`, async () => {
       const serie = key === 'cobertura_turnos' ? await this.coverageSeries(desde, hasta) : await this.sqlSeries(key, desde, hasta);
-      return { indicador: key, unidad: INDICATORS[key], desde, hasta, actualizadoEn: this.clock.now().toISOString(), serie };
+      const resumen = key === 'tiempo_laboratorio' ? await this.labSummary(desde, hasta) : undefined;
+      return { indicador: key, unidad: INDICATORS[key], desde, hasta, actualizadoEn: this.clock.now().toISOString(), serie, ...(resumen ? { resumen } : {}) };
     });
+  }
+
+  /**
+   * D3: the lab's own turnaround for its Inicio (`GET /laboratorio/tiempo-entrega`), the last seven local days with the
+   * same rule, average and median as `/metricas/tiempo_laboratorio`; only aggregates, readable with `laboratorio.ver_cola`.
+   */
+  labTurnaround() {
+    const hasta = this.clock.today();
+    const desde = businessDate(new Date(businessDayRange(hasta).start.valueOf() - (LAB_TURNAROUND_DAYS - 1) * DAY + HOUR));
+    return this.series('tiempo_laboratorio', desde, hasta);
+  }
+
+  /** D2: average and median (percentile_cont 0.5) of the lab turnaround over the whole range, in minutes. */
+  private async labSummary(from: string, to: string): Promise<Summary> {
+    const [row] = await this.db.query<{ promedio: unknown; mediana: unknown; muestras: number }>(`SELECT count(*)::int AS muestras,round(avg(${LAB_MINUTES})::numeric,1) AS promedio,
+        round((percentile_cont(0.5) WITHIN GROUP (ORDER BY ${LAB_MINUTES}))::numeric,1) AS mediana
+      FROM laboratorio.orden o WHERE ${LAB_DONE} AND (o.completada_en AT TIME ZONE ${zone})::date BETWEEN $1::date AND $2::date`, [from, to, this.clock.now()]);
+    return { promedio: num(row.promedio), mediana: num(row.mediana), muestras: row.muestras };
   }
 
   private async sqlSeries(key: Exclude<Indicator, 'cobertura_turnos'>, from: string, to: string): Promise<Point[]> {
@@ -102,8 +128,9 @@ export class MetricsService {
         SELECT d.fecha::text AS fecha,count(s.admision_id)::int AS muestras,round(avg(extract(epoch FROM s.fin-s.ini))/86400,2) AS valor
         FROM d LEFT JOIN s ON (s.fin AT TIME ZONE ${zone})::date=d.fecha AND s.fin<=$3::timestamptz GROUP BY d.fecha ORDER BY d.fecha`,
       tiempo_laboratorio: `${DAYS}
-        SELECT d.fecha::text AS fecha,count(o.id)::int AS muestras,round(avg(extract(epoch FROM o.completada_en-o.creada_en))/60,1) AS valor
-        FROM d LEFT JOIN laboratorio.orden o ON o.estado='completado' AND NOT o.externa AND o.completada_en IS NOT NULL AND (o.completada_en AT TIME ZONE ${zone})::date=d.fecha AND o.completada_en<=$3::timestamptz
+        SELECT d.fecha::text AS fecha,count(o.id)::int AS muestras,round(avg(extract(epoch FROM o.completada_en-o.creada_en))/60,1) AS valor,
+          round((percentile_cont(0.5) WITHIN GROUP (ORDER BY ${LAB_MINUTES}))::numeric,1) AS mediana
+        FROM d LEFT JOIN laboratorio.orden o ON ${LAB_DONE} AND (o.completada_en AT TIME ZONE ${zone})::date=d.fecha
         GROUP BY d.fecha ORDER BY d.fecha`,
       tiempo_ambulancia: `${DAYS}, t AS (SELECT coalesce(sol.creada_en,s.despachado_en) AS inicio,
           (SELECT min(h.ocurrido_en) FROM ambulancia.hito h WHERE h.servicio_id=s.id AND h.tipo='en_escena') AS escena
@@ -111,8 +138,9 @@ export class MetricsService {
         SELECT d.fecha::text AS fecha,count(t.escena)::int AS muestras,round(avg(extract(epoch FROM t.escena-t.inicio))/60,1) AS valor
         FROM d LEFT JOIN t ON t.escena IS NOT NULL AND (t.inicio AT TIME ZONE ${zone})::date=d.fecha AND t.escena<=$3::timestamptz GROUP BY d.fecha ORDER BY d.fecha`,
     };
-    const rows = await this.db.query<{ fecha: string; valor: unknown; muestras: number }>(sql[key], [from, to, now]);
-    return rows.map(r => ({ fecha: r.fecha, valor: r.muestras > 0 || key === 'ocupacion_diaria' ? num(r.valor) : null, muestras: r.muestras }));
+    const rows = await this.db.query<{ fecha: string; valor: unknown; muestras: number; mediana?: unknown }>(sql[key], [from, to, now]);
+    return rows.map(r => ({ fecha: r.fecha, valor: r.muestras > 0 || key === 'ocupacion_diaria' ? num(r.valor) : null, muestras: r.muestras,
+      ...(key === 'tiempo_laboratorio' ? { mediana: r.muestras > 0 ? num(r.mediana) : null } : {}) }));
   }
 
   /** Horas con algún hueco de cobertura por día local (FR-103-08 aplicado al rango). */
