@@ -64,6 +64,11 @@ object DoctorChoices {
         if (showAll || query.isNotBlank()) 0 else (ordered.size - LIMIT).coerceAtLeast(0)
 }
 /** Cita de `GET /citas` tal como la ve Recepción (o el médico, sus propias citas). Las acciones vienen del servidor. */
+/** `arrival` of an appointment row: the number its arrival issued ("Llegó · CON 4"). */
+data class AppointmentArrival(val id: String, val number: Int, val state: String) {
+    val code get() = "CON $number"
+}
+
 data class ReceptionAppointment(
     val id: String, val patientName: String, val doctorName: String, val start: String, val end: String, val state: String, val version: Int,
     val doctorId: String = "",
@@ -75,7 +80,12 @@ data class ReceptionAppointment(
     val reschedule: RescheduleRequest? = null,
     /** Categories of the request by reason this appointment came from; empty when booked directly. */
     val categories: List<CategoryRef> = emptyList(),
+    val patientId: String = "",
+    /** D-1: the queue number reception issued when the patient arrived (`arrival`); null before the arrival. */
+    val arrival: AppointmentArrival? = null,
 ) {
+    /** D-1, the web rule: a confirmed appointment of [today] whose arrival is not registered yet. */
+    fun canRegisterArrival(today: String) = arrival == null && state == "confirmada" && patientId.isNotBlank() && AppointmentAgenda.dayKey(start) == today
     /** A patient's pending reschedule request that this reader can decide. */
     val pendingReschedule get() = reschedule?.takeIf { it.pending }
     val isRequest get() = state == "solicitada"
@@ -134,6 +144,8 @@ object ReceptionScheduling {
             rescheduledToId = it.text("rescheduledToId"),
             reschedule = ServerActions.reschedule(it),
             categories = CategoryRequestRules.refs(it),
+            patientId = it.optString("patientId"),
+            arrival = it.optJSONObject("arrival")?.let { a -> AppointmentArrival(a.optString("id"), a.optInt("numero"), a.optString("state")) },
         )
     }
 
@@ -154,30 +166,56 @@ data class LinkRequestRow(
     val candidateRecord: String?, val candidateName: String?, val candidateBirth: String?, val candidates: Int,
     /** G2: the nearest record when nothing matches exactly (one digit off, for example); shown to compare, never approvable. */
     val closestRecord: String? = null, val closestName: String? = null, val closestBirth: String? = null, val closestDui: String? = null,
+    /** G-2: the DUI of the exact candidate record, compared field by field with the declared one. */
+    val candidateDui: String? = null,
 ) {
     val hasCandidate get() = candidateRecord != null
     /** Regla de la pantalla: aprobar solo si un expediente coincide en DUI y nacimiento; la API lo vuelve a validar. */
     val canApprove get() = hasCandidate
     val birthMatches get() = hasCandidate && candidateBirth == declaredBirth
+    /** The record compared: the exact candidate, else the closest one (never approvable). */
+    private val comparedRecord get() = candidateRecord ?: closestRecord
+    /** Field-by-field comparison, the same rule as the web (`compare` in account-links.tsx). */
+    val fields: List<LinkField> get() {
+        val name = candidateName ?: closestName
+        val dui = if (hasCandidate) candidateDui else closestDui
+        val birth = if (hasCandidate) candidateBirth else closestBirth
+        val any = comparedRecord != null
+        return listOf(
+            LinkField("Nombre", accountName.ifBlank { "Sin nombre en la cuenta" }, if (any) listOfNotNull(name, comparedRecord).joinToString(" · ") else "—",
+                any && accountName.isNotBlank() && name != null && ReceptionLinking.plain(name) == ReceptionLinking.plain(accountName)),
+            LinkField("DUI", declaredDui, dui ?: if (any) "Sin DUI en el expediente" else "—", dui != null && ReceptionLinking.digits(dui) == ReceptionLinking.digits(declaredDui)),
+            LinkField("Nacimiento", BirthDates.format(declaredBirth) ?: "—", if (any) BirthDates.format(birth) ?: "—" else "—", any && birth == declaredBirth),
+        )
+    }
+    /** Labels of the fields that do not match, for the approval confirmation ("nombre, dui"). */
+    val mismatched: List<String> get() = fields.filterNot { it.matches }.map { it.label.lowercase() }
     val guidance get() = when {
         hasCandidate -> "DUI y fecha de nacimiento coinciden con el expediente $candidateRecord. Verifica la identidad antes de aprobar."
-        candidates > 1 -> "Más de un expediente coincide: resuelve el posible duplicado antes de aprobar."
+        candidates > 1 -> "Más de un expediente tiene el DUI $declaredDui y esa fecha de nacimiento, así que no se puede aprobar todavía. Recepción no fusiona expedientes: búscalos en Pacientes por ese DUI, confirma con el paciente cuál es el suyo y avisa a Administración del posible duplicado. Si el paciente no puede esperar, rechaza con ese motivo."
         closestRecord != null -> "No coincide exacto, pero el expediente $closestRecord se parece. Compara los datos con el paciente y corrige el que esté mal antes de aprobar."
         else -> "No hay expediente con ese DUI y esa fecha: búscalo en Pacientes y regístralo si no existe; después aprueba."
     }
 }
+/** One row of the linking comparison: what the account declared, what the record says, and whether they match. */
+data class LinkField(val label: String, val declared: String, val record: String, val matches: Boolean)
+
 object ReceptionLinking {
     fun parse(array: JSONArray) = (0 until array.length()).mapNotNull { array.optJSONObject(it) }.map { row ->
         val account = row.optJSONObject("account"); val declared = row.optJSONObject("declared"); val candidate = row.optJSONObject("candidate")
         val closest = row.optJSONObject("closest")
         fun JSONObject.text(key: String) = if (isNull(key)) null else optString(key).ifBlank { null }
         LinkRequestRow(
-            row.optString("id"), row.optInt("version", 1), row.optString("createdAt"), account?.optString("email").orEmpty(), account?.optString("name").orEmpty(),
-            declared?.optString("dui").orEmpty(), declared?.optString("birth").orEmpty(),
-            candidate?.optString("record"), candidate?.optString("fullName"), candidate?.let { if (it.isNull("birth")) null else it.optString("birth") }, row.optInt("candidates"),
+            row.optString("id"), row.optInt("version", 1), row.optString("createdAt"), account?.text("email").orEmpty(), account?.text("name").orEmpty(),
+            declared?.text("dui").orEmpty(), declared?.text("birth").orEmpty(),
+            candidate?.text("record"), candidate?.text("fullName"), candidate?.text("birth"), row.optInt("candidates"),
             closest?.text("record"), closest?.text("fullName"), closest?.text("birth"), closest?.text("dui"),
+            candidateDui = candidate?.text("dui"),
         )
     }
+    fun digits(value: String) = value.filter(Char::isDigit)
+    /** Name compared without accents, case or extra spaces (web `plain`). */
+    fun plain(value: String) = java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "").replace(Regex("\\s+"), " ").trim().lowercase()
     fun rejectError(reason: String) = if (reason.trim().length < 10) "El motivo debe tener al menos 10 caracteres." else null
     fun approveBody(row: LinkRequestRow) = JSONObject().put("version", row.version)
     fun rejectBody(row: LinkRequestRow, reason: String) = JSONObject().put("version", row.version).put("reason", reason.trim())

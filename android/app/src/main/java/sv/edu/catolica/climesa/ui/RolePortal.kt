@@ -156,7 +156,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
             onOpenVitals=if(AndroidSection.VITAL_SIGNS in sections&&role!="MED"){subject->selectedName=AndroidSection.VITAL_SIGNS.name;inbox.post(QuickActionRequest(AndroidSection.VITAL_SIGNS,subject=subject))}else null)
         page==AndroidSection.SUPPLIES->InventoryScreen(Modifier.padding(padding),account.profile)
         page==AndroidSection.MY_ACCESS->MyAccessScreen(Modifier.padding(padding))
-        page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,userId=account.session.userId)
+        page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,userId=account.session.userId,onOpenVitals=if(AndroidSection.VITAL_SIGNS in sections&&role!="MED"){subject->selectedName=AndroidSection.VITAL_SIGNS.name;inbox.post(QuickActionRequest(AndroidSection.VITAL_SIGNS,subject=subject))}else null)
         page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW->LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page,userId=account.session.userId)
         page==AndroidSection.LINK_RECORD->LinkRecordScreen(account.profile,Modifier.padding(padding))
         page==AndroidSection.HISTORY||page==AndroidSection.RECORD->ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding))

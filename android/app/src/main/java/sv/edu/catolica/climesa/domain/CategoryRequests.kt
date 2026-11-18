@@ -125,6 +125,23 @@ object CategoryRequestRules {
         .apply { if (!preferredDoctorId.isNullOrBlank()) put("preferredDoctorId", preferredDoctorId) }
 
     fun assignPath(request: CategoryRequest) = "$PATH/${request.id}/asignar"
+    /** A-1: the server's first day with a gap in the requested time of day, with that doctor (up to 14 days). */
+    fun suggestionPath(request: CategoryRequest) = "$PATH/${request.id}/sugerencia"
+
+    /** `GET .../sugerencia`; null when nothing was found or the answer is incomplete. */
+    fun suggestion(value: Any?): RequestSuggestion? {
+        val json = value as? org.json.JSONObject ?: return null
+        if (!json.optBoolean("found", false)) return null
+        fun text(key: String) = if (json.isNull(key)) null else json.optString(key).takeIf { it.isNotBlank() }
+        val date = text("date")?.let { runCatching { java.time.LocalDate.parse(it.take(10)) }.getOrNull() } ?: return null
+        return RequestSuggestion(text("doctorId") ?: return null, date, text("start"))
+    }
+
+    /** The suggested slot when it is still free, else the first free one of the requested time of day. */
+    fun suggestedSlot(slots: List<DaySlot>, suggestedStart: String?, franja: RequestFranja, wholeDay: Boolean): DaySlot? =
+        slots.firstOrNull { suggestedStart != null && it.selectable && sameInstant(it.start, suggestedStart) } ?: firstFreeSlot(slots, franja, wholeDay)
+
+    private fun sameInstant(a: String, b: String) = runCatching { java.time.Instant.parse(a) == java.time.Instant.parse(b) }.getOrDefault(a == b)
     fun rejectPath(request: CategoryRequest) = "$PATH/${request.id}/rechazar"
     fun cancelPath(request: CategoryRequest) = "$PATH/${request.id}/cancelar"
 
@@ -156,3 +173,6 @@ object CategoryRequestRules {
 
     fun firstFreeSlot(slots: List<DaySlot>, franja: RequestFranja, wholeDay: Boolean) = slotsFor(slots, franja, wholeDay).firstOrNull { it.selectable }
 }
+
+/** A-1: what `GET /citas/solicitudes-categoria/{id}/sugerencia` proposes: the doctor, the day and the slot start. */
+data class RequestSuggestion(val doctorId: String, val date: java.time.LocalDate, val start: String?)

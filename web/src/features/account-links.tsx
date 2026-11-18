@@ -103,7 +103,10 @@ function LinkRequestCard({ api, row, allowed, canRegister, ready, onReject, onRe
       ? <Notice kind="success">DUI y fecha de nacimiento coinciden con el expediente {candidate.record}. Verifica la identidad antes de aprobar.</Notice>
       : candidate
       ? <Notice kind="info">Ningún expediente coincide con exactitud. El más parecido es {candidate.record}: misma fecha de nacimiento y el DUI cambia en un dígito. Confirma el DUI con el paciente; si se equivocó al escribirlo, rechaza con ese motivo para que lo pida otra vez.</Notice>
-      : <Notice kind="info">{row.candidates > 1 ? 'Más de un expediente coincide: resuelve el posible duplicado antes de aprobar.' : 'No hay expediente con ese DUI y esa fecha: búscalo en Pacientes y regístralo si no existe; después aprueba.'}</Notice>}
+      : row.candidates > 1
+      // The record pair cannot be merged from Recepción: the card says what this person can do now.
+      ? <Notice kind="info">Más de un expediente tiene el DUI <span className="mono-data">{row.declared.dui}</span> y esa fecha de nacimiento, así que no se puede aprobar todavía. Recepción no fusiona expedientes: <a className="cl-link-button" href="#/pacientes">búscalos en Pacientes</a> por ese DUI, confirma con el paciente cuál es el suyo y avisa a Administración del posible duplicado. Si el paciente no puede esperar, rechaza con ese motivo.</Notice>
+      : <Notice kind="info">No hay expediente con ese DUI y esa fecha: búscalo en Pacientes y regístralo si no existe; después aprueba.</Notice>}
     {!confirming && <WriteError error={action.error} />}
     {allowed && <div className="dialog-actions">
       <button type="button" className="secondary-button" onClick={onReject} disabled={action.busy}>Rechazar con motivo</button>

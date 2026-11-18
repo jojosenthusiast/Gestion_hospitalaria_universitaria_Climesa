@@ -67,18 +67,16 @@ describe('#9 and #15 · the request tray', () => {
     expect(location.hash).not.toContain('asignar=');
   });
 
-  it('on a phone a tray of more than 3 folds to 3 with «Ver las N restantes»', async () => {
-    const media = window.matchMedia;
-    window.matchMedia = ((query: string) => ({ matches: query.includes('max-width'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined })) as unknown as typeof window.matchMedia;
-    try {
-      const asked = [1, 2, 3, 4].map(n => row({ id: `a-${n}`, state: 'solicitada', patientName: `Pide Ficticia ${n}`, start: `2026-11-2${n}T16:20:00Z`, end: `2026-11-2${n}T16:40:00Z`, allowedActions: ['confirmar', 'rechazar'] }));
-      mount(rec(), asked);
-      const tray = await screen.findByRole('region', { name: 'Solicitudes por asignar' });
-      await within(tray).findByText('Ana Ficticia Agenda');
-      expect(tray.querySelectorAll('.rq-row')).toHaveLength(3);
-      await userEvent.click(within(tray).getByRole('button', { name: 'Ver las 2 restantes' }));
-      expect(tray.querySelectorAll('.rq-row')).toHaveLength(5);
-    } finally { window.matchMedia = media; }
+  it('a tray of more than 3 folds to 3 with «Ver N más» on every width, each row tagged by its state', async () => {
+    const asked = [1, 2, 3, 4].map(n => row({ id: `a-${n}`, state: 'solicitada', patientName: `Pide Ficticia ${n}`, start: `2026-11-2${n}T16:20:00Z`, end: `2026-11-2${n}T16:40:00Z`, allowedActions: ['confirmar', 'rechazar'] }));
+    mount(rec(), asked);
+    const tray = await screen.findByRole('region', { name: 'Solicitudes por asignar' });
+    await within(tray).findByText('Ana Ficticia Agenda');
+    expect(tray.querySelectorAll('.rq-row')).toHaveLength(3);
+    expect(within(tray).getByText('Por asignar')).toBeTruthy();
+    expect(within(tray).getAllByText('Por confirmar')).toHaveLength(2);
+    await userEvent.click(within(tray).getByRole('button', { name: 'Ver 2 más' }));
+    expect(tray.querySelectorAll('.rq-row')).toHaveLength(5);
   });
 
   it('on a phone each doctor of the day starts folded (except the first) and opens on its header', async () => {

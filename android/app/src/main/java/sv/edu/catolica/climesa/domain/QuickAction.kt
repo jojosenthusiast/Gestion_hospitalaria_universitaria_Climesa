@@ -15,6 +15,8 @@ enum class QuickAction(val verb: String) {
     ASSIGN_BED("cama"),
     DISPATCH("despachar"),
     REQUEST_AMBULANCE("solicitud"),
+    /** R7 U1: "Ingresar" from the patient record opens the admission guide with that patient chosen (web `accion=admision`). */
+    ADMIT("admision"),
     ;
 
     companion object {
@@ -91,6 +93,7 @@ object QuickActions {
         QuickAction.ASSIGN_BED -> "camas.asignar"
         QuickAction.DISPATCH -> "ambulancia.despachar"
         QuickAction.REQUEST_AMBULANCE -> "ambulancia.solicitar"
+        QuickAction.ADMIT -> "admision.crear"
     }
 
     fun allowed(action: QuickAction, permissions: Collection<String>) = permissionFor(action) in permissions
