@@ -65,7 +65,7 @@ const unitsOf = unitPlural;
 const perArticle = (rows: StockRow[]) => [...new Map(rows.map(r => [r.articulo_id, { ...r, minimo: Number(r.minimo), disponible: Number(r.disponible), vencido: Number(r.vencido) }])).values()];
 const lowStock = (d: DashboardData): TrayGroupSpec => ({
   id: 'inventario', title: 'Inventario bajo el mínimo', href: '#/inventario', masculine: true, state: asRemote(d.stock),
-  items: perArticle(d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: `${r.disponible} de ${plural(r.minimo, r.unidad, unitsOf(r.unidad))}${r.vencido > 0 ? ` · ${r.vencido} vencidos` : ''}`, tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', ...stockState(r) })),
+  items: perArticle(d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: [(r.bajo_minimo || r.disponible <= 0) && `Quedan ${plural(r.disponible, r.unidad, unitsOf(r.unidad))} · mínimo ${r.minimo}`, r.vencido > 0 && `${r.vencido} vencidos`].filter(Boolean).join(' · '), tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', ...stockState(r) })),
 });
 const pendingAmbulance = (d: DashboardData): TrayGroupSpec => ({
   id: 'ambulancia', title: 'Ambulancia por confirmar', href: '#/ambulancia', state: asRemote(d.ambulance),
