@@ -107,8 +107,9 @@ class VitalSignsTest {
             .put(JSONObject().put("patientId", "p1").put("patientName", "Ana").put("state", "hospitalizado").put("bed", "HAB-203-A"))
             .put(JSONObject().put("patientId", "p2").put("patientName", "Beto").put("state", "pendiente_cama").put("bed", ""))
             .put(JSONObject().put("patientId", "p3").put("patientName", "Carla").put("state", "alta_firmada").put("bed", "X")))
-        assertEquals(listOf("Cama HAB-203-A", "Sin cama asignada"), ward.map { it.detail })
-        assertEquals(2, ward.size)
+        // ENF/AST audit #14: a signed discharge still occupies its bed until the exit, so it stays on the ward picker.
+        assertEquals(listOf("Cama HAB-203-A", "Sin cama asignada", "Cama X"), ward.map { it.detail })
+        assertEquals(3, ward.size)
         val queue = VitalsParser.queue(JSONArray()
             .put(JSONObject().put("patientId", "p1").put("patientName", "Ana").put("state", "en_espera").put("service", "consulta_general").put("numero", 4))
             .put(JSONObject().put("patientId", JSONObject.NULL).put("state", "en_espera").put("service", "emergencia").put("numero", 5))

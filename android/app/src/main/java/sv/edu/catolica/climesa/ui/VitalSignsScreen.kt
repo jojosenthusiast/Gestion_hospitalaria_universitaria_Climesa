@@ -115,6 +115,8 @@ internal fun vitalLevelFamily(level: VitalLevel): StatusFamily? = when (level) {
 fun VitalSignsScreen(
     profile: AccessProfile, modifier: Modifier = Modifier, readOnly: Boolean = false, userId: String? = null,
     subject: sv.edu.catolica.climesa.domain.QuickSubject? = null, onSubjectHandled: () -> Unit = {},
+    /** ENF/AST audit #18: opened from another section (the ward card); back returns there in one step. */
+    onExit: (() -> Unit)? = null,
     model: VitalSignsViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
@@ -123,7 +125,7 @@ fun VitalSignsScreen(
     LaunchedEffect(subject, userId) { subject?.let { model.open(sv.edu.catolica.climesa.domain.VitalsCandidate(it.id, it.name, it.detail)); onSubjectHandled() } }
     LaunchedEffect(profile.permissions) { model.loadSources(profile.permissions) }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
-    BackHandler(enabled = state.patientId != null) { model.close() }
+    BackHandler(enabled = state.patientId != null || onExit != null) { model.close(); onExit?.invoke() }
     PageList(modifier) {
         if (state.patientId == null) {
             pickerItems(state, profile, model)
@@ -186,6 +188,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.patientItems(state: V
                     hint?.let { SectionCard(it.name, eyebrow = it.record?.let { r -> stringResource(R.string.signos_expediente, r) }) { it.detail?.let { d -> Text(d, style = MaterialTheme.typography.bodyMedium) } } }
                     LoadingState()
                 }
+                // ENF/AST audit #15: no care context is information (with the way back), not a failure to retry.
+                state.refused != null -> Column(verticalArrangement = Arrangement.spacedBy(Spacing.block)) {
+                    hint?.let { SectionCard(it.name, eyebrow = it.record?.let { r -> stringResource(R.string.signos_expediente, r) }) { it.detail?.let { d -> Text(d, style = MaterialTheme.typography.bodyMedium) } } }
+                    NoticeBanner(NoticeKind.INFO, state.refused)
+                }
                 else -> ErrorState(state.error ?: stringResource(R.string.signos_error_historial), model::reload)
             }
         }
@@ -218,7 +225,21 @@ private fun androidx.compose.foundation.lazy.LazyListScope.patientItems(state: V
     }
     item { Text(stringResource(R.string.signos_historial), style = MaterialTheme.typography.titleLarge) }
     if (history.readings.isEmpty()) item { EmptyState(stringResource(R.string.signos_historial_vacio), detail = stringResource(R.string.signos_historial_vacio_detalle), icon = Icons.Default.MonitorHeart) }
-    else items(history.readings, key = { it.id }) { ReadingCard(it) }
+    else {
+        // ENF/AST audit #13: grouped by day; the newest day stays open and earlier days fold under "Ver N más".
+        val days = history.days()
+        val past = days.drop(1)
+        days.firstOrNull()?.let { day ->
+            item(key = "dia-0") { Text(day.label, style = MaterialTheme.typography.titleSmall) }
+            items(day.readings, key = { it.id }) { ReadingCard(it) }
+        }
+        if (state.pastOpen) past.forEachIndexed { index, day ->
+            item(key = "dia-${index + 1}") { Text(day.label, style = MaterialTheme.typography.titleSmall) }
+            items(day.readings, key = { it.id }) { ReadingCard(it) }
+        }
+        val hidden = past.sumOf { it.readings.size }
+        if (hidden > 0) item(key = "signos-fold") { FoldMoreButton(hidden, state.pastOpen, model::togglePast) }
+    }
 }
 
 @Composable
@@ -232,7 +253,7 @@ private fun PatientHeader(history: VitalsHistory) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             history.age?.let { LabeledValue(stringResource(R.string.signos_edad), stringResource(R.string.signos_edad_anios, it), Modifier.weight(1f)) }
             LabeledValue(stringResource(R.string.signos_ubicacion), location, Modifier.weight(1.4f))
-            LabeledValue(stringResource(R.string.signos_ultima_toma), history.latest?.let { VitalsFormat.hour(it.takenAt) } ?: stringResource(R.string.signos_sin_tomas_aun), Modifier.weight(1f))
+            LabeledValue(stringResource(R.string.signos_ultima_toma), history.latest?.let { VitalsFormat.time(it.takenAt) } ?: stringResource(R.string.signos_sin_tomas_aun), Modifier.weight(1f))
         }
     }
 }
@@ -346,7 +367,8 @@ private fun ReadingCard(reading: VitalReading) {
     val author = reading.takenByName?.let { stringResource(R.string.signos_tomado_por, it) }
     val meta = listOfNotNull(author, if (reading.fromConsultation) stringResource(R.string.signos_de_consulta) else null, reading.note).joinToString(" · ").ifBlank { null }
     DataRow(
-        VitalsFormat.time(reading.takenAt),
+        // The day is the group header above, so the row shows only the hour.
+        VitalsFormat.hour(reading.takenAt),
         subtitle = reading.summary(),
         meta = meta,
         leadingIcon = Icons.Default.MonitorHeart,

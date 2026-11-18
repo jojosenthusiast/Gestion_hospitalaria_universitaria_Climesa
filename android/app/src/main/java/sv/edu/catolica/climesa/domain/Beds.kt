@@ -40,6 +40,26 @@ object BedRules {
         if (bed.state == "limpieza" && bed.cleaningPending && bed.cleaningCompleted && !bed.cleanedByCurrentUser && canVerify) add(BedAction.VERIFY_CLEANING)
     }
 
+    /** Rows of the board that stay visible before "Ver N más" folds the rest. */
+    const val REST_VISIBLE = 6
+
+    /**
+     * ENF/AST audit #4: what this person can act on comes first: beds to verify, then beds to finish cleaning; the rest keep
+     * the server order. Returns (actionable, rest); only the rest folds.
+     */
+    fun boardGroups(beds: List<Bed>, permissions: Set<String>): Pair<List<Bed>, List<Bed>> {
+        fun rank(bed: Bed): Int {
+            val actions = availableActions(bed, permissions)
+            return when {
+                BedAction.VERIFY_CLEANING in actions -> 0
+                BedAction.COMPLETE_CLEANING in actions -> 1
+                else -> 2
+            }
+        }
+        val ordered = beds.sortedBy(::rank)
+        return ordered.partition { rank(it) < 2 }
+    }
+
     fun validateReason(action: BedAction, reason: String): String? = when {
         reason.trim().length < action.minReason -> "Escribe al menos ${action.minReason} caracteres."
         reason.trim().length > MAX_REASON -> "Usa como máximo $MAX_REASON caracteres."

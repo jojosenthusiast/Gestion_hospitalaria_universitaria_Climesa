@@ -40,6 +40,7 @@ private class VitalsGateway : ApiGateway {
     var failGets = false
     var failPosts = 0
     var heartRate = 70
+    var refuseHistory = false
     override suspend fun request(path: String, method: String, body: JSONObject?): Any {
         calls += Triple(path, method, body)
         if (method == "POST") {
@@ -48,11 +49,12 @@ private class VitalsGateway : ApiGateway {
             return JSONObject().put("id", "r9")
         }
         if (failGets) error("sin red")
+        if (refuseHistory && path.contains("/signos")) throw sv.edu.catolica.climesa.data.AuthRequestException("Solo puedes ver los signos de un paciente que atiendes.", 403)
         return when {
             path.startsWith("/pacientes/p1/signos") -> JSONObject().put("patientId", "p1").put("patientName", "Ana Pérez").put("record", "EXP-1").put("age", 34)
                 .put("admissionId", "adm-1").put("bed", "HAB-203-A")
                 .put("items", JSONArray().put(JSONObject().put("id", "r1").put("takenAt", "2026-11-14T10:00:00Z").put("heartRate", heartRate)))
-            path.startsWith("/pacientes/selector") -> JSONObject().put("items", JSONArray().put(JSONObject().put("id", "p1").put("record", "EXP-1").put("fullName", "Ana Pérez")))
+            path.startsWith("/pacientes/selector") -> JSONObject().put("items", JSONArray().put(JSONObject().put("id", "p7").put("record", "EXP-7").put("fullName", "Ana Ruiz")).put(JSONObject().put("id", "p1").put("record", "EXP-1").put("fullName", "Ana Pérez")))
             path == "/admisiones" -> JSONArray().put(JSONObject().put("patientId", "p1").put("patientName", "Ana Pérez").put("state", "hospitalizado").put("bed", "HAB-203-A"))
             path == "/fila" -> JSONArray().put(JSONObject().put("patientId", "p2").put("patientName", "Beto").put("state", "llamado").put("service", "emergencia").put("numero", 3))
             else -> JSONArray()
@@ -87,7 +89,7 @@ class VitalSignsViewModelTest {
         assertEquals(0, api.gets("/pacientes/selector"))
         advanceTimeBy(200); runCurrent()
         assertEquals(1, api.gets("/pacientes/selector"))
-        assertEquals("Exp. EXP-1", vm.state.value.search.items.single().detail)
+        assertEquals(listOf("Exp. EXP-7", "Exp. EXP-1"), vm.state.value.search.items.map { it.detail })
     }
 
     @Test fun openLoadsHistoryWithHeaderData() = runTest(dispatcher) {
@@ -151,5 +153,23 @@ class VitalSignsViewModelTest {
         vm.close()
         assertNull(vm.state.value.patientId); assertNull(vm.state.value.history)
         assertEquals("", vm.state.value.form.value(VitalMeasure.HEART_RATE))
+    }
+
+    // ENF/AST audit #15: the patients this person attends come first in the search.
+    @Test fun searchRanksPatientsInContextFirst() = runTest(dispatcher) {
+        val api = VitalsGateway(); val vm = VitalSignsViewModel(api, VitalsBus())
+        vm.loadSources(listOf("signos.registrar", "admision.ver")); runCurrent()
+        vm.onQuery("ana"); advanceTimeBy(400); runCurrent()
+        assertEquals(listOf("p1", "p7"), vm.state.value.search.items.map { it.patientId })
+    }
+
+    // ENF/AST audit #15: without a care context the API refuses (403): information, not an error to retry.
+    @Test fun refusedHistoryIsInformationNotAnError() = runTest(dispatcher) {
+        val api = VitalsGateway().apply { refuseHistory = true }; val vm = VitalSignsViewModel(api, VitalsBus())
+        vm.open(patient); runCurrent()
+        assertEquals("Solo puedes ver los signos de un paciente que atiendes.", vm.state.value.refused)
+        assertNull(vm.state.value.error)
+        assertNull(vm.state.value.history)
+        assertFalse(vm.state.value.loading)
     }
 }
