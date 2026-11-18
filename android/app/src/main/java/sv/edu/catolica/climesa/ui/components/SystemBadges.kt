@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -65,35 +67,39 @@ private fun badgeTextStyle() = MaterialTheme.typography.labelLarge.copy(fontSize
  * border. The pattern, not the colour, tells families apart in grayscale.
  */
 private fun Modifier.statusPattern(pattern: StatusPattern, fam: Color, soft: Color, surface: Color): Modifier = drawBehind {
-    val radius = CornerRadius(RadiusChip.toPx())
+    val radius = RadiusChip.toPx()
     val px = 1.dp.toPx()
-    fun outline(width: Float, effect: PathEffect? = null, inset: Float = width / 2) = drawRoundRect(
-        fam, topLeft = Offset(inset, inset), size = Size(size.width - inset * 2, size.height - inset * 2),
-        cornerRadius = CornerRadius((radius.x - inset).coerceAtLeast(0f)), style = Stroke(width, pathEffect = effect, cap = StrokeCap.Round),
-    )
     when (pattern) {
         StatusPattern.STRIPED -> {
-            drawRoundRect(soft, cornerRadius = radius)
+            drawRoundRect(soft, cornerRadius = CornerRadius(radius))
             clipRect { stripes(fam.copy(alpha = .18f), step = 7.dp.toPx(), width = 3.dp.toPx()) }
-            outline(px)
+            roundOutline(fam, radius, px)
         }
         StatusPattern.DOTTED -> {
-            drawRoundRect(soft, cornerRadius = radius)
-            val step = 5.dp.toPx()
-            val dot = fam.copy(alpha = .32f)
-            var y = step / 2
-            while (y < size.height) { var x = step / 2; while (x < size.width) { drawCircle(dot, 1.dp.toPx() * .7f, Offset(x, y)); x += step }; y += step }
-            outline(px, PathEffect.dashPathEffect(floatArrayOf(.1f, 3.dp.toPx())))
+            drawRoundRect(soft, cornerRadius = CornerRadius(radius))
+            dots(fam.copy(alpha = .32f))
+            roundOutline(fam, radius, px, PathEffect.dashPathEffect(floatArrayOf(.1f, 3.dp.toPx())))
         }
-        StatusPattern.SOLID -> drawRoundRect(fam, cornerRadius = radius)
-        StatusPattern.OUTLINE -> { drawRoundRect(surface, cornerRadius = radius); outline(1.5f * px) }
-        StatusPattern.DASHED -> outline(1.5f * px, PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())))
+        StatusPattern.SOLID -> drawRoundRect(fam, cornerRadius = CornerRadius(radius))
+        StatusPattern.OUTLINE -> { drawRoundRect(surface, cornerRadius = CornerRadius(radius)); roundOutline(fam, radius, 1.5f * px) }
+        StatusPattern.DASHED -> roundOutline(fam, radius, 1.5f * px, PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())))
         StatusPattern.DOUBLE -> {
-            drawRoundRect(soft, cornerRadius = radius)
-            outline(px, inset = px / 2)
-            outline(px, inset = px * 2.5f)
+            drawRoundRect(soft, cornerRadius = CornerRadius(radius))
+            roundOutline(fam, radius, px, inset = px / 2)
+            roundOutline(fam, radius, px, inset = px * 2.5f)
         }
     }
+}
+
+private fun DrawScope.roundOutline(color: Color, radius: Float, width: Float, effect: PathEffect? = null, inset: Float = width / 2) = drawRoundRect(
+    color, topLeft = Offset(inset, inset), size = Size(size.width - inset * 2, size.height - inset * 2),
+    cornerRadius = CornerRadius((radius - inset).coerceAtLeast(0f)), style = Stroke(width, pathEffect = effect, cap = StrokeCap.Round),
+)
+
+private fun DrawScope.dots(color: Color) {
+    val step = 5.dp.toPx()
+    var y = step / 2
+    while (y < size.height) { var x = step / 2; while (x < size.width) { drawCircle(color, 1.dp.toPx() * .7f, Offset(x, y)); x += step }; y += step }
 }
 
 private fun DrawScope.stripes(color: Color, step: Float, width: Float) {
@@ -203,5 +209,85 @@ internal fun StatusLegend(modifier: Modifier = Modifier, areas: Boolean = true, 
         if (areas) group("Áreas") { Area.entries.forEach { AreaTag(it.code, showName = true) } }
         if (statuses) group("Estados") { StatusFamily.entries.forEach { FamilyBadge(it.label, it) } }
         if (priorities) group("Prioridad") { Priority.entries.forEach { PriorityBadge(it) } }
+    }
+}
+
+/** Corner of a filter chip (Material filter chips use 8 dp); the texture is drawn with the same corner. */
+private val ChipCorner = 8.dp
+
+/**
+ * Filter chip that filters by a status or priority (S7). With a [tone] it wears that badge's colour, texture and icon:
+ * unselected it is the soft badge, selected it fills with the strong colour and keeps the texture in the text colour.
+ * The label (with its count) always stays, so the chip never speaks by colour alone. Without a tone it is the plain
+ * Material filter chip ("Todos").
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun StatusFilterChip(selected: Boolean, onClick: () -> Unit, label: String, tone: ChipTone?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    if (tone == null) {
+        FilterChip(selected, onClick, { Text(label) }, modifier, enabled = enabled)
+        return
+    }
+    val colors = MaterialTheme.system
+    val surface = MaterialTheme.colorScheme.surface
+    val (strong, soft) = colors.tone(tone)
+    val (fg, _) = colors.chip(tone, selected, surface)
+    val ink = fg.copy(alpha = if (enabled) 1f else .38f)
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold) },
+        modifier = modifier.chipPattern(tone.pattern, selected, strong, soft, surface, colors.onStatus),
+        enabled = enabled,
+        leadingIcon = { Icon(tone.icon.vector(), null, Modifier.size(FilterChipDefaults.IconSize)) },
+        shape = RoundedCornerShape(ChipCorner),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = Color.Transparent, selectedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent, disabledSelectedContainerColor = Color.Transparent,
+            labelColor = ink, selectedLabelColor = ink, disabledLabelColor = ink,
+            iconColor = ink, selectedLeadingIconColor = ink, disabledLeadingIconColor = ink,
+        ),
+        border = null,
+    )
+}
+
+/**
+ * Texture of a status filter chip. Unselected: the badge pattern (a solid family or a plain priority shows as its soft
+ * tint with a border, so the selected chip still stands out). Selected: strong fill with the same texture in [on].
+ */
+private fun Modifier.chipPattern(pattern: StatusPattern?, selected: Boolean, strong: Color, soft: Color, surface: Color, on: Color): Modifier = drawBehind {
+    val radius = ChipCorner.toPx()
+    val px = 1.dp.toPx()
+    val corner = CornerRadius(radius)
+    if (selected) {
+        drawRoundRect(strong, cornerRadius = corner)
+        when (pattern) {
+            StatusPattern.STRIPED -> clipRect { stripes(on.copy(alpha = .22f), step = 7.dp.toPx(), width = 3.dp.toPx()) }
+            StatusPattern.DOTTED -> dots(on.copy(alpha = .4f))
+            StatusPattern.DASHED -> roundOutline(on, radius, px, PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())), inset = px * 2.5f)
+            StatusPattern.DOUBLE -> roundOutline(on, radius, px, inset = px * 2.5f)
+            StatusPattern.SOLID, StatusPattern.OUTLINE, null -> Unit
+        }
+        return@drawBehind
+    }
+    when (pattern) {
+        StatusPattern.STRIPED -> {
+            drawRoundRect(soft, cornerRadius = corner)
+            clipRect { stripes(strong.copy(alpha = .18f), step = 7.dp.toPx(), width = 3.dp.toPx()) }
+            roundOutline(strong, radius, px)
+        }
+        StatusPattern.DOTTED -> {
+            drawRoundRect(soft, cornerRadius = corner)
+            dots(strong.copy(alpha = .32f))
+            roundOutline(strong, radius, px, PathEffect.dashPathEffect(floatArrayOf(.1f, 3.dp.toPx())))
+        }
+        StatusPattern.OUTLINE -> { drawRoundRect(surface, cornerRadius = corner); roundOutline(strong, radius, 1.5f * px) }
+        StatusPattern.DASHED -> { drawRoundRect(surface, cornerRadius = corner); roundOutline(strong, radius, 1.5f * px, PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))) }
+        StatusPattern.DOUBLE -> {
+            drawRoundRect(soft, cornerRadius = corner)
+            roundOutline(strong, radius, px, inset = px / 2)
+            roundOutline(strong, radius, px, inset = px * 2.5f)
+        }
+        StatusPattern.SOLID, null -> { drawRoundRect(soft, cornerRadius = corner); roundOutline(strong, radius, px) }
     }
 }

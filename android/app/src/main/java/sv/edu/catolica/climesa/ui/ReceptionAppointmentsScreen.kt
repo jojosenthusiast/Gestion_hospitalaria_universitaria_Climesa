@@ -110,7 +110,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
             else -> {
                 val visible = state.shown.filter { sv.edu.catolica.climesa.domain.matchesQuery(query, it.patientName, it.doctorName) }
                 item { LiveSearchField(query, { query = it }, stringResource(R.string.rec_citas_buscar)) }
-                item { ChipRow(listOf(Triple(false, stringResource(R.string.cita_todas), state.appointments.size), Triple(true, stringResource(R.string.cita_solo_solicitudes), state.appointments.count { it.isRequest })), state.requestsOnly, model::showRequests) }
+                item { ChipRow(listOf(Triple(false, stringResource(R.string.cita_todas), state.appointments.size), Triple(true, stringResource(R.string.cita_solo_solicitudes), state.appointments.count { it.isRequest })), state.requestsOnly, { if (it) ChipTone.of("solicitada") else null }, model::showRequests) }
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.listas_sin_coincidencias), detail = stringResource(R.string.listas_sin_coincidencias_detalle)) }
                 // Por día y, dentro del día, por hora: cada cita en una sola línea con su rango "08:00 – 08:20".
                 // Past days stay folded behind one button: the list opens on today, where reception works.

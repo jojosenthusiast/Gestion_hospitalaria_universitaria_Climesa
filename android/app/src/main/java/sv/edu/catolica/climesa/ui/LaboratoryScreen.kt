@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.contentDescription
@@ -134,10 +133,10 @@ fun LaboratoryScreen(
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
                 if (!ownResults && !inboxOnly) {
                     item { LiveSearchField(query, { query = it }, stringResource(R.string.lab_buscar)) }
-                    item { ChipRow(LabFilter.entries.map { Triple(it, it.label, state.orders.count(it::matches)) }, filter) { filterName = it.name } }
+                    item { ChipRow(LabFilter.entries.map { Triple(it, it.label, state.orders.count(it::matches)) }, filter, FilterTones::lab) { filterName = it.name } }
                     // R3 A-49: one toggle instead of a second row of priority chips.
                     item {
-                        FilterChip(urgentOnly, { urgentOnly = !urgentOnly }, { Text(stringResource(R.string.lab_solo_urgentes) + " (${state.orders.count(LabWorklist::isUrgent)})") }, Modifier.heightIn(min = Spacing.touch))
+                        StatusFilterChip(urgentOnly, { urgentOnly = !urgentOnly }, stringResource(R.string.lab_solo_urgentes) + " (${state.orders.count(LabWorklist::isUrgent)})", ChipTone.Level(Priority.URGENTE), Modifier.heightIn(min = Spacing.touch))
                     }
                 }
                 // The clock is read when the list is drawn: each realtime event redraws it, no timers.
