@@ -69,6 +69,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     // The open consultation survives rotation and process death (saved instance state); its fields survive leaving
     // the screen or closing the app as a local draft (DraftStore).
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    var showPast by rememberSaveable { mutableStateOf(false) }
     val permissions = profile?.permissions.orEmpty()
     LaunchedEffect(userId) { userId?.let { model.configure(it, "fila.ver" in permissions && "consulta.iniciar" in permissions, withUnsigned = "consulta.iniciar" in permissions, withReschedules = "citas.ver" in permissions && "consulta.iniciar" in permissions) }; model.load() }
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
@@ -97,12 +98,13 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
         if (state.unsigned.isNotEmpty()) {
             item { Text(stringResource(R.string.clin_sin_firmar_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
             items(state.unsigned, key = { "sf-${it.id}" }) { c ->
-                SectionCard(c.patientName) {
-                    Text(stringResource(R.string.clin_sin_firmar_item, formatDateTime(c.startedAt)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    c.reason?.let { Text(stringResource(R.string.clin_consulta_motivo, it), style = MaterialTheme.typography.bodySmall) }
-                    if (primary == ConsultationPrimary.ResumeUnsigned(c.id)) PrimaryButton(stringResource(R.string.clin_reanudar), { model.clearMessages(); model.resume(c) }, enabled = !state.saving)
-                    else SecondaryButton(stringResource(R.string.clin_reanudar), { model.clearMessages(); model.resume(c) }, enabled = !state.saving)
+                val subtitle = listOfNotNull(stringResource(R.string.clin_sin_firmar_item, formatDateTime(c.startedAt)), c.reason?.let { stringResource(R.string.clin_consulta_motivo, it) }).joinToString("\n")
+                // Only the screen's primary unsigned consultation gets a button; the rest are compact rows that open on tap.
+                if (primary == ConsultationPrimary.ResumeUnsigned(c.id)) SectionCard(c.patientName) {
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    PrimaryButton(stringResource(R.string.clin_reanudar), { model.clearMessages(); model.resume(c) }, enabled = !state.saving)
                 }
+                else DataRow(title = c.patientName, subtitle = subtitle, leadingIcon = Icons.Default.EditNote, onClick = { if (!state.saving) { model.clearMessages(); model.resume(c) } })
             }
         }
         if (state.reschedules.isNotEmpty()) {
@@ -122,7 +124,13 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                items(state.appointments, key = { it.appointmentId }) { item -> MedicalAppointmentCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }) }
+                // "Mi día" opens on today: earlier days stay folded behind one button.
+                val today = java.time.LocalDate.now(sanSalvador)
+                val dayOf = { iso: String -> runCatching { java.time.Instant.parse(iso).atZone(sanSalvador).toLocalDate() }.getOrDefault(today) }
+                val pastDays = state.appointments.map { dayOf(it.start) }.filter { it < today }.distinct().size
+                val foldPast = !showPast && pastDays > 0 && state.appointments.any { dayOf(it.start) >= today }
+                if (foldPast) item { RowAction(stringResource(R.string.citas_ver_dias_anteriores, pastDays), { showPast = true }) }
+                items(state.appointments.filter { !foldPast || dayOf(it.start) >= today }, key = { it.appointmentId }) { item -> MedicalAppointmentCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }) }
             }
         }
         if (state.queue.isNotEmpty()) {

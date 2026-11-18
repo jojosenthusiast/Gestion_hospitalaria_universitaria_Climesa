@@ -45,3 +45,6 @@ internal val ClimesaTypography = Typography(
     labelMedium = TextStyle(fontFamily = ClimesaMono, fontSize = 13.sp, lineHeight = 18.sp, fontFeatureSettings = TabularNumbers),
     labelSmall = TextStyle(fontFamily = ClimesaMono, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 17.sp, letterSpacing = .8.sp, fontFeatureSettings = TabularNumbers),
 )
+
+/** Bottom-bar labels: sans and without tracking, so long Spanish labels (Resultados, Internados) fit without an ellipsis. */
+internal val NavLabel = TextStyle(fontFamily = ClimesaSans, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp)

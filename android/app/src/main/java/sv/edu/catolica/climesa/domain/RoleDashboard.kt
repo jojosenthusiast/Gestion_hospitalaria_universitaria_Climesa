@@ -144,7 +144,7 @@ object RoleDashboard {
             .mapNotNull { row -> instant(text(row, "end"))?.takeIf { it.isAfter(now) }?.let { end -> Triple(instant(text(row, "start")) ?: end, row.optString("area"), row.optString("state")) } }
             .minByOrNull { it.first } ?: return null
         val area = next.second.ifBlank { "Turno" }
-        return if (next.third == "en_curso") "$area · en curso" else "$area · ${MyShifts.formatInstant(next.first.toString())}"
+        return if (next.third == "en_curso") "$area · en curso" else "$area · ${MyShifts.relative(next.first, now)}"
     }
 
     fun nextAppointment(value: Any?, now: Instant): String? {
@@ -152,7 +152,7 @@ object RoleDashboard {
             .filter { it.optString("state") in setOf("solicitada", "confirmada") }
             .mapNotNull { row -> instant(text(row, "start"))?.takeIf { it.isAfter(now) }?.let { it to row.optString("doctorName") } }
             .minByOrNull { it.first } ?: return null
-        return listOf(MyShifts.formatInstant(next.first.toString()), next.second.takeIf { it.isNotBlank() }).filterNotNull().joinToString(" · ")
+        return listOf(MyShifts.relative(next.first, now), next.second.takeIf { it.isNotBlank() }).filterNotNull().joinToString(" · ")
     }
 
     // --- model -----------------------------------------------------------------------------------------------------
@@ -270,7 +270,7 @@ object RoleDashboard {
             "AST" -> {
                 queueKpis()
                 queue?.let {
-                    kpis += DashboardKpi("En atención", ((it["llamado"] ?: 0) + (it["en_atencion"] ?: 0)).toString(), DashboardTone.PROCESS, target = target(AndroidSection.ASSISTANT_STATION))
+                    kpis += DashboardKpi("Llamados o en atención", ((it["llamado"] ?: 0) + (it["en_atencion"] ?: 0)).toString(), DashboardTone.PROCESS, target = target(AndroidSection.ASSISTANT_STATION))
                     kpis += DashboardKpi("Atendidos hoy", (it["atendido"] ?: 0).toString(), DashboardTone.SUCCESS)
                 }
                 shiftKpi()

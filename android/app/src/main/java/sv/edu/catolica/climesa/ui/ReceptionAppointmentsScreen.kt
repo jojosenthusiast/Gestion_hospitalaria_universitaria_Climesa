@@ -71,6 +71,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { actions.resume(); onPauseOrDispose { } }
     AppointmentActionDialog(actionState, actions)
     var query by rememberSaveable { mutableStateOf("") }
+    var showPast by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels); if (canSchedule) { requests.load(); requests.startLive(channels); followUps.load(); followUps.startLive(channels) } }
     LaunchedEffect(quickAction) {
         if (quickAction == null) return@LaunchedEffect
@@ -96,8 +97,12 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
         if (canSchedule) {
             requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
             requestState.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
-            item { CategoryRequestInbox(requestState, requests) }
-            item { LabProposalInbox(followUpState, followUps) }
+            // Empty inboxes collapse into one line so the appointment list starts on the first screen.
+            val inboxEmpty = requestState.inbox.isEmpty() && !requestState.loading
+            val followUpsEmpty = followUpState.proposals.isEmpty() && !followUpState.loading && followUpState.error == null && followUpState.notice == null
+            if (!inboxEmpty) item { CategoryRequestInbox(requestState, requests) }
+            if (!followUpsEmpty) item { LabProposalInbox(followUpState, followUps) }
+            if (inboxEmpty && followUpsEmpty) item { Text(stringResource(R.string.citas_bandejas_al_dia), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         when {
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
@@ -108,7 +113,13 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                 item { ChipRow(listOf(Triple(false, stringResource(R.string.cita_todas), state.appointments.size), Triple(true, stringResource(R.string.cita_solo_solicitudes), state.appointments.count { it.isRequest })), state.requestsOnly, model::showRequests) }
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.listas_sin_coincidencias), detail = stringResource(R.string.listas_sin_coincidencias_detalle)) }
                 // Por día y, dentro del día, por hora: cada cita en una sola línea con su rango "08:00 – 08:20".
-                sv.edu.catolica.climesa.domain.AppointmentAgenda.groupByDay(visible) { it.start }.forEach { (day, rows) ->
+                // Past days stay folded behind one button: the list opens on today, where reception works.
+                val groups = sv.edu.catolica.climesa.domain.AppointmentAgenda.groupByDay(visible) { it.start }
+                val today = sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(java.time.Instant.now().toString())
+                val pastDays = groups.count { it.first < today }
+                val foldPast = !showPast && query.isBlank() && pastDays in 1 until groups.size
+                if (foldPast) item { RowAction(stringResource(R.string.citas_ver_dias_anteriores, pastDays), { showPast = true }) }
+                groups.filter { !foldPast || it.first >= today }.forEach { (day, rows) ->
                     item(key = "d-$day") { Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(day), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
                     items(rows, key = { it.id }) { row ->
                         // D-3: "No asistió" is one tap; the row offers "Deshacer" for 8 s before anything is sent.
