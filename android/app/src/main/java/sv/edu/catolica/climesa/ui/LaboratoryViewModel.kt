@@ -169,7 +169,7 @@ class LaboratoryViewModel @Inject constructor(
     /** Loads the doctor's inbox; only called for readers with `laboratorio.revisar` (the API answers 403 otherwise). */
     fun loadFollowUps() {
         viewModelScope.launch {
-            try { mutable.value = mutable.value.copy(followUps = LabFollowUpRules.parse(api.request("/laboratorio/pendientes")), followUpsError = null) }
+            try { api.request("/laboratorio/pendientes").let { r -> mutable.value = mutable.value.copy(followUps = LabFollowUpRules.parse(r), followUpsError = null) } }
             catch (e: CancellationException) { throw e }
             // The list below still works and the inbox keeps what it showed, but the failure is said, never swallowed.
             catch (e: Exception) { mutable.value = mutable.value.copy(followUpsError = userMessage(e, "No se pudieron cargar los resultados por revisar.")) }
