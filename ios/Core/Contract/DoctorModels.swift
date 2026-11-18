@@ -299,6 +299,8 @@ public struct AmbulanceStatus: Decodable, Sendable, Equatable {
         public let destination: String
         public let dispatchedAt: String
         public let hasPrehospital: Bool
+        /// Milestones recorded so far; nil from an older API.
+        public let milestones: [AmbulanceLogEntry.Milestone]?
     }
     public let unit: UnitInfo
     public let activeService: ActiveService?

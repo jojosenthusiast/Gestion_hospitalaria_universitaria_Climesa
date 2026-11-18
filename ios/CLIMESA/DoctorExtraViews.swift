@@ -98,6 +98,8 @@ struct AmbulanceOverviewView: View {
     @State private var log = Loader<[AmbulanceLogEntry]>()
     @State private var query = AmbulanceLogQuery()
     @State private var filtersOpen = false
+    /// Past days of the log stay folded until opened.
+    @State private var pastOpen = false
     /// Filters of the last request, so a filter change reloads once and the first appearance does not load twice.
     @State private var filtersApplied: String?
 
@@ -143,6 +145,17 @@ struct AmbulanceOverviewView: View {
                 ListRow(title: "\(service.origin) → \(service.destination)", meta: String(format: L.text("arrival.dispatched"), ClimesaDates.display(service.dispatchedAt, .time))) {
                     MedicoTag(service.priority.rawValue, label: service.priority.label)
                 }
+                if AmbulanceLogRules.isUnclosed(dispatchedAt: service.dispatchedAt) { PriorityBadge(.urgente, label: L.text("ambulance.unclosed")) }
+                if let milestones = service.milestones {
+                    ForEach(["salida", "en_escena", "trasladando", "en_hospital", "finalizado"], id: \.self) { type in
+                        let done = milestones.first { $0.type == type }
+                        HStack {
+                            Text(verbatim: AmbulanceRules.milestoneLabel(type)).font(Typo.small).foregroundStyle(done == nil ? Theme.muted : Theme.ink)
+                            Spacer()
+                            Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.mono).foregroundStyle(Theme.muted)
+                        }
+                    }
+                }
             }
         } else {
             EmptyStateView(title: L.text("arrival.none"), symbol: "cross.case")
@@ -175,16 +188,29 @@ struct AmbulanceOverviewView: View {
         }
         LoadState(loader: log, retry: loadLog) { entries in
             if entries.isEmpty { EmptyStateView(title: L.text("ambulance.log.none"), symbol: "list.bullet.rectangle") }
-            ForEach(entries) { entry in logRow(entry) }
+            // Day-grouped: today open, the past days folded (open by themselves when nothing happened today).
+            let days = AmbulanceLogRules.days(entries)
+            if let today = days.today { dayGroup(ClimesaDates.localDay(Date()), today) }
+            if !days.past.isEmpty {
+                DisclosureGroup(isExpanded: Binding(get: { pastOpen || days.today == nil }, set: { pastOpen = $0 })) {
+                    ForEach(days.past) { group in dayGroup(group.day, group.entries) }
+                } label: {
+                    Text(verbatim: String(format: L.text("ambulance.log.pastDays"), days.past.reduce(0) { $0 + $1.entries.count })).font(Typo.label).foregroundStyle(Theme.muted)
+                }
+            }
         }
     }
 
     @ViewBuilder private var filterPanel: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
-            Picker("ambulance.log.priority", selection: $query.priority) {
-                Text("ambulance.log.any").tag(AmbulancePriority?.none)
-                ForEach([AmbulancePriority.roja, .naranja, .amarilla, .verde], id: \.self) { Text(verbatim: $0.label).tag(Optional($0)) }
-            }.pickerStyle(.menu)
+            // Each priority filters with the triage colour its rows wear.
+            Text("ambulance.log.priority").font(Typo.label).foregroundStyle(Theme.ink)
+            FlowLayout(spacing: Spacing.s) {
+                StatusFilterChip(label: L.text("ambulance.log.any"), selected: query.priority == nil) { query.priority = nil }
+                ForEach([AmbulancePriority.roja, .naranja, .amarilla, .verde], id: \.self) { priority in
+                    StatusFilterChip(label: priority.label, priority: AmbulanceLogRules.priorityLevel(priority), selected: query.priority == priority) { query.priority = priority }
+                }
+            }
             // Each final state filters with the badge its rows wear.
             Text("ambulance.log.state").font(Typo.label).foregroundStyle(Theme.ink)
             FlowLayout(spacing: Spacing.s) {
@@ -203,6 +229,12 @@ struct AmbulanceOverviewView: View {
         }
     }
 
+    @ViewBuilder private func dayGroup(_ day: String, _ entries: [AmbulanceLogEntry]) -> some View {
+        Text(verbatim: ClimesaDates.shortDay(day)).font(Typo.label).foregroundStyle(Theme.ink).padding(.top, Spacing.s)
+            .accessibilityAddTraits(.isHeader)
+        ForEach(entries) { entry in logRow(entry) }
+    }
+
     @ViewBuilder private func logRow(_ entry: AmbulanceLogEntry) -> some View {
         SectionCard {
             ListRow(title: "\(entry.origin) → \(entry.destination)", subtitle: [AmbulanceLogRules.typeLabel(entry.type), entry.municipality].compactMap { $0 }.joined(separator: " · "),
@@ -210,7 +242,8 @@ struct AmbulanceOverviewView: View {
                 MedicoTag(entry.priority.rawValue, label: entry.priority.label)
             }
             HStack(spacing: Spacing.s) {
-                MedicoTag(AmbulanceFinalState.statusValue(entry.finalState), label: AmbulanceLogRules.finalStateLabel(entry.finalState))
+                let tag = AmbulanceLogRules.finalTag(entry)
+                MedicoTag(tag.value, label: tag.label)
                 if let response = AmbulanceLogRules.responseText(entry.responseMinutes) { Text(verbatim: response).font(Typo.small).foregroundStyle(Theme.muted) }
             }
             if !entry.crew.isEmpty {

@@ -183,13 +183,27 @@ public enum AmbulanceRules {
     /// MA-AMB-05: la solicitud que sigue la pantalla: la activa más reciente (por confirmar o en camino).
     public static func active(_ requests: [OwnAmbulanceRequest]) -> OwnAmbulanceRequest? { requests.first { $0.isActive } }
 
+    /// With nothing active, the most recent request of the last 7 days (the API's window) that already has an outcome
+    /// (discarded, cancelled or with its service finished); the screen shows how it ended above the new-request form.
+    public static func latestResolved(_ requests: [OwnAmbulanceRequest]) -> OwnAmbulanceRequest? {
+        requests.contains { $0.isActive } ? nil : requests.first
+    }
+
+    /// Status value of the request's tag: its final state once the service ended, otherwise the request state.
+    public static func tagValue(_ request: OwnAmbulanceRequest) -> (value: String, label: String) {
+        if let final = request.service?.finalState, let state = AmbulanceFinalState(rawValue: final) { return (state.statusValue, state.label) }
+        return (request.state.rawValue, request.state.label)
+    }
+
     /// Qué pasa con la solicitud, en una frase para el paciente; sale del estado del servidor, no de los eventos.
     public static func progress(_ request: OwnAmbulanceRequest) -> String {
         let done = Set(request.service?.milestones.map(\.type) ?? [])
         switch request.state {
         case .porConfirmar: return "Despacho te llamará para confirmar antes de mover la ambulancia."
         case .cancelada: return "Cancelaste esta solicitud."
-        case .descartada: return "Despacho no pudo atender esta solicitud. Si hay riesgo de vida, llama al 911."
+        case .descartada:
+            let why = request.discardReason?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return "Despacho no pudo atender esta solicitud\(why.isEmpty ? "" : ": \(why)"). Si hay riesgo de vida, llama al 911."
         default: break
         }
         guard let service = request.service else { return "Despacho confirmó tu solicitud." }

@@ -505,6 +505,8 @@ public struct OwnAmbulanceRequest: Decodable, Sendable, Equatable, Identifiable 
     public let service: Service?
     public let allowedActions: [String]
     public let notice: String
+    /// Why dispatch discarded it (only in state `descartada`); nil from an older API.
+    public let discardReason: String?
     public var canCancel: Bool { allowedActions.contains("cancelar") }
     /// Sigue esperando o va en camino: la pantalla la sigue en lugar de ofrecer otra solicitud.
     public var isActive: Bool { state == .porConfirmar || (state == .confirmada && service != nil && service?.finalState == nil) }
