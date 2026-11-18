@@ -12,6 +12,7 @@ import type { AdmissionRow, DashboardData, LabOrderRow, QueueTicket, Source, Sto
 import { unitPlural } from '../inventory/model';
 import { auditActionLabel } from './labels';
 import { coverageTodayGroup } from './coverage-tray';
+import { needsStaffLink } from '../personal/filters';
 import { AttentionList, Panel, PanelState, isToday, localDay, minutesBetween, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
 export type RoleId = 'ADM' | 'JOP' | 'DPD' | 'REC' | 'AST' | 'ENF' | 'MED' | 'LAB' | 'PAR' | 'PAC';
@@ -102,8 +103,8 @@ const adm: RoleDashboard = {
     { id: 'metricas', label: 'Ver métricas', hint: 'Indicadores del hospital por día', icon: 'chart', href: '#/metricas', permission: 'metricas.ver' },
   ],
   tray: ({ d }) => [{
-    id: 'cuentas', title: 'Cuentas sin personal vinculado', href: '#/personal?cuenta=con', state: asRemote(d.users),
-    items: (d.users.data ?? []).filter(u => u.state === 'activo' && !u.staffId && u.roles.some(r => ['REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR'].includes(r))).map(u => ({ id: u.id, title: u.name || u.email, detail: u.roles.map(r => roleNames[r] ?? r).join(' · '), tone: 'warn' as Tone, href: '#/personal?cuenta=con', action: 'Vincular' })),
+    id: 'cuentas', title: 'Cuentas sin personal vinculado', href: '#/personal?cuenta=sin_ficha', state: asRemote(d.users),
+    items: (d.users.data ?? []).filter(u => needsStaffLink(u)).map(u => ({ id: u.id, title: u.name || u.email, detail: u.roles.map(r => roleNames[r] ?? r).join(' · '), tone: 'warn' as Tone, href: `#/personal?cuenta=sin_ficha&vincular=${u.id}`, action: 'Vincular' })),
   }],
   figures: ({ d }) => [
     fig('cuentas-activas', 'Cuentas activas', d.users, u => u.filter(x => x.state === 'activo').length, { href: '#/personal?cuenta=con' }),
