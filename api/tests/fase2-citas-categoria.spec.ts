@@ -207,4 +207,34 @@ describe('Fase 2 · solicitud de cita por categoría', () => {
     expect(confirmed.status).toBe(201);
     expect(confirmed.body.state).toBe('confirmada');
   });
+
+  test('la cita creada desde la solicitud lleva sus categorías en citas, agenda del médico y fila; la agendada directo no', async () => {
+    const created = (await request({ categories: ['corazon', 'digestivo'] })).body;
+    const slot = slotAt('2026-11-17T19:00:00.000Z');
+    const assigned = (await t.call('REC', 'POST', `/citas/solicitudes-categoria/${created.id}/asignar`, { version: 1, doctorId, ...slot })).body;
+    const direct = await t.appointment(patientId, new Date('2026-11-17T20:00:00.000Z'));
+    const expected = [{ code: 'corazon', name: expect.any(String), icon: 'corazon' }, { code: 'digestivo', name: expect.any(String), icon: 'digestivo' }];
+    for (const role of ['REC', 'PAC', 'MED']) {
+      const list = (await t.call(role, 'GET', '/citas?from=2026-11-17&to=2026-11-17')).body as any[];
+      expect(list.find(c => c.id === assigned.appointmentId).categories).toEqual(expected);
+      expect(list.find(c => c.id === direct).categories).toEqual([]);
+    }
+    const agenda = (await t.call('MED', 'GET', '/consultas/agenda')).body as any[];
+    expect(agenda.find(a => a.appointmentId === assigned.appointmentId).categories).toEqual(expected);
+    expect(agenda.find(a => a.appointmentId === direct).categories).toEqual([]);
+
+    // A number issued for the appointment carries its categories; a walk-in number carries none.
+    const linked = await t.one(`INSERT INTO atencion.ticket_fila(servicio,fecha,numero,paciente_id,cita_id) VALUES('consulta_general','2026-11-17',951,$1,$2) RETURNING id`, [patientId, assigned.appointmentId]);
+    const walkIn = await t.one(`INSERT INTO atencion.ticket_fila(servicio,fecha,numero,paciente_id) VALUES('emergencia','2026-11-17',952,$1) RETURNING id`, [patientId]);
+    const queue = (await t.call('REC', 'GET', '/fila?date=2026-11-17')).body as any[];
+    expect(queue.find(q => q.id === linked.id).categories).toEqual(expected);
+    expect(queue.find(q => q.id === walkIn.id).categories).toEqual([]);
+
+    // A rescheduled appointment keeps the categories of the one the request created.
+    await t.pg.query("UPDATE atencion.cita SET estado='reprogramada' WHERE id=$1", [assigned.appointmentId]);
+    const moved = await t.one(`INSERT INTO atencion.cita(paciente_id,medico_id,horario,estado,origen,reprogramada_de,reprogramaciones)
+      VALUES($1,$2,tstzrange('2026-11-17T21:00:00Z','2026-11-17T21:20:00Z','[)'),'confirmada','paciente',$3,1) RETURNING id`, [patientId, doctorId, assigned.appointmentId]);
+    const after = (await t.call('REC', 'GET', '/citas?from=2026-11-17&to=2026-11-17')).body as any[];
+    expect(after.find(c => c.id === moved.id).categories).toEqual(expected);
+  });
 });

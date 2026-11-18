@@ -18,6 +18,8 @@ data class PatientAppointment(
     val cancelableUntil: String? = null,
     val rescheduledToId: String? = null,
     val reschedule: RescheduleRequest? = null,
+    /** Categories the patient picked when asking by reason; empty when reception booked it directly. */
+    val categories: List<CategoryRef> = emptyList(),
 ) {
     fun allows(action: AppointmentAction) = action in allowedActions
     fun blockedReason(action: AppointmentAction) = blockedActions[action]
@@ -68,6 +70,7 @@ object PatientAppointmentRules {
                 cancelableUntil = ServerActions.text(row, "cancelableUntil"),
                 rescheduledToId = ServerActions.text(row, "rescheduledToId"),
                 reschedule = ServerActions.reschedule(row),
+                categories = CategoryRequestRules.refs(row),
             )
         } }
     }

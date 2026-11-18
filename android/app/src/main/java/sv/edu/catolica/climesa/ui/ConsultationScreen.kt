@@ -153,6 +153,7 @@ private fun MedicalAppointmentCard(item: MedicalAppointment, onOpen: () -> Unit)
         leadingIcon = if (item.consultationState == "firmada") Icons.Default.CheckCircle else Icons.Default.EditNote,
         status = { ClinicalStatusTag(item.consultationState ?: StatusCatalogClinico.NOT_STARTED) },
         onClick = onOpen,
+        titleTrailing = if (item.categories.isEmpty()) null else ({ CategoryMarks(item.categories) }),
     )
 }
 

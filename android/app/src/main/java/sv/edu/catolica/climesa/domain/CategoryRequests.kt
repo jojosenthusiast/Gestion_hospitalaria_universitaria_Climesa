@@ -16,6 +16,9 @@ data class AppointmentCategory(val code: String, val name: String, val descripti
 
 data class CategoryRef(val code: String, val name: String, val icon: String)
 
+/** Soft tone of a category mark; the UI maps each one to a pair of existing theme tokens (strong icon, soft background). */
+enum class CategoryTone { SLATE, AMBER, MAGENTA, RED, ORANGE, BLUE, TEAL, PURPLE, INDIGO, GREEN, CYAN }
+
 data class AssignedAppointment(val id: String, val doctorName: String, val start: String, val end: String)
 
 /** Row of `GET /citas/solicitudes-categoria`; the actions come from the server (`allowedActions`). */
@@ -69,10 +72,32 @@ object CategoryRequestRules {
         AppointmentCategory(it.optString("code"), it.optString("name"), it.optString("description"), it.optString("icon"), it.optJSONArray("specialties").strings(), it.optString("keywords"))
     }
 
+    /**
+     * `categories` of an appointment, agenda entry or request row (`CategoryRefResponse[]`). Defensive: a missing field,
+     * `null`, a non-array value or entries without a code give no categories, so older servers show no marks.
+     */
+    fun refs(row: JSONObject): List<CategoryRef> = (row.opt("categories") as? JSONArray).objects()
+        .mapNotNull { item -> item.text("code")?.let { CategoryRef(it, item.text("name") ?: it, item.optString("icon")) } }
+
+    /** Same palette as the web (`components/category.tsx`); unknown icons are slate. */
+    fun tone(icon: String): CategoryTone = when (icon) {
+        "nino", "piel" -> CategoryTone.AMBER
+        "mujer" -> CategoryTone.MAGENTA
+        "corazon" -> CategoryTone.RED
+        "hueso", "alergia" -> CategoryTone.ORANGE
+        "ojo" -> CategoryTone.BLUE
+        "oido" -> CategoryTone.TEAL
+        "mente" -> CategoryTone.PURPLE
+        "neuro" -> CategoryTone.INDIGO
+        "digestivo" -> CategoryTone.GREEN
+        "rinon" -> CategoryTone.CYAN
+        else -> CategoryTone.SLATE
+    }
+
     fun requests(value: Any): List<CategoryRequest> = (value as? JSONArray).objects().map { row ->
         CategoryRequest(
             row.optString("id"), row.text("patientName") ?: "Paciente", row.text("record"),
-            row.optJSONArray("categories").objects().map { CategoryRef(it.optString("code"), it.optString("name"), it.optString("icon")) },
+            refs(row),
             row.optJSONArray("specialties").strings(), RequestFranja.of(row.optString("franja")), row.text("note"),
             row.text("preferredDoctorId"), row.text("preferredDoctorName"), row.optString("state"), row.text("rejectionReason"),
             row.optJSONObject("appointment")?.let { AssignedAppointment(it.optString("id"), it.optString("doctorName"), it.optString("start"), it.optString("end")) },

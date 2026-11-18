@@ -3,6 +3,7 @@ import { ESTADO_ADMISION, ESTADO_CITA, ESTADO_REPROGRAMACION, ESTADO_CONSULTA, E
 import { QUEUE_SERVICES } from './queue.dto';
 import { APPOINTMENT_ACTIONS, QUEUE_ACTIONS, QUEUE_PRIORITIES, QUEUE_UNDO_ACTIONS } from './attention.rules';
 import { AREA_FILA } from './queue-areas';
+import { CategoryRefResponse } from './appointment-request.responses';
 
 export const MOTIVO_SIGUIENTE = ['emergencia', 'urgente', 'cita', 'llegada'] as const;
 
@@ -97,6 +98,7 @@ export class AppointmentResponse {
   @StrProp({ nullable: true, description: 'Opción rápida con la que el paciente canceló (D-8): ya_no_lo_necesito, no_puedo_a_esa_hora u otro' }) cancelReasonCode!: string | null;
   @StrProp({ nullable: true, description: 'Motivo escrito de la cancelación' }) cancelReason!: string | null;
   @ClassProp(AppointmentArrivalResponse, { nullable: true, description: 'Número de fila con el que Recepción registró la llegada (D-1)' }) arrival!: AppointmentArrivalResponse | null;
+  @ClassArrayProp(CategoryRefResponse, { optional: true, description: 'Categorías que el paciente eligió al pedir la cita por motivo (vacío si recepción la agendó directo)' }) categories?: CategoryRefResponse[];
   @EnumArrayProp(APPOINTMENT_ACTIONS, 'AccionCita', { description: 'Acciones que el servidor acepta ahora para quien lee' }) allowedActions!: string[];
   @ClassArrayProp(BlockedAppointmentActionResponse, { description: 'Acciones del rol bloqueadas ahora, con su motivo' }) blockedActions!: BlockedAppointmentActionResponse[];
 }
@@ -130,6 +132,7 @@ export class AgendaEntryResponse {
   @IntProp({ nullable: true, description: 'Versión de la consulta; null si no se ha iniciado' }) version!: number | null;
   @DateTimeProp({ nullable: true }) startedAt!: string | null;
   @DateTimeProp({ nullable: true }) signedAt!: string | null;
+  @ClassArrayProp(CategoryRefResponse, { optional: true, description: 'Categorías que el paciente eligió al pedir la cita por motivo (vacío si recepción la agendó directo)' }) categories?: CategoryRefResponse[];
   @EnumArrayProp(APPOINTMENT_ACTIONS, 'AccionCita', { description: 'iniciar_consulta solo el día de la cita y sin consulta previa' }) allowedActions!: string[];
   @ClassArrayProp(BlockedAppointmentActionResponse) blockedActions!: BlockedAppointmentActionResponse[];
 }
@@ -383,6 +386,7 @@ export class QueueTicketResponse {
   @UuidProp({ nullable: true, description: 'Médico de esa cita (B-4)' }) appointmentDoctorId!: string | null;
   @StrProp({ nullable: true, description: 'Nombre del médico de esa cita (B-4)' }) appointmentDoctorName!: string | null;
   @BoolProp({ description: 'true si el número se emitió al registrar la llegada de la cita (D-1)' }) arrivalFromAppointment!: boolean;
+  @ClassArrayProp(CategoryRefResponse, { optional: true, description: 'Categorías de la cita del número cuando nació de una solicitud por motivo; vacío sin cita o si recepción la agendó directo' }) categories?: CategoryRefResponse[];
   @DateTimeProp({ nullable: true, description: 'Hasta cuándo quien lo emitió puede anularlo (B-3); null para los demás o si ya no espera' }) voidableUntil!: string | null;
   @EnumArrayProp(QUEUE_UNDO_ACTIONS, 'DeshacerFila', { description: 'Acciones reversibles que el servidor acepta ahora' }) undoActions!: string[];
   @UuidProp({ nullable: true, description: 'Consulta iniciada desde este número por quien consulta la fila; null si no hay o es de otro profesional' }) consultationId!: string | null;

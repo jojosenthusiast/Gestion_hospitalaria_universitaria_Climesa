@@ -19,6 +19,8 @@ data class MedicalAppointment(
     /** `allowedActions` / `blockedActions` of the agenda entry: `iniciar_consulta` only on the appointment's day. */
     val allowedActions: List<AppointmentAction> = emptyList(),
     val blockedActions: Map<AppointmentAction, String> = emptyMap(),
+    /** Categories of the request by reason the appointment came from; empty when booked directly or opened from the queue. */
+    val categories: List<CategoryRef> = emptyList(),
 ) {
     /** A new consultation can be started from this appointment only when the API offers it. */
     val canStart: Boolean get() = consultationId == null && AppointmentAction.START_CONSULTATION in allowedActions
@@ -106,6 +108,7 @@ object ConsultationResume {
                 row.optString("appointmentId"), row.optString("patientId"), row.text("patientName").orEmpty(), row.optString("start"), row.optString("end"), row.optString("appointmentState"),
                 row.text("reason"), row.text("consultationId"), row.text("consultationState"), row.text("consultationReason"), row.text("physicalExam"), row.text("plan"), row.optInt("version", 1),
                 allowedActions = ServerActions.appointmentAllowed(row), blockedActions = ServerActions.appointmentBlocked(row),
+                categories = CategoryRequestRules.refs(row),
             )
         } }
     }

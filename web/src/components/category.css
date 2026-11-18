@@ -1,0 +1,4 @@
+/* Marca discreta de la categoría de la cita: fondo suave del tono de identidad y el ícono en su color. */
+.cat-badges { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; margin-inline-start: 6px; }
+.cat-badge { display: inline-grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 50%; background: var(--id-bg); color: var(--id-fg); }
+.cat-badge > span { display: inline-grid; place-items: center; }

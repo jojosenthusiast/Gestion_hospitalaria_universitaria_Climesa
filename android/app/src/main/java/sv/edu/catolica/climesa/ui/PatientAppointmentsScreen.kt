@@ -139,6 +139,7 @@ private fun NextAppointmentCard(appointment: PatientAppointment, onCancel: () ->
         Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start)), style = MaterialTheme.typography.titleLarge)
         Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end), style = MaterialTheme.typography.headlineSmall)
         Text(appointment.doctorName.ifBlank { "Médico asignado" }, style = MaterialTheme.typography.bodyLarge)
+        CategoryMarks(appointment.categories, showNames = true)
         appointment.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2) }
         AppointmentDetails(appointment, onCancel, onReschedule)
     }
@@ -149,6 +150,7 @@ private fun AppointmentCard(appointment: PatientAppointment, onCancel: () -> Uni
     // R3 A-41: one compact block per appointment (when, who, why) with its state on the right; no labels in capitals.
     SectionCard(appointment.doctorName.ifBlank { "Médico asignado" }, action = { PatientAppointmentTag(appointment.state) }) {
         Text("${sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayKey(appointment.start))} · ${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(appointment.start, appointment.end)}", style = MaterialTheme.typography.bodyLarge)
+        CategoryMarks(appointment.categories, showNames = true)
         appointment.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
         AppointmentDetails(appointment, onCancel, onReschedule)
     }

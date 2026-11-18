@@ -1,3 +1,4 @@
+import { appointmentCategoriesSql } from './appointment-categories';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { Actor, contextsOf } from '../platform/actor';
@@ -104,6 +105,7 @@ export class QueueService {
       t.prioridad AS priority,
       CASE WHEN t.estado='en_espera' THEN (SELECT count(*) FROM atencion.ticket_fila w WHERE w.servicio=t.servicio AND w.fecha=t.fecha AND w.estado='en_espera' AND w.numero<t.numero)::int END AS ahead,
       ap.start AS "appointmentAt",ap.id AS "appointmentId",ap.doctor_id AS "appointmentDoctorId",ap.doctor_name AS "appointmentDoctorName",
+      ${appointmentCategoriesSql('ap.id')} AS categories,
       (t.cita_id IS NOT NULL) AS "arrivalFromAppointment",(t.emitido_por IS NOT DISTINCT FROM $6::uuid) AS "issuedByMe",
       k.id AS "consultationId",k.estado AS "consultationState",coalesce(t.llamado_por=$4::uuid,false) AS "calledByMe",
       (t.llamado_por IS NOT NULL AND t.llamado_por IS DISTINCT FROM $4::uuid AND EXISTS(SELECT 1 FROM acceso.usuario u

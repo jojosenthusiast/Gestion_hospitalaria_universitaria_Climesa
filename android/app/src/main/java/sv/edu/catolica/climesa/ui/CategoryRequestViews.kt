@@ -40,7 +40,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -48,7 +55,9 @@ import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AppointmentAgenda
 import sv.edu.catolica.climesa.domain.AppointmentDoctor
 import sv.edu.catolica.climesa.domain.CategoryRequest
+import sv.edu.catolica.climesa.domain.CategoryRef
 import sv.edu.catolica.climesa.domain.CategoryRequestRules
+import sv.edu.catolica.climesa.domain.CategoryTone
 import sv.edu.catolica.climesa.domain.RequestFranja
 import sv.edu.catolica.climesa.domain.matchesQuery
 
@@ -69,6 +78,45 @@ internal fun categoryIcon(key: String): ImageVector = when (key) {
     "alergia" -> Icons.Default.Air
     "cirugia" -> Icons.Default.Healing
     else -> Icons.Default.MedicalServices
+}
+
+/** Strong (icon) and soft (background) colours of a category tone, taken from the existing theme tokens. */
+@Composable
+internal fun categoryColors(tone: CategoryTone): Pair<Color, Color> {
+    val c = MaterialTheme.climesa
+    val s = MaterialTheme.system
+    return when (tone) {
+        CategoryTone.SLATE -> c.blocked to c.blockedSoft
+        CategoryTone.AMBER, CategoryTone.ORANGE -> c.warning to c.warningSoft
+        CategoryTone.MAGENTA -> s.areaEmg to s.areaEmgSoft
+        CategoryTone.RED -> c.danger to c.dangerSoft
+        CategoryTone.BLUE -> c.process to c.processSoft
+        CategoryTone.TEAL -> s.areaCon to s.areaConSoft
+        CategoryTone.PURPLE -> c.reserved to c.reservedSoft
+        CategoryTone.INDIGO -> s.areaLab to s.areaLabSoft
+        CategoryTone.GREEN -> c.success to c.successSoft
+        CategoryTone.CYAN -> s.areaHos to s.areaHosSoft
+    }
+}
+
+/**
+ * Quiet body-part marks of an appointment that came from a request by reason, next to the patient's name. Each mark
+ * carries the category name as its content description, so colour is never the only signal; [showNames] also writes it.
+ * Draws nothing when the appointment has no categories (booked directly by reception).
+ */
+@Composable
+internal fun CategoryMarks(categories: List<CategoryRef>, modifier: Modifier = Modifier, showNames: Boolean = false) {
+    if (categories.isEmpty()) return
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        categories.forEach { category ->
+            val (strong, soft) = categoryColors(CategoryRequestRules.tone(category.icon))
+            Row(Modifier.clip(CircleShape).background(soft).padding(horizontal = if (showNames) 8.dp else 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(categoryIcon(category.icon), contentDescription = if (showNames) null else category.name, Modifier.size(14.dp), tint = strong)
+                if (showNames) Text(category.name, style = MaterialTheme.typography.labelSmall, color = strong)
+            }
+        }
+    }
 }
 
 /** A1: the web pairs (pendiente waits, asignada is called, rechazada and cancelada are closed) through the shared table. */

@@ -23704,6 +23704,25 @@
           "state"
         ]
       },
+      "CategoryRefResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "icon"
+        ]
+      },
       "AccionCita": {
         "type": "string",
         "enum": [
@@ -23840,6 +23859,13 @@
                 "$ref": "#/components/schemas/AppointmentArrivalResponse"
               }
             ]
+          },
+          "categories": {
+            "description": "Categorías que el paciente eligió al pedir la cita por motivo (vacío si recepción la agendó directo)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryRefResponse"
+            }
           },
           "allowedActions": {
             "type": "array",
@@ -24186,6 +24212,13 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "categories": {
+            "description": "Categorías que el paciente eligió al pedir la cita por motivo (vacío si recepción la agendó directo)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryRefResponse"
+            }
           },
           "allowedActions": {
             "type": "array",
@@ -24721,6 +24754,13 @@
           "arrivalFromAppointment": {
             "type": "boolean",
             "description": "true si el número se emitió al registrar la llegada de la cita (D-1)"
+          },
+          "categories": {
+            "description": "Categorías de la cita del número cuando nació de una solicitud por motivo; vacío sin cita o si recepción la agendó directo",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryRefResponse"
+            }
           },
           "voidableUntil": {
             "type": "string",
@@ -26398,25 +26438,6 @@
           "icon",
           "specialties",
           "keywords"
-        ]
-      },
-      "CategoryRefResponse": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "icon": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "name",
-          "icon"
         ]
       },
       "FranjaSolicitudCita": {
