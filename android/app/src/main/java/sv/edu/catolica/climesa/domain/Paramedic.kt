@@ -70,6 +70,12 @@ object ParamedicRules {
         else -> "Avisa a Jefatura de Operaciones."
     }
 
+    /**
+     * Whether the paramedic screen shows the unit's dispatch block. `en_servicio` only means the unit is busy with the
+     * service shown right below, so the crew does not get a "the unit cannot leave" warning while running it.
+     */
+    fun showsDispatchBlock(code: String): Boolean = code != "en_servicio"
+
     /** Secciones que resuelve la pantalla del paramédico; la unidad solo cuando el rol opera la ambulancia. */
     fun handles(section: AndroidSection, permissions: Collection<String>) = when (section) {
         AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT -> true
