@@ -138,7 +138,9 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
                 // Without a proposal the panel would keep saying "Calculando…": it shows why instead.
                 if (nextService != null && mutable.value.next == null) mutable.value = mutable.value.copy(nextLoading = false, nextError = userMessage(e, "No se pudo calcular quién pasa después."))
                 else mutable.value = mutable.value.copy(nextLoading = false)
-                if (!silent) mutable.value = mutable.value.copy(loading = false, error = message(e))
+                // A silent reload (area chosen, realtime event) may have cancelled the first load: with nothing on screen yet, its
+                // failure must still end "Cargando…" and say why, or the board spins forever.
+                if (!silent || mutable.value.loading) mutable.value = mutable.value.copy(loading = false, error = message(e))
             }
         }
     }
