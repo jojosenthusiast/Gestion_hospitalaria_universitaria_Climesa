@@ -27117,6 +27117,11 @@
             "items": {
               "$ref": "#/components/schemas/AccionExternaLaboratorio"
             }
+          },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo de la cancelación; null si la orden no está cancelada"
           }
         },
         "required": [
@@ -27143,7 +27148,8 @@
           "external",
           "externalPlace",
           "externalInstructions",
-          "externalActions"
+          "externalActions",
+          "cancellationReason"
         ]
       },
       "LabResultHistoryResponse": {
@@ -27390,7 +27396,8 @@
           },
           "cancellationReason": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Motivo de la cancelación; null si la orden no está cancelada"
           },
           "history": {
             "description": "Vacío para quien no ve valores",

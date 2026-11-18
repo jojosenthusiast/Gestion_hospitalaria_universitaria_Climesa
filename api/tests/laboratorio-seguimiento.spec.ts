@@ -82,6 +82,7 @@ describe('Laboratorio · seguimiento, orden externa y cita propuesta (S10)', () 
       expect((await inbox()).some(p => p.orderId === o.id)).toBe(false);
       const rows = await t.pg.query<{ estado: string }>('SELECT estado FROM laboratorio.pendiente_medico WHERE orden_id=$1', [o.id]);
       expect(rows.rows.map(r => r.estado)).toEqual(['revisado']);
+      expect((await listed('MED', o.id)).cancellationReason).toBe('Muestra hemolizada; se repite en otra orden.');
     });
 
     test('una observación relevante sin valor crítico crea el pendiente y avisa al médico sin aviso crítico', async () => {

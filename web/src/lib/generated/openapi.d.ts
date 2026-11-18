@@ -5155,6 +5155,8 @@ export interface components {
             patientNote?: string | null;
             /** @description S10: acciones del camino externo que el servidor acepta ahora para quien lee */
             externalActions: components["schemas"]["AccionExternaLaboratorio"][];
+            /** @description Motivo de la cancelación; null si la orden no está cancelada */
+            cancellationReason: string | null;
         };
         LabResultHistoryResponse: {
             /** Format: uuid */
@@ -5236,6 +5238,7 @@ export interface components {
             patientNote?: string | null;
             /** @description S10: acciones del camino externo que el servidor acepta ahora para quien lee */
             externalActions: components["schemas"]["AccionExternaLaboratorio"][];
+            /** @description Motivo de la cancelación; null si la orden no está cancelada */
             cancellationReason: string | null;
             /** @description Vacío para quien no ve valores */
             history: components["schemas"]["LabResultHistoryResponse"][];
