@@ -11,7 +11,7 @@ Cada pantalla trae: para quién es, qué muestra, qué se puede hacer, qué camb
 | Plataforma | Pantallas | Exigidas (R) | Extra (E) |
 |---|---|---|---|
 | Web | 52 | 31 | 21 |
-| Android | 42 | 35 | 7 |
+| Android | 43 | 36 | 7 |
 | iOS | 20 | 17 | 3 |
 
 ## Estados que toda pantalla debe diseñar
@@ -893,6 +893,16 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **Privacidad:** Solo la cuenta propia; nada económico a clínicos
 - **Spec:** 006
 
+### A15 · Mi habitación (R)
+
+- **Para:** PAC
+- **Propósito:** Saber dónde estoy hospitalizado
+- **Muestra:** Cama, categoría, aislamiento, médico tratante y estado de la admisión activa (lee /admisiones)
+- **Acciones:** Ninguna
+- **En vivo:** En vivo
+- **Privacidad:** Solo la admisión propia
+- **Spec:** 108
+
 ## iOS
 
 ### I01 · Ingreso (R)
@@ -1087,4 +1097,4 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 | Laboratorista | W01, W04, W20, W21, W22, W23, W25, W35, W36 | no usa | no usa |
 | Paramédico | no usa | A01, A10, A12, A26, A70, A71, A72, A73, A74 | no usa |
 | Delegado de protección de datos | W01, W04, W19, W25, W32, W33, W35, W36 | no usa | no usa |
-| Paciente | no usa | A01, A02, A03, A04, A05, A06, A07, A08, A09, A10, A11, A12, A13 | I01, I02, I03, I04, I05, I06, I07, I08, I09, I10, I11, I12, I13 |
+| Paciente | no usa | A01, A02, A03, A04, A05, A06, A07, A08, A09, A10, A11, A12, A13, A15 | I01, I02, I03, I04, I05, I06, I07, I08, I09, I10, I11, I12, I13 |

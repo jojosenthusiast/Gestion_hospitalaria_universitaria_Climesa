@@ -133,6 +133,11 @@ public struct LabExam: Decodable, Sendable, Identifiable, Equatable {
     public let name: String
     public let isPanel: Bool
     public let unit: String?
+    /// `numerico` or `texto` (`TipoResultadoLaboratorio`); optional so an older answer still decodes as numeric.
+    public let resultType: String?
+
+    /// The value is a number unless the catalog says `texto` (same rule as the web `RegisterExternalResultDialog`).
+    public var numeric: Bool { resultType != "texto" }
 }
 
 /// `LabOrderCreatedResponse` de `POST /laboratorio/ordenes`.
@@ -386,5 +391,7 @@ public struct PrehospitalView: Decodable, Sendable, Equatable {
 /// the consultation detail, so it decodes as `ConsultationDetail.VitalSigns` (extra fields are ignored).
 public struct PatientVitalsHistory: Decodable, Sendable, Equatable {
     public let patientId: String
+    /// Active admission of the patient: a take recorded from the record is linked to it (D5).
+    public let admissionId: String?
     public let items: [ConsultationDetail.VitalSigns]
 }

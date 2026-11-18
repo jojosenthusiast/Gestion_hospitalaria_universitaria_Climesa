@@ -269,3 +269,87 @@ public enum LabWorkGroup: String, Sendable, CaseIterable {
             .filter { !$0.orders.isEmpty }
     }
 }
+
+// MARK: - D4 · external result without an order (doctor's patient record)
+
+/// D4 (R7 C-5, D-5): the patient brings an exam done elsewhere that nobody ordered here. The doctor with a care
+/// relationship records it from the record with `POST /laboratorio/pacientes/{id}/resultado-externo`
+/// (`LabExternalRecordDto`, permission `laboratorio.ordenar`); the file goes up next, as in `ExternalResultFlow`.
+/// Same bounds as the API, the web and Android (`ExternalRecordRules`); the API stays the guarantee.
+public enum ExternalRecordRules {
+    public static let permission = "laboratorio.ordenar"
+    public static let placeMinimum = 3
+    public static let placeMaximum = 200
+    public static let examMaximum = 50
+    public static let textMaximum = 5000
+
+    public static func path(_ patientId: String) -> String { "/laboratorio/pacientes/\(patientId)/resultado-externo" }
+
+    /// Rule 8: the action depends on the permission, never on the role.
+    public static func canRecord(_ profile: AccessProfile?) -> Bool { profile?.hasPermission(permission) ?? false }
+
+    /// A finite number, with the decimal comma people type in El Salvador ("nan" and "inf" are not numbers).
+    public static func number(_ value: String) -> Double? {
+        guard let parsed = LabExternalRules.number(value), parsed.isFinite else { return nil }
+        return parsed
+    }
+
+    /// Exams that can still be added: never a panel (the API refuses them), not picked yet, matching [query], by name.
+    public static func options(_ catalog: [LabExam], picked: [LabExam], query: String = "") -> [LabExam] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return catalog
+            .filter { exam in !exam.isPanel && !picked.contains { $0.id == exam.id } }
+            .filter { q.isEmpty || $0.name.lowercased().contains(q) || $0.code.lowercased().contains(q) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// First blocking problem of the form, or nil when it can be sent.
+    public static func error(place: String, exams: [LabExam], values: [String: String], file: LabExternalFile?, note: String) -> String? {
+        let spot = place.trimmingCharacters(in: .whitespacesAndNewlines)
+        if spot.count < placeMinimum { return "Indica dónde se hizo el examen (al menos \(placeMinimum) caracteres)." }
+        if spot.count > placeMaximum { return "El lugar no puede pasar de \(placeMaximum) caracteres." }
+        if exams.isEmpty { return "Agrega al menos un examen." }
+        if exams.count > examMaximum { return "Registra como máximo \(examMaximum) exámenes." }
+        if Set(exams.map(\.id)).count != exams.count { return "Cada examen va una sola vez." }
+        let text: (LabExam) -> String = { (values[$0.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
+        let missing = exams.filter { text($0).isEmpty }.count
+        if missing > 0 { return "Falta el valor de \(missing) examen(es)." }
+        if let exam = exams.first(where: { $0.numeric && number(text($0)) == nil }) { return "El valor de \(exam.name) debe ser un número." }
+        if let exam = exams.first(where: { !$0.numeric && text($0).count > textMaximum }) { return "El valor de \(exam.name) no puede pasar de \(textMaximum) caracteres." }
+        if note.trimmingCharacters(in: .whitespacesAndNewlines).count > LabExternalRules.noteMaximum { return "La nota no puede pasar de \(LabExternalRules.noteMaximum) caracteres." }
+        return LabExternalRules.attachmentError(file)
+    }
+
+    /// `LabExternalRecordDto`: place, file reference, one value per exam (`value` if numeric, `text` otherwise) and the note.
+    public static func body(place: String, file: LabExternalFile, exams: [LabExam], values: [String: String], note: String) -> LabExternalRecordBody {
+        let results = exams.map { exam -> LabExternalRecordValueBody in
+            let raw = (values[exam.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return exam.numeric ? LabExternalRecordValueBody(examId: exam.id, value: number(raw), text: nil) : LabExternalRecordValueBody(examId: exam.id, value: nil, text: raw)
+        }
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return LabExternalRecordBody(place: place.trimmingCharacters(in: .whitespacesAndNewlines), attachment: file.reference, results: results, note: trimmed.isEmpty ? nil : trimmed)
+    }
+}
+
+/// `LabExternalRecordValueDto`: an exam of the catalog with `value` (numeric) or `text`.
+public struct LabExternalRecordValueBody: Encodable, Sendable, Equatable {
+    public let examId: String
+    public let value: Double?
+    public let text: String?
+}
+
+/// `LabExternalRecordDto` of `POST /laboratorio/pacientes/{id}/resultado-externo`.
+public struct LabExternalRecordBody: Encodable, Sendable, Equatable {
+    public let place: String
+    public let attachment: LabAttachmentReferenceBody
+    public let results: [LabExternalRecordValueBody]
+    public let note: String?
+}
+
+/// `LabExternalRecordResponse`: the completed order, the attachment that receives the file next and the consultation.
+public struct LabExternalRecordSaved: Decodable, Sendable, Equatable {
+    public let id: String
+    public let version: Int
+    public let attachmentId: String?
+    public let consultationId: String?
+}

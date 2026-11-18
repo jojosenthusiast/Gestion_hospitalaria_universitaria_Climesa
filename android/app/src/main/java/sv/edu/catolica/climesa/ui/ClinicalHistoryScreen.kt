@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Bed
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -32,22 +33,33 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AccessProfile
+import sv.edu.catolica.climesa.domain.ExternalRecordRules
 import sv.edu.catolica.climesa.domain.HistoryConsultation
 import sv.edu.catolica.climesa.domain.LaboratoryLabels
 import sv.edu.catolica.climesa.domain.LaboratoryOrder
+import sv.edu.catolica.climesa.ui.lab.ExternalRecordDialog
+import sv.edu.catolica.climesa.ui.lab.ExternalRecordViewModel
 
 /**
  * A08 (own history, [own] = true) and A22 (clinician record). The patient needs a linked account (RN-39); the clinician
  * searches a patient and the API applies the care relationship.
  */
 @Composable
-fun ClinicalHistoryScreen(profile: AccessProfile, own: Boolean, modifier: Modifier = Modifier, model: ClinicalHistoryViewModel = viewModel()) {
+fun ClinicalHistoryScreen(
+    profile: AccessProfile, own: Boolean, modifier: Modifier = Modifier, model: ClinicalHistoryViewModel = viewModel(),
+    external: ExternalRecordViewModel = viewModel(),
+) {
     val state by model.state.collectAsStateWithLifecycle()
+    val externalState by external.state.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val patientId = if (own) profile.patientId else selectedId
-    LaunchedEffect(patientId) { if (patientId != null) model.open(patientId) else model.close() }
+    LaunchedEffect(patientId) { external.dismissNotice(); if (patientId != null) model.open(patientId) else model.close() }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
+    // D4: a recorded external result shows up in the laboratory list right away.
+    LaunchedEffect(externalState.saved) { if (externalState.saved > 0) patientId?.let { model.open(it, silent = true) } }
+    val canRecordExternal = !own && ExternalRecordRules.canRecord(profile.permissions)
+    if (canRecordExternal && patientId != null) state.history?.let { ExternalRecordDialog(it.patientName, externalState, external) }
     PageList(modifier) {
         if (own && profile.patientId == null) {
             item { EmptyState(stringResource(R.string.historial_sin_vinculo), icon = Icons.Default.Lock) }
@@ -71,7 +83,10 @@ fun ClinicalHistoryScreen(profile: AccessProfile, own: Boolean, modifier: Modifi
         else state.history?.let { history ->
             if (state.loading) item { RefreshHint() }
             item { SectionCard(history.patientName, eyebrow = stringResource(R.string.historial_expediente, history.record)) {
+                if (canRecordExternal) SecondaryButton(stringResource(R.string.extres_titulo), { patientId?.let(external::open) }, icon = Icons.Default.UploadFile)
             } }
+            externalState.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
+            externalState.uploadFailure?.let { item { NoticeBanner(NoticeKind.WARNING, it) } }
             item { Text(stringResource(R.string.historial_consultas), style = MaterialTheme.typography.titleLarge) }
             if (history.consultations.isEmpty()) item { EmptyState(stringResource(R.string.historial_sin_consultas)) }
             else items(history.consultations, key = { it.id }) { ConsultationHistoryCard(it) }
